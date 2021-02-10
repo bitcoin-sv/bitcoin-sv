@@ -8,10 +8,6 @@
   "time": 11
  },
  {
-  "name": "abc-high_priority_transaction.py",
-  "time": 15
- },
- {
   "name": "abc-mempool-accept-txn.py",
   "time": 5
  },
@@ -166,10 +162,6 @@
  {
   "name": "mempool_limit.py",
   "time": 9
- },
- {
-  "name": "mempool_packages.py",
-  "time": 10
  },
  {
   "name": "mempool_persist.py",

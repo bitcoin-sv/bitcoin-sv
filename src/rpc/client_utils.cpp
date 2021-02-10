@@ -10,19 +10,12 @@
 #include "rpc/http_request.h"
 #include "rpc/http_response.h"
 #include "util.h"
-#include "support/events.h"
 #include "chainparamsbase.h"
 #include "utilstrencodings.h"
 #include "clientversion.h"
-
-#include <cstdint>
 #include <set>
-
-#include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <univalue.h>
-
 #include <event2/buffer.h>
-#include <event2/keyvalq_struct.h>
 
 class CRPCConvertParam {
 public:

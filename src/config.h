@@ -45,23 +45,21 @@ public:
     virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
 
-    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
-    virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 
-    virtual bool SetMinConsolidationFactor(uint64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConsolidationFactor() const = 0;
 
-    virtual bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
 
-    virtual bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMinConsolidationInputMaturity() const = 0;
+    virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMinConfConsolidationInput() const = 0;
 
-    virtual bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
 
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
@@ -76,17 +74,11 @@ public:
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
 
-    virtual void SetLimitAncestorSize(uint64_t limitAncestorSize) = 0;
-    virtual uint64_t GetLimitAncestorSize() const = 0;
-
-    virtual void SetLimitDescendantSize(uint64_t limitDescendantSize) = 0;
-    virtual uint64_t GetLimitDescendantSize() const = 0;
-
-    virtual void SetLimitAncestorCount(uint64_t limitAncestorCount) = 0;
+    virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
 
-    virtual void SetLimitDescendantCount(uint64_t limitDescendantCount) = 0;
-    virtual uint64_t GetLimitDescendantCount() const = 0;
+    virtual bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
 
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
@@ -98,8 +90,8 @@ public:
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
 
-    virtual bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetGenesisActivationHeight() const = 0;
+    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual int32_t GetGenesisActivationHeight() const = 0;
 
     virtual bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -147,6 +139,12 @@ public:
     virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
 
+    virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
+    virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
+
+    virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
+    virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
+
     virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
     virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
@@ -163,17 +161,20 @@ public:
     virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
 
+    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
+    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
+
+    virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
+    virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
+
     virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
-
-    virtual bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) = 0;
-    virtual uint64_t GetLimitFreeRelay() const = 0;
 
     virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
 
-    virtual bool SetStopAtHeight(int64_t StopAtHeight, std::string* err) = 0;
-    virtual uint64_t GetStopAtHeight() const = 0;
+    virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
+    virtual int32_t GetStopAtHeight() const = 0;
 
     virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
     virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
@@ -189,10 +190,23 @@ public:
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
 
+    // P2P parameters
+    virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual int64_t GetP2PHandshakeTimeout() const = 0;
+
+    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
+    virtual bool GetDisableBIP30Checks() const = 0;
+
 #if ENABLE_ZMQ
     virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
 #endif
+
+    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
+    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
+    virtual unsigned int GetMaxProtocolRecvPayloadLength() const = 0;
+    virtual unsigned int GetMaxProtocolSendPayloadLength() const = 0;
+    virtual unsigned int GetRecvInvQueueFactor() const = 0;
 
 protected:
     ~Config() = default;
@@ -216,23 +230,21 @@ public:
     bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override;
     int64_t GetBlockSizeActivationTime() const override;
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
-    uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
 
-    bool SetMinConsolidationFactor(uint64_t value, std::string* err = nullptr) override;
+    bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMinConsolidationFactor() const  override;
 
-    bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) override;
+    bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMaxConsolidationInputScriptSize() const  override;
 
-    bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override;
-    uint64_t GetMinConsolidationInputMaturity() const  override;
+    bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) override;
+    uint64_t GetMinConfConsolidationInput() const override;
 
-    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override;
+    bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) override;
     bool GetAcceptNonStdConsolidationInput() const  override;
 
     void SetMinFeePerKB(CFeeRate amt) override;
@@ -247,18 +259,12 @@ public:
     void SetDataCarrierSize(uint64_t dataCarrierSize) override;
     uint64_t GetDataCarrierSize() const override;
 
-    void SetLimitAncestorSize(uint64_t limitAncestorSize) override;
-    uint64_t GetLimitAncestorSize() const override;
-
-    void SetLimitDescendantSize(uint64_t limitDescendantSize) override;
-    uint64_t GetLimitDescendantSize() const override;
-
-    void SetLimitAncestorCount(uint64_t limitAncestorCount) override;
+    bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) override;
     uint64_t GetLimitAncestorCount() const override;
 
-    void SetLimitDescendantCount(uint64_t limitDescendantCount) override;
-    uint64_t GetLimitDescendantCount() const override;
-
+    bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) override;
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
+    
     void SetTestBlockCandidateValidity(bool test) override;
     bool GetTestBlockCandidateValidity() const override;
 
@@ -269,8 +275,8 @@ public:
     void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
 
-    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override;
-    uint64_t GetGenesisActivationHeight() const override;
+    bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override;
+    int32_t GetGenesisActivationHeight() const override;
 
     bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -323,6 +329,12 @@ public:
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsViewCacheSize() const override {return mMaxCoinsViewCacheSize;}
 
+    bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) override;
+    uint64_t GetMaxCoinsProviderCacheSize() const override {return mMaxCoinsProviderCacheSize;}
+
+    bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) override;
+    uint64_t GetMaxCoinsDbOpenFiles() const override {return mMaxCoinsDbOpenFiles; }
+
     void SetInvalidBlocks(const std::set<uint256>& hashes) override; 
     const std::set<uint256>& GetInvalidBlocks() const override;
     bool IsBlockInvalidated(const uint256& hash) const override;
@@ -339,17 +351,20 @@ public:
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
     uint64_t GetMaxMempool() const override;
 
+    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override;
+    uint64_t GetMaxMempoolSizeDisk() const override;
+
+    bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) override;
+    uint64_t GetMempoolMaxPercentCPFP() const override;
+
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override;
     uint64_t GetMemPoolExpiry() const override;
-
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override;
-    uint64_t GetLimitFreeRelay() const override;
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
 
-    bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override;
-    uint64_t GetStopAtHeight() const override;
+    bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override;
+    int32_t GetStopAtHeight() const override;
 
     bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override;
     uint64_t GetPromiscuousMempoolFlags() const override;
@@ -365,10 +380,23 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    // P2P parameters
+    bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
+
+    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
+    bool GetDisableBIP30Checks() const override;
+
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override;
     int64_t GetInvalidTxZMQMaxMessageSize() const override;
 #endif
+
+    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override;
+    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override;
+    unsigned int GetMaxProtocolRecvPayloadLength() const override;
+    unsigned int GetMaxProtocolSendPayloadLength() const override;
+    unsigned int GetRecvInvQueueFactor() const override;
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -379,7 +407,6 @@ private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
     CFeeRate blockMinFeePerKB;
-    uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
 
@@ -400,18 +427,16 @@ private:
     uint64_t maxTxSizePolicy;
     uint64_t minConsolidationFactor;
     uint64_t maxConsolidationInputScriptSize;
-    uint64_t minConsolidationInputMaturity;
-    uint64_t acceptNonStdConsolidationInput;
+    uint64_t minConfConsolidationInput;
+    bool acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
-    uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
-    uint64_t limitDescendantSize;
-    uint64_t limitAncestorSize;
+    uint64_t limitSecondaryMempoolAncestorCount;
 
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
 
-    uint64_t genesisActivationHeight;
+    int32_t genesisActivationHeight;
 
     int mMaxConcurrentAsyncTasksPerNode;
 
@@ -438,26 +463,38 @@ private:
     bool mAcceptNonStandardOutput;
 
     uint64_t mMaxCoinsViewCacheSize;
+    uint64_t mMaxCoinsProviderCacheSize;
+
+    uint64_t mMaxCoinsDbOpenFiles;
 
     uint64_t mMaxMempool;
+    uint64_t mMaxMempoolSizeDisk;
+    uint64_t mMempoolMaxPercentCPFP;
     uint64_t mMemPoolExpiry;
-    uint64_t mLimitFreeRelay;
     uint64_t mMaxOrphanTxSize;
-    uint64_t mStopAtHeight;
+    int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
     bool mIsSetPromiscuousMempoolFlags;
 
     std::set<uint256> mInvalidBlocks;
+
     std::set<std::string> mBannedUAClients;
     uint64_t maxMerkleTreeDiskSpace;
     uint64_t preferredMerkleTreeFileSize;
     uint64_t maxMerkleTreeMemoryCacheSize;
 
-    bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
-
     std::set<std::string> invalidTxSinks;
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
+
+    // P2P parameters
+    int64_t p2pHandshakeTimeout;
+    unsigned int maxProtocolRecvPayloadLength;
+    unsigned int maxProtocolSendPayloadLength;
+    unsigned int recvInvQueueFactor;
+
+    std::optional<bool> mDisableBIP30Checks;
+
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
@@ -491,12 +528,6 @@ public:
     }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
-        SetErrorMsg(err);
-        return false;
-    }
-    uint8_t GetBlockPriorityPercentage() const override { return 0; }
-
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
@@ -505,7 +536,7 @@ public:
     }
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
 
-    bool SetMinConsolidationFactor(uint64_t value, std::string* err = nullptr) override
+    bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
         minConsolidationFactor = value;
@@ -513,7 +544,7 @@ public:
     }
     uint64_t GetMinConsolidationFactor() const override { return minConsolidationFactor; }
 
-    bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) override
+    bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
         maxConsolidationInputScriptSize = value;
@@ -521,18 +552,18 @@ public:
     }
     uint64_t GetMaxConsolidationInputScriptSize() const override { return maxConsolidationInputScriptSize; }
 
-    bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override
+    bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        minConsolidationInputMaturity = value;
+        minConfConsolidationInput = value;
         return false;
     }
-    uint64_t GetMinConsolidationInputMaturity() const override { return minConsolidationInputMaturity; }
+    uint64_t GetMinConfConsolidationInput() const override { return minConfConsolidationInput; }
 
-    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override
+    bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        acceptNonStdConsolidationInput = value;
+        acceptNonStdConsolidationInput = flagValue;
         return false;
     }
     bool GetAcceptNonStdConsolidationInput() const override { return acceptNonStdConsolidationInput; }
@@ -552,17 +583,11 @@ public:
     uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override { dataCarrierSize = dataCarrierSizeIn; }
 
-    void SetLimitAncestorSize(uint64_t limitAncestorSize) override {}
-    uint64_t GetLimitAncestorSize() const override { return 0; }
-
-    void SetLimitDescendantSize(uint64_t limitDescendantSize) override {}
-    uint64_t GetLimitDescendantSize() const override { return 0; }
-
-    void SetLimitAncestorCount(uint64_t limitAncestorCount) override {}
+    bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) override {return true;}
     uint64_t GetLimitAncestorCount() const override { return 0; }
 
-    void SetLimitDescendantCount(uint64_t limitDescendantCount) override {}
-    uint64_t GetLimitDescendantCount() const override { return 0; }
+    bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) override {return true;}
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override { return 0; }
 
     void SetTestBlockCandidateValidity(bool skip) override {}
     bool GetTestBlockCandidateValidity() const override { return false; }
@@ -576,8 +601,8 @@ public:
         return mining::CMiningFactory::BlockAssemblerType::JOURNALING;
     }
 
-    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn); return true; }
-    uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
+    bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = genesisActivationHeightIn; return true; }
+    int32_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
 
     bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -696,6 +721,22 @@ public:
     }
     uint64_t GetMaxCoinsViewCacheSize() const override {return 0; /* unlimited */}
 
+    bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return false;
+    }
+    uint64_t GetMaxCoinsProviderCacheSize() const override {return 0; /* unlimited */}
+
+    bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)  override
+    {
+        SetErrorMsg(err);
+
+        return false;
+    }
+    uint64_t GetMaxCoinsDbOpenFiles() const override {return 64; /* old default */}
+
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override
     {
         SetErrorMsg(err);
@@ -703,6 +744,24 @@ public:
         return true;
     }
     uint64_t GetMaxMempool() const override { return DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE; }
+
+    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxMempoolSizeDisk() const override {
+        return DEFAULT_MAX_MEMPOOL_SIZE * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR * ONE_MEGABYTE;
+    }
+
+    bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMempoolMaxPercentCPFP() const override { return DEFAULT_MEMPOOL_MAX_PERCENT_CPFP; }
 
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override
     {
@@ -712,14 +771,6 @@ public:
     }
     uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
 
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override
-    {
-        SetErrorMsg(err);
-
-        return true;
-    }
-    uint64_t GetLimitFreeRelay() const override { return DEFAULT_LIMITFREERELAY * ONE_KILOBYTE; }
-
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
     {
         SetErrorMsg(err);
@@ -728,13 +779,13 @@ public:
     }
     uint64_t GetMaxOrphanTxSize() const override { return COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE; }
 
-    bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override
+    bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override
     {
         SetErrorMsg(err);
 
         return true;
     }
-    uint64_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
+    int32_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
 
     bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override
     {
@@ -770,6 +821,12 @@ public:
         return mBannedUAClients.find(uaClient) != mBannedUAClients.end();
     }
 
+    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override { return true; }
+    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override { return true; }
+    unsigned int GetMaxProtocolRecvPayloadLength() const override { return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH; }
+    unsigned int GetMaxProtocolSendPayloadLength() const override { return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH*MAX_PROTOCOL_SEND_PAYLOAD_FACTOR; }
+    unsigned int GetRecvInvQueueFactor() const override { return DEFAULT_RECV_INV_QUEUE_FACTOR; }
+
     bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) override { return true; };
     std::set<std::string> GetInvalidTxSinks() const override { return {"NONE"}; };
     std::set<std::string> GetAvailableInvalidTxSinks() const override { return {"NONE"}; };
@@ -779,6 +836,10 @@ public:
 
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
+
+    // P2P parameters
+    bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetP2PHandshakeTimeout() const override { return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
@@ -815,14 +876,24 @@ public:
         return 0;
     }
 
+    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    bool GetDisableBIP30Checks() const override
+    {
+        return true;
+    }
+
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
-    uint64_t genesisActivationHeight;
+    int32_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
     uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE };
-    uint64_t minConsolidationInputMaturity { DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY };
+    uint64_t minConfConsolidationInput { DEFAULT_MIN_CONF_CONSOLIDATION_INPUT };
     uint64_t acceptNonStdConsolidationInput { DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;

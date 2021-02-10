@@ -18,18 +18,15 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-#include "invalid_txn_publisher.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
-
 #endif
 
 #include "vmtouch.h"
-
 #include <univalue.h>
-
 #include <cstdint>
 
 /**
@@ -424,8 +421,8 @@ static UniValue createmultisig(const Config &config,
             "\nAs a json rpc call\n" +
             HelpExampleRpc("createmultisig",
                            "2, "
-                           "\"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\","
-                           "\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"");
+                           "[\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\","
+                           "\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\"]");
         throw std::runtime_error(msg);
     }
 
@@ -718,7 +715,150 @@ static UniValue activezmqnotifications(const Config &config, const JSONRPCReques
     }
 #endif
     return obj;
+}
 
+static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
+{
+
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw std::runtime_error(
+            "getsettings\n"
+            "Returns node policy and consensus settings that are used when constructing"
+            " a block or transaction.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"excessiveblocksize\": xxxxx,            (numeric) The maximum block size "
+            "in bytes we will accept from any source\n"
+            "  \"blockmaxsize\": xxxxx,                  (numeric) The maximum block size "
+            "in bytes we will mine\n"
+            "  \"maxtxsizepolicy\": xxxxx,               (numeric) The maximum transaction "
+            "size in bytes we relay and mine\n"
+            "  \"datacarriersize\": xxxxx,               (numeric) The maximum size in bytes "
+            "we consider acceptable for data carrier outputs.\n"
+
+            "  \"maxscriptsizepolicy\": xxxxx,           (numeric) The maximum script size "
+            "in bytes we're willing to relay/mine per script\n"
+            "  \"maxopsperscriptpolicy\": xxxxx,         (numeric) The maximum number of "
+            "non-push operations we're willing to relay/mine per script\n"
+            "  \"maxscriptnumlengthpolicy\": xxxxx,      (numeric) The maximum allowed number "
+            "length in bytes we're willing to relay/mine in scripts\n"
+            "  \"maxpubkeyspermultisigpolicy\": xxxxx,   (numeric) The maximum allowed number "
+            "of public keys we're willing to relay/mine in a single CHECK_MULTISIG(VERIFY) operation\n"
+            "  \"maxtxsigopscountspolicy\": xxxxx,       (numeric) The maximum allowed number "
+            "of signature operations we're willing to relay/mine in a single transaction\n"
+            "  \"maxstackmemoryusagepolicy\": xxxxx,     (numeric) The maximum stack memory "
+            "usage in bytes used for script verification we're willing to relay/mine in a single transaction\n"
+
+            "  \"maxorphantxsize\": xxxxx,               (numeric) The maximum size in bytes of "
+            "unconnectable transactions in memory\n"
+
+            "  \"limitancestorcount\": xxxxx,            (numeric) Do not accept transactions "
+            "if number of in-mempool ancestors is <n> or more.\n"
+            "  \"limitcpfpgroupmemberscount\": xxxxx,    (numeric) Do not accept transactions "
+            "if number of in-mempool low paying ancestors is <n> or more.\n"
+
+            "  \"maxmempool\": xxxxx,                    (numeric) Keep the resident size of "
+            "the transaction memory pool below <n> megabytes.\n"
+            "  \"maxmempoolsizedisk\": xxxxx,            (numeric) Additional amount of mempool "
+            "transactions to keep stored on disk below <n> megabytes.\n"
+            "  \"mempoolmaxpercentcpfp\": xxxxx,         (numeric) Percentage of total mempool "
+            "size (ram+disk) to allow for low paying transactions (0..100).\n"
+
+            "  \"acceptnonstdoutputs\": xxxx,            (boolean) Relay and mine transactions "
+            "that create or consume non-standard output\n"
+            "  \"datacarrier\": xxxx,                    (boolean) Relay and mine data carrier transactions\n"
+            "  \"blockmintxfee\": xxxxx,                 (numeric) Lowest fee rate (in BSV/kB) for "
+            "transactions to be included in block creation\n"
+            "  \"minrelaytxfee\": xxxxx,                 (numeric) Fees (in BSV/kB) smaller "
+            "than this are considered zero fee for relaying, mining and transaction creation\n"
+            "  \"dustrelayfee\": xxxxx,                  (numeric) Fee rate (in BSV/kB) used to defined dust, the value of "
+            "an output such that it will cost about 1/3 of its value in fees at this fee rate to spend it. \n"
+            "  \"maxstdtxvalidationduration\": xxxxx,    (numeric) Time before terminating validation "
+            "of standard transaction in milliseconds\n"
+            "  \"maxnonstdtxvalidationduration\": xxxxx, (numeric) Time before terminating validation "
+            "of non-standard transaction in milliseconds\n"
+
+            "  \"minconsolidationfactor\": xxxxx         (numeric) Minimum ratio between scriptPubKey inputs and outputs, "
+            "0 disables consolidation transactions\n"
+            "  \"maxconsolidationinputscriptsize\": xxxx (numeric) Maximum scriptSig length of input in bytes\n"
+            "  \"minconfconsolidationinput\": xxxxx      (numeric) Minimum number of confirmations for inputs spent\n"
+            "  \"minconsolidationinputmaturity\": xxxxx  (numeric) Minimum number of confirmations for inputs spent "
+            "(DEPRECATED: use minconfconsolidationinput instead)\n"
+            "  \"acceptnonstdconsolidationinput\": xxxx  (boolean) Accept consolidation transactions that use non "
+            "standard inputs\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getsettings", "") +
+            HelpExampleRpc("getsettings", ""));
+    }
+
+    UniValue obj(UniValue::VOBJ);
+
+    obj.push_back(Pair("excessiveblocksize", config.GetMaxBlockSize()));
+    obj.push_back(Pair("blockmaxsize", config.GetMaxGeneratedBlockSize()));
+    obj.push_back(Pair("maxtxsizepolicy", config.GetMaxTxSize(true, false)));
+    obj.push_back(Pair("maxorphantxsize", config.GetMaxOrphanTxSize()));
+    obj.push_back(Pair("datacarriersize", config.GetDataCarrierSize()));
+
+    obj.push_back(Pair("maxscriptsizepolicy", config.GetMaxScriptSize(true, false)));
+    obj.push_back(Pair("maxopsperscriptpolicy", config.GetMaxOpsPerScript(true, false)));
+    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(true, false)));
+    obj.push_back(Pair("maxpubkeyspermultisigpolicy", config.GetMaxPubKeysPerMultiSig(true, false)));
+    obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(true)));
+    obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));
+
+    obj.push_back(Pair("limitancestorcount", config.GetLimitAncestorCount()));
+    obj.push_back(Pair("limitcpfpgroupmemberscount", config.GetLimitSecondaryMempoolAncestorCount()));
+
+    obj.push_back(Pair("maxmempool", config.GetMaxMempool()));
+    obj.push_back(Pair("maxmempoolsizedisk", config.GetMaxMempoolSizeDisk()));
+    obj.push_back(Pair("mempoolmaxpercentcpfp", config.GetMempoolMaxPercentCPFP()));
+
+    obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+    obj.push_back(Pair("datacarrier", fAcceptDatacarrier));
+    obj.push_back(Pair("minrelaytxfee", ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
+    obj.push_back(Pair("dustrelayfee", ValueFromAmount(dustRelayFee.GetFeePerK())));
+    obj.push_back(Pair("blockmintxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
+    obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));
+    obj.push_back(Pair("maxnonstdtxvalidationduration", config.GetMaxNonStdTxnValidationDuration().count()));
+
+    obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
+    obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));
+    obj.push_back(Pair("minconfconsolidationinput",  config.GetMinConfConsolidationInput()));
+    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConfConsolidationInput()));
+    obj.push_back(Pair("acceptnonstdconsolidationinput",  config.GetAcceptNonStdConsolidationInput()));
+
+    return obj;
+}
+
+static UniValue dumpparameters(const Config &config, const JSONRPCRequest &request)
+{
+
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw std::runtime_error(
+            "dumpparameters\n"
+            "Dumps non-sensitive force set parameters and parameters set by switches and config file.\n"
+            "Note: rpcuser, rpcpassword and rpcauth are excluded from the dump.\n"
+            "\nResult:\n"
+            "[ (array) parameters\n"
+            "    parametername=value,\n"
+            "    ...,\n"
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("dumpparameters", "") +
+            HelpExampleRpc("dumpparameters", ""));
+    }
+
+    UniValue obj(UniValue::VARR);
+
+    for(const auto& arg : gArgs.GetNonSensitiveParameters())
+    {
+        obj.push_back(arg);
+    }
+
+    return obj;
 }
 
 // clang-format off
@@ -727,6 +867,8 @@ static const CRPCCommand commands[] = {
     //  ------------------- ------------------------  ----------------------  ----------
     { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
     { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
+    { "control",            "dumpparameters",         dumpparameters,         true,  {} },
+    { "control",            "getsettings",            getsettings,            true,  {} },
     { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
     { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
     { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },

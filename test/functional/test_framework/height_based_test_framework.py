@@ -53,7 +53,7 @@ class HeightBasedTestsCase:
     COINBASE_KEY = None
     ADDITIONAL_CONNECTIONS = []
     ARGS = []
-    P2P_ACCEPT_TIMEOUT = 10
+    P2P_ACCEPT_TIMEOUT = 20
 
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
@@ -296,8 +296,10 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             tip_height += 1
             tip_hash = block.hash
 
+        # Observed data shows that during testing in debug mode it takes about 0.1s to process one block
+        # We use double the amount of 0.2s plus extra 30s for good measure
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=10, check_interval=0.2, label="Waiting for block to become current tip")
+                   timeout=0.2*n_blocks+30, check_interval=0.2, label="Waiting for block to become current tip")
 
         return coinbases, block
 

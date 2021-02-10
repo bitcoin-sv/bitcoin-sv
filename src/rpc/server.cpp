@@ -4,28 +4,20 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "rpc/server.h"
-
-#include "base58.h"
 #include "config.h"
-#include "fs.h"
 #include "init.h"
 #include "random.h"
 #include "rpc/http_protocol.h"
 #include "sync.h"
-#include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "blockchain.h"
-
 #include <univalue.h>
-
 #include <boost/bind/bind.hpp>
 #include <boost/signals2/signal.hpp>
-#include <boost/thread.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_upper()
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-
 #include <memory> // for unique_ptr
 #include <set>
 #include <unordered_map>
@@ -180,10 +172,7 @@ std::string CRPCTable::help(Config &config, const std::string &strCommand,
     std::string category;
     std::set<const CRPCCommand *> setDone;
     std::vector<std::pair<std::string, const CRPCCommand *>> vCommands;
-
-    for (std::map<std::string, const CRPCCommand *>::const_iterator mi =
-             mapCommands.begin();
-         mi != mapCommands.end(); ++mi)
+    for(auto mi = mapCommands.begin(); mi != mapCommands.end(); ++mi)
         vCommands.push_back(
             std::make_pair(mi->second->category + mi->first, mi->second));
     sort(vCommands.begin(), vCommands.end());
@@ -192,9 +181,9 @@ std::string CRPCTable::help(Config &config, const std::string &strCommand,
     jreq.fHelp = true;
     jreq.params = UniValue();
 
-    for (const std::pair<std::string, const CRPCCommand *> &command :
-         vCommands) {
-        const CRPCCommand *pcmd = command.second;
+    for(const auto& command : vCommands)
+    {
+        const CRPCCommand* pcmd = command.second;
         std::string strMethod = pcmd->name;
         // We already filter duplicates, but these deprecated screw up the sort
         // order
@@ -304,9 +293,7 @@ CRPCTable::CRPCTable() {
     unsigned int vcidx;
     for (vcidx = 0; vcidx < (sizeof(vRPCCommands) / sizeof(vRPCCommands[0]));
          vcidx++) {
-        const CRPCCommand *pcmd;
-
-        pcmd = &vRPCCommands[vcidx];
+        const CRPCCommand* pcmd = &vRPCCommands[vcidx];
         mapCommands[pcmd->name] = pcmd;
     }
 }
@@ -488,12 +475,15 @@ transformNamedArguments(const JSONRPCRequest &in,
     return out;
 }
 
-UniValue CRPCCommand::call(Config &config, const JSONRPCRequest &jsonRequest, HTTPRequest *httpReq, bool processedInBatch) const
+UniValue CRPCCommand::call(Config& config,
+                           const JSONRPCRequest& jsonRequest,
+                           HTTPRequest* httpReq,
+                           bool processedInBatch) const
 {
     UniValue result;
     if (useHTTPRequest)
     {
-        (*actor.http_fn)(config, jsonRequest, *httpReq, processedInBatch);
+        (*actor.http_fn)(config, jsonRequest, httpReq, processedInBatch);
         result = NullUniValue;
     }
     else
@@ -549,10 +539,10 @@ void CRPCTable::execute(Config &config,
 }
 
 std::vector<std::string> CRPCTable::listCommands() const {
+    using namespace boost::placeholders;
     std::vector<std::string> commandList;
     typedef std::map<std::string, const CRPCCommand *> commandMap;
 
-    using namespace boost::placeholders;
     std::transform(mapCommands.begin(), mapCommands.end(),
                    std::back_inserter(commandList),
                    boost::bind(&commandMap::value_type::first, _1));

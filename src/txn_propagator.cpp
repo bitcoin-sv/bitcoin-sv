@@ -110,7 +110,7 @@ void CTxnPropagator::shutdown()
 /** Thread entry point for new transaction queue handling */
 void CTxnPropagator::threadNewTxnHandler() noexcept
 {
-    RenameThread("bitcoin-txnpropagator");
+    RenameThread("txnpropagator");
     try
     {
         LogPrint(BCLog::TXNPROP, "New transaction handling thread starting\n");

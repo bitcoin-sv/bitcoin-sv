@@ -28,7 +28,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
             "-maxconsolidationinputscriptsize=151",
-            "-minconsolidationinputmaturity=5",
+            "-minconfconsolidationinput=5",
             "-acceptnonstdtxn=1",
             "-acceptnonstdconsolidationinput=1"
             ],[
@@ -56,10 +56,11 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
     def test_extra_args_values (self):
         # Check that all exra args are read correction
-        assert(int(self.nodes[0].getnetworkinfo()['minconsolidationfactor']) == 2)
-        assert(int(self.nodes[0].getnetworkinfo()['maxconsolidationinputscriptsize']) == 151)
-        assert(int(self.nodes[0].getnetworkinfo()['minconsolidationinputmaturity']) == 5)
-        assert(int(self.nodes[0].getnetworkinfo()['acceptnonstdconsolidationinput']) == 1)
+        network_info = self.nodes[0].getnetworkinfo()
+        assert(int(network_info['minconsolidationfactor']) == 2)
+        assert(int(network_info['maxconsolidationinputscriptsize']) == 151)
+        assert(int(network_info['minconfconsolidationinput']) == 5)
+        assert(network_info['acceptnonstdconsolidationinput'] is True)
 
     def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations):
 
@@ -192,10 +193,11 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             node.generate(200)
             for output_count in output_counts:
                 for single_output_script_size in single_output_script_sizes:
-                    self.consolidation_factor = int(node.getnetworkinfo()['minconsolidationfactor'])
-                    self.scriptSigSpam = int(node.getnetworkinfo()['maxconsolidationinputscriptsize'])
-                    self.minConfirmations = int(node.getnetworkinfo()['minconsolidationinputmaturity'])
-                    self.acceptNonStandardInputs = int(node.getnetworkinfo()['acceptnonstdconsolidationinput'])
+                    network_info = node.getnetworkinfo()
+                    self.consolidation_factor = int(network_info['minconsolidationfactor'])
+                    self.scriptSigSpam = int(network_info['maxconsolidationinputscriptsize'])
+                    self.minConfirmations = int(network_info['minconfconsolidationinput'])
+                    self.acceptNonStandardInputs = network_info['acceptnonstdconsolidationinput']
                     self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
                     self.log.info ("scriptSig limit: {}".format( self.scriptSigSpam))
                     self.log.info("minimum input confirmations: {}".format( self.minConfirmations))
@@ -233,7 +235,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                         self.log.info ("test 1 - failing cnonsolidation transaction not disabled: PASS")
                         break
 
-                    if self.acceptNonStandardInputs == 0:
+                    if self.acceptNonStandardInputs is False:
                         tx_hex = self.create_and_sign_tx(node,
                                                          in_count = output_count * 2,
                                                          out_count = output_count,
@@ -269,7 +271,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      )
 
                     assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info("test 2 - failing all inputs maturities > minimum maturity: PASS")
+                    self.log.info("test 2 - failing all inputs min conf > min conf: PASS")
 
                     tx_hex = self.create_and_sign_tx(node,
                                                      in_count=enough_inputs,

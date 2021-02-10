@@ -13,9 +13,7 @@
 #include "util.h"
 #include "validation.h"
 #include "zmq_publisher.h"
-
-#include <cstdarg>
-
+#include <string>
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier *>
     mapPublishNotifiers;
@@ -102,11 +100,11 @@ bool CZMQAbstractPublishNotifier::SendZMQMessage(const char *command,
     assert(psocket);
     assert(zmqPublisher);
 
-    bool rc = zmqPublisher->SendZMQMessage(psocket, command, data, size, nSequence);
-    if (rc == false) return false;
+    /* SendZMQMessage can be called by multiple threads. Increment memory only sequence number here to ensure its uniqueness in sent messages */
+    uint32_t sequence = nSequence++;
 
-    /* increment memory only sequence number after sending */
-    nSequence++;
+    bool rc = zmqPublisher->SendZMQMessage(psocket, command, data, size, sequence);
+    if (rc == false) return false;
 
     return true;
 }
@@ -132,56 +130,57 @@ bool CZMQPublishHashTransactionNotifier::NotifyTransaction(
 
 bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint256& txid,
                                                                      MemPoolRemovalReason reason,
-                                                                     const CTransaction* conflictedWith,
-                                                                     const uint256* blockhash)
+                                                                     const CTransactionConflict& conflictedWith)
 {
 
     CStringWriter tw;
     CJSONWriter jw(tw, false);
 
     jw.writeBeginObject();
-    jw.pushKV("txid", txid.GetHex(), true);
+    jw.pushKV("txid", txid.GetHex());
 
     switch (reason)
     {
         case MemPoolRemovalReason::EXPIRY:
-            jw.pushKV("reason", "expired", false);
+            jw.pushKV("reason", "expired");
             break;
         case MemPoolRemovalReason::SIZELIMIT:
-            jw.pushKV("reason", "mempool-sizelimit-exceeded", false);
+            jw.pushKV("reason", "mempool-sizelimit-exceeded");
             break;
         case MemPoolRemovalReason::CONFLICT:
-            if (conflictedWith != nullptr)
+            if (conflictedWith)
             {
+                const auto& conflictedTransaction = conflictedWith.value().conflictedWith;
+                const auto& blockhash = conflictedWith.value().blockhash;
                 jw.pushKV("reason", "collision-in-block-tx");
                 jw.writeBeginObject("collidedWith");
-                jw.pushKV("txid", conflictedWith->GetId().GetHex(), true);
-                jw.pushKV("size", int64_t(conflictedWith->GetTotalSize()), true);
+                jw.pushKV("txid", conflictedTransaction->GetId().GetHex());
+                jw.pushKV("size", int64_t(conflictedTransaction->GetTotalSize()));
                 jw.pushK("hex");
-                jw.pushQuote(true, false);
-                EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
-                jw.pushQuote(true, false);
+                jw.pushQuote();
+                EncodeHexTx(*conflictedTransaction, jw.getWriter(), 0);
+                jw.pushQuote();
                 // push hash of block in which transaction we "collided with" arrived.
                 if (blockhash != nullptr)
                 {  
-                    jw.writeEndObject(true);
-                    jw.pushKV("blockhash", blockhash->GetHex(), false);
+                    jw.writeEndObject();
+                    jw.pushKV("blockhash", blockhash->GetHex());
                 }
                 else
                 {
-                    jw.writeEndObject(false);
+                    jw.writeEndObject();
                 } 
             }
             else
             {
-                jw.pushKV("reason", "collision-in-block-tx", false);
+                jw.pushKV("reason", "collision-in-block-tx");
             }
             break;
         default:
-            jw.pushKV("reason", "unknown-reason", false);
+            jw.pushKV("reason", "unknown-reason");
     }
 
-    jw.writeEndObject(false);
+    jw.writeEndObject();
 
     std::string message = tw.MoveOutString();
 
@@ -209,9 +208,8 @@ bool CZMQPublishRemovedFromMempoolBlockNotifier::NotifyRemovedFromMempoolBlock(c
             jw.pushKV("reason", "unknown-reason");
     }
     
-    jw.pushK("txid");
-    jw.pushV(txid.GetHex(), false);
-    jw.writeEndObject(false);
+    jw.pushKV("txid", txid.GetHex());
+    jw.writeEndObject();
 
     std::string message = tw.MoveOutString();
 

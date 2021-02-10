@@ -3,11 +3,7 @@
 // Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <chrono>
-#include <optional>
-#include <shared_mutex>
 #include "net/net_processing.h"
-
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
@@ -20,17 +16,16 @@
 #include "init.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
-#include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/netbase.h"
 #include "netmessagemaker.h"
 #include "policy/fees.h"
-#include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "random.h"
 #include "taskcancellation.h"
 #include "tinyformat.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "util.h"
@@ -40,11 +35,12 @@
 #include "protocol.h"
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
-
+#include <algorithm>
+#include <chrono>
+#include <optional>
+#include <shared_mutex>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
-
-#include "blockfileinfostore.h"
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -247,7 +243,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
                      int64_t nTime) {
     ServiceFlags nLocalNodeServices = pnode->GetLocalServices();
     uint64_t nonce = pnode->GetLocalNonce();
-    int nNodeStartingHeight = pnode->GetMyStartingHeight();
+    int32_t nNodeStartingHeight = pnode->GetMyStartingHeight();
     NodeId nodeid = pnode->GetId();
     CAddress addr = pnode->GetAssociation().GetPeerAddr();
 
@@ -256,35 +252,61 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
                             : CAddress(CService(), addr.nServices));
     CAddress addrMe = CAddress(CService(), nLocalNodeServices);
 
+    // Include association ID if we have one and supported stream policies
+    std::vector<uint8_t> assocIDBytes {};
+    std::string assocIDStr { AssociationID::NULL_ID_STR };
+    AssociationIDPtr assocID { pnode->GetAssociation().GetAssociationID() };
+    if(assocID) {
+        assocIDBytes = assocID->GetBytes();
+        assocIDStr = assocID->ToString();
+    }
+
     connman.PushMessage(pnode,
                         CNetMsgMaker(INIT_PROTO_VERSION)
                             .Make(NetMsgType::VERSION, PROTOCOL_VERSION,
                                   (uint64_t)nLocalNodeServices, nTime, addrYou,
                                   addrMe, nonce, userAgent(),
-                                  nNodeStartingHeight, ::fRelayTxes));
+                                  nNodeStartingHeight, ::fRelayTxes, assocIDBytes));
 
     if (fLogIPs) {
         LogPrint(BCLog::NET, "send version message: version %d, blocks=%d, "
-                             "us=%s, them=%s, peer=%d\n",
-                 PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(),
-                 addrYou.ToString(), nodeid);
+                             "us=%s, them=%s, assocID=%s, peer=%d\n", PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(),
+                 addrYou.ToString(), assocIDStr, nodeid);
     } else {
         LogPrint(
             BCLog::NET,
-            "send version message: version %d, blocks=%d, us=%s, peer=%d\n",
-            PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), nodeid);
+            "send version message: version %d, blocks=%d, us=%s, assocID=%s, peer=%d\n",
+            PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), assocIDStr, nodeid);
     }
 }
 
-void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
+void PushProtoconf(const CNodePtr& pnode, CConnman& connman, const Config &config)
+{
+    std::string streamPolicies { connman.GetStreamPolicyFactory().GetSupportedPolicyNamesStr() };
     connman.PushMessage(
-            pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF, CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)));
+        pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF,
+            CProtoconf(config.GetMaxProtocolRecvPayloadLength(), streamPolicies)
+    ));
 
-    LogPrint(BCLog::NET, "send protoconf message: max size %d, number of fields =%d, ", MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, 1);
+    LogPrint(BCLog::NET, "send protoconf message: max size %d, stream policies %s, number of fields %d\n",
+        config.GetMaxProtocolRecvPayloadLength(), streamPolicies, 2);
 }
 
+static void PushCreateStream(const CNodePtr& pnode, CConnman& connman, StreamType streamType,
+    const std::string& streamPolicyName, const AssociationIDPtr& assocID)
+{
 
-void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
+    connman.PushMessage(pnode,
+        CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::CREATESTREAM, assocID->GetBytes(),
+            static_cast<uint8_t>(streamType), streamPolicyName
+    ));
+
+    LogPrint(BCLog::NET, "send createstream message: type %s, assoc %s, peer=%d\n", enum_cast<std::string>(streamType),
+        assocID->ToString(), pnode->id);
+}
+
+void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectInfo* connectInfo)
+{
     CAddress addr = pnode->GetAssociation().GetPeerAddr();
     std::string addrName = pnode->GetAddrName();
     NodeId nodeid = pnode->GetId();
@@ -297,7 +319,15 @@ void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
     }
 
     if (!pnode->fInbound) {
-        PushNodeVersion(pnode, connman, GetTime());
+        if(connectInfo && connectInfo->fNewStream) {
+            PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
+        }
+        else {
+            if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
+            }
+            PushNodeVersion(pnode, connman, GetTime());
+        }
     }
 }
 
@@ -622,8 +652,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     if(nWindowSize <= 0) {
         nWindowSize = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
     }
-    int nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
-    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
+    int32_t nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
+    int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed)
@@ -684,6 +714,53 @@ inline unsigned int GetInventoryBroadcastMax(const Config& config)
 {
     return INVENTORY_BROADCAST_MAX_PER_MB * (config.GetMaxBlockSize() / ONE_MEGABYTE);
 }
+
+/**
+ * Helper class for logging the duration of ProcessMessages request
+ * processing. It writes to log all the requests that take more time to
+ * process than the provided threshold.
+ */
+class CLogP2PStallDuration
+{
+public:
+    CLogP2PStallDuration(CLogP2PStallDuration const &) = delete;
+    CLogP2PStallDuration & operator= (CLogP2PStallDuration const &) = delete;
+    CLogP2PStallDuration(CLogP2PStallDuration &&) = default;
+    CLogP2PStallDuration & operator= (CLogP2PStallDuration &&) = default;
+
+    CLogP2PStallDuration(
+        std::string command,
+        std::chrono::milliseconds debugP2PTheadStallsThreshold)
+        : mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
+        , mProcessingStart{std::chrono::steady_clock::now()}
+        , mCommand{std::move(command)}
+    {/**/}
+
+
+    ~CLogP2PStallDuration()
+    {   
+        if(!mCommand.empty())
+        {   
+            auto processingDuration =
+                    std::chrono::steady_clock::now() - mProcessingStart;
+
+            if(processingDuration > mDebugP2PTheadStallsThreshold)
+            {   
+                LogPrintf(
+                    "ProcessMessages request processing took %s ms to complete "
+                    "processing '%s' request!\n",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        processingDuration).count(),
+                    mCommand);
+            }
+        }
+    }
+
+private:
+    std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
+    std::chrono::time_point<std::chrono::steady_clock> mProcessingStart;
+    std::string mCommand;
+};
 
 } // namespace
 
@@ -972,7 +1049,7 @@ void PeerLogicValidation::NewPoWValidBlock(
 void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew,
                                           const CBlockIndex *pindexFork,
                                           bool fInitialDownload) {
-    const int nNewHeight = pindexNew->nHeight;
+    const int32_t nNewHeight = pindexNew->nHeight;
     connman->SetBestHeight(nNewHeight);
 
     if (!fInitialDownload) {
@@ -1126,7 +1203,7 @@ void RelayTransaction(const CTransaction &tx, CConnman &connman) {
         txinfo = mempool.getNonFinalPool().getInfo(tx.GetId());
     }
 
-    if(txinfo.tx)
+    if (!txinfo.IsNull())
     {
         connman.EnqueueTransaction( {inv, txinfo} );
     }
@@ -1319,7 +1396,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
 
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway.
-        if (pfrom->fPauseSend) {
+        if (pfrom->GetPausedForSending()) {
             break;
         }
 
@@ -1404,10 +1481,10 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     send = false;
                 }
 
-                bool isMostRecentBlock = chainActive.Tip() == mi->second;
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
                 if (send && (mi->second->nStatus.hasData())) {
+                    bool isMostRecentBlock = chainActive.Tip() == mi->second;
                     // Send block from disk
 
                     if (inv.type == MSG_BLOCK)
@@ -1518,11 +1595,11 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     // To protect privacy, do not answer getdata using the
                     // mempool when that TX couldn't have been INVed in reply to
                     // a MEMPOOL request.
-                    if (txinfo.tx &&
+                    if (!txinfo.IsNull() &&
                         txinfo.nTime <= pfrom->timeLastMempoolReq) {
                         connman.PushMessage(pfrom,
                                             msgMaker.Make(NetMsgType::TX,
-                                                          *txinfo.tx));
+                                                          *txinfo.GetTx()));
                         push = true;
                     }
                 }
@@ -1631,6 +1708,146 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 }
 
 /**
+* Process createstream messages.
+*/
+static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string& strCommand,
+    CDataStream& vRecv, CConnman& connman)
+{
+    // Check we haven't already received either a createstream or a version message
+    if(pfrom->nVersion != 0)
+    {
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                std::string("Invalid createstream scenario")));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    std::vector<uint8_t> associationID {};
+    uint8_t streamTypeRaw {0};
+    std::string streamPolicyName {};
+
+    // Which association is this for?
+    try
+    {
+        try
+        {
+            vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+            vRecv >> streamTypeRaw;
+            vRecv >> LIMITED_STRING(streamPolicyName, MAX_STREAM_POLICY_NAME_LENGTH);
+        }
+        catch(std::exception& e)
+        {
+            throw std::runtime_error("Badly formatted message");
+        }
+
+        // Parse stream type
+        if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
+        {
+            throw std::runtime_error("StreamType out of range");
+        }
+        StreamType streamType { static_cast<StreamType>(streamTypeRaw) };
+
+        // Parse association ID
+        AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        if(idptr == nullptr)
+        {
+            throw std::runtime_error("NULL association ID");
+        }
+        LogPrint(BCLog::NET, "Got request for new %s stream within association %s, peer=%d\n",
+            enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
+
+        // Move stream to owning association
+        CNodePtr newOwner { connman.MoveStream(pfrom->id, idptr, streamType, streamPolicyName) };
+
+        // Send stream ack
+        connman.PushMessage(newOwner, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::STREAMACK, associationID, streamTypeRaw),
+            streamType);
+
+        // Once a node has had its stream moved out it's just an empty husk
+        // and should be flagged for shutdown/removal. The actual stream and
+        // socket connection will live on however under the new owner.
+        pfrom->fDisconnect = true;
+    }
+    catch(std::exception& e)
+    {
+        LogPrint(BCLog::NET, "peer=%d Failed to setup new stream (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    return true;
+}
+
+/**
+* Process streamack messages.
+*/
+static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& strCommand,
+    CDataStream& vRecv, CConnman& connman)
+{
+    // Can't receive streamacks over an established connection
+    if(pfrom->nVersion != 0)
+    {
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                std::string("Invalid streamack")));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    std::vector<uint8_t> associationID {};
+    uint8_t streamTypeRaw {0};
+
+    try
+    {
+        try
+        {
+            vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+            vRecv >> streamTypeRaw;
+        }
+        catch(std::exception& e)
+        {
+            throw std::runtime_error("Badly formatted message");
+        }
+
+        // Parse stream type
+        if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
+        {
+            throw std::runtime_error("StreamType out of range");
+        }
+        StreamType streamType { static_cast<StreamType>(streamTypeRaw) };
+
+        // Parse association ID
+        AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        if(idptr == nullptr)
+        {
+            throw std::runtime_error("NULL association ID");
+        }
+        LogPrint(BCLog::NET, "Got stream ack for new %s stream within association %s, peer=%d\n",
+            enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
+
+        // Move newly established stream to owning association
+        connman.MoveStream(pfrom->id, idptr, streamType);
+
+        // Once a node has had its stream moved out it's just an empty husk
+        // and should be flagged for shutdown/removal. The actual stream and
+        // socket connection will live on however under the new owner.
+        pfrom->fDisconnect = true;
+    }
+    catch(std::exception& e)
+    {
+        LogPrint(BCLog::NET, "peer=%d Failed to process stream ack (%s); disconnecting\n", pfrom->id, e.what());
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    return true;
+}
+
+/**
 * Process version messages.
 */
 static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strCommand,
@@ -1657,63 +1874,114 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     int nSendVersion;
     std::string strSubVer;
     std::string cleanSubVer;
-    int nStartingHeight = -1;
+    int32_t nStartingHeight = -1;
     bool fRelay = true;
+    std::vector<uint8_t> associationID {};
+    std::string assocIDStr { AssociationID::NULL_ID_STR };
 
-    vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
-    nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
-    nServices = ServiceFlags(nServiceInt);
-    if(!pfrom->fInbound) {
-        connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
-    }
-    if(pfrom->nServicesExpected & ~nServices) {
-        LogPrint(BCLog::NET, "peer=%d does not offer the expected services "
-                             "(%08x offered, %08x expected); "
-                             "disconnecting\n",
-                 pfrom->id, nServices, pfrom->nServicesExpected);
-        connman.PushMessage(
-            pfrom,
-            CNetMsgMaker(INIT_PROTO_VERSION)
-                .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
-                      strprintf("Expected to offer services %08x",
-                                pfrom->nServicesExpected)));
-        pfrom->fDisconnect = true;
-        return false;
-    }
-
-    if(nVersion < MIN_PEER_PROTO_VERSION) {
-        // Disconnect from peers older than this proto version
-        LogPrint(BCLog::NET, "peer=%d using obsolete version %i; disconnecting\n",
-                  pfrom->id, nVersion);
-        connman.PushMessage(
-            pfrom,
-            CNetMsgMaker(INIT_PROTO_VERSION)
-                .Make(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
-                      strprintf("Version must be %d or greater",
-                                MIN_PEER_PROTO_VERSION)));
-        pfrom->fDisconnect = true;
-        return false;
-    }
-
-    if(!vRecv.empty()) {
-        vRecv >> addrFrom >> nNonce;
-    }
-    if(!vRecv.empty()) {
-        vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
-        cleanSubVer = SanitizeString(strSubVer);
-        
-        if (config.IsClientUABanned(cleanSubVer))
-        {
-            Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+    try {
+        vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
+        nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
+        nServices = ServiceFlags(nServiceInt);
+        if(!pfrom->fInbound) {
+            connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
+        }
+        if(pfrom->nServicesExpected & ~nServices) {
+            LogPrint(BCLog::NET, "peer=%d does not offer the expected services "
+                                 "(%08x offered, %08x expected); "
+                                 "disconnecting\n",
+                     pfrom->id, nServices, pfrom->nServicesExpected);
+            connman.PushMessage(
+                pfrom,
+                CNetMsgMaker(INIT_PROTO_VERSION)
+                    .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                          strprintf("Expected to offer services %08x",
+                                    pfrom->nServicesExpected)));
+            pfrom->fDisconnect = true;
             return false;
         }
+
+        if(nVersion < MIN_PEER_PROTO_VERSION) {
+            // Disconnect from peers older than this proto version
+            LogPrint(BCLog::NET, "peer=%d using obsolete version %i; disconnecting\n",
+                      pfrom->id, nVersion);
+            connman.PushMessage(
+                pfrom,
+                CNetMsgMaker(INIT_PROTO_VERSION)
+                    .Make(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
+                          strprintf("Version must be %d or greater",
+                                    MIN_PEER_PROTO_VERSION)));
+            pfrom->fDisconnect = true;
+            return false;
+        }
+
+        if(!vRecv.empty()) {
+            vRecv >> addrFrom >> nNonce;
+        }
+        if(!vRecv.empty()) {
+            vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
+            cleanSubVer = SanitizeString(strSubVer);
+            
+            if (config.IsClientUABanned(cleanSubVer))
+            {
+                Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+                return false;
+            }
+        }
+        if(!vRecv.empty()) {
+            vRecv >> nStartingHeight;
+        }
+        if(!vRecv.empty()) {
+            vRecv >> fRelay;
+        }
+
+        if(!vRecv.empty()) {
+            try {
+                vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+                if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                    // Decode received association ID
+                    AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
+                    if(recvdAssocID) {
+                        assocIDStr = recvdAssocID->ToString();
+
+                        // If we sent them an assoc ID, make sure they echoed back the same one
+                        const AssociationIDPtr& currAssocID { pfrom->GetAssociation().GetAssociationID() };
+                        if(currAssocID != nullptr) {
+                            if(!(*recvdAssocID == *currAssocID)) {
+                                throw std::runtime_error("Mismatched association IDs");
+                            }
+                        }
+                        else {
+                            // Set association ID for node
+                            pfrom->GetAssociation().SetAssociationID(std::move(recvdAssocID));
+                        }
+                    }
+                    else {
+                        // Peer sent us a null ID, so they support streams but have disabled them
+                        pfrom->GetAssociation().ClearAssociationID();
+                    }
+                }
+            }
+            catch(std::exception& e) {
+                // Re-throw
+                std::stringstream err {};
+                err << "Badly formatted association ID: " << e.what();
+                throw std::runtime_error(err.str());
+            }
+        }
+        else if(!pfrom->fInbound) {
+            // Remote didn't echo back the association ID, so they don't support streams
+            pfrom->GetAssociation().ClearAssociationID();
+        }
     }
-    if(!vRecv.empty()) {
-        vRecv >> nStartingHeight;
+    catch(std::exception& e) {
+        LogPrint(BCLog::NET, "peer=%d Failed to process version: (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
+        pfrom->fDisconnect = true;
+        return false;
     }
-    if(!vRecv.empty()) {
-        vRecv >> fRelay;
-    }
+
     // Disconnect if we connected to ourself
     if(pfrom->fInbound && !connman.CheckIncomingNonce(nNonce)) {
         LogPrintf("connected to self at %s, disconnecting\n",
@@ -1734,7 +2002,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
 
     // Announce our protocol configuration immediately after we send VERACK.
-    PushProtoconf(pfrom, connman);
+    PushProtoconf(pfrom, connman, config);
 
     pfrom->nServices = nServices;
     pfrom->GetAssociation().SetPeerAddrLocal(addrMe);
@@ -1795,10 +2063,10 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     }
 
     LogPrint(BCLog::NET, "receive version message: [%s] %s: version %d, blocks=%d, "
-              "us=%s, peer=%d%s\n",
+              "us=%s, assocID=%s, peer=%d%s\n",
               peerAddr.ToString().c_str(), cleanSubVer, pfrom->nVersion,
-              pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
-              remoteAddr);
+              pfrom->nStartingHeight, addrMe.ToString(), assocIDStr,
+              pfrom->id, remoteAddr);
 
     int64_t nTimeOffset = nTime - GetTime();
     pfrom->nTimeOffset = nTimeOffset;
@@ -2040,7 +2308,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                               const CNetMsgMaker& msgMaker,
                               const std::atomic<bool>& interruptMsgProc,
                               CDataStream& vRecv,
-                              CConnman& connman)
+                              CConnman& connman,
+                              const Config &config)
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
@@ -2053,8 +2322,6 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
     }
 
     LOCK(cs_main);
-    std::vector<CInv> vToFetch;
-
     for(size_t nInv = 0; nInv < vInv.size(); nInv++) {
         CInv &inv = vInv[nInv];
 
@@ -2095,16 +2362,12 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                          inv.hash.ToString(), pfrom->id);
             }
             else if(!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
-                pfrom->AskFor(inv);
+                pfrom->AskFor(inv, config);
             }
         }
 
         // Track requests for our stuff
         GetMainSignals().Inventory(inv.hash);
-    }
-
-    if(!vToFetch.empty()) {
-        connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vToFetch));
     }
 }
 
@@ -2269,11 +2532,47 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         return;
     }
 
-    CBlock block;
-    bool ret = ReadBlockFromDisk(block, it->second, config);
-    assert(ret);
+    // Create stream reader object that will be used to read block from disk.
+    auto block_stream_reader = GetDiskBlockStreamReader(it->second, config, false); // Disk block meta-data is not needed and does not need to be calculated.
+    assert(block_stream_reader); // It must always be possible to read a valid block from disk if block was found in block index.
 
-    SendBlockTransactions(block, req, pfrom, connman);
+    // Number of transactions in block
+    const std::size_t num_txn_in_block { block_stream_reader->GetRemainingTransactionsCount() };
+
+    BlockTransactions resp(req);
+
+    std::size_t num_txn_read=0; // Number of transactions that were already read from block stream
+    for(std::size_t i=0; i<req.indices.size(); ++i)
+    {
+        const std::size_t txn_idx { req.indices[i] };
+        if (txn_idx >= num_txn_in_block)
+        {
+            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
+            LogPrintf("Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            return;
+        }
+
+        // Transaction indexes in request are assumed to be sorted in ascending order without duplicates.
+        // This must always be true since indexes are differentially encoded in getblocktxn P2P message.
+        assert(txn_idx>=num_txn_read);
+
+        // Read from block stream until we get to the transaction with requested index.
+        for(; num_txn_read<=txn_idx; ++num_txn_read)
+        {
+            assert(!block_stream_reader->EndOfStream()); // We should never get pass the end of stream since we checked transaction index above.
+            auto* tx_ptr = block_stream_reader->ReadTransaction_NoThrow();
+            (void)tx_ptr; // not used except for assert
+            assert(tx_ptr); // Reading block should not fail
+        }
+
+        // CBlockStreamReader object now holds transaction with requested index.
+        // Take ownership of transaction object and store transaction reference in the response.
+        resp.txn[i] = block_stream_reader->GetLastTransactionRef();
+    }
+
+    const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
+    connman.PushMessage(pfrom,
+        msgMaker.Make(NetMsgType::BLOCKTXN, std::move(resp)));
 }
  
 /**
@@ -2377,8 +2676,8 @@ static void ProcessTxMessage(const Config& config,
     // Update 'ask for' inv set
     {
         LOCK(cs_invQueries);
-        pfrom->setAskFor.erase(inv.hash);
-        mapAlreadyAskedFor.erase(inv.hash);
+        pfrom->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
+        mapAlreadyAskedFor->erase(inv.hash);
     }
     // Enqueue txn for validation if it is not known
     if (!IsTxnKnown(inv)) {
@@ -2391,8 +2690,8 @@ static void ProcessTxMessage(const Config& config,
                 std::move(ptx), // a pointer to the tx
                 TxSource::p2p,  // tx source
                 TxValidationPriority::high,  // tx validation priority
+                TxStorage::memory, // tx storage
                 GetTime(),      // nAcceptTime
-                true,           // fLimitFree
                 Amount(0),      // nAbsurdFee
                 pfrom));        // pNode
     } else {
@@ -2620,7 +2919,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                     }
                     connman.PushMessage(
                         pfrom,
-                        msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                        msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vGetData));
                 }
             }
         }
@@ -2667,7 +2966,7 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
             std::vector<CInv> invs;
             invs.push_back(CInv(MSG_BLOCK, resp.blockhash));
             connman.PushMessage(pfrom,
-                                msgMaker.Make(NetMsgType::GETDATA, invs));
+                                msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, invs));
         }
         else {
             // Block is either okay, or possibly we received
@@ -2841,7 +3140,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                 std::vector<CInv> vInv(1);
                 vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
                 connman.PushMessage(
-                    pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
+                    pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vInv));
             }
             return true;
         }
@@ -2896,7 +3195,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                     // Duplicate txindices, the block is now in-flight, so just request it.
                     std::vector<CInv> vInv(1);
                     vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
-                    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
+                    connman.PushMessage(pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vInv));
                     return true;
                 }
 
@@ -2946,7 +3245,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                 // normally.
                 std::vector<CInv> vInv(1);
                 vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
-                connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
+                connman.PushMessage(pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vInv));
                 return true;
             }
             else {
@@ -3332,7 +3631,8 @@ static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process protoconf message.
 */
-static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, const std::string& strCommand)
+static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, CConnman& connman,
+                                    const std::string& strCommand, const Config &config)
 {
     if (pfrom->protoconfReceived) {
         pfrom->fDisconnect = true;
@@ -3362,13 +3662,32 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, c
             return false;
         }
 
-        // Limit the amount of data we are willing to send to MAX_PROTOCOL_SEND_PAYLOAD_LENGTH if a peer (or an attacker)
+        // Limit the amount of data we are willing to send if a peer (or an attacker)
         // that is running a newer version sends us large size, that we are not prepared to handle. 
-        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, protoconf.maxRecvPayloadLength));
+        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(config.GetMaxProtocolSendPayloadLength(), protoconf.maxRecvPayloadLength));
+
+        // Parse supported stream policies if we have them
+        if(protoconf.numberOfFields >= 2) {
+            pfrom->SetSupportedStreamPolicies(protoconf.streamPolicies);
+        }
 
         LogPrint(BCLog::NET, "Protoconf received \"%s\" from peer=%d; peer's proposed max message size: %d," 
-            "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d\n",
-            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, pfrom->maxInvElements);
+            "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d, "
+            "their stream policies: %s, common stream policies: %s\n",
+            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, config.GetMaxProtocolSendPayloadLength(), pfrom->maxInvElements,
+            protoconf.streamPolicies, pfrom->GetCommonStreamPoliciesStr());
+    }
+
+    if(!pfrom->fInbound) {
+        try {
+            // For outbound connections, now we can create any required further streams to this peer
+            pfrom->GetAssociation().OpenRequiredStreams(connman);
+        }
+        catch(std::exception& e) {
+            LogPrint(BCLog::NET, "Error opening required streams (%s) to peer=%d\n", e.what(), pfrom->id);
+            pfrom->fDisconnect = true;
+            return false;
+        }
     }
 
     return true;
@@ -3409,9 +3728,15 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     else if (strCommand == NetMsgType::VERSION) {
         return ProcessVersionMessage(pfrom, strCommand, vRecv, connman, config);
     }
+    else if(strCommand == NetMsgType::CREATESTREAM) {
+        return ProcessCreateStreamMessage(pfrom, strCommand, vRecv, connman);
+    }
+    else if(strCommand == NetMsgType::STREAMACK) {
+        return ProcessStreamAckMessage(pfrom, strCommand, vRecv, connman);
+    }
 
     else if (pfrom->nVersion == 0) {
-        // Must have a version message before anything else
+        // Must have a version or createstream message before anything else
         Misbehaving(pfrom, 1, "missing-version");
         return false;
     }
@@ -3442,7 +3767,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::INV) {
-        ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman);
+        ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman, config);
     }
 
     else if (strCommand == NetMsgType::GETDATA) {
@@ -3521,7 +3846,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::PROTOCONF) {
-        return ProcessProtoconfMessage(pfrom, vRecv, strCommand);
+        return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand, config);
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {
@@ -3578,7 +3903,9 @@ static bool SendRejectsAndCheckIfBanned(const CNodePtr& pnode, CConnman &connman
 }
 
 bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
-                     const std::atomic<bool> &interruptMsgProc) {
+                     const std::atomic<bool> &interruptMsgProc,
+                     std::chrono::milliseconds debugP2PTheadStallsThreshold)
+{
     const CChainParams &chainparams = config.GetChainParams();
     //
     // Message format
@@ -3616,28 +3943,25 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Don't bother if send buffer is too full to respond anyway
-    if (pfrom->fPauseSend) {
+    if (pfrom->GetPausedForSending(true)) {
         return false;
     }
 
-    std::list<CNetMessage> msgs;
-    {
-        LOCK(pfrom->cs_vProcessMsg);
-        if (pfrom->vProcessMsg.empty()) {
-            return false;
-        }
-        // Just take one message
-        msgs.splice(msgs.begin(), pfrom->vProcessMsg,
-                    pfrom->vProcessMsg.begin());
-        pfrom->nProcessQueueSize -=
-            msgs.front().vRecv.size() + CMessageHeader::HEADER_SIZE;
-        pfrom->fPauseRecv =
-            pfrom->nProcessQueueSize > connman.GetReceiveFloodSize();
-        fMoreWork = !pfrom->vProcessMsg.empty();
+    // Get next message for processing
+    auto [ nextMsg, moreMsgs ] { pfrom->GetAssociation().GetNextMessage() };
+    if(!nextMsg) {
+        return false;
     }
-    CNetMessage &msg(msgs.front());
-
+    fMoreWork = moreMsgs;
+    CNetMessage& msg { *nextMsg };
     msg.SetVersion(pfrom->GetRecvVersion());
+
+    std::optional<CLogP2PStallDuration> durationLog;
+    using namespace std::literals::chrono_literals;
+    if(debugP2PTheadStallsThreshold > 0ms)
+    {
+        durationLog = { msg.hdr.GetCommand(), debugP2PTheadStallsThreshold };
+    }
 
     // Scan for message start
     if (memcmp(msg.hdr.pchMessageStart.data(),
@@ -3885,12 +4209,31 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
     assert(state);
     std::vector<CBlock> vHeaders {};
 
+    LOCK(pto->cs_inventory);
+
+    // Array vBlockHashesToAnnounce must be sorted in ascending order according to block height since this
+    // is assumed by algorithms below. E.g.: If hash of block with the largest height is not the last in array,
+    // that block may never be announced.
+    // Note that even if blocks are always processed according to height, hashes are added to this array
+    // asynchronously making the ordering arbitrary.
+    // This sort should not affect performance much since array vBlockHashesToAnnounce contains only small number
+    // of hashes (often just one). This is because each time a new hash is added after tip was updated, network
+    // thread is also woken up so that we immediately try to send them. As a result, this function is also called
+    // shortly after and array vBlockHashesToAnnounce is always cleared before it completes.
+    std::sort(pto->vBlockHashesToAnnounce.begin(), pto->vBlockHashesToAnnounce.end(), [](const auto& h1, const auto& h2){
+        auto it_blk_idx1 = mapBlockIndex.find(h1);
+        auto it_blk_idx2 = mapBlockIndex.find(h2);
+        assert(it_blk_idx1 != mapBlockIndex.end());
+        assert(it_blk_idx2 != mapBlockIndex.end());
+
+        return it_blk_idx1->second->nHeight < it_blk_idx2->second->nHeight;
+    });
+
     // If we have less than MAX_BLOCKS_TO_ANNOUNCE in our list of block
     // hashes we're relaying, and our peer wants headers announcements, then
     // find the first header not yet known to our peer but would connect,
     // and send. If no header would connect, or if we have too many blocks,
     // or if the peer doesn't want headers, just add all to the inv queue.
-    LOCK(pto->cs_inventory);
     bool fRevertToInv =
         ((!state->fPreferHeaders &&
           (!state->fPreferHeaderAndIDs ||
@@ -4064,7 +4407,7 @@ void SendTxnInventory(const Config &config, const CNodePtr& pto, CConnman &connm
             vRelayExpiration.pop_front();
         }
 
-        auto ret = mapRelay.insert(std::make_pair(std::move(txn.getInv().hash), std::move(txn.getTxnRef())));
+        auto ret = mapRelay.insert(std::make_pair(std::move(txn.getInv().hash), txn.getTxnRef()));
         if(ret.second)
         {
             vRelayExpiration.push_back(std::make_pair(nNow + 15 * 60 * 1000000, ret.first));
@@ -4123,7 +4466,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         LOCK(pto->cs_filter);
 
         for (const auto &txinfo : vtxinfo) {
-            const uint256 &txid = txinfo.tx->GetId();
+            const uint256 &txid = txinfo.GetTxId();
             CInv inv(MSG_TX, txid);
             pto->setInventoryTxToSend.erase(txid);
             if (filterrate != Amount(0)) {
@@ -4131,7 +4474,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
                     continue;
                 }
             }
-            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.tx)) {
+            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.GetTx())) {
                 continue;
             }
             pto->filterInventoryKnown.insert(txid);
@@ -4172,7 +4515,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // Also, don't abandon this attempt to download all the while we are making
         // sufficient progress, as measured by the current download speed to this
         // peer.
-        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamType::BLOCK).first };
+        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
         int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
         minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
         if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
@@ -4250,13 +4593,13 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamType::BLOCK).first };
+                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
                 LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }
     }
     if (!vGetData.empty()) {
-        connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+        connman.PushMessage(pto, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vGetData));
     }
 }
 
@@ -4287,14 +4630,14 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
                 }
                 else {
                     // If we're not going to ask, don't expect a response.
-                    pto->setAskFor.erase(inv.hash);
+                    pto->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
                 }
                 pto->mapAskFor.erase(firstIt);
             }
             else {
                 // Look ahead to see if we can clear out some items we have already recieved from elsewhere
                 if(alreadyHave) {
-                    pto->setAskFor.erase(inv.hash);
+                    pto->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
                     pto->mapAskFor.erase(firstIt);
                 }
                 else {
@@ -4304,6 +4647,17 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
                     break;
                 }
             }
+        }
+
+        // Check and expire entries from indexAskFor
+        auto& timeIndex { pto->indexAskFor.get<CNode::TagInsertionTime>() };
+        for(auto it = timeIndex.begin(); it != timeIndex.end(); ) {
+            if(it->expiryTime > nNow) {
+                break;
+            }
+
+            // Remove expired entry
+            it = timeIndex.erase(it);
         }
     }
     if (!vGetData.empty()) {
@@ -4324,19 +4678,20 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         !(pto->fWhitelisted &&
           gArgs.GetBoolArg("-whitelistforcerelay",
                            DEFAULT_WHITELISTFORCERELAY))) {
-        Amount currentFilter = mempool.GetMinFee(config.GetMaxMempool()).GetFeePerK();
+        MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
+        Amount currentFilter =
+            mempool
+                .GetMinFee(limits.Total())
+                .GetFeePerK();
         int64_t timeNow = GetTimeMicros();
         if (timeNow > pto->nextSendTimeFeeFilter) {
             static CFeeRate default_feerate =
                 CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
             static FeeFilterRounder filterRounder(default_feerate);
             Amount filterToSend = filterRounder.round(currentFilter);
-            // If we don't allow free transactions, then we always have a fee
+            // We don't allow free transactions, we always have a fee
             // filter of at least minRelayTxFee
-            if (config.GetLimitFreeRelay() <= 0) {
-                filterToSend = std::max(filterToSend,
-                                        config.GetMinFeePerKB().GetFeePerK());
-            }
+            filterToSend = std::max(filterToSend, config.GetMinFeePerKB().GetFeePerK());
 
             if (filterToSend != pto->lastSentFeeFilter) {
                 connman.PushMessage(

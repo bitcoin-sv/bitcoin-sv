@@ -28,7 +28,7 @@ struct SeedSpec6 {
     uint16_t port;
 };
 
-typedef std::map<int, uint256> MapCheckpoints;
+typedef std::map<int32_t, uint256> MapCheckpoints;
 
 struct CCheckpointData {
     MapCheckpoints mapCheckpoints;
@@ -75,13 +75,11 @@ public:
     int GetDefaultPort() const { return nDefaultPort; }
 
     const CBlock &GenesisBlock() const { return genesis; }
-    /** Make miner wait to have peers to avoid wasting work */
-    bool MiningRequiresPeers() const { return fMiningRequiresPeers; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
-    uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
+    int32_t PruneAfterHeight() const { return nPruneAfterHeight; }
     /**
      * Make miner stop after a block is found. In RPC, don't return until
      * nGenProcLimit blocks are generated.
@@ -100,6 +98,9 @@ public:
 
     bool TestBlockCandidateValidity() const { return fTestBlockCandidateValidity; }
 
+    bool DisableBIP30Checks() const { return fDisbleBIP30Checks; }
+    bool CanDisableBIP30Checks() const { return fCanDisbleBIP30Checks; }
+
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
     CChainParams() {}
@@ -108,7 +109,7 @@ protected:
     CMessageHeader::MessageMagic diskMagic;
     CMessageHeader::MessageMagic netMagic;
     int nDefaultPort;
-    uint64_t nPruneAfterHeight;
+    int32_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
@@ -119,6 +120,8 @@ protected:
     bool fRequireStandard;
     bool fMineBlocksOnDemand;
     bool fTestBlockCandidateValidity;
+    bool fDisbleBIP30Checks;
+    bool fCanDisbleBIP30Checks;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
     DefaultBlockSizeParams defaultBlockSizeParams;

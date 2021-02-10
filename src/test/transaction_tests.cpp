@@ -277,8 +277,8 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
 
 BOOST_AUTO_TEST_CASE(test_Get) {
     CBasicKeyStore keystore;
-    CCoinsView coinsDummy;
-    CCoinsViewCache coins(&coinsDummy);
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions =
         SetupDummyInputs(keystore, coins);
 
@@ -471,17 +471,17 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     auto source = task::CCancellationSource::Make();
     auto control = pool.GetChecker(0, source->GetToken());
 
-    std::vector<Coin> coins;
+    std::vector<CoinWithScript> coins;
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         CTxOut out;
         out.nValue = Amount(1000);
         out.scriptPubKey = scriptPubKey;
-        coins.emplace_back(std::move(out), 1, false);
+        coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false));
     }
 
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         std::vector<CScriptCheck> vChecks;
-        CTxOut &out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
+        const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
         vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, i,
                              MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
         
@@ -626,8 +626,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
 BOOST_AUTO_TEST_CASE(test_IsStandard) {
     LOCK(cs_main);
     CBasicKeyStore keystore;
-    CCoinsView coinsDummy;
-    CCoinsViewCache coins(&coinsDummy);
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions =
         SetupDummyInputs(keystore, coins);
 
@@ -702,8 +702,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
 {
     LOCK(cs_main);
     CBasicKeyStore keystore;
-    CCoinsView coinsDummy;
-    CCoinsViewCache coins(&coinsDummy);
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
 
     std::string reason;

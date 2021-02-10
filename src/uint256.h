@@ -7,6 +7,7 @@
 #define BITCOIN_UINT256_H
 
 #include "crypto/common.h"
+#include "utilstrencodings.h"
 
 #include <cassert>
 #include <cstdint>
@@ -24,7 +25,10 @@ protected:
 public:
     base_blob() { memset(data, 0, sizeof(data)); }
 
-    explicit base_blob(const std::vector<uint8_t> &vch);
+    explicit base_blob(const std::vector<uint8_t> &vch) {
+        assert(vch.size() == sizeof(data));
+        memcpy(data, &vch[0], sizeof(data));
+    }
 
     bool IsNull() const {
         for (int i = 0; i < WIDTH; i++)
@@ -48,10 +52,47 @@ public:
         return a.Compare(b) < 0;
     }
 
-    std::string GetHex() const;
-    void SetHex(const char *psz);
-    void SetHex(const std::string &str);
-    std::string ToString() const;
+    std::string GetHex() const {
+        std::string hex(WIDTH * 2, 0);
+        for(unsigned int i = 0; i < WIDTH; ++i) {
+            uint8_t c = data[WIDTH - i - 1];
+            hex[i * 2] = hexmap[c >> 4];
+            hex[i * 2 + 1] = hexmap[c & 15];
+        }
+        return hex;
+    }
+
+    void SetHex(const char *psz) {
+        memset(data, 0, sizeof(data));
+        // skip leading spaces
+        while (isspace(*psz))
+            ++psz;
+
+        // skip 0x
+        if (psz[0] == '0' && tolower(psz[1]) == 'x')
+            psz += 2;
+
+        // hex string to uint
+        const char *pbegin = psz;
+        while (::HexDigit(*psz) != -1)
+            ++psz;
+
+        --psz;
+        uint8_t *p1 = data;
+        uint8_t *pend = p1 + WIDTH;
+        while (psz >= pbegin && p1 < pend) {
+            *p1 = ::HexDigit(*psz);
+            --psz;
+            if (psz >= pbegin) {
+                *p1 |= uint8_t(::HexDigit(*psz) << 4);
+                --psz;
+                ++p1;
+            }
+        }
+    }
+    void SetHex(const std::string &str) { SetHex(str.c_str()); };
+
+    std::string ToString() const { return GetHex(); };
 
     uint8_t *begin() { return &data[0]; }
 

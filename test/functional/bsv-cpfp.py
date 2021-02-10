@@ -100,6 +100,10 @@ class Cpfp(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, [tx_pays_relay1, tx_pays_relay2, tx_pays_enough_for_itself])
             wait_until(lambda: conn.rpc.getminingcandidate()["num_tx"] == 1) #"should be coinbase only"
 
+            #try  to rebuild journal, mining candidate should stay the same
+            conn.rpc.rebuildjournal()
+            wait_until(lambda: conn.rpc.getminingcandidate()["num_tx"] == 1)
+
             # this will trigger cpfp for two unpaying antcestors (tx_pays_relay1 and tx_pays_relay1) then
             # after that tx_pays_enough_for_itself will be free of ancestor debt and it will be accepted also
             conn.send_message(msg_tx(tx_pays_for_ancestors))
@@ -110,6 +114,10 @@ class Cpfp(BitcoinTestFramework):
             conn.send_message(msg_tx(tx_pays_relay3))
             check_mempool_equals(conn.rpc, [tx_pays_relay1, tx_pays_relay2, tx_pays_enough_for_itself, tx_pays_for_ancestors, tx_pays_relay3])
             wait_until(lambda: conn.rpc.getminingcandidate()["num_tx"] == 5), #"all tx, except tx_pays_relay3 plus coinbase"
+
+            #try  to rebuild journal, mining candidate should stay the same
+            conn.rpc.rebuildjournal()
+            wait_until(lambda: conn.rpc.getminingcandidate()["num_tx"] == 5)
 
             # we will mine a new block, all transactions from the journal will end up in new block, mempool will contain
             # only tx_pays_relay3

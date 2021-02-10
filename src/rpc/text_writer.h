@@ -11,19 +11,24 @@
 class CTextWriter
 {
 public:
-    virtual ~CTextWriter() {};
+    virtual ~CTextWriter() = default;
     virtual void Write(char val) = 0;
     virtual void Write(const std::string& jsonText) = 0;
-    virtual void WriteLine(const std::string& jsonText) = 0;
     virtual void Flush() = 0;
     virtual void ReserveAdditional(size_t size) = 0;
-}; 
+
+    void WriteLine(const std::string& jsonText) {
+        Write(jsonText);
+        Write('\n');
+    }
+    void WriteLine() {
+        Write('\n');
+    }
+};
 
 class CStringWriter : public CTextWriter
 {
 public:
-
-    ~CStringWriter() override {};
 
     void Write(char val) override
     {
@@ -33,12 +38,6 @@ public:
     void Write(const std::string& jsonText) override
     {
         strBuffer.append(jsonText);
-    }
-
-    void WriteLine(const std::string& jsonText = "") override
-    {
-        strBuffer.append(jsonText);
-        strBuffer.push_back('\n');
     }
 
     void Flush() override {}
@@ -66,14 +65,14 @@ class CHttpTextWriter : public CTextWriter
 {
 public:
 
-    CHttpTextWriter(HTTPRequest& request) : _request(request)
+    explicit CHttpTextWriter(HTTPRequest& request) : _request(request)
     {
         strBuffer.reserve(BUFFER_SIZE);
     }
 
     ~CHttpTextWriter() override
     {
-        Flush();
+        FlushNonVirtual();
     }
 
     void Write(char val) override
@@ -86,19 +85,9 @@ public:
         WriteToBuff(jsonText);
     }
 
-    void WriteLine(const std::string& jsonText = "") override
-    {
-        WriteToBuff(jsonText);
-        WriteToBuff('\n');
-    }
-
     void Flush() override
     {
-        if (!strBuffer.empty())
-        {
-            _request.WriteReplyChunk(strBuffer);
-            strBuffer.clear();
-        }
+        FlushNonVirtual();
     }
 
     void ReserveAdditional(size_t size) override {}
@@ -108,11 +97,11 @@ private:
     HTTPRequest& _request;
     std::string strBuffer;
 
-    void WriteToBuff(std::string jsonText)
+    void WriteToBuff(std::string const & jsonText)
     {
         if (jsonText.size() > BUFFER_SIZE)
         {
-            Flush();
+            FlushNonVirtual();
             _request.WriteReplyChunk(jsonText);
             return;
         }
@@ -120,7 +109,7 @@ private:
         strBuffer.append(jsonText);
         if (strBuffer.size() > BUFFER_SIZE)
         {
-            Flush();
+            FlushNonVirtual();
         }
     }
 
@@ -129,19 +118,31 @@ private:
         strBuffer.push_back(jsonText);
         if (strBuffer.size() > BUFFER_SIZE)
         {
-            Flush();
+            FlushNonVirtual();
         }
     }
-
+    void FlushNonVirtual()
+    {
+        if (!strBuffer.empty())
+        {
+            _request.WriteReplyChunk(strBuffer);
+            strBuffer.clear();
+        }
+    }
 };
 
 class CFileTextWriter : public CTextWriter
 {
 public:
-    CFileTextWriter(const std::string& path)
+    explicit CFileTextWriter(const std::string& path)
     {
         file.open(path, std::ios::out | std::ios::trunc);
         CheckForError();
+    }
+
+    ~CFileTextWriter () override
+    {
+        FlushNonVirtual();
     }
 
     void Write(char val) override
@@ -162,27 +163,14 @@ public:
         }
     }
 
-    void WriteLine(const std::string& jsonText = "") override
-    {
-        if (error.empty())
-        {
-            file << jsonText << '\n';
-            CheckForError();
-        }
-    }
-
     void Flush() override
     {
-        if (error.empty())
-        {
-            file.flush();
-            CheckForError();
-        }
+        FlushNonVirtual();
     }
 
     void ReserveAdditional(size_t size) override {}
 
-    // returns empty string if no errors occured
+    // returns empty string if no errors occurred
     std::string GetError()
     {
         return error;
@@ -194,6 +182,14 @@ private:
         if(file.fail())
         {
             error =  "Failed to write to file: " + std::generic_category().message(errno);
+        }
+    }
+    void FlushNonVirtual()
+    {
+        if (error.empty())
+        {
+            file.flush();
+            CheckForError();
         }
     }
 

@@ -22,6 +22,7 @@
 #include "utiltime.h"
 
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <exception>
 #include <map>
@@ -127,9 +128,14 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
+    static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
+
     void ParseParameters(int argc, const char *const argv[]);
     void ReadConfigFile(const std::string &confPath);
     std::vector<std::string> GetArgs(const std::string &strArg);
+    bool IsSensitiveArg(const std::string& argName);
+    std::vector<std::string> GetNonSensitiveParameters();
+    void LogSetParameters();
 
     /**
      * Return true if the given argument has been manually set.
@@ -199,6 +205,9 @@ public:
     // Forces a arg setting, used only in testing
     void ForceSetArg(const std::string &strArg, const std::string &strValue);
 
+    // Forces a boolean arg setting, used only in testing
+    void ForceSetBoolArg(const std::string &strArg, bool fValue);
+
     // Forces a multi arg setting, used only in testing
     void ForceSetMultiArg(const std::string &strArg,
                           const std::string &strValue);
@@ -241,7 +250,7 @@ std::string GetThreadName();
  * .. and a wrapper that just calls func once
  */
 template <typename Callable> void TraceThread(const char *name, Callable func) {
-    std::string s = strprintf("bitcoin-%s", name);
+    std::string s = strprintf("%s", name);
     RenameThread(s.c_str());
     try {
         LogPrintf("%s thread start\n", name);

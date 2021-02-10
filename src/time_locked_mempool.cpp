@@ -3,7 +3,6 @@
 
 #include <clientversion.h>
 #include <config.h>
-#include <init.h>
 #include <logging.h>
 #include <memusage.h>
 #include <mining/journal_change_set.h>
@@ -29,7 +28,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(
     const TxInputDataSPtr& pTxInputData,
     CValidationState& state)
 {
-    const CTransactionRef& txn { info.tx };
+    CTransactionRef txn { info.GetTx() };
 
     std::unique_lock lock { mMtx };
 
@@ -64,6 +63,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(
                 LogPrint(BCLog::MEMPOOL, "Finalising non-final tx: %s\n", txn->GetId().ToString());
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
                 pTxInputData->SetTxSource(TxSource::finalised);
+                pTxInputData->SetTxStorage(info.GetTxStorage()),
                 pTxInputData->SetAcceptTime(GetTime());
                 state.SetResubmitTx();
             }
@@ -92,7 +92,7 @@ std::vector<TxId> CTimeLockedMempool::getTxnIDs() const
     std::shared_lock lock { mMtx };
     for(const auto& info : mTransactionMap.get<TagTxID>())
     {
-        res.emplace_back(info.tx->GetId());
+        res.emplace_back(info.GetTxId());
     }
 
     return res;
@@ -228,7 +228,7 @@ void CTimeLockedMempool::dumpMempool() const
 
         for(const auto& details : index)
         {
-            file << *(details.tx);
+            file << *(details.GetTx());
             file << details.nTime;
         }
 
@@ -299,8 +299,8 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                             tx,    // a pointer to the tx
                             TxSource::file, // tx source
                             standard ? TxValidationPriority::high : TxValidationPriority::low,
-                            nTime, // nAcceptTime
-                            true),  // fLimitFree
+                            TxStorage::memory, // tx storage
+                            nTime), // nAcceptTime
                         changeSet, // an instance of the mempool journal
                         true) // fLimitMempoolSize
                 };
@@ -387,7 +387,7 @@ std::set<CTransactionRef> CTimeLockedMempool::getTransactionsUpdatedByNL(const C
 // Insert a new transaction
 void CTimeLockedMempool::insertNL(const TxMempoolInfo& info, CValidationState& state)
 {
-    const CTransactionRef& txn { info.tx };
+    CTransactionRef txn { info.GetTx() };
 
     // Put new txn in the main index
     auto& index { mTransactionMap.get<TagTxID>() };
@@ -547,7 +547,7 @@ void CTimeLockedMempool::periodicChecks()
     auto it { index.begin() };
     while(it != index.end())
     {
-        CTransactionRef txn { it->tx };
+        CTransactionRef txn { it->GetTx() };
         int64_t insertionTime { it->nTime };
         int64_t timeInPool { now - insertionTime };
 
@@ -571,6 +571,7 @@ void CTimeLockedMempool::periodicChecks()
                     txn,
                     TxSource::finalised,
                     standard ? TxValidationPriority::high : TxValidationPriority::low,
+                    TxStorage::memory,
                     GetTime()));
         }
         // Purge age passed?

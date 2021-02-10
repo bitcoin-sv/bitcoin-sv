@@ -3,17 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "checkpoints.h"
-
 #include "chain.h"
 #include "chainparams.h"
-
-#include <cstdint>
-
 #include <boost/range/adaptor/reversed.hpp>
 
 namespace Checkpoints {
 
-bool CheckBlock(const CCheckpointData &data, int nHeight, const uint256 &hash) {
+bool CheckBlock(const CCheckpointData &data, int32_t nHeight, const uint256 &hash) {
     const MapCheckpoints &checkpoints = data.mapCheckpoints;
 
     MapCheckpoints::const_iterator i = checkpoints.find(nHeight);

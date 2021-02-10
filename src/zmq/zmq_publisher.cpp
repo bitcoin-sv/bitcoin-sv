@@ -5,9 +5,8 @@
 #include "zmq_publisher.h"
 #include "zmqpublishnotifier.h"
 #include "consensus/consensus.h"
-#include <iostream>
 #include <logging.h>
-#include <cstdarg>
+#include <vector>
 #include <zmq.h>
 #include <memusage.h>
 #include <util.h>

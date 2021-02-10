@@ -296,9 +296,8 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
             LimitMempoolSize(
                 mMempool,
                 changeSet,
-                mConfig.GetMaxMempool(),
-                mConfig.GetMemPoolExpiry());
-    }
+                MempoolSizeLimits::FromConfig());
+    } /*TODO*/
     // Execute post processing steps.
     postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
     // After we've (potentially) uncached entries, ensure our coins cache is
@@ -318,7 +317,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
 /** Thread entry point for new transaction queue handling */
 void CTxnValidator::threadNewTxnHandler() noexcept {
     try {
-        RenameThread("bitcoin-txnvalidator");
+        RenameThread("txnvalidator");
         LogPrint(BCLog::TXNVAL, "New transaction handling thread. Starting validator.\n");
         // Get a number of High and Low priority threads.
         size_t nNumStdTxValidationThreads {
@@ -346,9 +345,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         };
         // Ensure, that the last - long running task - won't exceed the limit.
         nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
+
         // Get mempool limits.
-        size_t nMaxMempoolSize = mConfig.GetMaxMempool();
-        unsigned long nMempoolExpiry = mConfig.GetMemPoolExpiry();
+        MempoolSizeLimits nLimits(MempoolSizeLimits::FromConfig());
+
         // The main running loop
         while(mRunning) {
             // Run every few seconds or until stopping
@@ -430,8 +430,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     LimitMempoolSize(
                                         mMempool,
                                         handlers.mJournalChangeSet,
-                                        nMaxMempoolSize,
-                                        nMempoolExpiry)
+                                        nLimits)
                                 };
                                 // Execute post processing steps.
                                 postProcessingStepsNL(imdResult.mAcceptedTxns, vRemovedTxIds, handlers);
@@ -534,7 +533,7 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
             mpTxnDoubleSpendDetector,
             fUseLimits);
     // Process validated results for the given txn
-    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize, mConfig);
     return result;
 }
 

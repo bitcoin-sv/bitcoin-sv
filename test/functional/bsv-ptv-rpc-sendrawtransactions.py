@@ -268,7 +268,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1: {} chains of length {}. Default params for rpc call.'.format(num_of_chains, chain_length),
@@ -289,7 +288,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Node's config
         args = ['-txnvalidationasynchrunfreq=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS2: {} chains of length {}. Shuffled txs. Default params for rpc call.'.format(num_of_chains, chain_length),
@@ -311,7 +309,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-txnvalidationasynchrunfreq=0',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS3: {} chains of length {}. Default params for rpc call.'.format(num_of_chains, chain_length),
@@ -335,7 +332,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS4: {} chains of length {}. allowhighfees={}, dontcheckfee={}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee)),
@@ -359,7 +355,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS5: {} chains of length {}. allowhighfees={}, dontcheckfee={}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee)),
@@ -381,7 +376,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS6: Invalid conditions',
@@ -396,6 +390,8 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         chain_length = 10
         # Node's config
         args = ['-txnvalidationasynchrunfreq=10000',
+                '-maxstdtxnsperthreadratio=0', # Do not take any std txs for processing (from the ptv queues).
+                '-maxnonstdtxnsperthreadratio=0', # Do not take any non-std txs for processing (from the ptv queues).
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS7: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
@@ -414,7 +410,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Node's config
         args = ['-txnvalidationasynchrunfreq=0',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS8: {} chains of length {}. Test duplicated inputs.'.format(num_of_chains, chain_length),

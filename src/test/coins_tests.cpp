@@ -6,532 +6,170 @@
 #include "consensus/validation.h"
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 #include "uint256.h"
 #include "undo.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "chainparams.h"
 
+#include <chrono>
 #include <map>
+#include <optional>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
 #include <config.h>
 
+namespace{ class coins_tests_uid; } // only used as unique identifier
+
+template <>
+struct CoinsStore::UnitTestAccess<coins_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static CCoinsMap& GetRawCacheCoins(CoinsStore& cache) { return cache.cacheCoins; }
+    static size_t& GetCachedCoinsUsage(CoinsStore& cache) { return cache.cachedCoinsUsage; }
+};
+using TestAccessCoinsCache = CoinsStore::UnitTestAccess<coins_tests_uid>;
+
+template <>
+struct CoinsDBSpan::UnitTestAccess<coins_tests_uid> : public CoinsDBSpan
+{
+    using CoinsDBSpan::CoinsDBSpan;
+
+    CCoinsMap& GetRawCacheCoins() { return TestAccessCoinsCache::GetRawCacheCoins(mCache); }
+    size_t& GetCachedCoinsUsage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mCache); }
+
+    void BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlockIn)
+    {
+        mCache.BatchWrite(mapCoins);
+        hashBlock = hashBlockIn;
+    }
+};
+using TestCoinsSpanCache = CoinsDBSpan::UnitTestAccess<coins_tests_uid>;
+
+/**
+ * Class for testing provider internals that are otherwise not exposed through
+ * public API of views/spans
+ */
+template <>
+struct CoinsDB::UnitTestAccess<coins_tests_uid> : public CoinsDB
+{
+public:
+    UnitTestAccess( std::size_t cacheSize )
+        : CoinsDB{ cacheSize, 0, CoinsDB::MaxFiles::Default(), false, false }
+    {}
+
+    const std::optional<CoinImpl>& GetLatestCoin() const { return mLatestGetCoin; }
+    uint64_t GetLatestRequestedScriptSize() const { return mLatestRequestedScriptSize; }
+
+    void SizeOverride(std::optional<uint64_t> override) { mOverrideSize = override; }
+
+    CCoinsMap& GetRawCacheCoins()
+    {
+        return TestAccessCoinsCache::GetRawCacheCoins(mCache);
+    }
+
+protected:
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
+    {
+        mLatestRequestedScriptSize = (mOverrideSize.has_value() ? mOverrideSize.value() : maxScriptSize);
+        mLatestGetCoin = CoinsDB::GetCoin(outpoint, mLatestRequestedScriptSize);
+
+        return mLatestGetCoin->MakeNonOwning();
+    }
+
+    void ReadLock(WPUSMutex::Lock& lockHandle)
+    {
+        return CoinsDB::ReadLock(lockHandle);
+    }
+
+private:
+    mutable uint64_t mLatestRequestedScriptSize;
+    mutable std::optional<CoinImpl> mLatestGetCoin;
+    std::optional<uint64_t> mOverrideSize;
+
+    friend class CTestCoinsView;
+};
+using CCoinsProviderTest = CoinsDB::UnitTestAccess<coins_tests_uid>;
+
+class CTestCoinsView
+{
+public:
+    CTestCoinsView(CCoinsProviderTest& providerIn)
+        : provider{providerIn}
+    {
+        provider.ReadLock( mLock );
+    }
+
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const
+    {
+        auto coinData = provider.GetCoin(outpoint, 0);
+        if(coinData.has_value())
+        {
+            return Coin{coinData.value()};
+        }
+
+        return {};
+    }
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = provider.GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
+        }
+
+        return {};
+    }
+
+private:
+    CCoinsProviderTest& provider;
+    WPUSMutex::Lock mLock;
+};
+
 namespace {
 
-//! equality test
-bool operator==(const Coin &a, const Coin &b) {
-    // Empty Coin objects are always equal.
-    if (a.IsSpent() && b.IsSpent()) {
-        return true;
-    }
-
-    return a.IsCoinBase() == b.IsCoinBase() && a.GetHeight() == b.GetHeight() &&
-           a.GetTxOut() == b.GetTxOut();
-}
-
-// Dummy cursor that returns no data
-class CCoinsViewCursorEmpty : public CCoinsViewCursor {
+class CCoinsViewCacheTest : public TestCoinsSpanCache {
 public:
-    CCoinsViewCursorEmpty(const uint256& hashBlockIn)
-        : CCoinsViewCursor(hashBlockIn) { }
-    ~CCoinsViewCursorEmpty() {}
+    CCoinsViewCacheTest( CoinsDB& db ) : TestCoinsSpanCache(db) {}
 
-    bool GetKey(COutPoint& key) const override {        
-        return false;
-    }
-    bool GetValue(Coin& coin) const override {        
-        return false;
-    }
-    unsigned int GetValueSize() const override {
-        return 0;
-    };
-
-    bool Valid() const override {        
-        return false;
-    };
-    void Next() override {        
-    };
-};
-
-class CCoinsViewTest : public CCoinsView {
-    uint256 hashBestBlock_;
-    std::map<COutPoint, Coin> map_;
-
-public:
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override {
-        std::map<COutPoint, Coin>::const_iterator it = map_.find(outpoint);
-        if (it == map_.end()) {
-            return false;
-        }
-        coin = it->second;
-        if (coin.IsSpent() && InsecureRandBool() == 0) {
-            // Randomly return false in case of an empty entry.
-            return false;
-        }
-        return true;
-    }
-
-    bool HaveCoin(const COutPoint &outpoint) const override {
-        Coin coin;
-        return GetCoin(outpoint, coin);
-    }
-
-    uint256 GetBestBlock() const override { return hashBestBlock_; }
-
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override {
-        for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
-            if (it->second.flags & CCoinsCacheEntry::DIRTY) {
-                // Same optimization used in CCoinsViewDB is to only write dirty
-                // entries.
-                map_[it->first] = it->second.coin;
-                if (it->second.coin.IsSpent() && InsecureRandRange(3) == 0) {
-                    // Randomly delete empty entries on write.
-                    map_.erase(it->first);
-                }
-            }
-            mapCoins.erase(it++);
-        }
-        if (!hashBlock.IsNull()) {
-            hashBestBlock_ = hashBlock;
-        }
-        return true;
-    }
-
-    CCoinsViewCursor* Cursor(const TxId& txId) const override
-    {
-        CCoinsViewCursorEmpty* cc = new CCoinsViewCursorEmpty(GetBestBlock());
-        return cc;
-    }
-};
-
-class CCoinsViewCacheTest : public CCoinsViewCache {
-public:
-    CCoinsViewCacheTest(CCoinsView *base) : CCoinsViewCache(base) {}
-
-    void SelfTest() const {
+    void SelfTest() {
         // Manually recompute the dynamic usage of the whole data, and compare
         // it.
-        size_t ret = memusage::DynamicUsage(cacheCoins);
+        size_t ret = memusage::DynamicUsage(GetRawCacheCoins());
         size_t count = 0;
-        for (CCoinsMap::iterator it = cacheCoins.begin();
-             it != cacheCoins.end(); it++) {
-            ret += it->second.coin.DynamicMemoryUsage();
+        for (const auto& entry : GetRawCacheCoins())
+        {
+            ret += entry.second.DynamicMemoryUsage();
             count++;
         }
-        BOOST_CHECK_EQUAL(GetCacheSize(), count);
+        BOOST_CHECK_EQUAL(GetRawCacheCoins().size(), count);
         BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
     }
-
-    CCoinsMap &map() { return cacheCoins; }
-    size_t &usage() { return cachedCoinsUsage; }
 };
+
+CoinWithScript DataStreamToCoinWithScript(CDataStream& stream)
+{
+    CoinImpl coin;
+    stream >> coin;
+
+    return coin;
+}
+
 } // namespace
 
 BOOST_FIXTURE_TEST_SUITE(coins_tests, BasicTestingSetup)
-
-static const unsigned int NUM_SIMULATION_ITERATIONS = 40000;
-
-// This is a large randomized insert/remove simulation test on a variable-size
-// stack of caches on top of CCoinsViewTest.
-//
-// It will randomly create/update/delete Coin entries to a tip of caches, with
-// txids picked from a limited list of random 256-bit hashes. Occasionally, a
-// new tip is added to the stack of caches, or the tip is flushed and removed.
-//
-// During the process, booleans are kept to make sure that the randomized
-// operation hits all branches.
-BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
-    // Various coverage trackers.
-    bool removed_all_caches = false;
-    bool reached_4_caches = false;
-    bool added_an_entry = false;
-    bool added_an_unspendable_entry = false;
-    bool removed_an_entry = false;
-    bool updated_an_entry = false;
-    bool found_an_entry = false;
-    bool missed_an_entry = false;
-    bool uncached_an_entry = false;
-
-    // A simple map to track what we expect the cache stack to represent.
-    std::map<COutPoint, Coin> result;
-
-    // The cache stack.
-    // A CCoinsViewTest at the bottom.
-    CCoinsViewTest base;
-    // A stack of CCoinsViewCaches on top.
-    std::vector<CCoinsViewCacheTest *> stack;
-    // Start with one cache.
-    stack.push_back(new CCoinsViewCacheTest(&base));
-
-    // Use a limited set of random transaction ids, so we do test overwriting
-    // entries.
-    std::vector<TxId> txids;
-    txids.resize(NUM_SIMULATION_ITERATIONS / 8);
-    for (size_t i = 0; i < txids.size(); i++) {
-        txids[i] = TxId(InsecureRand256());
-    }
-
-    for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++) {
-        // Do a random modification.
-        {
-            // txid we're going to modify in this iteration.
-            TxId txid = txids[InsecureRandRange(txids.size())];
-            Coin &coin = result[COutPoint(txid, 0)];
-            const Coin &entry =
-                (InsecureRandRange(500) == 0)
-                    ? AccessByTxid(*stack.back(), txid)
-                    : stack.back()->AccessCoin(COutPoint(txid, 0));
-            BOOST_CHECK(coin == entry);
-
-            testConfig.SetGenesisActivationHeight(testConfig.GetChainParams().GetConsensus().genesisHeight);
-
-            if (InsecureRandRange(5) == 0 || coin.IsSpent()) {
-                CTxOut txout;
-                txout.nValue = Amount(int64_t(insecure_rand()));
-                if (InsecureRandRange(16) == 0 && coin.IsSpent()) {
-                    txout.scriptPubKey.assign(1 + InsecureRandBits(6),
-                                              OP_RETURN);
-                    BOOST_CHECK(txout.scriptPubKey.IsUnspendable(IsGenesisEnabled(testConfig, 1)));
-                    added_an_unspendable_entry = true;
-                } else {
-                    // Random sizes so we can test memory usage accounting
-                    txout.scriptPubKey.assign(InsecureRandBits(6), 0);
-                    (coin.IsSpent() ? added_an_entry : updated_an_entry) = true;
-                    coin = Coin(txout, 1, false);
-                }
-
-                Coin newcoin(txout, 1, false);
-                stack.back()->AddCoin(COutPoint(txid, 0), newcoin,
-                                      !coin.IsSpent() || insecure_rand() & 1, testConfig.GetGenesisActivationHeight());
-            } else {
-                removed_an_entry = true;
-                coin.Clear();
-                stack.back()->SpendCoin(COutPoint(txid, 0));
-            }
-        }
-
-        // One every 10 iterations, remove a random entry from the cache
-        if (InsecureRandRange(10)) {
-            COutPoint out(txids[insecure_rand() % txids.size()], 0);
-            int cacheid = insecure_rand() % stack.size();
-            stack[cacheid]->Uncache(out);
-            uncached_an_entry |= !stack[cacheid]->HaveCoinInCache(out);
-        }
-
-        // Once every 1000 iterations and at the end, verify the full cache.
-        if (InsecureRandRange(1000) == 1 ||
-            i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (auto it = result.begin(); it != result.end(); it++) {
-                bool have = stack.back()->HaveCoin(it->first);
-                const Coin &coin = stack.back()->AccessCoin(it->first);
-                BOOST_CHECK(have == !coin.IsSpent());
-                BOOST_CHECK(coin == it->second);
-                if (coin.IsSpent()) {
-                    missed_an_entry = true;
-                } else {
-                    BOOST_CHECK(stack.back()->HaveCoinInCache(it->first));
-                    found_an_entry = true;
-                }
-            }
-            for (const CCoinsViewCacheTest *test : stack) {
-                test->SelfTest();
-            }
-        }
-
-        // Every 100 iterations, flush an intermediate cache
-        if (InsecureRandRange(100) == 0) {
-            if (stack.size() > 1 && InsecureRandBool() == 0) {
-                unsigned int flushIndex = InsecureRandRange(stack.size() - 1);
-                stack[flushIndex]->Flush();
-            }
-        }
-        if (InsecureRandRange(100) == 0) {
-            // Every 100 iterations, change the cache stack.
-            if (stack.size() > 0 && InsecureRandBool() == 0) {
-                // Remove the top cache
-                stack.back()->Flush();
-                delete stack.back();
-                stack.pop_back();
-            }
-            if (stack.size() == 0 || (stack.size() < 4 && InsecureRandBool())) {
-                // Add a new cache
-                CCoinsView *tip = &base;
-                if (stack.size() > 0) {
-                    tip = stack.back();
-                } else {
-                    removed_all_caches = true;
-                }
-                stack.push_back(new CCoinsViewCacheTest(tip));
-                if (stack.size() == 4) {
-                    reached_4_caches = true;
-                }
-            }
-        }
-    }
-
-    // Clean up the stack.
-    while (stack.size() > 0) {
-        delete stack.back();
-        stack.pop_back();
-    }
-
-    // Verify coverage.
-    BOOST_CHECK(removed_all_caches);
-    BOOST_CHECK(reached_4_caches);
-    BOOST_CHECK(added_an_entry);
-    BOOST_CHECK(added_an_unspendable_entry);
-    BOOST_CHECK(removed_an_entry);
-    BOOST_CHECK(updated_an_entry);
-    BOOST_CHECK(found_an_entry);
-    BOOST_CHECK(missed_an_entry);
-    BOOST_CHECK(uncached_an_entry);
-}
-
-// Store of all necessary tx and undo data for next test
-typedef std::map<COutPoint, std::tuple<CTransaction, CTxUndo, Coin>> UtxoData;
-UtxoData utxoData;
-
-UtxoData::iterator FindRandomFrom(const std::set<COutPoint> &utxoSet) {
-    assert(utxoSet.size());
-    auto utxoSetIt = utxoSet.lower_bound(COutPoint(InsecureRand256(), 0));
-    if (utxoSetIt == utxoSet.end()) {
-        utxoSetIt = utxoSet.begin();
-    }
-    auto utxoDataIt = utxoData.find(*utxoSetIt);
-    assert(utxoDataIt != utxoData.end());
-    return utxoDataIt;
-}
-
-// This test is similar to the previous test except the emphasis is on testing
-// the functionality of UpdateCoins random txs are created and UpdateCoins is
-// used to update the cache stack. In particular it is tested that spending a
-// duplicate coinbase tx has the expected effect (the other duplicate is
-// overwitten at all cache levels)
-BOOST_AUTO_TEST_CASE(updatecoins_simulation_test) {
-    bool spent_a_duplicate_coinbase = false;
-    // A simple map to track what we expect the cache stack to represent.
-    std::map<COutPoint, Coin> result;
-
-    // The cache stack.
-    // A CCoinsViewTest at the bottom.
-    CCoinsViewTest base;
-    // A stack of CCoinsViewCaches on top.
-    std::vector<CCoinsViewCacheTest *> stack;
-    // Start with one cache.
-    stack.push_back(new CCoinsViewCacheTest(&base));
-
-    // Track the txids we've used in various sets
-    std::set<COutPoint> coinbase_coins;
-    std::set<COutPoint> disconnected_coins;
-    std::set<COutPoint> duplicate_coins;
-    std::set<COutPoint> utxoset;
-
-    for (int64_t i = 0; i < NUM_SIMULATION_ITERATIONS; i++) {
-        uint32_t randiter = insecure_rand();
-
-        // 19/20 txs add a new transaction
-        if (randiter % 20 < 19) {
-            CMutableTransaction tx;
-            tx.vin.resize(1);
-            tx.vout.resize(1);
-            // Keep txs unique unless intended to duplicate.
-            tx.vout[0].nValue = Amount(i);
-            // Random sizes so we can test memory usage accounting
-            tx.vout[0].scriptPubKey.assign(insecure_rand() & 0x3F, 0);
-            unsigned int height = insecure_rand();
-            Coin old_coin;
-
-            // 2/20 times create a new coinbase
-            if (randiter % 20 < 2 || coinbase_coins.size() < 10) {
-                // 1/10 of those times create a duplicate coinbase
-                if (InsecureRandRange(10) == 0 && coinbase_coins.size()) {
-                    auto utxod = FindRandomFrom(coinbase_coins);
-                    // Reuse the exact same coinbase
-                    tx = std::get<0>(utxod->second);
-                    // shouldn't be available for reconnection if its been
-                    // duplicated
-                    disconnected_coins.erase(utxod->first);
-
-                    duplicate_coins.insert(utxod->first);
-                } else {
-                    coinbase_coins.insert(COutPoint(tx.GetId(), 0));
-                }
-                assert(CTransaction(tx).IsCoinBase());
-            }
-
-            // 17/20 times reconnect previous or add a regular tx
-            else {
-
-                COutPoint prevout;
-                // 1/20 times reconnect a previously disconnected tx
-                if (randiter % 20 == 2 && disconnected_coins.size()) {
-                    auto utxod = FindRandomFrom(disconnected_coins);
-                    tx = std::get<0>(utxod->second);
-                    prevout = tx.vin[0].prevout;
-                    if (!CTransaction(tx).IsCoinBase() &&
-                        !utxoset.count(prevout)) {
-                        disconnected_coins.erase(utxod->first);
-                        continue;
-                    }
-
-                    // If this tx is already IN the UTXO, then it must be a
-                    // coinbase, and it must be a duplicate
-                    if (utxoset.count(utxod->first)) {
-                        assert(CTransaction(tx).IsCoinBase());
-                        assert(duplicate_coins.count(utxod->first));
-                    }
-                    disconnected_coins.erase(utxod->first);
-                }
-
-                // 16/20 times create a regular tx
-                else {
-                    auto utxod = FindRandomFrom(utxoset);
-                    prevout = utxod->first;
-
-                    // Construct the tx to spend the coins of prevouthash
-                    tx.vin[0].prevout = COutPoint(prevout.GetTxId(), 0);
-                    assert(!CTransaction(tx).IsCoinBase());
-                }
-
-                // In this simple test coins only have two states, spent or
-                // unspent, save the unspent state to restore
-                old_coin = result[prevout];
-                // Update the expected result of prevouthash to know these coins
-                // are spent
-                result[prevout].Clear();
-
-                utxoset.erase(prevout);
-
-                // The test is designed to ensure spending a duplicate coinbase
-                // will work properly if that ever happens and not resurrect the
-                // previously overwritten coinbase
-                if (duplicate_coins.count(prevout)) {
-                    spent_a_duplicate_coinbase = true;
-                }
-            }
-            // Update the expected result to know about the new output coins
-            assert(tx.vout.size() == 1);
-            const COutPoint outpoint(tx.GetId(), 0);
-            result[outpoint] =
-                Coin(tx.vout[0], height, CTransaction(tx).IsCoinBase());
-
-            // Call UpdateCoins on the top cache
-            CTxUndo undo;
-            UpdateCoins(CTransaction(tx), *(stack.back()), undo, height);
-
-            // Update the utxo set for future spends
-            utxoset.insert(outpoint);
-
-            // Track this tx and undo info to use later
-            utxoData.emplace(outpoint,
-                             std::make_tuple(CTransaction(tx), undo, old_coin));
-        }
-
-        // 1/20 times undo a previous transaction
-        else if (utxoset.size()) {
-            auto utxod = FindRandomFrom(utxoset);
-
-            CTransaction &tx = std::get<0>(utxod->second);
-            CTxUndo &undo = std::get<1>(utxod->second);
-            Coin &orig_coin = std::get<2>(utxod->second);
-
-            // Update the expected result
-            // Remove new outputs
-            result[utxod->first].Clear();
-            // If not coinbase restore prevout
-            if (!tx.IsCoinBase()) {
-                result[tx.vin[0].prevout] = orig_coin;
-            }
-
-            // Disconnect the tx from the current UTXO
-            // See code in DisconnectBlock
-            // remove outputs
-            stack.back()->SpendCoin(utxod->first);
-
-            // restore inputs
-            if (!tx.IsCoinBase()) {
-                const COutPoint &out = tx.vin[0].prevout;
-                UndoCoinSpend(undo.vprevout[0], *(stack.back()), out, testConfig);
-            }
-
-            // Store as a candidate for reconnection
-            disconnected_coins.insert(utxod->first);
-
-            // Update the utxoset
-            utxoset.erase(utxod->first);
-            if (!tx.IsCoinBase()) {
-                utxoset.insert(tx.vin[0].prevout);
-            }
-        }
-
-        // Once every 1000 iterations and at the end, verify the full cache.
-        if (InsecureRandRange(1000) == 1 ||
-            i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (auto it = result.begin(); it != result.end(); it++) {
-                bool have = stack.back()->HaveCoin(it->first);
-                const Coin &coin = stack.back()->AccessCoin(it->first);
-                BOOST_CHECK(have == !coin.IsSpent());
-                BOOST_CHECK(coin == it->second);
-            }
-        }
-
-        // One every 10 iterations, remove a random entry from the cache
-        if (utxoset.size() > 1 && InsecureRandRange(30)) {
-            stack[insecure_rand() % stack.size()]->Uncache(
-                FindRandomFrom(utxoset)->first);
-        }
-        if (disconnected_coins.size() > 1 && InsecureRandRange(30)) {
-            stack[insecure_rand() % stack.size()]->Uncache(
-                FindRandomFrom(disconnected_coins)->first);
-        }
-        if (duplicate_coins.size() > 1 && InsecureRandRange(30)) {
-            stack[insecure_rand() % stack.size()]->Uncache(
-                FindRandomFrom(duplicate_coins)->first);
-        }
-
-        if (InsecureRandRange(100) == 0) {
-            // Every 100 iterations, flush an intermediate cache
-            if (stack.size() > 1 && InsecureRandBool() == 0) {
-                unsigned int flushIndex = InsecureRandRange(stack.size() - 1);
-                stack[flushIndex]->Flush();
-            }
-        }
-        if (InsecureRandRange(100) == 0) {
-            // Every 100 iterations, change the cache stack.
-            if (stack.size() > 0 && InsecureRandBool() == 0) {
-                stack.back()->Flush();
-                delete stack.back();
-                stack.pop_back();
-            }
-            if (stack.size() == 0 || (stack.size() < 4 && InsecureRandBool())) {
-                CCoinsView *tip = &base;
-                if (stack.size() > 0) {
-                    tip = stack.back();
-                }
-                stack.push_back(new CCoinsViewCacheTest(tip));
-            }
-        }
-    }
-
-    // Clean up the stack.
-    while (stack.size() > 0) {
-        delete stack.back();
-        stack.pop_back();
-    }
-
-    // Verify coverage.
-    BOOST_CHECK(spent_a_duplicate_coinbase);
-}
 
 BOOST_AUTO_TEST_CASE(coin_serialization) {
     // Good example
     CDataStream ss1(
         ParseHex("97f23c835800816115944e077fe7c803cfa57f29b36bf87c1d35"),
         SER_DISK, CLIENT_VERSION);
-    Coin c1;
-    ss1 >> c1;
+    CoinWithScript c1 = DataStreamToCoinWithScript(ss1);
     BOOST_CHECK_EQUAL(c1.IsCoinBase(), false);
     BOOST_CHECK_EQUAL(c1.GetHeight(), 203998U);
     BOOST_CHECK_EQUAL(c1.GetTxOut().nValue, Amount(60000000000LL));
@@ -543,8 +181,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     CDataStream ss2(
         ParseHex("8ddf77bbd123008c988f1a4a4de2161e0f50aac7f17e7f9555caa4"),
         SER_DISK, CLIENT_VERSION);
-    Coin c2;
-    ss2 >> c2;
+    CoinWithScript c2 = DataStreamToCoinWithScript(ss2);
     BOOST_CHECK_EQUAL(c2.IsCoinBase(), true);
     BOOST_CHECK_EQUAL(c2.GetHeight(), 120891);
     BOOST_CHECK_EQUAL(c2.GetTxOut().nValue, Amount(110397LL));
@@ -554,8 +191,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
 
     // Smallest possible example
     CDataStream ss3(ParseHex("000006"), SER_DISK, CLIENT_VERSION);
-    Coin c3;
-    ss3 >> c3;
+    CoinWithScript c3 = DataStreamToCoinWithScript(ss3);
     BOOST_CHECK_EQUAL(c3.IsCoinBase(), false);
     BOOST_CHECK_EQUAL(c3.GetHeight(), 0);
     BOOST_CHECK_EQUAL(c3.GetTxOut().nValue, Amount(0));
@@ -564,8 +200,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     // scriptPubKey that ends beyond the end of the stream
     CDataStream ss4(ParseHex("000007"), SER_DISK, CLIENT_VERSION);
     try {
-        Coin c4;
-        ss4 >> c4;
+        CoinWithScript c4 = DataStreamToCoinWithScript(ss4);
         BOOST_CHECK_MESSAGE(false, "We should have thrown");
     } catch (const std::ios_base::failure &e) {
     }
@@ -577,8 +212,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     BOOST_CHECK_EQUAL(HexStr(tmp.begin(), tmp.end()), "8a95c0bb00");
     CDataStream ss5(ParseHex("00008a95c0bb00"), SER_DISK, CLIENT_VERSION);
     try {
-        Coin c5;
-        ss5 >> c5;
+        CoinWithScript c5 = DataStreamToCoinWithScript(ss5);
         BOOST_CHECK_MESSAGE(false, "We should have thrown");
     } catch (const std::ios_base::failure &e) {
     }
@@ -599,15 +233,19 @@ static const auto FLAGS = {char(0), FRESH, DIRTY, char(DIRTY | FRESH)};
 static const auto CLEAN_FLAGS = {char(0), FRESH};
 static const auto ABSENT_FLAGS = {NO_ENTRY};
 
-static void SetCoinValue(const Amount value, Coin &coin) {
+static void SetCoinValue(const Amount value, CCoinsCacheEntry &coin, char flags) {
     assert(value != ABSENT);
-    coin.Clear();
-    assert(coin.IsSpent());
+    coin = {CoinImpl{}, static_cast<uint8_t>(flags)};
+    assert(coin.GetCoin().IsSpent());
     if (value != PRUNED) {
         CTxOut out;
         out.nValue = value;
-        coin = Coin(std::move(out), 1, false);
-        assert(!coin.IsSpent());
+        coin =
+            CCoinsCacheEntry(
+                CoinImpl::FromCoinWithScript(
+                    CoinWithScript::MakeOwning(std::move(out), 1, false) ),
+                static_cast<uint8_t>(flags));
+        assert(!coin.GetCoin().IsSpent());
     }
 }
 
@@ -618,12 +256,12 @@ size_t InsertCoinMapEntry(CCoinsMap &map, const Amount value, char flags) {
     }
     assert(flags != NO_ENTRY);
     CCoinsCacheEntry entry;
-    entry.flags = flags;
-    SetCoinValue(value, entry.coin);
+    SetCoinValue(value, entry, flags);
     auto inserted = map.emplace(OUTPOINT, std::move(entry));
     assert(inserted.second);
-    return inserted.first->second.coin.DynamicMemoryUsage();
+    return inserted.first->second.DynamicMemoryUsage();
 }
+
 
 void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
     auto it = map.find(OUTPOINT);
@@ -631,47 +269,55 @@ void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
         value = ABSENT;
         flags = NO_ENTRY;
     } else {
-        if (it->second.coin.IsSpent()) {
-            value = PRUNED;
-        } else {
-            value = it->second.coin.GetTxOut().nValue;
+        value = it->second.GetCoin().GetAmount();
+
+        if (it->second.GetCoin().IsSpent()) {
+            assert(value == PRUNED);
         }
+
         flags = it->second.flags;
         assert(flags != NO_ENTRY);
     }
 }
 
-void WriteCoinViewEntry(CCoinsView &view, const Amount value, char flags) {
+void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount value, char flags) {
     CCoinsMap map;
     InsertCoinMapEntry(map, value, flags);
-    view.BatchWrite(map, {});
+    span.BatchWrite(map, uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
 }
 
 class SingleEntryCacheTest {
 public:
     SingleEntryCacheTest(const Amount base_value, const Amount cache_value,
-                         char cache_flags) {
-        WriteCoinViewEntry(base, base_value,
-                           base_value == ABSENT ? NO_ENTRY : DIRTY);
-        cache.usage() +=
-            InsertCoinMapEntry(cache.map(), cache_value, cache_flags);
+                         char cache_flags){
+        {
+            TestCoinsSpanCache span{base};
+            WriteCoinViewEntry(span, base_value,
+                               base_value == ABSENT ? NO_ENTRY : DIRTY);
+            span.TryFlush();
+        }
+        cache = std::make_unique<CCoinsViewCacheTest>(base);
+        cache->GetCachedCoinsUsage() +=
+            InsertCoinMapEntry(cache->GetRawCacheCoins(), cache_value, cache_flags);
     }
 
-    CCoinsView root;
-    CCoinsViewCacheTest base{&root};
-    CCoinsViewCacheTest cache{&base};
+private:
+    CoinsDB base{ std::numeric_limits<size_t>::max(), 0, CoinsDB::MaxFiles::Default(), false, false };
+
+public:
+    std::unique_ptr<CCoinsViewCacheTest> cache;
 };
 
 void CheckAccessCoin(const Amount base_value, const Amount cache_value,
                      const Amount expected_value, char cache_flags,
                      char expected_flags) {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    test.cache.AccessCoin(OUTPOINT);
-    test.cache.SelfTest();
+    test.cache->GetCoin(OUTPOINT);
+    test.cache->SelfTest();
 
     Amount result_value;
     char result_flags;
-    GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+    GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
 }
@@ -693,7 +339,7 @@ BOOST_AUTO_TEST_CASE(coin_access) {
     CheckAccessCoin(ABSENT, VALUE2, VALUE2, FRESH, FRESH);
     CheckAccessCoin(ABSENT, VALUE2, VALUE2, DIRTY, DIRTY);
     CheckAccessCoin(ABSENT, VALUE2, VALUE2, DIRTY | FRESH, DIRTY | FRESH);
-    CheckAccessCoin(PRUNED, ABSENT, PRUNED, NO_ENTRY, FRESH);
+    CheckAccessCoin(PRUNED, ABSENT, ABSENT, NO_ENTRY, NO_ENTRY);
     CheckAccessCoin(PRUNED, PRUNED, PRUNED, 0, 0);
     CheckAccessCoin(PRUNED, PRUNED, PRUNED, FRESH, FRESH);
     CheckAccessCoin(PRUNED, PRUNED, PRUNED, DIRTY, DIRTY);
@@ -717,12 +363,12 @@ void CheckSpendCoin(Amount base_value, Amount cache_value,
                     Amount expected_value, char cache_flags,
                     char expected_flags) {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    test.cache.SpendCoin(OUTPOINT);
-    test.cache.SelfTest();
+    test.cache->SpendCoin(OUTPOINT);
+    test.cache->SelfTest();
 
     Amount result_value;
     char result_flags;
-    GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+    GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
 };
@@ -775,10 +421,11 @@ void CheckAddCoinBase(Amount base_value, Amount cache_value,
     try {
         CTxOut output;
         output.nValue = modify_value;
-        test.cache.AddCoin(OUTPOINT, Coin(std::move(output), 1, coinbase),
+        test.cache->GetCoin( OUTPOINT ); // make sure that coin is preloaded if it already exists
+        test.cache->AddCoin(OUTPOINT, CoinWithScript::MakeOwning(std::move(output), 1, coinbase),
                            coinbase, GlobalConfig::GetConfig().GetGenesisActivationHeight());
-        test.cache.SelfTest();
-        GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+        test.cache->SelfTest();
+        GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     } catch (std::logic_error &e) {
         result_value = FAIL;
         result_flags = NO_ENTRY;
@@ -809,7 +456,15 @@ BOOST_AUTO_TEST_CASE(coin_add) {
      * Cache   Write   Result  Cache        Result       potential_overwrite
      * Value   Value   Value   Flags        Flags
      */
-    CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
+    {
+        // Adding coins behaves differently in this case depending on whether
+        // coin was already present beforehand or not.
+        // New coin is added if coin is absent beforehand, otherwise adding it
+        // is treated as an error.
+        CheckAddCoinBase(ABSENT, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
+        CheckAddCoinBase(PRUNED, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
+        CheckAddCoinBase(VALUE1, ABSENT, VALUE3, FAIL, NO_ENTRY, NO_ENTRY, false);
+    }
     CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY | FRESH, false);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY, true);
@@ -837,9 +492,9 @@ void CheckWriteCoin(Amount parent_value, Amount child_value,
     Amount result_value;
     char result_flags;
     try {
-        WriteCoinViewEntry(test.cache, child_value, child_flags);
-        test.cache.SelfTest();
-        GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+        WriteCoinViewEntry(*test.cache, child_value, child_flags);
+        test.cache->SelfTest();
+        GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     } catch (std::logic_error &e) {
         result_value = FAIL;
         result_flags = NO_ENTRY;
@@ -925,6 +580,664 @@ BOOST_AUTO_TEST_CASE(coin_write) {
                 }
             }
         }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    pcoinsTip.reset();
+
+    /* Check method CCoinsViewDB::GetCoin_NoLargeScript
+     * Method should unserialize contents of the script only if size of script is not larger than specified.
+     * Otherwise member coin.out.scriptPubKey should be default initialized.
+     * In addition, method must always provide actual size of script, whether it was unserialized or not.
+     */
+
+    // Id of an unspent transaction
+    auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    // Hash and height of a block that contains unspent transaction (txId)
+    auto blockHash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    std::uint32_t blockHeight = 1;
+
+    // Size (in bytes) of small locking script
+    std::size_t script_small_size = 0;
+
+    // Size (in bytes) of big locking script
+    std::size_t script_big_size = 0;
+
+    //
+    // Add sample UTXOs to database
+    //
+    CCoinsProviderTest provider{ script_small_size }; // small cache
+
+    {
+        CoinsDBSpan span{provider};
+        span.SetBestBlock(blockHash);
+
+        {
+            // Output 0 - small locking script
+            CScript scr(OP_RETURN);
+            CTxOut txo(Amount(123), scr);
+            script_small_size = txo.scriptPubKey.size(); // remember size of small script for later
+            span.AddCoin(COutPoint(txId, 0), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false), false, 0); // UTXO is not coinbase
+        }
+
+        {
+            // Output 1 - big locking script
+            CTxOut txo;
+            txo.nValue = Amount(456);
+            txo.scriptPubKey = CScript(std::vector<uint8_t>(1024*1024, 0xde));
+            script_big_size = txo.scriptPubKey.size(); // remember size of big script for later
+            span.AddCoin(COutPoint(txId, 1), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false), false, 0); // UTXO is not coinbase
+        }
+
+        // And flush them to provider
+        BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
+    }
+
+    // Flush sample UTXOs to DB
+    BOOST_TEST(provider.Flush());
+
+    //
+    // Check that reading UTXOs from DB using GetCoinWithScript() method always also gets script
+    //
+    {
+        // Get output 0 from DB
+        auto c0 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 0));
+        BOOST_TEST(c0.has_value());
+        BOOST_TEST(c0->GetTxOut().nValue == Amount(123)); // check that we got the correct output
+        BOOST_TEST(c0->GetTxOut().scriptPubKey.size()==script_small_size);
+    }
+
+    {
+        // Get output 1 from DB
+        auto c1 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 1));
+        BOOST_TEST(c1.has_value());
+        BOOST_TEST(c1->GetTxOut().nValue == Amount(456)); // check that we got the correct output
+        BOOST_TEST(c1->GetTxOut().scriptPubKey.size()==script_big_size);
+    }
+
+    //
+    // Check that reading UTXOs from DB using GetCoin() only gets script if it is not larger than specified
+    //
+    {
+        // Get output 0 from DB with script regardless of its size
+        provider.SizeOverride(script_small_size);
+        auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
+        BOOST_TEST(c0.has_value());
+        BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_small_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_small_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+    }
+
+    {
+        // Get output 0 from DB without script (even if it is a very small one)
+        provider.SizeOverride( {} );
+        auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
+        BOOST_TEST(c0.has_value());
+        BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+    }
+
+    {
+        // Get output 1 from DB with script regardless of its size
+        provider.SizeOverride(script_big_size);
+        auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
+        BOOST_TEST(c1.has_value());
+        BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_big_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_big_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+    }
+
+    {
+        // Get output 1 from DB without script
+        provider.SizeOverride( {} );
+        auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
+        BOOST_TEST(c1.has_value());
+        BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(coins_provider_locks, TestingSetup)
+{
+    using namespace std::literals::chrono_literals;
+
+    auto test_try_flush =
+        [](std::atomic<int>& step)
+        {
+            // initialize first
+            CoinsDBSpan span{*pcoinsTip};
+            step = 1;
+
+            // wait for others to finish initialization
+            while(step.load() == 1);
+
+            // one thread should succeed, the rest should fail
+            return (span.TryFlush() == CoinsDBSpan::WriteState::ok);
+        };
+    auto test_read_lock =
+        [](std::atomic<int>& step)
+        {
+            // initialize first
+            CoinsDBView view{ *pcoinsTip };
+            CCoinsViewCache provider{ view };
+            step = 1;
+
+            // wait for others to finish initialization
+            while(step.load() == 1);
+        };
+
+    // TryFlush can be performed only if there are no other view locks
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_read_lock, std::reference_wrapper{one_step});
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_try_flush, std::reference_wrapper{two_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1 && two_step.load() == 1; }, 200ms));
+
+        two_step = 2;
+
+        // make sure that TryFlush keeps waiting for the read lock to be dropped
+        BOOST_TEST((two.wait_for(500ms) == std::future_status::timeout));
+
+        one_step = 2;
+
+        BOOST_TEST(two.get());
+        one.wait();
+    }
+
+    // TryFlush from second location fails
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_try_flush, std::reference_wrapper{one_step});
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_try_flush, std::reference_wrapper{two_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1 && two_step.load() == 1; }, 200ms));
+
+        one_step = 2;
+        two_step = 2;
+
+        BOOST_TEST(one.get() != two.get());
+    }
+
+    auto test_flush =
+        [](std::atomic<int>& step)
+        {
+            bool result = pcoinsTip->Flush();
+
+            step = 1;
+
+            return result;
+        };
+
+    // MT span creation waits until other view locks are present
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_read_lock, std::reference_wrapper{one_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1; }, 200ms));
+
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_flush, std::reference_wrapper{two_step});
+
+        // make sure that Flush keeps waiting for the read lock to be dropped
+        BOOST_TEST((one.wait_for(500ms) == std::future_status::timeout));
+
+        // MT span still hasn't been flushed
+        BOOST_TEST(two_step == 0);
+
+        one_step = 2;
+        one.wait();
+        BOOST_TEST(two.get());
+    }
+
+    // TryFlush fails if MT span creation is pending
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_try_flush, std::reference_wrapper{one_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1; }, 200ms));
+
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_flush, std::reference_wrapper{two_step});
+
+        // make sure that Flush keeps waiting for the read lock held inside
+        // test_try_flush to be dropped
+        BOOST_TEST((two.wait_for(500ms) == std::future_status::timeout));
+
+        ++one_step;
+
+        // make sure that TryFlush immediately fails since an exclusive write
+        // lock is pending
+        BOOST_TEST((one.wait_for(500ms) == std::future_status::ready));
+        BOOST_TEST((two.wait_for(500ms) == std::future_status::ready));
+
+        BOOST_TEST(one.get() == false);
+        BOOST_TEST(two.get());
+    }
+}
+
+// Test that coins caching works as expected when script cache is disabled
+BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    pcoinsTip.reset();
+
+    // Id of an unspent transaction
+    auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    // Hash and height of a block that contains unspent transaction (txId)
+    auto block_1_hash = uint256S("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto block_2_hash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    std::uint32_t blockHeight = 1;
+
+    CScript script_template =
+        []
+        {
+            // make sure that copies of this script don't end up smaller than
+            // expected as constructor from vector allocates more space than
+            // minimally needed
+            CScript tmp{std::vector<uint8_t>(1024*1024, 0xde)};
+            return CScript{tmp};
+        }();
+
+    // Dynamic memory usage of the scripts
+    std::uint32_t script_memory_usage = memusage::DynamicUsage(script_template);
+    BOOST_TEST(script_memory_usage != 0);
+
+    std::uint32_t coins_count = 5;
+
+    //
+    // Add sample UTXOs to database
+    //
+    CCoinsProviderTest primary{ 0 }; // no cache
+
+    // Each platform has its own default allocation policy for standard containers
+    // so even though the expected memory usage should be 0 that is not necessarily
+    // the case
+    auto defaultDynamicMemoryUsage = primary.DynamicMemoryUsage();
+
+    {
+        TestCoinsSpanCache secondary{primary};
+
+        // both caches are empty since we haven't added any coins
+        BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+        for(std::uint32_t i = 0; i < coins_count; ++i)
+        {
+            CTxOut txo;
+            txo.nValue = Amount(123);
+            txo.scriptPubKey = script_template;
+            secondary.AddCoin(
+                COutPoint{txId, i},
+                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false),
+                false,
+                0); // UTXO is not coinbase
+
+            BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+            BOOST_TEST(
+                secondary.DynamicMemoryUsage() ==
+                (memusage::DynamicUsage(secondary.GetRawCacheCoins()) + (script_memory_usage * (i + 1))));
+        }
+
+        // And flush them to primary cache
+        secondary.SetBestBlock(block_1_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // After flush dynamic memory usage can only be seen in primary cache
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + (script_memory_usage * coins_count)));
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+    }
+
+    // Flush sample UTXOs to DB
+    primary.Flush();
+
+    // After flush of primary cache to database the primary cache is empty
+    BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+    auto first_coin_outpoint = COutPoint{txId, 0};
+
+    //
+    // Read UTXOs from database without secondary cache
+    //
+    {
+        auto memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(primary.DynamicMemoryUsage() == memusage::DynamicUsage(primary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_load < primary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = primary.DynamicMemoryUsage();
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(primary.DynamicMemoryUsage() == memusage::DynamicUsage(primary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_with_script_load == primary.DynamicMemoryUsage());
+    }
+
+    //
+    // Read UTXOs from database with secondary cache
+    //
+    {
+        auto provider_memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+        TestCoinsSpanCache secondary{primary};
+        auto memory_usage_before_coin_load = secondary.DynamicMemoryUsage();
+        auto coin = secondary.GetCoin(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(secondary.DynamicMemoryUsage() == memusage::DynamicUsage(secondary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_load < secondary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = secondary.DynamicMemoryUsage();
+        auto coin_with_script = secondary.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(secondary.DynamicMemoryUsage() == memusage::DynamicUsage(secondary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        secondary.SpendCoin(first_coin_outpoint);
+
+        // Spending coin doesn't affect cache as the script was not in it
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        // Reading spent coin from secondary cache returns a spent coin
+        coin = secondary.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(coin->IsSpent() == true);
+        auto coin_with_script_2 = secondary.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == true);
+
+        secondary.SetBestBlock(block_2_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // Flush spent coin to primary cache doesn't affect cache as the script was not in it
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+    }
+
+    //
+    // Reading spent coin from primary cache shouldn't return any coins
+    //
+    {
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value() == false);
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script.has_value() == false);
+    }
+}
+
+
+
+// Test that coins caching works as expected when script cache is disabled
+BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    pcoinsTip.reset();
+
+    // Id of an unspent transaction
+    auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    // Hash and height of a block that contains unspent transaction (txId)
+    auto block_1_hash = uint256S("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto block_2_hash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    std::uint32_t blockHeight = 1;
+
+    CScript script_template =
+        []
+        {
+            // make sure that copies of this script don't end up smaller than
+            // expected as constructor from vector allocates more space than
+            // minimally needed
+            CScript tmp{std::vector<uint8_t>(1024*1024, 0xde)};
+            return CScript{tmp};
+        }();
+
+    // Dynamic memory usage of the scripts
+    std::uint32_t script_memory_usage = memusage::DynamicUsage(script_template);
+    BOOST_TEST(script_memory_usage != 0);
+
+    std::uint32_t coins_count = 5;
+
+    //
+    // Add sample UTXOs to database
+    //
+
+    // cache a bit larger than two scripts since some of the cache is also used
+    // up by coins themselves without scripts and we want the third script to
+    // no longer fit into cache in this test
+    CCoinsProviderTest primary{ static_cast<std::uint32_t>(script_memory_usage * 2.5) };
+
+    // Each platform has its own default allocation policy for standard containers
+    // so even though the expected memory usage should be 0 that is not necessarily
+    // the case
+    auto defaultDynamicMemoryUsage = primary.DynamicMemoryUsage();
+
+    {
+        TestCoinsSpanCache secondary{primary};
+
+        // both caches are empty since we haven't added any coins
+        BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+        for(std::uint32_t i = 0; i < coins_count; ++i)
+        {
+            CTxOut txo;
+            txo.nValue = Amount(123);
+            txo.scriptPubKey = script_template;
+            auto size = memusage::DynamicUsage(txo.scriptPubKey);
+            secondary.AddCoin(
+                COutPoint{txId, i},
+                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false),
+                false,
+                0); // UTXO is not coinbase
+
+            BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+            assert(script_memory_usage == size);
+            BOOST_TEST(
+                secondary.DynamicMemoryUsage() ==
+                (memusage::DynamicUsage(secondary.GetRawCacheCoins()) + (script_memory_usage * (i + 1))));
+        }
+
+        // And flush them to primary cache
+        secondary.SetBestBlock(block_1_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // After flush dynamic memory usage can only be seen in primary cache
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + (script_memory_usage * coins_count)));
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+    }
+
+    // Flush sample UTXOs to DB
+    primary.Flush();
+
+    // After flush of primary cache to database the primary cache is empty
+    BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+    auto first_coin_outpoint = COutPoint{txId, 0};
+
+    //
+    // Read UTXOs from database without secondary cache
+    //
+    {
+        auto memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+
+        // Cache contains coin with script even though no script was requested
+        // as it had enough space to store it
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage));
+        BOOST_TEST(memory_usage_before_coin_load < primary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = primary.DynamicMemoryUsage();
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache contains coin with script
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(!coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage));
+        BOOST_TEST(memory_usage_before_coin_with_script_load == primary.DynamicMemoryUsage());
+
+        // Cache contains two coins with script
+        auto coin_with_script_2 = view.GetCoinWithScript(COutPoint{txId, 1});
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == false);
+        BOOST_TEST(coin_with_script_2->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+
+        // Three was no more space for the third script
+        auto coin_with_script_3 = view.GetCoinWithScript(COutPoint{txId, 2});
+        BOOST_TEST(coin_with_script_3.has_value());
+        BOOST_TEST(coin_with_script_3->IsStorageOwner());
+        BOOST_TEST(coin_with_script_3->IsSpent() == false);
+        BOOST_TEST(coin_with_script_3->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+    }
+
+    //
+    // Uncache and read another coin into cache
+    //
+    {
+        auto memory_usage_before_uncache = primary.DynamicMemoryUsage();
+        primary.Uncache({COutPoint{txId, 1}});
+        BOOST_TEST(memory_usage_before_uncache > primary.DynamicMemoryUsage());
+
+        CoinsDBView view{primary};
+
+        // Cache contains two coins with script
+        auto coin_with_script_2 = view.GetCoinWithScript(COutPoint{txId, 3});
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == false);
+        BOOST_TEST(coin_with_script_2->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+
+        // Three was no more space for the third script
+        auto coin_with_script_3 = view.GetCoinWithScript(COutPoint{txId, 4});
+        BOOST_TEST(coin_with_script_3.has_value());
+        BOOST_TEST(coin_with_script_3->IsStorageOwner());
+        BOOST_TEST(coin_with_script_3->IsSpent() == false);
+        BOOST_TEST(coin_with_script_3->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+    }
+
+    //
+    // Read UTXOs from database with secondary cache
+    //
+    {
+        auto provider_memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+        TestCoinsSpanCache secondary{primary};
+        auto memory_usage_before_coin_load = secondary.DynamicMemoryUsage();
+        auto coin = secondary.GetCoin(first_coin_outpoint);
+
+        // Secondary cache contains only coin without script while primary cache
+        // now contains coin with script so we expect it to grow
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(
+            secondary.DynamicMemoryUsage() ==
+            memusage::DynamicUsage(secondary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_load < secondary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = secondary.DynamicMemoryUsage();
+        auto coin_with_script = secondary.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache doesn't change as there was enough space to load the script to
+        // cache while asking only for the coin
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(!coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        secondary.SpendCoin(first_coin_outpoint);
+
+        // Spending coin doesn't affect secondary cache as the script was not in
+        // it as it was in the primary cache. Primary cache doesn't change as
+        // the change wasn't flushed to it yet.
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        // Reading spent coin from secondary cache returns a spent coin
+        coin = secondary.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(coin->IsSpent() == true);
+        auto coin_with_script_2 = secondary.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == true);
+
+        secondary.SetBestBlock(block_2_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // Flush spent coin to primary cache shrinks the primary cache as script
+        // is no longer present in the coin
+        BOOST_TEST(provider_memory_usage_before_coin_load > primary.DynamicMemoryUsage());
+    }
+
+    //
+    // Reading spent coin from primary cache shouldn't return any coins
+    //
+    {
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value() == false);
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script.has_value() == false);
     }
 }
 

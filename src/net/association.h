@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include <net/association_id.h>
 #include <net/net_message.h>
 #include <net/net_types.h>
 #include <net/stream.h>
+#include <net/stream_policy.h>
 #include <streams.h>
 
 #include <type_traits>
@@ -30,9 +32,8 @@ class Association
     Association& operator=(const Association&) = delete;
     Association& operator=(Association&&) = delete;
 
-    Association(CNode& node, SOCKET socket, const CAddress& peerAddr);
+    Association(CNode* node, SOCKET socket, const CAddress& peerAddr);
     ~Association();
-
 
     // Get peer address
     const CAddress& GetPeerAddr() const { return mPeerAddr; }
@@ -41,25 +42,46 @@ class Association
     CService GetPeerAddrLocal() const;
     void SetPeerAddrLocal(const CService& addrLocal);
 
+    // Generate and set a new association ID
+    template<typename IDType, typename... Args>
+    void CreateAssociationID(Args&&... args)
+    {
+        LOCK(cs_mAssocID);
+        mAssocID = std::make_shared<IDType>(std::forward<Args>(args)...);
+    }
+
+    // Get/Set association ID from peer
+    AssociationIDPtr GetAssociationID() const;
+    void SetAssociationID(AssociationIDPtr&& id);
+    void ClearAssociationID();
+
     // Shutdown the connection
     void Shutdown();
+
+    // Open any further required streams beyond the initial GENERAL stream
+    void OpenRequiredStreams(CConnman& connman);
+
+    // Move ownership of our stream to a different association
+    void MoveStream(StreamType newType, Association& to);
+
+    // Replace our active stream policy with a new one
+    void ReplaceStreamPolicy(const StreamPolicyPtr& newPolicy);
 
     // Copy out current statistics
     void CopyStats(AssociationStats& stats) const;
 
     // Add our sockets to the sets for reading and writing
-    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                             SOCKET& socketMax, bool pauseRecv) const;
+    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
 
-    // Move newly read completed messages to the caller's queue
-    size_t GetNewMsgs(std::list<CNetMessage>& msgList);
+    // Fetch the next message for processing
+    std::pair<Stream::QueuedNetMessage, bool> GetNextMessage();
 
     // Service all sockets that are ready
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                        const Config& config, bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent);
+                        const Config& config, bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     // Get current total send queue size
-    size_t GetTotalSendQueueSize() const;
+    uint64_t GetTotalSendQueueSize() const;
 
     // Update average bandwidth measurements
     void AvgBandwithCalc();
@@ -69,32 +91,36 @@ class Association
     AverageBandwidth GetAverageBandwidth(const StreamType streamType) const;
 
     // Add new message to our list for sending
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg);
+    uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType);
 
     // Get last send/receive time for any stream
     int64_t GetLastSendTime() const;
     int64_t GetLastRecvTime() const;
 
+    // Get whether we are paused for receiving (ANY stream or ALL streams)
+    enum PausedFor { ANY, ALL };
+    bool GetPausedForReceiving(PausedFor anyAll) const;
+
   private:
 
     // Node we are for
-    CNode& mNode;
+    CNode* mNode {nullptr};
+
+    // ID possibly passed in from peer
+    AssociationIDPtr mAssocID {nullptr};
+    mutable CCriticalSection cs_mAssocID {};
 
     // Streams within the association
-    using StreamMap = std::map<StreamType, StreamPtr>;
     StreamMap mStreams {};
+    StreamPolicyPtr mStreamPolicy { std::make_shared<DefaultStreamPolicy>() };
     bool mShutdown {false};
     mutable CCriticalSection cs_mStreams {};
-
-    // Track bytes sent/received per command
-    mapMsgCmdSize mSendBytesPerMsgCmd {};
-    mapMsgCmdSize mRecvBytesPerMsgCmd {};
-    mutable CCriticalSection cs_mSendRecvBytes {};
 
     // The address of the remote peer
     const CAddress mPeerAddr {};
     CService mPeerAddrLocal {};
     mutable CCriticalSection cs_mPeerAddr {};
+
 
     // Helper functions for running something over all streams that returns a result
     template <typename Callable,

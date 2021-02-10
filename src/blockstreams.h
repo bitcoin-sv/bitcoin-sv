@@ -9,6 +9,7 @@
 #include "streams.h"
 #include "chain.h"
 #include "hash.h"
+#include "util.h"
 
 #include <memory>
 #include <vector>
@@ -34,10 +35,14 @@ template<typename Reader>
 class CBlockStreamReader
 {
 public:
-    CBlockStreamReader(Reader&& reader, const CStreamVersionAndType& version, bool calculateDiskBlockMetadata=false)
+    /**
+     * @param disk_block_pos Which block is being read. Used for logging.
+     */
+    CBlockStreamReader(Reader&& reader, const CStreamVersionAndType& version, bool calculateDiskBlockMetadata=false, const CDiskBlockPos& disk_block_pos=CDiskBlockPos())
         : mCalculateDiskBlockMetadata(calculateDiskBlockMetadata)
         , mReader{std::move(reader)}
         , mDeserializationStream{this, version.type, version.version}
+        , disk_block_pos(disk_block_pos)
     {
         mDeserializationStream >> mBlockHeader;
         mRemainingTransactionsCounter = ReadCompactSize(mDeserializationStream);
@@ -51,6 +56,18 @@ public:
     const CBlockHeader& GetBlockHeader() const
     {
         return mBlockHeader;
+    }
+
+    /**
+     * Returns reference to last read transaction and transfers the ownership
+     * of CTransaction object to the caller
+     * 
+     * It will return null if ReadTransaction()/ReadTransaction_NoThrow() was never called before or if this
+     * method is called more than once after the last call to ReadTransaction()/ReadTransaction_NoThrow().
+     */
+    CTransactionRef GetLastTransactionRef()
+    {
+        return CTransactionRef(std::move(mTransaction));
     }
 
     size_t GetRemainingTransactionsCount() const
@@ -74,6 +91,24 @@ public:
         }
 
         return *mTransaction;
+    }
+
+    /**
+     * Same as ReadTransaction() except that nullptr is returned instead of throwing an exception
+     * if reading or deserializing transaction from stream fails.
+     */
+    const CTransaction* ReadTransaction_NoThrow() noexcept
+    {
+        try
+        {
+            return &this->ReadTransaction();
+        }
+        catch(const std::exception &e)
+        {
+            error("%s: Deserialize or I/O error - %s at %s", __func__,
+                e.what(), disk_block_pos.ToString());
+        }
+        return nullptr;
     }
 
     bool EndOfStream() const
@@ -129,6 +164,7 @@ private:
     size_t mRemainingTransactionsCounter;
     CBlockHeader mBlockHeader;
     std::unique_ptr<const CTransaction> mTransaction;
+    CDiskBlockPos disk_block_pos;
 };
 
 /**

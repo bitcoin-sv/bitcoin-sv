@@ -281,8 +281,8 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry(const TxI
                             pTxInputData->GetTxnPtr(),        // a pointer to the tx
                             pTxInputData->GetTxSource(),   // tx source
                             pTxInputData->GetTxValidationPriority(),     // tx validation priority
+                            pTxInputData->GetTxStorage(),  // tx storage
                             GetTime(),                 // nAcceptTime
-                            pTxInputData->IsLimitFree(), // fLimitFree
                             pTxInputData->GetAbsurdFee(), // nAbsurdFee
                             pTxInputData->GetNodePtr(),      // pNode
                             pTxInputData->IsOrphanTxn()));  // fOrphan

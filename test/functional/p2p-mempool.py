@@ -10,8 +10,8 @@ import time
 
 # This test checks different cases of handling mempool requests.
 # If a peer is not whitelisted:
-    # If rejectmempoolrequest=true, mempool request is always rejected.
-    # If rejectmempoolrequest=false (default value), mempool request is rejected only if peerbloomfilters=0.
+    # If rejectmempoolrequest=true (default value), mempool request is always rejected.
+    # If rejectmempoolrequest=false mempool request is rejected only if peerbloomfilters=0.
 # Is a peer is whitelisted, mempool request is never rejected.
 
 class P2PMempoolTests(BitcoinTestFramework):
@@ -39,14 +39,14 @@ class P2PMempoolTests(BitcoinTestFramework):
                     assert_equal(len(self.nodes[0].getpeerinfo()), 0)
 
         test_cases = [
-            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=false (default), not whitelisted", ['-peerbloomfilters=0'], True],
-            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=false (default), not whitelisted", ['-peerbloomfilters=1'], False],
-            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=true, not whitelisted", ['-peerbloomfilters=0', '-rejectmempoolrequest=1'], True],
-            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=true, not whitelisted", ['-peerbloomfilters=1', '-rejectmempoolrequest=1'], True],
-            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=false (default), whitelisted", ['-peerbloomfilters=0', '-whitelist=127.0.0.1'], False],
-            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=false (default), whitelisted", ['-peerbloomfilters=1', '-whitelist=127.0.0.1'], False],
-            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=true, whitelisted", ['-peerbloomfilters=0', '-rejectmempoolrequest=1', '-whitelist=127.0.0.1'], False],
-            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=true, whitelisted", ['-peerbloomfilters=1', '-rejectmempoolrequest=1', '-whitelist=127.0.0.1'], False]
+            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=false, not whitelisted", ['-peerbloomfilters=0', '-rejectmempoolrequest=0'], True],
+            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=false, not whitelisted", ['-peerbloomfilters=1', '-rejectmempoolrequest=0'], False],
+            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=true (default), not whitelisted", ['-peerbloomfilters=0'], True],
+            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=true (default), not whitelisted", ['-peerbloomfilters=1'], True],
+            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=false, whitelisted", ['-peerbloomfilters=0', '-rejectmempoolrequest=0', '-whitelist=127.0.0.1'], False],
+            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=false, whitelisted", ['-peerbloomfilters=1', '-rejectmempoolrequest=0', '-whitelist=127.0.0.1'], False],
+            ["Scenario: peerbloomfilters=0, rejectMempoolRequests=true (default), whitelisted", ['-peerbloomfilters=0', '-whitelist=127.0.0.1'], False],
+            ["Scenario: peerbloomfilters=1, rejectMempoolRequests=true (default), whitelisted", ['-peerbloomfilters=1', '-whitelist=127.0.0.1'], False]
         ]
 
         for test_case in test_cases:

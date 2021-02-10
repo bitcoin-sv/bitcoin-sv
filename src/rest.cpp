@@ -4,11 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "chain.h"
-#include "chainparams.h"
 #include "config.h"
 #include "httpserver.h"
 #include "core_io.h"
-#include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
@@ -17,51 +15,44 @@
 #include "rpc/tojson.h"
 #include "streams.h"
 #include "sync.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
-
 #include <boost/algorithm/string.hpp>
 #include <univalue.h>
 
 // Allow a max of 15 outpoints to be queried at once.
 static const size_t MAX_GETUTXOS_OUTPOINTS = 15;
 
-enum RetFormat {
-    RF_UNDEF,
-    RF_BINARY,
-    RF_HEX,
-    RF_JSON,
-};
+namespace {
 
-static const struct {
-    enum RetFormat rf;
-    const char *name;
-} rf_names[] = {
-    {RF_UNDEF, ""}, {RF_BINARY, "bin"}, {RF_HEX, "hex"}, {RF_JSON, "json"},
-};
+class CCoin {
+private:
+    CoinWithScript coin;
 
-struct CCoin {
-    uint32_t nHeight;
-    CTxOut out;
+public:
+    CCoin() = default;
+    CCoin(CoinWithScript&& in) noexcept : coin{std::move(in)} {}
 
-    CCoin() : nHeight(0) {}
-    CCoin(Coin in) : nHeight(in.GetHeight()), out(std::move(in.GetTxOut())) {}
+    int32_t GetHeight() const { return coin.GetHeight(); }
+    const Amount& GetAmount() const { return coin.GetTxOut().nValue; }
+    const CScript& GetScriptPubKey() const { return coin.GetTxOut().scriptPubKey; }
 
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action) {
+    template <typename Stream>
+    inline void Serialize(Stream &s) const {
         uint32_t nTxVerDummy = 0;
-        READWRITE(nTxVerDummy);
-        READWRITE(nHeight);
-        READWRITE(out);
+        s << nTxVerDummy;
+        s << coin.GetHeight();
+        s << coin.GetTxOut();
     }
 };
 
+} // namespace
+
 extern UniValue mempoolInfoToJSON(const Config& config);
-extern UniValue mempoolToJSON(bool fVerbose = false);
+extern void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false);
 
 static bool RESTERR(HTTPRequest *req, enum HTTPStatusCode status,
                     std::string message) {
@@ -157,19 +148,35 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    std::vector<const CBlockIndex *> headers;
+    std::optional<uint256> lastBlockHash;
+    int confirmations = -1;
+    std::vector<const CBlockIndex*> headers;
     headers.reserve(count);
     {
         LOCK(cs_main);
+        const CBlockIndex* tip = chainActive.Tip();
         BlockMap::const_iterator it = mapBlockIndex.find(hash);
         const CBlockIndex *pindex =
             (it != mapBlockIndex.end()) ? it->second : nullptr;
+        if (!pindex)
+            return RESTERR(req, HTTP_BAD_REQUEST, "Block not found: " + hashStr);
+        
+        confirmations = tip->nHeight - pindex->nHeight + 1;
+
         while (pindex != nullptr && chainActive.Contains(pindex)) {
             headers.push_back(pindex);
             if (headers.size() == size_t(count)) {
                 break;
             }
             pindex = chainActive.Next(pindex);
+        }
+        // store blockhash of additional header if we are not on chain tip
+        // because each header points to next blockhash
+        if (pindex) {
+            const CBlockIndex* pLast = chainActive.Next(pindex);
+            if (pLast) {
+                lastBlockHash = pLast->GetBlockHash();
+            }
         }
     }
 
@@ -195,8 +202,15 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         }
         case RF_JSON: {
             UniValue jsonHeaders(UniValue::VARR);
-            for (const CBlockIndex *pindex : headers) {
-                jsonHeaders.push_back(blockheaderToJSON(pindex));
+            for (size_t i = 0; i < headers.size(); i++) {
+                std::optional<uint256> nextBlockHash;
+                const CBlockIndex* pindex= headers[i];
+                if (pindex != headers.back()) {
+                    nextBlockHash = headers[i + 1]->GetBlockHash();
+                } else {
+                    nextBlockHash = lastBlockHash;
+                }
+                jsonHeaders.push_back(blockheaderToJSON(pindex, confirmations--, nextBlockHash));
             }
             std::string strJSON = jsonHeaders.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
@@ -228,78 +242,58 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    std::unique_ptr<CForwardReadonlyStream> stream;
-    bool hasDiskBlockMetaData;
-    CDiskBlockMetaData metadata;
-    CBlockIndex *pblockindex = nullptr;
+    int confirmations;
+    std::optional<uint256> nextBlockHash;
+    CBlockIndex* pblockindex = nullptr;
     {
         LOCK(cs_main);
 
         if (mapBlockIndex.count(hash) == 0) {
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
         }
-
         pblockindex = mapBlockIndex[hash];
         if (fHavePruned && !pblockindex->nStatus.hasData() &&
             pblockindex->nTx > 0) {
             return RESTERR(req, HTTP_NOT_FOUND,
                            hashStr + " not available (pruned data)");
         }
-
-
-        stream = StreamSyncBlockFromDisk(*pblockindex);
-        if (!stream) {
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
-        }
-
-        // obtaining data under cs_main lock
-        hasDiskBlockMetaData = pblockindex->nStatus.hasDiskBlockMetaData();
-        if (hasDiskBlockMetaData) {
-            metadata = pblockindex->GetDiskBlockMetaData();
-        }
+        confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), pblockindex, nextBlockHash);
     }
 
-    switch (rf) {
-        /*
-         * When Content-Length HTTP header is NOT set, libevent will automatically use chunked-encoding transfer.
-         * When Content-Length HTTP header is set, no encoding is done by libevent,
-         * but we still read and write response in chunks to avoid bringing whole data in memory.
-        */
-        case RF_BINARY: {
-            if (hasDiskBlockMetaData) {
-                req->WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+    try
+    {
+        switch (rf) {
+            /*
+             * When Content-Length HTTP header is NOT set, libevent will automatically use chunked-encoding transfer.
+             * When Content-Length HTTP header is set, no encoding is done by libevent,
+             * but we still read and write response in chunks to avoid bringing whole data in memory.
+            */
+            case RF_BINARY: {
+                writeBlockChunksAndUpdateMetadata(false, *req, *pblockindex, "", false, rf);
+                break;
             }
-            req->WriteHeader("Content-Type", "application/octet-stream");
-            req->StartWritingChunks(HTTP_OK);
-            writeBlockChunksAndUpdateMetadata(false, *req, *stream, *pblockindex);
-            break;
-        }
 
-        case RF_HEX: {
-            if (hasDiskBlockMetaData) {
-                req->WriteHeader("Content-Length", std::to_string(metadata.diskDataSize * 2));
+            case RF_HEX: {
+                writeBlockChunksAndUpdateMetadata(true, *req, *pblockindex, "", false, rf);
+                break;
             }
-            req->WriteHeader("Content-Type", "text/plain");
-            req->StartWritingChunks(HTTP_OK);
-            writeBlockChunksAndUpdateMetadata(true, *req, *stream, *pblockindex);
-            break;
-        }
 
-        case RF_JSON: {
-            req->WriteHeader("Content-Type", "application/json");
-            req->StartWritingChunks(HTTP_OK);
-            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex, false);
-            break;
-        }
+            case RF_JSON: {
+                writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails , *pblockindex, false, false, confirmations, nextBlockHash, "");
+                break;
+            }
 
-        default: {
-            return RESTERR(req, HTTP_NOT_FOUND,
-                           "output format not found (available: " +
-                               AvailableDataFormatsString() + ")");
+            default: {
+                return RESTERR(req, HTTP_NOT_FOUND,
+                    "output format not found (available: " +
+                    AvailableDataFormatsString() + ")");
+            }
         }
     }
-
-    req->StopWritingChunks();
+    catch (block_parse_error& ex)
+    {
+        return RESTERR(req, HTTP_NOT_FOUND, std::string(ex.what()));
+    }
 
     return true;
 }
@@ -384,11 +378,16 @@ static bool rest_mempool_contents(Config &config, HTTPRequest *req,
 
     switch (rf) {
         case RF_JSON: {
-            UniValue mempoolObject = mempoolToJSON(true);
-
-            std::string strJSON = mempoolObject.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
-            req->WriteReply(HTTP_OK, strJSON);
+            req->StartWritingChunks(HTTP_OK);
+
+            CHttpTextWriter httpWriter(*req);
+            CJSONWriter jWriter(httpWriter, false);
+
+            writeMempoolToJson(jWriter, true);
+
+            httpWriter.Flush();
+            req->StopWritingChunks();
             return true;
         }
         default: {
@@ -579,41 +578,43 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
     // check spentness and form a bitmap (as well as a JSON capable
     // human-readable string representation)
-    std::vector<uint8_t> bitmap;
+    std::vector<uint8_t> bitmap((vOutPoints.size() + 7) / 8);
     std::vector<CCoin> outs;
-    std::string bitmapStringRepresentation;
-    std::vector<bool> hits;
-    bitmap.resize((vOutPoints.size() + 7) / 8);
+    outs.reserve(vOutPoints.size()); // reserve space for max possible amount of coins
+    std::string bitmapStringRepresentation( vOutPoints.size(), '0' );
+
+    auto handleUnspentCoin =
+        [&outs, &bitmapStringRepresentation, &bitmap]
+        (const CoinWithScript& coin, size_t idx)
+        {
+            outs.emplace_back( coin.MakeOwning() );
+            // form a binary string representation (human-readable
+            // for json output)
+            bitmapStringRepresentation[ idx ] = '1';
+            bitmap[idx / 8] |= (1 << (idx % 8));
+        };
+
+    if( fCheckMemPool )
     {
-        LOCK(cs_main);
-        std::shared_lock lock(mempool.smtx);
+        mempool.OnUnspentCoinsWithScript(
+            CoinsDBView{ *pcoinsTip },
+            vOutPoints,
+            handleUnspentCoin);
+    }
+    else
+    {
+        CoinsDBView view{ *pcoinsTip };
+        std::size_t idx = 0;
 
-        CCoinsView viewDummy;
-        CCoinsViewCache view(&viewDummy);
-
-        CCoinsViewCache &viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-
-        if (fCheckMemPool) {
-            // switch cache backend to db+mempool in case user likes to query
-            // mempool.
-            view.SetBackend(viewMempool);
-        }
-
-        for (size_t i = 0; i < vOutPoints.size(); i++) {
-            Coin coin;
-            bool hit = false;
-            if (view.GetCoin(vOutPoints[i], coin) &&
-                !mempool.IsSpentNL(vOutPoints[i])) {
-                hit = true;
-                outs.emplace_back(std::move(coin));
+        for(const auto& out : vOutPoints)
+        {
+            if (auto coin = view.GetCoinWithScript( out );
+                coin.has_value() && !coin->IsSpent())
+            {
+                handleUnspentCoin( std::move( coin.value() ), idx );
             }
 
-            hits.push_back(hit);
-            // form a binary string representation (human-readable for json
-            // output)
-            bitmapStringRepresentation.append(hit ? "1" : "0");
-            bitmap[i / 8] |= ((uint8_t)hit) << (i % 8);
+            ++idx;
         }
     }
 
@@ -661,13 +662,13 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             UniValue utxos(UniValue::VARR);
             for (const CCoin &coin : outs) {
                 UniValue utxo(UniValue::VOBJ);
-                utxo.push_back(Pair("height", int32_t(coin.nHeight)));
-                utxo.push_back(Pair("value", ValueFromAmount(coin.out.nValue)));
+                utxo.push_back(Pair("height", coin.GetHeight()));
+                utxo.push_back(Pair("value", ValueFromAmount(coin.GetAmount())));
 
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
-                int height = (coin.nHeight == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.nHeight;
-                ScriptPubKeyToUniv(coin.out.scriptPubKey, true, IsGenesisEnabled(config, height), o);
+                int32_t height = (coin.GetHeight() == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.GetHeight();
+                ScriptPubKeyToUniv(coin.GetScriptPubKey(), true, IsGenesisEnabled(config, height), o);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }

@@ -56,7 +56,7 @@ static void CoinSelection(benchmark::State &state) {
 
         std::set<std::pair<const CWalletTx *, unsigned int>> setCoinsRet;
         Amount nValueRet;
-        bool success = wallet.SelectCoinsMinConf(1003 * COIN, 1, 6, 0, vCoins,
+        bool success = wallet.SelectCoinsMinConf(1003 * COIN, 1, 6, 0, 0, vCoins,
                                                  setCoinsRet, nValueRet);
         assert(success);
         assert(nValueRet == 1003 * COIN);

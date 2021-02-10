@@ -8,12 +8,10 @@
 #endif
 
 #include "init.h"
-
 #include "addrman.h"
 #include "amount.h"
 #include "chain.h"
 #include "chainparams.h"
-#include "checkpoints.h"
 #include "compat/sanity.h"
 #include "config.h"
 #include "consensus/validation.h"
@@ -23,14 +21,11 @@
 #include "httpserver.h"
 #include "invalid_txn_publisher.h"
 #include "key.h"
-#include "mining/journal_builder.h"
 #include "mining/journaling_block_assembler.h"
-#include "mining/legacy.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
-#include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
@@ -69,10 +64,7 @@
 #endif
 
 #include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
@@ -142,36 +134,6 @@ task::CCancellationToken GetShutdownToken()
     return shutdownSource->GetToken();
 }
 
-/**
- * This is a minimally invasive approach to shutdown on LevelDB read errors from
- * the chainstate, while keeping user interface out of the common library, which
- * is shared between bitcoind and non-server tools.
- */
-class CCoinsViewErrorCatcher final : public CCoinsViewBacked {
-public:
-    CCoinsViewErrorCatcher(CCoinsView *view) : CCoinsViewBacked(view) {}
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override {
-        try {
-            return CCoinsViewBacked::GetCoin(outpoint, coin);
-        } catch (const std::runtime_error &e) {
-            uiInterface.ThreadSafeMessageBox(
-                _("Error reading from database, shutting down."), "",
-                CClientUIInterface::MSG_ERROR);
-            LogPrintf("Error reading from database: %s\n", e.what());
-            // Starting the shutdown sequence and returning false to the caller
-            // would be interpreted as 'entry not found' (as opposed to unable
-            // to read data), and could lead to invalid interpretation. Just
-            // exit immediately, as we can't continue anyway, and all writes
-            // should be atomic.
-            abort();
-        }
-    }
-    // Writes do not need similar protection, as failure to write is handled by
-    // the caller.
-};
-
-static CCoinsViewDB *pcoinsdbview = nullptr;
-static CCoinsViewErrorCatcher *pcoinscatcher = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group &threadGroup) {
@@ -195,7 +157,7 @@ void Shutdown() {
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
 
-    RenameThread("bitcoin-shutoff");
+    RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
     StopHTTPRPC();
@@ -213,8 +175,6 @@ void Shutdown() {
 
     mining::g_miningFactory.reset();
 
-    ShutdownScriptCheckQueues();
-
     if (g_connman) {
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
@@ -224,11 +184,15 @@ void Shutdown() {
         g_connman.reset();
     }
 
+    // must be called after g_connman shutdown as conman threads could still be
+    // using it before that
+    ShutdownScriptCheckQueues();
+
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater &&
         gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        DumpMempool();
+        mempool.DumpMempool();
     }
 
     {
@@ -236,12 +200,7 @@ void Shutdown() {
         if (pcoinsTip != nullptr) {
             FlushStateToDisk();
         }
-        delete pcoinsTip;
-        pcoinsTip = nullptr;
-        delete pcoinscatcher;
-        pcoinscatcher = nullptr;
-        delete pcoinsdbview;
-        pcoinsdbview = nullptr;
+        pcoinsTip.reset();
         delete pblocktree;
         pblocktree = nullptr;
     }
@@ -250,6 +209,8 @@ void Shutdown() {
         pwallet->Flush(true);
     }
 #endif
+
+    pMerkleTreeFactory.reset();
 
 #if ENABLE_ZMQ
     {
@@ -278,6 +239,16 @@ void Shutdown() {
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
+
+    {
+        // Free block headers
+        LOCK(cs_main);
+        for(const auto& block : mapBlockIndex) {
+            delete block.second;
+        }
+        mapBlockIndex.clear();
+    }
+
     LogPrintf("%s: done\n", __func__);
 }
 
@@ -401,9 +372,25 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Imports blocks from external blk000??.dat file on startup"));
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                               strprintf(_("Keep the transaction memory pool "
-                                           "below <n> megabytes (default: %u%s,  must be at least %d). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-                                         DEFAULT_MAX_MEMPOOL_SIZE, showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "", std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
+                   strprintf(_("Keep the resident size of the transaction memory pool below <n> megabytes "
+                               "(default: %u%s,  must be at least %d). "
+                               "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                             DEFAULT_MAX_MEMPOOL_SIZE,
+                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
+                             std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
+    if (showDebug) 
+    {
+        strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
+                                   strprintf(_("Experimental: Additional amount of mempool transactions to keep stored on disk "
+                                               "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
+                                               "be larger due to leveldb compaction strategy. "
+                                               "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                                             DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
+    }
+    strUsage += HelpMessageOpt("-mempoolmaxpercentcpfp=<n>",
+                               strprintf(_("Percentage of total mempool size (ram+disk) to allow for "
+                                           "low paying transactions (0..100) (default: %u)"),
+                                         DEFAULT_MEMPOOL_MAX_PERCENT_CPFP));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -504,8 +491,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         HelpMessageOpt("-reindex", _("Rebuild chain state and block index from "
                                      "the blk*.dat files on disk"));
     strUsage +=
-        HelpMessageOpt("-rejectmempoolrequest", _("Reject every mempool request from "
-                                     "non-whitelisted peers."));
+        HelpMessageOpt("-rejectmempoolrequest", strprintf(_("Reject every mempool request from "
+                                     "non-whitelisted peers (default: %d)."), DEFAULT_REJECTMEMPOOLREQUEST));
 #ifndef WIN32
     strUsage += HelpMessageOpt(
         "-sysperms",
@@ -564,6 +551,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("Size of block download window before considering we may be stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
     }
+    strUsage += HelpMessageOpt(
+        "-broadcastdelay=<n>",
+        strprintf(
+            _("Set inventory broadcast delay duration in millisecond(min: %d, max: %d)"),
+            0,MAX_INV_BROADCAST_DELAY));
     strUsage +=
         HelpMessageOpt("-connect=<ip>",
                        _("Connect only to the specified node(s); -noconnect or "
@@ -605,6 +597,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer "
                                           "in kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB)."),
                                         DEFAULT_MAXSENDBUFFER));
+    strUsage += HelpMessageOpt("-maxsendbuffermult=<n>",
+        strprintf(_("Temporary multiplier applied to the -maxsendbuffer size to "
+                    "allow connections to unblock themselves in the unlikely "
+                    "situation where they have become paused for both sending and "
+                    "receiving (default: %d)"), DEFAULT_MAXSENDBUFFER_MULTIPLIER));
     strUsage += HelpMessageOpt(
         "-factormaxsendqueuesbytes=<n>",
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
@@ -618,11 +615,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "perspective of time may be influenced by peers forward or "
                     "backward by this amount. (default: %u seconds)"),
                   DEFAULT_MAX_TIME_ADJUSTMENT));
-    strUsage += HelpMessageOpt(
-        "-broadcastdelay=<n>",
-        strprintf(
-            _("Set inventory broadcast delay duration in millisecond(min: %d, max: %d)"),
-            0,MAX_INV_BROADCAST_DELAY));
+
+    /** Multi-streaming */
+    strUsage += HelpMessageOpt("-multistreams",
+        _("Enable the use of multiple streams to our peers") + " " +
+            strprintf(_("(default: %d)"), DEFAULT_STREAMS_ENABLED));
+    strUsage += HelpMessageOpt("-multistreampolicies",
+        _("List of stream policies to use with our peers in order of preference") + " " +
+            strprintf(_("(available policies: %s, default: %s)"),
+        StreamPolicyFactory{}.GetAllPolicyNamesStr(), DEFAULT_STREAM_POLICY_LIST));
+
     strUsage +=
         HelpMessageOpt("-onion=<ip:port>",
                        strprintf(_("Use separate SOCKS5 proxy to reach peers "
@@ -640,6 +642,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("Number of seconds before timing out some operations "
                 "within the P2P layer. Affected operations include pings and "
                 "send/receive inactivity (default: %u seconds)"), DEFAULT_P2P_TIMEOUT_INTERVAL));
+        strUsage += HelpMessageOpt("-p2phandshaketimeout=<n>",
+            strprintf(_("Number of seconds to wait for a P2P connection to fully "
+                "establish before timing out and dropping it (default: %u seconds)"),
+                DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL));
     }
     strUsage += HelpMessageOpt(
         "-peerbloomfilters",
@@ -792,23 +798,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf("Do not accept transactions if number of in-mempool "
                       "ancestors is <n> or more (default: %u)",
                       DEFAULT_ANCESTOR_LIMIT));
-        strUsage +=
-            HelpMessageOpt("-limitancestorsize=<n>",
-                           strprintf("Do not accept transactions whose size "
-                                     "with all in-mempool ancestors exceeds "
-                                     "<n> kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                                     DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt(
-            "-limitdescendantcount=<n>",
-            strprintf("Do not accept transactions if any ancestor would have "
-                      "<n> or more in-mempool descendants (default: %u)",
-                      DEFAULT_DESCENDANT_LIMIT));
-        strUsage += HelpMessageOpt(
-            "-limitdescendantsize=<n>",
-            strprintf("Do not accept transactions if any ancestor would have "
-                      "more than <n> kilobytes of in-mempool descendants "
-                      "(default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                      DEFAULT_DESCENDANT_SIZE_LIMIT));
+            "-limitcpfpgroupmemberscount=<n>",
+            strprintf("Do not accept transactions if number of in-mempool transactions "
+                      "which we are not willing to mine due to a low fee is <n> or more (default: %u)",
+                      DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
     strUsage += HelpMessageOpt(
         "-debug=<category>",
@@ -855,16 +849,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "-blocksizeactivationtime=<n>",
             "Change time that specifies when new defaults for -blockmaxsize are used");
         strUsage += HelpMessageOpt(
-            "-limitfreerelay=<n>",
-            strprintf("Continuously rate-limit free transactions to <n> "
-                      "kilobytes per minute (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                      DEFAULT_LIMITFREERELAY));
-        strUsage +=
-            HelpMessageOpt("-relaypriority",
-                           strprintf("Require high priority for relaying free "
-                                     "or low-fee transactions (default: %d)",
-                                     DEFAULT_RELAYPRIORITY));
-        strUsage += HelpMessageOpt(
             "-maxsigcachesize=<n>",
             strprintf("Limit size of signature cache to <n> MiB (default: %u). The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_MAX_SIG_CACHE_SIZE));
@@ -897,12 +881,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-printtoconsole",
         _("Send trace/debug info to console instead of bitcoind.log file"));
-    if (showDebug) {
-        strUsage += HelpMessageOpt(
-            "-printpriority", strprintf("Log transaction priority and fee per "
-                                        "kB when mining blocks (default: %d)",
-                                        DEFAULT_PRINTPRIORITY));
-    }
     strUsage += HelpMessageOpt("-shrinkdebugfile",
                                _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));
@@ -956,7 +934,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set maximum stack memory usage used for script verification "
                     "we're willing to relay/mine in a single transaction "
                     "(default: %u MB, 0 = unlimited) "
-                    "after Genesis is activated (policy level). The value may be given in bytes or with unit (B, kB, MB, GB)."
+                    "after Genesis is activated (policy level). The value may be given in bytes or with unit (B, kB, MB, GB). "
                     "Must be less or equal to -maxstackmemoryusageconsensus."),
                   DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS/ONE_MEGABYTE));
     strUsage +=
@@ -1000,13 +978,18 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                      DEFAULT_MIN_CONSOLIDATION_FACTOR));
     strUsage +=
             HelpMessageOpt("-maxconsolidationinputscriptsize=<n>",
-                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). "),
+                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). The value may be given in bytes or with unit (B, kB, MB, GB)."),
                                      DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
 
     strUsage +=
-            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+            HelpMessageOpt("-minconfconsolidationinput=<n>",
                            strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
-                                     DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
+
+    strUsage +=
+            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+                           strprintf(_("(DEPRECATED: This option will be removed, use -minconfconsolidationinput instead) Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
 
     strUsage +=
             HelpMessageOpt("-acceptnonstdconsolidationinput=<n>",
@@ -1042,12 +1025,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter / ONE_MEGABYTE
                     ));
     strUsage += HelpMessageOpt(
-        "-blockprioritypercentage=<n>",
-        strprintf(_("Set maximum percentage of a block reserved to "
-                    "high-priority/low-fee transactions (default: %d). NOTE: This is supported only by the legacy block assembler which"
-                    " is not default block assembler any more and will be removed in the upcoming release."),
-                  DEFAULT_BLOCK_PRIORITY_PERCENTAGE));
-    strUsage += HelpMessageOpt(
         "-blockmintxfee=<amt>",
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. (default: %s)"),
@@ -1073,13 +1050,17 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             HelpMessageOpt("-blockcandidatevaliditytest",
                            strprintf(_("Perform validity test on block candidates. Defaults: "
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
+        strUsage +=
+            HelpMessageOpt("-disablebip30checks",
+                           "Disable BIP30 checks when connecting a block. "
+                           "This flag can not be set on the mainnet.");
     }
 
     /** Block assembler */
     strUsage += HelpMessageOpt(
         "-blockassembler=<type>",
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
-                    "LEGACY or JOURNALING. (default: %s)"),
+                    "JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
     strUsage += HelpMessageOpt(
         "-jbamaxtxnbatch=<max batch size>",
@@ -1218,6 +1199,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Set the maximum cumulative size of accepted transaction inputs inside coins cache (default: unlimited -> 0). "
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
+        "-maxcoinsprovidercachesize=<n>",
+        strprintf(_("Set soft maximum limit of cached coin tip buffer size (default: %d GB, minimum: %d MB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            DEFAULT_COINS_PROVIDER_CACHE_SIZE / ONE_GIGABYTE,
+            MIN_COINS_PROVIDER_CACHE_SIZE / ONE_MEGABYTE));
+    strUsage += HelpMessageOpt(
+        "-maxcoinsdbfiles=<n>",
+        strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
+                  CoinsDB::MaxFiles::Default().maxFiles));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -1262,7 +1253,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE / ONE_MEGABYTE));
 #endif
 
+      strUsage += HelpMessageOpt(
+        "-maxprotocolrecvpayloadlength=<n>",
+        strprintf("Set maximum protocol recv payload length you are willing to accept in bytes (default %d). Value should be bigger than legacy protocol payload length: %d B "
+                  "and smaller than: %d B.", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, ONE_GIGABYTE));
 
+      strUsage += HelpMessageOpt(
+        "-recvinvqueuefactor=<n>",
+        strprintf("Set maximum number of full size inventory messages that we can store for each peer (default %d). Inventory message size can be set with -maxprotocolrecvpayloadlength. "
+          "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
     return strUsage;
 }
 
@@ -1318,6 +1317,10 @@ static void BlockNotifyGenesisWait(bool, const CBlockIndex *pBlockIndex) {
 }
 
 struct CImportingNow {
+    CImportingNow(const CImportingNow&) = delete;
+    CImportingNow& operator=(const CImportingNow&) = delete;
+    CImportingNow(CImportingNow&&) = delete;
+    CImportingNow& operator=(CImportingNow&&) = delete;
     CImportingNow() {
         assert(fImporting == false);
         fImporting = true;
@@ -1363,7 +1366,7 @@ void CleanupBlockRevFiles() {
     // a separate counter. Once we hit a gap (or if 0 doesn't exist) start
     // removing block files.
     int nContigCounter = 0;
-    for (const std::pair<std::string, fs::path> &item : mapBlockFiles) {
+    for (const auto& item : mapBlockFiles) {
         if (atoi(item.first) == nContigCounter) {
             nContigCounter++;
             continue;
@@ -1376,7 +1379,7 @@ void CleanupBlockRevFiles() {
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
 void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
-    RenameThread("bitcoin-loadblk");
+    RenameThread("loadblk");
 
     {
         CImportingNow imp;
@@ -1433,7 +1436,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         }
     } // End scope of CImportingNow
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        LoadMempool(config, shutdownToken);
+        mempool.LoadMempool(config, shutdownToken);
+        mempool.ResumeSanityCheck();
         fDumpMempoolLater = !shutdownToken.IsCanceled();
     }
 }
@@ -1679,14 +1683,6 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(_("Prune mode is incompatible with -txindex."));
     }
 
-    // if space reserved for high priority transactions is misconfigured
-    // stop program execution and warn the user with a proper error message
-    const int64_t blkprio = gArgs.GetArg("-blockprioritypercentage",
-                                         DEFAULT_BLOCK_PRIORITY_PERCENTAGE);
-    if (std::string err; !config.SetBlockPriorityPercentage(blkprio, &err)) {
-        return InitError(err);
-    }
-
     // Make sure enough file descriptors are available
     int nBind = std::max(
         (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
@@ -1822,6 +1818,19 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
+    const auto defaultMaxMempoolSizeDisk = int64_t(
+        std::ceil(1.0 * config.GetMaxMempool() * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR
+                  / ONE_MEGABYTE));
+    if (std::string err; !config.SetMaxMempoolSizeDisk(
+        gArgs.GetArgAsBytes("-maxmempoolsizedisk", defaultMaxMempoolSizeDisk, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+    if (std::string err; !config.SetMempoolMaxPercentCPFP(
+        gArgs.GetArg("-mempoolmaxpercentcpfp", DEFAULT_MEMPOOL_MAX_PERCENT_CPFP), &err))
+    {
+        return InitError(err);
+    }
 
     // script validation settings
     if(std::string error; !config.SetBlockScriptValidatorsParams(
@@ -1846,14 +1855,6 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
-
-    // Configure free transactions limit
-    if (std::string err; !config.SetLimitFreeRelay(
-        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
-    {
-        return InitError(err);
-    }
-
     // Configure max orphant Tx size
     if (std::string err; !config.SetMaxOrphanTxSize(
         gArgs.GetArgAsBytes("-maxorphantxsize",
@@ -1920,6 +1921,15 @@ bool AppInitParameterInteraction(Config &config) {
     config.SetTestBlockCandidateValidity(
         gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
 
+    // Configure whether to performe BIP30 checks
+    if(gArgs.IsArgSet("-disablebip30checks"))
+    {
+        bool doDisable = gArgs.GetBoolArg("-disablebip30checks", chainparams.DisableBIP30Checks());
+        if (std::string err; !config.SetDisableBIP30Checks(doDisable)){
+            return InitError(err);
+        }
+    }
+
     // Configure mining block assembler
     if(gArgs.IsArgSet("-blockassembler")) {
         std::string assemblerStr { boost::to_upper_copy<std::string>(gArgs.GetArg("-blockassembler", "")) };
@@ -1934,14 +1944,22 @@ bool AppInitParameterInteraction(Config &config) {
         config.SetDataCarrierSize(gArgs.GetArgAsBytes("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
     }
 
-    // Configure descendant limit count.
-    if(gArgs.IsArgSet("-limitdescendantcount")) {
-        config.SetLimitDescendantCount(gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
-    }
-
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitancestorcount")) {
-        config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+        int64_t limitancestorcount = gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+        if(std::string err; !config.SetLimitAncestorCount(limitancestorcount, &err))
+        {
+            return InitError(err);
+        }
+    }
+    
+    // Configure ancestor limit count.
+    if(gArgs.IsArgSet("-limitcpfpgroupmemberscount")) {
+        int64_t limitcpfpgroupmemberscount = gArgs.GetArgAsBytes("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT);
+        if(std::string err; !config.SetLimitSecondaryMempoolAncestorCount(limitcpfpgroupmemberscount, &err)){
+            return InitError(err);
+        }
+        config.SetLimitSecondaryMempoolAncestorCount(gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
 
     // configure max transaction size policy
@@ -1956,7 +1974,7 @@ bool AppInitParameterInteraction(Config &config) {
     // configure min ratio between tx input to tx output size to be considered free consolidation tx.
     if (gArgs.IsArgSet("-minconsolidationfactor"))
     {
-        uint64_t minConsolidationFactor = gArgs.GetArg("-minconsolidationfactor", DEFAULT_MIN_CONSOLIDATION_FACTOR);
+        int64_t minConsolidationFactor = gArgs.GetArg("-minconsolidationfactor", DEFAULT_MIN_CONSOLIDATION_FACTOR);
         if (std::string err; !config.SetMinConsolidationFactor(minConsolidationFactor, &err)) {
             return InitError(err);
         }
@@ -1965,42 +1983,41 @@ bool AppInitParameterInteraction(Config &config) {
     // configure maxiumum scriptSig input size not considered spam in a consolidation transaction
     if (gArgs.IsArgSet("-maxconsolidationinputscriptsize"))
     {
-        uint64_t maxConsolidationInputScriptSize = gArgs.GetArg("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+        int64_t maxConsolidationInputScriptSize = gArgs.GetArgAsBytes("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
         if (std::string err; !config.SetMaxConsolidationInputScriptSize(maxConsolidationInputScriptSize, &err)) {
             return InitError(err);
         }
     }
 
     // configure minimum number of confirmations needed by transactions spent in a consolidatin transaction
-    if (gArgs.IsArgSet("-minconsolidationinputmaturity"))
-    {
-        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY);
-        if (std::string err; !config.SetMinConsolidationInputMaturity(param, &err)) {
+    if (gArgs.IsArgSet("-minconfconsolidationinput") && gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        return InitError(
+            _("Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time"));
+    }
+    if (gArgs.IsArgSet("-minconfconsolidationinput")) {
+        int64_t param = gArgs.GetArg("-minconfconsolidationinput", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
             return InitError(err);
         }
+    }
+    if (gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        int64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
+            return InitError(err);
+        }
+        LogPrintf("Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead.\n");
     }
 
     // configure if non standard inputs for consolidation transactions are allowed
     if (gArgs.IsArgSet("-acceptnonstdconsolidationinput"))
     {
-        uint64_t param = gArgs.GetArg("-acceptnonstdconsolidationinput", DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT);
+        bool param = gArgs.GetBoolArg("-acceptnonstdconsolidationinput", DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT);
         if (std::string err; !config.SetAcceptNonStdConsolidationInput(param, &err)) {
             return InitError(err);
         }
     }
-
-    // Configure descendant limit size.
-    if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArgAsBytes("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT, ONE_KILOBYTE));
-    }
-
-    // Configure ancestor limit size.
-    if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArgAsBytes("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT, ONE_KILOBYTE));
-    }
-
     // Configure genesis activation height.
-    int64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
+    int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
         return InitError(err);
     }
@@ -2021,7 +2038,7 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
-
+    // Txn sinks
     if (gArgs.IsArgSet("-invalidtxsink"))
     {
         for (const std::string &sink : gArgs.GetArgs("-invalidtxsink"))
@@ -2031,6 +2048,11 @@ bool AppInitParameterInteraction(Config &config) {
                 return InitError(err);
             }
         }
+    }
+
+    // P2P parameters
+    if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
+        return InitError(err);
     }
 
 #if ENABLE_ZMQ
@@ -2148,6 +2170,19 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxCoinsProviderCacheSize(
+        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
+        &err))
+    {
+        return InitError(err);
+    }
+
+    if(std::string err; !config.SetMaxCoinsDbOpenFiles(
+        gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -2164,7 +2199,7 @@ bool AppInitParameterInteraction(Config &config) {
     if (gArgs.IsArgSet("-minrelaytxfee")) {
         Amount n(0);
         auto parsed = ParseMoney(gArgs.GetArg("-minrelaytxfee", ""), n);
-        if (!parsed || Amount(0) == n)
+        if (!parsed)
             return InitError(AmountErrMsg("minrelaytxfee",
                                           gArgs.GetArg("-minrelaytxfee", "")));
         // High fee check is done afterward in CWallet::ParameterInteraction()
@@ -2323,6 +2358,20 @@ bool AppInitParameterInteraction(Config &config) {
         {
             return InitError(err);
         }
+    }
+
+    const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+    if (std::string err; !config.SetMaxProtocolRecvPayloadLength(value, &err))
+    {
+        return InitError(err);
+    }
+    mapAlreadyAskedFor = std::make_unique<limitedmap<uint256, int64_t>>(CInv::estimateMaxInvElements(config.GetMaxProtocolSendPayloadLength()));
+
+
+    const uint64_t recvInvQueueFactorArg = gArgs.GetArg("-recvinvqueuefactor", DEFAULT_RECV_INV_QUEUE_FACTOR);
+    if (std::string err; !config.SetRecvInvQueueFactor(recvInvQueueFactorArg, &err))
+    {
+        return InitError(err);
     }
 
     return true;
@@ -2508,7 +2557,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     InitScriptCheckQueues(config, threadGroup);
 
     // Late configuration for globaly constructed objects
+    mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
+    mempool.InitMempoolTxDB();
+    if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
+        mempool.ResumeSanityCheck();
+    }
 
     // Start the lightweight task scheduler thread
     scheduler.startServiceThread(threadGroup);
@@ -2757,7 +2811,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     nTotalCache -= nMerkleTreeIndexDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
-    int64_t nMempoolSizeMax = config.GetMaxMempool();
+    MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
@@ -2766,9 +2820,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     LogPrintf("* Using %.1fMiB for chain state database\n",
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
-              "unused mempool space)\n",
-              nCoinCacheUsage * (1.0 / ONE_MEBIBYTE),
-              nMempoolSizeMax * (1.0 / ONE_MEBIBYTE));
+              "unused mempool space and %.1fMiB of disk space)\n",
+              nCoinCacheUsage * (1.0 / 1024 / 1024),
+              limits.Memory() * (1.0 / 1024 / 1024),
+              limits.Disk() * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {
@@ -2781,18 +2836,20 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         do {
             try {
                 UnloadBlockIndex();
-                delete pcoinsTip;
-                delete pcoinsdbview;
-                delete pcoinscatcher;
+                pcoinsTip.reset();
                 delete pblocktree;
 
                 pblocktree =
                     new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
-                pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false,
-                                                fReindex || fReindexChainState);
-                pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
-                
+                pcoinsTip =
+                    std::make_unique<CoinsDB>(
+                        config.GetMaxCoinsProviderCacheSize(),
+                        nCoinDBCache,
+                        CDBWrapper::MaxFiles{config.GetMaxCoinsDbOpenFiles()},
+                        false,
+                        fReindex || fReindexChainState);
+
                 if (fReindex) {
                     pblocktree->WriteReindexing(true);
                     // If we're reindexing in prune mode, wipe away unusable
@@ -2800,7 +2857,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     if (fPruneMode) {
                         CleanupBlockRevFiles();
                     }
-                } else if (pcoinsdbview->IsOldDBFormat()) {
+                } else if (pcoinsTip->IsOldDBFormat()) {
                     strLoadError = _("Refusing to start, older database format detected");
                     break;
                 }
@@ -2846,14 +2903,13 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     break;
                 }
 
-                if (!ReplayBlocks(config, pcoinsdbview)) {
+                if (!ReplayBlocks(config, *pcoinsTip)) {
                     strLoadError =
                         _("Unable to replay blocks. You will need to rebuild "
                           "the database using -reindex-chainstate.");
                     break;
                 }
 
-                pcoinsTip = new CCoinsViewCache(pcoinscatcher);
                 {
                     LOCK(cs_main);
                     LoadChainTip(chainparams);
@@ -2897,13 +2953,16 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 }
 
                 if (!CVerifyDB().VerifyDB(
-                        config, pcoinsdbview,
+                        config, *pcoinsTip,
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
                         shutdownToken)) {
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
+                // Make sure that nothing stays in cache as VerifyDB loads coins
+                // from database.
+                FlushStateToDisk();
 
                 InvalidateBlocksFromConfig(config);
 
@@ -2961,6 +3020,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 #else
     LogPrintf("No wallet support compiled in!\n");
 #endif
+
+    gArgs.LogSetParameters();
 
     // Step 9: data directory maintenance
 

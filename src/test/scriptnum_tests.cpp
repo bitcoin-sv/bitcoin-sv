@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(construction)
         {{1, 2, 3, 4, 5}, 6, true},
     };
 
-    for(const auto [v, max_size, big_int] : valid_constructions)
+    for(const auto& [v, max_size, big_int] : valid_constructions)
     {
         try
         {
@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(construction)
         {{1, 2, 3, 4, 5}, 4, false},
         {{1, 2, 3, 4, 5}, 4, true},
     };
-    for(const auto [v, max_size, big_int] : invalid_constructions)
+    for(const auto& [v, max_size, big_int] : invalid_constructions)
     {
         try
         {
@@ -367,7 +367,7 @@ BOOST_AUTO_TEST_CASE(negation)
     };
     // clang-format off
 
-    for(const auto [n, m] : test_data)
+    for(const auto& [n, m] : test_data)
     {
         // little int & little int
         CScriptNum a{n};
@@ -375,7 +375,7 @@ BOOST_AUTO_TEST_CASE(negation)
         BOOST_CHECK_EQUAL(b, -a);
     }
 
-    for(const auto [n, m] : test_data)
+    for(const auto& [n, m] : test_data)
     {
         // big int & big int
         CScriptNum a{bint{n}};

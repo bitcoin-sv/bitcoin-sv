@@ -59,9 +59,6 @@ static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEG
 static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
 
-/** Default for -blockprioritypercentage, define the amount of block space
- * reserved to high priority transactions **/
-static const uint64_t DEFAULT_BLOCK_PRIORITY_PERCENTAGE = 5;
 /** Default for -blockmintxfee, which sets the minimum feerate for a transaction
  * in blocks created by mining code **/
 static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
@@ -73,10 +70,10 @@ static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABY
 static const uint64_t DEFAULT_MIN_CONSOLIDATION_FACTOR = 20;
 /** The default maximum size for input scriptSig in a consolidation transaction */
 static const uint64_t DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE = 150;
-/** The default minimum number of blocks that need to be mined on top of the block containing previous output, for it to be eligible as an input in consolidation transaction */
-static const uint64_t DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY = 6;
+/** The default minimum number of confirmations to be eligible as an input in consolidation transaction */
+static const uint64_t DEFAULT_MIN_CONF_CONSOLIDATION_INPUT = 6;
 /** consolidation transaction with non standard inputs */
-static const uint64_t DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = 0;
+static const bool DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = false;
 
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
@@ -95,6 +92,11 @@ static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
+/** Default -maxmempoolsizedisk factor, maximum megabytes of total mempool disk usage as scaled -maxmempool */
+static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR = 0;
+/** Default percentage of total mempool size (ram+disk) to use as max limit for CPFP transactions */
+static const unsigned int DEFAULT_MEMPOOL_MAX_PERCENT_CPFP = 10;
+
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are
@@ -132,6 +134,11 @@ static const uint64_t DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS = 100 * ON
 
 // Default policy value for script number length after Genesis
 static const uint64_t DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = 250 * ONE_KILOBYTE;
+
+// Default policy value for coins cache size threshold before coins are no longer
+// loaded into cache but instead returned directly to the caller.
+static const uint64_t MIN_COINS_PROVIDER_CACHE_SIZE = ONE_MEGABYTE;
+static const uint64_t DEFAULT_COINS_PROVIDER_CACHE_SIZE = ONE_GIGABYTE;
 
 /**
  * Standard script verification flags that standard transactions will comply
@@ -173,9 +180,9 @@ inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
 }
 
 /** Consolidation transactions are free */
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight);
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
 
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
 
 /**
  * Check for standard transaction types
@@ -184,7 +191,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
  * @return True if all outputs (scriptPubKeys) use only standard transaction
  * forms
  */
-bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason);
+bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason);
 
 /**
  * Check for standard transaction types
@@ -197,7 +204,7 @@ std::optional<bool> AreInputsStandard(
     const Config& config,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
-    const int mempoolHeight);
+    const int32_t mempoolHeight);
 
 extern CFeeRate dustRelayFee;
 

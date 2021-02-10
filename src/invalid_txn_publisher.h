@@ -208,8 +208,7 @@ private:
     void PutTx(
         CJSONWriter& writer,
         const std::variant<CTransactionRef, TxData>& transaction,
-        bool writeHex,
-        bool addLastComma) const;
+        bool writeHex) const;
     void PutState(CJSONWriter& writer) const;
     void PutRejectionTime(CJSONWriter& writer) const;
 };

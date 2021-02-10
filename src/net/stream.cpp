@@ -10,10 +10,12 @@ const enumTableT<StreamType>& enumTable(StreamType)
 {
     static enumTableT<StreamType> table
     {
-        { StreamType::UNKNOWN,     "UNKNOWN" },
-        { StreamType::GENERAL,     "GENERAL" },
-        { StreamType::BLOCK,       "BLOCK" },
-        { StreamType::TRANSACTION, "TRANSACTION" }
+        { StreamType::UNKNOWN,  "UNKNOWN" },
+        { StreamType::GENERAL,  "GENERAL" },
+        { StreamType::DATA1,    "DATA1" },
+        { StreamType::DATA2,    "DATA2" },
+        { StreamType::DATA3,    "DATA3" },
+        { StreamType::DATA4,    "DATA4" },
     };
     return table;
 }
@@ -30,11 +32,19 @@ namespace
 
         return msg.hdr.IsOversized(config);
     }
+
+    const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 }
 
-Stream::Stream(CNode& node, StreamType streamType, SOCKET socket)
-: mNode{node}, mStreamType{streamType}, mSocket{socket}
+Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize)
+: mNode{node}, mStreamType{streamType}, mSocket{socket}, mMaxRecvBuffSize{maxRecvBuffSize}
 {
+    // Setup bytes count per message type
+    for(const std::string& msg : getAllNetMessageTypes())
+    {   
+        mRecvBytesPerMsgCmd[msg] = 0;
+    }
+    mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 }
 
 Stream::~Stream()
@@ -44,24 +54,26 @@ Stream::~Stream()
 
 void Stream::Shutdown()
 {
+    LOCK(cs_mNode);
+
     // Close the socket connection
     LOCK(cs_mSocket);
     if(mSocket != INVALID_SOCKET)
     {
         LogPrint(BCLog::NET, "closing %s stream to peer=%d\n", enum_cast<std::string>(mStreamType),
-            mNode.GetId());
+            mNode->GetId());
         CloseSocket(mSocket);
     }
 }
 
 bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                                 SOCKET& socketMax, bool pauseRecv) const
+                                SOCKET& socketMax) const
 {
     // Implement the following logic:
     // * If there is data to send select() for sending data.
     // * If there is space left in the receive buffer select() for receiving data.
 
-    bool select_recv = !pauseRecv;
+    bool select_recv = !mPauseRecv;
     bool select_send;
     {   
         LOCK(cs_mSendMsgQueue);
@@ -89,9 +101,8 @@ bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
     return true;
 }
 
-void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                            CConnman& connman, const Config& config, const CNetAddr& peerAddr,
-                            bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent)
+void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
+                           bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     //
     // Receive
@@ -99,83 +110,98 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
     bool recvSet = false;
     bool sendSet = false;
     bool errorSet = false;
-    {   
-        LOCK(cs_mSocket);
-        if (mSocket == INVALID_SOCKET)
-        {   
-            return;
-        }
-        recvSet = FD_ISSET(mSocket, &setRecv);
-        sendSet = FD_ISSET(mSocket, &setSend);
-        errorSet = FD_ISSET(mSocket, &setError);
-    }
-    if (recvSet || errorSet)
-    {   
-        // typical socket buffer is 8K-64K
-        char pchBuf[0x10000];
-        ssize_t nBytes = 0;
+
+    {
+        LOCK(cs_mNode);
         {   
             LOCK(cs_mSocket);
             if (mSocket == INVALID_SOCKET)
             {   
                 return;
             }
-            nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+            recvSet = FD_ISSET(mSocket, &setRecv);
+            sendSet = FD_ISSET(mSocket, &setSend);
+            errorSet = FD_ISSET(mSocket, &setError);
         }
-        if (nBytes > 0)
+        if (recvSet || errorSet)
         {   
-            bytesRecv = static_cast<size_t>(nBytes);
-            const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
-            if (status != RECV_OK)
+            // typical socket buffer is 8K-64K
+            char pchBuf[0x10000];
+            ssize_t nBytes = 0;
+
             {   
-                mNode.CloseSocketDisconnect();
-                if (status == RECV_BAD_LENGTH)
+                LOCK(cs_mSocket);
+                if (mSocket == INVALID_SOCKET)
                 {   
-                    // Ban the peer if try to send messages with bad length
-                    connman.Ban(peerAddr, BanReasonNodeMisbehaving);
+                    return;
                 }
+                nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
             }
-        }
-        else if (nBytes == 0)
-        {   
-            // socket closed gracefully
-            if (!mNode.GetDisconnect())
-            {   
-                LogPrint(BCLog::NET, "stream socket closed\n");
-            }
-            mNode.CloseSocketDisconnect();
-        }
-        else if (nBytes < 0)
-        {
-            // error
-            int nErr = WSAGetLastError();
-            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
+            if (nBytes > 0)
             {
-                if (!mNode.GetDisconnect())
-                {
-                    LogPrintf("stream socket recv error %s\n", NetworkErrorString(nErr));
+                bytesRecv = static_cast<uint64_t>(nBytes);
+                const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
+                if (status != RECV_OK)
+                {   
+                    mNode->CloseSocketDisconnect();
+                    if (status == RECV_BAD_LENGTH)
+                    {   
+                        // Ban the peer if try to send messages with bad length
+                        throw BanStream{};
+                    }
                 }
-                mNode.CloseSocketDisconnect();
             }
+            else if (nBytes == 0)
+            {   
+                // socket closed gracefully
+                if (!mNode->GetDisconnect())
+                {   
+                    LogPrint(BCLog::NET, "stream socket closed\n");
+                }
+                mNode->CloseSocketDisconnect();
+            }
+            else if (nBytes < 0)
+            {
+                // error
+                int nErr = WSAGetLastError();
+                if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
+                {
+                    if (!mNode->GetDisconnect())
+                    {
+                        LogPrintf("stream socket recv error %s\n", NetworkErrorString(nErr));
+                    }
+                    mNode->CloseSocketDisconnect();
+                }
+            }
+        }
+
+        //
+        // Send
+        //
+        if (sendSet)
+        {
+            bytesSent = SocketSendData();
         }
     }
 
-    //
-    // Send
-    //
-    if (sendSet)
+    // Pull out any completely received msgs
+    if(gotNewMsgs)
     {
-        bytesSent = SocketSendData();
+        GetNewMsgs();
     }
 }
 
-size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-    size_t nPayloadLength, size_t nTotalSize)
+uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+    uint64_t nPayloadLength, uint64_t nTotalSize)
 {   
-    size_t nBytesSent {0};
+    uint64_t nBytesSent {0};
 
+    LOCK(cs_mNode);
     LOCK(cs_mSendMsgQueue);
     bool optimisticSend { mSendMsgQueue.empty() };
+
+    // Log total amount of bytes per command
+    mSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
 
     // Track send queue length
     mSendMsgQueueSize += nTotalSize;
@@ -195,24 +221,25 @@ size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedN
     return nBytesSent;
 }
 
-size_t Stream::GetNewMsgs(std::list<CNetMessage>& msgList)
+std::pair<Stream::QueuedNetMessage, bool> Stream::GetNextMessage()
 {
-    size_t nSizeAdded {0};
+    QueuedNetMessage msg {nullptr};
 
     LOCK(cs_mRecvMsgQueue);
-    auto it { mRecvMsgQueue.begin() };
-    for(; it != mRecvMsgQueue.end(); ++it)
-    {   
-        if(!it->complete())
-        {   
-            break;
-        }
-        nSizeAdded += it->vRecv.size() + CMessageHeader::HEADER_SIZE;
+
+    // If we have completed msgs queued, return the first one
+    if(!mRecvCompleteMsgQueue.empty())
+    {
+        msg = std::move(mRecvCompleteMsgQueue.front());
+        mRecvCompleteMsgQueue.pop_front();
+
+        // Update total queued msgs size
+        mRecvMsgQueueSize -= msg->vRecv.size() + CMessageHeader::HEADER_SIZE;
+        mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
     }
 
-    msgList.splice(msgList.end(), mRecvMsgQueue, mRecvMsgQueue.begin(), it);
-
-    return nSizeAdded;
+    // Return whether we still have more msgs queued
+    return { std::move(msg), !mRecvCompleteMsgQueue.empty() };
 }
 
 void Stream::CopyStats(StreamStats& stats) const
@@ -225,11 +252,15 @@ void Stream::CopyStats(StreamStats& stats) const
         LOCK(cs_mSendMsgQueue);
         stats.nSendBytes = mTotalBytesSent;
         stats.nSendSize = mSendMsgQueueSize.getSendQueueBytes();
+        stats.mapSendBytesPerMsgCmd = mSendBytesPerMsgCmd;
     }
 
     {
         LOCK(cs_mRecvMsgQueue);
         stats.nRecvBytes = mTotalBytesRecv;
+        stats.fPauseRecv = mPauseRecv;
+        stats.nRecvSize = mRecvMsgQueueSize;
+        stats.mapRecvBytesPerMsgCmd = mRecvBytesPerMsgCmd;
 
         // Avg bandwidth measurements
         if(!mAvgBandwidth.empty())
@@ -281,15 +312,23 @@ AverageBandwidth Stream::GetAverageBandwidth() const
     return {0,0};
 }
 
-size_t Stream::GetSendQueueSize() const
+uint64_t Stream::GetSendQueueSize() const
 {
     LOCK(cs_mSendMsgQueue);
     return mSendMsgQueueSize.getSendQueueBytes();
 }
 
-Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes,
+void Stream::SetOwningNode(CNode* newNode)
+{
+    LOCK(cs_mNode);
+    mNode = newNode;
+}
+
+Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes,
     bool& complete)
 {
+    AssertLockHeld(cs_mNode);
+
     complete = false;
     int64_t nTimeMicros = GetTimeMicros();
 
@@ -301,12 +340,12 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     while (nBytes > 0)
     {   
         // Get current incomplete message, or create a new one.
-        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back().complete())
-        {   
-            mRecvMsgQueue.push_back(CNetMessage(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
+        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back()->complete())
+        {
+            mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
         }
 
-        CNetMessage& msg = mRecvMsgQueue.back();
+        CNetMessage& msg { *(mRecvMsgQueue.back()) };
 
         // Absorb network data.
         int handled;
@@ -330,7 +369,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
 
         if (IsOversizedMessage(config, msg))
         {   
-            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode.GetId());
+            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
             return RECV_BAD_LENGTH;
         }
 
@@ -347,12 +386,13 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     return RECV_OK;
 }   
 
-size_t Stream::SocketSendData()
+uint64_t Stream::SocketSendData()
 {   
-    size_t nSentSize = 0;
-    size_t nMsgCount = 0;
-    size_t nSendBufferMaxSize = g_connman->GetSendBufferSize();
+    uint64_t nSentSize = 0;
+    uint64_t nMsgCount = 0;
+    uint64_t nSendBufferMaxSize = g_connman->GetSendBufferSize();
 
+    AssertLockHeld(cs_mNode);
     LOCK(cs_mSendMsgQueue);
 
     for(const auto& data : mSendMsgQueue)
@@ -380,18 +420,53 @@ size_t Stream::SocketSendData()
     return nSentSize;
 }
 
-Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
-{   
+void Stream::GetNewMsgs()
+{
+    uint64_t nSizeAdded {0};
+
+    LOCK(cs_mRecvMsgQueue);
+    auto it { mRecvMsgQueue.begin() };
+    for(; it != mRecvMsgQueue.end(); ++it)
+    {   
+        if(!(*it)->complete())
+        {   
+            break;
+        }
+        uint64_t msgSize { (*it)->vRecv.size() + CMessageHeader::HEADER_SIZE };
+        nSizeAdded += msgSize;
+
+        // Update recieved msg counts
+        mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find((*it)->hdr.pchCommand) };
+        if(i == mRecvBytesPerMsgCmd.end())
+        {   
+            i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
+        }
+
+        assert(i != mRecvBytesPerMsgCmd.end());
+        i->second += msgSize;
+    }
+
+    mRecvCompleteMsgQueue.splice(mRecvCompleteMsgQueue.end(), mRecvMsgQueue, mRecvMsgQueue.begin(), it);
+
+    // Track total queued complete msgs size
+    mRecvMsgQueueSize += nSizeAdded;
+    mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
+}
+
+Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize)
+{
+    AssertLockHeld(cs_mNode);
+
     if (maxChunkSize == 0)
     {   
         // if maxChunkSize is 0 assign some default chunk size value
         maxChunkSize = 1024;
     }
-    size_t sentSize = 0;
+    uint64_t sentSize = 0;
 
     do
     {   
-        int nBytes = 0;
+        ssize_t nBytes = 0;
         if (!mSendChunk)
         {   
             mSendChunk = data.ReadAsync(maxChunkSize);
@@ -430,7 +505,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_
             if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
             {
                 LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
-                mNode.CloseSocketDisconnect();
+                mNode->CloseSocketDisconnect();
             }
 
             return {false, sentSize};
@@ -440,7 +515,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_
         mLastSendTime = GetSystemTimeInSeconds();
         mTotalBytesSent += nBytes;
         sentSize += nBytes;
-        if (static_cast<size_t>(nBytes) != mSendChunk->Size())
+        if (static_cast<uint64_t>(nBytes) != mSendChunk->Size())
         {
             // could not send full message; stop sending more
             mSendChunk =

@@ -61,7 +61,11 @@ private:
     bool replySent;
 
 public:
-    HTTPRequest(struct evhttp_request *req);
+    HTTPRequest(const HTTPRequest&) = delete;
+    HTTPRequest& operator=(const HTTPRequest&) = delete;
+    HTTPRequest(HTTPRequest&&) = delete;
+    HTTPRequest& operator=(HTTPRequest&&) = delete;
+    explicit HTTPRequest(struct evhttp_request *req);
     ~HTTPRequest();
 
     enum RequestMethod { UNKNOWN, GET, POST, HEAD, PUT, OPTIONS };
@@ -136,6 +140,10 @@ public:
      * triggered (and the handler called)
      * handler is the handler to call when the event is triggered.
      */
+    HTTPEvent(const HTTPEvent&) = delete;
+    HTTPEvent& operator=(const HTTPEvent&) = delete;
+    HTTPEvent(HTTPEvent&&) = delete;
+    HTTPEvent& operator=(HTTPEvent&&) = delete;
     HTTPEvent(struct event_base *base, bool deleteWhenTriggered,
               const std::function<void(void)> &handler);
     ~HTTPEvent();

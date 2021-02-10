@@ -3,13 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "scheduler.h"
-
 #include "random.h"
 #include "reverselock.h"
 #include "util.h"
-
 #include <boost/bind/bind.hpp>
-#include <cassert>
 #include <chrono>
 #include <thread>
 #include <utility>

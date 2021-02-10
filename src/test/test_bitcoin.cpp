@@ -17,6 +17,7 @@
 #include "net/net_processing.h"
 #include "pubkey.h"
 #include "random.h"
+#include "rpc/mining.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/scriptcache.h"
@@ -28,6 +29,7 @@
 #include "validation.h"
 
 #include "test/testutil.h"
+#include "test/mempool_test_access.h"
 
 #include <atomic>
 #include <chrono>
@@ -63,7 +65,18 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     testConfig.Reset(); // make sure that we start every test with a clean config
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
+    // Use a temporary datadir that we don't inadvertently create the default one.
+    ClearDatadirCache();
+    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
+                                         (unsigned long)GetTime(),
+                                         (int)(InsecureRandRange(100000)));
+    fs::create_directories(pathTemp);
+    gArgs.ForceSetArg("-datadir", pathTemp.string());
+
+    mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
+    CTxMemPoolTestAccess{mempool}.InitInMemoryMempoolTxDB();
+    mempool.ResumeSanityCheck();
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
@@ -79,6 +92,8 @@ BasicTestingSetup::~BasicTestingSetup() {
         g_connman->Stop();
         g_connman.reset();
     }
+
+    fs::remove_all(pathTemp);
 }
 
 TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory::BlockAssemblerType assemblerType)
@@ -88,16 +103,14 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
-    ClearDatadirCache();
-    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
-                                         (unsigned long)GetTime(),
-                                         (int)(InsecureRandRange(100000)));
-    fs::create_directories(pathTemp);
-    gArgs.ForceSetArg("-datadir", pathTemp.string());
     mempool.SetSanityCheck(1.0);
     pblocktree = new CBlockTreeDB(1 << 20, true);
-    pcoinsdbview = new CCoinsViewDB(1 << 23, true);
-    pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    pcoinsTip =
+        std::make_unique<CoinsDB>(
+            std::numeric_limits<size_t>::max(),
+            1 << 23,
+            CoinsDB::MaxFiles::Default(),
+            true);
     if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
     }
@@ -129,10 +142,8 @@ TestingSetup::~TestingSetup() {
     threadGroup.interrupt_all();
     threadGroup.join_all();
     UnloadBlockIndex();
-    delete pcoinsTip;
-    delete pcoinsdbview;
+    pcoinsTip.reset();
     delete pblocktree;
-    fs::remove_all(pathTemp);
 }
 
 TestChain100Setup::TestChain100Setup()
@@ -192,14 +203,8 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx,
 
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
                                                CTxMemPool *pool) {
-    // Hack to assume either it's completely dependent on other mempool txs or
-    // not at all.
-    Amount inChainValue =
-        pool && pool->HasNoInputsOf(txn) ? txn.GetValueOut() : Amount(0);
-
-    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, dPriority,
-                           nHeight, inChainValue, spendsCoinbase, sigOpCost,
-                           lp);
+    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, 
+                           nHeight, spendsCoinbase, lp);
 }
 
 namespace {

@@ -4,7 +4,6 @@
 #include "invalid_txn_publisher.h"
 #include "core_io.h"
 #include "util.h"
-#include "config.h"
 #include "memusage.h"
 
 InvalidTxnInfo::InvalidTxnInfo(
@@ -75,7 +74,6 @@ void InvalidTxnInfo::PutOrigin(CJSONWriter& writer) const
     {
         writer.pushKV("fromBlock", true);
         writer.writeBeginArray("origins");
-        const InvalidTxnInfo::BlockOrigin* lastElement = &blockDetails->origins.back();
         for(const auto& origin: blockDetails->origins)
         {
             writer.writeBeginObject();
@@ -84,9 +82,9 @@ void InvalidTxnInfo::PutOrigin(CJSONWriter& writer) const
             if(!origin.address.empty())
             {
                 writer.pushKV("address", origin.address);
-                writer.pushKV("nodeId", origin.nodeId, false);
+                writer.pushKV("nodeId", origin.nodeId);
             }
-            writer.writeEndObject(&origin != lastElement);
+            writer.writeEndObject();
         };
         writer.writeEndArray();
         writer.pushKV("blockhash", blockDetails->hash.GetHex());
@@ -108,28 +106,27 @@ void InvalidTxnInfo::PutOrigin(CJSONWriter& writer) const
 void InvalidTxnInfo::PutTx(
     CJSONWriter& writer,
     const std::variant<CTransactionRef, TxData>& transaction,
-    bool writeHex,
-    bool addLastComma) const
+    bool writeHex) const
 {
     if(auto tx = std::get_if<CTransactionRef>(&transaction))
     {
         if(*tx)
         {
             writer.pushKV("txid", (*tx)->GetId().GetHex());
-            writer.pushKV("size", int64_t((*tx)->GetTotalSize()), !writeHex ? addLastComma : true);
+            writer.pushKV("size", int64_t((*tx)->GetTotalSize()));
             if(writeHex)
             {
                 writer.pushK("hex");
-                writer.pushQuote(true, false);
+                writer.pushQuote();
                 EncodeHexTx(**tx, writer.getWriter(), 0);
-                writer.pushQuote(false, addLastComma);
+                writer.pushQuote();
             }
         }
     }
     else if(auto tx = std::get_if<InvalidTxnInfo::TxData>(&transaction))
     {
         writer.pushKV("txid", tx->txid.GetHex());
-        writer.pushKV("size", tx->txSize, addLastComma);
+        writer.pushKV("size", tx->txSize);
     }
 }
 
@@ -152,7 +149,7 @@ void InvalidTxnInfo::PutRejectionTime(CJSONWriter& writer) const
 {
     //YYYY-MM-DDThh:mm:ssZ
     auto time = DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", mRejectionTime);
-    writer.pushKV("rejectionTime", time, false);
+    writer.pushKV("rejectionTime", time);
 }
 
 // writes invalidTxnInfo to the writer
@@ -161,7 +158,7 @@ void InvalidTxnInfo::ToJson(CJSONWriter& writer, bool writeHex) const
     writer.writeBeginObject();
 
     PutOrigin(writer);
-    PutTx(writer, mTransaction, writeHex, true);
+    PutTx(writer, mTransaction, writeHex);
     PutState(writer);
 
     writer.writeBeginArray("collidedWith");
@@ -169,16 +166,15 @@ void InvalidTxnInfo::ToJson(CJSONWriter& writer, bool writeHex) const
     for(auto& item : mCollidedWithTransaction)
     {
         writer.writeBeginObject();
-        PutTx(writer, item.mTransaction, writeHex, false);
-        bool placeComma = idx % mCollidedWithTransaction.size();
-        writer.writeEndObject(placeComma);
+        PutTx(writer, item.mTransaction, writeHex);
+        writer.writeEndObject();
         ++idx;
     }
     writer.writeEndArray();
 
     PutRejectionTime(writer);
 
-    writer.writeEndObject(false);
+    writer.writeEndObject();
 }
 
 CInvalidTxnPublisher::CInvalidTxnPublisher(

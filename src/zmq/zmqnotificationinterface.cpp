@@ -8,8 +8,6 @@
 #include "streams.h"
 #include "util.h"
 #include "validation.h"
-#include "version.h"
-
 
 void zmqError(const char *str) {
     LogPrint(BCLog::ZMQ, "zmq: Error: %s, errno=%s\n", str,
@@ -200,13 +198,13 @@ void CZMQNotificationInterface::TransactionAddedToMempool(
 
 
 void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason, 
-                                                              const CTransaction* conflictedWith, const uint256* blockhash)
+                                                            const CTransactionConflict& conflictedWith)
 {
 
     for (auto i = notifiers.begin(); i != notifiers.end();)
     {
         CZMQAbstractNotifier *notifier = *i;
-        if (notifier->NotifyRemovedFromMempool(txid, reason, conflictedWith, blockhash))
+        if (notifier->NotifyRemovedFromMempool(txid, reason, conflictedWith))
         {
             ++i;
         }

@@ -3,13 +3,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "config.h"
-#include "consensus/consensus.h"
 #include "rpc/server.h"
 #include "utilstrencodings.h"
-#include "validation.h"
-
-#include <univalue.h>
-
 #include <boost/lexical_cast.hpp>
 
 static UniValue getexcessiveblock(const Config &config,

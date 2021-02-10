@@ -8,80 +8,96 @@
 
 #include "amount.h"
 #include "coins.h"
-#include "indirectmap.h"
+#include "mining/journal_entry.h"
 #include "mining/journal_builder.h"
-#include "random.h"
+#include "primitives/transaction.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
+#include "txhasher.h"
 #include "tx_mempool_info.h"
+#include "txn_validation_data.h"
 #include "policy/policy.h"
 
 #include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index_container.hpp>
+#include <boost/multi_index/member.hpp>
 
 #include <boost/signals2/signal.hpp>
+#include <boost/uuid/uuid.hpp>
 
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 #include <mutex>
 #include <shared_mutex>
+#include <unordered_map>
 
 class CAutoFile;
 class CBlockIndex;
+class CEvictionCandidateTracker;
 class Config;
-
-inline double AllowFreeThreshold() {
-    return COIN.GetSatoshis() * 144 / 250;
-}
-
-inline bool AllowFree(double dPriority) {
-    // Large (in bytes) low-priority (new, small-coin) transactions need a fee.
-    return dPriority > AllowFreeThreshold();
-}
+class CoinsDB;
+class CoinsDBView;
+class CAsyncMempoolTxDB;
 
 /**
  * Fake height value used in Coins to signify they are only in the memory
  * pool(since 0.8)
  */
-static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
+static const int32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
 struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)
     // of this tx given our view of block chain history
-    int height;
+    int32_t height;
     int64_t time;
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
     // values are still valid even after a reorg.
-    CBlockIndex *maxInputBlock;
+    const CBlockIndex *maxInputBlock;
 
     LockPoints() : height(0), time(0), maxInputBlock(nullptr) {}
 };
 
 class CTxMemPool;
+class CPFPGroup;
 
 /**
- * Shared ancestor/descendant count information.
+ * Statistics for the secondary mempool and CPFP groups.
+ *
+ * In the secondary mempool, the stats accumulated from parents are approximate
+ * because they don't account for possible duplicates.
+ *
+ * In the primary mempool CPFP group, duplicates are eliminated and the
+ * accumulated data are precise, except for @c ancestorsCount, which is not used.
  */
-struct AncestorDescendantCounts
+struct SecondaryMempoolEntryData
 {
-    AncestorDescendantCounts(uint64_t ancestors, uint64_t descendants)
-    : nCountWithAncestors{ancestors}, nCountWithDescendants{descendants}
-    {}
+    // Accumulated data from parents or for the whole group.
+    Amount fee {0};
+    Amount feeDelta {0};
+    size_t size {0};
 
-    // These don't actually need to be atomic currently, but there's no cost
-    // if they are and we might want to access them across threads in the future.
-    std::atomic_uint64_t nCountWithAncestors   {0};
-    std::atomic_uint64_t nCountWithDescendants {0};
+    // We only count ancestors and chain length in the secondary mempool.
+    size_t ancestorsCount {0};
 };
-using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
+
+inline bool operator==(const SecondaryMempoolEntryData& a,
+                       const SecondaryMempoolEntryData& b)
+{
+    return ((&a == &b) || ((a.fee == b.fee) &&
+                           (a.feeDelta == b.feeDelta) &&
+                           (a.size == b.size) &&
+                           (a.ancestorsCount == b.ancestorsCount)));
+}
 
 /** \class CTxPrioritizer
  *
@@ -97,7 +113,7 @@ private:
     std::vector<TxId> mTxnsToPrioritise {};
 
 public:
-    CTxPrioritizer(CTxMemPool& mempool, TxId txnToPrioritise);
+    CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise = TxId());
     CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise);
     ~CTxPrioritizer();
     // Forbid copying/assignment
@@ -109,9 +125,7 @@ public:
 
 /** \class CTxMemPoolEntry
  *
- * CTxMemPoolEntry stores data about the corresponding transaction, as well as
- * data about all in-mempool transactions that depend on the transaction
- * ("descendant" transactions).
+ * CTxMemPoolEntry stores data about the corresponding transaction.
  *
  * When a new entry is added to the mempool, we update the descendant state
  * (nCountWithDescendants, nSizeWithDescendants, and nModFeesWithDescendants)
@@ -123,142 +137,85 @@ public:
  * limit the amount of work we're willing to do to avoid consuming too much
  * CPU.)
  */
-
 class CTxMemPoolEntry {
 private:
-    CTransactionRef tx;
+    CTransactionWrapperRef tx;
+    // The mempool info constructor needs access to the wrapper reference.
+    friend TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry&);
+    // So does the journal entry constructor.
+    friend mining::CJournalEntry::CJournalEntry(const CTxMemPoolEntry&);
+
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
     //!< ... and avoid recomputing tx size
     size_t nTxSize;
-    //!< ... and modified size for priority
-    size_t nModSize;
     //!< ... and total memory usage
     size_t nUsageSize;
     //!< Local time when entering the mempool
     int64_t nTime;
-    //!< Priority when entering the mempool
-    double entryPriority;
-    //!< Sum of all txin values that are already in blockchain
-    Amount inChainInputValue;
-    //!< Total sigop plus P2SH sigops count
-    int64_t sigOpCount;
     //!< Used for determining the priority of the transaction for mining in a
     //! block
     Amount feeDelta;
     //!< Track the height and time at which tx was final
     LockPoints lockPoints;
 
-    // Information about descendants of this transaction that are in the
-    // mempool; if we remove this transaction we must remove all of these
-    // descendants as well.  if nCountWithDescendants is 0, treat this entry as
-    // dirty, and nSizeWithDescendants and nModFeesWithDescendants will not be
-    // correct.
-    //!< number of descendant transactions
-    AncestorDescendantCountsPtr ancestorDescendantCounts;
-    //!< ... and size
-    uint64_t nSizeWithDescendants;
-    //!< ... and total fees (all including us)
-    Amount nModFeesWithDescendants;
-
-    // Analogous statistics for ancestor transactions
-    uint64_t nSizeWithAncestors;
-    Amount nModFeesWithAncestors;
-    int64_t nSigOpCountWithAncestors;
+    // Grouping data for long chains/CPFP evaluation.
+    std::shared_ptr<CPFPGroup> group {nullptr};
+    std::optional<SecondaryMempoolEntryData> groupingData {std::nullopt};
+    // The mempool needs access to the group statistics.
+    friend class CTxMemPool;
 
     //!< Chain height when entering the mempool
-    unsigned int entryHeight;
+    int32_t entryHeight;
     //!< keep track of transactions that spend a coinbase
     bool spendsCoinbase;
-
+    // index of insertion to mempool, entry with smaller index is inserted before the one with larger
+    uint64_t insertionIndex;
+    // ancestors count
+    size_t ancestorsCount;
+    
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
-                    int64_t _nTime, double _entryPriority,
-                    unsigned int _entryHeight, Amount _inChainInputValue,
-                    bool spendsCoinbase, int64_t nSigOpsCost, LockPoints lp);
+                    int64_t _nTime,
+                    int32_t _entryHeight,
+                    bool spendsCoinbase, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
-    const CTransaction &GetTx() const { return *this->tx; }
-    CTransactionRef GetSharedTx() const { return this->tx; }
-    /**
-     * Fast calculation of lower bound of current priority as update from entry
-     * priority. Only inputs that were originally in-chain will age.
-     */
-    double GetPriority(unsigned int currentHeight) const;
-    const Amount GetFee() const { return nFee; }
+    // CPFP group, if any that this transaction belongs to.
+    mining::GroupID GetCPFPGroupId() const;
+    CTransactionRef GetSharedTx() const { return tx->GetTx(); }
+    const TxId& GetTxId() const { return tx->GetId(); }
+
+    Amount GetFee() const { return nFee; }
+    Amount GetFeeDelta() const { return feeDelta; }
     size_t GetTxSize() const { return nTxSize; }
     int64_t GetTime() const { return nTime; }
-    unsigned int GetHeight() const { return entryHeight; }
-    int64_t GetSigOpCount() const { return sigOpCount; }
+    int32_t GetHeight() const { return entryHeight; }
     Amount GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
 
-    // Adjusts the descendant state, if this entry is not dirty.
-    void UpdateDescendantState(int64_t modifySize, Amount modifyFee,
-                               int64_t modifyCount);
-    // Adjusts the ancestor state
-    void UpdateAncestorState(int64_t modifySize, Amount modifyFee,
-                             int64_t modifyCount, int modifySigOps);
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(Amount feeDelta);
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    const AncestorDescendantCountsPtr& GetAncestorDescendantCounts() const { return ancestorDescendantCounts; }
-    uint64_t GetCountWithDescendants() const { return ancestorDescendantCounts->nCountWithDescendants; }
-    uint64_t GetSizeWithDescendants() const { return nSizeWithDescendants; }
-    Amount GetModFeesWithDescendants() const { return nModFeesWithDescendants; }
-
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
-    uint64_t GetCountWithAncestors() const { return ancestorDescendantCounts->nCountWithAncestors; }
-    uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
-    Amount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
-    int64_t GetSigOpCountWithAncestors() const {
-        return nSigOpCountWithAncestors;
-    }
+    bool IsCPFPGroupMember() const { return group != nullptr; }
+    bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
+    std::shared_ptr<const CPFPGroup> GetCPFPGroup() const { return group; }
 
-    //!< Index in mempool's vTxHashes
-    mutable size_t vTxHashesIdx;
-};
+    bool IsInMemory() const noexcept { return tx->IsInMemory(); }
+    TxStorage GetTxStorage() const noexcept { return tx->GetTxStorage(); }
 
-// Helpers for modifying CTxMemPool::mapTx, which is a boost multi_index.
-struct update_descendant_state {
-    update_descendant_state(int64_t _modifySize, Amount _modifyFee,
-                            int64_t _modifyCount)
-        : modifySize(_modifySize), modifyFee(_modifyFee),
-          modifyCount(_modifyCount) {}
+    template<typename X> struct UnitTestAccess;
 
-    void operator()(CTxMemPoolEntry &e) {
-        e.UpdateDescendantState(modifySize, modifyFee, modifyCount);
-    }
-
-private:
-    int64_t modifySize;
-    Amount modifyFee;
-    int64_t modifyCount;
-};
-
-struct update_ancestor_state {
-    update_ancestor_state(int64_t _modifySize, Amount _modifyFee,
-                          int64_t _modifyCount, int64_t _modifySigOpsCost)
-        : modifySize(_modifySize), modifyFee(_modifyFee),
-          modifyCount(_modifyCount), modifySigOpsCost(_modifySigOpsCost) {}
-
-    void operator()(CTxMemPoolEntry &e) {
-        e.UpdateAncestorState(modifySize, modifyFee, modifyCount,
-                              modifySigOpsCost);
-    }
-
-private:
-    int64_t modifySize;
-    Amount modifyFee;
-    int64_t modifyCount;
-    int64_t modifySigOpsCost;
+    void SetInsertionIndex(uint64_t ndx) { insertionIndex = ndx; }
+    uint64_t GetInsertionIndex() const { return insertionIndex; }
 };
 
 struct update_fee_delta {
@@ -283,54 +240,11 @@ private:
 struct mempoolentry_txid {
     typedef uint256 result_type;
     result_type operator()(const CTxMemPoolEntry &entry) const {
-        return entry.GetTx().GetId();
+        return entry.GetTxId();
     }
 
     result_type operator()(const CTransactionRef &tx) const {
         return tx->GetId();
-    }
-};
-
-/** \class CompareTxMemPoolEntryByDescendantScore
- *
- *  Sort an entry by max(score/size of entry's tx, score/size with all
- * descendants).
- */
-class CompareTxMemPoolEntryByDescendantScore {
-public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const {
-        bool fUseADescendants = UseDescendantScore(a);
-        bool fUseBDescendants = UseDescendantScore(b);
-
-        double aModFee = (fUseADescendants ? a.GetModFeesWithDescendants()
-                                           : a.GetModifiedFee())
-                             .GetSatoshis();
-        double aSize =
-            fUseADescendants ? a.GetSizeWithDescendants() : a.GetTxSize();
-
-        double bModFee = (fUseBDescendants ? b.GetModFeesWithDescendants()
-                                           : b.GetModifiedFee())
-                             .GetSatoshis();
-        double bSize =
-            fUseBDescendants ? b.GetSizeWithDescendants() : b.GetTxSize();
-
-        // Avoid division by rewriting (a/b > c/d) as (a*d > c*b).
-        double f1 = aModFee * bSize;
-        double f2 = aSize * bModFee;
-
-        if (f1 == f2) {
-            return a.GetTime() >= b.GetTime();
-        }
-        return f1 < f2;
-    }
-
-    // Calculate which score to use for an entry (avoiding division).
-    bool UseDescendantScore(const CTxMemPoolEntry &a) const {
-        double f1 = double(a.GetSizeWithDescendants() *
-                           a.GetModifiedFee().GetSatoshis());
-        double f2 =
-            double(a.GetTxSize() * a.GetModFeesWithDescendants().GetSatoshis());
-        return f2 > f1;
     }
 };
 
@@ -344,7 +258,7 @@ public:
         double f1 = double(b.GetTxSize() * a.GetModifiedFee().GetSatoshis());
         double f2 = double(a.GetTxSize() * b.GetModifiedFee().GetSatoshis());
         if (f1 == f2) {
-            return b.GetTx().GetId() < a.GetTx().GetId();
+            return b.GetTxId() < a.GetTxId();
         }
         return f1 > f2;
     }
@@ -357,31 +271,13 @@ public:
     }
 };
 
-class CompareTxMemPoolEntryByAncestorFee {
-public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const {
-        double aFees = double(a.GetModFeesWithAncestors().GetSatoshis());
-        double aSize = a.GetSizeWithAncestors();
-
-        double bFees = double(b.GetModFeesWithAncestors().GetSatoshis());
-        double bSize = b.GetSizeWithAncestors();
-
-        // Avoid division by rewriting (a/b > c/d) as (a*d > c*b).
-        double f1 = aFees * bSize;
-        double f2 = aSize * bFees;
-
-        if (f1 == f2) {
-            return a.GetTx().GetId() < b.GetTx().GetId();
-        }
-
-        return f1 > f2;
-    }
-};
-
 // Multi_index tag names
-struct descendant_score {};
+struct transaction_id {};
 struct entry_time {};
-struct ancestor_score {};
+struct insertion_order {};
+
+struct by_prevout {};
+struct by_txiter {};
 
 
 /**
@@ -405,18 +301,20 @@ enum class MemPoolRemovalReason {
     REPLACED
 };
 
-class SaltedTxidHasher {
-private:
-    /** Salt */
-    const uint64_t k0, k1;
+struct DisconnectedBlockTransactions;
 
-public:
-    SaltedTxidHasher();
-
-    size_t operator()(const uint256 &txid) const {
-        return SipHashUint256(k0, k1, txid);
+struct CTransactionConflictData {
+    const CTransaction* const conflictedWith;
+    const uint256* const blockhash;
+    CTransactionConflictData(const CTransaction* conflictedWith_, const uint256* blockhash_)
+    : conflictedWith{conflictedWith_}
+    , blockhash{blockhash_}
+    {
+        assert(conflictedWith != nullptr);
     }
 };
+
+using CTransactionConflict = std::optional<CTransactionConflictData>;
 
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain transactions that
@@ -434,11 +332,9 @@ public:
  *
  * CTxMemPool::mapTx, and CTxMemPoolEntry bookkeeping:
  *
- * mapTx is a boost::multi_index that sorts the mempool on 4 criteria:
+ * mapTx is a boost::multi_index that sorts the mempool on 2 criteria:
  * - transaction hash
- * - feerate [we use max(feerate of tx, feerate of tx with all descendants)]
  * - time in mempool
- * - mining score (feerate modified by any fee deltas from PrioritiseTransaction)
  *
  * Note: mapTx will become private and may be modified extensively in the future. It will
  * not be part of the public definition of this class.
@@ -446,12 +342,6 @@ public:
  * Note: the term "descendant" refers to in-mempool transactions that depend on
  * this one, while "ancestor" refers to in-mempool transactions that a given
  * transaction depends on.
- *
- * Note: the feerate sort (referenced below) will be removed in future.
- * In order for the feerate sort to remain correct, we must update transactions
- * in the mempool when new descendants arrive. To facilitate this, we track the
- * set of in-mempool direct parents and direct children in mapLinks. Within each
- * CTxMemPoolEntry, we track the size and fees of all descendants.
  *
  * Note: tracking of ancestors and descendants may be removed in the future.
  *
@@ -486,14 +376,14 @@ public:
  * in-block transactions by calling UpdateTransactionsFromBlock(). Note that
  * until this is called, the mempool state is not consistent, and in particular
  * mapLinks may not be correct (and therefore functions like
- * CalculateMemPoolAncestors() and CalculateDescendants() that rely on them to
- * walk the mempool are not generally safe to use).
+ * CalculateMemPoolAncestorsNL() and CalculateDescendantsNL() that rely on them
+ * to walk the mempool are not generally safe to use).
  *
  * Computational limits:
  *
  * Updating all in-mempool ancestors of a newly added transaction can be slow,
  * if no bound exists on how many in-mempool ancestors there may be.
- * CalculateMemPoolAncestors() takes configurable limits that are designed to
+ * CalculateMemPoolAncestorsNL() takes configurable limits that are designed to
  * prevent these calculations from being too CPU intensive.
  *
  * Adding transactions from a disconnected block can be very time consuming,
@@ -506,14 +396,25 @@ public:
  */
 class CTxMemPool {
 private:
-    //!< Value n means that n times in 2^32 we check.
-    std::atomic_uint32_t nCheckFrequency;
-    std::atomic_uint nTransactionsUpdated;
+    static constexpr int MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO = 1000;
 
+    //!< Value n means that n times in 2^32 we check.
+    // Sanity checks off by default for performance, because otherwise accepting
+    // transactions becomes O(N^2) where N is the number of transactions in the
+    // pool
+    std::atomic_uint32_t nCheckFrequency {0};
+
+    // Flag to temporarily suspend sanity checking
+    std::atomic_bool suspendSanityCheck {false};
+
+    std::atomic_uint nTransactionsUpdated {0};
+
+    // fee that a transaction or a group needs to pay to enter the primary mempool
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
 
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
+
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
     //! themselves)
     uint64_t cachedInnerUsage;
@@ -529,83 +430,170 @@ private:
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
 
-public:
-    // public only for testing
-    static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
+    // The group definition needs access to the mempool index iterator type.
+    friend class CPFPGroup;
 
-    // DEPRECATED - this will become private and ultimately changed or removed
+public:
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     typedef boost::multi_index_container<
         CTxMemPoolEntry, boost::multi_index::indexed_by<
                              // sorted by txid
                              boost::multi_index::hashed_unique<
+                                 boost::multi_index::tag<transaction_id>,
                                  mempoolentry_txid, SaltedTxidHasher>,
-                             // sorted by fee rate
-                             boost::multi_index::ordered_non_unique<
-                                 boost::multi_index::tag<descendant_score>,
-                                 boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByDescendantScore>,
                              // sorted by entry time
                              boost::multi_index::ordered_non_unique<
                                  boost::multi_index::tag<entry_time>,
                                  boost::multi_index::identity<CTxMemPoolEntry>,
                                  CompareTxMemPoolEntryByEntryTime>,
-                             // sorted by fee rate with ancestors
-                             boost::multi_index::ordered_non_unique<
-                                 boost::multi_index::tag<ancestor_score>,
-                                 boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByAncestorFee>>>
+                             // arranged by insertion order
+                             boost::multi_index::sequenced<
+                                 boost::multi_index::tag<insertion_order>>>>
         indexed_transaction_set;
 
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     mutable std::shared_mutex smtx;
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     indexed_transaction_set mapTx;
 
-    // DEPRECATED - this will become private and ultimately changed or removed
-    typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
-    //!< All tx hashes/entries in mapTx, in random order
-    // DEPRECATED - this will become private and ultimately changed or removed
-    std::vector<std::pair<uint256, txiter>> vTxHashes;
+private:
+    static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
 
-    // DEPRECATED - this will become private and ultimately changed or removed
+    using txiter = indexed_transaction_set::index<transaction_id>::type::const_iterator;
+
     struct CompareIteratorByHash {
         bool operator()(const txiter &a, const txiter &b) const {
-            return a->GetTx().GetId() < b->GetTx().GetId();
+            return a->GetTxId() < b->GetTxId();
         }
     };
-    // DEPRECATED - this will become private and ultimately changed or removed
-    typedef std::set<txiter, CompareIteratorByHash> setEntries;
 
-    // DEPRECATED - this will become private and ultimately changed or removed
+    class SaltedTxiterHasher : private SaltedTxidHasher {
+    public:
+        size_t operator()(const txiter& entry) const {
+            return SaltedTxidHasher::operator()(entry->GetTxId());
+        }
+    };
+
+    using setEntries = std::unordered_set<txiter, SaltedTxiterHasher>;
+     
+    class InsrtionOrderComparator
+    {
+    public:
+        bool operator() (const txiter& lhs, const txiter& rhs) const
+        { 
+            return lhs->GetInsertionIndex() < rhs->GetInsertionIndex(); 
+        }
+    };
+    // when inserting transaction to mempool, all of its mempool parents must be already inserted and none of its children should be inserted.
+    // transaction which is inserted later has larger insertion index. thus if we sort a sequence by insertion index it will be topo sorted
+    using setEntriesTopoSorted = std::set<txiter, InsrtionOrderComparator>;
+
     const setEntries &GetMemPoolParentsNL(txiter entry) const;
-    // DEPRECATED - this will become private and ultimately changed or removed
     const setEntries &GetMemPoolChildrenNL(txiter entry) const;
-
-private:
-    typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
 
     struct TxLinks {
         setEntries parents;
         setEntries children;
     };
 
-    typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
+
+    using txlinksMap = std::unordered_map<txiter, TxLinks, SaltedTxiterHasher>;
     txlinksMap mapLinks;
 
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::vector<indexed_transaction_set::const_iterator>
-    getSortedDepthAndScoreNL() const;
+    struct OutpointTxPair
+    {
+        COutPoint outpoint;
+        txiter spentBy;
+    };
+
+    using MapNextTx =
+    boost::multi_index_container<
+        OutpointTxPair,
+        boost::multi_index::indexed_by<
+            boost::multi_index::hashed_unique<
+                boost::multi_index::tag<by_prevout>,
+                boost::multi_index::member<
+                    OutpointTxPair,
+                    COutPoint,
+                    &OutpointTxPair::outpoint
+                >,
+                SaltedOutpointHasher
+            >,
+            boost::multi_index::hashed_non_unique<
+                boost::multi_index::tag<by_txiter>,
+                boost::multi_index::member<
+                    OutpointTxPair,
+                    txiter,
+                    &OutpointTxPair::spentBy
+                >,
+                SaltedTxiterHasher
+            >
+        >
+    >;
+
+    MapNextTx mapNextTx;
+
+    std::map<uint256, Amount> mapDeltas;
+
+    class InsertionIndex
+    {
+        uint64_t nextIndex = 1;
+    public:
+        uint64_t GetNext()
+        {
+            return nextIndex++;
+        }
+    } insertionIndex;
+
+    // The eviction tracker must be declared after mapLinks because it refers to
+    // it and must be destroyed first.
+    friend class CEvictionCandidateTracker;
+    std::shared_ptr<CEvictionCandidateTracker> evictionTracker;
+    static int64_t evaluateEvictionCandidateNL(txiter entry);
+
+    // Shortcuts for eviction tracking. Must be called with the mempool locked.
+    void TrackEntryAdded(CTxMemPool::txiter entry);
+    void TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents);
+    void TrackEntryModified(CTxMemPool::txiter entry);
+
+    std::vector<COutPoint> GetOutpointsSpentByNL(CTxMemPool::txiter entry) const;
+
+    class SecondaryMempoolStats {
+        // Primary and secondary mempool sizes are tracked separately.
+        uint64_t secondaryMempoolSize;
+
+        //!< sum of transaction sizes of secondary mempool map elements (NOT the maps
+        //! themselves)
+        uint64_t cachedSecondaryInnerUsage;
+
+        public:
+        SecondaryMempoolStats()
+        {
+            Clear();
+        }
+        void Clear() {
+            secondaryMempoolSize = 0;
+            cachedSecondaryInnerUsage = 0;
+        }
+        void Add(const txiter& entryIt) {
+            secondaryMempoolSize++;
+            cachedSecondaryInnerUsage += entryIt->DynamicMemoryUsage();
+        }
+        void Remove(const txiter& entryIt) {
+            secondaryMempoolSize--;
+            cachedSecondaryInnerUsage -= entryIt->DynamicMemoryUsage();
+        }
+        unsigned long Size() const { return secondaryMempoolSize; }
+        uint64_t InnerUsage() const { return cachedSecondaryInnerUsage; }
+    };
+    SecondaryMempoolStats secondaryMempoolStats;
+
 
 public:
-    // DEPRECATED - this will become private and ultimately changed or removed
-    indirectmap<COutPoint, const CTransaction *> mapNextTx;
-    // DEPRECATED - this will become private and ultimately changed or removed
-    std::map<uint256, std::pair<double, Amount>> mapDeltas;
-
-    /** Create a new CTxMemPool.
-     */
+    /** Create a new CTxMemPool. */
     CTxMemPool();
     ~CTxMemPool();
 
@@ -616,77 +604,113 @@ public:
      * If sanity-checking is turned off, check does nothing.
      */
     void CheckMempool(
-        const CCoinsViewCache *pcoins,
+        CoinsDB& db,
         const mining::CJournalChangeSetPtr& changeSet) const;
 
     std::string CheckJournal() const;
 
     void SetSanityCheck(double dFrequency = 1.0);
+    void SuspendSanityCheck() { suspendSanityCheck.store(true); }
+    void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
+    CFeeRate GetBlockMinTxFee() { return blockMinTxfee; };
 
-    /** Rebuild the journal contents so they match the mempool */
-    void RebuildJournal() const;
+    /** Rebuilds the mempool by reseting it and then resubmitting transactions that were inside before.
+        As consequence the journal is rebuilt. The caller must apply the changeset. */
+    mining::CJournalChangeSetPtr RebuildMempool();
 
-    // AddUnchecked must updated state for all ancestors of a given transaction,
-    // to track size/count of descendant transactions. First version of
-    // AddUnchecked can be used to have it call CalculateMemPoolAncestors(), and
-    // then invoke the second version.
+    // AddUnchecked must update the state for all ancestors of a given
+    // transaction, to track size/count of descendant transactions.
     void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
+            const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
-            size_t* pnMempoolSize = nullptr,
+            size_t* pnPrimaryMempoolSize = nullptr,
+            size_t* pnSecondaryMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
-    void AddUnchecked(
-            const uint256 &hash,
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            const mining::CJournalChangeSetPtr& changeSet,
-            size_t* pnMempoolSize = nullptr,
-            size_t* pnDynamicMemoryUsage = nullptr);
+private:
+    // Check the contents of the mempool transaction database against the mempool.
+    // hardErrors=true means the implementation will assert() on error.
+    bool CheckMempoolTxDBNL(bool hardErrors = true) const;
 
-    void RemoveRecursive(
-        const CTransaction &tx,
-        const mining::CJournalChangeSetPtr& changeSet,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    // walks through ancestors and collect all that are still in the secondary mempool
+    // payingTx will be includes in this set also
+    setEntriesTopoSorted GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const;
 
-    void RemoveForReorg(
-            const Config &config,
-            const CCoinsViewCache *pcoins,
-            const mining::CJournalChangeSetPtr& changeSet,
-            int nChainActiveHeight,
-            int nMedianTimePast,
-            int flags);
+    // it will calculate grouping data for the actual group, used when a group is accepted
+    SecondaryMempoolEntryData FillGroupingDataNL(const CTxMemPool::setEntriesTopoSorted& groupMembers) const;
 
+    // checks groupingData if ti pays enough to enter the primary mempool
+    bool IsPayingEnough(const SecondaryMempoolEntryData& groupingData) const;
+
+    // calculate grouping data for the given entry based on it's direct parents, does not modify entry
+    SecondaryMempoolEntryData CalculateSecondaryMempoolData(txiter entryIt) const;
+
+    // modifies entry by adding grouping data
+    void SetGroupingData(txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData);
+
+    // forms a group out of groupMembers, modifys mempool entry (remove grouping data and create group object) and adds
+    // changes to the changeSet
+    void AcceptSingleGroupNL(const setEntriesTopoSorted& groupMembers, mining::CJournalChangeSet& changeSet);
+    
+    // result of the UpdateEntryGroupingDataNL
+    // designates what kind of change took place
+    enum class ResultOfUpdateEntryGroupingDataNL
+    {
+        NOTHING,                         // entry is not modified
+        GROUPING_DATA_MODIFIED,          // grouping data is modified, children needs to be updated
+        ADD_TO_PRIMARY_STANDALONE,       // grouping data is deleted as the entry should be accepted to the primary mempool
+        ADD_TO_PRIMARY_GROUP_PAYING_TX   // grouping data is modified, entry is detected as paying transaction for the group
+    };
+
+    // recalculates grouping data for the given entry, entry must not be in the primary mempool
+    ResultOfUpdateEntryGroupingDataNL UpdateEntryGroupingDataNL(CTxMemPool::txiter iter);
+
+    // tries to accept transactions to primary mempool. it recalculates grouping data, forms groups or accepts transactions as standalone
+    // this may result that some other transaction, which are not in the toUpdate, to be updated and accepted to primary mempool
+    void TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet);
+
+    // tries to accept entry to the primary mempool, may result in accepting other transactions (i.e. if the entry is groups paying tx)
+    void TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet);
+
+    // removes transactions from the primary mempool, together with all descedants. if we happen to remove a group then the group is disbanded
+    // and all its members are removed, together with all their children. 
+    //   -if the entries are expected to be revisited later one can set putDummyGroupingData to false to avoid recalculation of the grouping data
+    //   -one can set which entries can be ignored when disbanding groups by setting variable "entriesToIgnore"
+    setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, 
+        bool putDummyGroupingData = false, const setEntries* entriesToIgnore = nullptr);
+
+    struct ResubmitContext {
+        indexed_transaction_set oldMapTx {};
+        std::unordered_map<TxId, std::vector<COutPoint>, SaltedTxidHasher> outpointsSpentByStored {};
+    };
+    // prepare resubmit context
+    ResubmitContext PrepareResubmitContextAndClearNL(const mining::CJournalChangeSetPtr& changeSet);
+    // in AddToMempoolForReorg and RebuildMempool we need to submit transactions that already were in the mempool
+    void ResubmitEntriesToMempoolNL(ResubmitContext& resubmitContext, const mining::CJournalChangeSetPtr& changeSet);
+
+    // walks recursively through all descedants of the items in the set and updates theirs ancestorsCouunt
+    void UpdateAncestorsCountNL(setEntriesTopoSorted entries);
+
+public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
-            unsigned int nBlockHeight,
+            int32_t nBlockHeight,
             const mining::CJournalChangeSetPtr& changeSet,
             const uint256& blockhash);
 
     void Clear();
 
-    bool CompareDepthAndScore(
-            const uint256 &hasha,
-            const uint256 &hashb);
-    // A non-locking version of CompareDepthAndScore
-    // DEPRECATED - this will become private and ultimately changed or removed
-    bool CompareDepthAndScoreNL(
-            const uint256 &hasha,
-            const uint256 &hashb);
-
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
-    // A non-locking version of IsSpent
-    // DEPRECATED - this will become private and ultimately changed or removed
-    bool IsSpentNL(const COutPoint &outpoint);
-    // Returns const pointer to transaction that spends outpoint.
-    // Pointer is valid and transaction will not change as long as mempool smtx lock is held
-    const CTransaction* IsSpentByNL(const COutPoint &outpoint);
+    CTransactionWrapperRef IsSpentBy(const COutPoint &outpoint) const;
+
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
+
     /**
      * Check that none of this transactions inputs are in the mempool, and thus
      * the tx is not dependent on other mempool transactions to be included in a
@@ -698,22 +722,13 @@ public:
     void PrioritiseTransaction(
             const uint256& hash,
             const std::string& strHash,
-            double dPriorityDelta,
             const Amount nFeeDelta);
     void PrioritiseTransaction(
             const std::vector<TxId>& vTxToPrioritise,
-            double dPriorityDelta,
             const Amount nFeeDelta);
 
     void ApplyDeltas(
             const uint256& hash,
-            double &dPriorityDelta,
-            Amount &nFeeDelta) const;
-    // A non-locking version of ApplyDeltas
-    // DEPRECATED - this will become private and ultimately changed or removed
-    void ApplyDeltasNL(
-            const uint256& hash,
-            double &dPriorityDelta,
             Amount &nFeeDelta) const;
 
     // Get a reference to the journal builder
@@ -722,7 +737,57 @@ public:
     // Get a reference to the time-locked (non-final txn) mempool
     CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }
 
+    /**
+     * Execute callback function on coins that are unspent in view and in mempool.
+     * Callback parameters: coin and consecutive index of view outpoints
+     */
+    void OnUnspentCoinsWithScript(
+        const CoinsDBView& tip,
+        const std::vector<COutPoint>& outpoints,
+        const std::function<void(const CoinWithScript&, size_t)>& callback) const;
+
+private:
+    // Mempool transaction database
+    std::once_flag db_initialized {};
+    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
+
+    static std::atomic_int mempoolTxDB_uniqueInit;
+    int mempoolTxDB_uniqueSuffix {mempoolTxDB_uniqueInit.fetch_add(1)};
+
+    // Safely opens the transaction database
+    void OpenMempoolTxDB(const bool clearDatabase = false);
+
+    // This is the workhorse behind InitMempoolTxDB() and friends.
+    void DoInitMempoolTxDB();
+
+    // These are the default properties of a mempool that are used by
+    // OpenMempoolTxDB() without a prior call to one of the InitMempoolTxDB()
+    // variants, which is most of the time during tests:
+
+    //   - use an in-memory transaction database
+    bool mempoolTxDB_inMemory {true};
+
+    //   - use a uniquified name for the transaction database
+    bool mempoolTxDB_unique {true};
+
+    // Like InitMempoolTxDB(), but uses a unique name for the on-disk database.
+    void InitUniqueMempoolTxDB();
+
+    // Like InitMempoolTxDB(), but uses an in-memory database.
+    void InitInMemoryMempoolTxDB();
+
 public:
+    // Called at process init, opens the transaction database and checks its
+    // cross-reference with mempool.dat.
+    void InitMempoolTxDB();
+    uint64_t GetDiskUsage();
+    uint64_t GetDiskTxCount();
+    void SaveTxsToDisk(uint64_t requiredSize);
+
+    // May be called during validation.
+    // The transaction must not exist in the mempool.
+    void RemoveTxFromDisk(const CTransactionRef& transaction);
+
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
      * this set, then all in-mempool descendants must also be in the set, unless
@@ -744,65 +809,25 @@ public:
      * UpdateTransactionsFromBlock() will find child transactions and update the
      * descendant state for each transaction in hashesToUpdate (excluding any
      * child transactions present in hashesToUpdate, which are already accounted
-     * for).  
-     * Note: hashesToUpdate should be the set of transactions from the
-     *       disconnected block that have been accepted back into the mempool.
-     * Note: if the transaction from the disconnected block does not enter the journal
-     *       but their descendants are already in the journal we have to remove 
-     *       them using the changeSet. this can happen when low paying tx is mined
-     *       and we have its descendant in the mempool and journal, and when the block 
-     *       is disconnected low paying tx will end up in the mempool but will not be in the
-     *       journal while its descendants are already in
+     * for).  Note: hashesToUpdate should be the set of transactions from the
+     * disconnected block that have been accepted back into the mempool.
      */
     void UpdateTransactionsFromBlock(
-            const std::vector<uint256> &hashesToUpdate,
-            const mining::CJournalChangeSetPtr &changeSet);
-
+            const std::vector<uint256> &hashesToUpdate);
     /**
-     * Try to calculate all in-mempool ancestors of entry.
-     *  (these are all calculated including the tx itself)
-     *  limitAncestorCount = max number of ancestors
-     *  limitAncestorSize = max size of ancestors
-     *  limitDescendantCount = max number of descendants any ancestor can have
-     *  limitDescendantSize = max size of descendants any ancestor can have
-     *  errString = populated with error reason if any limits are hit
-     * fSearchForParents = whether to search a tx's vin for in-mempool parents,
-     * or look up parents from mapLinks. Must be true for entries not in the
-     * mempool
+     * Check if @a entry and its ancestors in the mempool conform to the
+     * provided limits (these are all calculated including @a entry itself):
+     * @param limitAncestorCount   max number of ancestors
+     * @param limitSecondaryMempoolAncestorCount    max size of ancestors which are in the secondary mempool
+     *
+     * Returns @c true if the set of ancestors is within the limits. Otherwise,
+     * if @a errString is provided, it is populated with the failure reason.
      */
-    bool CalculateMemPoolAncestors(
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            uint64_t limitAncestorCount,
-            uint64_t limitAncestorSize,
-            uint64_t limitDescendantCount,
-            uint64_t limitDescendantSize,
-            std::string &errString,
-            bool fSearchForParents = true) const;
-    // A non-locking version of CalculateMemPoolAncestors
-    // DEPRECATED - this will become private and ultimately changed or removed
-    bool CalculateMemPoolAncestorsNL(
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            uint64_t limitAncestorCount,
-            uint64_t limitAncestorSize,
-            uint64_t limitDescendantCount,
-            uint64_t limitDescendantSize,
-            std::string &errString,
-            bool fSearchForParents = true) const;
-
-    /**
-     * Populate setDescendants with all in-mempool descendants of hash.
-     * Assumes that setDescendants includes all in-mempool descendants of
-     * anything already in it.  */
-    void CalculateDescendants(
-            txiter it,
-            setEntries &setDescendants);
-    // A non-locking version of CalculateDescendants
-    // DEPRECATED - this will become private and ultimately changed or removed
-    void CalculateDescendantsNL(
-            txiter it,
-            setEntries &setDescendants);
+    bool CheckAncestorLimits(
+        const CTxMemPoolEntry& entry,
+        uint64_t limitAncestorCount,
+        uint64_t limitSecondaryMempoolAncestorCount,
+        std::optional<std::reference_wrapper<std::string>> errString) const;
 
     /**
      * The minimum fee to get into the mempool, which may itself not be enough
@@ -834,9 +859,8 @@ public:
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
-    bool TransactionWithinChainLimit(
-            const uint256 &txid,
-            size_t chainLimit) const;
+    bool TransactionWithinChainLimit(const uint256 &txid, int64_t maxAncestorCount, 
+                                     int64_t maxSecondaryMempoolAncestorCount) const;
 
     unsigned long Size();
 
@@ -844,32 +868,30 @@ public:
 
     bool Exists(const uint256& hash) const;
     // A non-locking version of Exists
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     bool ExistsNL(const uint256& hash) const;
 
     bool Exists(const COutPoint &outpoint) const;
     // A non-locking version of Exists
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     bool ExistsNL(const COutPoint &outpoint) const;
 
     CTransactionRef Get(const uint256& hash) const;
     // A non-locking version of Get
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     CTransactionRef GetNL(const uint256& hash) const;
 
     TxMempoolInfo Info(const uint256& hash) const;
 
     std::vector<TxMempoolInfo> InfoAll() const;
-    // A non-locking version of InfoAll
-    // DEPRECATED - this will become private and ultimately changed or removed
-    std::vector<TxMempoolInfo> InfoAllNL() const;
 
     size_t DynamicMemoryUsage() const;
+    size_t SecondaryMempoolUsage() const;
 
     CFeeRate estimateFee() const;
 
-    boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
-    boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
+    boost::signals2::signal<void(const CTransactionWrapper&)> NotifyEntryAdded;
+    boost::signals2::signal<void(const CTransactionWrapper&, MemPoolRemovalReason)>
         NotifyEntryRemoved;
 
     void ClearPrioritisation(const uint256 &hash);
@@ -877,63 +899,276 @@ public:
 
 private:
     /**
-     * updateForDescendantsNL is used by UpdateTransactionsFromBlock to update the
-     * descendants for a single transaction that has been added to the mempool
-     * but may have child transactions in the mempool, eg during a chain reorg.
-     * setExclude is the set of descendant transactions in the mempool that must
-     * not be accounted for (because any descendants in setExclude were added to
-     * the mempool after the transaction being updated and hence their state is
-     * already reflected in the parent state).
-     *
-     * cachedDescendants will be updated with the descendants of the transaction
-     * being updated, so that future invocations don't need to walk the same
-     * transaction again, if encountered in another transaction chain.
+     * Retreive mempool data needed by DumpMempool().
      */
-    void updateForDescendantsNL(
-            txiter updateIt,
-            cacheMap &cachedDescendants,
-            const std::set<uint256> &setExclude);
+    void GetDeltasAndInfo(std::map<uint256, Amount>& deltas, std::vector<TxMempoolInfo>& info) const;
+
+private:
+    // A non-locking version of InfoAll
+    std::vector<TxMempoolInfo> InfoAllNL() const;
+
+    /**
+     * Checks mempool chain limits by finding parents of the entry
+     * summing ancestorsCount for all of them
+     *
+     * Assumes that @a entry may not be in the mampool, so it searches the
+     * transaction's @c vin for in-mempool parents.
+     */
+    bool CheckAncestorLimitsNL(
+        const CTxMemPoolEntry& entry,
+        uint64_t limitAncestorCount,
+        uint64_t limitSecondaryMempoolAncestorCount,
+        std::optional<std::reference_wrapper<std::string>> errString) const;
+
+
+    /**
+     * Try to calculate all in-mempool ancestors of the entry.
+     *
+     * Returns the ancestors in @a setAncestors.
+     *
+     * Assumes that @a entryIter is in the mempool and it can look up parents
+     * from #mapLinks.
+     */
+    void GetMemPoolAncestorsNL(
+        const txiter& entryIter,
+        setEntries& setAncestors) const;
+
+
+    /**
+     * Populate setDescendants with all in-mempool descendants of hash.
+     * Assumes that setDescendants includes all in-mempool descendants of
+     * anything already in it.
+     */
+    void GetDescendantsNL(
+        txiter it,
+        setEntries &setDescendants) const;
+
+    // Non-locking, returns the size of the primary mempool.
+    unsigned long PrimaryMempoolSizeNL() const;
+
+public:
+    /** \class CTxMemPool::Snapshot
+     *
+     * CTxMemPool::Snapshot contains a read-only snapshot-in-time of the (partial)
+     * contents of the mempool.
+     *
+     * The snapshot contains two things: a copy of a number of mempool entries,
+     * and a set of additional relevant transaction IDs. Which transaction IDs
+     * are relevant depends on how the snapshot was created (for example, see
+     * CTxMemPool::GetTxSnapshot()).
+     *
+     * @note This class is non-moveable and non-copyable.
+     */
+    class Snapshot final
+    {
+        // Only CTxMemPool is allowed to call the constructor.
+        friend class CTxMemPool;
+
+        using Contents = std::vector<CTxMemPoolEntry>;
+        using CachedTxIds = std::vector<TxId>;
+        using CachedTxIdsRef = std::unique_ptr<CachedTxIds>;
+
+        /**
+         * The default constructor returns an invalid snapshot:
+         * IsValid() will return @c false.
+         */
+        explicit Snapshot() = default;
+
+        /**
+         * Creates a copy of the mempool with the given @a contents and an
+         * optional set of transaction IDs that will be used for TxIdExists()
+         * checks.
+         */
+        explicit Snapshot(Contents&& contents,
+                          CachedTxIdsRef&& relevantTxIds);
+
+        Snapshot(Snapshot&&) = delete;
+        Snapshot(const Snapshot&) = delete;
+
+    public:
+        using size_type = Contents::size_type;
+        using value_type = Contents::value_type;
+        using const_iterator = Contents::const_iterator;
+
+        bool empty() const noexcept { return mContents.empty(); }
+        size_type size() const noexcept { return mContents.size(); }
+
+        const_iterator begin() const noexcept { return mContents.begin(); }
+        const_iterator cbegin() const noexcept { return begin(); }
+
+        const_iterator end() const noexcept { return mContents.end(); }
+        const_iterator cend() const noexcept { return end(); }
+
+        /// Returns an immutable iterator to a mempool entry in the snapshot
+        /// contents, or cend() if no such entry exists.
+        const_iterator find(const uint256& hash) const;
+
+        /// Checks if @a hash exists in the snapshot, even if the mempool entry
+        /// for that hash is not actually in the snapshot contents. May return
+        /// @c true when find() for the same hash returns cend().
+        bool TxIdExists(const uint256& hash) const;
+
+        /// Checks whether the contents are valid.
+        bool IsValid() const noexcept { return mValid; };
+        operator bool() const noexcept { return IsValid(); }
+
+    private:
+        const bool mValid {false};
+        const Contents mContents;
+        const CachedTxIdsRef mRelevantTxIds;
+
+        // The transaction lookup index.
+        using TxIdIndex = std::unordered_map<uint256, Snapshot::const_iterator>;
+        mutable TxIdIndex mIndex;
+        mutable std::once_flag mCreateIndexOnce;
+        void CreateIndex() const;
+    };
+
+    /**
+     * Returns a read-only snapshot of the mempool contents. This will copy all
+     * the mempool entries.
+     */
+    Snapshot GetSnapshot() const;
+    
+    /**
+     * Retreival modes for GetTxSnapshot().
+     */
+    enum class TxSnapshotKind
+    {
+        /// Retreive only one transaction.
+        SINGLE,
+        /// Retreive the transaction and all its ancestors.
+        TX_WITH_ANCESTORS,
+        /// Retreive only the transaction's ancestors.
+        ONLY_ANCESTORS,
+        /// Retreive the transaction and all its descendants.
+        TX_WITH_DESCENDANTS,
+        /// Retreive only the transaction's descendants.
+        ONLY_DESCENDANTS
+    };
+
+    /**
+     * Returns a read-only snapshot of the mempool for one entry, identified by
+     * @a hash, and/or optionally its ancestors or descendants, selected by
+     * @a kind. This will also fill the transaction ID cache with the inputs of
+     * the copied mempool entries (Snapshot#TxIdExists() will return @c true for
+     * the hashes of those input transactions even if the entries are not in the
+     * snapshot).
+     *
+     * If a transaction with the given @a hash does not exist, the returned
+     * snapshot will be invalid, that is: Snapshot#IsValid() will return @c false.
+     */
+    Snapshot GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const;
+
+
+    /**
+     * Returns shared references to all the transactions in the mempool, without
+     * the mempool entries. The transactions are not indexed and are returned in
+     * an unpredictable order.
+     */
+    std::vector<CTransactionRef> GetTransactions() const;
+
+
+    /**
+     * Make mempool consistent after a reorg, by re-adding
+     * disconnected block transactions from the mempool, and also removing any other
+     * transactions from the mempool that are no longer valid given the new
+     * tip/height, most notably coinbase transactions and their descendants.
+     *
+     * Note: we assume that disconnectpool only contains transactions that are NOT
+     * confirmed in the current chain nor already in the mempool (otherwise,
+     * in-mempool descendants of such transactions would be removed).
+     *
+     * Note: this function currently still runs under `cs_main` and does *not*
+     * lock mempool. It calls mempool-locking functions internally, and
+     * not their `NL` variants. Therefore it should *not* have the `NL` postfix.
+     */
+    void AddToMempoolForReorg(
+        const Config &config,
+        DisconnectedBlockTransactions &disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Make mempool consistent after a reorg, by recursively erasing
+     * disconnected block transactions from the mempool
+     *
+     * Note: this function currently still runs under `cs_main` and does *not*
+     * lock mempool. It calls mempool-locking functions internally, and
+     * not their `NL` variants. Therefore it should *not* have the `NL` postfix.
+     */
+    void RemoveFromMempoolForReorg(
+        const Config &config,
+        DisconnectedBlockTransactions &disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Add vtx to disconnectpool observing the limit. block transactions that do not make it
+     * into disconnectpool need to have their descendants removed from mempool, too
+     */
+    void AddToDisconnectPoolUpToLimit(
+        const mining::CJournalChangeSetPtr &changeSet,
+        DisconnectedBlockTransactions *disconnectpool,
+        uint64_t maxDisconnectedTxPoolSize,
+        const std::vector<CTransactionRef> &vtx);
+
+private:
+    void RemoveRecursive(
+        const CTransaction &tx,
+        const mining::CJournalChangeSetPtr& changeSet,
+        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+
+    // A non-locking version of CheckMempool
+    void CheckMempoolNL(
+            CoinsDBView& view,
+            const mining::CJournalChangeSetPtr& changeSet) const;
+
+    // The implementation of CheckMempool
+    void CheckMempoolImplNL(
+            CoinsDBView& view,
+            const mining::CJournalChangeSetPtr& changeSet) const;
+
+    // common condition for CheckMempool and CheckMempoolNL
+    bool ShouldCheckMempool() const;
+
+    // A non-locking version of IsSpent
+    bool IsSpentNL(const COutPoint &outpoint) const;
+
+    void RemoveForReorg(
+        const Config &config,
+        const CoinsDB& coinsTip,
+        const mining::CJournalChangeSetPtr& changeSet,
+        const CBlockIndex& tip,
+        int flags);
+
 
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
     // It needs to be called explicitly by a user if AddUncheckedNL is used.
+    using SpentOutputs = std::optional<std::reference_wrapper<const std::vector<COutPoint>>>;
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
+            const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
-            size_t* pnMempoolSize = nullptr,
+            SpentOutputs spentOutputs = std::nullopt,
+            size_t* pnPrimaryMempoolSize = nullptr,
+            size_t* pnSecondaryMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
+
+    // A non-locking version of ApplyDeltas
+    void ApplyDeltasNL(
+        const uint256& hash,
+        Amount &nFeeDelta) const;
 
     /**
      * Update ancestors of hash to add/remove it as a descendant transaction.
      */
     void updateAncestorsOfNL(
             bool add,
-            txiter hash,
-            setEntries &setAncestors);
+            txiter hash);
 
-    /**
-     * Set ancestor state for an entry
-     */
-    void updateEntryForAncestorsNL(
-            txiter it,
-            const setEntries &setAncestors);
-
-    /**
-     * For each transaction being removed, update ancestors and any direct
-     * children. If updateDescendants is true, then also update in-mempool
-     * descendants' ancestor state.
-     */
-
-    void updateForRemoveFromMempoolNL(
-            const setEntries &entriesToRemove,
-            bool updateDescendants);
-
-    /**
-     * Sever link between specified transaction and direct children.
-     */
-    void updateChildrenForRemovalNL(txiter entry);
+    // typesafe default for conflictedWith parameter of remove* functions
+    const CTransactionConflict noConflict {};
 
     /**
      * Before calling removeUnchecked for a given transaction,
@@ -944,105 +1179,164 @@ private:
      * in a chain before we've updated all the state for the removal.
      */
     void removeUncheckedNL(
-            txiter entry,
-            const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason,
-            const CTransaction* conflictedWith,
-            const uint256* blockhash = nullptr);
+            const setEntries& entries,
+            mining::CJournalChangeSet& changeSet,
+            const CTransactionConflict& conflictedWith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
-    void removeConflictsNL(
-            const CTransaction &tx,
-            const mining::CJournalChangeSetPtr& changeSet,
-            const uint256& blockhash);
+    void clearNL(bool skipTransactionDatabase = false);
 
-    void clearNL();
-
-    void trackPackageRemovedNL(const CFeeRate &rate);
+    void trackPackageRemovedNL(const CFeeRate &rate, bool haveSecondaryMempoolTxs);
 
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
-     * this set, then all in-mempool descendants must also be in the set, unless
-     * this transaction is being removed for being in a block. Set
-     * updateDescendants to true when removing a tx that was in a block, so that
-     * any in-mempool descendants have their ancestor state updated.
+     * this set, then all in-mempool descendants must also be in the set. 
      */
     void removeStagedNL(
-            setEntries &stage,
-            bool updateDescendants,
-            const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            bool updateJournal = true,
-            const CTransaction* conflictedwith = nullptr,
-            const uint256* blockhash = nullptr);
+            setEntries& stage,
+            mining::CJournalChangeSet& changeSet,
+            const CTransactionConflict& conflictedwith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     void prioritiseTransactionNL(
             const uint256& hash,
-            double dPriorityDelta,
             const Amount nFeeDelta);
 
     void clearPrioritisationNL(const uint256& hash);
 
     // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
-            const CTransaction &tx,
+            const CTransaction& origTx,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            const CTransaction* conflictedWith = nullptr,
-            const uint256* blockhash = nullptr);
+            const CTransactionConflict& conflictedWith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;
 
+    // A non-locking estimate of usage of mempool indexes without actual transactions
+    size_t DynamicMemoryIndexUsageNL() const;
+
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
 
-    // returns a set of entries which are connected to any of items in the given set, but not elements of the given set. transactions are considered "connected"  
-    // if one transaction can reach another trough one or more child or parent relations
-    // - only transactions for which filter returns true are considered
-    // - every transaction from the set will have all its in-mempool ancestors included in the set (if they pass filter)
-    // - if the limit is not std::nullopt, not all children/siblings will be added. adding new transactions to the set is stopped when the size of the 
-    //   entries set is reached, but we have to ensure that all parents of all transactions in the set, so
-    //   we have to add parents of the last added entry too, this can extend the size of the entries set by up to {-limitdescendantcount - 1} transactions
-    setEntries getConnectedNL(const setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit= std::nullopt) const;
-    
-    // returns a set of entries which are connected to any of items in the given set, but not elements of the given set.
-    setEntries getConnectedNL(const setEntries& entries) const;
+    // A non-locking version of SecondaryMempoolUsage.
+    size_t SecondaryMempoolUsageNL() const;
 
-    // checks if affected transactions have met conditions to be mined, 
-    // - if they could be mined but they are not in the journal they are added to the changeSet as ADD
-    // - if they could not be mined but they are in the journal they are added to the changeSet as REMOVE
-    // - "Child pays for parent" (cpfp) is taken into account here
-    // - parents which are not in the affectedTransactions set are considered to be already mined or accepted to the journal
-    void checkJournalAcceptanceNL(const setEntries& affectedTransactions, mining::CJournalChangeSet& changeSet) const;
+    // Dumping and loading the mempool.
+    using DumpFileID = boost::uuids::uuid;
+    FILE* OpenDumpFile(uint64_t& version, DumpFileID& instanceId);
+
+    // Mempool dump and load for testing different file formats
+    // and custion validation.
+    void DumpMempool(uint64_t version);
+    bool LoadMempool(const Config &config,
+                     const task::CCancellationToken& shutdownToken,
+                     const std::function<CValidationState(
+                         const TxInputDataSPtr& txInputData,
+                         const mining::CJournalChangeSetPtr& changeSet,
+                         bool limitMempoolSize)>& processValidation);
+
+public:
+    // Allow access to some mempool internals from unit tests.
+    template<typename X> struct UnitTestAccess;
+
+    /** Dump the mempool to disk. */
+    void DumpMempool();
+
+    /** Load the mempool from disk. */
+    bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
 };
 
+// Group definition in the secondary mempool.
+class CPFPGroup
+{
+    SecondaryMempoolEntryData evaluationParams {};
+
+    // Transactions are topologically sorted.
+    std::vector<CTxMemPool::txiter> transactions {};
+
+    // txid of the groups paying transaction
+    TxId payingTxId {};
+
+    static std::atomic<uint64_t> counter;
+    mining::GroupID groupId {};
+
+public:
+
+    explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
+        : evaluationParams{evalParams}
+        , transactions{txs}
+        , groupId{counter++}
+    {
+        payingTxId = transactions.back()->GetTxId();
+    }
+
+    const TxId& PayingTransactionId() const { return payingTxId; }
+    mining::GroupID Id() const { return groupId; }
+    const SecondaryMempoolEntryData& EvaluationParams() const { return evaluationParams; }
+    const std::vector<CTxMemPool::txiter>& Transactions() const { return transactions; }
+};
+
+
 /**
- * CCoinsView that brings transactions from a memorypool into view.
- * It does not check for spendings by memory pool transactions.
+ * ICoinsView that brings transactions from a memorypool into view.
+ * If a transaction is in mempool this class will return an unspent coin even
+ *
+ * - If GetCoin/HaveCoin finds a coin  it will always return it in subsequent calls.
+ * - If GetCoin/HaveCoin does NOT return a coin on first call it can still return
+ *   them on later calls - coins can be added to mempool when transaction are added).
+ * - If GetCoin/HaveCoin return coin from a transaction that is stored inside
+ *   mempool for one outpoint it is guaranteed that it will also return coins
+ *   for all the other outpoints that exist inside that transaction.
+ * - GetCoin/HaveCoin return true even if the coin is spend by another transaction
+ *   in the mempool (This is different from implementation of provider used by
+ *   pcoinsTip as there we cant have a parent and a child coin present in the database
+ *   at the same time). The final check against coins that are spent in mempool
+ *   is done by CTxMemPool::CheckTxConflicts which is called from two places:
+ *   + TxnValidation (this is preliminary check, subject to race conditions)
+ *   + CTxnDoubleSpendDetector::insertTxnInputs  - this is final check, executed
+ *     while holding double spend detector lock
  */
-class CCoinsViewMemPool : public CCoinsViewBacked {
-protected:
+class CCoinsViewMemPool : public ICoinsView {
+private:
     const CTxMemPool &mempool;
 
 public:
-    // The caller of the constructor needs to hold mempool.smtx.
-    CCoinsViewMemPool(CCoinsView *baseIn, const CTxMemPool &mempoolIn);
-    // The caller of GetCoin needs to hold mempool.smtx.
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
-    bool HaveCoin(const COutPoint &outpoint) const override;
-};
+    CCoinsViewMemPool(const CoinsDBView& DBView, const CTxMemPool &mempoolIn);
 
-// We want to sort transactions by coin age priority
-typedef std::pair<double, CTxMemPool::txiter> TxCoinAgePriority;
+    /**
+     * Returns cached transaction reference.
+     * In case the reference is not found in cache it tries to load it from the
+     * underlying mempool.
+     */
+    CTransactionRef GetCachedTransactionRef(const COutPoint& outpoint) const;
 
-struct TxCoinAgePriorityCompare {
-    bool operator()(const TxCoinAgePriority &a, const TxCoinAgePriority &b) {
-        if (a.first == b.first) {
-            // Reverse order to make sort less than
-            return CompareTxMemPoolEntryByScore()(*(b.second), *(a.second));
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
         }
-        return a.first < b.first;
+
+        return {};
     }
+
+    std::optional<Coin> GetCoinFromDB(const COutPoint& outpoint) const;
+
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override;
+
+protected:
+    uint256 GetBestBlock() const override;
+
+private:
+    const CoinsDBView& mDBView;
+
+    mutable std::mutex mMutex;
+    mutable std::map<TxId, CTransactionRef> mCache;
 };
 
 /**
@@ -1062,7 +1356,6 @@ struct TxCoinAgePriorityCompare {
 
 // multi_index tag names
 struct txid_index {};
-struct insertion_order {};
 
 struct DisconnectedBlockTransactions {
     typedef boost::multi_index_container<
@@ -1086,9 +1379,12 @@ struct DisconnectedBlockTransactions {
     // reorg, besides draining this object).
     ~DisconnectedBlockTransactions() { assert(queuedTx.empty()); }
 
+private:
     indexed_disconnected_transactions queuedTx;
     uint64_t cachedInnerUsage = 0;
 
+    friend class CTxMemPool;
+public:
     // Estimate the overhead of queuedTx to be 6 pointers + an allocation, as
     // no exact formula for boost::multi_index_contained is implemented.
     size_t DynamicMemoryUsage() const {

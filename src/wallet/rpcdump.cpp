@@ -7,7 +7,6 @@
 #include "config.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "merkleblock.h"
 #include "rpc/server.h"
 #include "rpcwallet.h"
@@ -18,14 +17,10 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "wallet.h"
-
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
 #include <univalue.h>
-
-#include <cstdint>
-#include <fstream>
+#include <string>
 #include <iostream>
 
 static std::string EncodeDumpTime(int64_t nTime) {
@@ -398,7 +393,7 @@ UniValue removeprunedfunds(const Config &config,
                                                 "ce581bebf46446a512166eae762873"
                                                 "4ea0a5\"") +
             "\nAs a JSON-RPC call\n" +
-            HelpExampleRpc("removprunedfunds", "\"a8d0c0184dde994a09ec054286f1c"
+            HelpExampleRpc("removeprunedfunds", "\"a8d0c0184dde994a09ec054286f1c"
                                                "e581bebf46446a512166eae7628734e"
                                                "a0a5\""));
     }
@@ -1211,10 +1206,11 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
             "     \"rescan\": <false>,         (boolean, optional, default: true) Stating if should rescan the blockchain after all imports\n"
             "  }\n"
             "\nExamples:\n" +
-            HelpExampleCli("importmulti", "'[{ \"scriptPubKey\": { \"address\": \"<my address>\" }, \"timestamp\":1455191478 }, "
-                                          "{ \"scriptPubKey\": { \"address\": \"<my 2nd address>\" }, \"label\": \"example 2\", \"timestamp\": 1455191480 }]'") +
-            HelpExampleCli("importmulti", "'[{ \"scriptPubKey\": { \"address\": \"<my address>\" }, \"timestamp\":1455191478 }]' '{ \"rescan\": false}'") +
-
+            HelpExampleCli("importmulti", "\"[{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my address\\\"}, \\\"timestamp\\\":1455191478}, "
+                                          "{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my 2nd address\\\"}, \\\"label\\\":\\\"example 2\\\", \\\"timestamp\\\":1455191480}]\"") +
+            HelpExampleCli("importmulti", "\"[{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my address\\\"}, \\\"timestamp\\\":1455191478}]\" \"{\\\"rescan\\\":false}\"") +
+            HelpExampleRpc("importmulti", "[{\"scriptPubKey\": {\"address\":\"my address\"}, \"timestamp\":1455191478}], {\"rescan\":false}") +
+            
             "\nResponse is an array with the same size as the input that has the execution result :\n"
             "  [{ \"success\": true } , { \"success\": false, \"error\": { \"code\": -1, \"message\": \"Internal Server Error\"} }, ... ]\n");
     }

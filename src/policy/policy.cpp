@@ -8,11 +8,7 @@
 
 #include "policy/policy.h"
 #include "script/script_num.h"
-
 #include "taskcancellation.h"
-#include "tinyformat.h"
-#include "util.h"
-#include "utilstrencodings.h"
 #include "validation.h"
 #include "config.h"
 
@@ -30,7 +26,7 @@
  * expensive-to-check-upon-redemption script like:
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType) {
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType) {
     std::vector<std::vector<uint8_t>> vSolutions;
     if (!Solver(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
@@ -55,10 +51,10 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
 // Check if a transaction is a consolidation transaction.
 // A consolidation transaction is a transaction which reduces the size of the UTXO database to
 // an extent that is rewarding enough for the miner to mine the transaction for free.
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight)
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
     const uint64_t factor = config.GetMinConsolidationFactor();
-    const uint64_t minMaturity = config.GetMinConsolidationInputMaturity();
+    const uint64_t minConf = config.GetMinConfConsolidationInput();
     const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
     const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
 
@@ -81,13 +77,14 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
     for (CTxIn const & u: tx.vin) {
 
         // accept only with many confirmations
-        const Coin &coin = inputs.AccessCoin(u.prevout);
-        const auto coinHeight = coin.GetHeight();
+        const auto& coin = inputs.GetCoinWithScript(u.prevout);
+        assert(coin.has_value());
+        const auto coinHeight = coin->GetHeight();
 
         if (coinHeight == MEMPOOL_HEIGHT)
             return false;
 
-        if (coinHeight && (tipHeight - coinHeight < minMaturity)) // older versions did not store height
+        if (coinHeight && (tipHeight + 1 - coinHeight < minConf)) // older versions did not store height
             return false;
 
         // spam detection
@@ -97,11 +94,11 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
         // if not acceptnonstdconsolidationinput then check if inputs are standard
         // and fail otherwise
         txnouttype dummyType;
-        if (stdInputOnly  && !IsStandard(config, coin.GetTxOut().scriptPubKey, coinHeight, dummyType))
+        if (stdInputOnly  && !IsStandard(config, coin->GetTxOut().scriptPubKey, coinHeight, dummyType))
             return false;
 
         // sum up some script sizes
-        sumScriptPubKeySizeOfTxInputs += coin.GetTxOut().scriptPubKey.size();
+        sumScriptPubKeySizeOfTxInputs += coin->GetTxOut().scriptPubKey.size();
     }
 
     // check ratio between sum of tx-scriptPubKeys to sum of parent-scriptPubKeys
@@ -117,7 +114,7 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
     return true;
 }
 
-bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason) {
+bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason) {
     if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
         reason = "version";
         return false;
@@ -189,7 +186,7 @@ std::optional<bool> AreInputsStandard(
     const Config& config,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
-    const int mempoolHeight)
+    const int32_t mempoolHeight)
 {
     if (tx.IsCoinBase()) {
         // Coinbases don't use vin normally.
@@ -197,15 +194,16 @@ std::optional<bool> AreInputsStandard(
     }
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
-        const CTxOut &prev = mapInputs.GetOutputFor(tx.vin[i]);
-        const Coin& coin = mapInputs.AccessCoin(tx.vin[i].prevout);
+        auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );
+        assert(prev.has_value());
+        assert(!prev->IsSpent());
 
         std::vector<std::vector<uint8_t>> vSolutions;
         txnouttype whichType;
         // get the scriptPubKey corresponding to this input:
-        const CScript &prevScript = prev.scriptPubKey;
-        
-        if (!Solver(prevScript, IsGenesisEnabled(config, coin, mempoolHeight),
+        const CScript &prevScript = prev->GetTxOut().scriptPubKey;
+
+        if (!Solver(prevScript, IsGenesisEnabled(config, prev.value(), mempoolHeight),
                     whichType, vSolutions)) {
             return false;
         }

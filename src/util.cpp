@@ -36,10 +36,8 @@
 
 #endif // __linux__
 
-#include <algorithm>
 #include <fcntl.h>
 #include <sys/resource.h>
-#include <sys/stat.h>
 #include <thread>
 
 #else
@@ -75,15 +73,13 @@
 #endif
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 #include <boost/filesystem/fstream.hpp>
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/thread.hpp>
-
 #include <openssl/conf.h>
 #include <openssl/rand.h>
+#include <boost/algorithm/string/predicate.hpp>
 
 // Application startup time (used for uptime calculation)
 const int64_t nStartupTime = GetTime();
@@ -188,6 +184,48 @@ void ArgsManager::ParseParameters(int argc, const char *const argv[]) {
 
         mapArgs[str] = strValue;
         mapMultiArgs[str].push_back(strValue);
+    }
+}
+
+bool ArgsManager::IsSensitiveArg(const std::string& argName)
+{
+    return std::find(sensitiveArgs.begin(), sensitiveArgs.end(), argName) != sensitiveArgs.end();
+}
+
+std::vector<std::string> ArgsManager::GetNonSensitiveParameters()
+{
+    std::vector<std::string> nonSensitiveParameters;
+
+    // Parameter names (keys of mapMultiArgs) are in form of -name. They also need to be specified like that
+    // when starting bitcoind (e.g. bitcoin -name) or they will not be added to mapMultiArgs.
+    // Filter out sensitive parameters and remove first character (-)
+    for(const auto& arg : mapMultiArgs)
+    {
+        if (IsSensitiveArg(arg.first))
+        {
+            continue;
+        }
+        for(const auto& value : arg.second)
+        {
+            if (value.empty())
+            {
+                nonSensitiveParameters.push_back(arg.first.substr(1));
+            }
+            else
+            {
+                nonSensitiveParameters.push_back(arg.first.substr(1) + "=" + value);
+            }
+        }
+    }
+    return nonSensitiveParameters;
+}
+
+void ArgsManager::LogSetParameters()
+{
+    LogPrint(BCLog::ALL, "Printing non-sensitive parameters that are force set and set by switches and config file...\n");
+    for(const auto& arg : gArgs.GetNonSensitiveParameters())
+    {
+        LogPrintf("%s\n", arg);
     }
 }
 
@@ -332,6 +370,13 @@ void ArgsManager::ForceSetArg(const std::string &strArg,
     LOCK(cs_args);
     mapArgs[strArg] = strValue;
     mapMultiArgs[strArg].push_back(strValue);
+}
+
+void ArgsManager::ForceSetBoolArg(const std::string &strArg, bool fValue) {
+    if (fValue)
+        return ForceSetArg(strArg, std::string("1"));
+    else
+        return ForceSetArg(strArg, std::string("0"));
 }
 
 /**

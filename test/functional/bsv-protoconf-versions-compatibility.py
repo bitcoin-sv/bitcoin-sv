@@ -161,7 +161,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             logger.info("Received bitcoind max message size: {} B, which represents {} elements. ".format(max_recv_payload_length, maxInvElements))
 
             # 3.2. Send bitcoind Inv message (should be 2MiB)
-            test_node.send_message(mininode.msg_inv([mininode.CInv(1, i) for i in range(0, maxInvElements)]))
+            test_node.send_message(mininode.msg_inv([mininode.CInv(mininode.CInv.TX, i) for i in range(0, maxInvElements)]))
 
             # 3.3. Receive GetData.
             test_node.wait_for_getdata()

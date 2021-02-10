@@ -74,7 +74,7 @@ CMiningCandidateRef CMiningCandidateManager::Get(const MiningCandidateId& candid
  */
 void CMiningCandidateManager::RemoveOldCandidates()
 {
-    unsigned int height {0};
+    int32_t height {0};
     int64_t tdiff {0};
 
     {
@@ -82,7 +82,7 @@ void CMiningCandidateManager::RemoveOldCandidates()
         if(chainActive.Height() < 0)
             return;
 
-        height = static_cast<unsigned int>(chainActive.Height());
+        height = chainActive.Height();
         if(height <= mPrevHeight)
             return;
 

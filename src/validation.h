@@ -77,7 +77,7 @@ static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for DEFAULT_WHITELISTFORCERELAY. */
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** Default for DEFAULT_REJECTMEMPOOLREQUEST. */
-static const bool DEFAULT_REJECTMEMPOOLREQUEST = false;
+static const bool DEFAULT_REJECTMEMPOOLREQUEST = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr Amount DEFAULT_MIN_RELAY_TX_FEE(250);
 //! -maxtxfee default
@@ -88,15 +88,9 @@ static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
  * satoshis */
 static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
-static const uint64_t DEFAULT_ANCESTOR_LIMIT = 25;
-/** Default for -limitdescendantcount, max number of in-mempool descendants */
-static const uint64_t DEFAULT_DESCENDANT_LIMIT = 25;
-/** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool
- * ancestors */
-static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
-/** Default for -limitdescendantsize, maximum kilobytes of in-mempool
- * descendants */
-static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
+static const uint64_t DEFAULT_ANCESTOR_LIMIT = 1000;
+/** Default for -limitancestorcount, max number of secondary mempool ancestors */
+static const uint64_t DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT = 25;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in
  * hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
@@ -182,8 +176,6 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
  */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 
-static const unsigned int DEFAULT_LIMITFREERELAY = 0;
-static const bool DEFAULT_RELAYPRIORITY = true;
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
@@ -213,7 +205,7 @@ static const int MAX_UNCONNECTING_HEADERS = 10;
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
 
 /** Default for -stopatheight */
-static const int DEFAULT_STOPATHEIGHT = 0;
+static const int32_t DEFAULT_STOPATHEIGHT = 0;
 
 /** Default count of transaction script checker instances */
 constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
@@ -223,8 +215,6 @@ constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
-extern uint64_t nLastBlockTx;
-extern uint64_t nLastBlockSize;
 extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
@@ -276,7 +266,7 @@ extern bool fPruneMode;
 extern uint64_t nPruneTarget;
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of
  * chainActive.Tip() will not be pruned. */
-static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
+static const int32_t MIN_BLOCKS_TO_KEEP = 288;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
@@ -568,7 +558,7 @@ bool ActivateBestChain(
     CValidationState &state,
     const mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
-Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
+Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams);
 
 /**
  * Determines whether block is a best chain candidate or not.
@@ -609,13 +599,13 @@ bool FlushStateToDisk(
     const CChainParams &chainParams,
     CValidationState &state,
     FlushStateMode mode,
-    int nManualPruneHeight = 0);
+    int32_t nManualPruneHeight = 0);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
 /** Prune block files up to a given height */
-void PruneBlockFilesManual(int nPruneUpToHeight);
+void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 
 /** Check if UAHF has activated. */
 bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
@@ -629,13 +619,13 @@ bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
  * Do not call this overload with height of coin. If the coin was created in mempool, 
  * this function will throw exception.
  */
-bool IsGenesisEnabled(const Config& config, int nHeight);
+bool IsGenesisEnabled(const Config& config, int32_t nHeight);
 /**  Check if Genesis has activated.
  * When a coins is present in mempool, it will have height MEMPOOL_HEIGHT. 
  * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
  *as parameter to correctly determine if genesis is enabled for this coin.
  */
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight  );
+bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight);
 int GetGenesisActivationHeight(const Config& config);
 
 /**
@@ -664,20 +654,52 @@ size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
  */
 size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
 
+
+class MempoolSizeLimits {
+public:
+    MempoolSizeLimits(size_t memory, size_t disk, size_t secondary, unsigned long age)
+    : limitMemory{memory}
+    , limitDisk{disk}
+    , limitSecondary{secondary}
+    , limitAge{age}
+    {}
+
+    // A size limit for RAM used by mempool. When exceeded write out transactions to disk.
+    size_t Memory() const { return limitMemory; }
+
+    // A size limit for disk used by mempool.
+    size_t Disk() const { return limitDisk; }
+
+    // A size limit for mempool RAM and disk combined. When exceeded remove transactions.
+    size_t Total() const { return limitMemory + limitDisk; }
+
+    // A size limit for secondary mempool ram and disk. When exceeded remove transactions.
+    size_t Secondary() const { return limitSecondary; }
+
+    // A time limit for txn to be tracked by mempool. When exceeded remove transactions.
+    unsigned long Age() const { return limitAge; }
+
+    static MempoolSizeLimits FromConfig();
+
+private:
+    size_t limitMemory;
+    size_t limitDisk;
+    size_t limitSecondary;
+    unsigned long limitAge;
+};
+
 /**
  * Limit mempool size.
  *
  * @param pool A reference to the mempool
  * @param changeSet A reference to the Jorunal ChangeSet
- * @param limit A size limit for txn to remove
- * @param age Time limit for txn to remove
+ * @param limits The limits to enforce by writeout to disk or removal
  * @return A vector with all TxIds which were removed from the mempool
  */
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const mining::CJournalChangeSetPtr& changeSet,
-    size_t limit,
-    unsigned long age);
+    const MempoolSizeLimits& limits);
 
 /**
  * Submit transaction to the mempool.
@@ -685,11 +707,9 @@ std::vector<TxId> LimitMempoolSize(
  * @param ptx A reference to the transaction
  * @param entry A valid entry point for the given transaction
  * @param fTxValidForFeeEstimation A flag to inform if txn is valid for fee estimations.
- * @param setAncestors  A set of ancestors
  * @param pool A reference to the mempool
  * @param state A reference to a state variable
  * @param changeSet A reference to the Jorunal ChangeSet
- * @param fLimitMempoolSize A flag to limit a mempool size
  * @param pnMempoolSize If not null store mempool size after txn is commited
  * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
  */
@@ -697,7 +717,6 @@ void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& entry,
     bool fTxValidForFeeEstimation,
-    CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
     const mining::CJournalChangeSetPtr& changeSet,
@@ -770,7 +789,8 @@ void ProcessValidatedTxn(
     CTxMemPool& pool,
     CTxnValResult& txStatus,
     CTxnHandlers& handlers,
-    bool fLimitMempoolSize);
+    bool fLimitMempoolSize,
+    const Config &config);
 
 /**
  * Create a tx reject message.
@@ -805,7 +825,7 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled,
  */
 uint64_t GetP2SHSigOpCount(const Config &config, 
                            const CTransaction &tx,
-                           const CCoinsViewCache &mapInputs, 
+                           const CCoinsViewCache &mapInputs,
                            bool& sigOpCountError);
 
 /**
@@ -818,7 +838,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
  */
 uint64_t GetTransactionSigOpCount(const Config &config, 
                                   const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, 
+                                  const CCoinsViewCache &inputs,
                                   bool checkP2SH, 
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError);
@@ -853,9 +873,9 @@ std::optional<bool> CheckInputs(
     std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight);
+void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight);
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
-                 CTxUndo &txundo, int nHeight);
+                 CTxUndo &txundo, int32_t nHeight);
 
 /** Transaction validation functions */
 
@@ -871,14 +891,14 @@ namespace Consensus {
  * sigs. Preconditions: tx.IsCoinBase() is false.
  */
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int nSpendHeight);
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight);
 
 } // namespace Consensus
 
 /**
  * Test whether the given transaction is final for the given height and time.
  */
-bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
+bool IsFinalTx(const CTransaction &tx, int32_t nBlockHeight, int64_t nBlockTime);
 
 /**
  * Test whether the LockPoints height and time are still valid on the current
@@ -892,7 +912,7 @@ bool TestLockPointValidity(const LockPoints *lp);
  * tx's inputs (in order) confirmed.
  */
 bool SequenceLocks(const CTransaction &tx, int flags,
-                   std::vector<int> *prevHeights, const CBlockIndex &block);
+                   std::vector<int32_t> *prevHeights, const CBlockIndex &block);
 
 /**
  * Check if transaction will be BIP 68 final in the next block to be created.
@@ -904,16 +924,14 @@ bool SequenceLocks(const CTransaction &tx, int flags,
  * should not be considered valid if CheckSequenceLocks returns false.
  *
  * See consensus/consensus.h for flag definitions.
- *
- * The caller of the method needs to hold the mempool's smtx.
  */
 bool CheckSequenceLocks(
+    const CBlockIndex& tip,
     const CTransaction &tx,
-    const CTxMemPool &pool,
     const Config& config,
     int flags,
     LockPoints *lp = nullptr,
-    bool useExistingLockPoints = false);
+    CCoinsViewCache* viewMemPool = nullptr); // if set lockpoints are re-calculated
 
 /**
  * Closure representing one script verification.
@@ -955,6 +973,8 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CDiskBlockPos& pos, bool calculateDiskBlockMetadata=false);
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader( // Same as above except that pos is obtained from pindex and some additional checks are performed
+    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
 std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
     int networkVersion);
@@ -969,7 +989,7 @@ void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData me
  * transactions are valid, block is a valid size, etc.)
  */
 bool CheckBlock(
-    const Config &Config, const CBlock &block, CValidationState &state, int blockHeight,
+    const Config &Config, const CBlock &block, CValidationState &state, int32_t blockHeight,
     BlockValidationOptions validationOptions = BlockValidationOptions());
 
 /**
@@ -979,7 +999,7 @@ bool CheckBlock(
  * activation/deactivation and CLTV.
  */
 bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
-                                CValidationState &state, int nHeight,
+                                CValidationState &state, int32_t nHeight,
                                 int64_t nLockTimeCutoff, bool fromBlock);
 
 /**
@@ -999,7 +1019,7 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
 bool ContextualCheckTransactionForCurrentBlock(
     const Config &config,
     const CTransaction &tx,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast,
     CValidationState &state,
     int flags = -1);
@@ -1027,12 +1047,12 @@ class CVerifyDB {
 public:
     CVerifyDB();
     ~CVerifyDB();
-    bool VerifyDB(const Config &config, CCoinsView *coinsview, int nCheckLevel,
+    bool VerifyDB(const Config &config, CoinsDB& db, int nCheckLevel,
                   int nCheckDepth, const task::CCancellationToken& shutdownToken);
 };
 
 /** Replay blocks that aren't fully applied to the database. */
-bool ReplayBlocks(const Config &config, CCoinsView *view);
+bool ReplayBlocks(const Config &config, CoinsDB& view);
 
 /** Find the last common block between the parameter chain and a locator. */
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
@@ -1062,9 +1082,9 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex);
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
 
-/** Global variable that points to the active CCoinsView (protected by cs_main)
+/** Global variable that points to the active CCoinsProvider (protected by cs_main)
  */
-extern CCoinsViewCache *pcoinsTip;
+extern std::unique_ptr<CoinsDB> pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main)
  */
@@ -1076,7 +1096,7 @@ extern CBlockTreeDB *pblocktree;
  * cs_main)
  * This is also true for mempool checks.
  */
-std::pair<int,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
+std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
 
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for
@@ -1092,12 +1112,6 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** No space for transaction */
 static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
-
-/** Dump the mempool to disk. */
-void DumpMempool();
-
-/** Load the mempool from disk. */
-bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
 
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);

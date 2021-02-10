@@ -12,7 +12,6 @@
 #include "sync.h"
 #include "ui_interface.h"
 #include "util.h"
-#include "utilstrencodings.h"
 #include "warnings.h"
 
 static CCriticalSection cs_nTimeOffset;

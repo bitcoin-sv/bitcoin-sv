@@ -86,7 +86,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
             # node1 sends transaction to bitcoind
             connection1.cb.send_message(msg_tx(tx))
             # assert that node2 gets INV with previously sent transaction
-            msg = [CInv(1, tx.sha256)]
+            msg = [CInv(CInv.TX, tx.sha256)]
             connection2.cb.wait_for_inv(msg)
 
             end_test = datetime.datetime.now()

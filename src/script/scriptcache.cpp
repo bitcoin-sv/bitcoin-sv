@@ -3,15 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "scriptcache.h"
-
 #include "crypto/sha256.h"
 #include "cuckoocache.h"
 #include "primitives/transaction.h"
 #include "random.h"
 #include "script/sigcache.h"
-#include "sync.h"
 #include "util.h"
-#include "validation.h"
 #include <mutex>
 
 std::mutex cs_script_cache;

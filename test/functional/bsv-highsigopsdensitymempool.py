@@ -14,8 +14,7 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.genesisactivationheight = 50
-        # works also with legacy block assembler
-        self.extra_args = [['-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight, '-blockassembler=JOURNALING']]
+        self.extra_args = [['-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight]]
 
     def run_test(self):
         self.test.run()

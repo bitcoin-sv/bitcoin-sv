@@ -25,8 +25,6 @@ BlockAssemblerRef CMiningFactory::GetAssembler() const
 {
     switch(mConfig.GetMiningCandidateBuilder())
     {
-        case(CMiningFactory::BlockAssemblerType::LEGACY):
-            return std::make_shared<LegacyBlockAssembler>(mConfig);
         case(CMiningFactory::BlockAssemblerType::JOURNALING):
 			return mJournalingAssembler;
         default:
@@ -49,7 +47,6 @@ const enumTableT<CMiningFactory::BlockAssemblerType>& enumTable(CMiningFactory::
     static enumTableT<CMiningFactory::BlockAssemblerType> table
     {   
         { CMiningFactory::BlockAssemblerType::UNKNOWN,    "UNKNOWN" },
-        { CMiningFactory::BlockAssemblerType::LEGACY,     "LEGACY" },
         { CMiningFactory::BlockAssemblerType::JOURNALING, "JOURNALING" }
     };
     return table;

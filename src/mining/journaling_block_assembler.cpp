@@ -14,6 +14,7 @@
 
 #include <limits>
 
+using mining::CJournal;
 using mining::CBlockTemplate;
 using mining::JournalingBlockAssembler;
 
@@ -37,7 +38,7 @@ JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
     // Create a new starting block
     newBlock();
     // Initialise our starting position
-    mJournalPos = CJournal::ReadLock{mJournal}.begin();
+    mState.mJournalPos = CJournal::ReadLock{mJournal}.begin();
 
     // Launch our main worker thread
     future_ = std::async(std::launch::async,
@@ -80,7 +81,7 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     }
 
     // Fill in the block header fields
-    FillBlockHeader(block, pindexPrevNew, scriptPubKeyIn);
+    FillBlockHeader(block, pindexPrevNew, scriptPubKeyIn, mState.mBlockFees);
 
     // If required, check block validity
     if(mConfig.GetTestBlockCandidateValidity())
@@ -94,29 +95,21 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
         }
     }
 
-    uint64_t serializeSize { GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION) };
-    LogPrintf("JournalingBlockAssembler::CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
-        serializeSize, block->vtx.size() - 1, mBlockFees, mBlockSigOps);
 
-    bool isGenesisEnabled = IsGenesisEnabled(mConfig, chainActive.Height() + 1);
-    bool sigOpCountError;
+    BlockStats blockStats {
+        block->vtx.size() - 1,
+        GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION) };
+
+    LogPrintf("JournalingBlockAssembler::CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
+        blockStats.blockSize, blockStats.txCount, mState.mBlockFees, mState.mBlockSigOps);
+
+    mLastBlockStats = blockStats;
 
     // Build template
     std::unique_ptr<CBlockTemplate> blockTemplate { std::make_unique<CBlockTemplate>(block) };
     blockTemplate->vTxFees = mTxFees;
-    blockTemplate->vTxSigOpsCount = mTxSigOpsCount;
-    blockTemplate->vTxFees[0] = -1 * mBlockFees;
+    blockTemplate->vTxFees[0] = -1 * mState.mBlockFees;
 
-    int64_t txSigOpCount = static_cast<int64_t>(GetSigOpCountWithoutP2SH(*block->vtx[0], isGenesisEnabled, sigOpCountError));
-    // This can happen if supplied coinbase scriptPubKeyIn contains multisig with too many public keys
-    if (sigOpCountError)
-    {
-        blockTemplate = nullptr;
-    }
-    else
-    {
-        blockTemplate->vTxSigOpsCount[0] = txSigOpCount;
-    }
     // Can now update callers pindexPrev
     pindexPrev = pindexPrevNew;
     mRecentlyUpdated = false;
@@ -170,7 +163,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         // Update chain state
         if(pindex)
         {
-            int height { pindex->nHeight + 1 };
+            int32_t height { pindex->nHeight + 1 };
             mLockTimeCutoff = (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, height)) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }
@@ -179,7 +172,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         CJournal::ReadLock journalLock { mJournal };
 
         // Does our journal or iterator need replacing?
-        while(!mJournal->getCurrent() || !mJournalPos.valid())
+        while(!mJournal->getCurrent() || !mState.mJournalPos.valid())
         {
             // Release old lock, update journal/block, take new lock
             journalLock = CJournal::ReadLock {};
@@ -187,26 +180,34 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
             journalLock = CJournal::ReadLock { mJournal };
 
             // Reset our position to the start of the journal
-            mJournalPos = journalLock.begin();
+            mState.mJournalPos = journalLock.begin();
         }
 
         // Reposition our journal index incase we were previously at the end and now
         // some new additions have arrived.
-        mJournalPos.reset();
+        mState.mJournalPos.reset();
 
         // Read and process transactions from the journal until either we've done as many
         // as we allow this go or we reach the end of the journal.
-        bool finished { mJournalPos == journalLock.end() };
+        CJournal::Index journalEnd {journalLock.end()};
+        bool finished { mState.mJournalPos == journalEnd };
+
         while(!finished)
         {
-            // Try to add another txn to the block
-            if(addTransaction(pindex))
+            // Try to add another txn or a whole group of txns to the block
+            // mMaxTransactions is an internal limit used to reduce lock contention
+            // When we're adding a group we may add more transactions and that's OK
+            size_t nAdded = addTransactionOrGroup(pindex, journalEnd);
+            if(nAdded)
             {
-                ++txnNum;
+                txnNum += nAdded;
+
+                // Set updated flag
+                mRecentlyUpdated = true;
 
                 // We're finished if we've reached the end of the journal, or we've added
                 // as many transactions this iteration as we're allowed.
-                finished = (mJournalPos == journalLock.end() || txnNum >= maxTxns);
+                finished = (mState.mJournalPos == journalEnd  || txnNum >= maxTxns);
             }
             else
             {
@@ -244,51 +245,84 @@ void JournalingBlockAssembler::newBlock()
     // Reset transaction list
     mBlockTxns.clear();
     mTxFees.clear();
-    mTxSigOpsCount.clear();
 
     // Reset other accounting information
-    mBlockFees = Amount{0};
-    mBlockSigOps = COINBASE_SIG_OPS;
-    mBlockSize = COINBASE_SIZE;
+    mState.mBlockFees = Amount{0};
+    mState.mBlockSigOps = COINBASE_SIG_OPS;
+    mState.mBlockSize = COINBASE_SIZE;
 
     // Add dummy coinbase as first transaction
     mBlockTxns.emplace_back();
     mTxFees.emplace_back(Amount{-1});
-    mTxSigOpsCount.emplace_back(-1);
 
     // Set updated flag
     mRecentlyUpdated = true;
 }
 
+size_t JournalingBlockAssembler::addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd)
+{
+    auto& groupId { mState.mJournalPos.at().getGroupId() };
+    if (!groupId)
+    {
+        return addTransaction(pindex);
+    }
+    else
+    {
+        GroupCheckpoint checkpoint {*this};
+        size_t nAddedTotal {0};
+        while (mState.mJournalPos != journalEnd && groupId == mState.mJournalPos.at().getGroupId()) {
+            size_t nAdded = addTransaction(pindex);
+            if (!nAdded) {
+                checkpoint.rollback();
+                return 0;
+            }
+            nAddedTotal += nAdded;
+        }
+        checkpoint.commit();
+        return nAddedTotal;
+    }
+}
+
+JournalingBlockAssembler::GroupCheckpoint::GroupCheckpoint(JournalingBlockAssembler& assembler)
+: mAssembler {assembler}
+, mAssemblerStateCheckpoint {assembler.mState}
+, mBlockTxnsCheckpoint {assembler.mBlockTxns}
+, mTxFeesCheckpoint {assembler.mTxFees}
+{
+}
+
+void JournalingBlockAssembler::GroupCheckpoint::rollback()
+{
+    if (!mShouldRollback) {
+        return;
+    }
+    mShouldRollback = false;
+    mAssembler.mState = mAssemblerStateCheckpoint;
+    mBlockTxnsCheckpoint.trimToSize();
+    mTxFeesCheckpoint.trimToSize();
+}
+
 // Test whether we can add another transaction to the next block, and if
 // so do it - Caller holds mutex
-bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
+size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
 {
-    const CJournalEntry& entry { mJournalPos.at() };
-    const CTransactionRef& txn { entry.getTxn() };
+    const CJournalEntry& entry { mState.mJournalPos.at() };
 
     // Check for block being full
     uint64_t maxBlockSize { ComputeMaxGeneratedBlockSize(pindex) };
-    uint64_t txnSize { txn->GetTotalSize() };
-    uint64_t blockSizeWithTx { mBlockSize + txnSize };
+    uint64_t txnSize { entry.getTxnSize() };
+    uint64_t blockSizeWithTx { mState.mBlockSize + txnSize };
     if(blockSizeWithTx >= maxBlockSize)
     {
-        return false;
+        return 0;
     }
 
-    uint64_t txnSigOps{ static_cast<uint64_t>(entry.getSigOpsCount()) };
-    uint64_t blockSigOpsWithTx{ mBlockSigOps + txnSigOps };
-
-    // After Genesis we don't count sigops anymore
-    if (!IsGenesisEnabled(mConfig, pindex->nHeight + 1))
-    {
-        // Check sig ops count
-        uint64_t maxBlockSigOps = mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithTx);
-     
-        if (blockSigOpsWithTx >= maxBlockSigOps)
-        {
-            return false;
-        }
+    // FIXME: We may read the transaction from disk and then throw
+    //        it away if the contextual check fails.
+    const auto txn = entry.getTxn()->GetTx();
+    if (txn == nullptr) {
+        LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler found stale wrapper in the journal. need to start over.\n");
+        return 0;
     }
 
     // Must check that lock times are still valid
@@ -297,26 +331,21 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
         CValidationState state {};
         if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff, false))
         {
-            return false;
+            return 0;
         }
     }
 
     // Append next txn to the block template
     mBlockTxns.emplace_back(txn);
     mTxFees.emplace_back(entry.getFee());
-    mTxSigOpsCount.emplace_back(entry.getSigOpsCount());
 
     // Update block accounting details
-    mBlockSize = blockSizeWithTx;
-    mBlockSigOps = blockSigOpsWithTx;
-    mBlockFees += entry.getFee();
-
-    // Set updated flag
-    mRecentlyUpdated = true;
+    mState.mBlockSize = blockSizeWithTx;
+    mState.mBlockFees += entry.getFee();
 
     // Move to the next item in the journal
-    ++mJournalPos;
+    ++mState.mJournalPos;
 
-    return true;
+    return 1;
 }
 

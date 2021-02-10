@@ -139,7 +139,7 @@ class AcceptBlockTest(BitcoinTestFramework):
                     result = self.nodes[0].getblock(x['hash'])
                     assert(False);
                 except JSONRPCException as e:
-                    assert('Block not found on disk' in repr(e))
+                    assert(x['hash'] + ' not found on disk' in repr(e))
 
         for x in self.nodes[1].getchaintips():
             if x['hash'] == blocks_h2f[1].hash:
@@ -199,7 +199,7 @@ class AcceptBlockTest(BitcoinTestFramework):
         for x in all_blocks[:-1]:
             self.nodes[0].getblock(x.hash)
         assert_raises_rpc_error(
-            -1, "Block not found on disk", self.nodes[0].getblock, all_blocks[-1].hash)
+            -1, all_blocks[-1].hash + " not found on disk", self.nodes[0].getblock, all_blocks[-1].hash)
 
         headers_message.headers.pop()  # Ensure the last block is unrequested
         white_node.send_message(headers_message)  # Send headers leading to tip
@@ -230,7 +230,7 @@ class AcceptBlockTest(BitcoinTestFramework):
         with mininode_lock:
             # Clear state so we can check the getdata request
             test_node.last_message.pop("getdata", None)
-            test_node.send_message(msg_inv([CInv(2, blocks_h3[0].sha256)]))
+            test_node.send_message(msg_inv([CInv(CInv.BLOCK, blocks_h3[0].sha256)]))
 
         test_node.sync_with_ping()
         with mininode_lock:

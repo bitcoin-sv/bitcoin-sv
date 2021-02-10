@@ -22,11 +22,13 @@ ser_*, deser_*: functions that handle serialization/deserialization
 """
 
 import asyncore
+import binascii
 from codecs import encode
 from collections import defaultdict
 import copy
 import hashlib
 from contextlib import contextmanager
+from enum import Enum
 from io import BytesIO
 import logging
 import random
@@ -36,6 +38,7 @@ import sys
 import time
 from itertools import chain
 from threading import RLock, Thread
+import uuid
 
 from test_framework.siphash import siphash256
 from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB
@@ -59,6 +62,15 @@ NODE_BLOOM = (1 << 2)
 NODE_WITNESS = (1 << 3)
 NODE_XTHIN = (1 << 4)
 NODE_BITCOIN_CASH = (1 << 5)
+
+# Stream types enumeration
+class StreamType(Enum):
+    UNKNOWN = 0
+    GENERAL = 1
+    DATA1 = 2
+    DATA2 = 3
+    DATA3 = 4
+    DATA4 = 5
 
 # Howmuch data will be read from the network at once
 READ_BUFFER_SIZE = 8192
@@ -260,6 +272,27 @@ def FromHex(obj, hex_string):
 def ToHex(obj):
     return bytes_to_hex_str(obj.serialize())
 
+
+# Serialise a UUID association ID as a stream of bytes for sending over the network
+def serialise_uuid_associd(assocId):
+    assocIdBytes = bytes()
+    if(assocId):
+        assocIdPlusType = b"".join((
+            struct.pack("<B", 0),
+            assocId.bytes
+        ))
+        assocIdBytes = ser_string(assocIdPlusType)
+    return assocIdBytes
+
+# Deserialise an association ID from the network into a UUID
+def deserialise_uuid_associd(raw):
+    return uuid.UUID(bytes=raw[1:])
+
+# Create a new random association ID
+def create_association_id():
+    return uuid.uuid4()
+
+
 # Objects that map to bitcoind objects, which can be serialized/deserialized
 
 
@@ -318,14 +351,20 @@ class CAddress():
         return "CAddress(nServices=%i ip=%s port=%i time=%d)" % (self.nServices, self.ip, self.port, self.nTime)
 
 class CInv():
+
+    ERROR = 0
+    TX = 1
+    BLOCK = 2
+    COMPACT_BLOCK = 4
+
     typemap = {
-        0: "Error",
-        1: "TX",
-        2: "Block",
-        4: "CompactBlock"
+        ERROR: "Error",
+        TX: "TX",
+        BLOCK: "Block",
+        COMPACT_BLOCK: "CompactBlock"
     }
 
-    def __init__(self, t=0, h=0):
+    def __init__(self, t=ERROR, h=0):
         self.type = t
         self.hash = h
 
@@ -347,24 +386,28 @@ class CInv():
         return int((max_payload_length - 8) / (4 + 32))
 
 class CProtoconf():
-    def __init__(self, number_of_fields=1, max_recv_payload_length=0):
+    def __init__(self, number_of_fields=2, max_recv_payload_length=0, stream_policies=b"Default"):
         self.number_of_fields = number_of_fields
         self.max_recv_payload_length = max_recv_payload_length
+        self.stream_policies = stream_policies
         
     def deserialize(self, f):
         self.number_of_fields = deser_compact_size(f)
         self.max_recv_payload_length = struct.unpack("<i", f.read(4))[0]
+        if self.number_of_fields > 1:
+            self.stream_policies = deser_string(f)
 
     def serialize(self):
         r = b""
         r += ser_compact_size(self.number_of_fields)
         r += struct.pack("<i", self.max_recv_payload_length) 
+        if self.number_of_fields > 1:
+            r += ser_string(self.stream_policies)
         return r
 
     def __repr__(self):
-        return "CProtoconf(number_of_fields=%064x max_recv_payload_length=%064x)" \
-            % (self.number_of_fields, self.max_recv_payload_length)
-
+        return "CProtoconf(number_of_fields=%064x max_recv_payload_length=%064x stream_policies=%s)" \
+            % (self.number_of_fields, self.max_recv_payload_length, self.stream_policies)
 
 class CBlockLocator():
     def __init__(self, have=[]):
@@ -507,8 +550,9 @@ class CTransaction():
         return True
 
     def __repr__(self):
-        return "CTransaction(nVersion=%i vin=%s vout=%s nLockTime=%i)" \
-            % (self.nVersion, repr(self.vin), repr(self.vout), self.nLockTime)
+        self.rehash()
+        return "CTransaction(hash=%s nVersion=%i vin=%s vout=%s nLockTime=%i)" \
+            % (self.hash, self.nVersion, repr(self.vin), repr(self.vout), self.nLockTime)
 
 
 class CBlockHeader():
@@ -574,8 +618,9 @@ class CBlockHeader():
         return self.sha256
 
     def __repr__(self):
-        return "CBlockHeader(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x)" \
-            % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
+        self.rehash()
+        return "CBlockHeader(hash=%s nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x)" \
+            % (self.hash, self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce)
 
 
@@ -632,8 +677,9 @@ class CBlock(CBlockHeader):
             self.rehash()
 
     def __repr__(self):
-        return "CBlock(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x vtx=%s)" \
-            % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
+        self.rehash()
+        return "CBlock(hash=%s nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x vtx=%s)" \
+            % (self.hash, self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce, repr(self.vtx))
 
 
@@ -909,6 +955,7 @@ class msg_version():
         self.strSubVer = MY_SUBVERSION
         self.nStartingHeight = -1
         self.nRelay = MY_RELAY
+        self.assocID = create_association_id()
 
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
@@ -939,10 +986,16 @@ class msg_version():
             # Relay field is optional for version 70001 onwards
             try:
                 self.nRelay = struct.unpack("<b", f.read(1))[0]
+                try:
+                    uuidBytes = deser_string(f)
+                    self.assocID = deserialise_uuid_associd(uuidBytes)
+                except:
+                    self.assocID = None
             except:
                 self.nRelay = 0
         else:
             self.nRelay = 0
+            self.assocID = None
 
     def serialize(self):
         r = b"".join((
@@ -954,14 +1007,16 @@ class msg_version():
             struct.pack("<Q", self.nNonce),
             ser_string(self.strSubVer),
             struct.pack("<i", self.nStartingHeight),
-            struct.pack("<b", self.nRelay),))
+            struct.pack("<b", self.nRelay),
+            serialise_uuid_associd(self.assocID),
+        ))
         return r
 
     def __repr__(self):
-        return 'msg_version(nVersion=%i nServices=%i nTime=%s addrTo=%s addrFrom=%s nNonce=0x%016X strSubVer=%s nStartingHeight=%i nRelay=%i)' \
+        return 'msg_version(nVersion=%i nServices=%i nTime=%s addrTo=%s addrFrom=%s nNonce=0x%016X strSubVer=%s nStartingHeight=%i nRelay=%i assocID=%s)' \
             % (self.nVersion, self.nServices, time.ctime(self.nTime),
                repr(self.addrTo), repr(self.addrFrom), self.nNonce,
-               self.strSubVer, self.nStartingHeight, self.nRelay)
+               self.strSubVer, self.nStartingHeight, self.nRelay, str(self.assocID))
 
 
 class msg_verack():
@@ -979,12 +1034,61 @@ class msg_verack():
     def __repr__(self):
         return "msg_verack()"
 
+
+class msg_createstream():
+    command = b"createstrm"
+
+    def __init__(self, stream_type, stream_policy=b"", assocID=None):
+        self.assocID = assocID
+        self.stream_type = stream_type
+        self.stream_policy = stream_policy
+
+    def deserialize(self, f):
+        uuidBytes = deser_string(f)
+        self.assocID = deserialise_uuid_associd(uuidBytes)
+        self.stream_type = struct.unpack("<B", f.read(1))[0]
+        self.stream_policy = deser_string(f)
+
+    def serialize(self):
+        return b"".join((
+            serialise_uuid_associd(self.assocID),
+            struct.pack("<B", self.stream_type),
+            ser_string(self.stream_policy),
+        ))
+
+    def __repr__(self):
+        return "msg_createstream(assocID=%s stream_type=%i stream_policy=%s)" % (str(self.assocID), self.stream_type,
+            str(self.stream_policy))
+
+
+class msg_streamack():
+    command = b"streamack"
+
+    def __init__(self, assocID=None, stream_type=StreamType.UNKNOWN.value):
+        self.assocID = assocID
+        self.stream_type = stream_type
+
+    def deserialize(self, f):
+        uuidBytes = deser_string(f)
+        self.assocID = deserialise_uuid_associd(uuidBytes)
+        self.stream_type = struct.unpack("<B", f.read(1))[0]
+
+    def serialize(self):
+        return b"".join((
+            serialise_uuid_associd(self.assocID),
+            struct.pack("<B", self.stream_type),
+        ))
+
+    def __repr__(self):
+        return "msg_streamack(assocID=%s stream_type=%i)" % (str(self.assocID), self.stream_type)
+
+
 class msg_protoconf():
     command = b"protoconf"
 
     def __init__(self, protoconf=None):
         if protoconf is None:
-            self.protoconf = CProtoconf(1,0)
+            self.protoconf = CProtoconf(2,0,b"")
         else:
             self.protoconf = protoconf
 
@@ -1403,6 +1507,24 @@ class msg_blocktxn():
     def __repr__(self):
         return "msg_blocktxn(block_transactions=%s)" % (repr(self.block_transactions))
 
+class msg_notfound():
+    command = b"notfound"
+
+    def __init__(self, inv=None):
+        if inv is None:
+            self.inv = []
+        else:
+            self.inv = inv
+
+    def deserialize(self, f):
+        self.inv = deser_vector(f, CInv)
+
+    def serialize(self):
+        return ser_vector(self.inv)
+
+    def __repr__(self):
+        return "msg_notfound(inv=%s)" % (repr(self.inv))
+
 
 class NodeConnCB():
     """Callback and helper functions for P2P connection to a bitcoind node.
@@ -1533,6 +1655,8 @@ class NodeConnCB():
         conn.ver_recv = conn.ver_send
         self.verack_received = True
 
+    def on_streamack(self, conn, message): pass
+
     def on_protoconf(self, conn, message): pass
 
     def on_version(self, conn, message):
@@ -1544,8 +1668,10 @@ class NodeConnCB():
             conn.ver_recv = conn.ver_send
         conn.nServices = message.nServices
 
+    def on_notfound(self, conn, message): pass
+
     def send_protoconf(self, conn):
-        conn.send_message(msg_protoconf(CProtoconf(1, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)))
+        conn.send_message(msg_protoconf(CProtoconf(2, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, b"BlockPriority,Default")))
 
     # Connection helper methods
 
@@ -1596,6 +1722,10 @@ class NodeConnCB():
 
     def wait_for_protoconf(self, timeout=60):
         def test_function(): return self.message_count["protoconf"]
+        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
+    def wait_for_streamack(self, timeout=60):
+        def test_function(): return self.message_count["streamack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     # Message sending helper functions
@@ -1649,6 +1779,8 @@ class NodeConn(asyncore.dispatcher):
         b"version": msg_version,
         b"protoconf": msg_protoconf,
         b"verack": msg_verack,
+        b"createstrm": msg_createstream,
+        b"streamack": msg_streamack,
         b"addr": msg_addr,
         b"alert": msg_alert,
         b"inv": msg_inv,
@@ -1668,7 +1800,8 @@ class NodeConn(asyncore.dispatcher):
         b"sendcmpct": msg_sendcmpct,
         b"cmpctblock": msg_cmpctblock,
         b"getblocktxn": msg_getblocktxn,
-        b"blocktxn": msg_blocktxn
+        b"blocktxn": msg_blocktxn,
+        b"notfound": msg_notfound
     }
 
     MAGIC_BYTES = {
@@ -1678,7 +1811,8 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True, strSubVer=None):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True,
+                 strSubVer=None, assocID=None, nullAssocID=False):
         # Lock must be acquired when new object is added to prevent NetworkThread from trying
         # to access partially constructed object or trying to call callbacks before the connection
         # is established.
@@ -1699,6 +1833,10 @@ class NodeConn(asyncore.dispatcher):
             self.nServices = 0
             self.maxInvElements = CInv.estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
             self.strSubVer = strSubVer
+            self.assocID = assocID
+
+            if(assocID):
+                send_version = False
 
             if send_version:
                 # stuff version msg into sendbuf
@@ -1710,7 +1848,10 @@ class NodeConn(asyncore.dispatcher):
                 vt.addrFrom.port = 0
                 if(strSubVer):
                     vt.strSubVer = strSubVer
+                if(nullAssocID):
+                    vt.assocID = None
                 self.send_message(vt, True)
+                self.assocID = vt.assocID
 
             logger.info('Connecting to Bitcoin Node: %s:%d' %
                         (self.dstaddr, self.dstport))

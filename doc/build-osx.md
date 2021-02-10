@@ -50,3 +50,36 @@ When the popup appears, click `Install`.
     #
     # Alternatively -G "Sublime Text 2 - Unix Makefiles" generates a
     # Sublime text 3 project
+
+### Potential python core dumps while running functional tests
+
+There is a chance on MacOS that functional tests start producing python
+core dumps due to test/functional/test_framework/key.py using invalid OpenSSL
+library.
+This can happen due to conflicting loads of system and Homebrew/MacPorts OpenSSL
+libraries caused by MacOS System Integrity Protection not allowing to override
+library loading paths from outside world.
+
+In such case as a workaround test/functional/test_framework/key.py should be
+modified by changing the library search path and modifying the value of ssl
+variable:
+
+    import os
+    import platform
+    import subprocess
+
+    search_path = ['/opt/local/lib']
+    try:
+        homebrew_libdir = subprocess.check_output(['brew', '--prefix', 'openssl'])
+        homebrew_libdir = homebrew_libdir.decode('UTF-8').rstrip('\n')
+        search_path.insert(0, os.path.join(homebrew_libdir, 'lib'))
+    except subprocess.SubprocessError:
+        pass
+    dyld_library_path = os.environ.get('DYLD_LIBRARY_PATH', None)
+    if dyld_library_path:
+        search_path.append(dyld_library_path.lstrip(os.path.pathsep))
+    os.environ['DYLD_LIBRARY_PATH'] = os.path.pathsep.join(search_path)
+
+    ssl = ctypes.cdll.LoadLibrary(   ctypes.util.find_library('ssl')
+                                  or ctypes.util.find_library('libcrypto-1_1-x64')
+                                  or ctypes.util.find_library('libeay32'))

@@ -236,9 +236,9 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
     if attempts == float('inf') and timeout == float('inf'):
         timeout = 60
     attempt = 0
-    timeout += time.time()
+    timestamp = timeout + time.time()
 
-    while attempt < attempts and time.time() < timeout:
+    while attempt < attempts and time.time() < timestamp:
         if lock:
             with lock:
                 if predicate():
@@ -251,7 +251,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
 
     # Print the cause of the timeout
     assert attempts > attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
-    assert timeout >= time.time(), f"{label} : timeout exceeded {timeout}"
+    assert timestamp >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
 # RPC/P2P connection constants and functions
@@ -260,9 +260,9 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
 
 # The maximum number of nodes a single test can spawn
 MAX_NODES = 8
-# Don't assign rpc or p2p ports lower than this
+# Don't assign rpc, p2p or zmq ports lower than this
 PORT_MIN = 11000
-# The number of ports to "reserve" for p2p and rpc, each
+# The number of ports to "reserve" for p2p, rpc and zmq, each
 PORT_RANGE = 5000
 
 
@@ -304,6 +304,11 @@ def p2p_port(n):
 
 def rpc_port(n):
     return PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+
+
+def zmq_port(n):
+    assert(n <= MAX_NODES)
+    return PORT_MIN + 2*PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 
 def rpc_url(datadir, i, rpchost=None):
@@ -472,8 +477,20 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
         timeout -= wait
     raise AssertionError("Mempool sync failed")
 
-def check_mempool_equals(rpc, should_be_in_mempool, timeout=20):
-    wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=timeout)
+def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0.1):
+    try:
+        wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool},
+                   timeout=timeout, check_interval=check_interval)
+    except:
+        mempool = set(rpc.getrawmempool())
+        expected = {t.hash for t in should_be_in_mempool}
+        missing = expected - mempool
+        unexpected = mempool - expected
+        if missing:
+            rpc.log.info("Transactions missing from the mempool: " + str(list(missing)))
+        if unexpected:
+            rpc.log.info("Transactions that should not be in the mempool: " + str(list(unexpected)))
+        raise
 
 # The function checks if transaction/block was rejected
 # The actual reject reason is checked if specified
@@ -773,7 +790,7 @@ def loghash(inhash=None):
 def check_for_log_msg(rpc, log_msg, node_dir):
     for line in open(glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]):
         if log_msg in line:
-            rpc.log.info("Found line: %s", line)
+            rpc.log.info("Found line: %s", line.strip())
             return True
     return False
 
@@ -800,3 +817,8 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
         import zmq
     except ImportError:
         raise Exception("pyzmq module not available.")
+
+def wait_for_txn_propagator(node):
+    # Wait for this node's transactions propagator to finish relaying transactions to other nodes.
+    # Can be used to make sure current transactions are not relayed to nodes being reconnected later.
+    wait_until(lambda: (node.getnetworkinfo()['txnpropagationqlen'] == 0))

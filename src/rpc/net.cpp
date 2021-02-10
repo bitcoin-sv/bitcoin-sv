@@ -3,14 +3,12 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/server.h"
-
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
-#include "policy/policy.h"
 #include "protocol.h"
 #include "sync.h"
 #include "timedata.h"
@@ -20,7 +18,6 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
-
 #include <univalue.h>
 
 static UniValue getconnectioncount(const Config &config,
@@ -91,9 +88,12 @@ static UniValue getpeerinfo(const Config &config,
             "    \"bytessent\": n,            (numeric) The total bytes sent\n"
             "    \"bytesrecv\": n,            (numeric) The total bytes received\n"
             "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
+            "    \"recvsize\": n,             (numeric) Current size of queued messages for receiving\n"
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
-            "    \"pauserecv\": true|false,   (boolean) Are we paused for receiving\n"
+            "    \"unpausesend\": true|false, (boolean) Have we temporarily unpaused sending\n"
             "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
+            "    \"associd\": \"xxxxxxx\"       (string) The association ID if set by the peer, otherwise Null\n"
+            "    \"streampolicy\": \"xxxxxxx\"  (string) The stream policy in use\n"
             "    \"streams\": [\n"
             "       {\n"
             "          \"streamtype\": \"TYPE\" (string) The type of this stream\n"
@@ -102,8 +102,10 @@ static UniValue getpeerinfo(const Config &config,
             "          \"bytessent\": n,      (numeric) The total bytes sent\n"
             "          \"bytesrecv\": n,      (numeric) The total bytes received\n"
             "          \"sendsize\": n,       (numeric) Current size of queued messages for sending\n"
+            "          \"recvsize\": n,       (numeric) Current size of queued messages for receiving\n"
             "          \"spotrecvbw\": n,     (numeric) The spot average download bandwidth over this stream (bytes/sec)\n"
             "          \"minuterecvbw\": n    (numeric) The 1 minute average download bandwidth over this stream (bytes/sec)\n"
+            "          \"pauserecv\": true|false, (boolean) Are we paused for receiving\n"
             "       }\n"
             "       ...\n"
             "    ],\n"
@@ -183,11 +185,14 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("lastsend", stats.associationStats.nLastSend));
         obj.push_back(Pair("lastrecv", stats.associationStats.nLastRecv));
         obj.push_back(Pair("sendsize", stats.associationStats.nSendSize));
+        obj.push_back(Pair("recvsize", stats.associationStats.nRecvSize));
         obj.push_back(Pair("pausesend", stats.fPauseSend));
-        obj.push_back(Pair("pauserecv", stats.fPauseRecv));
+        obj.push_back(Pair("unpausesend", stats.fUnpauseSend));
         obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
         obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
         obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));
+        obj.push_back(Pair("associd", stats.associationStats.assocID));
+        obj.push_back(Pair("streampolicy", stats.associationStats.streamPolicyName));
 
         UniValue streams(UniValue::VARR);
         for (const StreamStats& streamStats : stats.associationStats.streamStats) {
@@ -198,8 +203,10 @@ static UniValue getpeerinfo(const Config &config,
             streamDetails.push_back(Pair("bytessent", streamStats.nSendBytes));
             streamDetails.push_back(Pair("bytesrecv", streamStats.nRecvBytes));
             streamDetails.push_back(Pair("sendsize", streamStats.nSendSize));
+            streamDetails.push_back(Pair("recvsize", streamStats.nRecvSize));
             streamDetails.push_back(Pair("spotrecvbw", streamStats.nSpotBytesPerSec));
             streamDetails.push_back(Pair("minuterecvbw", streamStats.nMinuteBytesPerSec));
+            streamDetails.push_back(Pair("pauserecv", streamStats.fPauseRecv));
             streams.push_back(streamDetails);
         }
         obj.push_back(Pair("streams", streams));
@@ -286,8 +293,8 @@ static UniValue addnode(const Config &config, const JSONRPCRequest &request) {
     std::string strNode = request.params[0].get_str();
 
     if (strCommand == "onetry") {
-        CAddress addr;
-        g_connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str());
+        NodeConnectInfo connectInfo { CAddress{}, strNode.c_str() };
+        g_connman->OpenNetworkConnection(connectInfo, nullptr);
         return NullUniValue;
     }
 
@@ -544,6 +551,7 @@ static UniValue getnetworkinfo(const Config &config,
             "  \"connections\": xxxxx,                  (numeric) the number "
             "of connections\n"
             "  \"addresscount\": xxxxx,                 (numeric) number of known peer addresses\n"
+            "  \"streampolicies\": \"xxxxxxxxxxxxxxx\", (string) list of available stream policies to use\n"
             "  \"networkactive\": true|false,           (bool) whether p2p "
             "networking is enabled\n"
             "  \"networks\": [                          (array) information "
@@ -566,11 +574,12 @@ static UniValue getnetworkinfo(const Config &config,
             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
-			    "  \"minconsolidationfactor\": xxxxx        (numeric) minimum ratio between scriptPubKey inputs and outputs, "
+			    "  \"minconsolidationfactor\": xxxxx               (numeric) minimum ratio between scriptPubKey inputs and outputs, "
 			    "0 disables consolidation transactions\n"
-			    "  \"maxconsolidationinputscriptsize\": xxxxx  (numeric) max input scriptSig size\n"
-			    "  \"minconsolidationinputmaturity\": xxxxx    (numeric) minimum number of confirmations for inputs spent\n"
-			    "  \"acceptnonstdconsolidationinput\": xxxxx   (numeric) 1 allow 0 dissallow std transactions to be spent\n"
+			    "  \"maxconsolidationinputscriptsize\": xxxxx      (numeric) maximum input scriptSig size\n"
+			    "  \"minconfconsolidationinput\": xxxxx        (numeric) minimum number of confirmations for inputs spent\n"
+			    "  \"minconsolidationinputmaturity\": xxxxx    (numeric) minimum number of confirmations for inputs spent (DEPRECATED: use minconfconsolidationinput instead) \n"
+			    "  \"acceptnonstdconsolidationinput\": true|false  (boolean) true if non std inputs can be spent\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
                             "  {\n"
@@ -606,6 +615,16 @@ static UniValue getnetworkinfo(const Config &config,
         obj.push_back(Pair("networkactive", g_connman->GetNetworkActive()));
         obj.push_back(Pair("connections", (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
         obj.push_back(Pair("addresscount", static_cast<uint64_t>(g_connman->GetAddressCount())));
+
+        // Format list of prioritised policy names
+        std::stringstream streamPoliciesStr {};
+        for(const auto& policy : g_connman->GetStreamPolicyFactory().GetPrioritisedPolicyNames()) {
+            if(!streamPoliciesStr.str().empty()) {
+                streamPoliciesStr << ",";
+            }
+            streamPoliciesStr << policy;
+        }
+        obj.push_back(Pair("streampolicies", streamPoliciesStr.str()));
     }
 
     obj.push_back(Pair("networks", GetNetworksInfo()));
@@ -613,16 +632,17 @@ static UniValue getnetworkinfo(const Config &config,
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
     obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
     obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));
-    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConsolidationInputMaturity()));
+    obj.push_back(Pair("minconfconsolidationinput",  config.GetMinConfConsolidationInput()));
+    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConfConsolidationInput()));
     obj.push_back(Pair("acceptnonstdconsolidationinput",  config.GetAcceptNonStdConsolidationInput()));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
-        for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost) {
+        for (auto const & [address, info] : mapLocalHost) {
             UniValue rec(UniValue::VOBJ);
-            rec.push_back(Pair("address", item.first.ToString()));
-            rec.push_back(Pair("port", item.second.nPort));
-            rec.push_back(Pair("score", item.second.nScore));
+            rec.push_back(Pair("address", address.ToString()));
+            rec.push_back(Pair("port", info.nPort));
+            rec.push_back(Pair("score", info.nScore));
             localAddresses.push_back(rec);
         }
     }

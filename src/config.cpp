@@ -8,7 +8,37 @@
 #include "validation.h"
 #include "util.h"
 #include "consensus/merkle.h"
+
 #include <boost/algorithm/string.hpp>
+#include <limits>
+
+namespace
+{
+    bool LessThan(
+        int64_t argValue,
+        std::string* err,
+        const std::string& errorMessage,
+        int64_t minValue)
+    {
+        if (argValue < minValue)
+        {
+            if (err)
+            {
+                *err = errorMessage;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool LessThanZero(
+        int64_t argValue,
+        std::string* err,
+        const std::string& errorMessage)
+    {
+        return LessThan( argValue, err, errorMessage, 0 );
+    }
+}
 
 GlobalConfig::GlobalConfig() {
     Reset();
@@ -18,7 +48,6 @@ void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
     blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
-    blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
 
@@ -33,15 +62,13 @@ void GlobalConfig::Reset()
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
     maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
-    minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
     acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
-    limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
     limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
-    limitDescendantSize = DEFAULT_DESCENDANT_SIZE_LIMIT;
-    limitAncestorSize = DEFAULT_ANCESTOR_SIZE_LIMIT;
-
+    limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
+    
     testBlockCandidateValidity = false;
     blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
 
@@ -69,10 +96,17 @@ void GlobalConfig::Reset()
     mAcceptNonStandardOutput = true;
 
     mMaxCoinsViewCacheSize = 0;
-    
+    mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+
+    maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+    maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
+
+    recvInvQueueFactor = DEFAULT_RECV_INV_QUEUE_FACTOR;
+
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
+    mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
+    mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
-    mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
     mStopAtHeight = DEFAULT_STOPATHEIGHT;
     mPromiscuousMempoolFlags = 0;
@@ -80,6 +114,12 @@ void GlobalConfig::Reset()
 
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+
+    // P2P parameters
+    p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+
+    mDisableBIP30Checks = std::nullopt;
+
 #if ENABLE_ZMQ
     invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
 #endif
@@ -87,6 +127,7 @@ void GlobalConfig::Reset()
     maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
     preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
     maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
+
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -116,19 +157,6 @@ void GlobalConfig::CheckSetDefaultCalled() const
         throw std::runtime_error(
             "GlobalConfig::SetDefaultBlockSizeParams must be called before accessing block size related parameters");
     }
-}
-
-bool GlobalConfig::LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage)
-{
-    if (argValue < 0) 
-    {
-        if (err) 
-        {
-            *err = errorMessage;
-        }
-        return true;
-    }
-    return false;
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
@@ -208,21 +236,6 @@ int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     return blockSizeActivationTime;
 };
 
-bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage, std::string* err) {
-    // blockPriorityPercentage has to belong to [0..100]
-    if ((percentage < 0) || (percentage > 100)) {
-        if (err)
-            *err = _("Block priority percentage has to belong to the [0..100] interval.");
-        return false;
-    }
-    blockPriorityPercentage = percentage;
-    return true;
-}
-
-uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
-    return blockPriorityPercentage;
-}
-
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
     if (LessThanZero(maxTxSizePolicyIn, err, "Policy value for max tx size must not be less than 0"))
@@ -274,9 +287,13 @@ uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) con
     return maxTxSizePolicy;
 }
 
-bool GlobalConfig::SetMinConsolidationFactor(uint64_t minConsolidationFactorIn, std::string* err)
+bool GlobalConfig::SetMinConsolidationFactor(int64_t minConsolidationFactorIn, std::string* err)
 {
-    minConsolidationFactor = minConsolidationFactorIn;
+    if (LessThanZero(minConsolidationFactorIn, err, "Minimum consolidation factor cannot be less than zero."))
+    {
+        return false;
+    }
+    minConsolidationFactor = static_cast<uint64_t>(minConsolidationFactorIn);
     return true;
 }
 
@@ -285,12 +302,16 @@ uint64_t GlobalConfig::GetMinConsolidationFactor() const
     return minConsolidationFactor;
 }
 
-bool GlobalConfig::SetMaxConsolidationInputScriptSize(uint64_t maxConsolidationInputScriptSizeIn, std::string* err)
+bool GlobalConfig::SetMaxConsolidationInputScriptSize(int64_t maxConsolidationInputScriptSizeIn, std::string* err)
 {
-    if (maxConsolidationInputScriptSizeIn == 0) {
+    if (LessThanZero(maxConsolidationInputScriptSizeIn, err, "Maximum length for a scriptSig input in a consolidation txn cannot be less than zero."))
+    {
+        return false;
+    }
+    else if (maxConsolidationInputScriptSizeIn == 0) {
         maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     } else {
-        maxConsolidationInputScriptSize = maxConsolidationInputScriptSizeIn;
+        maxConsolidationInputScriptSize = static_cast<uint64_t>(maxConsolidationInputScriptSizeIn);
     }
     return true;
 }
@@ -300,24 +321,31 @@ uint64_t GlobalConfig::GetMaxConsolidationInputScriptSize() const
     return maxConsolidationInputScriptSize;
 }
 
-bool GlobalConfig::SetMinConsolidationInputMaturity(uint64_t minconsolidationinputmaturityIn, std::string* err)
+bool GlobalConfig::SetMinConfConsolidationInput(int64_t minconfIn, std::string* err)
 {
-    if (minconsolidationinputmaturityIn == 0) {
-        minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
-    } else {
-        minConsolidationInputMaturity = minconsolidationinputmaturityIn;
+    if (LessThanZero(minconfIn, err, "Minimum number of confirmations of inputs spent by consolidation transactions cannot be less than 0"))
+    {
+        return false;
+    }
+    if (minconfIn == 0)
+    {
+        minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
+    }
+    else
+    {
+        minConfConsolidationInput = static_cast<uint64_t>(minconfIn);
     }
     return true;
 }
 
-uint64_t GlobalConfig::GetMinConsolidationInputMaturity() const
+uint64_t GlobalConfig::GetMinConfConsolidationInput() const
 {
-    return minConsolidationInputMaturity;
+    return minConfConsolidationInput;
 }
 
-bool GlobalConfig::SetAcceptNonStdConsolidationInput(uint64_t acceptNonStdConsolidationInputIn, std::string* err)
+bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
 {
-    acceptNonStdConsolidationInput = acceptNonStdConsolidationInputIn;
+    acceptNonStdConsolidationInput = flagValue;
     return true;
 }
 
@@ -334,36 +362,38 @@ uint64_t GlobalConfig::GetDataCarrierSize() const {
     return dataCarrierSize;
 }
 
-void GlobalConfig::SetLimitAncestorSize(uint64_t limitAncestorSizeIn) {
-    limitAncestorSize = limitAncestorSizeIn;
-}
-
-uint64_t GlobalConfig::GetLimitAncestorSize() const {
-    return limitAncestorSize;
-}
-
-void GlobalConfig::SetLimitDescendantSize(uint64_t limitDescendantSizeIn) {
-    limitDescendantSize = limitDescendantSizeIn;
-}
-
-uint64_t GlobalConfig::GetLimitDescendantSize() const {
-    return limitDescendantSize;
-}
-
-void GlobalConfig::SetLimitAncestorCount(uint64_t limitAncestorCountIn) {
-    limitAncestorCount = limitAncestorCountIn;
+bool  GlobalConfig::SetLimitAncestorCount(int64_t limitAncestorCountIn, std::string* err) {
+    if (limitAncestorCountIn <= 0)
+    {
+        if (err)
+        {
+            *err = "The maximal number of the in-mempool ancestors must be greater than 0.";
+        }
+        return false;
+    }
+    limitAncestorCount = static_cast<uint64_t>(limitAncestorCountIn);
+    return true;
 }
 
 uint64_t GlobalConfig::GetLimitAncestorCount() const {
     return limitAncestorCount;
 }
 
-void GlobalConfig::SetLimitDescendantCount(uint64_t limitDescendantCountIn) {
-    limitDescendantCount = limitDescendantCountIn;
+bool GlobalConfig::SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err) {
+    if (limitSecondaryMempoolAncestorCountIn <= 1)
+    {
+        if (err)
+        {
+            *err = "The maximal number of the CPFP group members must be greater than 1.";
+        }
+        return false;
+    }
+    limitSecondaryMempoolAncestorCount = static_cast<uint64_t>(limitSecondaryMempoolAncestorCountIn);
+    return true;
 }
 
-uint64_t GlobalConfig::GetLimitDescendantCount() const {
-    return limitDescendantCount;
+uint64_t GlobalConfig::GetLimitSecondaryMempoolAncestorCount()const {
+    return limitSecondaryMempoolAncestorCount;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {
@@ -465,7 +495,7 @@ mining::CMiningFactory::BlockAssemblerType GlobalConfig::GetMiningCandidateBuild
     return blockAssemblerType;
 }
 
-bool GlobalConfig::SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err) {
+bool GlobalConfig::SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err) {
     if (genesisActivationHeightIn <= 0)
     {
         if (err)
@@ -474,11 +504,11 @@ bool GlobalConfig::SetGenesisActivationHeight(int64_t genesisActivationHeightIn,
         }
         return false;
     }
-    genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn);
+    genesisActivationHeight = genesisActivationHeightIn;
     return true;
 }
 
-uint64_t GlobalConfig::GetGenesisActivationHeight() const {
+int32_t GlobalConfig::GetGenesisActivationHeight() const {
     return genesisActivationHeight;
 }
 
@@ -832,6 +862,37 @@ bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
     return true;
 }
 
+bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
+{
+    static_assert( MIN_COINS_PROVIDER_CACHE_SIZE <= std::numeric_limits<int64_t>::max() );
+
+    if (LessThan(
+            max,
+            err,
+            "Policy value for maximum coins provider cache size must not be less than "
+                + std::to_string(MIN_COINS_PROVIDER_CACHE_SIZE),
+            MIN_COINS_PROVIDER_CACHE_SIZE))
+    {
+        return false;
+    }
+
+    mMaxCoinsProviderCacheSize = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
+{
+    if (LessThanZero(max - 1, err, "Minimum value for max number of leveldb open files for coinsdb size must not be less than 1."))
+    {
+        return false;
+    }
+
+    mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
+
+    return true;
+}
+
 void GlobalConfig::SetInvalidBlocks(const std::set<uint256>& hashes)
 {
     mInvalidBlocks = hashes;
@@ -916,7 +977,6 @@ bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
         }
         return false;
     }
-
     invalidTxSinks.insert(sink);
     return true;
 }
@@ -977,6 +1037,38 @@ InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
     return invalidTxFileSinkEvictionPolicy;
 }
 
+// P2P Parameters
+bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        *err = "P2P handshake timeout must be greater than 0.";
+        return false;
+    }
+
+    p2pHandshakeTimeout = timeout;
+    return true;
+}
+
+bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
+{
+    if(!GetChainParams().CanDisableBIP30Checks())
+    {
+        if(err)
+        {
+            *err = "Can not change disabling of BIP30 checks on " + GetChainParams().NetworkIDString() + " network.";
+            return false;
+        }
+    }
+    mDisableBIP30Checks = disable;
+    return true;
+}
+
+bool GlobalConfig::GetDisableBIP30Checks() const
+{
+    return mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
+}
+
 #if ENABLE_ZMQ
 bool GlobalConfig::SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err)
 {
@@ -1009,6 +1101,66 @@ bool GlobalConfig::SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, s
 uint64_t GlobalConfig::GetMaxMerkleTreeMemoryCacheSize() const
 {
     return maxMerkleTreeMemoryCacheSize;
+}
+
+bool GlobalConfig::SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err)
+{
+    // sending maxRecvPayloadLength less than LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH is considered protocol violation
+    if (value < LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
+    {
+        if (err)
+        {
+            *err = "MaxProtocolRecvPayloadLength should be at least: " + std::to_string(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH) + ".";
+        }
+        return false;
+    }
+    
+    if (value > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH )
+    {
+        if (err)
+        {
+            *err = "MaxProtocolRecvPayloadLength should be less than: " + std::to_string(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH ) + ".";
+        }
+        return false;
+    }
+
+    maxProtocolRecvPayloadLength = value;
+
+    // Since value is between LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH and ONE_GIGABYTE and MAX_PROTOCOL_SEND_PAYLOAD_FACTOR is set to 4
+    // this cannot overflow unsigned int
+    maxProtocolSendPayloadLength = static_cast<unsigned int>(value * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR);
+    
+    return true;
+}
+
+bool GlobalConfig::SetRecvInvQueueFactor(uint64_t value, std::string* err)
+{
+    if(value < MIN_RECV_INV_QUEUE_FACTOR || value > MAX_RECV_INV_QUEUE_FACTOR)
+    {
+        if(err)
+        {
+            *err = "RecvInvQueueFactor should be between: " + std::to_string(MIN_RECV_INV_QUEUE_FACTOR) + " and " + 
+                   std::to_string(MAX_RECV_INV_QUEUE_FACTOR) + ".";
+        }
+        return false;
+    }
+    recvInvQueueFactor = value;
+    return true;
+}
+
+unsigned int GlobalConfig::GetMaxProtocolRecvPayloadLength() const
+{
+  return maxProtocolRecvPayloadLength;
+}
+
+unsigned int GlobalConfig::GetMaxProtocolSendPayloadLength() const
+{
+  return maxProtocolSendPayloadLength;
+}
+
+unsigned int GlobalConfig::GetRecvInvQueueFactor() const
+{
+  return recvInvQueueFactor;
 }
 
 DummyConfig::DummyConfig()
@@ -1135,7 +1287,7 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
 }
 
 bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
-    if (LessThanZero(maxMempool, err, "Policy value for maximum memory pool must not be less than 0."))
+    if (LessThanZero(maxMempool, err, "Policy value for maximum resident memory pool must not be less than 0."))
     {
         return false;
     }
@@ -1143,7 +1295,7 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
     {
         if (err)
         {
-            *err = strprintf(_("Policy value for maximum memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
+            *err = strprintf(_("Policy value for maximum resident memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
         }
         return false;
     }
@@ -1155,6 +1307,45 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
 
 uint64_t GlobalConfig::GetMaxMempool() const {
     return mMaxMempool;
+}
+
+bool GlobalConfig::SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) {
+    if (LessThanZero(maxMempoolSizeDisk, err, "Policy value for maximum on-disk memory pool must not be less than 0."))
+    {
+        return false;
+    }
+
+    mMaxMempoolSizeDisk = static_cast<uint64_t>(maxMempoolSizeDisk);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMempoolSizeDisk() const {
+    return mMaxMempoolSizeDisk;
+}
+
+bool GlobalConfig::SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) {
+    if (LessThanZero(mempoolMaxPercentCPFP, err, "Policy value for percentage of memory for low paying transactions must not be less than 0."))
+    {
+        return false;
+    }
+
+    if (mempoolMaxPercentCPFP > 100)
+    {
+        if (err)
+        {
+            *err = "Policy value for percentage of memory for low paying transactions must not be greater than 100";
+        }
+        return false;
+    }
+
+    mMempoolMaxPercentCPFP = static_cast<uint64_t>(mempoolMaxPercentCPFP);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMempoolMaxPercentCPFP() const {
+    return mMempoolMaxPercentCPFP;
 }
 
 bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
@@ -1172,21 +1363,6 @@ uint64_t GlobalConfig::GetMemPoolExpiry() const {
     return mMemPoolExpiry;
 }
 
-bool GlobalConfig::SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) {
-    if (LessThanZero(limitFreeRelay, err, "Policy value for rate-limit free transactions must not be less than 0."))
-    {
-        return false;
-    }
-
-    mLimitFreeRelay = static_cast<uint64_t>(limitFreeRelay);
-
-    return true;
-}
-
-uint64_t GlobalConfig::GetLimitFreeRelay() const {
-    return mLimitFreeRelay;
-}
-
 bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) {
     if (LessThanZero(maxOrphanTxSize, err, "Policy value for maximum orphan transaction size must not be less than 0."))
     {
@@ -1202,18 +1378,18 @@ uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
     return mMaxOrphanTxSize;
 }
 
-bool GlobalConfig::SetStopAtHeight(int64_t stopAtHeight, std::string* err) {
+bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
     if (LessThanZero(stopAtHeight, err, "Policy value for stop at height in the main chain must not be less than 0."))
     {
         return false;
     }
 
-    mStopAtHeight = static_cast<uint64_t>(stopAtHeight);
+    mStopAtHeight = stopAtHeight;
 
     return true;
 }
 
-uint64_t GlobalConfig::GetStopAtHeight() const {
+int32_t GlobalConfig::GetStopAtHeight() const {
     return mStopAtHeight;
 }
 

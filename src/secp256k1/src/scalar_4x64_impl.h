@@ -267,6 +267,7 @@ static int secp256k1_scalar_cond_negate(secp256k1_scalar *r, int flag) {
     VERIFY_CHECK(c2 == 0); \
 }
 
+ATTRIBUTE_NO_SANITIZE_ADDRESS
 static void secp256k1_scalar_reduce_512(secp256k1_scalar *r, const uint64_t *l) {
 #ifdef USE_ASM_X86_64
     /* Reduce 512 bits into 385. */

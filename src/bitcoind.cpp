@@ -12,15 +12,11 @@
 #include "compat.h"
 #include "config.h"
 #include "fs.h"
-#include "httprpc.h"
-#include "httpserver.h"
 #include "init.h"
 #include "noui.h"
-#include "rpc/server.h"
 #include "scheduler.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
 
@@ -65,7 +61,7 @@ void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellation
 // Start
 //
 bool AppInit(int argc, char *argv[]) {
-    RenameThread("bitcoin-main");
+    RenameThread("main");
     boost::thread_group threadGroup;
     CScheduler scheduler;
 

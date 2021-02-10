@@ -18,6 +18,7 @@ import traceback
 import contextlib
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import NetworkThread, StopNetworkThread
+from .associations import Association, AssociationCB
 
 from .authproxy import JSONRPCException
 from . import coverage
@@ -35,6 +36,7 @@ from .util import (
     set_node_times,
     sync_blocks,
     sync_mempools,
+    wait_until
 )
 
 from test_framework.blocktools import *
@@ -337,6 +339,46 @@ class BitcoinTestFramework():
             connection.close()
         del connections
         # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        self.stop_node(node_index)
+        logger.debug("finished %s", title)
+
+    # This method runs and stops bitcoind node with index 'node_index'.
+    # It also creates (and handles closing of) some number of associations (desribed by their stream policies)
+    # to bitcoind node with index 'node_index'.
+    @contextlib.contextmanager
+    def run_node_with_associations(self, title, node_index, args, stream_policies, cb_class=AssociationCB, ip='127.0.0.1', strSubVer=None):
+        logger.debug("setup %s", title)
+
+        self.start_node(node_index, args)
+
+        # Create associations and their connections to the node
+        associations = []
+        for stream_policy in stream_policies:
+            association = Association(stream_policy, cb_class)
+            association.create_streams(self.nodes[node_index], ip, strSubVer)
+            associations.append(association)
+
+        # Start network handling thread
+        thr = NetworkThread()
+        thr.start()
+
+        # Allow associations to exchange their setup messages and fully initialise
+        for association in associations:
+            association.setup()
+        wait_until(lambda: len(self.nodes[node_index].getpeerinfo()) == len(associations))
+
+        # Test can now proceed
+        logger.debug("before %s", title)
+        yield tuple(associations)
+        logger.debug("after %s", title)
+
+        # Shutdown associations and their connections
+        for association in associations:
+            association.close_streams()
+        del associations
+
+        # Once all connections are closed, NetworkThread run loop completes and thr.join() returns success
         thr.join()
         self.stop_node(node_index)
         logger.debug("finished %s", title)

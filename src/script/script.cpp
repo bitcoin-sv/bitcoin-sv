@@ -9,10 +9,7 @@
 #include "instruction_iterator.h"
 #include "int_serialization.h"
 #include "script_num.h"
-
-#include "tinyformat.h"
 #include "utilstrencodings.h"
-
 #include <algorithm>
 #include <sstream>
 
@@ -178,17 +175,6 @@ bsv::instruction_iterator CScript::end_instructions() const
 {
     return bsv::instruction_iterator{
         bsv::span<const uint8_t>{data() + size(), 0}};
-}
-
-std::string CScriptWitness::ToString() const {
-    std::string ret = "CScriptWitness(";
-    for (unsigned int i = 0; i < stack.size(); i++) {
-        if (i) {
-            ret += ", ";
-        }
-        ret += HexStr(stack[i]);
-    }
-    return ret + ")";
 }
 
 std::ostream& operator<<(std::ostream& os, const CScript& script)

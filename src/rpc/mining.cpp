@@ -9,11 +9,12 @@
 #include "chainparams.h"
 #include "config.h"
 #include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "mining/factory.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
@@ -21,26 +22,49 @@
 #include "pow.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
+#include "script/script_num.h"
 #include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
-
+#include "rpc/http_protocol.h"
 #include <univalue.h>
-
 #include <cstdint>
 #include <memory>
 
 using mining::CBlockTemplate;
+
+void IncrementExtraNonce(CBlock *pblock,
+                         const CBlockIndex *pindexPrev,
+                         unsigned int &nExtraNonce) {
+    // Update nExtraNonce
+    static uint256 hashPrevBlock;
+    if (hashPrevBlock != pblock->hashPrevBlock) {
+        nExtraNonce = 0;
+        hashPrevBlock = pblock->hashPrevBlock;
+    }
+    ++nExtraNonce;
+    // Height first in coinbase required for block.version=2
+    unsigned int nHeight = pindexPrev->nHeight + 1;
+    CMutableTransaction txCoinbase(*pblock->vtx[0]);
+    txCoinbase.vin[0].scriptSig =
+        (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
+    assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
+
+    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+    pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+}
+
+
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
  * or from the last difficulty change if 'lookup' is nonpositive. If 'height' is
  * nonnegative, compute the estimate at the time when a given block was found.
  */
-static UniValue GetNetworkHashPS(int lookup, int height) {
+static UniValue GetNetworkHashPS(int lookup, int32_t height) {
     CBlockIndex *pb = chainActive.Tip();
 
     if (height >= 0 && height < chainActive.Height()) {
@@ -118,9 +142,9 @@ UniValue generateBlocks(const Config &config,
                         std::shared_ptr<CReserveScript> coinbaseScript,
                         int nGenerate, uint64_t nMaxTries, bool keepScript) {
     static const int nInnerLoopCount = 0x100000;
-    int nHeightStart = 0;
-    int nHeightEnd = 0;
-    int nHeight = 0;
+    int32_t nHeightStart = 0;
+    int32_t nHeightEnd = 0;
+    int32_t nHeight = 0;
 
     {
         // Don't keep cs_main locked.
@@ -138,6 +162,13 @@ UniValue generateBlocks(const Config &config,
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
     CBlockIndex* pindexPrev {nullptr};
+    /* Generating blocks in this loop on a busy node can call more than one CreateNewBlock on the same
+     * active chain height, causing to overwrite block(s). generateBlocks will thus not create exactly
+     * nGenerate blocks.
+     * This can happen if there is another asynchronous ActivateBestChain running while the one running
+     * in this thread (ProcessNewBlock) returns before chain is updated (for example when
+     * CBlockValidationStatus::isAncestorInValidation)
+     */
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
             mining::g_miningFactory->GetAssembler()->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
@@ -207,7 +238,8 @@ static UniValue generatetoaddress(const Config &config,
             "[ blockhashes ]     (array) hashes of blocks generated\n"
             "\nExamples:\n"
             "\nGenerate 11 blocks to myaddress\n" +
-            HelpExampleCli("generatetoaddress", "11 \"myaddress\""));
+            HelpExampleCli("generatetoaddress", "11 \"myaddress\"") +
+            HelpExampleRpc("generatetoaddress", "11, \"myaddress\""));
     }
 
     int nGenerate = request.params[0].get_int();
@@ -259,13 +291,10 @@ static UniValue getmininginfo(const Config &config,
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("blocks", int(chainActive.Height())));
-    obj.push_back(Pair("currentblocksize", uint64_t(nLastBlockSize)));
-    obj.push_back(Pair("currentblocktx", uint64_t(nLastBlockTx)));
+    auto stats = mining::g_miningFactory->GetAssembler()->getLastBlockStats();
+    obj.push_back(Pair("currentblocksize", uint64_t(stats.blockSize)));
+    obj.push_back(Pair("currentblocktx", uint64_t(stats.txCount)));
     obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
-    obj.push_back(
-        Pair("blockprioritypercentage",
-             uint8_t(gArgs.GetArg("-blockprioritypercentage",
-                                  DEFAULT_BLOCK_PRIORITY_PERCENTAGE))));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("networkhashps", getnetworkhashps(config, request)));
     obj.push_back(Pair("pooledtx", uint64_t(mempool.Size())));
@@ -284,12 +313,7 @@ static UniValue prioritisetransaction(const Config &config,
             "priority\n"
             "\nArguments:\n"
             "1. \"txid\"       (string, required) The transaction id.\n"
-            "2. priority_delta (numeric, required) The priority to add or "
-            "subtract.\n"
-            "                  The transaction selection algorithm considers "
-            "the tx as it would have a higher priority.\n"
-            "                  (priority of a transaction is calculated: "
-            "coinage * value_in_satoshis / txsize) \n"
+            "2. dummy (numeric, required) Unused, must be set to zero.\n"
             "3. fee_delta      (numeric, required) The fee value (in satoshis) "
             "to add (or subtract, if negative).\n"
             "                  The fee is not actually paid, only the "
@@ -306,10 +330,13 @@ static UniValue prioritisetransaction(const Config &config,
     LOCK(cs_main);
 
     uint256 hash = ParseHashStr(request.params[0].get_str(), "txid");
+    if(request.params[1].get_real() != 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Dummy parameter must be set to zero.");
+    }
     Amount nAmount(request.params[2].get_int64());
 
-    mempool.PrioritiseTransaction(hash, request.params[0].get_str(),
-                                  request.params[1].get_real(), nAmount);
+    mempool.PrioritiseTransaction(hash, request.params[0].get_str(), nAmount);
     return true;
 }
 
@@ -337,8 +364,11 @@ static UniValue BIP22ValidationResult(const Config &config,
     return "valid?";
 }
 
-static UniValue getblocktemplate(const Config &config,
-                                 const JSONRPCRequest &request) {
+void getblocktemplate(const Config& config,
+                      const JSONRPCRequest& request,
+                      HTTPRequest* httpReq,
+                      bool processedInBatch = true)
+{
     if (request.fHelp || request.params.size() > 1) {
         throw std::runtime_error(
             "getblocktemplate ( TemplateRequest )\n"
@@ -402,10 +432,6 @@ static UniValue getblocktemplate(const Config &config,
             "collected block fees (ie, not including the block subsidy); if "
             "key is not present, fee is unknown and clients MUST NOT assume "
             "there isn't one\n"
-            "         \"sigops\" : n,                (numeric) total SigOps "
-            "cost, as counted for purposes of block limits; if key is not "
-            "present, sigop cost is unknown and clients MUST NOT assume it is "
-            "zero\n"
             "         \"required\" : true|false      (boolean) if provided and "
             "true, this transaction must be in the final block\n"
             "      }\n"
@@ -434,8 +460,6 @@ static UniValue getblocktemplate(const Config &config,
             "  ],\n"
             "  \"noncerange\" : \"00000000ffffffff\",(string) A range of valid "
             "nonces\n"
-            "  \"sigoplimit\" : n,                 (numeric) limit of sigops "
-            "in blocks\n"
             "  \"sizelimit\" : n,                  (numeric) limit of block "
             "size\n"
             "  \"curtime\" : ttt,                  (numeric) current timestamp "
@@ -450,6 +474,9 @@ static UniValue getblocktemplate(const Config &config,
             HelpExampleCli("getblocktemplate", "") +
             HelpExampleRpc("getblocktemplate", ""));
     }
+
+    if(httpReq == nullptr)
+        return;
 
     LOCK(cs_main);
 
@@ -483,28 +510,66 @@ static UniValue getblocktemplate(const Config &config,
 
             uint256 hash = block.GetHash();
             BlockMap::iterator mi = mapBlockIndex.find(hash);
+            // result is of type UniValue because of BIP22ValidationResult return type
+            UniValue result;
             if (mi != mapBlockIndex.end()) {
                 CBlockIndex *pindex = mi->second;
-                if (pindex->IsValid(BlockValidity::SCRIPTS)) {
-                    return "duplicate";
+                if (pindex->IsValid(BlockValidity::SCRIPTS))
+                {
+                    result = "duplicate";
                 }
-                if (pindex->nStatus.isInvalid()) {
-                    return "duplicate-invalid";
+                else if (pindex->nStatus.isInvalid())
+                {
+                    result = "duplicate-invalid";
                 }
-                return "duplicate-inconclusive";
+                else
+                {
+                    result = "duplicate-inconclusive";
+                }
+
+            }
+            else
+            {
+                CBlockIndex *const pindexPrev = chainActive.Tip();
+                // TestBlockValidity only supports blocks built on the current Tip
+                if (block.hashPrevBlock != pindexPrev->GetBlockHash())
+                {
+                    result = "inconclusive-not-best-prevblk";
+                }
+                else
+                {
+                    CValidationState state;
+                    BlockValidationOptions validationOptions =
+                        BlockValidationOptions(false, true);
+                    TestBlockValidity(config, state, block, pindexPrev,
+                                      validationOptions);
+                    result = BIP22ValidationResult(config, state);
+                }
             }
 
-            CBlockIndex *const pindexPrev = chainActive.Tip();
-            // TestBlockValidity only supports blocks built on the current Tip
-            if (block.hashPrevBlock != pindexPrev->GetBlockHash()) {
-                return "inconclusive-not-best-prevblk";
+            // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
+            if (!processedInBatch)
+            {
+                httpReq->WriteHeader("Content-Type", "application/json");
+                httpReq->StartWritingChunks(HTTP_OK);
             }
-            CValidationState state;
-            BlockValidationOptions validationOptions =
-                BlockValidationOptions(false, true);
-            TestBlockValidity(config, state, block, pindexPrev,
-                              validationOptions);
-            return BIP22ValidationResult(config, state);
+
+            {
+                CHttpTextWriter httpWriter(*httpReq);
+                CJSONWriter jWriter(httpWriter, false);
+                jWriter.writeBeginObject();
+                jWriter.pushKVJSONFormatted("result", result.write());
+                jWriter.pushKV("error", nullptr);
+                jWriter.pushKVJSONFormatted("id", request.id.write());
+                jWriter.writeEndObject();
+                jWriter.flush();
+            }
+
+            if (!processedInBatch)
+            {
+                httpReq->StopWritingChunks();
+            }
+            return;  
         }
     }
 
@@ -610,86 +675,111 @@ static UniValue getblocktemplate(const Config &config,
     CBlock *pblock = blockRef.get();
 
     // Update nTime
-    UpdateTime(pblock, config, pindexPrev);
+    mining::UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
-    UniValue aCaps(UniValue::VARR);
-    aCaps.push_back("proposal");
-
-    UniValue transactions(UniValue::VARR);
-    std::map<uint256, int64_t> setTxIndex;
-    int i = 0;
-    for (const auto &it : pblock->vtx) {
-        const CTransaction &tx = *it;
-        uint256 txId = tx.GetId();
-        setTxIndex[txId] = i++;
-
-        if (tx.IsCoinBase()) {
-            continue;
-        }
-
-        UniValue entry(UniValue::VOBJ);
-
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
-        entry.push_back(Pair("txid", txId.GetHex()));
-        entry.push_back(Pair("hash", tx.GetHash().GetHex()));
-
-        UniValue deps(UniValue::VARR);
-        for (const CTxIn &in : tx.vin) {
-            if (setTxIndex.count(in.prevout.GetTxId())) {
-                deps.push_back(setTxIndex[in.prevout.GetTxId()]);
-            }
-        }
-        entry.push_back(Pair("depends", deps));
-
-        int index_in_template = i - 1;
-        entry.push_back(Pair(
-            "fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis()));
-        int64_t nTxSigOps = pblocktemplate->vTxSigOpsCount[index_in_template];
-        entry.push_back(Pair("sigops", nTxSigOps));
-
-        transactions.push_back(entry);
+    // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
+    if (!processedInBatch)
+    {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
-    UniValue aux(UniValue::VOBJ);
-    aux.push_back(
-        Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    {
+        CHttpTextWriter httpWriter(*httpReq);
+        CJSONWriter jWriter(httpWriter, false);
 
-    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
+        jWriter.writeBeginObject();
 
-    UniValue aMutable(UniValue::VARR);
-    aMutable.push_back("time");
-    aMutable.push_back("transactions");
-    aMutable.push_back("prevblock");
+        jWriter.writeBeginArray("capabilities");
+        jWriter.pushV("proposal");
+        jWriter.writeEndArray();
 
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(
-        Pair("coinbasevalue",
-             (int64_t)pblock->vtx[0]->vout[0].nValue.GetSatoshis()));
-    result.push_back(Pair("longpollid",
-                          chainActive.Tip()->GetBlockHash().GetHex() +
-                              i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(
-        Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
+        jWriter.pushKV("version", pblock->nVersion);
+        jWriter.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
+        jWriter.writeBeginArray("transactions");
 
-    auto defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
-    // FIXME: Allow for mining block greater than 1M.
-    result.push_back(
-        Pair("sigoplimit", INT64_MAX));
-    result.push_back(Pair("sizelimit", defaultmaxBlockSize));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight + 1)));
+        std::map<uint256, int64_t> setTxIndex;
+        int i = 0;
+        for (const auto &it : pblock->vtx) {
+            const CTransaction &tx = *it;
+            uint256 txId = tx.GetId();
+            setTxIndex[txId] = i++;
 
-    return result;
+            if (tx.IsCoinBase()) {
+                continue;
+            }
+
+            jWriter.writeBeginObject();
+
+            jWriter.pushK("data");
+            jWriter.pushQuote();
+            jWriter.flush();
+            // EncodeHexTx supports streaming (large transaction's hex should be chunked)
+            EncodeHexTx(tx, httpWriter, RPCSerializationFlags());
+            jWriter.pushQuote();
+
+            jWriter.pushKV("txid", txId.GetHex());
+            jWriter.pushKV("hash", tx.GetHash().GetHex());
+
+            jWriter.writeBeginArray("depends");
+            for (const CTxIn &in : tx.vin) {
+                if (setTxIndex.count(in.prevout.GetTxId())) {
+                    jWriter.pushV(setTxIndex[in.prevout.GetTxId()]);
+                }
+            }
+            jWriter.writeEndArray();
+
+            unsigned int index_in_template = i - 1;
+            jWriter.pushKV("fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis());
+
+            jWriter.writeEndObject();
+        }
+
+        jWriter.writeEndArray();
+
+        jWriter.writeBeginObject("coinbaseaux");
+        jWriter.pushKV("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
+        jWriter.writeEndObject();
+
+        jWriter.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue.GetSatoshis());
+
+        jWriter.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
+
+        arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+        jWriter.pushKV("target", hashTarget.GetHex());
+
+        jWriter.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
+
+        jWriter.writeBeginArray("mutable");
+        jWriter.pushV("time");
+        jWriter.pushV("transactions");
+        jWriter.pushV("prevblock");
+        jWriter.writeEndArray();
+
+        jWriter.pushKV("noncerange", "00000000ffffffff");
+
+        int64_t defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
+        jWriter.pushKV("sizelimit", defaultmaxBlockSize);
+
+        jWriter.pushKV("curtime", pblock->GetBlockTime());
+        jWriter.pushKV("bits", strprintf("%08x", pblock->nBits));
+        jWriter.pushKV("height", (int64_t)(pindexPrev->nHeight + 1));
+
+        jWriter.writeEndObject();
+
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKVJSONFormatted("id", request.id.write());
+        jWriter.writeEndObject();
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq->StopWritingChunks();
+    } 
 }
 
 class submitblock_StateCatcher : public CValidationInterface {

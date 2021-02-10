@@ -3,10 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
-
 #include "base58.h"
-#include "validation.h"
-
 #include <string>
 #include <vector>
 

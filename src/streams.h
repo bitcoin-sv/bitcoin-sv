@@ -53,10 +53,6 @@ public:
     int GetType() const { return nType; }
 };
 
-template <typename S> OverrideStream<S> WithOrVersion(S *s, int nVersionFlag) {
-    return OverrideStream<S>(s, s->GetType(), s->GetVersion() | nVersionFlag);
-}
-
 /**
  * Minimal stream for overwriting and/or appending to an existing byte vector.
  *
@@ -310,7 +306,6 @@ public:
     // Stream subset
     //
     bool eof() const { return size() == 0; }
-    CDataStream *rdbuf() { return this; }
     int in_avail() { return size(); }
 
     void SetType(int n) { nType = n; }

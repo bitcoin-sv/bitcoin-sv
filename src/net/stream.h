@@ -12,6 +12,8 @@
 #include <sync.h>
 #include <utiltime.h>
 
+#include <atomic>
+#include <exception>
 #include <list>
 #include <memory>
 #include <optional>
@@ -26,25 +28,48 @@ class Config;
 class CSerializedNetMsg;
 class StreamStats;
 
-// Enumerate possible stream types
-enum class StreamType
+/**
+ * Enumerate possible stream types.
+ *
+ * All associations have at least a GENERAL stream established, and anything
+ * can always be sent over a GENERAL stream.
+ *
+ * Streams DATA1 - DATA4 are optional additional general purpose streams that
+ * can be used for whatever the currently active stream policy deems useful.
+ */
+enum class StreamType : uint8_t
 {
-    UNKNOWN,
+    UNKNOWN = 0,
     GENERAL,
-    BLOCK,
-    TRANSACTION
+    DATA1,
+    DATA2,
+    DATA3,
+    DATA4,
+
+    MAX_STREAM_TYPE
 };
 // Enable enum_cast for StreamType, so we can log informatively
 const enumTableT<StreamType>& enumTable(StreamType);
 
 /**
- * A stream is a single channel of communiction carried over an association
+ * Exception type that gets thrown if we should ban a peer due to something
+ * they did over a stream.
+ */
+class BanStream : public std::exception
+{
+  public:
+    const char* what() const noexcept override { return "StreamBan"; }
+};
+
+
+/**
+ * A stream is a single channel of communication carried over an association
  * between 2 peers.
  */
 class Stream
 {
   public:
-    Stream(CNode& node, StreamType streamType, SOCKET socket);
+    Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize);
     ~Stream();
 
     Stream(const Stream&) = delete;
@@ -56,21 +81,21 @@ class Stream
     void Shutdown();
 
     // Add our socket to the sets for reading and writing
-    bool SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                            SOCKET& socketMax, bool pauseRecv) const;
+    bool SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
 
     // Service our socket for reading and writing
-    void ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                       CConnman& connman, const Config& config, const CNetAddr& peerAddr,
-                       bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent);
+    void ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
+                       bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
 
 
     // Add new message to our list for sending
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-                       size_t nPayloadLength, size_t nTotalSize);
+    uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+                         uint64_t nPayloadLength, uint64_t nTotalSize);
 
-    // Move newly read completed messages to the callers queue
-    size_t GetNewMsgs(std::list<CNetMessage>& msgList);
+    // Fetch the next message for processing.
+    // Also returns a boolean set true if there are more queued messages available, and false if not.
+    using QueuedNetMessage = std::unique_ptr<CNetMessage>;
+    std::pair<QueuedNetMessage, bool> GetNextMessage();
 
     // Get last send/receive time
     int64_t GetLastSendTime() const { return mLastSendTime; }
@@ -86,15 +111,26 @@ class Stream
     AverageBandwidth GetAverageBandwidth() const;
 
     // Get current send queue size
-    size_t GetSendQueueSize() const;
+    uint64_t GetSendQueueSize() const;
+
+    // Get/Set stream type
+    StreamType GetStreamType() const { return mStreamType; }
+    void SetStreamType(StreamType streamType) { mStreamType = streamType; }
+
+    // Set our owning CNode
+    void SetOwningNode(CNode* newNode);
+
+    // Get whether we're paused for receiving
+    bool GetPausedForReceiving() const { return mPauseRecv; }
 
   private:
 
     // Node we are for
-    CNode& mNode;
+    CNode* mNode {nullptr};
+    mutable CCriticalSection cs_mNode {};
 
     // What does this stream carry?
-    StreamType mStreamType { StreamType::UNKNOWN };
+    std::atomic<StreamType> mStreamType { StreamType::UNKNOWN };
 
     // Our socket
     SOCKET mSocket {0};
@@ -104,23 +140,31 @@ class Stream
     std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> mSendMsgQueue {};
     uint64_t mTotalBytesSent {0};
     CSendQueueBytes mSendMsgQueueSize {};
+    mapMsgCmdSize mSendBytesPerMsgCmd {};
     mutable CCriticalSection cs_mSendMsgQueue {};
 
     // Receive message queue
-    std::list<CNetMessage> mRecvMsgQueue {};
+    std::list<QueuedNetMessage> mRecvMsgQueue {};
     uint64_t mTotalBytesRecv {0};
+    uint64_t mRecvMsgQueueSize {0};
+    std::atomic_bool mPauseRecv {false};
+    mapMsgCmdSize mRecvBytesPerMsgCmd {};
+    std::list<QueuedNetMessage> mRecvCompleteMsgQueue {};
     mutable CCriticalSection cs_mRecvMsgQueue {};
 
     // Last time we sent or received anything
     std::atomic<int64_t> mLastSendTime {0};
     std::atomic<int64_t> mLastRecvTime {0};
 
+    // Maximum receieve queue size
+    const uint64_t mMaxRecvBuffSize {0};
+
     // Process some newly read bytes from our underlying socket
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
-    RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes, bool& complete);
+    RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes, bool& complete);
 
     // Write the next batch of data to the wire
-    size_t SocketSendData();
+    uint64_t SocketSendData();
 
     /** Average bandwidth measurements */
     // Keep enough spot measurements to cover 1 minute
@@ -149,12 +193,16 @@ class Stream
     struct CSendResult
     {
         bool sendComplete {false};
-        size_t sentSize {0};
+        uint64_t sentSize {0};
     };
 
+    // Move newly read completed messages to another queue
+    void GetNewMsgs();
+
     // Message sending
-    CSendResult SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize);
+    CSendResult SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize);
 
 };
 
 using StreamPtr = std::shared_ptr<Stream>;
+using StreamMap = std::map<StreamType, StreamPtr>;

@@ -47,7 +47,8 @@ import json
 from test_framework.script import CTransaction, CScript, OP_TRUE, CTxOut
 from test_framework.test_framework import BitcoinTestFramework, SkipTest, ToHex, FromHex
 from test_framework.util import (assert_equal, check_zmq_test_requirements, 
-                                 disconnect_nodes_bi, connect_nodes_bi, sync_blocks)
+                                 disconnect_nodes_bi, connect_nodes_bi, sync_blocks,
+                                 zmq_port)
 from test_framework.mininode import CTxIn, COutPoint
 
 
@@ -69,10 +70,10 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         self.zmqSubSocket.set(zmq.RCVTIMEO, 60000)
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"discardedfrommempool")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"removedfrommempoolblock")
-        ip_address = "tcp://127.0.0.1:28332"
-        self.zmqSubSocket.connect(ip_address)
-        self.extra_args = [["-zmqpubdiscardedfrommempool=%s" % ip_address,
-                            "-zmqpubremovedfrommempoolblock=%s" % ip_address], []]
+        address = f"tcp://127.0.0.1:{zmq_port(0)}"
+        self.zmqSubSocket.connect(address)
+        self.extra_args = [["-zmqpubdiscardedfrommempool=%s" % address,
+                            "-zmqpubremovedfrommempoolblock=%s" % address], []]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
 

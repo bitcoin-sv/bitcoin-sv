@@ -10,12 +10,9 @@
 #include "script/script_num.h"
 #include "script/standard.h"
 #include "serialize.h"
-#include "streams.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-#include "rpc/server.h"
-
 #include <univalue.h>
 
 std::string FormatScript(const CScript &script) {
@@ -107,7 +104,7 @@ void ScriptToAsmStr(const CScript& script,
     {
         if (pc != script.begin()) 
         {
-            textWriter.Write(" ");
+            textWriter.Write(' ');
         }
 
         if (!script.GetOp(pc, opcode, vch))
@@ -246,16 +243,15 @@ void TxToJSON(const CTransaction& tx,
     entry.pushKV("locktime", (int64_t)tx.nLockTime);
 
     entry.writeBeginArray("vin");
-    for (size_t i = 0; i < tx.vin.size(); i++)
+    for (const CTxIn& txin : tx.vin)
     {
-        const CTxIn& txin = tx.vin[i];
         entry.writeBeginObject();
         if (tx.IsCoinBase())
         {
             entry.pushK("coinbase");
-            entry.pushQuote(true, false);
+            entry.pushQuote();
             HexStr(txin.scriptSig.begin(), txin.scriptSig.end(), entry.getWriter());
-            entry.pushQuote(false);
+            entry.pushQuote();
         }
         else
         {
@@ -264,20 +260,20 @@ void TxToJSON(const CTransaction& tx,
             entry.writeBeginObject("scriptSig");
 
             entry.pushK("asm");
-            entry.pushQuote(true, false);
+            entry.pushQuote();
             ScriptToAsmStr(txin.scriptSig, entry.getWriter(), true);
-            entry.pushQuote(false);
+            entry.pushQuote();
 
             entry.pushK("hex");
-            entry.pushQuote(true, false);
+            entry.pushQuote();
             HexStr(txin.scriptSig.begin(), txin.scriptSig.end(), entry.getWriter());
-            entry.pushQuote(false, false);
+            entry.pushQuote();
 
             entry.writeEndObject();
         }
-        entry.pushKV("sequence", (int64_t)txin.nSequence, false);
+        entry.pushKV("sequence", (int64_t)txin.nSequence);
 
-        entry.writeEndObject(i < tx.vin.size() - 1);
+        entry.writeEndObject();
     }
     entry.writeEndArray();
 
@@ -287,14 +283,14 @@ void TxToJSON(const CTransaction& tx,
         const CTxOut& txout = tx.vout[i];
         entry.writeBeginObject();
 
-        entry.pushKVMoney("value", FormatMoney(txout.nValue));
+        entry.pushKVJSONFormatted("value", FormatMoney(txout.nValue));
         entry.pushKV("n", static_cast<int64_t>(i));
 
         entry.writeBeginObject("scriptPubKey");
         ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
-        entry.writeEndObject(false);
+        entry.writeEndObject();
 
-        entry.writeEndObject(i < tx.vout.size() - 1);
+        entry.writeEndObject();
     }
 
     entry.writeEndArray();
@@ -319,11 +315,11 @@ void TxToJSON(const CTransaction& tx,
     // the hex-encoded transaction. used the name "hex" to be consistent with
     // the verbose output of "getrawtransaction".
     entry.pushK("hex");
-    entry.pushQuote(true, false);
+    entry.pushQuote();
     EncodeHexTx(tx, entry.getWriter(), serializeFlags);
-    entry.pushQuote(false, false);
+    entry.pushQuote();
 
-    entry.writeEndObject(false);
+    entry.writeEndObject();
 }
 
 void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
@@ -335,20 +331,20 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
     int nRequired;
 
     entry.pushK("asm");
-    entry.pushQuote(true, false);
+    entry.pushQuote();
     ScriptToAsmStr(scriptPubKey, entry.getWriter());
-    entry.pushQuote(false);
+    entry.pushQuote();
     if (fIncludeHex)
     {
         entry.pushK("hex");
-        entry.pushQuote(true, false);
+        entry.pushQuote();
         HexStr(scriptPubKey.begin(), scriptPubKey.end(), entry.getWriter());
-        entry.pushQuote(false);
+        entry.pushQuote();
     }
 
     if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired))
     {
-        entry.pushKV("type", GetTxnOutputType(type), false);
+        entry.pushKV("type", GetTxnOutputType(type));
         return;
     }
 
@@ -356,10 +352,9 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
     entry.pushKV("type", GetTxnOutputType(type));
 
     entry.writeBeginArray("addresses");
-    for (size_t i = 0; i < addresses.size(); i++)
+    for (const CTxDestination& addr : addresses )
     {
-        const CTxDestination& addr = addresses[i];
-        entry.pushV(EncodeDestination(addr), i < addresses.size() - 1);
+        entry.pushV(EncodeDestination(addr));
     }
-    entry.writeEndArray(false);
+    entry.writeEndArray();
 }

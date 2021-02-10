@@ -10,7 +10,6 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "keystore.h"
 #include "merkleblock.h"
 #include "mining/journal_builder.h"
@@ -24,26 +23,27 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "merkletreestore.h"
+#include "rpc/blockchain.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
 #endif
 
 #include <cstdint>
-
 #include <univalue.h>
 
 using namespace mining;
 
 void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,
-                       HTTPRequest& httpReq,
+                       HTTPRequest* httpReq,
                        bool processedInBatch)
 {
     if (request.fHelp || request.params.size() < 1 ||
@@ -132,12 +132,18 @@ void getrawtransaction(const Config& config,
             HelpExampleRpc("getrawtransaction", "\"mytxid\", true"));
     }
 
-    CHttpTextWriter httpWriter(httpReq);
-    getrawtransaction(config, request, httpWriter, processedInBatch, [&httpReq] {httpReq.WriteHeader("Content-Type", "application/json");  httpReq.StartWritingChunks(HTTP_OK); });
+    if(httpReq == nullptr)
+        return;
+
+    CHttpTextWriter httpWriter(*httpReq);
+    getrawtransaction(config, request, httpWriter, processedInBatch, [httpReq] {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
+    });
     httpWriter.Flush();
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
@@ -269,12 +275,12 @@ static CBlockIndex* GetBlockIndex(const Config& config,
 
         if (verifyTxIds)
         {
-            // Check if all provided transactions are in the block 
+            // Check if all provided transactions are in the block
             CBlock block;
             bool allTxIdsFound = false;
             if (ReadBlockFromDisk(block, pblockindex, config))
             {
-                int numberOfTxIdsFound = 0;
+                auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
                 for (const auto &tx : block.vtx)
                 {
                     if (setTxIds.find(tx->GetId()) != setTxIds.end())
@@ -297,14 +303,14 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     }
     else
     {
+        CoinsDBView tipView{ *pcoinsTip };
+
         // Try to find a block containing at least one requested transaction with utxo
         for (const TxId& txid : setTxIds)
         {
-            const Coin& coin = AccessByTxid(*pcoinsTip, txid);
-            if (!coin.IsSpent())
-            {
-                LOCK(cs_main);
-                pblockindex = chainActive[coin.GetHeight()];
+            auto coin = tipView.GetCoinByTxId(txid);
+            if (coin.has_value()) {
+                pblockindex = chainActive[coin->GetHeight()];
                 break;
             }
         }
@@ -523,11 +529,11 @@ static UniValue createrawtransaction(const Config &config,
                            "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\" "
                            "\"{\\\"data\\\":\\\"00010203\\\"}\"") +
             HelpExampleRpc("createrawtransaction",
-                           "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", "
-                           "\"{\\\"address\\\":0.01}\"") +
+                           "[{\"txid\":\"myid\",\"vout\":0}], "
+                           "{\"address\":0.01}") +
             HelpExampleRpc("createrawtransaction",
-                           "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", "
-                           "\"{\\\"data\\\":\\\"00010203\\\"}\""));
+                           "[{\"txid\":\"myid\",\"vout\":0}], "
+                           "{\"data\":\"00010203\"}"));
     }
 
     RPCTypeCheck(request.params,
@@ -630,7 +636,7 @@ static UniValue createrawtransaction(const Config &config,
 
 void decoderawtransaction(const Config& config,
                           const JSONRPCRequest& request,
-                          HTTPRequest& httpReq,
+                          HTTPRequest* httpReq,
                           bool processedInBatch)
 {
     if (request.fHelp || request.params.size() != 1) 
@@ -691,13 +697,20 @@ void decoderawtransaction(const Config& config,
             HelpExampleCli("decoderawtransaction", "\"hexstring\"") +
             HelpExampleRpc("decoderawtransaction", "\"hexstring\""));
     }
+    
+    if(httpReq == nullptr)
+        return;
 
-    CHttpTextWriter httpWriter(httpReq);
-    decoderawtransaction(config, request, httpWriter, processedInBatch, [&httpReq] {httpReq.WriteHeader("Content-Type", "application/json");  httpReq.StartWritingChunks(HTTP_OK);});
+    CHttpTextWriter httpWriter(*httpReq);
+    decoderawtransaction(
+        config, request, httpWriter, processedInBatch, [httpReq] {
+            httpReq->WriteHeader("Content-Type", "application/json");
+            httpReq->StartWritingChunks(HTTP_OK);
+        });
     httpWriter.Flush();
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
@@ -937,23 +950,9 @@ static UniValue signrawtransaction(const Config &config,
     CMutableTransaction mergedTx(txVariants[0]);
 
     // Fetch previous transactions (inputs):
-    CCoinsView viewDummy;
-    CCoinsViewCache view(&viewDummy);
-    {
-        std::shared_lock lock(mempool.smtx);
-        CCoinsViewCache &viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-        // Temporarily switch cache backend to db+mempool view.
-        view.SetBackend(viewMempool);
-
-        for (const CTxIn &txin : mergedTx.vin) {
-            // Load entries from viewChain into view; can fail.
-            view.AccessCoin(txin.prevout);
-        }
-
-        // Switch back to avoid locking mempool for too long.
-        view.SetBackend(viewDummy);
-    }
+    CoinsDBView tipView{ *pcoinsTip };
+    CCoinsViewMemPool viewMempool(tipView, mempool);
+    CCoinsViewCache view(viewMempool);
 
     bool fGivenKeys = false;
     CBasicKeyStore tempKeystore;
@@ -1021,11 +1020,11 @@ static UniValue signrawtransaction(const Config &config,
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                const Coin &coin = view.AccessCoin(out);
-                if (!coin.IsSpent() &&
-                    coin.GetTxOut().scriptPubKey != scriptPubKey) {
+                if (auto coin = view.GetCoinWithScript(out);
+                    coin.has_value() && !coin->IsSpent() &&
+                    coin->GetTxOut().scriptPubKey != scriptPubKey) {
                     std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin.GetTxOut().scriptPubKey) +
+                    err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                           "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
                 }
@@ -1052,7 +1051,7 @@ static UniValue signrawtransaction(const Config &config,
                 // We do not have coin height here. We assume that the coin is about to
                 // be mined using latest active rules.
                 const auto genesisActivationHeight = config.GetGenesisActivationHeight();
-                uint32_t coinHeight = static_cast<uint32_t>(chainActive.Height() + 1);
+                int32_t coinHeight = chainActive.Height() + 1;
 
                 // except if we are trying to sign transactions that spends p2sh transaction, which
                 // are non-standard (and therefore cannot be signed) after genesis upgrade
@@ -1061,7 +1060,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, Coin(txout, coinHeight, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false), true, genesisActivationHeight);
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -1136,16 +1135,17 @@ static UniValue signrawtransaction(const Config &config,
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsSpent()) {
+        auto coin = view.GetCoinWithScript(txin.prevout);
+        if (!coin.has_value() || coin->IsSpent())
+        {
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;
         }
 
-        const CScript &prevPubKey = coin.GetTxOut().scriptPubKey;
-        const Amount amount = coin.GetTxOut().nValue;
+        const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
+        const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin, chainActive.Height() + 1); 
+        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), chainActive.Height() + 1);
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -1240,7 +1240,7 @@ static UniValue sendrawtransaction(const Config &config,
     }
 
     CTransactionRef tx(MakeTransactionRef(std::move(mtx)));
-    const uint256 &txid = tx->GetId();
+    const TxId &txid = tx->GetId();
 
     Amount nMaxRawTxFee = maxTxFee;
     if (request.params.size() > 1 && request.params[1].get_bool()) {
@@ -1256,31 +1256,39 @@ static UniValue sendrawtransaction(const Config &config,
             RPC_CLIENT_P2P_DISABLED,
             "Error: Peer-to-peer functionality missing or disabled");
     }
+    // Make transaction's input data object.
+    TxInputDataSPtr pTxInputData =
+        std::make_shared<CTxInputData>(
+            g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
+            std::move(tx),                  // a pointer to the tx
+            TxSource::rpc,                  // tx source
+            TxValidationPriority::normal,   // tx validation priority
+            TxStorage::memory,              // tx storage
+            GetTime(),                      // nAcceptTime
+            nMaxRawTxFee);                 // nAbsurdFee
+    // Check if transaction is already received through p2p interface,
+    // and thus, couldn't be added to the TxIdTracker.
+    if (!pTxInputData->IsTxIdStored()) {
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED,
+                strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
+    }
+    // Check if txn is present in one of the mempools.
     if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
-        if (dontCheckFee) {
-            mempool.PrioritiseTransaction(tx->GetId(), tx->GetId().ToString(),
-                                          0.0, MAX_MONEY);
-        }
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
         };
+        // Prioritise transaction (if it was requested to prioritise)
+        // - mempool prioritisation cleanup is done during destruction,
+        //   if the prioritised txn was not accepted by the mempool
+        // The mempool prioritisation is not executed on a null TxId
+        // - no-op in terms of prioritise/clear operations
+        CTxPrioritizer txPrioritizer(mempool, dontCheckFee ? txid : TxId());
         // Forward transaction to the validator and wait for results.
-        // To support backward compatibility (of this interface) we need
-        // to wait until the transaction is processed.
-        // At this stage any information about validation failure (or mempool rejects)
-        // are put into the log file.
         const auto& txValidator = g_connman->getTxnValidator();
         const CValidationState& status {
             txValidator->processValidation(
-                std::make_shared<CTxInputData>(
-                    g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
-                    std::move(tx), // a pointer to the tx
-                    TxSource::rpc, // tx source
-                    TxValidationPriority::normal, // tx validation priority
-                    GetTime(),     // nAcceptTime
-                    false,         // fLimitFree
-                    nMaxRawTxFee), // nAbsurdFee
+                std::move(pTxInputData), // txn's input data
                 changeSet, // an instance of the journal
                 true) // fLimitMempoolSize
         };
@@ -1289,9 +1297,6 @@ static UniValue sendrawtransaction(const Config &config,
         // checking a result from the status variable.
         if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
             if (!status.IsValid()) {
-                if (dontCheckFee) {
-                    mempool.ClearPrioritisation(txid);
-                }
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
                 } else if (status.IsInvalid()) {
@@ -1328,7 +1333,7 @@ static UniValue sendrawtransaction(const Config &config,
     // - block was mined
     // - the Validator's asynch mode removed the txn (and triggered reject msg)
     // - this txn is final version of timelocked txn and is still being validated
-    if (txinfo.tx != nullptr){
+    if (!txinfo.IsNull()){
         g_connman->EnqueueTransaction({ inv, txinfo });
     }
 
@@ -1339,57 +1344,85 @@ static UniValue sendrawtransaction(const Config &config,
 }
 
 /**
- * Pushes a JSON object for invalid transactions to vInvalidRet.
+ * Pushes a JSON object for invalid transactions to JSON writer.
  */
-static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, UniValue &vInvalidRet) {
-    for (const auto& elem: invalidTxns) {
-        UniValue entry(UniValue::VOBJ);
-        entry.push_back(Pair("txid", elem.first.ToString()));
-        if (elem.second.IsMissingInputs()) {
-            entry.push_back(Pair("reject_code", REJECT_INVALID));
-            entry.push_back(Pair("reject_reason", "missing-inputs"));
-        } else {
-            entry.push_back(Pair("reject_code", uint64_t(elem.second.GetRejectCode())));
-            entry.push_back(Pair("reject_reason", elem.second.GetRejectReason()));
-        }
-        const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
-        if (!collidedWithTx.empty())
+static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, CJSONWriter& writer)
+{
+    if (!invalidTxns.empty())
+    {
+        writer.writeBeginArray("invalid");
+        for (const auto& elem: invalidTxns)
         {
-            UniValue uvCollidedWith(UniValue::VARR);
-            for (const CTransactionRef& tx : collidedWithTx)
+            writer.writeBeginObject();
+            writer.pushKV("txid", elem.first.ToString());
+            if (elem.second.IsMissingInputs())
             {
-                UniValue objTx(UniValue::VOBJ);
-                objTx.pushKV("txid", tx->GetId().GetHex());
-                objTx.pushKV("size", int64_t(tx->GetTotalSize()));
-                objTx.push_back(Pair("hex", EncodeHexTx(*tx)));
-                uvCollidedWith.push_back(objTx);
+                writer.pushKV("reject_code", REJECT_INVALID);
+                writer.pushKV("reject_reason", "missing-inputs");
+            } 
+            else
+            {
+                writer.pushKV("reject_code", uint64_t(elem.second.GetRejectCode()));
+                writer.pushKV("reject_reason", elem.second.GetRejectReason());
             }
-            entry.pushKV("collidedWith", uvCollidedWith);
+            const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
+            if (!collidedWithTx.empty())
+            {
+                writer.writeBeginArray("collidedWith");
+                for (const CTransactionRef& tx : collidedWithTx)
+                {
+                    writer.writeBeginObject();
+                    writer.pushKV("txid", tx->GetId().GetHex());
+                    writer.pushKV("size", int64_t(tx->GetTotalSize()));
+                    writer.pushK("hex");
+                    writer.pushQuote();
+                    EncodeHexTx(*tx, writer.getWriter(), 0);
+                    writer.pushQuote();
+                    writer.writeEndObject();
+                }
+                writer.writeEndArray();
+            }
+            writer.writeEndObject();
         }
-        vInvalidRet.push_back(entry);
+        writer.writeEndArray();
     }
 }
 
 /**
- * Pushes insufficient fee txns to vEvictedRet.
+ * Pushes insufficient fee txns to JSON writer.
  */
-static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, UniValue &vEvictedRet) {
-    for (const auto& elem: evictedTxns) {
-        vEvictedRet.push_back(elem.ToString());
+static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, CJSONWriter& writer)
+{
+    if (!evictedTxns.empty())
+    {
+        writer.writeBeginArray("evicted");
+        for (const auto& elem: evictedTxns) {
+            writer.pushV(elem.ToString());
+        }
+        writer.writeEndArray();
     }
 }
 
 /**
- * Pushes known txns to vKnownRet.
+ * Pushes known txns to JSON writer.
  */
-static void KnownTxnsToJSON(const std::vector<TxId>& evictedTxns, UniValue &vKnownRet) {
-    for (const auto& elem: evictedTxns) {
-        vKnownRet.push_back(elem.ToString());
+static void KnownTxnsToJSON(const std::vector<TxId>& knownTxns, CJSONWriter& writer)
+{
+    if (!knownTxns.empty())
+    {
+        writer.writeBeginArray("known");
+        for (const auto& elem: knownTxns) {
+            writer.pushV(elem.ToString());
+        }
+        writer.writeEndArray();
     }
 }
 
-static UniValue sendrawtransactions(const Config &config,
-                                   const JSONRPCRequest &request) {
+void sendrawtransactions(const Config& config,
+                         const JSONRPCRequest& request,
+                         HTTPRequest* httpReq,
+                         bool processedInBatch)
+{
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 1) {
         throw std::runtime_error(
@@ -1466,6 +1499,9 @@ static UniValue sendrawtransactions(const Config &config,
                            "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]"));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     RPCTypeCheck(request.params, {UniValue::VARR});
 
     if (request.params[0].empty()) {
@@ -1479,7 +1515,7 @@ static UniValue sendrawtransactions(const Config &config,
     vTxInputData.reserve(inputs.size());
     // A vector to store transactions that need to be prioritised.
     std::vector<TxId> vTxToPrioritise {};
-    // A vector to sotre already known transactions.
+    // A vector to store already known transactions.
     std::vector<TxId> vKnownTxns {};
 
     /**
@@ -1543,8 +1579,8 @@ static UniValue sendrawtransactions(const Config &config,
                 std::move(tx),                  // a pointer to the tx
                 TxSource::rpc,                  // tx source
                 TxValidationPriority::normal,   // tx validation priority
-                GetTime(),                      // nAcceptTime
-                false,                          // fLimitFree
+                TxStorage::memory,              // tx storage
+                GetTime(),                      // fLimitFree
                 nMaxRawTxFee);                 // nAbsurdFee
         // Check if transaction is already known
         // - received through p2p interface or present in the mempools
@@ -1604,7 +1640,7 @@ static UniValue sendrawtransactions(const Config &config,
             // It is possible that txn was added and removed from the mempool, because:
             // - a block was mined
             // - PTV's asynch mode removed txn(s)
-            if (txinfo.tx != nullptr){
+            if (txinfo.GetTx() != nullptr){
                 g_connman->EnqueueTransaction({ inv, txinfo });
             }
             LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
@@ -1636,27 +1672,34 @@ static UniValue sendrawtransactions(const Config &config,
      * present in the mempool.
      */
     // A result json object.
-    UniValue result(UniValue::VOBJ);
-    // Known txns array.
-    UniValue uvKnownTxns(UniValue::VARR);
-    KnownTxnsToJSON(vKnownTxns, uvKnownTxns);
-    if (!uvKnownTxns.empty()) {
-        result.push_back(Pair("known", uvKnownTxns));
-    }
-    // Rejected txns array.
-    UniValue uvInvalidTxns(UniValue::VARR);
-    InvalidTxnsToJSON(rejectedTxns.first, uvInvalidTxns);
-    if (!uvInvalidTxns.empty()) {
-        result.push_back(Pair("invalid", uvInvalidTxns));
-    }
-    // Evicted txns array.
-    UniValue uvEvictedTxns(UniValue::VARR);
-    EvictedTxnsToJSON(rejectedTxns.second, uvEvictedTxns);
-    if (!uvEvictedTxns.empty()) {
-        result.push_back(Pair("evicted", uvEvictedTxns));
+    if (!processedInBatch)
+    {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
-    return result;
+    CHttpTextWriter httpWriter(*httpReq);
+    CJSONWriter jWriter(httpWriter, false);
+
+    jWriter.writeBeginObject();
+    jWriter.pushKNoComma("result");
+    jWriter.writeBeginObject();
+    // Known txns array.
+    KnownTxnsToJSON(vKnownTxns, jWriter);
+    // Rejected txns array.
+    InvalidTxnsToJSON(rejectedTxns.first, jWriter);
+    // Evicted txns array.
+    EvictedTxnsToJSON(rejectedTxns.second, jWriter);
+    jWriter.writeEndObject();
+    jWriter.pushKV("error", nullptr);
+    jWriter.pushKVJSONFormatted("id", request.id.write());
+    jWriter.writeEndObject();
+    jWriter.flush();
+
+    if (!processedInBatch)
+    {
+        httpReq->StopWritingChunks();
+    }
 }
 
 static UniValue getmerkleproof(const Config& config,
@@ -1690,8 +1733,8 @@ static UniValue getmerkleproof(const Config& config,
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getmerkleproof", "\"mytxid\"") +
-            HelpExampleCli("getmerkleproof", "\"mytxid\" myblockhash") +
-            HelpExampleRpc("getmerkleproof", "\"mytxid\", myblockhash"));
+            HelpExampleCli("getmerkleproof", "\"mytxid\" \"myblockhash\"") +
+            HelpExampleRpc("getmerkleproof", "\"mytxid\", \"myblockhash\""));
     }
 
     TxId transactionId = TxId(ParseHashV(request.params[0], "hash"));
@@ -1748,7 +1791,14 @@ static UniValue getmerkleproof(const Config& config,
     callbackDataObject.pushKV("flags", 2);
     callbackDataObject.pushKV("index", static_cast<uint64_t>(proof.transactionIndex));
     callbackDataObject.pushKV("txOrId", transactionId.GetHex());
-    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex));
+    int confirmations = 0;
+    std::optional<uint256> nextBlockHash;
+    {
+        LOCK(cs_main);
+        confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
+    }
+
+    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
     callbackDataObject.pushKV("nodes", merkleProofArray);
     return callbackDataObject;
 }
@@ -1776,9 +1826,9 @@ static UniValue verifymerkleproof(const Config& config,
             "\nResult:\n"
             "true|false                           (boolean) If true, proof for \"txOrId\" was successfully verified, false otherwise\n"
             "\nExamples:\n" +
-            HelpExampleCli("verifymerkleproof", "'{\"flags\": 2, \"index\": 1, \"txOrId\": \"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\", "
-                "\"target\": {\"merkleroot\": \"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\"}, "
-                "\"nodes\": [\"*\", \"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\"]}'") +
+            HelpExampleCli("verifymerkleproof", "\"{\\\"flags\\\": 2, \\\"index\\\": 1, \\\"txOrId\\\": \\\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\\\", "
+                "\\\"target\\\": {\\\"merkleroot\\\": \\\"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\\\"}, "
+                "\\\"nodes\\\": [\\\"*\\\", \\\"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\\\"]}\"") +
             HelpExampleRpc("verifymerkleproof", "{\"flags\": 2, \"index\": 1, \"txOrId\": \"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\", "
                 "\"target\": {\"merkleroot\": \"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\"}, "
                 "\"nodes\": [\"*\", \"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\"]}"));   

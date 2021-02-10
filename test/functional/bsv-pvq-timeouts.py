@@ -223,6 +223,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - tc1_txs_num funding transactions are needed in this test case.
         spend_txs = out[0:tc1_txs_num]
         args = ['-checkmempool=0', '-persistmempool=0',
+                '-maxstdtxvalidationduration=500', # increasing max validation time ensures that timeout doesn't occur for standard txns, even on slower machines and on debug build
                 '-maxnonstdtxnsperthreadratio=0'] # setting it to zero ensures that non-standard txs won't be processed (if there are any queued).
         with self.run_node_with_connections('TC1: {} txs detected as std and then accepted.'.format(tc1_txs_num),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
@@ -272,7 +273,8 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - one funding transaction is needed in this test case.
         spend_txs = out[tc1_txs_num+1:tc1_txs_num+2]
         args = ['-checkmempool=0', '-persistmempool=0',
-                '-maxnonstdtxvalidationduration=6000',
+                '-maxnonstdtxvalidationduration=100000', # On slow/busy machine txn validation times have to be high
+                '-maxtxnvalidatorasynctasksrunduration=100001', # This needs to mehigher then maxnonstdtxvalidationduration
                 '-maxscriptsizepolicy=0']
         with self.run_node_with_connections('TC3: {} txs with large bignums detected as non-std txs and then finally accepted.'.format(tc3_txs_num),
                 0, args + self.default_args, number_of_connections=1) as (conn,):

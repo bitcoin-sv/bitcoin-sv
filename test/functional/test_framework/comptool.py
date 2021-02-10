@@ -115,7 +115,7 @@ class TestNode(NodeConnCB):
                 message.code, message.reason)
 
     def send_inv(self, obj):
-        mtype = 2 if isinstance(obj, CBlock) else 1
+        mtype = CInv.BLOCK if isinstance(obj, CBlock) else CInv.TX
         self.conn.send_message(msg_inv([CInv(mtype, obj.sha256)]))
 
     def send_getheaders(self):
@@ -172,11 +172,12 @@ class TestNode(NodeConnCB):
 
 
 class TestInstance():
-    def __init__(self, objects=None, sync_every_block=True, sync_every_tx=False, sync_timeout=300):
+    def __init__(self, objects=None, sync_every_block=True, sync_every_tx=False, sync_timeout=300, timeout_to_requested_block=None):
         self.blocks_and_transactions = objects if objects else []
         self.sync_every_block = sync_every_block
         self.sync_every_tx = sync_every_tx
         self.sync_timeout = sync_timeout
+        self.timeout_to_requested_block = timeout_to_requested_block
 
 
 class TestManager():
@@ -219,14 +220,19 @@ class TestManager():
             if all(node.received_ping_response(counter) for node in self.test_nodes):
                 # after we receive pong we need to check that there are no async
                 # block/transaction processes still running
-                return all(sum(c.rpc.getblockchainactivity().values()) for c in self.connections) == 0
+                for c in self.connections:
+                    res=c.rpc.getblockchainactivity()
+                    if sum(res.values())>0:
+                        # this node is still processing some block/transaction
+                        return False
+                return True
             return False
         wait_until(received_pongs, lock=mininode_lock, timeout=timeout)
 
     # sync_blocks: Wait for all connections to request the blockhash given
     # then send get_headers to find out the tip of each node, and synchronize
     # the response by using a ping (and waiting for pong with same nonce).
-    def sync_blocks(self, blockhash, num_blocks, timeout=60):
+    def sync_blocks(self, blockhash, num_blocks, timeout=60, timeout_to_requested_block=None):
         def blocks_requested():
             return all(
                 blockhash in node.block_request_map and node.block_request_map[blockhash]
@@ -234,10 +240,15 @@ class TestManager():
             )
 
         # --> error if not requested
+        # Automatic (default) timeout is calculated as described below. In special cases,
+        # manual override is possible with parameter 'timeout_to_requested_block'.
         # Measured values for processing blocks range from 0.008 to 0.035 s/block (debug build)
         # Processing gets slower with the amount of blocks (0.008 s/block @ 200 blocks, 0.035 s/block @ 1000 blocks)
         # We use a slightly higher value of 0.05s + an extra 30s for good measure.
-        wait_until(blocks_requested, timeout=0.05*num_blocks+30, lock=mininode_lock)
+        if timeout_to_requested_block is None:
+            timeout_to_requested_block = 0.05*num_blocks+30
+
+        wait_until(blocks_requested, timeout=timeout_to_requested_block, lock=mininode_lock)
 
         # Wait for all the blocks to finish processing
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
@@ -254,7 +265,7 @@ class TestManager():
 
     # Analogous to sync_block (see above)
     def sync_transaction(self, txhash, num_events):
-        # Wait for nodes to request transaction (50ms sleep * 20 tries * num_events)
+        # Wait for nodes to request transaction
         def transaction_requested():
             return all(
                 txhash in node.tx_request_map and node.tx_request_map[txhash]
@@ -262,8 +273,9 @@ class TestManager():
             )
 
         # --> error if not requested
-        wait_until(transaction_requested, attempts=20 *
-                   num_events, lock=mininode_lock)
+        # Observed data shows that during testing some responses take up to 2 seconds.
+        # Timeout of 3s plus an extra 30s for good measure
+        wait_until(transaction_requested, timeout=3*num_events+30, lock=mininode_lock)
 
         # We must wait for node to finish processing transactions before 'mempool' p2p message is sent
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
@@ -422,7 +434,7 @@ class TestManager():
                         # if we expect failure, just push the block and see what happens.
                         if outcome == True:
                             [c.cb.send_inv(block) for c in self.connections]
-                            self.sync_blocks(block.sha256, 1, timeout=test_instance.sync_timeout)
+                            self.sync_blocks(block.sha256, 1, timeout=test_instance.sync_timeout, timeout_to_requested_block=test_instance.timeout_to_requested_block)
                         else:
                             [c.send_message(msg_block(block))
                              for c in self.connections]
@@ -434,7 +446,7 @@ class TestManager():
                             raise AssertionError(
                                 "Test failed at test %d" % test_number)
                     else:
-                        invqueue.append(CInv(2, block.sha256))
+                        invqueue.append(CInv(CInv.BLOCK, block.sha256))
                 elif isinstance(b_or_t, CBlockHeader):
                     block_header = b_or_t
                     self.block_store.add_header(block_header)
@@ -457,7 +469,7 @@ class TestManager():
                             raise AssertionError(
                                 "Test failed at test %d" % test_number)
                     else:
-                        invqueue.append(CInv(1, tx.sha256))
+                        invqueue.append(CInv(CInv.TX, tx.sha256))
                 # Ensure we're not overflowing the inv queue
                 if len(invqueue) == c.maxInvElements:
                     [c.send_message(msg_inv(invqueue))
@@ -470,7 +482,7 @@ class TestManager():
                     [c.send_message(msg_inv(invqueue))
                      for c in self.connections]
                     invqueue = []
-                self.sync_blocks(block.sha256, len(test_instance.blocks_and_transactions), timeout=test_instance.sync_timeout)
+                self.sync_blocks(block.sha256, len(test_instance.blocks_and_transactions), timeout=test_instance.sync_timeout, timeout_to_requested_block=test_instance.timeout_to_requested_block)
                 if (not self.check_results(tip, block_outcome)):
                     raise AssertionError(
                         "Block test failed at test %d" % test_number)

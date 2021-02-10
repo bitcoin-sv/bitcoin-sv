@@ -15,11 +15,6 @@ option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
 
-if (NOT MSVC)
-  #bitcoin seeder can not be build with MSVC
-	option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
-endif()
-
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
@@ -115,7 +110,6 @@ add_library(util
 	sync.cpp
 	threadinterrupt.cpp
 	threadpriority.cpp
-	uint256.cpp
 	util.cpp
 	utilmoneystr.cpp
 	utilstrencodings.cpp
@@ -192,7 +186,9 @@ add_library(common
 	scheduler.cpp
 	script/sign.cpp
 	script/standard.cpp
+	txhasher.cpp
 	warnings.cpp
+    write_preferring_upgradable_mutex.cpp
 )
 
 target_link_libraries(common util secp256k1)
@@ -211,7 +207,6 @@ add_library(bitcoinconsensus
 	script/script.cpp
 	script/script_num.cpp
 	script/script_error.cpp
-	uint256.cpp
 	utilstrencodings.cpp
 )
 
@@ -238,6 +233,7 @@ add_library(server
     invalid_txn_sinks/file_sink.cpp
     invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
+	mempooltxdb.cpp
 	merkleblock.cpp
 	merkletreedb.cpp
 	merkletreestore.cpp
@@ -247,13 +243,16 @@ add_library(server
 	mining/journal.cpp
 	mining/journal_builder.cpp
 	mining/journal_change_set.cpp
+	mining/journal_entry.cpp
 	mining/journaling_block_assembler.cpp
-    mining/legacy.cpp
     net/association.cpp
+    net/association_id.cpp
 	net/net.cpp
     net/net_message.cpp
 	net/net_processing.cpp
     net/stream.cpp
+    net/stream_policy.cpp
+    net/stream_policy_factory.cpp
 	noui.cpp
 	orphan_txns.cpp
 	policy/fees.cpp
@@ -276,6 +275,7 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txmempoolevictioncandidates.cpp
     tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
@@ -341,11 +341,6 @@ add_library(rpcclient
     rpc/http_response.cpp
 )
 target_link_libraries(rpcclient univalue util)
-
-# bitcoin-seeder
-if(BUILD_BITCOIN_SEEDER)
-	add_subdirectory(seeder)
-endif()
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)

@@ -9,6 +9,8 @@
 # WARNING:
 # This test uses 4GB of disk space.
 # This test takes 30 mins or more (up to 2 hours)
+# This is not suitable to run on a debug build and will almost certainly fail
+# If the test wouldn't fail, it would need many hours, possibly tens of hours to complete
 # ********
 
 from test_framework.test_framework import BitcoinTestFramework
@@ -35,8 +37,8 @@ class PruneTest(BitcoinTestFramework):
 
         # Create nodes 0 and 1 to mine.
         # Create node 2 to test pruning.
-        self.full_node_default_args = ["-maxreceivebuffer=20000", "-blockmaxsize=999000", "-checkblocks=5",
-                                       "-limitdescendantcount=100", "-limitdescendantsize=5000", "-limitancestorcount=100", "-limitancestorsize=5000"]
+        self.full_node_default_args = ["-maxreceivebuffer=20000", "-blockmaxsize=999000", "-checkblocks=5", "-checkmempool=1",
+                                       "-limitancestorcount=100"]
         # Create nodes 3 and 4 to test manual pruning (they will be re-started with manual pruning later)
         # Create nodes 5 to test wallet in prune mode, but do not connect
         self.extra_args = [self.full_node_default_args,

@@ -5,28 +5,16 @@
 #ifndef BITCOIN_RPCBLOCKCHAIN_H
 #define BITCOIN_RPCBLOCKCHAIN_H
 
+#include <optional>
 #include <univalue.h>
 #include "streams.h"
 #include "httpserver.h"
 #include "uint256.h"
 #include "chain.h"
+#include "blockstreams.h"
 
-class CBlockIndex;
 class Config;
 class JSONRPCRequest;
-
-UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
-void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest &req, bool processedInBatch);
-void getblockbyheight(const Config &config, const JSONRPCRequest &request,
-                      HTTPRequest &req, bool processedInBatch);
-void getblockdata(CBlockIndex *pblockindex, const Config &config, const JSONRPCRequest &jsonRPCReq, 
-                  HTTPRequest &httpReq, bool processedInBatch);
-void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
-                          bool showTxDetails, CBlockIndex& blockindex, bool showOnlyCoinBase);
-void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
-                          CForwardReadonlyStream& stream, CBlockIndex& blockIndex);
-
-double GetDifficulty(const CBlockIndex *blockindex);
 
 enum class GetBlockVerbosity {
     RAW_BLOCK = 0,
@@ -54,5 +42,46 @@ public:
         return false;
     }
 };
+
+enum RetFormat {
+    RF_UNDEF,
+    RF_BINARY,
+    RF_HEX,
+    RF_JSON,
+};
+
+static const struct {
+    enum RetFormat rf;
+    const char* name;
+} rf_names[] = {
+    {RF_UNDEF, ""}, {RF_BINARY, "bin"}, {RF_HEX, "hex"}, {RF_JSON, "json"},
+};
+
+class block_parse_error : public std::runtime_error
+{
+public:
+    block_parse_error(const std::string& msg) : std::runtime_error(msg)  {}
+};
+
+int ComputeNextBlockAndDepthNL(const CBlockIndex* tip, const CBlockIndex* blockindex, std::optional<uint256>& nextBlockHash);
+UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
+void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest &req, bool processedInBatch);
+void getblockbyheight(const Config& config, const JSONRPCRequest& request,
+                      HTTPRequest& req, bool processedInBatch);
+void getblockdata(CBlockIndex& pblockindex, const Config& config, const JSONRPCRequest& jsonRPCReq,
+                  HTTPRequest& httpReq, bool processedInBatch,
+                  const int confirmations, const std::optional<uint256>& nextBlockHash);
+
+void writeBlockJsonChunksAndUpdateMetadata(const Config& config, HTTPRequest& req, bool showTxDetails,
+                                           CBlockIndex& blockIndex, bool showOnlyCoinbase,
+                                           bool processedInBatch, const int confirmations,
+                                           const std::optional<uint256>& nextBlockHash,
+                                           const std::string& rpcReqId);
+void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest& req,
+                                       CBlockIndex& blockIndex, const std::string& rpcReqId,
+                                       bool processedInBatch, const RetFormat& rf);
+
+double GetDifficulty(const CBlockIndex *blockindex);
+
 
 #endif // BITCOIN_RPCBLOCKCHAIN_H

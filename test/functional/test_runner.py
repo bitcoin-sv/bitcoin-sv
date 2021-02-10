@@ -70,6 +70,22 @@ LARGE_BLOCK_TESTS = [
     "bsv-large-blocks-txindex-data.py"
 ]
 
+# This is a list of tests that should not run in parallel.
+# These tests are executed one by one when all others have finished
+# Such tests may fall in one of the following categories:
+# - Test is resource intensive and utilizes many CPU cores and use a lot o RAM
+#   (these tests may cause others to fail)
+# - Test relies on time measurements and/or compares times of multiple operations
+# - A test is vulnerable to CPU/RAM availability fluctuations
+
+SOLO_TESTS = {
+    "wallet-encryption.py",
+    "bsv-ptv-txn-chains.py",
+    "mining_api.py",
+    "bsv-pbv-withsigops.py",
+    "bsv-broadcast_delay.py"
+}
+
 # This tests can be only run by explicitly specifying them on command line. 
 # This is usefull for tests that take really long time to execute.
 EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
@@ -129,6 +145,8 @@ def main():
         '--exclude', '-x', help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
     parser.add_argument('--extended', action='store_true',
                         help='run the extended test suite in addition to the basic tests')
+    parser.add_argument('--list-tests', action='store_true',
+                        help='just show the tests that would be run')
     parser.add_argument('--help', '-h', '-?',
                         action='store_true', help='print help text and exit')
     parser.add_argument('--jobs', '-j', type=int, default=4,
@@ -150,6 +168,7 @@ def main():
                                            "it will show bitcoind.log file of the specified node")
     parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
     parser.add_argument('--output-type', type=int, default=2, help="Output type: 2 - Automatic detection. 0 - Primitive output suited for CI. 1 - Advanced suited for console.")
+
     args, unknown_args = parser.parse_known_args()
 
     # Output type. Default is 2: automatic detection
@@ -235,7 +254,7 @@ def main():
         src_dir, "test", "functional", 'timing.json'))
 
     # Add test parameters and remove long running tests if needed
-    test_list = get_tests_to_run(
+    test_list, solo_position_start = get_tests_to_run(
         test_list, TEST_PARAMS, cutoff, src_timings, build_timings)
 
     if not test_list:
@@ -251,15 +270,19 @@ def main():
             [sys.executable, os.path.join(tests_dir, test_list[0]), '-h'])
         sys.exit(0)
 
+    if args.list_tests:
+        print("\n".join(test_list))
+        sys.exit(0)
+
     if not args.keepcache:
         shutil.rmtree(os.path.join(build_dir, "test",
                                    "cache"), ignore_errors=True)
 
     run_tests(test_list, build_dir, tests_dir, args.junitouput,
-              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console)
+              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console, solo_position_start)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False):
+def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -311,7 +334,7 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
             raise
 
     # Run Tests
-    job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags, file_for_monitoring, console)
+    job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags, file_for_monitoring, console, solo_position_start)
     time0 = time.time()
     test_results = []
 
@@ -382,7 +405,7 @@ class TestHandler:
     Trigger the testscrips passed in via the list.
     """
 
-    def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None, file_for_monitoring=None, console=False):
+    def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None, file_for_monitoring=None, console=False, solo_position_start=-1):
         assert (num_tests_parallel >= 1)
         self.num_jobs = num_tests_parallel
         self.tests_dir = tests_dir
@@ -392,6 +415,8 @@ class TestHandler:
         self.num_running = 0
         self.ts = time.time()
         self.console = console
+        self.test_count = 0
+        self.solo_position_start=solo_position_start
         # In case there is a graveyard of zombie bitcoinds, we can apply a
         # pseudorandom offset to hopefully jump over them.
         # (625 is PORT_RANGE/MAX_NODES)
@@ -407,6 +432,18 @@ class TestHandler:
         log_job = None
         try:
             while self.num_running < self.num_jobs and self.test_list:
+
+                # Run parallel tests first, then solo
+                if self.solo_position_start >= 0 and self.test_count >= self.solo_position_start:
+                    if self.num_running > 0:
+                        # All tests that may still be running must finish before solo tests can be started
+                        break
+                    if self.num_jobs > 1:
+                        # From this point on the tests are not run in parallel anymore
+                        self.num_jobs = 1
+                        print_log("*\n*** Finished running tests in parallel, now running solo tests ***\n*", console=self.console)
+                self.test_count += 1
+
                 # Add tests
                 self.num_running += 1
                 t = self.test_list.pop(0)
@@ -523,7 +560,7 @@ def get_all_scripts_from_disk(test_dir, non_scripts):
 
 def get_tests_to_run(test_list, test_params, cutoff, src_timings, build_timings=None):
     """
-    Returns only test that will not run longer that cutoff.
+    Returns only test that will not run longer then cutoff (see --extended option).
     Long running tests are returned first to favor running tests in parallel
     Timings from build directory override those from src directory
     """
@@ -540,18 +577,34 @@ def get_tests_to_run(test_list, test_params, cutoff, src_timings, build_timings=
             (x['time'] for x in src_timings.existing_timings if x['name'] == test), 0)
 
     # Some tests must also be run with additional parameters. Add them to the list.
+    # Separate the list in two parts: parallel first, solo last
     tests_with_params = []
+    solo_tests = []
     for test_name in test_list:
         # always execute a test without parameters
-        tests_with_params.append(test_name)
+        if test_name in SOLO_TESTS:
+            solo_tests.append(test_name)
+        else:
+            tests_with_params.append(test_name)
+
+        # Add predefined parameters to tests
         params = test_params.get(test_name)
         if params is not None:
-            tests_with_params.extend(
-                [test_name + " " + " ".join(p) for p in params])
+            if test_name in SOLO_TESTS:
+                solo_tests.extend([test_name + " " + " ".join(p) for p in params])
+            else:
+                tests_with_params.extend([test_name + " " + " ".join(p) for p in params])
 
+    # Remove extended tests (tests, whose expected running time is longer than cutoff, see '--extended') and sort
     result = [t for t in tests_with_params if get_test_time(t) <= cutoff]
     result.sort(key=lambda x: (-get_test_time(x), x))
-    return result
+
+    result_solo = [t for t in solo_tests if get_test_time(t) <= cutoff]
+    result_solo.sort(key=lambda x: (-get_test_time(x), x))
+
+    solo_position_start = len(result)
+    result = result + result_solo
+    return result, solo_position_start
 
 
 class RPCCoverage():
@@ -724,6 +777,7 @@ def print_log(data="", jobs=None, console=False):
             print(line)
 
         # Print * Running jobs *
+        sys.stdout.write("\033[K")  # clear line
         print("******* Running jobs *******")
         printed_lines += 1
         for job in running_jobs:
