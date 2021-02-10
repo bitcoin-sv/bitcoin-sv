@@ -97,7 +97,7 @@ class PBVCallGetDataBeforeBlockIsValidated(BitcoinTestFramework):
             if message.block.sha256 == block.sha256:
                 receivedBlock = True
         node0.on_block = on_block
-        node0.send_message(msg_getdata([CInv(2, int(block.hash, 16))]))
+        node0.send_message(msg_getdata([CInv(CInv.BLOCK, int(block.hash, 16))]))
 
         wait_until(lambda: check_for_log_msg(self, block.hash + " is still waiting as a candidate", "/node0"))
 

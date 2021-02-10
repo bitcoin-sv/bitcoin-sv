@@ -1,4 +1,4 @@
-# Bitcoin SV version 1.0.7.beta Release Notes
+# Bitcoin SV version 1.0.7 Release Notes
 
 ## Headline changes since 1.0.6
 * Removed performance penalty for long chains. Mempool performance does not depend on the transaction's chain length anymore.
@@ -6,7 +6,7 @@
 * Refactoring of CCoinView.
 * P2P improvements.
 
-## Full list of changes since 1.0.6
+## Full list of changes between 1.0.6 and 1.0.7.beta
 * Increased default maximum ancestors count for paying transactions to 1000.
 * Removing transactions from the mempool when a new block is mined is much faster. As a consequence, block propagation is faster.
 * More efficient mempool transaction eviction algorithm.
@@ -125,6 +125,18 @@
 * Fix: Unit tests fail to build
 * bsv-protoconf.py starts to fail with large value of maxprotocolrecvpayloadlength
 * Explicitly define the missing copy constructor
+
+## List of changes since 1.0.7.beta
+* Ensure correct `id` type in RPC
+* New RPC dumpparameters to provide configuration settings.
+* Help text - coinbaseValue parameter added to help text for getminingcandidate RPC.
+* Packaged Diagnostic Service - allows remote gathering of diagnotic information.
+* The default value for maxcoinsprovidercachesize = 1GB and must be at least 1MB.
+* The mempoolminfee (rolling fee) is prevented from becoming greater than blockminfee while there are secondary mempool transactions.
+* Fix: Heap used after free during shutdown.
+* Fix: possible undefined behaviour processing block requested via getdata.
+* Fix: Undefined behaviour in RIPEMD160, SHA1 and SHA256 code.
+* Fix: Possible referenced null pointer triggered by help RPC command.
 
 ## Scaling Test Network (STN) Reset
 N/A
