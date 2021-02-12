@@ -3649,7 +3649,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     {
         CoinsDBSpan pCoinsTipSpan{ *pcoinsTip };
         assert(pCoinsTipSpan.GetBestBlock() == pindexDelete->GetBlockHash());
-        if (ProcessingBlockIndex(const_cast<CBlockIndex&>(*pindexDelete)).DisconnectBlock(block, pCoinsTipSpan, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
+        if (ProcessingBlockIndex(*pindexDelete).DisconnectBlock(block, pCoinsTipSpan, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
             return error("DisconnectTip(): DisconnectBlock %s failed",
                          pindexDelete->GetBlockHash().ToString());
         }
