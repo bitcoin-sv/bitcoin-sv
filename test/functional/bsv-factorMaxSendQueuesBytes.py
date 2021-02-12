@@ -48,7 +48,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             nonlocal numberOfRejectedMsgs
             numberOfRejectedMsgs += 1
 
-        getdata_request = msg_getdata([CInv(2, block)])
+        getdata_request = msg_getdata([CInv(CInv.BLOCK, block)])
 
         for test_node in test_nodes:
             test_node.cb.on_block = on_block

@@ -115,7 +115,7 @@ class TestNode(NodeConnCB):
                 message.code, message.reason)
 
     def send_inv(self, obj):
-        mtype = 2 if isinstance(obj, CBlock) else 1
+        mtype = CInv.BLOCK if isinstance(obj, CBlock) else CInv.TX
         self.conn.send_message(msg_inv([CInv(mtype, obj.sha256)]))
 
     def send_getheaders(self):
@@ -446,7 +446,7 @@ class TestManager():
                             raise AssertionError(
                                 "Test failed at test %d" % test_number)
                     else:
-                        invqueue.append(CInv(2, block.sha256))
+                        invqueue.append(CInv(CInv.BLOCK, block.sha256))
                 elif isinstance(b_or_t, CBlockHeader):
                     block_header = b_or_t
                     self.block_store.add_header(block_header)
@@ -469,7 +469,7 @@ class TestManager():
                             raise AssertionError(
                                 "Test failed at test %d" % test_number)
                     else:
-                        invqueue.append(CInv(1, tx.sha256))
+                        invqueue.append(CInv(CInv.TX, tx.sha256))
                 # Ensure we're not overflowing the inv queue
                 if len(invqueue) == c.maxInvElements:
                     [c.send_message(msg_inv(invqueue))

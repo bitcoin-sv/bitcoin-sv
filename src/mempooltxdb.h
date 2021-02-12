@@ -6,6 +6,7 @@
 #define BITCOIN_MEMPOOLTXDB_H
 
 #include "dbwrapper.h"
+#include "txhasher.h"
 #include "tx_mempool_info.h"
 
 #include <boost/uuid/uuid.hpp>
@@ -82,7 +83,7 @@ public:
     /*
      * Used to add a batch of new transactions into the database
      */
-    bool AddTransactions(const std::vector<CTransactionRef> &txs);
+    bool AddTransactions(const std::vector<CTransactionRef>& txs);
 
     /*
      * Used to retrieve transaction from the database.
@@ -105,7 +106,7 @@ public:
     /*
      * Used to remove a batch of transactions from the database.
      */
-    bool RemoveTransactions(const std::vector<TxData>& transactionsToRemove);
+    bool RemoveTransactions(const std::vector<TxData>& txs);
 
     /**
      * Return the total size of transactions moved to disk.
@@ -186,11 +187,11 @@ public:
     //       to the database are possible.
     void Clear();
 
-    // Asynchronously add transactions to the database.
-    void Add(std::vector<CTransactionWrapperRef>&& transactionsToAdd);
+    // Asynchronously add a transaction to the database.
+    void Add(CTransactionWrapperRef&& transactionToAdd);
 
-    // Asynchronously remove transactions from the database.
-    void Remove(std::vector<CMempoolTxDB::TxData>&& transactionsToRemove);
+    // Asynchronously remove a transaction from the database.
+    void Remove(CMempoolTxDB::TxData&& transactionToRemove);
 
     // Get the size of the data in the database.
     uint64_t GetDiskUsage()

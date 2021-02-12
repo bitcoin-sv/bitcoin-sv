@@ -1209,10 +1209,10 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     send = false;
                 }
 
-                bool isMostRecentBlock = chainActive.Tip() == mi->second;
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
                 if (send && (mi->second->nStatus.hasData())) {
+                    bool isMostRecentBlock = chainActive.Tip() == mi->second;
                     // Send block from disk
 
                     if (inv.type == MSG_BLOCK)
@@ -1441,13 +1441,21 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
     std::vector<uint8_t> associationID {};
     uint8_t streamTypeRaw {0};
     std::string streamPolicyName {};
-    vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-    vRecv >> streamTypeRaw;
-    vRecv >> LIMITED_STRING(streamPolicyName, MAX_STREAM_POLICY_NAME_LENGTH);
 
     // Which association is this for?
     try
     {
+        try
+        {
+            vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+            vRecv >> streamTypeRaw;
+            vRecv >> LIMITED_STRING(streamPolicyName, MAX_STREAM_POLICY_NAME_LENGTH);
+        }
+        catch(std::exception& e)
+        {
+            throw std::runtime_error("Badly formatted message");
+        }
+
         // Parse stream type
         if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
         {
@@ -1457,6 +1465,10 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
 
         // Parse association ID
         AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        if(idptr == nullptr)
+        {
+            throw std::runtime_error("NULL association ID");
+        }
         LogPrint(BCLog::NET, "Got request for new %s stream within association %s, peer=%d\n",
             enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
 
@@ -1503,11 +1515,19 @@ static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& st
 
     std::vector<uint8_t> associationID {};
     uint8_t streamTypeRaw {0};
-    vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-    vRecv >> streamTypeRaw;
 
     try
     {
+        try
+        {
+            vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+            vRecv >> streamTypeRaw;
+        }
+        catch(std::exception& e)
+        {
+            throw std::runtime_error("Badly formatted message");
+        }
+
         // Parse stream type
         if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
         {
@@ -1517,6 +1537,10 @@ static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& st
 
         // Parse association ID
         AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        if(idptr == nullptr)
+        {
+            throw std::runtime_error("NULL association ID");
+        }
         LogPrint(BCLog::NET, "Got stream ack for new %s stream within association %s, peer=%d\n",
             enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
 
@@ -1568,101 +1592,109 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     int32_t nStartingHeight = -1;
     bool fRelay = true;
     std::vector<uint8_t> associationID {};
+    std::string assocIDStr { AssociationID::NULL_ID_STR };
 
-    vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
-    nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
-    nServices = ServiceFlags(nServiceInt);
-    if(!pfrom->fInbound) {
-        connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
-    }
-    if(pfrom->nServicesExpected & ~nServices) {
-        LogPrint(BCLog::NET, "peer=%d does not offer the expected services "
-                             "(%08x offered, %08x expected); "
-                             "disconnecting\n",
-                 pfrom->id, nServices, pfrom->nServicesExpected);
-        connman.PushMessage(
-            pfrom,
-            CNetMsgMaker(INIT_PROTO_VERSION)
-                .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
-                      strprintf("Expected to offer services %08x",
-                                pfrom->nServicesExpected)));
-        pfrom->fDisconnect = true;
-        return false;
-    }
-
-    if(nVersion < MIN_PEER_PROTO_VERSION) {
-        // Disconnect from peers older than this proto version
-        LogPrint(BCLog::NET, "peer=%d using obsolete version %i; disconnecting\n",
-                  pfrom->id, nVersion);
-        connman.PushMessage(
-            pfrom,
-            CNetMsgMaker(INIT_PROTO_VERSION)
-                .Make(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
-                      strprintf("Version must be %d or greater",
-                                MIN_PEER_PROTO_VERSION)));
-        pfrom->fDisconnect = true;
-        return false;
-    }
-
-    if(!vRecv.empty()) {
-        vRecv >> addrFrom >> nNonce;
-    }
-    if(!vRecv.empty()) {
-        vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
-        cleanSubVer = SanitizeString(strSubVer);
-        
-        if (config.IsClientUABanned(cleanSubVer))
-        {
-            Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+    try {
+        vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
+        nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
+        nServices = ServiceFlags(nServiceInt);
+        if(!pfrom->fInbound) {
+            connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
+        }
+        if(pfrom->nServicesExpected & ~nServices) {
+            LogPrint(BCLog::NET, "peer=%d does not offer the expected services "
+                                 "(%08x offered, %08x expected); "
+                                 "disconnecting\n",
+                     pfrom->id, nServices, pfrom->nServicesExpected);
+            connman.PushMessage(
+                pfrom,
+                CNetMsgMaker(INIT_PROTO_VERSION)
+                    .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                          strprintf("Expected to offer services %08x",
+                                    pfrom->nServicesExpected)));
+            pfrom->fDisconnect = true;
             return false;
         }
-    }
-    if(!vRecv.empty()) {
-        vRecv >> nStartingHeight;
-    }
-    if(!vRecv.empty()) {
-        vRecv >> fRelay;
-    }
 
-    std::string assocIDStr { AssociationID::NULL_ID_STR };
-    if(!vRecv.empty()) {
-        vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-        if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
-            try {
-                // Decode received association ID
-                AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
-                if(recvdAssocID) {
-                    assocIDStr = recvdAssocID->ToString();
+        if(nVersion < MIN_PEER_PROTO_VERSION) {
+            // Disconnect from peers older than this proto version
+            LogPrint(BCLog::NET, "peer=%d using obsolete version %i; disconnecting\n",
+                      pfrom->id, nVersion);
+            connman.PushMessage(
+                pfrom,
+                CNetMsgMaker(INIT_PROTO_VERSION)
+                    .Make(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
+                          strprintf("Version must be %d or greater",
+                                    MIN_PEER_PROTO_VERSION)));
+            pfrom->fDisconnect = true;
+            return false;
+        }
 
-                    // If we sent them an assoc ID, make sure they echoed back the same one
-                    const AssociationIDPtr& currAssocID { pfrom->GetAssociation().GetAssociationID() };
-                    if(currAssocID != nullptr) {
-                        if(!(*recvdAssocID == *currAssocID)) {
-                            throw std::runtime_error("Mismatched association IDs");
-                        }
-                    }
-                    else {
-                        // Set association ID for node
-                        pfrom->GetAssociation().SetAssociationID(std::move(recvdAssocID));
-                    }
-                }
-                else {
-                    // Peer sent us a null ID, so they support streams but have disabled them
-                    pfrom->GetAssociation().ClearAssociationID();
-                }
-            }
-            catch(std::exception& e) {
-                LogPrint(BCLog::NET, "peer=%d bad association ID or stream policy list (%s); disconnecting\n", pfrom->id, e.what());
-                connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
-                    .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
-                pfrom->fDisconnect = true;
+        if(!vRecv.empty()) {
+            vRecv >> addrFrom >> nNonce;
+        }
+        if(!vRecv.empty()) {
+            vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
+            cleanSubVer = SanitizeString(strSubVer);
+            
+            if (config.IsClientUABanned(cleanSubVer))
+            {
+                Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
                 return false;
             }
         }
+        if(!vRecv.empty()) {
+            vRecv >> nStartingHeight;
+        }
+        if(!vRecv.empty()) {
+            vRecv >> fRelay;
+        }
+
+        if(!vRecv.empty()) {
+            try {
+                vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+                if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                    // Decode received association ID
+                    AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
+                    if(recvdAssocID) {
+                        assocIDStr = recvdAssocID->ToString();
+
+                        // If we sent them an assoc ID, make sure they echoed back the same one
+                        const AssociationIDPtr& currAssocID { pfrom->GetAssociation().GetAssociationID() };
+                        if(currAssocID != nullptr) {
+                            if(!(*recvdAssocID == *currAssocID)) {
+                                throw std::runtime_error("Mismatched association IDs");
+                            }
+                        }
+                        else {
+                            // Set association ID for node
+                            pfrom->GetAssociation().SetAssociationID(std::move(recvdAssocID));
+                        }
+                    }
+                    else {
+                        // Peer sent us a null ID, so they support streams but have disabled them
+                        pfrom->GetAssociation().ClearAssociationID();
+                    }
+                }
+            }
+            catch(std::exception& e) {
+                // Re-throw
+                std::stringstream err {};
+                err << "Badly formatted association ID: " << e.what();
+                throw std::runtime_error(err.str());
+            }
+        }
+        else if(!pfrom->fInbound) {
+            // Remote didn't echo back the association ID, so they don't support streams
+            pfrom->GetAssociation().ClearAssociationID();
+        }
     }
-    else if(!pfrom->fInbound) {
-        // Remote didn't echo back the association ID, so they don't support streams
-        pfrom->GetAssociation().ClearAssociationID();
+    catch(std::exception& e) {
+        LogPrint(BCLog::NET, "peer=%d Failed to process version: (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
+        pfrom->fDisconnect = true;
+        return false;
     }
 
     // Disconnect if we connected to ourself

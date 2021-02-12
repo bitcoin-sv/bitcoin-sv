@@ -201,6 +201,7 @@ BITCOIN_CORE_H = \
   time_locked_mempool.h \
   torcontrol.h \
   txdb.h \
+  txhasher.h \
   txmempool.h \
   txmempoolevictioncandidates.h \
   tx_mempool_info.h \
@@ -445,6 +446,7 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  txhasher.cpp \
   warnings.cpp \
   write_preferring_upgradable_mutex.cpp \
   $(BITCOIN_CORE_H)

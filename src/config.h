@@ -74,10 +74,10 @@ public:
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
 
-    virtual void SetLimitAncestorCount(uint64_t limitAncestorCount) = 0;
+    virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
 
-    virtual void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) = 0;
+    virtual bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
 
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
@@ -259,10 +259,10 @@ public:
     void SetDataCarrierSize(uint64_t dataCarrierSize) override;
     uint64_t GetDataCarrierSize() const override;
 
-    void SetLimitAncestorCount(uint64_t limitAncestorCount) override;
+    bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) override;
     uint64_t GetLimitAncestorCount() const override;
 
-    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override;
+    bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) override;
     uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
     
     void SetTestBlockCandidateValidity(bool test) override;
@@ -483,8 +483,6 @@ private:
     uint64_t preferredMerkleTreeFileSize;
     uint64_t maxMerkleTreeMemoryCacheSize;
 
-    bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
-
     std::set<std::string> invalidTxSinks;
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
@@ -585,10 +583,10 @@ public:
     uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override { dataCarrierSize = dataCarrierSizeIn; }
 
-    void SetLimitAncestorCount(uint64_t limitAncestorCount) override {}
+    bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) override {return true;}
     uint64_t GetLimitAncestorCount() const override { return 0; }
 
-    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override {}
+    bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) override {return true;}
     uint64_t GetLimitSecondaryMempoolAncestorCount() const override { return 0; }
 
     void SetTestBlockCandidateValidity(bool skip) override {}

@@ -835,12 +835,42 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     return obj;
 }
 
+static UniValue dumpparameters(const Config &config, const JSONRPCRequest &request)
+{
+
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw std::runtime_error(
+            "dumpparameters\n"
+            "Dumps non-sensitive force set parameters and parameters set by switches and config file.\n"
+            "Note: rpcuser, rpcpassword and rpcauth are excluded from the dump.\n"
+            "\nResult:\n"
+            "[ (array) parameters\n"
+            "    parametername=value,\n"
+            "    ...,\n"
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("dumpparameters", "") +
+            HelpExampleRpc("dumpparameters", ""));
+    }
+
+    UniValue obj(UniValue::VARR);
+
+    for(const auto& arg : gArgs.GetNonSensitiveParameters())
+    {
+        obj.push_back(arg);
+    }
+
+    return obj;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
     //  ------------------- ------------------------  ----------------------  ----------
     { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
     { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
+    { "control",            "dumpparameters",         dumpparameters,         true,  {} },
     { "control",            "getsettings",            getsettings,            true,  {} },
     { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
     { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */

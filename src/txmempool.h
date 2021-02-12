@@ -14,6 +14,7 @@
 #include "primitives/transaction.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
+#include "txhasher.h"
 #include "tx_mempool_info.h"
 #include "txn_validation_data.h"
 #include "policy/policy.h"
@@ -1186,7 +1187,7 @@ private:
 
     void clearNL(bool skipTransactionDatabase = false);
 
-    void trackPackageRemovedNL(const CFeeRate &rate);
+    void trackPackageRemovedNL(const CFeeRate &rate, bool haveSecondaryMempoolTxs);
 
     /**
      * Remove a set of transactions from the mempool. If a transaction is in

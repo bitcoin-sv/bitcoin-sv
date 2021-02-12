@@ -3,6 +3,7 @@
 // LICENSE.
 
 #pragma once
+#include "txhasher.h"
 #include "txmempool.h"
 
 // CEvictionCandidateTracker is class that tracks which transaction should be removed. candidates for the removal
