@@ -1393,6 +1393,10 @@ CTxnValResult TxnValidation(
         // Clear any invalid state due to promiscuousmempool flags usage.
         state = CValidationState();
     }
+
+    // Finished all script checks
+    state.SetScriptsChecked();
+
     // Check a mempool conflict and a double spend attempt
     if(!dsDetector->insertTxnInputs(pTxInputData, pool, state, isFinal)) {
         if (state.IsMempoolConflictDetected()) {

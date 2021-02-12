@@ -41,6 +41,7 @@ private:
     bool fValidationTimeoutExceeded {false};
     bool fStandardTx {false};
     bool fResubmitTx {false};
+    bool fScriptsChecked {false};
 
     // Set of transactions with which the inputs collisions were detected either
     // by fDoubleSpendDetected or fMempoolConflictDetected.
@@ -100,9 +101,10 @@ public:
 
     bool CorruptionPossible() const { return corruptionPossible; }
     bool IsNonFinal() const { return nonFinal; }
-    bool IsValidationTimeoutExceeded() const { return fValidationTimeoutExceeded; };
-    bool IsStandardTx() const { return fStandardTx; };
-    bool IsResubmittedTx() const { return fResubmitTx; };
+    bool IsValidationTimeoutExceeded() const { return fValidationTimeoutExceeded; }
+    bool IsStandardTx() const { return fStandardTx; }
+    bool IsResubmittedTx() const { return fResubmitTx; }
+    bool ScriptsChecked() const { return fScriptsChecked; }
 
     void SetMissingInputs() { fMissingInputs = true; }
     void SetDoubleSpendDetected(std::set<CTransactionRef>&& collidedWithTx)
@@ -116,9 +118,10 @@ public:
         fMempoolConflictDetected = true;
     }
     void SetNonFinal(bool nf = true) { nonFinal = nf; }
-    void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; };
-    void SetStandardTx() { fStandardTx = true; };
-    void SetResubmitTx(bool nf = true) { fResubmitTx = nf; };
+    void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; }
+    void SetStandardTx() { fStandardTx = true; }
+    void SetResubmitTx(bool nf = true) { fResubmitTx = nf; }
+    void SetScriptsChecked() { fScriptsChecked = true; }
 
     int GetNDoS() const { return nDoS; }
     unsigned int GetRejectCode() const { return chRejectCode; }
