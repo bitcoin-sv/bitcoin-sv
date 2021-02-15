@@ -26,25 +26,38 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 # Enable warning
-include(AddCompilerFlags)
-
-add_c_compiler_flag(-Wnested-externs -Wstrict-prototypes)
-add_compiler_flag(
-	-Wall
-	-Wextra
-	-Wformat
-	-Wvla
-	-Wformat-security
-	-Wcast-align
-	-Wunused-parameter
-)
-
 option(EXTRA_WARNINGS "Enable extra warnings" OFF)
-if(EXTRA_WARNINGS)
-	add_compiler_flag(-Wshadow)
-	add_cxx_compiler_flag(-Wsuggest-override)
-else()
-	add_compiler_flag(-Wno-unused-parameter)
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
+	add_compile_options(
+		-Wall
+		-Wextra
+		-Wformat
+		-Wvla
+		-Wformat-security
+		-Wcast-align
+		-Wunused-parameter
+		$<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
+		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+	)
+
+	if(EXTRA_WARNINGS)
+		add_compile_options(
+			-Wshadow
+			$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
+		)
+	else()
+		add_compile_options(
+			-Wno-unused-parameter
+		)
+	endif()
+elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+    if(NOT EXTRA_WARNINGS)
+		add_compile_options(
+			/wd4146
+			/wd4244 # conversion from double to int
+			/D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING # deprecated usage of std::iterator class template
+		)
+	endif()
 endif()
 
 if(MSVC)

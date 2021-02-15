@@ -123,8 +123,8 @@ public:
         OPENSSL_no_config();
 
 #ifdef WIN32
-        // Seed OpenSSL PRNG with current contents of the screen.
-        RAND_screen();
+        // Seed OpenSSL PRNG using random input obtained from polling various trusted entropy sources
+        RAND_poll();
 #endif
 
         // Seed OpenSSL PRNG with performance counter.

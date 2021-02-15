@@ -4,10 +4,25 @@
 
 project(Leveldb VERSION 0.1.0 LANGUAGES C CXX)
 # Remove some warnings for leveldb as they can get noisy.
-add_compiler_flag(-Wno-sign-compare -Wno-implicit-fallthrough)
-add_c_compiler_flag(-Wno-strict-prototypes)
-remove_compiler_flags(-Wstrict-prototypes)
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
+	add_compile_options(
+		-Wno-sign-compare
+		-Wno-implicit-fallthrough
+		$<$<COMPILE_LANGUAGE:C>:-Wno-strict-prototypes>
+		-Wno-format-security
+		-Wno-format
+		-Wno-reorder
+		-Wno-missing-field-initializers
+		-Wno-unused-variable
+	)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+	add_compile_options(
+		/wd4312
+		/wd4005 # disable warning C4005: 'OS_WINDOWS': macro redefinition
+	)
+endif()
 
+include(CheckCCompilerFlag)
 include(CheckIncludeFileCXX)
 check_include_file_cxx("atomic" LEVELDB_ATOMIC_PRESENT)
 

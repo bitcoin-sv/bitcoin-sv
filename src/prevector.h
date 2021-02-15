@@ -12,6 +12,14 @@
 
 #include <iterator>
 
+#include "compiler_warnings.h"
+
+#ifndef __clang__
+    // -Wmaybe-uninitialized warning flag is disabled here because it gives false alarms in this class due to _union.indirect variable.
+    // _union.indirect is always used after _size becomes larger than N. When this happens, _union.indirect is set for the first time.
+    GCC_WARNINGS_IGNORE(-Wmaybe-uninitialized);
+#endif
+
 /**
  * Implements a drop-in replacement for std::vector<T> which stores up to N
  * elements directly (without heap allocation). The types Size and Diff are used

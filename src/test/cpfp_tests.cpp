@@ -19,7 +19,7 @@ namespace{
 
 CTxMemPoolEntry MakeEntry(
     CFeeRate feerate, 
-    std::vector<std::tuple<TxId, int, Amount>> inChainInputs, 
+    std::vector<std::tuple<TxId, size_t, Amount>> inChainInputs, 
     std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs,
     size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount{1},
     size_t opReturnSize=0)
@@ -80,10 +80,10 @@ TxId MakeId(uint16_t n)
     return id;
 }
 
-std::vector<std::tuple<TxId, int, Amount>> MakeConfirmedInputs(size_t count, Amount value)
+std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count, Amount value)
 {
     static uint16_t nextTxid = 1;
-    std::vector<std::tuple<TxId, int, Amount>> inputs;
+    std::vector<std::tuple<TxId, size_t, Amount>> inputs;
     for (size_t i = 0; i < count; i++)
     {
         inputs.push_back(std::make_tuple(MakeId(nextTxid++), i, value));

@@ -45,6 +45,9 @@ gen_json_header(JSON_HEADERS
 )
 
 include(TestSuite)
+include(CheckCXXCompilerFlag)
+include(CheckCCompilerFlag)
+
 create_test_suite(bitcoin)
 add_dependencies(check check-bitcoin)
 

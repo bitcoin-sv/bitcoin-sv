@@ -114,16 +114,6 @@ bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) 
     return CheckSequenceLocks(*chainActive.Tip(), tx, config, flags, nullptr, &cache);
 }
 
-static bool transactionInBlock(const CBlockTemplate& pBlockTemplate, const TxId& txId)
-{
-    for (const auto& txn : pBlockTemplate.GetBlockRef()->vtx) {
-        if (txn->GetId() == txId) {
-            return true;
-        }
-    }
-    return false;
-}
-
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
 void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 {

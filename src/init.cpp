@@ -63,6 +63,8 @@
 #include <signal.h>
 #endif
 
+#include "compiler_warnings.h"
+
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/bind/bind.hpp>
@@ -1646,8 +1648,11 @@ bool AppInitBasicSetup() {
 #define PROCESS_DEP_ENABLE 0x00000001
 #endif
     typedef BOOL(WINAPI * PSETPROCDEPPOL)(DWORD);
+    GCC_WARNINGS_PUSH
+    GCC_WARNINGS_IGNORE(-Wcast-function-type)
     PSETPROCDEPPOL setProcDEPPol = (PSETPROCDEPPOL)GetProcAddress(
         GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
+    GCC_WARNINGS_POP
     if (setProcDEPPol != nullptr) setProcDEPPol(PROCESS_DEP_ENABLE);
 #endif
 
