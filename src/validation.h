@@ -645,6 +645,10 @@ int GetGenesisActivationHeight(const Config& config);
  * Helper to return the script flags which should be checked for a block with given parent
  */
 uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip);
+/**
+ * Get script verification flags to use.
+ */
+uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled);
 
 /**
  * A function used to produce a default value for a number of Low priority threads
@@ -860,6 +864,25 @@ uint64_t GetTransactionSigOpCount(const Config &config,
                                   bool checkP2SH, 
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError);
+
+/**
+ * Check validity of scripts for a single input from a transaction.
+ */
+std::optional<bool> CheckInputScripts(
+    const task::CCancellationToken& token,
+    const Config& config,
+    bool consensus,
+    const CScript& scriptPubKey,
+    const Amount& amount,
+    const CTransaction& tx,
+    CValidationState& state,
+    size_t input,
+    int32_t coinHeight,
+    int32_t spendHeight,
+    const uint32_t flags,
+    bool sigCacheStore,
+    const PrecomputedTransactionData& txdata,
+    std::vector<CScriptCheck>* pvChecks);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends,
