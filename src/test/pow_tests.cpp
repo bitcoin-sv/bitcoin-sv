@@ -9,6 +9,7 @@
 #include "random.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
+#include "block_index_store.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -96,8 +97,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual) {
 
 BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
     DummyConfig config(CBaseChainParams::MAIN);
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CChain blocks;
 
     uint256 prev;
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
         header.nBits = 0x207fffff; /* target 0x7fffff000... */
         header.hashPrevBlock = prev;
 
-        blocks.SetTip( &CBlockIndex::Make( header, dirty, blockIndexStore ) );
+        blocks.SetTip( blockIndexStore.Insert( header ) );
 
         prev = blocks.Tip()->GetBlockHash();
     }
@@ -130,22 +130,20 @@ static CBlockIndex* GetBlockIndex(
     CBlockIndex* pindexPrev,
     int64_t nTimeInterval,
     uint32_t nBits,
-    DirtyBlockIndexStore& dirty,
-    std::map<uint256, CBlockIndex>& blockIndexStore)
+    BlockIndexStore& blockIndexStore)
 {
     CBlockHeader header;
     header.nTime = pindexPrev->GetBlockTime() + nTimeInterval;
     header.nBits = nBits;
-    header.nNonce = blockIndexStore.size();
+    header.nNonce = blockIndexStore.Count();
     header.hashPrevBlock = pindexPrev->GetBlockHash();
 
-    return &CBlockIndex::Make( header, dirty, blockIndexStore );
+    return blockIndexStore.Insert( header );
 }
 
 BOOST_AUTO_TEST_CASE(retargeting_test) {
     DummyConfig config(CBaseChainParams::MAIN);
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CChain blocks;
 
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
@@ -158,7 +156,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
         CBlockHeader header;
         header.nTime = 1269211443;
         header.nBits = initialBits;
-        blocks.SetTip( &CBlockIndex::Make( header, dirty, blockIndexStore ) );
+        blocks.SetTip( blockIndexStore.Insert( header ) );
     }
 
     // Pile up some blocks.
@@ -168,7 +166,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
                 blocks.Tip(),
                 params.nPowTargetSpacing,
                 initialBits,
-                dirty,
                 blockIndexStore) );
     }
 
@@ -183,7 +180,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
                 blocks.Tip(),
                 2 * 3600,
                 initialBits,
-                dirty,
                 blockIndexStore) );
         BOOST_CHECK_EQUAL(
             GetNextWorkRequired(blocks.Tip(), &blkHeaderDummy, config),
@@ -196,7 +192,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
             blocks.Tip(),
             2 * 3600,
             initialBits,
-            dirty,
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
     currentPow += (currentPow >> 2);
@@ -210,7 +205,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
             blocks.Tip(),
             2 * 3600,
             currentPow.GetCompact(),
-            dirty,
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
     currentPow += (currentPow >> 2);
@@ -224,7 +218,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
             blocks.Tip(),
             2 * 3600,
             currentPow.GetCompact(),
-            dirty,
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
     currentPow += (currentPow >> 2);
@@ -238,7 +231,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
             blocks.Tip(),
             2 * 3600,
             currentPow.GetCompact(),
-            dirty,
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
     currentPow += (currentPow >> 2);
@@ -253,7 +245,6 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
             blocks.Tip(),
             2 * 3600,
             currentPow.GetCompact(),
-            dirty,
             blockIndexStore) );
     BOOST_CHECK(powLimit.GetCompact() != currentPow.GetCompact());
     BOOST_CHECK_EQUAL(
@@ -263,8 +254,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
 
 BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     DummyConfig config(CBaseChainParams::MAIN);
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CChain blocks;
 
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
@@ -278,7 +268,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
         CBlockHeader header;
         header.nTime = 1269211443;
         header.nBits = initialBits;
-        blocks.SetTip( &CBlockIndex::Make( header, dirty, blockIndexStore ) );
+        blocks.SetTip( blockIndexStore.Insert( header ) );
     }
 
     // Pile up some blocks every 10 mins to establish some history.
@@ -289,7 +279,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 600,
                 initialBits,
-                dirty,
                 blockIndexStore) );
     }
 
@@ -305,7 +294,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 600,
                 nBits,
-                dirty,
                 blockIndexStore) );
         BOOST_CHECK_EQUAL(
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config),
@@ -320,7 +308,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
             blocks.Tip(),
             6000,
             nBits,
-            dirty,
             blockIndexStore) );
     BOOST_CHECK_EQUAL(
         GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config), nBits);
@@ -329,7 +316,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
             blocks.Tip(),
             2 * 600 - 6000,
             nBits,
-            dirty,
             blockIndexStore) );
     BOOST_CHECK_EQUAL(
         GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config), nBits);
@@ -343,7 +329,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 600,
                 nBits,
-                dirty,
                 blockIndexStore) );
         BOOST_CHECK_EQUAL(
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config),
@@ -356,7 +341,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
             blocks.Tip(),
             550,
             nBits,
-            dirty,
             blockIndexStore) );
     BOOST_CHECK_EQUAL(
         GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config), nBits);
@@ -369,7 +353,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 550,
                 nBits,
-                dirty,
                 blockIndexStore) );
         const uint32_t nextBits =
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
@@ -397,7 +380,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 10,
                 nBits,
-                dirty,
                 blockIndexStore) );
         const uint32_t nextBits =
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
@@ -424,7 +406,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
             blocks.Tip(),
             6000,
             nBits,
-            dirty,
             blockIndexStore) );
     nBits = GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
 
@@ -439,7 +420,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 6000,
                 nBits,
-                dirty,
                 blockIndexStore) );
         const uint32_t nextBits =
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
@@ -467,7 +447,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
             blocks.Tip(),
             6000,
             nBits,
-            dirty,
             blockIndexStore) );
     nBits = GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
     BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bf);
@@ -481,7 +460,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 6000,
                 nBits,
-                dirty,
                 blockIndexStore) );
         const uint32_t nextBits =
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
@@ -511,7 +489,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
                 blocks.Tip(),
                 6000,
                 nBits,
-                dirty,
                 blockIndexStore) );
         const uint32_t nextBits =
             GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);

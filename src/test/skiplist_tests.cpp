@@ -7,6 +7,7 @@
 #include "pow.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
+#include "block_index_store.h"
 
 #include <map>
 #include <vector>
@@ -21,8 +22,7 @@ extern CCriticalSection cs_main;
 BOOST_FIXTURE_TEST_SUITE(skiplist_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(skiplist_test) {
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CChain vIndex;
 
     // Genesis block.
@@ -36,14 +36,14 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
                     chainActive.Tip(),
                     &header,
                     GlobalConfig::GetConfig() );
-            return &CBlockIndex::Make( header, dirty, blockIndexStore );
+            return blockIndexStore.Insert( header );
         }() );
 
     for (int i = 1; i < SKIPLIST_LENGTH; i++) {
         CBlockHeader header;
         header.hashPrevBlock = vIndex.Tip()->GetBlockHash();
         header.nBits = vIndex.Tip()->GetBits(); // leave same complexity as dummy bits
-        vIndex.SetTip( &CBlockIndex::Make( header, dirty, blockIndexStore ) );
+        vIndex.SetTip( blockIndexStore.Insert( header ) );
     }
 
     for (int i = 0; i < SKIPLIST_LENGTH; i++) {
@@ -67,8 +67,7 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
 }
 
 BOOST_AUTO_TEST_CASE(getlocator_test) {
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CBlockIndex* lastIndex =
         [&]
         {
@@ -80,7 +79,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
                     &header,
                     GlobalConfig::GetConfig() );
 
-            return &CBlockIndex::Make( header, dirty, blockIndexStore );
+            return blockIndexStore.Insert( header );
         }();
 
     BOOST_CHECK( lastIndex->IsGenesis() );
@@ -95,9 +94,9 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             CBlockHeader header;
             header.nTime = GetTime();
             header.hashPrevBlock = lastIndex->GetBlockHash();
-            header.nNonce = blockIndexStore.size();
+            header.nNonce = blockIndexStore.Count();
             header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
-            lastIndex = &CBlockIndex::Make( header, dirty, blockIndexStore );
+            lastIndex = blockIndexStore.Insert( header );
 
             BOOST_CHECK_EQUAL( i, lastIndex->GetHeight() );
             BOOST_CHECK(lastIndex->GetHeight() == lastIndex->GetPrev()->GetHeight() + 1);
@@ -108,9 +107,9 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             CBlockHeader header;
             header.nTime = GetTime();
             header.hashPrevBlock = lastIndex->GetBlockHash();
-            header.nNonce = blockIndexStore.size();
+            header.nNonce = blockIndexStore.Count();
             header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
-            lastIndex = &CBlockIndex::Make( header, dirty, blockIndexStore );
+            lastIndex = blockIndexStore.Insert( header );
 
             BOOST_CHECK_EQUAL( i, lastIndex->GetHeight() );
             BOOST_CHECK(lastIndex->GetHeight() == lastIndex->GetPrev()->GetHeight() + 1);
@@ -123,7 +122,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         CBlockHeader header;
         header.hashPrevBlock = splitLastIndex->GetBlockHash();
         header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
-        splitLastIndex = &CBlockIndex::Make( header, dirty, blockIndexStore );
+        splitLastIndex = blockIndexStore.Insert( header );
 
         BOOST_CHECK_EQUAL( i, splitLastIndex->GetHeight() );
         BOOST_CHECK(splitLastIndex->GetHeight() == splitLastIndex->GetPrev()->GetHeight() + 1);
@@ -151,7 +150,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
 
         // Entries 1 through 11 (inclusive) go back one step each.
         for (unsigned int i = 1; i < 12 && i < locator.vHave.size() - 1; i++) {
-            BOOST_CHECK_EQUAL(blockIndexStore.at( locator.vHave[i] ).GetHeight(),
+            BOOST_CHECK_EQUAL(blockIndexStore.Get( locator.vHave[i] )->GetHeight(),
                               tip->GetHeight() - i);
         }
 
@@ -159,8 +158,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         // steps.
         unsigned int dist = 2;
         for (unsigned int i = 12; i < locator.vHave.size() - 1; i++) {
-            BOOST_CHECK_EQUAL(blockIndexStore.at( locator.vHave[i - 1] ).GetHeight() -
-                              blockIndexStore.at( locator.vHave[i] ).GetHeight(),
+            BOOST_CHECK_EQUAL(blockIndexStore.Get( locator.vHave[i - 1] )->GetHeight() -
+                              blockIndexStore.Get( locator.vHave[i] )->GetHeight(),
                               dist);
             dist *= 2;
         }
@@ -168,8 +167,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
 }
 
 BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CChain chain;
     chain.SetTip(
         [&]
@@ -181,7 +179,7 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
                     nullptr,
                     &header,
                     GlobalConfig::GetConfig() );
-            return &CBlockIndex::Make( header, dirty, blockIndexStore );
+            return blockIndexStore.Insert( header );
         }() );
 
     for (unsigned int i = 1; i < 100000; ++i)
@@ -202,22 +200,22 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
                 &header,
                 GlobalConfig::GetConfig() );
 
-        chain.SetTip( &CBlockIndex::Make( header, dirty, blockIndexStore ) );
+        chain.SetTip( blockIndexStore.Insert( header ) );
     }
 
     // Check that we set nTimeMax up correctly.
     int64_t curTimeMax = 0;
-    for (size_t i = 0; i < blockIndexStore.size(); ++i)
+    for (size_t i = 0; i < blockIndexStore.Count(); ++i)
     {
         curTimeMax = std::max(curTimeMax, chain[i]->GetBlockTime());
         BOOST_CHECK(curTimeMax == chain[i]->GetBlockTimeMax());
     }
 
     // Verify that FindEarliestAtLeast is correct.
-    for (size_t i = 0; i < blockIndexStore.size(); ++i)
+    for (size_t i = 0; i < blockIndexStore.Count(); ++i)
     {
         // Pick a random element in vBlocksMain.
-        int r = InsecureRandRange(blockIndexStore.size());
+        int r = InsecureRandRange(blockIndexStore.Count());
         int64_t test_time = chain[r]->GetBlockTime();
         CBlockIndex *ret = chain.FindEarliestAtLeast(test_time);
         BOOST_CHECK(ret->GetBlockTimeMax() >= test_time);

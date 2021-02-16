@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 
+#include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "config.h"
@@ -20,8 +21,7 @@ BOOST_AUTO_TEST_CASE(mtp)
 {
     SelectParams( CBaseChainParams::REGTEST );
 
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
     CChain blocks;
     CBlockIndex* prev{};
     uint256 prevHash;
@@ -32,7 +32,7 @@ BOOST_AUTO_TEST_CASE(mtp)
         header.hashPrevBlock = prevHash;
         header.nBits = GetNextWorkRequired( prev, &header, GlobalConfig::GetConfig() );
 
-        prev = &CBlockIndex::Make( header, dirty, blockIndexStore );
+        prev = blockIndexStore.Insert( header );
         blocks.SetTip( prev );
         prevHash = prev->GetBlockHash();
     }

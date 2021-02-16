@@ -700,8 +700,7 @@ void Test_BlockAssembler_construction(TestingSetup& testingSetup)
 
 void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTime, uint64_t expectedSize)
 {
-    DirtyBlockIndexStore dirty;
-    std::map<uint256, CBlockIndex> blockIndexStore;
+    BlockIndexStore blockIndexStore;
 
     {
         LOCK(cs_main);
@@ -720,7 +719,7 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
                     chainActive.Tip(),
                     &header,
                     GlobalConfig::GetConfig() );
-            CBlockIndex* next = &CBlockIndex::Make( header, dirty, blockIndexStore );
+            CBlockIndex* next = blockIndexStore.Insert( header );
 
             prevHash = next->GetBlockHash();
 

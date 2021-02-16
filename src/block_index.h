@@ -250,18 +250,18 @@ public:
     CBlockIndex& operator=(const CBlockIndex&) = delete;
 
     /**
-     * Class that guarantees that public constructors of this class can only be
-     * used from CBlockIndex internal functions.
-     *       It needs to be public for emplace construction inside containers.
+     * Class used to guarantee that public constructors and other construction related methods
+     * of this class can only be used from friends specified in this class.
      */
     class PrivateTag
     {
         // intentionally private
-        PrivateTag() = default;
-        friend class CBlockIndex;
+        explicit PrivateTag() = default;
 
-        public:
-            template<typename T> struct UnitTestAccess;
+        friend class BlockIndexStore;
+
+    public:
+        template<typename T> struct UnitTestAccess;
     };
 
 private:
@@ -276,8 +276,6 @@ private:
 
     //! pointer to the index of the predecessor of this block
     CBlockIndex* pprev{ nullptr };
-    // Class BlockIndexStore must be friend so that it can modify value of pprev when loading objects from database.
-    friend class BlockIndexStore;
 
     //! pointer to the index of some further predecessor of this block
     const CBlockIndex* pskip{ nullptr };
@@ -331,69 +329,6 @@ private:
     unsigned int nTimeMax{ 0 };
 
 public:
-    /**
-     * T must be of std::map/std::unordered_map associative container interface
-     * concept.
-     *
-     * Parent block index must already exist in the provided container.
-     * Trying to construct a CBlockIndex instance with hash that already exists
-     * in the container is considered no-op and we just return the existing
-     * entry.
-     */
-    template<typename T>
-    static CBlockIndex& Make(
-        const CBlockHeader& block,
-        DirtyBlockIndexStore& notifyDirty,
-        T& container )
-    {
-        assert( !block.IsNull() );
-
-        auto prev = container.find(block.hashPrevBlock);
-
-        // Only genesis blocks may have missing previous block!
-        assert(
-            (block.hashPrevBlock.IsNull() && prev == container.end() ) ||
-            prev != container.end());
-
-        auto item =
-            container.try_emplace(
-                block.GetHash(),
-                block,
-                (prev != container.end() ? &prev->second : nullptr),
-                std::ref(notifyDirty),
-                PrivateTag{} );
-        assert( item.second );
-        auto& indexNew = item.first->second;
-        indexNew.phashBlock = &(item.first->first);
-
-        return indexNew;
-    }
-    /**
-     * T must be of std::map/std::unordered_map associative container interface
-     * concept.
-     *
-     * Trying to construct a CBlockIndex instance with hash that already exists
-     * in the container is considered no-op and we just return the existing
-     * entry.
-     */
-    template<typename T>
-    static CBlockIndex& UnsafeMakePartial(
-        const uint256& hash,
-        DirtyBlockIndexStore& notifyDirty,
-        T& container )
-    {
-        auto item =
-            container.try_emplace(
-                hash,
-                PrivateTag{},
-                std::ref(notifyDirty) );
-        assert( item.second );
-        auto& indexNew = item.first->second;
-        indexNew.phashBlock = &item.first->first;
-
-        return indexNew;
-    }
-
     /**
      * Used after indexes are loaded from the database to update their chain
      * related data.
@@ -787,18 +722,16 @@ public:
     friend class CDiskBlockIndex;
 
     /**
-     * NOTE: Constructor is private and is expectedly not constructible outside
-     *       static make member functions!
-     *       It needs to be public for emplace construction inside containers.
+     * NOTE: Constructor is not publicly available and can only be used by friends of PrivateTag class!
+     *       Because it is public, it can also be used for emplace construction inside containers.
      */
-    CBlockIndex(PrivateTag, DirtyBlockIndexStore& notifyDirty) noexcept
+    CBlockIndex(DirtyBlockIndexStore& notifyDirty, PrivateTag) noexcept
         : mNotifyDirty{ notifyDirty }
     {}
 
     /**
-     * NOTE: Constructor is private and is expectedly not constructible outside
-     *       static make member functions!
-     *       It needs to be public for emplace construction inside containers.
+     * NOTE: Constructor is not publicly available and can only be used by friends of PrivateTag class!
+     *       Because it is public, it can also be used for emplace construction inside containers.
      */
     CBlockIndex(
         const CBlockHeader& block,
@@ -807,6 +740,24 @@ public:
         PrivateTag) noexcept
         : CBlockIndex{ block, prev, notifyDirty }
     {}
+
+    /**
+     * NOTE: Method is not publicly available and can only be used by friends of PrivateTag class!
+     *       Because it is only used during logical object construction, method name has a class name prefix.
+     */
+    void CBlockIndex_SetBlockHash(const uint256* blockhash, PrivateTag)
+    {
+        CBlockIndex_SetBlockHash(blockhash);
+    }
+
+    /**
+     * NOTE: Method is not publicly available and can only be used by friends of PrivateTag class!
+     *       Because it is only used during logical object construction, method name has a class name prefix.
+     */
+    void CBlockIndex_SetPrev(CBlockIndex* prev, PrivateTag)
+    {
+        CBlockIndex_SetPrev(prev);
+    }
 
 protected:
     mutable CDiskBlockMetaData mDiskBlockMetaData;
@@ -882,6 +833,16 @@ private:
         // new index that might never get block data (can be forgotten after
         // restart) so we call Base version of RaiseValidity.
         RaiseValidityBaseNL( BlockValidity::TREE );
+    }
+
+    void CBlockIndex_SetBlockHash(const uint256* blockhash)
+    {
+        phashBlock = blockhash;
+    }
+
+    void CBlockIndex_SetPrev(CBlockIndex* prev)
+    {
+        pprev = prev;
     }
 
     bool PopulateBlockIndexBlockDiskMetaDataNL(FILE* file,

@@ -42,15 +42,36 @@ public:
         mDirtyBlockIndex.Clear();
     }
 
+    /**
+     * Insert new or return existing block index instance.
+     *
+     * Parent block index must already exist in the provided container.
+     * Trying to construct a CBlockIndex instance with hash that already exists
+     * in the container is considered no-op and we just return the existing
+     * entry.
+     */
     CBlockIndex* Insert( const CBlockHeader& block )
     {
         std::lock_guard lock{ mMutex };
 
-        auto& indexNew =
-            CBlockIndex::Make(
+        auto prev = mStore.find(block.hashPrevBlock);
+
+        // Only genesis blocks may have missing previous block!
+        assert(
+            (block.hashPrevBlock.IsNull() && prev == mStore.end() ) ||
+            prev != mStore.end());
+
+        auto mi =
+            mStore.try_emplace(
+                block.GetHash(),
                 block,
-                mDirtyBlockIndex,
-                mStore );
+                (prev != mStore.end() ? &prev->second : nullptr),
+                std::ref(mDirtyBlockIndex),
+                CBlockIndex::PrivateTag{})
+            .first;
+
+        auto& indexNew = mi->second;
+        indexNew.CBlockIndex_SetBlockHash( &mi->first, CBlockIndex::PrivateTag{} );
 
         if (mBestHeader == nullptr ||
             CBlockIndexWorkComparator()(mBestHeader, &indexNew))
@@ -132,11 +153,16 @@ private:
             return *index;
         }
 
-        return
-            CBlockIndex::UnsafeMakePartial(
+        auto [mi, inserted] =
+            mStore.try_emplace(
                 blockHash,
-                mDirtyBlockIndex,
-                mStore );
+                std::ref(mDirtyBlockIndex),
+                CBlockIndex::PrivateTag{} );
+        assert( inserted );
+        auto& indexNew = mi->second;
+        indexNew.CBlockIndex_SetBlockHash( &mi->first, CBlockIndex::PrivateTag{} );
+
+        return indexNew;
     }
 
     CBlockIndex* getNL( const uint256& blockHash )
