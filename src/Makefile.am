@@ -120,6 +120,7 @@ BITCOIN_CORE_H = \
   key.h \
   keystore.h \
   dbwrapper.h \
+  leaky_bucket.h \
   limitedmap.h \
   locked_ref.h \
   logging.h \
