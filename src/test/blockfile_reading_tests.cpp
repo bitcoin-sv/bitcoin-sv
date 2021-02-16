@@ -179,6 +179,10 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     std::vector<uint8_t> serializedData;
 
+    // prepare file ids set for pruning
+    std::set<int> fileIds;
+    fileIds.insert(index.nFile);
+
     // start reading and inbetween the read try to delete the file on disk
     {
         auto runStart = std::chrono::steady_clock::now();
@@ -197,8 +201,6 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
                 ((expectedSerializedData.size() / 2) <= serializedData.size()))
             {
                 // we're half way through the file so it's time to delete it
-                std::set<int> fileIds;
-                fileIds.insert(index.nFile);
                 UnlinkPrunedFiles(fileIds);
                 deleted = true;
             }
@@ -211,6 +213,12 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
         }
         while(!stream->EndOfStream());
     }
+
+    // Previously called UnlinkPrunedFiles might be unsuccessful because file was still open.
+    // With resetting the stream, file is closed and we can perform cleanup.
+    // On UNIX, pruning is performed successfully; resetting and unlinking is only needed for Windows.
+    stream.reset();
+    UnlinkPrunedFiles(fileIds);
 
     BOOST_REQUIRE_EQUAL_COLLECTIONS(
         serializedData.begin(), serializedData.end(),
