@@ -1118,12 +1118,6 @@ CTxnValResult TxnValidation(
     CoinsDBView tipView{ *pcoinsTip };
     CCoinsViewMemPool viewMemPool(tipView, pool);
     CCoinsViewCache view(viewMemPool);
-    // Do we already have it?
-    if(!CheckTxOutputs(tx, *pcoinsTip, view, vCoinsToUncache)) {
-       state.Invalid(false, REJECT_ALREADY_KNOWN,
-                    "txn-already-known");
-       return Result{state, pTxInputData, vCoinsToUncache};
-    }
     // Prepare coins to uncache list for inputs
     for (const CTxIn& txin : tx.vin)
     {
@@ -1143,8 +1137,14 @@ CTxnValResult TxnValidation(
     }
     else if (!have.value())
     {
-        state.SetMissingInputs();
-        state.Invalid();
+        // Do we already have it?
+        if(!CheckTxOutputs(tx, *pcoinsTip, view, vCoinsToUncache)) {
+           state.Invalid(false, REJECT_ALREADY_KNOWN,
+                        "txn-already-known");
+        } else {
+            state.SetMissingInputs();
+            state.Invalid();
+        }
         return Result{state, pTxInputData, vCoinsToUncache};
     }
     // Bring the best block into scope.
