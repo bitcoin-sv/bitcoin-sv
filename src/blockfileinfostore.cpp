@@ -37,10 +37,20 @@ void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
 void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
     LOCK(cs_LastBlockFile);
 
-    BlockFileAccess::FlushBlockFile(
-        nLastBlockFile,
-        vinfoBlockFile[nLastBlockFile],
-        fFinalize );
+    if ( !vinfoBlockFile.empty() )
+    {
+        assert( nLastBlockFile >= 0 );
+        assert( vinfoBlockFile.size() > static_cast<std::size_t>(nLastBlockFile) );
+
+        BlockFileAccess::FlushBlockFile(
+            nLastBlockFile,
+            vinfoBlockFile[nLastBlockFile],
+            fFinalize );
+    }
+    else
+    {
+        assert( nLastBlockFile == 0 );
+    }
 }
 
 std::vector<std::pair<int, const CBlockFileInfo *>> CBlockFileInfoStore::GetAndClearDirtyFileInfo()
