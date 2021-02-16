@@ -282,7 +282,7 @@ rm -rf %{buildroot}
 %files server
 %defattr(-,root,root,-)
 %license COPYING db-%{bdbv}.NC-LICENSE
-%doc COPYING bitcoin.conf.example doc/README.md doc/REST-interface.md doc/bips.md doc/dnsseed-policy.md doc/files.md doc/reduce-traffic.md doc/release-notes.md doc/tor.md
+%doc COPYING bitcoin.conf.example doc/README.md doc/REST-interface.md doc/bips.md doc/dnsseed-policy.md doc/files.md doc/reduce-traffic.md doc/release-notes.md
 %attr(0755,root,root) %{_sbindir}/bitcoind
 %attr(0644,root,root) %{_tmpfilesdir}/bitcoin.conf
 %attr(0644,root,root) %{_unitdir}/bitcoin.service

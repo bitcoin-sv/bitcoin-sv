@@ -247,10 +247,6 @@ Always query for peer addresses via DNS lookup (default: 1)
 Accept connections from outside (default: 1 if no \fB\-proxy\fR or
 \fB\-connect\fR/\-noconnect)
 .HP
-\fB\-listenonion\fR
-.IP
-Automatically create Tor hidden service (default: 1)
-.HP
 \fB\-maxconnections=\fR<n>
 .IP
 Maintain at most <n> connections to peers (default: 125)
@@ -295,14 +291,9 @@ List of stream policies to use with our peers in order of preference
 (available policies: BlockPriority,Default, default:
 BlockPriority,Default)
 .HP
-\fB\-onion=\fR<ip:port>
-.IP
-Use separate SOCKS5 proxy to reach peers via Tor hidden services
-(default: \fB\-proxy\fR)
-.HP
 \fB\-onlynet=\fR<net>
 .IP
-Only connect to nodes in network <net> (ipv4, ipv6 or onion)
+Only connect to nodes in network <net> (ipv4, ipv6)
 .HP
 \fB\-permitbaremultisig\fR
 .IP
@@ -323,8 +314,7 @@ Connect through SOCKS5 proxy
 .HP
 \fB\-proxyrandomize\fR
 .IP
-Randomize credentials for every proxy connection. This enables Tor
-stream isolation (default: 1)
+Randomize credentials for every proxy connection. (default: 1)
 .HP
 \fB\-seednode=\fR<ip>
 .IP
@@ -333,15 +323,6 @@ Connect to a node to retrieve peer addresses, and disconnect
 \fB\-timeout=\fR<n>
 .IP
 Specify connection timeout in milliseconds (minimum: 1, default: 5000)
-.HP
-\fB\-torcontrol=\fR<ip>:<port>
-.IP
-Tor control port to use if onion listening enabled (default:
-127.0.0.1:9051)
-.HP
-\fB\-torpassword=\fR<pass>
-.IP
-Tor control port password (default: empty)
 .HP
 \fB\-upnp\fR
 .IP
@@ -484,7 +465,7 @@ Append comment to the user agent string
 .IP
 Output debugging information (default: 0, supplying <category> is
 optional). If <category> is not supplied or if <category> = 1,
-output all debugging information.<category> can be: net, tor,
+output all debugging information.<category> can be: net,
 mempool, http, bench, zmq, db, rpc, addrman, selectcoins,
 reindex, cmpctblock, rand, prune, proxy, mempoolrej, libevent,
 coindb, leveldb, txnprop, txnsrc, journal, txnval.

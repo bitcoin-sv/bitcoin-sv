@@ -33,7 +33,7 @@ static CCriticalSection cs_proxyInfos;
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = DEFAULT_NAME_LOOKUP;
 
-// Need ample time for negotiation for very slow proxies such as Tor
+// Need ample time for negotiation for very slow proxies
 // (milliseconds)
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
 static std::atomic<bool> interruptSocks5Recv(false);
@@ -42,7 +42,6 @@ enum Network ParseNetwork(std::string net) {
     boost::to_lower(net);
     if (net == "ipv4") return NET_IPV4;
     if (net == "ipv6") return NET_IPV6;
-    if (net == "tor" || net == "onion") return NET_TOR;
     return NET_UNROUTABLE;
 }
 
@@ -52,8 +51,6 @@ std::string GetNetworkName(enum Network net) {
             return "ipv4";
         case NET_IPV6:
             return "ipv6";
-        case NET_TOR:
-            return "onion";
         default:
             return "";
     }
@@ -62,14 +59,6 @@ std::string GetNetworkName(enum Network net) {
 static bool LookupIntern(const char *pszName, std::vector<CNetAddr> &vIP,
                          unsigned int nMaxSolutions, bool fAllowLookup) {
     vIP.clear();
-
-    {
-        CNetAddr addr;
-        if (addr.SetSpecial(std::string(pszName))) {
-            vIP.push_back(addr);
-            return true;
-        }
-    }
 
     struct addrinfo aiHint;
     memset(&aiHint, 0, sizeof(struct addrinfo));
