@@ -926,7 +926,6 @@ bool IsTxnKnown(const CInv &inv) {
 
 bool IsBlockKnown(const CInv &inv) {
     if (MSG_BLOCK == inv.type) {
-        LOCK(cs_main);
         return mapBlockIndex.Get(inv.hash);
     }
     // Don't know what it is, just say we already got one

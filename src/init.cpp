@@ -3040,10 +3040,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Step 11: start node
 
     //// debug print
-    {
-        LOCK(cs_main);
-        LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.Count());
-    }
+    LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.Count());
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
 
     Discover(threadGroup);

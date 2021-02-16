@@ -156,9 +156,6 @@ void getrawtransaction(const Config& config,
                        bool processedInBatch,
                        std::function<void()> httpCallback) 
 {
-    
-    LOCK(cs_main);
-
     TxId txid = TxId(ParseHashV(request.params[0], "parameter 1"));
 
     // Accept either a bool (true) or a num (>=1) to indicate verbose output.
@@ -228,6 +225,7 @@ void getrawtransaction(const Config& config,
         CBlockDetailsData blockData;
         if (auto pindex = mapBlockIndex.Get(hashBlock); pindex)
         {
+            LOCK(cs_main); // protecting chainActive
             if (chainActive.Contains(pindex)) 
             {
                 blockData.confirmations = 1 + chainActive.Height() - pindex->GetHeight();
@@ -266,7 +264,6 @@ static CBlockIndex* GetBlockIndex(const Config& config,
 
     if (!requestedBlockHash.IsNull())
     {
-        LOCK(cs_main);
         pblockindex = mapBlockIndex.Get(requestedBlockHash);
         // Find requested block
         if (!pblockindex)
@@ -331,7 +328,6 @@ static CBlockIndex* GetBlockIndex(const Config& config,
                                "Transaction not yet in block or -txindex is not enabled");
         }
 
-        LOCK(cs_main);
         pblockindex = mapBlockIndex.Get(foundBlockHash);
         if (!pblockindex)
         {
@@ -461,7 +457,7 @@ static UniValue verifytxoutproof(const Config &config,
         return res;
     }
 
-    LOCK(cs_main);
+    LOCK(cs_main); // protecting chainActive
 
     if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
         !index || !chainActive.Contains(index))
@@ -722,8 +718,6 @@ void decoderawtransaction(const Config& config,
                           bool processedInBatch,
                           std::function<void()> httpCallback) 
 {
-
-    LOCK(cs_main);
     RPCTypeCheck(request.params, {UniValue::VSTR});
 
     CMutableTransaction mtx;
@@ -921,11 +915,6 @@ static UniValue signrawtransaction(const Config &config,
             HelpExampleRpc("signrawtransaction", "\"myhex\""));
     }
 
-#ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
-#else
-    LOCK(cs_main);
-#endif
     RPCTypeCheck(
         request.params,
         {UniValue::VSTR, UniValue::VARR, UniValue::VARR, UniValue::VSTR}, true);
@@ -950,6 +939,10 @@ static UniValue signrawtransaction(const Config &config,
     // mergedTx will end up with all the signatures; it starts as a clone of the
     // rawtx:
     CMutableTransaction mergedTx(txVariants[0]);
+
+#ifdef ENABLE_WALLET
+    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
+#endif
 
     // Fetch previous transactions (inputs):
     CoinsDBView tipView{ *pcoinsTip };
@@ -984,6 +977,9 @@ static UniValue signrawtransaction(const Config &config,
         EnsureWalletIsUnlocked(pwallet);
     }
 #endif
+    
+    // make sure that we consistently use the same height
+    auto activeChainHeight = chainActive.Height();
 
     // Add previous txouts given in the RPC call:
     if (request.params.size() > 1 && !request.params[1].isNull()) {
@@ -1053,7 +1049,7 @@ static UniValue signrawtransaction(const Config &config,
                 // We do not have coin height here. We assume that the coin is about to
                 // be mined using latest active rules.
                 const auto genesisActivationHeight = config.GetGenesisActivationHeight();
-                int32_t coinHeight = chainActive.Height() + 1;
+                int32_t coinHeight = activeChainHeight + 1;
 
                 // except if we are trying to sign transactions that spends p2sh transaction, which
                 // are non-standard (and therefore cannot be signed) after genesis upgrade
@@ -1132,7 +1128,7 @@ static UniValue signrawtransaction(const Config &config,
     // rehashing.
     const CTransaction txConst(mergedTx);
 
-    bool genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+    bool genesisEnabled = IsGenesisEnabled(config, activeChainHeight + 1);
 
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
@@ -1147,7 +1143,7 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), chainActive.Height() + 1);
+        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), activeChainHeight + 1);
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -1755,11 +1751,7 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
     }
 
-    int32_t currentChainHeight = 0;
-    {
-        LOCK(cs_main);
-        currentChainHeight = static_cast<int32_t>(chainActive.Height());
-    }
+    int32_t currentChainHeight = chainActive.Height();
 
     CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
 

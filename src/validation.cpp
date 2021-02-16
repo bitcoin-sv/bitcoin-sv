@@ -77,7 +77,7 @@ CChain chainActive;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
 std::atomic_bool fImporting(false);
-bool fReindex = false;
+std::atomic_bool fReindex{ false };
 bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
@@ -2124,27 +2124,35 @@ Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams
 }
 
 bool IsInitialBlockDownload() {
-    // Once this function has returned false, it must remain false.
+    // Once this function has returned false, all subsequent calls from the same
+    // thread will always return false.
     static std::atomic<bool> latchToFalse{false};
     // Optimization: pre-test latch before taking the lock.
     if (latchToFalse.load(std::memory_order_relaxed)) {
         return false;
     }
 
-    LOCK(cs_main);
+    static std::mutex mutexLatchToFalse;
+
+    std::lock_guard lock{ mutexLatchToFalse };
+
     if (latchToFalse.load(std::memory_order_relaxed)) {
         return false;
     }
+
+    auto tip = chainActive.Tip();
+
     if (fImporting || fReindex) {
         return true;
     }
-    if (chainActive.Tip() == nullptr) {
+    if (tip == nullptr) {
         return true;
     }
-    if (chainActive.Tip()->GetChainWork() < nMinimumChainWork) {
+    if (tip->GetChainWork() < nMinimumChainWork)
+    {
         return true;
     }
-    if (chainActive.Tip()->GetBlockTime() < (GetTime() - nMaxTipAge)) {
+    if (tip->GetBlockTime() < (GetTime() - nMaxTipAge)) {
         return true;
     }
     LogPrintf("Leaving InitialBlockDownload (latching to false)\n");
@@ -3106,151 +3114,9 @@ static bool ConnectBlock(
     CDiskTxPos pos(pindex->GetBlockPos(),
                    GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos>> vPos;
-    vPos.reserve(block.vtx.size());
-    blockundo.vtxundo.reserve(block.vtx.size() - 1);
-
-    uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
-
-    for (size_t i = 0; i < block.vtx.size(); i++) {
-        auto& txRef = block.vtx[i];
-        const CTransaction &tx = *txRef;
-
-        CScopedInvalidTxSenderBlock dumper(
-            g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr, 
-            txRef, pindex, state);
-
-        nInputs += tx.vin.size();
-
-        if (!tx.IsCoinBase()) {
-            if (!view.HaveInputs(tx)) {
-                return state.DoS(
-                    100, error("ConnectBlock(): inputs missing/spent"),
-                    REJECT_INVALID, "bad-txns-inputs-missingorspent");
-            }
-
-            // Check that transaction is BIP68 final BIP68 lock checks (as
-            // opposed to nLockTime checks) must be in ConnectBlock because they
-            // require the UTXO set.
-            prevheights.resize(tx.vin.size());
-            for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
-            }
-
-            if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
-                return state.DoS(
-                    100, error("%s: contains a non-BIP68-final transaction",
-                               __func__),
-                    REJECT_INVALID, "bad-txns-nonfinal");
-            }
-        }
-
-        // After Genesis we don't count sigops when connecting blocks
-        if (!isGenesisEnabled){
-            // GetTransactionSigOpCount counts 2 types of sigops:
-            // * legacy (always)
-            // * p2sh (when P2SH enabled)
-            bool sigOpCountError;
-            uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
-            if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
-                return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
-            }
-
-            nSigOpsCount += txSigOpsCount;
-            if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
-                return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                    REJECT_INVALID, "bad-blk-sigops");
-            }
-        }
-
-        if (!tx.IsCoinBase()) {
-            Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
-            nFees += fee;
-
-            // Don't cache results if we're actually connecting blocks (still
-            // consult the cache, though).
-            bool fCacheResults = fJustCheck;
-
-            std::vector<CScriptCheck> vChecks;
-
-            auto res =
-                CheckInputs(
-                    token,
-                    config,
-                    true,
-                    tx,
-                    state,
-                    view,
-                    fScriptChecks,
-                    flags,
-                    fCacheResults,
-                    fCacheResults,
-                    PrecomputedTransactionData(tx),
-                    &vChecks);
-            if (!res.has_value())
-            {
-                // With current implementation this can never happen as providing
-                // vChecks as parameter skips the path that checks the cancellation
-                // token
-                throw CBlockValidationCancellation{};
-            }
-            else if (!res.value())
-            {
-                return error("ConnectBlock(): CheckInputs on %s failed with %s",
-                             tx.GetId().ToString(), FormatStateMessage(state));
-            }
-
-            if(fScriptChecks)
-            {
-                control.Add(vChecks);
-            }
-        }
-
-        CTxUndo undoDummy;
-        if (i > 0) {
-            blockundo.vtxundo.push_back(CTxUndo());
-        }
-        UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(),
-                    pindex->GetHeight());
-
-        vPos.push_back(std::make_pair(tx.GetId(), pos));
-        pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
-    }
-
-    if (parallelBlockValidation)
-    {
-        view.ForceDetach();
-    }
-
-    int64_t nTime3 = GetTimeMicros();
-    nTimeConnect += nTime3 - nTime2;
-    LogPrint(BCLog::BENCH,
-             "      - Connect %u transactions: %.2fms (%.3fms/tx, "
-             "%.3fms/txin) [%.2fs]\n",
-             (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
-             0.001 * (nTime3 - nTime2) / block.vtx.size(),
-             nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1),
-             nTimeConnect * 0.000001);
-
-    Amount blockReward =
-        nFees + GetBlockSubsidy(pindex->GetHeight(), consensusParams);
-    if (block.vtx[0]->GetValueOut() > blockReward) {
-        auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
-                                           "(actual=%d vs limit=%d)",
-                                           block.vtx[0]->GetValueOut(), blockReward),
-                                REJECT_INVALID, "bad-cb-amount");
-        if(!state.IsValid() && g_connman)
-        {
-            g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
-        }
-        return result;
-
-    }
 
     int64_t nTime4; // This is set inside scope below
     {
-        auto guard =
-            blockValidationStatus.getScopedCurrentlyValidatingBlock(*pindex);
-
         /* Script validation is the most expensive part and is also not cs_main
         dependent so in case of parallel block validation we release it for
         the duration of validation.
@@ -3261,6 +3127,146 @@ static bool ConnectBlock(
             parallelBlockValidation
             ? std::make_unique<CTemporaryLeaveCriticalSectionGuard>(cs_main)
             : nullptr;
+
+        vPos.reserve(block.vtx.size());
+        blockundo.vtxundo.reserve(block.vtx.size() - 1);
+
+        uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
+
+        for (size_t i = 0; i < block.vtx.size(); i++) {
+            auto& txRef = block.vtx[i];
+            const CTransaction &tx = *txRef;
+
+            CScopedInvalidTxSenderBlock dumper(
+                g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr,
+                txRef, pindex, state);
+
+            nInputs += tx.vin.size();
+
+            if (!tx.IsCoinBase()) {
+                if (!view.HaveInputs(tx)) {
+                    return state.DoS(
+                        100, error("ConnectBlock(): inputs missing/spent"),
+                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                }
+
+                // Check that transaction is BIP68 final BIP68 lock checks (as
+                // opposed to nLockTime checks) must be in ConnectBlock because they
+                // require the UTXO set.
+                prevheights.resize(tx.vin.size());
+                for (size_t j = 0; j < tx.vin.size(); j++) {
+                    prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
+                }
+
+                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
+                    return state.DoS(
+                        100, error("%s: contains a non-BIP68-final transaction",
+                                   __func__),
+                        REJECT_INVALID, "bad-txns-nonfinal");
+                }
+            }
+
+            // After Genesis we don't count sigops when connecting blocks
+            if (!isGenesisEnabled){
+                // GetTransactionSigOpCount counts 2 types of sigops:
+                // * legacy (always)
+                // * p2sh (when P2SH enabled)
+                bool sigOpCountError;
+                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
+                if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
+                }
+
+                nSigOpsCount += txSigOpsCount;
+                if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
+                    return state.DoS(100, error("ConnectBlock(): too many sigops"),
+                        REJECT_INVALID, "bad-blk-sigops");
+                }
+            }
+
+            if (!tx.IsCoinBase()) {
+                Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
+                nFees += fee;
+
+                // Don't cache results if we're actually connecting blocks (still
+                // consult the cache, though).
+                bool fCacheResults = fJustCheck;
+
+                std::vector<CScriptCheck> vChecks;
+
+                auto res =
+                    CheckInputs(
+                        token,
+                        config,
+                        true,
+                        tx,
+                        state,
+                        view,
+                        fScriptChecks,
+                        flags,
+                        fCacheResults,
+                        fCacheResults,
+                        PrecomputedTransactionData(tx),
+                        &vChecks);
+                if (!res.has_value())
+                {
+                    // With current implementation this can never happen as providing
+                    // vChecks as parameter skips the path that checks the cancellation
+                    // token
+                    throw CBlockValidationCancellation{};
+                }
+                else if (!res.value())
+                {
+                    return error("ConnectBlock(): CheckInputs on %s failed with %s",
+                                 tx.GetId().ToString(), FormatStateMessage(state));
+                }
+
+                if(fScriptChecks)
+                {
+                    control.Add(vChecks);
+                }
+            }
+
+            CTxUndo undoDummy;
+            if (i > 0) {
+                blockundo.vtxundo.push_back(CTxUndo());
+            }
+            UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(),
+                        pindex->GetHeight());
+
+            vPos.push_back(std::make_pair(tx.GetId(), pos));
+            pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
+        }
+
+        if (parallelBlockValidation)
+        {
+            view.ForceDetach();
+        }
+
+        int64_t nTime3 = GetTimeMicros();
+        nTimeConnect += nTime3 - nTime2;
+        LogPrint(BCLog::BENCH,
+                 "      - Connect %u transactions: %.2fms (%.3fms/tx, "
+                 "%.3fms/txin) [%.2fs]\n",
+                 (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
+                 0.001 * (nTime3 - nTime2) / block.vtx.size(),
+                 nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1),
+                 nTimeConnect * 0.000001);
+
+        Amount blockReward =
+            nFees + GetBlockSubsidy(pindex->GetHeight(), consensusParams);
+        if (block.vtx[0]->GetValueOut() > blockReward) {
+            auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
+                                               "(actual=%d vs limit=%d)",
+                                               block.vtx[0]->GetValueOut(), blockReward),
+                                    REJECT_INVALID, "bad-cb-amount");
+            if(!state.IsValid() && g_connman)
+            {
+                g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
+            }
+            return result;
+
+        }
 
         if(checkPoolToken)
         {
@@ -3813,6 +3819,9 @@ static bool ConnectTip(
     const CJournalChangeSetPtr& changeSet,
     const arith_uint256& mostWorkOnChain)
 {
+    auto guard =
+        blockValidationStatus.getScopedCurrentlyValidatingBlock( *pindexNew );
+
     assert(pindexNew->GetPrev() == chainActive.Tip());
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
@@ -4838,13 +4847,14 @@ void InvalidateBlocksFromConfig(const Config &config)
     {
         CValidationState state;
         {
-            LOCK(cs_main);
             auto pblockindex = mapBlockIndex.Get(invalidBlockHash);
             if (!pblockindex)
             {
                 LogPrintf("Block %s that is marked as invalid is not found.\n", invalidBlockHash.GetHex());
                 continue;
             }
+
+            LOCK(cs_main);
 
             LogPrintf("Invalidating Block %s.\n", invalidBlockHash.GetHex());
             InvalidateBlock(config, state, pblockindex);
@@ -5431,8 +5441,6 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
  */
 static const CBlockIndex* FindPreviousBlockIndex(const CBlockHeader &block, CValidationState &state)
 {
-    AssertLockHeld(cs_main);
-
     CBlockIndex* ppindex = mapBlockIndex.Get(block.hashPrevBlock);
 
     if (ppindex)
@@ -5717,16 +5725,10 @@ bool VerifyNewBlock(const Config &config,
 
     CValidationState state;
     BlockValidationOptions validationOptions{false, true};
-    const CBlockIndex *pindexPrev = nullptr;
-
+    const CBlockIndex* pindexPrev = FindPreviousBlockIndex(*pblock, state);
+    if (!pindexPrev)
     {
-        LOCK(cs_main);
-        
-        pindexPrev = FindPreviousBlockIndex(*pblock, state);
-        if (!pindexPrev)
-        {
-            return false;
-        }
+        return false;
     }
 
     bool ret = CheckBlock(config, *pblock, state, pindexPrev->GetHeight() + 1, validationOptions);
@@ -5758,16 +5760,12 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
         const CChainParams &chainparams = config.GetChainParams();
 
         CValidationState state;
-        const CBlockIndex *pindexPrev = nullptr;
 
+        // We need previous block index to calculate current block height used by CheckBlock. This check is later repeated in AcceptBlockHeader
+        const CBlockIndex* pindexPrev = FindPreviousBlockIndex(*pblock, state);
+        if (!pindexPrev)
         {
-            LOCK(cs_main);
-            // We need previous block index to calculate current block height used by CheckBlock. This check is later repeated in AcceptBlockHeader
-            pindexPrev = FindPreviousBlockIndex(*pblock, state);
-            if (!pindexPrev)
-            {
-                return {};
-            }
+            return {};
         }
 
         // Ensure that CheckBlock() passes before calling AcceptBlock, as
@@ -6030,7 +6028,10 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     // Check whether we need to continue reindexing
     bool fReindexing = false;
     pblocktree->ReadReindexing(fReindexing);
-    fReindex |= fReindexing;
+    if (!fReindexing)
+    {
+        fReindex = false;
+    }
 
     // Check whether we have a transaction index
     pblocktree->ReadFlag("txindex", fTxIndex);
@@ -6511,7 +6512,7 @@ bool InitBlockIndex(const Config &config) {
     return true;
 }
 
-void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex)
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, std::atomic_bool& fReindex)
 {
     
     int nFile = 0;

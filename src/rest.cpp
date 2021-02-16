@@ -241,23 +241,25 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    int confirmations;
+    std::unique_ptr<CForwardReadonlyStream> stream;
+    CDiskBlockMetaData metadata;
+    CBlockIndex *pblockindex = mapBlockIndex.Get(hash);
+
+    if (!pblockindex) {
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
+    }
+
+    if (fHavePruned && !pblockindex->getStatus().hasData() &&
+        pblockindex->GetBlockTxCount() > 0) {
+        return RESTERR(req, HTTP_NOT_FOUND,
+                       hashStr + " not available (pruned data)");
+    }
+
     std::optional<uint256> nextBlockHash;
-    CBlockIndex* pblockindex = nullptr;
+    int confirmations;
     {
         LOCK(cs_main);
 
-        pblockindex = mapBlockIndex.Get(hash);
-
-        if (!pblockindex) {
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
-        }
-
-        if (fHavePruned && !pblockindex->getStatus().hasData() &&
-            pblockindex->GetBlockTxCount() > 0) {
-            return RESTERR(req, HTTP_NOT_FOUND,
-                           hashStr + " not available (pruned data)");
-        }
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), pblockindex, nextBlockHash);
     }
 

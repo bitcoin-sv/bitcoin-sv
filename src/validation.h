@@ -214,7 +214,7 @@ extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
-extern bool fReindex;
+extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -463,7 +463,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp = nullptr);
 
 /** used for --reindex */
-void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex);
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, std::atomic_bool& fReindex);
 
 /**
  * Initialize a new block tree database + block data on disk.

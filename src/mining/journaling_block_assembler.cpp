@@ -120,7 +120,6 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
 // Get the maximum generated block size for the current config and chain tip
 uint64_t JournalingBlockAssembler::GetMaxGeneratedBlockSize() const
 {
-    LOCK(cs_main);
     return ComputeMaxGeneratedBlockSize(chainActive.Tip());
 }
 

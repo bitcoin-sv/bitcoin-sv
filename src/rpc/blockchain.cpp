@@ -134,7 +134,6 @@ UniValue getblockcount(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("getblockcount", ""));
     }
 
-    LOCK(cs_main);
     return chainActive.Height();
 }
 
@@ -151,7 +150,6 @@ UniValue getbestblockhash(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("getbestblockhash", ""));
     }
 
-    LOCK(cs_main);
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
 
@@ -273,7 +271,6 @@ UniValue getdifficulty(const Config &config, const JSONRPCRequest &request) {
                                  HelpExampleRpc("getdifficulty", ""));
     }
 
-    LOCK(cs_main);
     return GetDifficulty(chainActive.Tip());
 }
 
@@ -730,7 +727,7 @@ UniValue getblockhash(const Config &config, const JSONRPCRequest &request) {
             HelpExampleCli("getblockhash", "1000") +
             HelpExampleRpc("getblockhash", "1000"));
     }
-
+    
     LOCK(cs_main);
 
     int32_t nHeight = request.params[0].get_int();
@@ -1497,10 +1494,7 @@ static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats) {
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = pcursor->GetBestBlock();
-    {
-        LOCK(cs_main);
-        stats.nHeight = mapBlockIndex.Get(stats.hashBlock)->GetHeight();
-    }
+    stats.nHeight = mapBlockIndex.Get(stats.hashBlock)->GetHeight();
     ss << stats.hashBlock;
     uint256 prevkey;
     std::map<uint32_t, CoinWithScript> outputs;
@@ -1550,30 +1544,35 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
             "Cannot prune blocks because node is not in prune mode.");
     }
 
-    LOCK(cs_main);
-
     int32_t heightParam = request.params[0].get_int();
     if (heightParam < 0) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative block height.");
     }
 
-    // Height value more than a billion is too high to be a block height, and
-    // too low to be a block time (corresponds to timestamp from Sep 2001).
-    if (heightParam > 1000000000) {
-        // Add a 2 hour buffer to include blocks which might have had old
-        // timestamps
-        CBlockIndex *pindex =
-            chainActive.FindEarliestAtLeast(heightParam - TIMESTAMP_WINDOW);
-        if (!pindex) {
-            throw JSONRPCError(
-                RPC_INVALID_PARAMETER,
-                "Could not find block with at least the specified timestamp.");
+    int32_t chainHeight;
+
+    {
+        LOCK(cs_main);
+
+        // Height value more than a billion is too high to be a block height, and
+        // too low to be a block time (corresponds to timestamp from Sep 2001).
+        if (heightParam > 1000000000) {
+            // Add a 2 hour buffer to include blocks which might have had old
+            // timestamps
+            CBlockIndex *pindex =
+                chainActive.FindEarliestAtLeast(heightParam - TIMESTAMP_WINDOW);
+            if (!pindex) {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER,
+                    "Could not find block with at least the specified timestamp.");
+            }
+            heightParam = pindex->GetHeight();
         }
-        heightParam = pindex->GetHeight();
+
+        chainHeight = chainActive.Height();
     }
 
     int32_t height = heightParam;
-    int32_t chainHeight = chainActive.Height();
     if (chainHeight < config.GetChainParams().PruneAfterHeight()) {
         throw JSONRPCError(RPC_MISC_ERROR,
                            "Blockchain is too short for pruning.");
@@ -1697,11 +1696,8 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     auto writeCoin =
         [&](const CoinWithScript& coin)
         {
-            CBlockIndex* pindex;
-            {
-                LOCK(cs_main);
-                pindex = mapBlockIndex.Get(tipView.GetBestBlock());
-            }
+            auto pindex = mapBlockIndex.Get(tipView.GetBestBlock());
+
             ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
             if (coin.GetHeight() == MEMPOOL_HEIGHT) {
                 ret.push_back(Pair("confirmations", 0));
@@ -1948,7 +1944,6 @@ void gettxouts(const Config& config,
                 }
                 else
                 {
-                    LOCK(cs_main);
                     auto pindex = mapBlockIndex.Get(tipView.GetBestBlock());
                     confirmations = int64_t(pindex->GetHeight() - coin.GetHeight() + 1);
                 }
@@ -2039,8 +2034,6 @@ UniValue verifychain(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("verifychain", ""));
     }
 
-    LOCK(cs_main);
-
     if (request.params.size() > 0) {
         nCheckLevel = request.params[0].get_int();
     }
@@ -2130,9 +2123,8 @@ UniValue getblockchaininfo(const Config &config,
             HelpExampleCli("getblockchaininfo", "") +
             HelpExampleRpc("getblockchaininfo", ""));
     }
-
-    LOCK(cs_main);
-
+    
+    auto tip = chainActive.Tip();
     auto bestHeader = mapBlockIndex.GetBestHeader();
 
     UniValue obj(UniValue::VOBJ);
@@ -2140,20 +2132,17 @@ UniValue getblockchaininfo(const Config &config,
     obj.push_back(Pair("blocks", int(chainActive.Height())));
     obj.push_back(Pair("headers", bestHeader ? bestHeader->GetHeight() : -1));
     obj.push_back(
-        Pair("bestblockhash", chainActive.Tip()->GetBlockHash().GetHex()));
-    obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
-    obj.push_back(
-        Pair("mediantime", chainActive.Tip()->GetMedianTimePast()));
+        Pair("bestblockhash", tip->GetBlockHash().GetHex()));
+    obj.push_back(Pair("difficulty", double(GetDifficulty(tip))));
+    obj.push_back(Pair("mediantime", tip->GetMedianTimePast()));
     obj.push_back(
         Pair("verificationprogress",
-             GuessVerificationProgress(config.GetChainParams().TxData(),
-                                       chainActive.Tip())));
-    obj.push_back(Pair("chainwork", chainActive.Tip()->GetChainWork().GetHex()));
+             GuessVerificationProgress(config.GetChainParams().TxData(), tip)));
+    obj.push_back(Pair("chainwork", tip->GetChainWork().GetHex()));
     obj.push_back(Pair("pruned", fPruneMode));
 
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
-    CBlockIndex *tip = chainActive.Tip();
     UniValue softforks(UniValue::VARR);
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
@@ -2164,7 +2153,12 @@ UniValue getblockchaininfo(const Config &config,
     obj.push_back(Pair("softforks", softforks));
 
     if (fPruneMode) {
-        const CBlockIndex* block = chainActive.Tip();
+        // No need for extra locking:
+        // We don't care about hasData() stability here as data is always
+        // pruned from older to newer and this result is only informative in
+        // nature as it can already differ once the result gets beck to the RPC
+        // caller.
+        const CBlockIndex* block = tip;
         while (block && !block->IsGenesis() && block->GetPrev()->getStatus().hasData())
         {
             block = block->GetPrev();
@@ -2384,15 +2378,11 @@ UniValue preciousblock(const Config &config, const JSONRPCRequest &request) {
 
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
-    CBlockIndex *pblockindex;
+    CBlockIndex *pblockindex = mapBlockIndex.Get(hash);
 
+    if (!pblockindex)
     {
-        LOCK(cs_main);
-        pblockindex = mapBlockIndex.Get(hash);
-        if (!pblockindex)
-        {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        }
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
     }
 
     CValidationState state;
@@ -2425,12 +2415,13 @@ UniValue invalidateblock(const Config &config, const JSONRPCRequest &request) {
     CValidationState state;
 
     {
-        LOCK(cs_main);
         auto pblockindex = mapBlockIndex.Get(hash);
         if (!pblockindex)
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
         }
+        
+        LOCK(cs_main);
 
         InvalidateBlock(config, state, pblockindex);
     }
@@ -2462,12 +2453,13 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
     uint256 hash(uint256S(strHash));
 
     {
-        LOCK(cs_main);
         auto pblockindex = mapBlockIndex.Get(hash);
         if (!pblockindex)
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
         }
+
+        LOCK(cs_main);
 
         ResetBlockFailureFlags(pblockindex);
     }
@@ -2770,22 +2762,24 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
         hash = uint256S(request.params[1].get_str());
     }
 
-    {
-        LOCK(cs_main);
-        if (havehash) {
-            pindex = mapBlockIndex.Get(hash);
-            if (!pindex)
-            {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
-                                   "Block not found");
-            }
-            if (!chainActive.Contains(pindex)) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER,
-                                   "Block is not in main chain");
-            }
-        } else {
-            pindex = chainActive.Tip();
+    if (havehash) {
+        pindex = mapBlockIndex.Get(hash);
+        if (!pindex)
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+                               "Block not found");
         }
+
+        LOCK(cs_main);
+
+        if (!chainActive.Contains(pindex)) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                               "Block is not in main chain");
+        }
+    } else {
+        LOCK(cs_main);
+
+        pindex = chainActive.Tip();
     }
 
     assert(pindex != nullptr);
@@ -2932,14 +2926,15 @@ static UniValue getblockstats(const Config &config,
                            "\"000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790\", [\"minfeerate\",\"avgfeerate\"]"));
     }
 
-    LOCK(cs_main);
-
     const std::string strHash = request.params[0].get_str();
     const uint256 hash(uint256S(strHash));
     auto pindex = mapBlockIndex.Get(hash);
     if (!pindex) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
     }
+
+    LOCK(cs_main);
+
     if (!chainActive.Contains(pindex)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                             strprintf("Block is not in chain %s",

@@ -97,9 +97,9 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
 
     LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
-#else
-    LOCK(cs_main);
 #endif
+    
+    auto tip = chainActive.Tip();
 
     proxyType proxy;
     GetProxy(NET_IPV4, proxy);
@@ -113,7 +113,7 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
         obj.push_back(Pair("balance", ValueFromAmount(pwallet->GetBalance())));
     }
 #endif
-    obj.push_back(Pair("blocks", (int)chainActive.Height()));
+    obj.push_back(Pair("blocks", (int)(tip ? tip->GetHeight() : -1)));
     obj.push_back(Pair("timeoffset", GetTimeOffset()));
     if (g_connman) {
         obj.push_back(
@@ -122,7 +122,7 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     }
     obj.push_back(Pair("proxy", (proxy.IsValid() ? proxy.proxy.ToStringIPPort()
                                                  : std::string())));
-    obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
+    obj.push_back(Pair("difficulty", double(GetDifficulty(tip))));
     obj.push_back(Pair("testnet",
                        config.GetChainParams().NetworkIDString() ==
                            CBaseChainParams::TESTNET));
@@ -250,8 +250,6 @@ static UniValue validateaddress(const Config &config,
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
 
     LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
-#else
-    LOCK(cs_main);
 #endif
 
     CTxDestination dest =
@@ -468,8 +466,6 @@ static UniValue verifymessage(const Config &config,
                                             "XX\", \"signature\", \"my "
                                             "message\""));
     }
-
-    LOCK(cs_main);
 
     std::string strAddress = request.params[0].get_str();
     std::string strSign = request.params[1].get_str();
