@@ -125,7 +125,7 @@ uint64_t DefaultStreamPolicy::PushMessage(StreamMap& streams, StreamType streamT
 void BlockPriorityStreamPolicy::SetupStreams(CConnman& connman, const CAddress& peerAddr,
     const AssociationIDPtr& assocID)
 {
-    LogPrint(BCLog::NET, "BlockPriorityStreamPolicy opening required streams\n");
+    LogPrint(BCLog::NETCONN, "BlockPriorityStreamPolicy opening required streams\n");
     connman.QueueNewStream(peerAddr, StreamType::DATA1, assocID, GetPolicyName());
 }
 

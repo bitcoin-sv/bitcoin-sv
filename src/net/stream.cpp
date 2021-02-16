@@ -80,7 +80,7 @@ void Stream::Shutdown()
     LOCK(cs_mSocket);
     if(mSocket != INVALID_SOCKET)
     {
-        LogPrint(BCLog::NET, "closing %s stream to peer=%d\n", enum_cast<std::string>(mStreamType),
+        LogPrint(BCLog::NETCONN, "closing %s stream to peer=%d\n", enum_cast<std::string>(mStreamType),
             mNode->GetId());
         CloseSocket(mSocket);
     }
@@ -176,7 +176,7 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                 // socket closed gracefully
                 if (!mNode->GetDisconnect())
                 {   
-                    LogPrint(BCLog::NET, "stream socket closed\n");
+                    LogPrint(BCLog::NETCONN, "stream socket closed\n");
                 }
                 mNode->CloseSocketDisconnect();
             }
@@ -409,7 +409,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
 
         if (IsOversizedMessage(config, msg))
         {   
-            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
+            LogPrint(BCLog::NETCONN, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
             return RECV_BAD_LENGTH;
         }
 

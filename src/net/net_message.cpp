@@ -25,13 +25,13 @@ int CNetMessage::readHeader(const Config &config, const char *pch,
     try {
         hdrbuf >> hdr;
     } catch (const std::exception &) {
-        LogPrint(BCLog::NET, "Bad header format\n");
+        LogPrint(BCLog::NETMSG, "Bad header format\n");
         return -1;
     }
 
     // Reject oversized messages
     if (hdr.IsOversized(config)) {
-        LogPrint(BCLog::NET, "Oversized header detected\n");
+        LogPrint(BCLog::NETMSG, "Oversized header detected\n");
         return -1;
     }
 

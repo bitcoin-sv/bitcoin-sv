@@ -54,14 +54,14 @@ void Association::SetAssociationID(AssociationIDPtr&& id)
 {
     LOCK(cs_mAssocID);
     mAssocID = std::move(id);
-    LogPrint(BCLog::NET, "association ID set to %s for peer=%d\n", mAssocID->ToString(), mNode->GetId());
+    LogPrint(BCLog::NETCONN, "association ID set to %s for peer=%d\n", mAssocID->ToString(), mNode->GetId());
 }
 
 void Association::ClearAssociationID()
 {
     LOCK(cs_mAssocID);
     mAssocID = nullptr;
-    LogPrint(BCLog::NET, "association ID cleared for peer=%d\n", mNode->GetId());
+    LogPrint(BCLog::NETCONN, "association ID cleared for peer=%d\n", mNode->GetId());
 }
 
 Association::~Association()
@@ -98,7 +98,7 @@ void Association::Shutdown()
         mShutdown = true;
         if(!mStreams.empty())
         {
-            LogPrint(BCLog::NET, "disconnecting peer=%d\n", mNode->GetId());
+            LogPrint(BCLog::NETCONN, "disconnecting peer=%d\n", mNode->GetId());
             for(auto& stream : mStreams)
             {
                 stream.second->Shutdown();
@@ -122,13 +122,13 @@ void Association::OpenRequiredStreams(CConnman& connman)
             mStreamPolicy = connman.GetStreamPolicyFactory().Make(mNode->GetPreferredStreamPolicyName());
 
             // Queue messages to setup an further required streams
-            LogPrint(BCLog::NET, "Queuing new stream requests to peer=%d\n", mNode->id);
+            LogPrint(BCLog::NETCONN, "Queuing new stream requests to peer=%d\n", mNode->id);
             mStreamPolicy->SetupStreams(connman, mPeerAddr, assocID);
         }
     }
     else
     {
-        LogPrint(BCLog::NET, "AssociationID not set so not queuing new stream requests to peer=%d\n",
+        LogPrint(BCLog::NETCONN, "AssociationID not set so not queuing new stream requests to peer=%d\n",
             mNode->id);
     }
 }
@@ -164,7 +164,7 @@ void Association::ReplaceStreamPolicy(const StreamPolicyPtr& newPolicy)
         LOCK(cs_mStreams);
         mStreamPolicy = newPolicy;
     }
-    LogPrint(BCLog::NET, "Stream policy changed to %s for peer=%d\n", newPolicy->GetPolicyName(), mNode->id);
+    LogPrint(BCLog::NETCONN, "Stream policy changed to %s for peer=%d\n", newPolicy->GetPolicyName(), mNode->id);
 }
 
 uint64_t Association::GetAverageBandwidth() const
@@ -427,7 +427,7 @@ uint64_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSeri
     }
     catch(std::exception& e)
     {
-        LogPrint(BCLog::NET, "Failed to send message (%s) for peer=%d\n", e.what(), mNode->id);
+        LogPrint(BCLog::NETCONN, "Failed to send message (%s) for peer=%d\n", e.what(), mNode->id);
     }
 
     return nBytesSent;
