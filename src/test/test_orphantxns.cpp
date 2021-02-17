@@ -488,7 +488,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
 
 // In this test we have got txn1 which creates two outputs and then two child transactions txn2 and txn3
 // each of them spending one of the outputs of txn1.
-// A single collectDependentTxnsForRetry invocation should return one related orphan at a time.
 BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
@@ -509,52 +508,19 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     orphanTxns->addTxn(txn3);
     // We presume that txn1 is submitted to the mempool so collect it's outpoints
     orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
-    // For the same parent we can not simply return both orphans.
-    // It is due to txn descendant count & size calculations.
-    //
-    // Test case1:
-    // Call collectDependentTxnsForRetry to get the first related orphan txn 
-    {
-        auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
-        BOOST_CHECK(vRetryTxns.size() == 1);
-        BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn2->GetTxnPtr()));
-        // Remove txn2 from orphans. It simulates a possible use cases:
-        // - txn2 was accepted to the mempool
-        // - txn2 was rejected as being invalid orphan txn.
-        orphanTxns->eraseTxn(txn2->GetTxnPtr()->GetId());
-    }
-    // Test case2:
-    // Call collectDependentTxnsForRetry to get the second related orphan txn 
-    {
-        auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
-        BOOST_CHECK(vRetryTxns.size() == 1);
-        BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn3->GetTxnPtr()));
-        // Remove txn3 from orphans.
-        orphanTxns->eraseTxn(txn3->GetTxnPtr()->GetId());
+
+    // Get txs that need to be reprocessed.
+    auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    BOOST_CHECK(vTxnsToReprocess.size() == 2);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 2);
+    // Remove txs from the orphan pool.
+    for (const auto& tx: vTxnsToReprocess) {
+        orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
     }
 
     // At this stage there is no orphans and collected outpoints in the queue.
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     BOOST_CHECK(!orphanTxns->getTxnsNumber());
-
-    // Test case3:
-    // The collect outpoint from txn1 persists in the queue after the call collectDependentTxnsForRetry.
-    // The outpoints are randomly shuffled every invocation.
-    {
-        orphanTxns->addTxn(txn2);
-        orphanTxns->addTxn(txn3);
-        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
-        {
-            auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
-            BOOST_CHECK(vRetryTxns.size() == 1);
-            BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn2->GetTxnPtr()));
-        }
-        {
-            auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
-            BOOST_CHECK(vRetryTxns.size() == 1);
-            BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn2->GetTxnPtr()) || *(vRetryTxns[0]->GetTxnPtr()) == *(txn3->GetTxnPtr()));
-        }
-    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
