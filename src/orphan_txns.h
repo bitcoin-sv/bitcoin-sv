@@ -9,7 +9,6 @@
 
 #include <shared_mutex>
 #include <vector>
-#include <random>
 
 struct COrphanTxnEntry {
     TxInputDataSPtr pTxInputData {nullptr};
@@ -84,7 +83,7 @@ class COrphanTxns {
     /** Limit a number of orphan transactions size */
     unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
-    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker = TxIdTrackerWPtr{});
+    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
     /** Collect txn's outpoints which will be used to find any dependant orphan txn */
     void collectTxnOutpoints(const CTransaction& tx);
     /** Erase collected outpoints */
@@ -133,7 +132,4 @@ class COrphanTxns {
 
     /** Control txns limit by a time slot */
     int64_t mNextSweep {0};
-
-    /** A default generator */
-    std::default_random_engine mGenerator {};
 };

@@ -15,8 +15,7 @@ CTxnValidator::CTxnValidator(
     TxIdTrackerWPtr pTxIdTracker)
     : mConfig(config),
       mMempool(mpool),
-      mpTxnDoubleSpendDetector(dsDetector),
-      mpTxIdTracker(pTxIdTracker) {
+      mpTxnDoubleSpendDetector(dsDetector) {
     // Configure our running frequency
     auto runFreq { gArgs.GetArg("-txnvalidationasynchrunfreq", DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS) };
     mAsynchRunFrequency = std::chrono::milliseconds {runFreq};
@@ -668,10 +667,10 @@ void CTxnValidator::postProcessingStepsNL(
 // A p2p orphan txn can be scheduled if:
 // - it is not present in the set of cancelled txns.
 // - it was not detected before and scheduled as a non-stdandard txn.
-// Collected orphnas are created as copies and not removed from the orphan's queue.
+// Any detected orphan tx is forwarded to the processing queue as a shared_ptr to the basic CTxInputData instance.
 size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtrVec& vCancelledTxns) {
     /** Get p2p orphan txns */
-    auto vOrphanTxns { mpOrphanTxnsP2PQ->collectDependentTxnsForRetry(mpTxIdTracker) };
+    auto vOrphanTxns { mpOrphanTxnsP2PQ->collectDependentTxnsForRetry() };
     size_t nOrphanTxnsNum { vOrphanTxns.size() };
     if (nOrphanTxnsNum) {
         // Remove those orphans which are present in the set of cancelled txns or already enqueued.

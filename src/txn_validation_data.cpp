@@ -56,12 +56,8 @@ CTxInputData::CTxInputData(
   mTxValidationPriority(txValidationPriority),
   mfOrphan(fOrphan)
 {
-    // Due to orphan transaction life-cycle we skip insert operation into the tracker, because:
-    // - TxIdTracker already stores the txid
-    // - an orphan transaction is entirely removed only if it is evicted or accepted
-    //   (this object is going to be a copy of an existing transaction)
     // A check on the tracker for nullness and availability
-    if(mfOrphan || mpTxIdTracker.expired()) {
+    if(mpTxIdTracker.expired()) {
         return;
     }
     // Add an entry to the TxIdTracker, if:
