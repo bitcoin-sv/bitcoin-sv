@@ -136,7 +136,7 @@ std::string BCLog::Logger::LogTimestampStr(const std::string& str)
 
     if(fStartedNewLine)
     {
-        static const DateTimeFormatter dtf{"%Y-%m-%d %H:%M:%S"};
+        thread_local const DateTimeFormatter dtf{"%Y-%m-%d %H:%M:%S"};
 
         const int64_t nTimeMicros{GetLogTimeMicros()};
         ss = dtf(nTimeMicros / 1000000);
