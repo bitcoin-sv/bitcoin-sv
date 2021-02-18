@@ -51,6 +51,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 // Check if a transaction is a consolidation transaction.
 // A consolidation transaction is a transaction which reduces the size of the UTXO database to
 // an extent that is rewarding enough for the miner to mine the transaction for free.
+// However, if a consolidation transaction is donated to the miner, then we do not need to honour the consolidation factor
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
     const bool isDonation =
@@ -59,7 +60,7 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
             tx.vout[0].scriptPubKey.size() == 1 &&
             tx.vout[0].scriptPubKey[0] == OP_FALSE;
     const uint64_t factor = isDonation
-            ? static_cast<uint64_t>(tx.vin.size() / tx.vout.size())
+            ? tx.vin.size()
             : config.GetMinConsolidationFactor();
     const int32_t minConf = static_cast<int32_t>(config.GetMinConfConsolidationInput());
     const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
