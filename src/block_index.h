@@ -276,6 +276,8 @@ private:
 
     //! pointer to the index of the predecessor of this block
     CBlockIndex* pprev{ nullptr };
+    // Class BlockIndexStore must be friend so that it can modify value of pprev when loading objects from database.
+    friend class BlockIndexStore;
 
     //! pointer to the index of some further predecessor of this block
     const CBlockIndex* pskip{ nullptr };
@@ -390,27 +392,6 @@ public:
         indexNew.phashBlock = &item.first->first;
 
         return indexNew;
-    }
-
-    void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
-    {
-        std::lock_guard lock{ GetMutex() };
-
-        pprev = previous;
-        nHeight = other.nHeight;
-        nFile = other.nFile;
-        nDataPos = other.nDataPos;
-        nUndoPos = other.nUndoPos;
-        nVersion = other.nVersion;
-        hashMerkleRoot = other.hashMerkleRoot;
-        nTime = other.nTime;
-        nBits = other.nBits;
-        nNonce = other.nNonce;
-        nStatus = other.nStatus;
-        nTx = other.nTx;
-        mDiskBlockMetaData = other.mDiskBlockMetaData;
-        nSoftRejected = other.nSoftRejected;
-        mValidationCompletionTime = other.mValidationCompletionTime;
     }
 
     /**
@@ -595,7 +576,6 @@ public:
     void SetSoftRejectedFromParent()
     {
         std::lock_guard lock { GetMutex() };
-
         SetSoftRejectedFromParentNL();
     }
 

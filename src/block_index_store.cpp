@@ -31,20 +31,23 @@ bool BlockIndexStore::ForceLoad(
             break;
         }
 
-        CBlockIndex::TemporaryBlockIndex idx{ {} };
-        CDiskBlockIndex diskindex{ idx };
-        if (!cursor->GetValue(diskindex)) {
+        // Create uninitialized block index object in array or return one that was created previously
+        auto& indexNew = GetOrInsertNL( key.second );
+        assert(indexNew.GetVersion()==0 && indexNew.pprev==nullptr); // We must always get an uninitialized block index object.
+
+        // Initialize object by reading it from database
+        CDiskBlockIndex diskindex{ indexNew };
+        if (!cursor->GetValue( diskindex ))
+        {
             return error("LoadBlockIndex() : failed to read value");
         }
 
-        // Construct block index object
-        auto& indexNew = GetOrInsertNL( diskindex.GetBlockHash() );
-
-        indexNew.LoadFromPersistentData(
-            idx,
-            diskindex.IsGenesis()
-            ? nullptr
-            : &GetOrInsertNL( diskindex.GetHashPrev() ));
+        if(!diskindex.IsGenesis())
+        {
+            // Set parent of this object. This is a second part part of logical object construction.
+            // If parent does not already exist in an array, a new uninitialized object is created.
+            indexNew.pprev = &GetOrInsertNL( diskindex.GetHashPrev() );
+        }
 
         if (!CheckProofOfWork(indexNew.GetBlockHash(), indexNew.GetBits(),
                               config)) {
