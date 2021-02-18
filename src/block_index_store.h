@@ -14,6 +14,16 @@
 #include "uint256.h"
 #include "utiltime.h"
 
+/**
+ * BlockIndexStore tracks all currently existing CBlockIndex objects (except TemporaryBlockIndex objects).
+ * In the outside world it can be accessed via mapBlockIndex global variable.
+ * CBlockIndex objects are stored in mStore member variable.
+ * mStore is locked internally with mMutex member variable on every read/write operation.
+ * The header that is valid and has the highest chain work is stored in mBestHeader member.
+ * Details about choosing the best header are in CBlockIndexWorkComparator implementation.
+ * BlockIndexStore also keeps tracks of objects that were changed during the lifetime and not yet persisted to the database: mDirtyBlockIndex.
+ * When changes are persisted to database, mDirtyBlockIndex is cleared via ExtractDirtyBlockIndices method.
+ */
 class BlockIndexStore
 {
 public:
