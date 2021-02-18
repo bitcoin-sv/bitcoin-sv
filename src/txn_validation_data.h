@@ -148,6 +148,14 @@ public:
         mfOrphan = fOrphan;
     }
 
+    void SetDeleted(bool deleted) {
+        mfDeleted = deleted;
+    }
+
+    bool IsDeleted() const {
+        return mfDeleted;
+    }
+
 // Optimizing for memory footprint:
 // - members are ordered by decreasing alignment
 private:
@@ -162,6 +170,7 @@ private:
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     bool mfOrphan {false};
     bool mfTxIdStored {false};
+    bool mfDeleted {false};
 };
 
 using TxInputDataSPtr = std::shared_ptr<CTxInputData>;

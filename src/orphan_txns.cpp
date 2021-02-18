@@ -16,7 +16,7 @@ COrphanTxns::COrphanTxns(
 {}
 
 void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
-    if (!pTxInputData) {
+    if (!pTxInputData || pTxInputData->IsDeleted()) {
         return;
     }
     // Mark txn as orphan
