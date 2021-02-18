@@ -53,7 +53,14 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 // an extent that is rewarding enough for the miner to mine the transaction for free.
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
-    const uint64_t factor = config.GetMinConsolidationFactor();
+    const bool isDonation =
+            tx.vout.size() == 1U &&
+            tx.vout[0].nValue.GetSatoshis() == 0U &&
+            tx.vout[0].scriptPubKey.size() == 1 &&
+            tx.vout[0].scriptPubKey[0] == OP_FALSE;
+    const uint64_t factor = isDonation
+            ? static_cast<uint64_t>(tx.vin.size() / tx.vout.size())
+            : config.GetMinConsolidationFactor();
     const int32_t minConf = static_cast<int32_t>(config.GetMinConfConsolidationInput());
     const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
     const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
