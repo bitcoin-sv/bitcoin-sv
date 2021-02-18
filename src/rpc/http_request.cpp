@@ -25,21 +25,6 @@ HTTPRequest HTTPRequest::CreateJSONRPCRequest(const RPCClientConfig& config, con
     return { endPoint, contents, RequestCmdType::POST };
 }
 
-// Create a properly formatted RESTPostRequest
-HTTPRequest HTTPRequest::CreateRESTPostRequest(const RPCClientConfig& config, const UniValue& params)
-{
-    // Format contents
-    UniValue request { UniValue::VOBJ };
-    request.pushKVs(params);
-    std::string contents { request.write() + "\n" };
-
-    // Format endpoint
-    std::string endpoint { config.GetEndpoint() + "/submit" };
-
-    // Create request
-    return { endpoint, contents, RequestCmdType::POST };
-}
-
 // Create a properly formatted query request to a double-spend endpoint
 HTTPRequest HTTPRequest::CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid)
 {

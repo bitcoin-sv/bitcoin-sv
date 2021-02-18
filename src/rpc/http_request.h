@@ -64,22 +64,6 @@ class HTTPRequest
     // Factory method to make JSON RPC request
     static HTTPRequest CreateJSONRPCRequest(const RPCClientConfig& config, const std::string& method, const UniValue& params);
 
-    // Factory method to make REST Post request
-    static HTTPRequest CreateRESTPostRequest(const RPCClientConfig& config, const UniValue& params);
-
-    // Factory method to make REST Get request
-    template<typename... Params>
-    static HTTPRequest CreateRESTGetRequest(const RPCClientConfig& config, Params... uriParams)
-    {
-        // Format endpoint
-        std::stringstream endpoint {};
-        endpoint << config.GetEndpoint();
-        ((endpoint << "/" << EncodeURI(uriParams)), ...);
-
-        // Create request
-        return { endpoint.str(), RequestCmdType::GET };
-    }
-
     // Factory method to make a query request to a double-spend endpoint
     static HTTPRequest CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid);
 

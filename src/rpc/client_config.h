@@ -20,17 +20,12 @@ class RPCClientConfig
   public:
 
     // Some default config values (here so they can be checked from unit tests)
-    static constexpr int DEFAULT_DS_AUTHORITY_PORT { 80 };
-    static constexpr int DEFAULT_DS_AUTHORITY_TIMEOUT { 60 };
-
     static constexpr int DEFAULT_DS_ENDPOINT_PORT { 80 };
     static constexpr int DEFAULT_DS_ENDPOINT_FAST_TIMEOUT { 5 };
     static constexpr int DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT { 60 };
 
     // Factory methods
     static RPCClientConfig CreateForBitcoind();
-    static RPCClientConfig CreateForDSA();
-    static RPCClientConfig CreateForDSA(const std::string& url);
     static RPCClientConfig CreateForDoubleSpendEndpoint(const Config& config,
                                                         const std::string& addr,
                                                         int timeout,

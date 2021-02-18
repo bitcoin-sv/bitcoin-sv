@@ -644,106 +644,6 @@ BOOST_AUTO_TEST_CASE(getminingcandidate_low_height)
     nMaxTipAge = oldMaxAge;
 }
 
-// Create client configs for DS Authority
-BOOST_AUTO_TEST_CASE(client_config_dsa)
-{
-    using namespace rpc::client;
-
-    {
-        // All good
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/DsAuthority/proof/");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof/");
-
-            // Also just check other defaults
-            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_AUTHORITY_TIMEOUT);
-            BOOST_CHECK_EQUAL(config.GetCredentials(), "");
-            BOOST_CHECK(! config.UsesAuth());
-            BOOST_CHECK_EQUAL(config.GetWallet(), "");
-        );
-    }
-
-    {
-        // Mimimal endpoint (and override timeout)
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/D");
-        gArgs.ForceSetArg("-dsauthoritytimeout", "10");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/D");
-            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 10);
-        );
-    }
-
-    {
-        // Missing endpoint
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/");
-        );
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
-        );
-    }
-
-    {
-        // Without http://
-        gArgs.ForceSetArg("-dsauthorityurl", "hostname:8080");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
-        );
-    }
-
-    {
-        // Missing port
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:/DsAuthority/proof");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname:");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
-        );
-    }
-
-    {
-        // Unspecified port
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname/DsAuthority/proof");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
-        );
-    }
-
-    {
-        // Missing server address
-        gArgs.ForceSetArg("-dsauthorityurl", "http://");
-        BOOST_CHECK_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-        , std::runtime_error);
-    }
-
-    {
-        // Unsupported protocol
-        gArgs.ForceSetArg("-dsauthorityurl", "https://hostname:8080/DsAuthority/proof");
-        BOOST_CHECK_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-        , std::runtime_error);
-    }
-}
-
 // Create client configs for double-spend endpoint
 BOOST_AUTO_TEST_CASE(client_config_ds_endpoint)
 {
@@ -806,20 +706,6 @@ BOOST_AUTO_TEST_CASE(http_requests)
     params = RPCConvertNamedValues(method, args);
 
     using namespace rpc::client;
-
-    {
-        // REST requests to the DS authority
-        RPCClientConfig config { RPCClientConfig::CreateForDSA("http://127.0.0.1:8080/DsAuthority/proof") };
-
-        auto postRequest { rpc::client::HTTPRequest::CreateRESTPostRequest(config, params) };
-        std::string strContents { postRequest.GetContents().begin(), postRequest.GetContents().end() };
-        BOOST_CHECK_EQUAL(strContents, "{\"tx1\":\"1\",\"tx2\":\"2\"}\n");
-        BOOST_CHECK_EQUAL(postRequest.GetEndpoint(), "/DsAuthority/proof/submit");
-
-        auto getRequest { rpc::client::HTTPRequest::CreateRESTGetRequest(config, "a56fd", 5) };
-        BOOST_CHECK_EQUAL(getRequest.GetContents().size(), 0);
-        BOOST_CHECK_EQUAL(getRequest.GetEndpoint(), "/DsAuthority/proof/a56fd/5");
-    }
 
     {
         // RPC request to a double-spend endpoint
