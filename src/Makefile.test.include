@@ -75,6 +75,7 @@ BITCOIN_TESTS =\
   test/json_tests.cpp \
   test/jsonutil.h \
   test/key_tests.cpp \
+  test/leaky_bucket_tests.cpp \
   test/limitedmap_tests.cpp \
   test/limitedstack_tests.cpp \
   test/locked_ref_tests.cpp \
