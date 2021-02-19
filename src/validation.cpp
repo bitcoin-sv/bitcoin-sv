@@ -5600,11 +5600,6 @@ static bool AcceptBlock(const Config& config,
         return false;
     }
 
-    // Try to process all requested blocks that we don't have, but only
-    // process an unrequested block if it's new and has enough work to
-    // advance our tip, and isn't too many blocks ahead.
-    bool fAlreadyHave = pindex->getStatus().hasData();
-
     // Compare block header timestamps and received times of the block and the
     // chaintip.  If they have the same chain height, just log the time
     // difference for both.
@@ -5644,9 +5639,13 @@ static bool AcceptBlock(const Config& config,
     // block is in a chain leading to a candidate for best tip, despite not
     // being such a candidate itself.
 
+    // Try to process all requested blocks that we don't have, but only
+    // process an unrequested block if it's new and has enough work to
+    // advance our tip, and isn't too many blocks ahead.
     // TODO: deal better with return value and error conditions for duplicate
     // and unrequested blocks.
-    if (fAlreadyHave) {
+    if (bool fAlreadyHave = pindex->getStatus().hasData(); fAlreadyHave)
+    {
         return true;
     }
 

@@ -4218,31 +4218,23 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
     }
 
     if (chainActive.Tip() && chainActive.Tip() != pindexRescan) {
-        // We can't rescan beyond non-pruned blocks, stop and throw an error.
-        // This might happen if a user uses a old wallet within a pruned node or
-        // if he ran -disablewallet for a longer time, then decided to
-        // re-enable.
-        if (fPruneMode) {
-            CBlockIndex *block = chainActive.Tip();
-            while (block && block->pprev && block->pprev->getStatus().hasData() &&
-                   block->pprev->nTx > 0 && pindexRescan != block) {
-                block = block->pprev;
-            }
-
-            if (pindexRescan != block) {
-                InitError(_("Prune: last wallet synchronisation goes beyond "
-                            "pruned data. You need to -reindex (download the "
-                            "whole blockchain again in case of pruned node)"));
-                return nullptr;
-            }
-        }
-
         uiInterface.InitMessage(_("Rescanning..."));
         LogPrintf("Rescanning last %i blocks (from block %i)...\n",
                   chainActive.Height() - pindexRescan->nHeight,
                   pindexRescan->nHeight);
         nStart = GetTimeMillis();
-        walletInstance->ScanForWalletTransactions(pindexRescan, true);
+        if (walletInstance->ScanForWalletTransactions(pindexRescan, true) == nullptr)
+        {
+            // We can't rescan beyond non-pruned blocks, stop and throw an error.
+            // This might happen if a user uses a old wallet within a pruned node or
+            // if he ran -disablewallet for a longer time, then decided to
+            // re-enable.
+            LogPrintf(" failed rescan      %15dms\n", GetTimeMillis() - nStart);
+            InitError(_("Prune: last wallet synchronisation goes beyond "
+                        "pruned data. You need to -reindex (download the "
+                        "whole blockchain again in case of pruned node)"));
+            return nullptr;
+        }
         LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         walletInstance->dbw->IncrementUpdateCounter();

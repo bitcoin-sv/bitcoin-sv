@@ -1194,64 +1194,65 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
 
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
-                if (send && (mi->second->getStatus().hasData())) {
+                if (send) {
                     bool isMostRecentBlock = chainActive.Tip() == mi->second;
+                    bool wasSent = false;
                     // Send block from disk
                     if (inv.type == MSG_BLOCK)
                     {
                         auto data = mi->second->StreamBlockFromDisk(pfrom->GetSendVersion());
 
-                        if (!data.stream)
+                        if (data.stream)
                         {
-                            assert(!"can not load block from disk");
+                            SendBlock(
+                                config,
+                                isMostRecentBlock,
+                                pfrom,
+                                std::move(data),
+                                connman);
+                            wasSent = true;
                         }
-                        SendBlock(
-                            config,
-                            isMostRecentBlock,
-                            pfrom,
-                            std::move(data),
-                            connman);
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
                         auto stream =
                             mi->second->GetDiskBlockStreamReader();
-                        if (!stream) {
-                            assert(!"can not load block from disk");
-                        }
-
-                        bool sendMerkleBlock = false;
-                        CMerkleBlock merkleBlock;
-                        {
-                            LOCK(pfrom->cs_filter);
-                            sendMerkleBlock = true;
-                            merkleBlock =
-                                CMerkleBlock(*stream, pfrom->mFilter);
-                        }
-                        if (sendMerkleBlock) {
-                            CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
-                            if (rejectIfMaxDownloadExceeded(config, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
-                                break;
+                        if (stream) {
+                            bool sendMerkleBlock = false;
+                            CMerkleBlock merkleBlock;
+                            {
+                                LOCK(pfrom->cs_filter);
+                                sendMerkleBlock = true;
+                                merkleBlock =
+                                    CMerkleBlock(*stream, pfrom->mFilter);
                             }
-                            connman.PushMessage(pfrom, std::move(merkleBlockMsg));
-                            // CMerkleBlock just contains hashes, so also push
-                            // any transactions in the block the client did not
-                            // see. This avoids hurting performance by
-                            // pointlessly requiring a round-trip. Note that
-                            // there is currently no way for a node to request
-                            // any single transactions we didn't send here -
-                            // they must either disconnect and retry or request
-                            // the full block. Thus, the protocol spec specified
-                            // allows for us to provide duplicate txn here,
-                            // however we MUST always provide at least what the
-                            // remote peer needs.
-                            SendUnseenTransactions(
-                                merkleBlock.vMatchedTxn,
-                                connman,
-                                pfrom,
-                                msgMaker,
-                                *mi->second);
+                            if (sendMerkleBlock) {
+                                CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
+                                if (rejectIfMaxDownloadExceeded(config, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
+                                    break;
+                                }
+                                connman.PushMessage(pfrom, std::move(merkleBlockMsg));
+                                // CMerkleBlock just contains hashes, so also push
+                                // any transactions in the block the client did not
+                                // see. This avoids hurting performance by
+                                // pointlessly requiring a round-trip. Note that
+                                // there is currently no way for a node to request
+                                // any single transactions we didn't send here -
+                                // they must either disconnect and retry or request
+                                // the full block. Thus, the protocol spec specified
+                                // allows for us to provide duplicate txn here,
+                                // however we MUST always provide at least what the
+                                // remote peer needs.
+                                SendUnseenTransactions(
+                                    merkleBlock.vMatchedTxn,
+                                    connman,
+                                    pfrom,
+                                    msgMaker,
+                                   * mi->second);
+                            }
+                            // else
+                            // no response
+
+                            wasSent = true;
                         }
-                        // else
-                        // no response
                     } else if (inv.type == MSG_CMPCT_BLOCK) {
                         // If a peer is asking for old blocks, we're almost
                         // guaranteed they won't have a useful mempool to match
@@ -1264,49 +1265,52 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         {
                             auto reader =
                                 mi->second->GetDiskBlockStreamReader( config );
-                            if (!reader) {
-                                assert(!"cannot load block from disk");
-                            }
-                            bool sent = SendCompactBlock(
-                                config,
-                                isMostRecentBlock,
-                                pfrom,
-                                connman,
-                                msgMaker,
-                                *reader);
-                            if (!sent)
+                            if (reader)
                             {
-                                break;
+                                bool sent = SendCompactBlock(
+                                    config,
+                                    isMostRecentBlock,
+                                    pfrom,
+                                    connman,
+                                    msgMaker,
+                                    *reader);
+                                if (!sent)
+                                {
+                                    break;
+                                }
+                                wasSent = true;
                             }
                         } else {
                             auto data = mi->second->StreamBlockFromDisk(pfrom->GetSendVersion());
 
-                            if (!data.stream)
+                            if (data.stream)
                             {
-                                assert(!"can not load block from disk");
+                                SendBlock(
+                                    config,
+                                    isMostRecentBlock,
+                                    pfrom,
+                                    std::move(data),
+                                    connman);
+                                wasSent = true;
                             }
-
-                            SendBlock(
-                                config,
-                                isMostRecentBlock,
-                                pfrom,
-                                std::move(data),
-                                connman);
                         }
                     }
 
-                    // Trigger the peer node to send a getblocks request for the
-                    // next batch of inventory.
-                    if (inv.hash == pfrom->hashContinue) {
-                        // Bypass PushInventory, this must send even if
-                        // redundant, and we want it right after the last block
-                        // so they don't wait for other stuff first.
-                        std::vector<CInv> vInv;
-                        vInv.push_back(
-                            CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
-                        connman.PushMessage(
-                            pfrom, msgMaker.Make(NetMsgType::INV, vInv));
-                        pfrom->hashContinue.SetNull();
+                    if (wasSent)
+                    {
+                        // Trigger the peer node to send a getblocks request for the
+                        // next batch of inventory.
+                        if (inv.hash == pfrom->hashContinue) {
+                            // Bypass PushInventory, this must send even if
+                            // redundant, and we want it right after the last block
+                            // so they don't wait for other stuff first.
+                            std::vector<CInv> vInv;
+                            vInv.push_back(
+                                CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
+                            connman.PushMessage(
+                                pfrom, msgMaker.Make(NetMsgType::INV, vInv));
+                            pfrom->hashContinue.SetNull();
+                        }
                     }
                 }
             } else if (inv.type == MSG_TX) {
@@ -2223,7 +2227,8 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     LOCK(cs_main);
 
     BlockMap::iterator it = mapBlockIndex.find(req.blockhash);
-    if(it == mapBlockIndex.end() || !it->second->getStatus().hasData()) {
+    if(it == mapBlockIndex.end())
+    {
         LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
         return;
     }
@@ -2248,8 +2253,11 @@ static void ProcessGetBlockTxnMessage(const Config& config,
 
     // Create stream reader object that will be used to read block from disk.
     auto block_stream_reader = it->second->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
-    assert(block_stream_reader); // It must always be possible to read a valid block from disk if block was found in block index.
-
+    if (!block_stream_reader)
+    {
+        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        return;
+    }
     // Number of transactions in block
     const std::size_t num_txn_in_block { block_stream_reader->GetRemainingTransactionsCount() };
 

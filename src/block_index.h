@@ -82,6 +82,9 @@ enum class BlockValidity : uint32_t {
 
 struct BlockStatus {
 private:
+    friend class CBlockIndex;
+    friend class CDiskBlockIndex;
+
     uint32_t status;
 
     explicit BlockStatus(uint32_t nStatusIn) : status(nStatusIn) {}
@@ -107,7 +110,29 @@ private:
     // Mask used to check if the block failed.
     static const uint32_t INVALID_MASK = FAILED_FLAG | FAILED_PARENT_FLAG;
 
+    [[nodiscard]] BlockStatus withData(bool hasData = true) const {
+        return BlockStatus((status & ~HAS_DATA_FLAG) |
+                           (hasData ? HAS_DATA_FLAG : 0));
+    }
+
+    [[nodiscard]] BlockStatus withUndo(bool hasUndo = true) const {
+        return BlockStatus((status & ~HAS_UNDO_FLAG) |
+                           (hasUndo ? HAS_UNDO_FLAG : 0));
+    }
+
+    [[nodiscard]] bool hasDiskBlockMetaData() const
+    {
+        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
+    }
+    [[nodiscard]] BlockStatus withDiskBlockMetaData(bool hasData = true) const
+    {
+        return BlockStatus((status & ~HAS_DISK_BLOCK_META_DATA_FLAG) |
+                           (hasData ? HAS_DISK_BLOCK_META_DATA_FLAG : 0));
+    }
+
 public:
+    template<typename T> struct UnitTestAccess;
+
     explicit BlockStatus() : status(0) {}
 
     BlockValidity getValidity() const {
@@ -119,31 +144,13 @@ public:
     }
 
     bool hasData() const { return status & HAS_DATA_FLAG; }
-    BlockStatus withData(bool hasData = true) const {
-        return BlockStatus((status & ~HAS_DATA_FLAG) |
-                           (hasData ? HAS_DATA_FLAG : 0));
-    }
 
     bool hasUndo() const { return status & HAS_UNDO_FLAG; }
-    BlockStatus withUndo(bool hasUndo = true) const {
-        return BlockStatus((status & ~HAS_UNDO_FLAG) |
-                           (hasUndo ? HAS_UNDO_FLAG : 0));
-    }
 
     bool hasFailed() const { return status & FAILED_FLAG; }
     BlockStatus withFailed(bool hasFailed = true) const {
         return BlockStatus((status & ~FAILED_FLAG) |
                            (hasFailed ? FAILED_FLAG : 0));
-    }
-
-    bool hasDiskBlockMetaData() const
-    {
-        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
-    }
-    BlockStatus withDiskBlockMetaData(bool hasData = true) const
-    {
-        return BlockStatus((status & ~HAS_DISK_BLOCK_META_DATA_FLAG) |
-                           (hasData ? HAS_DISK_BLOCK_META_DATA_FLAG : 0));
     }
 
     bool hasFailedParent() const { return status & FAILED_PARENT_FLAG; }
