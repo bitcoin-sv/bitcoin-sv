@@ -225,12 +225,13 @@ class CDiskBlockMetaDataMutable : public CDiskBlockMetaData
 {
 public:
 
-    CDiskBlockMetaDataMutable& operator=(const CDiskBlockMetaData& other)
+    CDiskBlockMetaDataMutable() = default;
+
+    CDiskBlockMetaDataMutable(const CDiskBlockMetaData &other)
     {
         diskDataHash = other.DiskDataHash();
         diskDataSize = other.DiskDataSize();
-        return *this;
-    }
+    } 
 
     uint256& MutableDiskDataHash() { return diskDataHash; }
     uint64_t& MutableDiskDataSize() { return diskDataSize; }
@@ -247,6 +248,12 @@ arith_uint256 GetBlockProof(const CBlockIndex &block);
 class CBlockIndex {
 public:
     template<typename T> struct UnitTestAccess;
+
+    struct BlockStreamAndMetaData
+    {
+        std::unique_ptr<CForwardAsyncReadonlyStream> stream;
+        CDiskBlockMetaData metaData;
+    };
 
     //! pointer to the hash of the block, if any. Memory is owned by this
     //! CBlockIndex
@@ -356,7 +363,12 @@ public:
         return GetBlockPosNL();
     }
 
-    CDiskBlockMetaData GetDiskBlockMetaData() const {return mDiskBlockMetaData;}
+    CDiskBlockMetaData GetDiskBlockMetaData() const
+    {
+        std::lock_guard lock(blockIndexMutex);
+
+        return mDiskBlockMetaData;
+    }
 
     void SetDiskBlockData(
         size_t transactionsCount,
@@ -630,7 +642,7 @@ public:
     std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
                             const Config &config, bool calculateDiskBlockMetadata=false) const;
 
-    std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(int networkVersion);
+    BlockStreamAndMetaData StreamBlockFromDisk(int networkVersion);
 
     std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk();
 

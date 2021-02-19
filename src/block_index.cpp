@@ -299,8 +299,6 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
     FILE* file,
     int networkVersion)
 {
-    AssertLockHeld(cs_main);
-
     CBlockStream stream{
         CNonOwningFileReader{file},
         CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
@@ -329,12 +327,11 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
 
     return true;
 }
-
-std::unique_ptr<CForwardAsyncReadonlyStream> CBlockIndex::StreamBlockFromDisk(
+auto CBlockIndex::StreamBlockFromDisk(
     int networkVersion)
+    -> BlockStreamAndMetaData
 {
     std::lock_guard lock{ blockIndexMutex };
-    AssertLockHeld(cs_main);
 
     UniqueCFile file{ BlockFileAccess::OpenBlockFile(GetBlockPosNL()) };
 
@@ -351,15 +348,18 @@ std::unique_ptr<CForwardAsyncReadonlyStream> CBlockIndex::StreamBlockFromDisk(
         }
     }
 
-    assert(!GetDiskBlockMetaData().IsNull());
+    assert(!mDiskBlockMetaData.IsNull());
 
     // We expect that block data on disk is in same format as data sent over the
     // network. If this would change in the future then CBlockStream would need
     // to be used to change the resulting fromat.
     return
-        std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
-            GetDiskBlockMetaData().DiskDataSize(),
-            CAsyncFileReader{std::move(file)});
+        {
+            std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
+                mDiskBlockMetaData.DiskDataSize(),
+                CAsyncFileReader{std::move(file)}),
+            mDiskBlockMetaData
+        };
 }
 
 std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk()
@@ -376,7 +376,7 @@ std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk()
     {
         return
             std::make_unique<CSyncFixedSizeStream<CFileReader>>(
-                GetDiskBlockMetaData().DiskDataSize(),
+                mDiskBlockMetaData.DiskDataSize(),
                 CFileReader{std::move(file)});
     }
 

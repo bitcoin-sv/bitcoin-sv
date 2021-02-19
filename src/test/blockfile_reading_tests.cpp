@@ -133,19 +133,18 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     // check that blockIndex was updated with disk content size and hash data
     {
-        auto stream = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
+        auto data = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
 
-        BOOST_REQUIRE( stream );
+        BOOST_REQUIRE( data.stream );
 
-        std::vector<uint8_t> serializedData{SerializeAsyncStream(*stream, 5u)};
+        std::vector<uint8_t> serializedData{SerializeAsyncStream(*data.stream, 5u)};
 
         uint256 expectedHash =
             Hash(serializedData.begin(), serializedData.end());
 
-        auto metaData = index.GetDiskBlockMetaData();
-        BOOST_REQUIRE_EQUAL(metaData.DiskDataSize(), serializedData.size());
+        BOOST_REQUIRE_EQUAL(data.metaData.DiskDataSize(), serializedData.size());
         BOOST_REQUIRE_EQUAL(
-            metaData.DiskDataHash().GetCheapHash(),
+            data.metaData.DiskDataHash().GetCheapHash(),
             expectedHash.GetCheapHash());
 
         BOOST_REQUIRE_EQUAL_COLLECTIONS(
@@ -162,13 +161,12 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
         auto streamCorruptMetaData =
             index.StreamBlockFromDisk(INIT_PROTO_VERSION);
-        auto metaData = index.GetDiskBlockMetaData();
-        BOOST_REQUIRE_EQUAL(metaData.DiskDataSize(), 1);
+        BOOST_REQUIRE_EQUAL(streamCorruptMetaData.metaData.DiskDataSize(), 1);
         BOOST_REQUIRE_EQUAL(
-            metaData.DiskDataHash().GetCheapHash(),
+            streamCorruptMetaData.metaData.DiskDataHash().GetCheapHash(),
             randomHash.GetCheapHash());
         BOOST_REQUIRE_EQUAL(
-            SerializeAsyncStream(*streamCorruptMetaData, 5u).size(),
+            SerializeAsyncStream(*streamCorruptMetaData.stream, 5u).size(),
             1);
     }
 }
@@ -190,9 +188,9 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
     LOCK(cs_main);
-    auto stream = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
+    auto data = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
 
-    BOOST_REQUIRE( stream );
+    BOOST_REQUIRE( data.stream );
 
     std::vector<uint8_t> serializedData;
 
@@ -222,19 +220,19 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
                 deleted = true;
             }
 
-            auto chunk = stream->ReadAsync(5u);
+            auto chunk = data.stream->ReadAsync(5u);
 
             serializedData.insert(
                 serializedData.end(),
                 chunk.Begin(), chunk.Begin() + chunk.Size());
         }
-        while(!stream->EndOfStream());
+        while(!data.stream->EndOfStream());
     }
 
     // Previously called UnlinkPrunedFiles might be unsuccessful because file was still open.
     // With resetting the stream, file is closed and we can perform cleanup.
     // On UNIX, pruning is performed successfully; resetting and unlinking is only needed for Windows.
-    stream.reset();
+    data.stream.reset();
     UnlinkPrunedFiles(fileIds);
 
     BOOST_REQUIRE_EQUAL_COLLECTIONS(

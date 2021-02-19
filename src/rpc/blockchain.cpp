@@ -1240,34 +1240,18 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                                        CBlockIndex& blockIndex, const std::string& rpcReqId,
                                        bool processedInBatch, const RetFormat& rf)
 {
-    CDiskBlockMetaDataMutable metadata;
-    bool hasDiskBlockMetaData;
-    std::unique_ptr<CForwardReadonlyStream> stream;
+    auto stream = blockIndex.StreamSyncBlockFromDisk();
+    if (!stream) 
     {
-        LOCK(cs_main);
-
-        BlockStatus status = blockIndex.getStatus();
-        if (fHavePruned && !status.hasData() && blockIndex.nTx > 0)
-        {
-            throw block_parse_error("Block not available (pruned data)");
-        }
-
-        stream = blockIndex.StreamSyncBlockFromDisk();
-        if (!stream) 
-        {
-            // Block not found on disk. This could be because we have the block
-            // header in our index but don't have the block (for example if a
-            // non-whitelisted node sends us an unrequested long chain of valid
-            // blocks, we add the headers to our index, but don't accept the block).
-            throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
-        }
-
-        hasDiskBlockMetaData = status.hasDiskBlockMetaData();
-        if (hasDiskBlockMetaData)
-        {
-            metadata = blockIndex.GetDiskBlockMetaData();
-        }
+        // Block not found on disk. This could be because we have the block
+        // header in our index but don't have the block (for example if a
+        // non-whitelisted node sends us an unrequested long chain of valid
+        // blocks, we add the headers to our index, but don't accept the block).
+        throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
     }
+
+    CDiskBlockMetaDataMutable metadata = blockIndex.GetDiskBlockMetaData();
+    bool hasDiskBlockMetaData = !metadata.IsNull();
 
     switch (rf)
     {
@@ -1359,29 +1343,13 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
                                            const std::optional<uint256>& nextBlockHash, 
                                            const std::string& rpcReqId)
 {
-    std::optional<CDiskBlockMetaData> diskBlockMetaData;
-    std::unique_ptr<CBlockStreamReader<CFileReader>> reader;
-    {
-        LOCK(cs_main);
+    CDiskBlockMetaData diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
 
-        BlockStatus status = blockIndex.getStatus();
-        if (fHavePruned && !status.hasData() && blockIndex.nTx > 0) 
-        {
-            throw block_parse_error("Block not available (pruned data)");
-        }
-
-        bool hasDiskBlockMetaData = status.hasDiskBlockMetaData();
-        if (hasDiskBlockMetaData) 
-        {
-            diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
-        }
-
-        reader = blockIndex.GetDiskBlockStreamReader(!hasDiskBlockMetaData);
-    }
+    auto reader = blockIndex.GetDiskBlockStreamReader(diskBlockMetaData.IsNull());
 
     if (!reader) 
     {
-        throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
+        throw block_parse_error("Block file " + blockIndex.GetBlockHash().GetHex() + " not available.");
     }
 
     if (!processedInBatch) 
@@ -1420,11 +1388,11 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     CBlockHeader header = reader->GetBlockHeader();
 
     // set metadata so it is available when setting header in the next step
-    if (!diskBlockMetaData.has_value() && reader->EndOfStream())
+    if (diskBlockMetaData.IsNull() && reader->EndOfStream())
     {
         diskBlockMetaData = reader->getDiskBlockMetadata();
         blockIndex.SetBlockIndexFileMetaDataIfNotSet(
-            std::move(diskBlockMetaData.value()));
+            std::move(diskBlockMetaData));
     }
     headerBlockToJSON(config, header, &blockIndex, diskBlockMetaData, confirmations, nextBlockHash, jWriter);
 
@@ -1449,16 +1417,16 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
 void headerBlockToJSON(const Config& config,
                        const CBlockHeader& blockHeader,
                        const CBlockIndex* blockindex, 
-                       std::optional<CDiskBlockMetaData> diskBlockMetaData,
+                       const CDiskBlockMetaData& diskBlockMetaData,
                        const int confirmations, 
                        const std::optional<uint256>& nextBlockHash,
                        CJSONWriter& jWriter)
 {
     jWriter.pushKV("hash", blockindex->GetBlockHash().GetHex());
     jWriter.pushKV("confirmations", confirmations);
-    if (diskBlockMetaData.has_value())
+    if (!diskBlockMetaData.IsNull())
     {
-        jWriter.pushKV("size", diskBlockMetaData.value().DiskDataSize());
+        jWriter.pushKV("size", diskBlockMetaData.DiskDataSize());
     }
     jWriter.pushKV("height", blockindex->nHeight);
     jWriter.pushKV("version", blockHeader.nVersion);
@@ -3099,24 +3067,10 @@ UniValue getblockstats_impl(const Config &config,
 
     CBlock block;
 
-    if (fHavePruned && !pindex->getStatus().hasData() &&
-        pindex->nTx > 0) {
-        throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
-    }
-
-    auto stream = pindex->StreamSyncBlockFromDisk();
-    if (!stream) {
-        // Block not found on disk. This could be because we have the block
-        // header in our index but don't have the block (for example if a
-        // non-whitelisted node sends us an unrequested long chain of valid
-        // blocks, we add the headers to our index, but don't accept the block).
-        throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
-    }
-
     auto reader = pindex->GetDiskBlockStreamReader(false);
     if (!reader)
     {
-        assert(!"cannot load block from disk");
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not available");
     }
 
     // Calculate everything if nothing selected (default)

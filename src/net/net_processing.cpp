@@ -705,9 +705,8 @@ namespace
                 0,
                 CBlockHeaderAndShortTxIDs{*mBlock}};
 
-            if(index.getStatus().hasDiskBlockMetaData())
+            if(auto metaData = index.GetDiskBlockMetaData(); !metaData.IsNull())
             {
-                auto metaData = index.GetDiskBlockMetaData();
                 mCompactBlockMessage =
                     std::make_shared<const CCompactBlockMessageData>(
                         std::move(serializedData),
@@ -1022,15 +1021,8 @@ static bool SendCompactBlock(
     const CNodePtr& node,
     CConnman& connman,
     const CNetMsgMaker msgMaker,
-    const CBlockIndex& index)
+    const CBlockHeaderAndShortTxIDs& cmpctblock)
 {
-    auto reader = index.GetDiskBlockStreamReader();
-    if (!reader) {
-        assert(!"cannot load block from disk");
-    }
-
-    CBlockHeaderAndShortTxIDs cmpctblock{*reader};
-
     CSerializedNetMsg compactBlockMsg =
         msgMaker.Make(NetMsgType::CMPCTBLOCK, cmpctblock);
     if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, node, connman)) {
@@ -1045,22 +1037,14 @@ static void SendBlock(
     const Config& config,
     bool isMostRecentBlock,
     const CNodePtr& pfrom,
-    CConnman& connman,
-    CBlockIndex& index)
+    CBlockIndex::BlockStreamAndMetaData data,
+    CConnman& connman)
 {
-    auto stream = index.StreamBlockFromDisk(pfrom->GetSendVersion());
-
-    if (!stream)
-    {
-        assert(!"can not load block from disk");
-    }
-
-    auto metaData = index.GetDiskBlockMetaData();
     CSerializedNetMsg blockMsg{
             NetMsgType::BLOCK,
-            std::move(metaData.DiskDataHash()),
-            metaData.DiskDataSize(),
-            std::move(stream)
+            std::move(data.metaData.DiskDataHash()),
+            data.metaData.DiskDataSize(),
+            std::move(data.stream)
         };
 
     if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
@@ -1213,15 +1197,20 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 if (send && (mi->second->getStatus().hasData())) {
                     bool isMostRecentBlock = chainActive.Tip() == mi->second;
                     // Send block from disk
-
                     if (inv.type == MSG_BLOCK)
                     {
+                        auto data = mi->second->StreamBlockFromDisk(pfrom->GetSendVersion());
+
+                        if (!data.stream)
+                        {
+                            assert(!"can not load block from disk");
+                        }
                         SendBlock(
                             config,
                             isMostRecentBlock,
                             pfrom,
-                            connman,
-                            *mi->second);
+                            std::move(data),
+                            connman);
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
                         auto stream =
                             mi->second->GetDiskBlockStreamReader();
@@ -1273,24 +1262,36 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             mi->second->nHeight >=
                                 chainActive.Height() - MAX_CMPCTBLOCK_DEPTH)
                         {
+                            auto reader =
+                                mi->second->GetDiskBlockStreamReader( config );
+                            if (!reader) {
+                                assert(!"cannot load block from disk");
+                            }
                             bool sent = SendCompactBlock(
                                 config,
                                 isMostRecentBlock,
                                 pfrom,
                                 connman,
                                 msgMaker,
-                                *mi->second);
+                                *reader);
                             if (!sent)
                             {
                                 break;
                             }
                         } else {
+                            auto data = mi->second->StreamBlockFromDisk(pfrom->GetSendVersion());
+
+                            if (!data.stream)
+                            {
+                                assert(!"can not load block from disk");
+                            }
+
                             SendBlock(
                                 config,
                                 isMostRecentBlock,
                                 pfrom,
-                                connman,
-                                *mi->second);
+                                std::move(data),
+                                connman);
                         }
                     }
 
@@ -4007,13 +4008,18 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
 
             if (!fGotBlockFromCache) {
                 // FIXME pBestIndex could be null... what to do in that case?
+                auto reader =
+                    pBestIndex->GetDiskBlockStreamReader( config );
+                if (!reader) {
+                    assert(!"cannot load block from disk");
+                }
                 SendCompactBlock(
                     config,
                     true,
                     pto,
                     connman,
                     msgMaker,
-                    *pBestIndex);
+                    *reader);
             }
             state->pindexBestHeaderSent = pBestIndex;
         }
