@@ -1215,7 +1215,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     // Send block from disk
                     if (inv.type == MSG_BLOCK)
                     {
-                        auto data = index->StreamBlockFromDisk(pfrom->GetSendVersion());
+                        auto data = index->StreamBlockFromDisk(pfrom->GetSendVersion(), mapBlockIndex);
 
                         if (data.stream)
                         {
@@ -1296,7 +1296,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                                 wasSent = true;
                             }
                         } else {
-                            auto data = index->StreamBlockFromDisk(pfrom->GetSendVersion());
+                            auto data = index->StreamBlockFromDisk(pfrom->GetSendVersion(), mapBlockIndex);
 
                             if (data.stream)
                             {

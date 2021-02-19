@@ -58,7 +58,6 @@ public:
                 block.GetHash(),
                 block,
                 (prev != mStore.end() ? &prev->second : nullptr),
-                std::ref(mDirtyBlockIndex),
                 CBlockIndex::PrivateTag{})
             .first;
 
@@ -136,6 +135,16 @@ public:
         return *mBestHeader;
     }
 
+
+    /**
+     * Allows BlockIndexStore object to be directly passed to methods that modify CBlockIndex object
+     * so that any changes automatically mark the object as dirty within the store.
+     */
+    operator DirtyBlockIndexStore&()
+    {
+        return mDirtyBlockIndex;
+    }
+
 private:
     CBlockIndex& GetOrInsertNL( const uint256& blockHash )
     {
@@ -148,7 +157,6 @@ private:
         auto [mi, inserted] =
             mStore.try_emplace(
                 blockHash,
-                std::ref(mDirtyBlockIndex),
                 CBlockIndex::PrivateTag{} );
         assert( inserted );
         auto& indexNew = mi->second;

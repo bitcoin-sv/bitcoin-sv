@@ -2258,7 +2258,7 @@ void CheckForkForInvalidBlocks(CBlockIndex* pindexForkTip)
         CBlockIndex* pindexWalk = pindexForkTip;
         while (pindexWalk != pindexInvalidBlock)
         {
-            pindexWalk->ModifyStatusWithFailedParent();
+            pindexWalk->ModifyStatusWithFailedParent(mapBlockIndex);
             setBlockIndexCandidates.erase(pindexWalk);
             pindexWalk = pindexWalk->GetPrev();
         }
@@ -2529,7 +2529,7 @@ static void InvalidChainFound(const CBlockIndex *pindexNew)
 static void InvalidBlockFound(CBlockIndex *pindex,
                               const CValidationState &state) {
     if (!state.CorruptionPossible()) {
-        pindex->ModifyStatusWithFailed();
+        pindex->ModifyStatusWithFailed(mapBlockIndex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);
     }
@@ -3351,7 +3351,8 @@ static bool ConnectBlock(
                 state,
                 blockundo,
                 fCheckForPruning,
-                config);
+                config,
+                mapBlockIndex);
 
         setBlockIndexCandidates.insert(pindex);
 
@@ -4583,7 +4584,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     AssertLockHeld(cs_main);
 
     // Mark the block itself as invalid.
-    pindex->ModifyStatusWithFailed();
+    pindex->ModifyStatusWithFailed(mapBlockIndex);
     setBlockIndexCandidates.erase(pindex);
 
     DisconnectedBlockTransactions disconnectpool;
@@ -4594,7 +4595,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         while (chainActive.Contains(pindex))
         {
             CBlockIndex* pindexWalk = chainActive.Tip();
-            pindexWalk->ModifyStatusWithFailedParent();
+            pindexWalk->ModifyStatusWithFailedParent(mapBlockIndex);
             setBlockIndexCandidates.erase(pindexWalk);
             // ActivateBestChain considers blocks already in chainActive
             // unconditionally valid already, so force disconnect away from it.
@@ -4671,13 +4672,13 @@ void SetRootSoftRejectedForNL(const BlockIndexWithDescendants& blockIndexWithDes
 {
     AssertLockHeld(cs_main);
     auto* item = blockIndexWithDescendants.Root();
-    item->BlockIndex()->SetSoftRejectedFor(numBlocks);
+    item->BlockIndex()->SetSoftRejectedFor(numBlocks, mapBlockIndex);
 
     item = item->Next();
     for(; item!=nullptr; item=item->Next())
     {
         // NOTE: tree is traversed depth first so that parents are always updated before children
-        item->BlockIndex()->SetSoftRejectedFromParent();
+        item->BlockIndex()->SetSoftRejectedFromParent(mapBlockIndex);
     }
 }
 
@@ -4867,7 +4868,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
         {
             if (!index.IsValid() &&
                 index.GetAncestor(nHeight) == pindex) {
-                index.ModifyStatusWithClearedFailedFlags();
+                index.ModifyStatusWithClearedFailedFlags(mapBlockIndex);
                 if (index.IsValid(BlockValidity::TRANSACTIONS) &&
                     index.GetChainTx() &&
                     setBlockIndexCandidates.value_comp()(chainActive.Tip(),
@@ -4885,7 +4886,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     // Remove the invalidity flag from all ancestors too.
     while (pindex != nullptr) {
         if (pindex->getStatus().isInvalid()) {
-            pindex->ModifyStatusWithClearedFailedFlags();
+            pindex->ModifyStatusWithClearedFailedFlags(mapBlockIndex);
         }
         pindex = pindex->GetPrev();
     }
@@ -4952,7 +4953,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
             pindexWalk = (*it);
             while (pindexWalk != pindexNew)
             {
-                pindexWalk->ModifyStatusWithFailedParent();
+                pindexWalk->ModifyStatusWithFailedParent(mapBlockIndex);
                 setBlockIndexCandidates.erase(pindexWalk);
                 pindexWalk = pindexWalk->GetPrev();
             }
@@ -5004,7 +5005,7 @@ static bool ReceivedBlockTransactions(
         {
             LogPrintf("Block %s at height %d violates TTOR order.\n", block.GetHash().ToString(), pindexNew->GetHeight());
             // Mark the block itself as invalid.
-            pindexNew->ModifyStatusWithFailed();
+            pindexNew->ModifyStatusWithFailed(mapBlockIndex);
             setBlockIndexCandidates.erase(pindexNew);
             InvalidateChain(pindexNew);
             InvalidChainFound(pindexNew);
@@ -5012,7 +5013,7 @@ static bool ReceivedBlockTransactions(
         }
     }
 
-    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData);
+    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData, mapBlockIndex);
 
     if (pindexNew->IsGenesis() || pindexNew->GetPrev()->GetChainTx())
     {
@@ -5642,7 +5643,7 @@ static bool AcceptBlock(const Config& config,
         !ContextualCheckBlock(config, block, state, pindex->GetPrev()))
     {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
-            pindex->ModifyStatusWithFailed();
+            pindex->ModifyStatusWithFailed(mapBlockIndex);
         }
         return error("%s: %s (block %s)", __func__, FormatStateMessage(state),
             block.GetHash().ToString());
@@ -5873,7 +5874,7 @@ static void PruneOneBlockFile(const int fileNumber) {
     mapBlockIndex.ForEachMutable(
         [&](CBlockIndex& index)
         {
-            if (index.ClearFileInfoIfFileNumberEquals(fileNumber))
+            if (index.ClearFileInfoIfFileNumberEquals(fileNumber, mapBlockIndex))
             {
                 // Prune from mapBlocksUnlinked -- any block we prune would have
                 // to be downloaded again in order to consider its chain, at which

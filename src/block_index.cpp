@@ -186,7 +186,7 @@ std::optional<CBlockUndo> CBlockIndex::GetBlockUndo() const
 
 
 bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
-                            bool fCheckForPruning, const Config &config)
+                            bool fCheckForPruning, const Config &config, DirtyBlockIndexStore& notifyDirty)
 {
     std::lock_guard lock { GetMutex() };
     if (GetUndoPosNL().IsNull() ||
@@ -210,7 +210,7 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
             nStatus = nStatus.withUndo();
         }
 
-        RaiseValidityNL(BlockValidity::SCRIPTS);
+        RaiseValidityNL(BlockValidity::SCRIPTS, notifyDirty);
     }
 
     return true;
@@ -252,7 +252,7 @@ bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
-    CDiskBlockMetaData metadata) const
+    CDiskBlockMetaData metadata, DirtyBlockIndexStore& notifyDirty) const
 {
     if (!nStatus.hasDiskBlockMetaData())
     {
@@ -262,15 +262,15 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
             return;
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
-        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
+        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize, notifyDirty);
     }
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(
-    CDiskBlockMetaData metadata) const
+    CDiskBlockMetaData metadata, DirtyBlockIndexStore& notifyDirty) const
 {
     std::lock_guard lock { GetMutex() };
-    SetBlockIndexFileMetaDataIfNotSetNL(metadata);
+    SetBlockIndexFileMetaDataIfNotSetNL(metadata, notifyDirty);
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
@@ -323,7 +323,8 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStream
 
 bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
     FILE* file,
-    int networkVersion) const
+    int networkVersion,
+    DirtyBlockIndexStore& notifyDirty) const
 {
     CBlockStream stream{
         CNonOwningFileReader{file},
@@ -342,7 +343,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
 
     hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
 
-    SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size});
+    SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size}, notifyDirty);
 
     if(fseek(file, GetBlockPosNL().Pos(), SEEK_SET) != 0)
     {
@@ -354,7 +355,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
     return true;
 }
 auto CBlockIndex::StreamBlockFromDisk(
-    int networkVersion) const
+    int networkVersion, DirtyBlockIndexStore& notifyDirty) const
     -> BlockStreamAndMetaData
 {
     std::lock_guard lock { GetMutex() };
@@ -368,7 +369,7 @@ auto CBlockIndex::StreamBlockFromDisk(
 
     if (!nStatus.hasDiskBlockMetaData())
     {
-        if (!PopulateBlockIndexBlockDiskMetaDataNL(file.get(), networkVersion))
+        if (!PopulateBlockIndexBlockDiskMetaDataNL(file.get(), networkVersion, notifyDirty))
         {
             return {};
         }

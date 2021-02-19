@@ -1322,7 +1322,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
     if (!hasDiskBlockMetaData)
     {
         hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.diskDataHash));
-        blockIndex.SetBlockIndexFileMetaDataIfNotSet(metadata);
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(metadata, mapBlockIndex);
     }
 
     // RPC requests have additional layer around the actual response 
@@ -1391,7 +1391,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     if (diskBlockMetaData.diskDataHash.IsNull() && reader->EndOfStream())
     {
         diskBlockMetaData = reader->getDiskBlockMetadata();
-        blockIndex.SetBlockIndexFileMetaDataIfNotSet(diskBlockMetaData);
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(diskBlockMetaData, mapBlockIndex);
     }
     headerBlockToJSON(config, header, &blockIndex, diskBlockMetaData, confirmations, nextBlockHash, jWriter);
 
