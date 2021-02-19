@@ -74,7 +74,6 @@ CCriticalSection cs_main;
 
 BlockIndexStore mapBlockIndex;
 CChain chainActive;
-const CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
 std::atomic_bool fImporting(false);
@@ -2973,9 +2972,11 @@ static bool ConnectBlock(
         // effectively caching the result of part of the verification.
         if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
         {
+            const auto& bestHeader = mapBlockIndex.GetBestHeaderRef();
             if (index->GetAncestor(pindex->GetHeight()) == pindex &&
-                pindexBestHeader->GetAncestor(pindex->GetHeight()) == pindex &&
-                pindexBestHeader->GetChainWork() >= nMinimumChainWork) {
+                bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
+                bestHeader.GetChainWork() >= nMinimumChainWork)
+            {
                 // This block is a member of the assumed verified chain and an
                 // ancestor of the best header. The equivalent time check
                 // discourages hashpower from extorting the network via DOS
@@ -2991,7 +2992,7 @@ static bool ConnectBlock(
                 // the expected chain.
                 fScriptChecks =
                     (GetBlockProofEquivalentTime(
-                         *pindexBestHeader, *pindex, *pindexBestHeader,
+                         bestHeader, *pindex, bestHeader,
                          consensusParams) <= 60 * 60 * 24 * 7 * 2);
             }
         }
@@ -4181,19 +4182,16 @@ static void NotifyHeaderTip() {
     bool fInitialBlockDownload = false;
     static std::mutex pindexHeaderOldMutex;
     static const CBlockIndex *pindexHeaderOld = nullptr;
-    const CBlockIndex *pindexHeader = nullptr;
-    {
-        LOCK(cs_main);
-        pindexHeader = pindexBestHeader;
+    const CBlockIndex* pindexHeader = mapBlockIndex.GetBestHeader();
 
-        if (std::lock_guard lock{ pindexHeaderOldMutex };
-            pindexHeader != pindexHeaderOld)
-        {
-            fNotify = true;
-            fInitialBlockDownload = IsInitialBlockDownload();
-            pindexHeaderOld = pindexHeader;
-        }
+    if (std::lock_guard lock{ pindexHeaderOldMutex };
+        pindexHeader != pindexHeaderOld)
+    {
+        fNotify = true;
+        fInitialBlockDownload = IsInitialBlockDownload();
+        pindexHeaderOld = pindexHeader;
     }
+
     // Send block tip changed notifications without cs_main
     if (fNotify) {
         uiInterface.NotifyHeaderTip(fInitialBlockDownload, pindexHeader);
@@ -4904,12 +4902,6 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
 
     // Construct new block index object
     auto pindexNew = mapBlockIndex.Insert( block );
-
-    if (pindexBestHeader == nullptr ||
-        pindexBestHeader->GetChainWork() < pindexNew->GetChainWork())
-    {
-        pindexBestHeader = pindexNew;
-    }
 
     setDirtyBlockIndex.insert(pindexNew);
 
@@ -6007,11 +5999,8 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
         {
             pindexBestInvalid = pindex;
         }
-        if (pindex->IsValid(BlockValidity::TREE) &&
-            (pindexBestHeader == nullptr ||
-             CBlockIndexWorkComparator()(pindexBestHeader, pindex))) {
-            pindexBestHeader = pindex;
-        }
+
+        mapBlockIndex.SetBestHeader( *pindex );
     }
 
     // Load block file info
@@ -6453,7 +6442,6 @@ void UnloadBlockIndex() {
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
     pindexBestInvalid = nullptr;
-    pindexBestHeader = nullptr;
     // FIXME: CORE-1253, CORE-1232
     // Assumption: This is called only at startup before mempool.dat is restored.
     // This is a quick fix for CORE-1253 to prevent wiping mempoolTxDB at

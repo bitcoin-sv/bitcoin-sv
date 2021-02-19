@@ -1140,6 +1140,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 inv.type == MSG_CMPCT_BLOCK) {
                 bool send = false;
                 auto index = mapBlockIndex.Get(inv.hash);
+                auto bestHeader = mapBlockIndex.GetBestHeader();
                 if (index)
                 {
                     if (index->GetChainTx() &&
@@ -1173,13 +1174,13 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         // equivalent proof of work) than the best header chain
                         // we know about.
                         send = index->IsValid(BlockValidity::SCRIPTS) &&
-                               (pindexBestHeader != nullptr) &&
-                               (pindexBestHeader->GetBlockTime() -
+                               (bestHeader != nullptr) &&
+                               (bestHeader->GetBlockTime() -
                                     index->GetBlockTime() <
                                 nOneMonth) &&
                                (GetBlockProofEquivalentTime(
-                                    *pindexBestHeader, *index,
-                                    *pindexBestHeader,
+                                    *bestHeader, *index,
+                                    *bestHeader,
                                     consensusParams) < nOneMonth);
                         if (!send) {
                             LogPrint(BCLog::NETMSG, "%s: ignoring request from peer=%i for "
@@ -1195,8 +1196,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 // assume > 1 week = historical
                 static const int nOneWeek = 7 * 24 * 60 * 60;
                 if (send && connman.OutboundTargetReached(true) &&
-                    (((pindexBestHeader != nullptr) &&
-                      (pindexBestHeader->GetBlockTime() -
+                    (((bestHeader != nullptr) &&
+                      (bestHeader->GetBlockTime() -
                            index->GetBlockTime() >
                        nOneWeek)) ||
                      inv.type == MSG_FILTERED_BLOCK) &&
@@ -2071,6 +2072,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                 fAlreadyHave ? "have" : "new", pfrom->id);
             UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
             if(!fAlreadyHave && !fImporting && !fReindex && !blockDownloadTracker.IsInFlight(inv.hash)) {
+                const auto& bestHeader = mapBlockIndex.GetBestHeaderRef();
                 // We used to request the full block here, but since
                 // headers-announcements are now the primary method of
                 // announcement on the network, and since, in the case that
@@ -2081,10 +2083,10 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                 connman.PushMessage(
                     pfrom,
                     msgMaker.Make(NetMsgType::GETHEADERS,
-                                  chainActive.GetLocator(pindexBestHeader),
+                                  chainActive.GetLocator(&bestHeader),
                                   inv.hash));
                 LogPrint(BCLog::NETMSG, "getheaders (%d) %s to peer=%d\n",
-                         pindexBestHeader->GetHeight(), inv.hash.ToString(),
+                         bestHeader.GetHeight(), inv.hash.ToString(),
                          pfrom->id);
             }
         }
@@ -2498,6 +2500,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
         //   nUnconnectingHeaders gets reset back to 0.
         if(mapBlockIndex.Get(headers[0].hashPrevBlock) == nullptr && nCount < MAX_BLOCKS_TO_ANNOUNCE)
         {
+            const auto& bestHeader = mapBlockIndex.GetBestHeaderRef();
             // Try to obtain an access to the node's state data.
             const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
             const CNodeStatePtr& nodestate { nodestateRef.get() };
@@ -2507,14 +2510,14 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
             connman.PushMessage(
                 pfrom,
                 msgMaker.Make(NetMsgType::GETHEADERS,
-                              chainActive.GetLocator(pindexBestHeader),
+                              chainActive.GetLocator(&bestHeader),
                               uint256()));
             LogPrint(BCLog::NETMSG, "received header %s: missing prev block "
                                  "%s, sending getheaders (%d) to end "
                                  "(peer=%d, nUnconnectingHeaders=%d)\n",
                      headers[0].GetHash().ToString(),
                      headers[0].hashPrevBlock.ToString(),
-                     pindexBestHeader->GetHeight(), pfrom->id,
+                     bestHeader.GetHeight(), pfrom->id,
                      nodestate->nUnconnectingHeaders);
             // Set hashLastUnknownBlock for this peer, so that if we
             // eventually get the headers - even from a different peer -
@@ -2579,7 +2582,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
         {
             // Headers message had its maximum size; the peer may have more headers.
             // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip
-            // or pindexBestHeader, continue from there instead.
+            // or mapBlockIndex.GetBestHeader(), continue from there instead.
             LogPrint(
                 BCLog::NETMSG,
                 "more getheaders (%d) to end to peer=%d (startheight:%d)\n",
@@ -2788,13 +2791,14 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         LOCK(cs_main);
 
         if(mapBlockIndex.Get(cmpctblock.header.hashPrevBlock) == nullptr) {
+            auto bestHeader = mapBlockIndex.GetBestHeader();
             // Doesn't connect (or is genesis), instead of DoSing in
             // AcceptBlockHeader, request deeper headers
             if(!IsInitialBlockDownload()) {
                 connman.PushMessage(
                     pfrom,
                     msgMaker.Make(NetMsgType::GETHEADERS,
-                                  chainActive.GetLocator(pindexBestHeader),
+                                  chainActive.GetLocator(bestHeader),
                                   uint256()));
             }
             return true;
@@ -3872,9 +3876,9 @@ void SendBlockSync(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
     const CNodeStatePtr& state)
 {
     // Start block sync
-    if (pindexBestHeader == nullptr) {
-        pindexBestHeader = chainActive.Tip();
-    }
+    auto tip = chainActive.Tip();
+    assert( tip );
+    const auto& bestHeader = mapBlockIndex.SetBestHeaderIfNotSet( *tip );
     assert(state);
     // Download if this is a nice peer, or we have no nice peers and this one
     // might do.
@@ -3885,17 +3889,17 @@ void SendBlockSync(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
         // Only actively request headers from a single peer, unless we're close
         // to today.
         if ((nSyncStarted == 0 && fFetch) ||
-            pindexBestHeader->GetBlockTime() >
+            bestHeader.GetBlockTime() >
                 GetAdjustedTime() - 24 * 60 * 60) {
             state->fSyncStarted = true;
             nSyncStarted++;
-            const CBlockIndex *pindexStart = pindexBestHeader;
+            const CBlockIndex *pindexStart = &bestHeader;
             /**
              * If possible, start at the block preceding the currently best
              * known header. This ensures that we always get a non-empty list of
              * headers back as long as the peer is up-to-date. With a non-empty
              * response, we can initialise the peer's known best block. This
-             * wouldn't be possible if we requested starting at pindexBestHeader
+             * wouldn't be possible if we requested starting at bestHeader
              * and got back an empty response.
              */
             if (!pindexStart->IsGenesis())

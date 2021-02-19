@@ -30,6 +30,7 @@ public:
         std::lock_guard lock{ mMutex };
 
         mStore.clear();
+        mBestHeader = nullptr;
     }
 
     CBlockIndex* GetOrInsert( const uint256& blockHash )
@@ -49,7 +50,15 @@ public:
     {
         std::lock_guard lock{ mMutex };
 
-        return &CBlockIndex::Make( block, mStore );
+        auto& indexNew = CBlockIndex::Make( block, mStore );
+
+        if (mBestHeader == nullptr ||
+            mBestHeader->GetChainWork() < indexNew.GetChainWork())
+        {
+            mBestHeader = &indexNew;
+        }
+
+        return &indexNew;
     }
 
     CBlockIndex* Get( const uint256& blockHash )
@@ -88,6 +97,47 @@ public:
         }
     }
 
+    void SetBestHeader(const CBlockIndex& bestHeaderCandidate)
+    {
+        std::lock_guard lock{ mMutex };
+
+        if (bestHeaderCandidate.IsValid(BlockValidity::TREE) &&
+            (mBestHeader == nullptr ||
+             CBlockIndexWorkComparator()(mBestHeader, &bestHeaderCandidate)))
+        {
+            mBestHeader = &bestHeaderCandidate;
+        }
+    }
+
+    const CBlockIndex& SetBestHeaderIfNotSet(
+        const CBlockIndex& bestHeaderCandidate)
+    {
+        std::lock_guard lock{ mMutex };
+
+        if (mBestHeader == nullptr)
+        {
+            mBestHeader = &bestHeaderCandidate;
+        }
+
+        return *mBestHeader;
+    }
+
+    const CBlockIndex& GetBestHeaderRef() const
+    {
+        std::shared_lock lock{ mMutex };
+
+        assert(mBestHeader);
+
+        return *mBestHeader;
+    }
+
+    const CBlockIndex* GetBestHeader() const
+    {
+        std::shared_lock lock{ mMutex };
+
+        return mBestHeader;
+    }
+
 private:
     CBlockIndex* getNL( const uint256& blockHash )
     {
@@ -101,6 +151,12 @@ private:
 
     mutable std::shared_mutex mMutex;
     std::unordered_map<uint256, CBlockIndex, BlockHasher> mStore;
+
+    /**
+     * Best header we've seen so far (used for getheaders queries' starting
+     * points).
+     */
+    const CBlockIndex* mBestHeader{ nullptr };
 };
 
 /**
