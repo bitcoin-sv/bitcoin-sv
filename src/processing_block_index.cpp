@@ -5,10 +5,10 @@
 
 #include "config.h"
 
-static DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
-                                const CBlock &block, const CBlockIndex *pindex,
+DisconnectResult ProcessingBlockIndex::ApplyBlockUndo(const CBlockUndo &blockUndo,
+                                const CBlock &block,
                                 CCoinsViewCache &view,
-                                const task::CCancellationToken& shutdownToken)
+                                const task::CCancellationToken& shutdownToken) const
 {
     bool fClean = true;
 
@@ -33,7 +33,7 @@ static DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
         // Check that all outputs are available and match the outputs in the
         // block itself exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (tx.vout[o].scriptPubKey.IsUnspendable(IsGenesisEnabled(config, pindex->GetHeight()))) {
+            if (tx.vout[o].scriptPubKey.IsUnspendable(IsGenesisEnabled(config, mIndex.GetHeight()))) {
                 continue;
             }
 
@@ -75,21 +75,11 @@ static DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
-DisconnectResult ProcessingBlockIndex::ApplyBlockUndo(const CBlockUndo &blockUndo,
-                                const CBlock &block,
-                                CCoinsViewCache &view,
-                                const task::CCancellationToken& shutdownToken) const
-{
-    return ::ApplyBlockUndo(blockUndo, block, &this->mIndex, view, shutdownToken);
-}
-
-
-static DisconnectResult DisconnectBlock(const CBlock &block,
-                                        const CBlockIndex *pindex,
+DisconnectResult ProcessingBlockIndex::DisconnectBlock(const CBlock &block,
                                         CCoinsViewCache &view,
-                                        const task::CCancellationToken& shutdownToken)
+                                        const task::CCancellationToken& shutdownToken) const
 {
-    auto blockUndo = pindex->GetBlockUndo();
+    auto blockUndo = mIndex.GetBlockUndo();
 
     if (!blockUndo.has_value())
     {
@@ -97,17 +87,9 @@ static DisconnectResult DisconnectBlock(const CBlock &block,
     }
 
     return
-        ::ApplyBlockUndo(
+        ApplyBlockUndo(
             blockUndo.value(),
             block,
-            pindex,
             view,
             shutdownToken );
-}
-
-DisconnectResult ProcessingBlockIndex::DisconnectBlock(const CBlock &block,
-                                        CCoinsViewCache &view,
-                                        const task::CCancellationToken& shutdownToken) const
-{
-    return ::DisconnectBlock(block, &this->mIndex, view, shutdownToken);
 }
