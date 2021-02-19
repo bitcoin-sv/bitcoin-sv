@@ -47,7 +47,7 @@ void IncrementExtraNonce(CBlock *pblock,
     }
     ++nExtraNonce;
     // Height first in coinbase required for block.version=2
-    unsigned int nHeight = pindexPrev->nHeight + 1;
+    unsigned int nHeight = pindexPrev->GetHeight() + 1;
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig =
         (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
@@ -71,20 +71,20 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
         pb = chainActive[height];
     }
 
-    if (pb == nullptr || !pb->nHeight) {
+    if (pb == nullptr || !pb->GetHeight()) {
         return 0;
     }
 
     // If lookup is -1, then use blocks since last difficulty change.
     if (lookup <= 0) {
-        lookup = pb->nHeight %
+        lookup = pb->GetHeight() %
                      Params().GetConsensus().DifficultyAdjustmentInterval() +
                  1;
     }
 
     // If lookup is larger than chain, then set it to chain length.
-    if (lookup > pb->nHeight) {
-        lookup = pb->nHeight;
+    if (lookup > pb->GetHeight()) {
+        lookup = pb->GetHeight();
     }
 
     CBlockIndex *pb0 = pb;
@@ -766,7 +766,7 @@ void getblocktemplate(const Config& config,
 
         jWriter.pushKV("curtime", pblock->GetBlockTime());
         jWriter.pushKV("bits", strprintf("%08x", pblock->nBits));
-        jWriter.pushKV("height", (int64_t)(pindexPrev->nHeight + 1));
+        jWriter.pushKV("height", (int64_t)(pindexPrev->GetHeight() + 1));
 
         jWriter.writeEndObject();
 

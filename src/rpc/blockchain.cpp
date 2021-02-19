@@ -75,7 +75,7 @@ int ComputeNextBlockAndDepthNL(const CBlockIndex* tip, const CBlockIndex* blocki
     nextBlockHash = std::nullopt;
     if (chainActive.Contains(blockindex))
     {
-        confirmations = tip->nHeight - blockindex->nHeight + 1;
+        confirmations = tip->GetHeight() - blockindex->GetHeight() + 1;
         if (tip != blockindex)
         {
             nextBlockHash = chainActive.Next(blockindex)->GetBlockHash();
@@ -92,7 +92,7 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
 
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     result.push_back(Pair("confirmations", confirmations));
-    result.push_back(Pair("height", blockindex->nHeight));
+    result.push_back(Pair("height", blockindex->GetHeight()));
     result.push_back(Pair("version", blockindex->GetVersion()));
     result.push_back(
         Pair("versionHex", strprintf("%08x", blockindex->GetVersion())));
@@ -201,7 +201,7 @@ UniValue waitfornewblock(const Config &config, const JSONRPCRequest &request) {
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("hash", indexNext->GetBlockHash().GetHex()));
-    ret.push_back(Pair("height", indexNext->nHeight));
+    ret.push_back(Pair("height", indexNext->GetHeight()));
     return ret;
 }
 
@@ -243,18 +243,18 @@ UniValue waitforblockheight(const Config &config,
         cond_blockchange.wait_for(
             lock, std::chrono::milliseconds(timeout), [&height, &indexNext] {
             indexNext = chainActive.Tip();
-            return indexNext->nHeight >= height || !IsRPCRunning();
+            return indexNext->GetHeight() >= height || !IsRPCRunning();
             });
     } else {
         cond_blockchange.wait(lock, [&height, &indexNext] {
             indexNext = chainActive.Tip();
-            return indexNext->nHeight >= height || !IsRPCRunning();
+            return indexNext->GetHeight() >= height || !IsRPCRunning();
         });
     }
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("hash", indexNext->GetBlockHash().GetHex()));
-    ret.push_back(Pair("height", indexNext->nHeight));
+    ret.push_back(Pair("height", indexNext->GetHeight()));
     return ret;
 }
 
@@ -1372,7 +1372,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     }
 
     jWriter.writeBeginArray("tx");
-    bool isGenesisEnabled = IsGenesisEnabled(config, blockIndex.nHeight);
+    bool isGenesisEnabled = IsGenesisEnabled(config, blockIndex.GetHeight());
     do
     {
         const CTransaction& transaction = reader->ReadTransaction();
@@ -1430,7 +1430,7 @@ void headerBlockToJSON(const Config& config,
     {
         jWriter.pushKV("size", diskBlockMetaData.DiskDataSize());
     }
-    jWriter.pushKV("height", blockindex->nHeight);
+    jWriter.pushKV("height", blockindex->GetHeight());
     jWriter.pushKV("version", blockHeader.nVersion);
     jWriter.pushKV("versionHex", strprintf("%08x", blockHeader.nVersion));
     jWriter.pushKV("merkleroot", blockHeader.hashMerkleRoot.GetHex());
@@ -1499,7 +1499,7 @@ static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats) {
     stats.hashBlock = pcursor->GetBestBlock();
     {
         LOCK(cs_main);
-        stats.nHeight = mapBlockIndex.find(stats.hashBlock)->second->nHeight;
+        stats.nHeight = mapBlockIndex.find(stats.hashBlock)->second->GetHeight();
     }
     ss << stats.hashBlock;
     uint256 prevkey;
@@ -1569,7 +1569,7 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
                 RPC_INVALID_PARAMETER,
                 "Could not find block with at least the specified timestamp.");
         }
-        heightParam = pindex->nHeight;
+        heightParam = pindex->GetHeight();
     }
 
     int32_t height = heightParam;
@@ -1708,7 +1708,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
                 ret.push_back(Pair("confirmations", 0));
             } else {
                 ret.push_back(Pair("confirmations",
-                                   int64_t(pindex->nHeight - coin.GetHeight() + 1)));
+                                   int64_t(pindex->GetHeight() - coin.GetHeight() + 1)));
             }
             ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
             UniValue o(UniValue::VOBJ);
@@ -1952,7 +1952,7 @@ void gettxouts(const Config& config,
                     LOCK(cs_main);
                     BlockMap::const_iterator it = mapBlockIndex.find(tipView.GetBestBlock());
                     CBlockIndex *pindex = it->second;
-                    confirmations = int64_t(pindex->nHeight - coin.GetHeight() + 1);
+                    confirmations = int64_t(pindex->GetHeight() - coin.GetHeight() + 1);
                 }
                 jWriter.pushKV("confirmations", confirmations);
             }
@@ -2060,16 +2060,16 @@ static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex,
     bool activated = false;
     switch (version) {
         case 2:
-            activated = pindex->nHeight >= consensusParams.BIP34Height;
+            activated = pindex->GetHeight() >= consensusParams.BIP34Height;
             break;
         case 3:
-            activated = pindex->nHeight >= consensusParams.BIP66Height;
+            activated = pindex->GetHeight() >= consensusParams.BIP66Height;
             break;
         case 4:
-            activated = pindex->nHeight >= consensusParams.BIP65Height;
+            activated = pindex->GetHeight() >= consensusParams.BIP65Height;
             break;
         case 5:
-            activated = pindex->nHeight >= consensusParams.CSVHeight;
+            activated = pindex->GetHeight() >= consensusParams.CSVHeight;
             break;
     }
     rv.push_back(Pair("status", activated));
@@ -2139,7 +2139,7 @@ UniValue getblockchaininfo(const Config &config,
     obj.push_back(Pair("chain", config.GetChainParams().NetworkIDString()));
     obj.push_back(Pair("blocks", int(chainActive.Height())));
     obj.push_back(
-        Pair("headers", pindexBestHeader ? pindexBestHeader->nHeight : -1));
+        Pair("headers", pindexBestHeader ? pindexBestHeader->GetHeight() : -1));
     obj.push_back(
         Pair("bestblockhash", chainActive.Tip()->GetBlockHash().GetHex()));
     obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
@@ -2171,7 +2171,7 @@ UniValue getblockchaininfo(const Config &config,
             block = block->GetPrev();
         }
 
-        obj.push_back(Pair("pruneheight", block->nHeight));
+        obj.push_back(Pair("pruneheight", block->GetHeight()));
     }
     return obj;
 }
@@ -2181,8 +2181,8 @@ struct CompareBlocksByHeight {
     bool operator()(const CBlockIndex *a, const CBlockIndex *b) const {
         // Make sure that unequal blocks with the same height do not compare
         // equal. Use the pointers themselves to make a distinction.
-        if (a->nHeight != b->nHeight) {
-            return (a->nHeight > b->nHeight);
+        if (a->GetHeight() != b->GetHeight()) {
+            return (a->GetHeight() > b->GetHeight());
         }
 
         return a < b;
@@ -2266,11 +2266,11 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
     UniValue res(UniValue::VARR);
     for (const CBlockIndex *block : setTips) {
         UniValue obj(UniValue::VOBJ);
-        obj.push_back(Pair("height", block->nHeight));
+        obj.push_back(Pair("height", block->GetHeight()));
         obj.push_back(Pair("hash", block->GetBlockHash().GetHex()));
 
         const int branchLen =
-            block->nHeight - chainActive.FindFork(block)->nHeight;
+            block->GetHeight() - chainActive.FindFork(block)->GetHeight();
         obj.push_back(Pair("branchlen", branchLen));
 
         std::string status;
@@ -2714,7 +2714,7 @@ Examples:
 
             UniValue v(UniValue::VOBJ);
             v.push_back(Pair("blockhash", bi->GetBlockHash().ToString()));
-            v.push_back(Pair("height", bi->nHeight));
+            v.push_back(Pair("height", bi->GetHeight()));
             v.push_back(Pair("previousblockhash", bi->GetPrev()->GetBlockHash().ToString()));
             v.push_back(Pair("numblocks", bi->GetSoftRejectedFor()));
             result.push_back(v);
@@ -2791,12 +2791,12 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
     assert(pindex != nullptr);
 
     if (request.params[0].isNull()) {
-        blockcount = std::max(0, std::min(blockcount, pindex->nHeight - 1));
+        blockcount = std::max(0, std::min(blockcount, pindex->GetHeight() - 1));
     } else {
         blockcount = request.params[0].get_int();
 
         if (blockcount < 0 ||
-            (blockcount > 0 && blockcount >= pindex->nHeight)) {
+            (blockcount > 0 && blockcount >= pindex->GetHeight())) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block count: "
                                                       "should be between 0 and "
                                                       "the block's height - 1");
@@ -2804,7 +2804,7 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
     }
 
     const CBlockIndex *pindexPast =
-        pindex->GetAncestor(pindex->nHeight - blockcount);
+        pindex->GetAncestor(pindex->GetHeight() - blockcount);
     int nTimeDiff =
         pindex->GetMedianTimePast() - pindexPast->GetMedianTimePast();
     int nTxDiff = pindex->GetChainTx() - pindexPast->GetChainTx();
@@ -3206,7 +3206,7 @@ UniValue getblockstats_impl(const Config &config,
                                     ? total_size / (numTx - 1)
                                     : 0);
     ret_all.pushKV("blockhash", pindex->GetBlockHash().GetHex());
-    ret_all.pushKV("height", (int64_t)pindex->nHeight);
+    ret_all.pushKV("height", (int64_t)pindex->GetHeight());
     ret_all.pushKV("ins", inputs);
     ret_all.pushKV("maxfee", ValueFromAmount(maxfee));
     ret_all.pushKV("maxfeerate", ValueFromAmount(maxfeerate));
@@ -3226,7 +3226,7 @@ UniValue getblockstats_impl(const Config &config,
     ret_all.pushKV("mintxsize", mintxsize == blockMaxSize ? 0 : mintxsize);
     ret_all.pushKV("outs", outputs);
     ret_all.pushKV("subsidy", ValueFromAmount(GetBlockSubsidy(
-                                  pindex->nHeight, Params().GetConsensus())));
+                                  pindex->GetHeight(), Params().GetConsensus())));
     ret_all.pushKV("time", pindex->GetBlockTime());
     ret_all.pushKV("total_out", ValueFromAmount(total_out));
     ret_all.pushKV("total_size", total_size);

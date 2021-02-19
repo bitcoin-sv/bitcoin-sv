@@ -1275,7 +1275,7 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx) {
     if (mapBlockIndex.count(hashBlock)) {
         CBlockIndex *pindex = mapBlockIndex[hashBlock];
         if (chainActive.Contains(pindex)) {
-            conflictconfirms = -(chainActive.Height() - pindex->nHeight + 1);
+            conflictconfirms = -(chainActive.Height() - pindex->GetHeight() + 1);
         }
     }
 
@@ -1761,7 +1761,7 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
         if (GetTime() >= nNow + 60) {
             nNow = GetTime();
             LogPrintf("Still rescanning. At block %d. Progress=%f\n",
-                      pindex->nHeight,
+                      pindex->GetHeight(),
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
 
@@ -3854,7 +3854,7 @@ void CWallet::GetKeyBirthTimes(
         BlockMap::const_iterator blit = mapBlockIndex.find(wtx.hashBlock);
         if (blit != mapBlockIndex.end() && chainActive.Contains(blit->second)) {
             // ... which are already in a block.
-            int32_t nHeight = blit->second->nHeight;
+            int32_t nHeight = blit->second->GetHeight();
             for (const CTxOut &txout : wtx.tx->vout) {
                 // Iterate over all their outputs...
                 CAffectedKeysVisitor(*this, vAffected)
@@ -3864,7 +3864,7 @@ void CWallet::GetKeyBirthTimes(
                     std::map<CKeyID, CBlockIndex *>::iterator rit =
                         mapKeyFirstBlock.find(keyid);
                     if (rit != mapKeyFirstBlock.end() &&
-                        nHeight < rit->second->nHeight) {
+                        nHeight < rit->second->GetHeight()) {
                         rit->second = blit->second;
                     }
                 }
@@ -4220,8 +4220,8 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
     if (chainActive.Tip() && chainActive.Tip() != pindexRescan) {
         uiInterface.InitMessage(_("Rescanning..."));
         LogPrintf("Rescanning last %i blocks (from block %i)...\n",
-                  chainActive.Height() - pindexRescan->nHeight,
-                  pindexRescan->nHeight);
+                  chainActive.Height() - pindexRescan->GetHeight(),
+                  pindexRescan->GetHeight());
         nStart = GetTimeMillis();
         if (walletInstance->ScanForWalletTransactions(pindexRescan, true) == nullptr)
         {
@@ -4526,7 +4526,7 @@ int CMerkleTx::GetHeightInMainChain() const {
         return MEMPOOL_HEIGHT;
     }
 
-    return pindex->nHeight;
+    return pindex->GetHeight();
 }
 
 bool CMerkleTx::IsGenesisEnabled() const {

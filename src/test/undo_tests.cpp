@@ -33,8 +33,21 @@ struct ProcessingBlockIndex::UnitTestAccess<undo_tests_uid>
             task::CCancellationSource::Make()->GetToken());
 
     }
+
 };
 using TestAccessProcessingBlockIndex = ProcessingBlockIndex::UnitTestAccess<undo_tests_uid>;
+
+template <>
+struct CBlockIndex::UnitTestAccess<undo_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void SetHeight( CBlockIndex& index, int32_t height)
+    {
+        index.nHeight = height;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<undo_tests_uid>;
 
 BOOST_FIXTURE_TEST_SUITE(undo_tests, BasicTestingSetup)
 
@@ -60,7 +73,7 @@ static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
 
     CBlockIndex::TemporaryBlockIndex index{ {} };
 
-    index->nHeight = nHeight;
+    TestAccessCBlockIndex::SetHeight( index, nHeight );
     TestAccessProcessingBlockIndex::ApplyBlockUndo(blockUndo, block, index.get(), view, task::CCancellationSource::Make()->GetToken());
 }
 

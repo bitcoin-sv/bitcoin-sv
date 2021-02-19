@@ -161,7 +161,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         if (!pindex)
             return RESTERR(req, HTTP_BAD_REQUEST, "Block not found: " + hashStr);
         
-        confirmations = tip->nHeight - pindex->nHeight + 1;
+        confirmations = tip->GetHeight() - pindex->GetHeight() + 1;
 
         while (pindex != nullptr && chainActive.Contains(pindex)) {
             headers.push_back(pindex);

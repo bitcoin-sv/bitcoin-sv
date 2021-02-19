@@ -165,8 +165,8 @@ public:
         // These blocks could be descendants or they could be on a different chain.
         for(auto& bi: mapBlockIndex)
         {
-            if(bi.second->nHeight > blockIndex->nHeight &&
-               bi.second->nHeight <= maxHeight)
+            if(bi.second->GetHeight() > blockIndex->GetHeight() &&
+               bi.second->GetHeight() <= maxHeight)
             {
                 blocks.emplace_back(bi.second);
             }

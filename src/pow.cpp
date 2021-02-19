@@ -23,7 +23,7 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
 
     // Only change once per difficulty adjustment interval
-    int32_t nHeight = pindexPrev->nHeight + 1;
+    int32_t nHeight = pindexPrev->GetHeight() + 1;
     if (nHeight % params.DifficultyAdjustmentInterval() == 0) {
         // Go back by what we want to be 14 days worth of blocks
         assert(nHeight >= params.DifficultyAdjustmentInterval());
@@ -50,7 +50,7 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
         // Return the last non-special-min-difficulty-rules-block
         const CBlockIndex *pindex = pindexPrev;
         while (!pindex->IsGenesis() &&
-               pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
+               pindex->GetHeight() % params.DifficultyAdjustmentInterval() != 0 &&
                pindex->GetBits() == nProofOfWorkLimit) {
             pindex = pindex->GetPrev();
         }
@@ -103,7 +103,7 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
         return pindexPrev->GetBits();
     }
 
-    if (IsDAAEnabled(config, pindexPrev->nHeight)) {
+    if (IsDAAEnabled(config, pindexPrev->GetHeight())) {
         return GetNextCashWorkRequired(pindexPrev, pblock, config);
     }
 
@@ -170,7 +170,7 @@ bool CheckProofOfWork(uint256 hash, uint32_t nBits, const Config &config) {
 static arith_uint256 ComputeTarget(const CBlockIndex *pindexFirst,
                                    const CBlockIndex *pindexLast,
                                    const Consensus::Params &params) {
-    assert(pindexLast->nHeight > pindexFirst->nHeight);
+    assert(pindexLast->GetHeight() > pindexFirst->GetHeight());
 
     /**
      * From the total work done and the time it took to produce that much work,
@@ -205,7 +205,7 @@ static arith_uint256 ComputeTarget(const CBlockIndex *pindexFirst,
  * basing our computation on via a median of 3.
  */
 static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
-    assert(pindex->nHeight >= 3);
+    assert(pindex->GetHeight() >= 3);
 
     /**
      * In order to avoid a block with a very skewed timestamp having too much
@@ -264,7 +264,7 @@ uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
     }
 
     // Compute the difficulty based on the full adjustment interval.
-    const int32_t nHeight = pindexPrev->nHeight;
+    const int32_t nHeight = pindexPrev->GetHeight();
     assert(nHeight >= params.DifficultyAdjustmentInterval());
 
     // Get the last suitable block of the difficulty interval.

@@ -54,8 +54,8 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
 
     for (int i = 0; i < SKIPLIST_LENGTH; i++) {
         if (i > 0) {
-            BOOST_CHECK(vIndex[i]->GetSkip() == vIndex[vIndex[i]->GetSkip()->nHeight]);
-            BOOST_CHECK(vIndex[i]->GetSkip()->nHeight < i);
+            BOOST_CHECK(vIndex[i]->GetSkip() == vIndex[vIndex[i]->GetSkip()->GetHeight()]);
+            BOOST_CHECK(vIndex[i]->GetSkip()->GetHeight() < i);
         } else {
             BOOST_CHECK(vIndex[i]->GetSkip() == nullptr);
         }
@@ -106,8 +106,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
             lastIndex = CBlockIndex::Make( header, blockIndexStore );
 
-            BOOST_CHECK_EQUAL( i, lastIndex->nHeight );
-            BOOST_CHECK(lastIndex->nHeight == lastIndex->GetPrev()->nHeight + 1);
+            BOOST_CHECK_EQUAL( i, lastIndex->GetHeight() );
+            BOOST_CHECK(lastIndex->GetHeight() == lastIndex->GetPrev()->GetHeight() + 1);
         }
         splitLastIndex = lastIndex;
         for (int i = 50000; i < 100000; ++i)
@@ -119,8 +119,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
             lastIndex = CBlockIndex::Make( header, blockIndexStore );
 
-            BOOST_CHECK_EQUAL( i, lastIndex->nHeight );
-            BOOST_CHECK(lastIndex->nHeight == lastIndex->GetPrev()->nHeight + 1);
+            BOOST_CHECK_EQUAL( i, lastIndex->GetHeight() );
+            BOOST_CHECK(lastIndex->GetHeight() == lastIndex->GetPrev()->GetHeight() + 1);
         }
     }
 
@@ -132,8 +132,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
         splitLastIndex = CBlockIndex::Make( header, blockIndexStore );
 
-        BOOST_CHECK_EQUAL( i, splitLastIndex->nHeight );
-        BOOST_CHECK(splitLastIndex->nHeight == splitLastIndex->GetPrev()->nHeight + 1);
+        BOOST_CHECK_EQUAL( i, splitLastIndex->GetHeight() );
+        BOOST_CHECK(splitLastIndex->GetHeight() == splitLastIndex->GetPrev()->GetHeight() + 1);
     }
 
     // Build a CChain for the main branch.
@@ -159,7 +159,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         // Entries 1 through 11 (inclusive) go back one step each.
         for (unsigned int i = 1; i < 12 && i < locator.vHave.size() - 1; i++) {
             BOOST_CHECK_EQUAL(blockIndexStore[ locator.vHave[i] ]->GetHeight(),
-                              tip->nHeight - i);
+                              tip->GetHeight() - i);
         }
 
         // The further ones (excluding the last one) go back with exponential
@@ -231,7 +231,7 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
         BOOST_CHECK(ret->nTimeMax >= test_time);
         BOOST_CHECK((ret->GetPrev() == nullptr) ||
                     ret->GetPrev()->nTimeMax < test_time);
-        BOOST_CHECK(chain[r]->GetAncestor(ret->nHeight) == ret);
+        BOOST_CHECK(chain[r]->GetAncestor(ret->GetHeight()) == ret);
     }
 
     BlockMapCleanup(blockIndexStore);

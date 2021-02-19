@@ -12,6 +12,20 @@
 
 #include <boost/test/unit_test.hpp>
 
+namespace{ class pow_tests_uid; } // only used as unique identifier
+
+template <>
+struct CBlockIndex::UnitTestAccess<pow_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void SetHeight( CBlockIndex& index, int32_t height)
+    {
+        index.nHeight = height;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<pow_tests_uid>;
+
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
 
 void BlockMapCleanup(BlockMap& blockMap)
@@ -32,7 +46,7 @@ BOOST_AUTO_TEST_CASE(get_next_work) {
     DummyConfig config(CBaseChainParams::MAIN);
 
     int64_t nLastRetargetTime = 1261130161; // Block #30240
-    pindexLast->nHeight = 32255;
+    TestAccessCBlockIndex::SetHeight( pindexLast, 32255 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
         0x1d00d86a);
@@ -48,7 +62,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit) {
     DummyConfig config(CBaseChainParams::MAIN);
 
     int64_t nLastRetargetTime = 1231006505; // Block #0
-    pindexLast->nHeight = 2015;
+    TestAccessCBlockIndex::SetHeight( pindexLast, 2015 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
         0x1d00ffff);
@@ -64,7 +78,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual) {
     DummyConfig config(CBaseChainParams::MAIN);
 
     int64_t nLastRetargetTime = 1279008237; // Block #66528
-    pindexLast->nHeight = 68543;
+    TestAccessCBlockIndex::SetHeight( pindexLast, 68543 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
         0x1c0168fd);
@@ -80,7 +94,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual) {
     DummyConfig config(CBaseChainParams::MAIN);
 
     int64_t nLastRetargetTime = 1263163443; // NOTE: Not an actual block time
-    pindexLast->nHeight = 46367;
+    TestAccessCBlockIndex::SetHeight( pindexLast, 46367 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
         0x1d00e1fd);

@@ -17,9 +17,9 @@ void CChain::SetTip(CBlockIndex *pindex)
         return;
     }
 
-    vChain.resize(static_cast<size_t>(pindex->nHeight + 1));
-    while (pindex && vChain[static_cast<size_t>(pindex->nHeight)] != pindex) {
-        vChain[static_cast<size_t>(pindex->nHeight)] = pindex;
+    vChain.resize(static_cast<size_t>(pindex->GetHeight() + 1));
+    while (pindex && vChain[static_cast<size_t>(pindex->GetHeight())] != pindex) {
+        vChain[static_cast<size_t>(pindex->GetHeight())] = pindex;
         pindex = pindex->GetPrev();
     }
 }
@@ -35,11 +35,11 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
     while (pindex) {
         vHave.push_back(pindex->GetBlockHash());
         // Stop when we have added the genesis block.
-        if (pindex->nHeight == 0) {
+        if (pindex->GetHeight() == 0) {
             break;
         }
         // Exponentially larger steps back, plus the genesis block.
-        int32_t nHeight = std::max(pindex->nHeight - nStep, 0);
+        int32_t nHeight = std::max(pindex->GetHeight() - nStep, 0);
         if (Contains(pindex)) {
             // Use O(1) CChain index if possible.
             pindex = (*this)[nHeight];
@@ -59,7 +59,7 @@ const CBlockIndex *CChain::FindFork(const CBlockIndex *pindex) const {
     if (pindex == nullptr) {
         return nullptr;
     }
-    if (pindex->nHeight > Height()) {
+    if (pindex->GetHeight() > Height()) {
         pindex = pindex->GetAncestor(Height());
     }
     while (pindex && !Contains(pindex)) {

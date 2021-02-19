@@ -115,10 +115,10 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
  */
 const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
                                       const CBlockIndex *pb) {
-    if (pa->nHeight > pb->nHeight) {
-        pa = pa->GetAncestor(pb->nHeight);
-    } else if (pb->nHeight > pa->nHeight) {
-        pb = pb->GetAncestor(pa->nHeight);
+    if (pa->GetHeight() > pb->GetHeight()) {
+        pa = pa->GetAncestor(pb->GetHeight());
+    } else if (pb->GetHeight() > pa->GetHeight()) {
+        pb = pb->GetAncestor(pa->GetHeight());
     }
 
     while (pa != pb && pa && pb) {

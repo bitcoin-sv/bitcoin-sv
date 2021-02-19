@@ -272,11 +272,9 @@ private:
     //! pointer to the index of some further predecessor of this block
     CBlockIndex* pskip{ nullptr };
 
-public:
     //! height of the entry in the chain. The genesis block has height 0
     int32_t nHeight{ 0 };
 
-private:
     //! Which # file this block is stored in (blk?????.dat)
     int nFile{ 0 };
 

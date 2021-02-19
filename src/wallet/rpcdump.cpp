@@ -595,7 +595,7 @@ UniValue importwallet(const Config &config, const JSONRPCRequest &request) {
         chainActive.FindEarliestAtLeast(nTimeBegin - TIMESTAMP_WINDOW);
 
     LogPrintf("Rescanning last %i blocks\n",
-              chainActive.Height() - pindex->nHeight + 1);
+              chainActive.Height() - pindex->GetHeight() + 1);
     pwallet->ScanForWalletTransactions(pindex);
     pwallet->MarkDirty();
 
@@ -1287,7 +1287,7 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
             pwallet->ReacceptWalletTransactions();
         }
 
-        if (!scannedRange || scannedRange->nHeight > pindex->nHeight) {
+        if (!scannedRange || scannedRange->GetHeight() > pindex->GetHeight()) {
             std::vector<UniValue> results = response.getValues();
             response.clear();
             response.setArray();

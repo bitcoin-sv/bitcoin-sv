@@ -551,7 +551,7 @@ CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockInd
             return nullptr;
         }
 
-        merkleTreePtr = std::make_unique<CMerkleTree>(*stream, blockIndex.GetBlockHash(), static_cast<int32_t>(blockIndex.nHeight), merkleTreeThreadPool.get());
+        merkleTreePtr = std::make_unique<CMerkleTree>(*stream, blockIndex.GetBlockHash(), static_cast<int32_t>(blockIndex.GetHeight()), merkleTreeThreadPool.get());
         merkleTreeStore.StoreMerkleTree(config, *merkleTreePtr, currentChainHeight);
     }
 

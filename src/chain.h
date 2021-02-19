@@ -52,7 +52,7 @@ public:
 
     /** Efficiently check whether a block is present in this chain. */
     bool Contains(const CBlockIndex *pindex) const {
-        return (*this)[pindex->nHeight] == pindex;
+        return (*this)[pindex->GetHeight()] == pindex;
     }
 
     /**
@@ -64,7 +64,7 @@ public:
             return nullptr;
         }
 
-        return (*this)[pindex->nHeight + 1];
+        return (*this)[pindex->GetHeight() + 1];
     }
 
     /**
@@ -73,7 +73,7 @@ public:
     int32_t Height() const
     {
         const CBlockIndex* tip = mChainTip;
-        return tip ? tip->nHeight : -1;
+        return tip ? tip->GetHeight() : -1;
     }
 
     /** Set/initialize a chain with a given tip. */

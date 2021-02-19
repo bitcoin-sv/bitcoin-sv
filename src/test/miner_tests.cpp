@@ -83,6 +83,11 @@ struct CBlockIndex::UnitTestAccess<miner_tests_uid>
     {
         index.nTime -= time;
     }
+
+    static void SetHeight( CBlockIndex& index, int32_t height)
+    {
+        index.nHeight = height;
+    }
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
 
@@ -309,10 +314,10 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
         times[i] = chainActive.Tip()
-                       ->GetAncestor(chainActive.Tip()->nHeight - i)
+                       ->GetAncestor(chainActive.Tip()->GetHeight() - i)
                        ->GetBlockTime();
         TestAccessCBlockIndex::SetTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
             P2SH_ACTIVATION_TIME);
     }
 
@@ -344,7 +349,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Restore the MedianTimePast.
         TestAccessCBlockIndex::SetTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
             times[i]);
     }
 
@@ -377,7 +382,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         auto tipMarker = chainActive.Tip();
         blockIndexStore.emplace( tipMarker->GetBlockHash(), tipMarker );
         // Create an actual 209999-long block chain (without valid blocks).
-        while (chainActive.Tip()->nHeight < 209999) {
+        while (chainActive.Tip()->GetHeight() < 209999) {
             CBlockHeader header;
             header.nTime = GetTime();
             header.hashPrevBlock = chainActive.Tip()->GetBlockHash();
@@ -388,7 +393,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         }
         BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
         // Extend to a 210000-long block chain.
-        while (chainActive.Tip()->nHeight < 210000) {
+        while (chainActive.Tip()->GetHeight() < 210000) {
             CBlockHeader header;
             header.nTime = GetTime();
             header.hashPrevBlock = chainActive.Tip()->GetBlockHash();
@@ -428,7 +433,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
     tx.vin[0].scriptSig = CScript() << OP_1;
     // txFirst[0] is the 2nd block
-    tx.vin[0].nSequence = chainActive.Tip()->nHeight + 1;
+    tx.vin[0].nSequence = chainActive.Tip()->GetHeight() + 1;
     prevheights[0] = baseheight + 1;
     tx.vout.resize(1);
     tx.vout[0].nValue = BLOCKSUBSIDY - HIGHFEE;
@@ -459,7 +464,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     {
         CBlockIndex::TemporaryBlockIndex index{ *chainActive.Tip(), {} };
 
-        index->nHeight += 1;
+        TestAccessCBlockIndex::SetHeight(index, index->GetHeight() + 1);
         // Sequence locks pass on 2nd block.
         BOOST_CHECK(SequenceLocks(CTransaction(tx), flags, &prevheights, index));
     }
@@ -495,7 +500,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
         TestAccessCBlockIndex::AddTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
             512);
     }
 
@@ -504,13 +509,13 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
         // Sequence locks pass 512 seconds later.
         BOOST_CHECK(
-                SequenceLocks(CTransaction(tx), flags, &prevheights, index));
+            SequenceLocks(CTransaction(tx), flags, &prevheights, index));
     }
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Undo tricked MTP.
         TestAccessCBlockIndex::SubTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
             512);
     }
 
@@ -518,7 +523,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     tx.vin[0].prevout = COutPoint(txFirst[2]->GetId(), 0);
     tx.vin[0].nSequence = CTxIn::SEQUENCE_FINAL - 1;
     prevheights[0] = baseheight + 3;
-    tx.nLockTime = chainActive.Tip()->nHeight + 1;
+    tx.nLockTime = chainActive.Tip()->GetHeight() + 1;
     hash = tx.GetId();
     mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
 
@@ -543,7 +548,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
-            config, CTransaction(tx), state, chainActive.Tip()->nHeight + 2,
+            config, CTransaction(tx), state, chainActive.Tip()->GetHeight() + 2,
             chainActive.Tip()->GetMedianTimePast(), false));
     }
 
@@ -576,13 +581,13 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
-            config, CTransaction(tx), state, chainActive.Tip()->nHeight + 1,
+            config, CTransaction(tx), state, chainActive.Tip()->GetHeight() + 1,
             chainActive.Tip()->GetMedianTimePast() + 1, false));
     }
 
     // mempool-dependent transactions (not added)
     tx.vin[0].prevout = COutPoint(hash, 0);
-    prevheights[0] = chainActive.Tip()->nHeight + 1;
+    prevheights[0] = chainActive.Tip()->GetHeight() + 1;
     tx.nLockTime = 0;
     tx.vin[0].nSequence = 0;
 
@@ -623,16 +628,16 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
         TestAccessCBlockIndex::AddTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
             512);
     }
-    chainActive.Tip()->nHeight++;
+    TestAccessCBlockIndex::SetHeight( *chainActive.Tip(), chainActive.Tip()->GetHeight() + 1 );
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
     BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
 
-    chainActive.Tip()->nHeight--;
+    TestAccessCBlockIndex::SetHeight( *chainActive.Tip(), chainActive.Tip()->GetHeight() - 1 );
     SetMockTime(0);
     mempool.Clear();
 

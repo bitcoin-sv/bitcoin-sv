@@ -231,10 +231,10 @@ void getrawtransaction(const Config& config,
             const CBlockIndex* pindex = mi->second;
             if (chainActive.Contains(pindex)) 
             {
-                blockData.confirmations = 1 + chainActive.Height() - pindex->nHeight;
+                blockData.confirmations = 1 + chainActive.Height() - pindex->GetHeight();
                 blockData.time = pindex->GetBlockTime();
                 blockData.blockTime = pindex->GetBlockTime();
-                blockData.blockHeight = pindex->nHeight;
+                blockData.blockHeight = pindex->GetHeight();
             }
             else 
             {

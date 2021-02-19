@@ -48,7 +48,7 @@ void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex
     const CChainParams& chainparams { mConfig.GetChainParams() };
 
     // Create coinbase transaction
-    int32_t blockHeight { pindex->nHeight + 1 };
+    int32_t blockHeight { pindex->GetHeight() + 1 };
     CMutableTransaction coinbaseTx {};
     coinbaseTx.vin.resize(1);
     coinbaseTx.vin[0].prevout = COutPoint{};

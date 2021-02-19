@@ -163,7 +163,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         // Update chain state
         if(pindex)
         {
-            int32_t height { pindex->nHeight + 1 };
+            int32_t height { pindex->GetHeight() + 1 };
             mLockTimeCutoff = (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, height)) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }
@@ -329,7 +329,7 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     if(pindex)
     {
         CValidationState state {};
-        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff, false))
+        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->GetHeight() + 1, mLockTimeCutoff, false))
         {
             return 0;
         }

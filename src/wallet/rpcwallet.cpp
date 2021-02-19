@@ -2122,7 +2122,7 @@ static UniValue listsinceblock(const Config &config,
         BlockMap::iterator it = mapBlockIndex.find(blockId);
         if (it != mapBlockIndex.end()) {
             pindex = it->second;
-            if (chainActive[pindex->nHeight] != pindex) {
+            if (chainActive[pindex->GetHeight()] != pindex) {
                 // the block being asked for is a part of a deactivated chain;
                 // we don't want to depend on its perceived height in the block
                 // chain, we want to instead use the last common ancestor
@@ -2143,7 +2143,7 @@ static UniValue listsinceblock(const Config &config,
         filter = filter | ISMINE_WATCH_ONLY;
     }
 
-    int depth = pindex ? (1 + chainActive.Height() - pindex->nHeight) : -1;
+    int depth = pindex ? (1 + chainActive.Height() - pindex->GetHeight()) : -1;
 
     UniValue transactions(UniValue::VARR);
 

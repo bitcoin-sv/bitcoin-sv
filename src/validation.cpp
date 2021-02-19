@@ -315,7 +315,7 @@ static bool EvaluateSequenceLocks(const CBlockIndex &block,
                                   std::pair<int32_t, int64_t> lockPair) {
     assert(!block.IsGenesis());
     int64_t nBlockTime = block.GetPrev()->GetMedianTimePast();
-    if (lockPair.first >= block.nHeight || lockPair.second >= nBlockTime) {
+    if (lockPair.first >= block.GetHeight() || lockPair.second >= nBlockTime) {
         return false;
     }
 
@@ -356,7 +356,7 @@ bool CheckSequenceLocks(
     CCoinsViewCache* viewMemPool)
 {
     // Post-genesis we don't care about the old sequence lock calculations
-    if(IsGenesisEnabled(config, tip.nHeight))
+    if(IsGenesisEnabled(config, tip.GetHeight()))
     {
         return true;
     }
@@ -385,7 +385,7 @@ bool CheckSequenceLocks(
             else if (coin->GetHeight() == MEMPOOL_HEIGHT)
             {
                 // Assume all mempool transaction confirm in the next block
-                prevheights[txinIndex] = tip.nHeight + 1;
+                prevheights[txinIndex] = tip.GetHeight() + 1;
             } else {
                 prevheights[txinIndex] = coin->GetHeight();
             }
@@ -411,7 +411,7 @@ bool CheckSequenceLocks(
             for (int32_t height : prevheights) {
                 // Can ignore mempool inputs since we'll fail if they had
                 // non-zero locks
-                if (height != tip.nHeight + 1) {
+                if (height != tip.GetHeight() + 1) {
                     maxInputHeight = std::max(maxInputHeight, height);
                 }
             }
@@ -653,7 +653,7 @@ bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
     }
 
     // Genesis is enabled on the currently processed block, not on the current tip.
-    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
+    return IsGenesisEnabled(config, pindexPrev->GetHeight() + 1);
 }
 
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
@@ -1068,7 +1068,7 @@ CTxnValResult TxnValidation(
     unsigned int lockTimeFlags;
     {
         const CBlockIndex* tip = chainActive.Tip();
-        int32_t height { tip->nHeight };
+        int32_t height { tip->GetHeight() };
         lockTimeFlags = StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height));
         ContextualCheckTransactionForCurrentBlock(config, tx, height, tip->GetMedianTimePast(),
             ctxState, lockTimeFlags);
@@ -2053,7 +2053,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
             {
                 return error("%s: mapBlockIndex mismatch  ", __func__);
             }
-            isGenesisEnabled = IsGenesisEnabled(config, foundBlockIndex->second->nHeight);
+            isGenesisEnabled = IsGenesisEnabled(config, foundBlockIndex->second->GetHeight());
             return true;
         }
     }
@@ -2079,7 +2079,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
                 if (tx->GetId() == txid) {
                     txOut = blockStreamReader->GetLastTransactionRef();
                     hashBlock = pindexSlow->GetBlockHash();
-                    isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->nHeight);
+                    isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->GetHeight());
                     return true;
                 }
             }
@@ -2289,11 +2289,11 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
     }
     else if (forkTipStatus.isValid() && pindexForkTip->GetChainTx() > 0 &&
              pindexForkTip->GetChainWork() - pindexForkBase->GetChainWork() > (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_VALID_FORK_LENGTH) &&
-             chainActive.Tip()->nHeight - pindexForkBase->nHeight <= SAFE_MODE_MAX_VALID_FORK_DISTANCE)
+             chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_VALID_FORK_DISTANCE)
     {
         return SafeModeLevel::VALID;
     }
-    else if (chainActive.Tip()->nHeight - pindexForkBase->nHeight <= SAFE_MODE_MAX_FORK_DISTANCE &&
+    else if (chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_FORK_DISTANCE &&
              chainActive.Tip()->GetChainWork() + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_POW_DIFFERENCE) <= pindexForkTip->GetChainWork())
     {
         if (forkTipStatus.isInvalid())
@@ -2348,9 +2348,9 @@ void NotifySafeModeLevelChange(SafeModeLevel safeModeLevel, const CBlockIndex* p
         LogPrintf("%s: Warning: Large valid fork found\n  forking the "
                   "chain at height %d (%s)\n  lasting to height %d "
                   "(%s).\nChain state database corruption likely.\n",
-                  __func__, pindexForkBase->nHeight,
+                  __func__, pindexForkBase->GetHeight(),
                   pindexForkBase->GetBlockHash().ToString(),
-                  pindexForkTip->nHeight,
+                  pindexForkTip->GetHeight(),
                   pindexForkTip->GetBlockHash().ToString());
         break;
     }
@@ -2505,7 +2505,7 @@ static void InvalidChainFound(CBlockIndex *pindexNew) {
 
     LogPrintf(
         "%s: invalid block=%s  height=%d  log2_work=%.8g  date=%s\n", __func__,
-        pindexNew->GetBlockHash().ToString(), pindexNew->nHeight,
+        pindexNew->GetBlockHash().ToString(), pindexNew->GetHeight(),
         log(chainWork.getdouble()) / log(2.0),
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", pindexNew->GetBlockTime()));
     CBlockIndex *tip = chainActive.Tip();
@@ -2567,7 +2567,7 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
 
 std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
     CBlockIndex *pindexPrev = mapBlockIndex.find(inputs.GetBestBlock())->second;
-    return { pindexPrev->nHeight + 1, pindexPrev->GetMedianTimePast() };
+    return { pindexPrev->GetHeight() + 1, pindexPrev->GetMedianTimePast() };
 }
 
 namespace Consensus {
@@ -2855,22 +2855,22 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     }
 
     // Start enforcing the DERSIG (BIP66) rule
-    if ((pChainTip->nHeight + 1) >= consensusparams.BIP66Height) {
+    if ((pChainTip->GetHeight() + 1) >= consensusparams.BIP66Height) {
         flags |= SCRIPT_VERIFY_DERSIG;
     }
 
     // Start enforcing CHECKLOCKTIMEVERIFY (BIP65) rule
-    if ((pChainTip->nHeight + 1) >= consensusparams.BIP65Height) {
+    if ((pChainTip->GetHeight() + 1) >= consensusparams.BIP65Height) {
         flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
     }
 
     // Start enforcing BIP112 (CSV).
-    if ((pChainTip->nHeight + 1) >= consensusparams.CSVHeight) {
+    if ((pChainTip->GetHeight() + 1) >= consensusparams.CSVHeight) {
         flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
     }
 
     // If the UAHF is enabled, we start accepting replay protected txns
-    if (IsUAHFenabled(config, pChainTip->nHeight)) {
+    if (IsUAHFenabled(config, pChainTip->GetHeight())) {
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
@@ -2879,12 +2879,12 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     // s in their signature. We also make sure that signature that are supposed
     // to fail (for instance in multisig or other forms of smart contracts) are
     // null.
-    if (IsDAAEnabled(config, pChainTip->nHeight)) {
+    if (IsDAAEnabled(config, pChainTip->GetHeight())) {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    if (IsGenesisEnabled(config, pChainTip->nHeight + 1)) {
+    if (IsGenesisEnabled(config, pChainTip->GetHeight() + 1)) {
         flags |= SCRIPT_GENESIS;
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
@@ -2938,7 +2938,7 @@ static bool ConnectBlock(
     // Check it again in case a previous version let a bad block in
     BlockValidationOptions validationOptions =
         BlockValidationOptions(!fJustCheck, !fJustCheck);
-    if (!CheckBlock(config, block, state, pindex->nHeight, validationOptions)) {
+    if (!CheckBlock(config, block, state, pindex->GetHeight(), validationOptions)) {
         return error("%s: Consensus::CheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
@@ -2971,8 +2971,8 @@ static bool ConnectBlock(
         // effectively caching the result of part of the verification.
         BlockMap::const_iterator it = mapBlockIndex.find(hashAssumeValid);
         if (it != mapBlockIndex.end()) {
-            if (it->second->GetAncestor(pindex->nHeight) == pindex &&
-                pindexBestHeader->GetAncestor(pindex->nHeight) == pindex &&
+            if (it->second->GetAncestor(pindex->GetHeight()) == pindex &&
+                pindexBestHeader->GetAncestor(pindex->GetHeight()) == pindex &&
                 pindexBestHeader->GetChainWork() >= nMinimumChainWork) {
                 // This block is a member of the assumed verified chain and an
                 // ancestor of the best header. The equivalent time check
@@ -3013,11 +3013,11 @@ static bool ConnectBlock(
     // applied to all blocks except the two in the chain that violate it. This
     // prevents exploiting the issue against nodes during their initial block
     // download.
-    bool fEnforceBIP30 = !((pindex->nHeight == 91842 &&
+    bool fEnforceBIP30 = !((pindex->GetHeight() == 91842 &&
                             pindex->GetBlockHash() ==
                                 uint256S("0x00000000000a4d0a398161ffc163c503763"
                                          "b1f4360639393e0e4c8e300e0caec")) ||
-                           (pindex->nHeight == 91880 &&
+                           (pindex->GetHeight() == 91880 &&
                             pindex->GetBlockHash() ==
                                 uint256S("0x00000000000743f190a18c5577a3c2d2a1f"
                                          "610ae9601ac046a38084ccb7cd721")));
@@ -3065,11 +3065,11 @@ static bool ConnectBlock(
 
     // Start enforcing BIP68 (sequence locks).
     int nLockTimeFlags = 0;
-    if (pindex->nHeight >= consensusParams.CSVHeight) {
-        nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->nHeight));
+    if (pindex->GetHeight() >= consensusParams.CSVHeight) {
+        nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->GetHeight()));
     }
     const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
-    bool isGenesisEnabled = IsGenesisEnabled(config, pindex->nHeight);
+    bool isGenesisEnabled = IsGenesisEnabled(config, pindex->GetHeight());
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
     LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs]\n",
@@ -3207,7 +3207,7 @@ static bool ConnectBlock(
             blockundo.vtxundo.push_back(CTxUndo());
         }
         UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(),
-                    pindex->nHeight);
+                    pindex->GetHeight());
 
         vPos.push_back(std::make_pair(tx.GetId(), pos));
         pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
@@ -3229,7 +3229,7 @@ static bool ConnectBlock(
              nTimeConnect * 0.000001);
 
     Amount blockReward =
-        nFees + GetBlockSubsidy(pindex->nHeight, consensusParams);
+        nFees + GetBlockSubsidy(pindex->GetHeight(), consensusParams);
     if (block.vtx[0]->GetValueOut() > blockReward) {
         auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
                                            "(actual=%d vs limit=%d)",
@@ -3633,7 +3633,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
 
-    FinalizeGenesisCrossing(config, pindexDelete->nHeight, changeSet);
+    FinalizeGenesisCrossing(config, pindexDelete->GetHeight(), changeSet);
 
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -3884,7 +3884,7 @@ static bool ConnectTip(
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet, blockConnecting.GetHash());
+            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->GetHeight(), changeSet, blockConnecting.GetHash());
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
@@ -3926,7 +3926,7 @@ static bool ConnectTip(
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
 
-    FinalizeGenesisCrossing(config, pindexNew->nHeight, changeSet);
+    FinalizeGenesisCrossing(config, pindexNew->GetHeight(), changeSet);
 
     return true;
 }
@@ -3969,7 +3969,7 @@ static CBlockIndex *FindMostWorkChain() {
         CBlockIndex *pindexTest = pindexNew;
         bool fInvalidAncestor = false;
         while (pindexTest && !chainActive.Contains(pindexTest)) {
-            assert(pindexTest->GetChainTx() || pindexTest->nHeight == 0);
+            assert(pindexTest->GetChainTx() || pindexTest->GetHeight() == 0);
 
             // Pruned nodes may have entries in setBlockIndexCandidates for
             // which block files have been deleted. Remove those as candidates
@@ -4077,15 +4077,15 @@ static bool ActivateBestChainStep(
         // Build list of new blocks to connect.
         std::vector<CBlockIndex *> vpindexToConnect;
         bool fContinue = true;
-        int32_t nHeight = pindexFork ? pindexFork->nHeight : -1;
-        while (fContinue && nHeight != pindexMostWork->nHeight) {
+        int32_t nHeight = pindexFork ? pindexFork->GetHeight() : -1;
+        while (fContinue && nHeight != pindexMostWork->GetHeight()) {
             // Don't iterate the entire list of potential improvements toward the
             // best tip, as we likely only need a few blocks along the way.
-            int32_t nTargetHeight = std::min(nHeight + 32, pindexMostWork->nHeight);
+            int32_t nTargetHeight = std::min(nHeight + 32, pindexMostWork->GetHeight());
             vpindexToConnect.clear();
             vpindexToConnect.reserve(static_cast<size_t>(nTargetHeight - nHeight));
             CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
-            while (pindexIter && pindexIter->nHeight != nHeight) {
+            while (pindexIter && pindexIter->GetHeight() != nHeight) {
                 vpindexToConnect.push_back(pindexIter);
                 pindexIter = pindexIter->GetPrev();
             }
@@ -4468,7 +4468,7 @@ bool ActivateBestChain(
 
     int32_t nStopAtHeight = config.GetStopAtHeight();
     if (nStopAtHeight && pindexNewTip &&
-        pindexNewTip->nHeight >= nStopAtHeight) {
+        pindexNewTip->GetHeight() >= nStopAtHeight) {
         StartShutdown();
     }
 
@@ -4568,7 +4568,7 @@ std::optional<bool> DisconnectSoftRejectedTipsNL(const Config& config, CValidati
 
         tip_disconnected = true;
         LogPrintf("Block %s was disconnected from active chain tip (height=%d) because it is considered soft rejected at this height and for the next %d block(s)\n",
-                  tip->GetBlockHash().ToString(), tip->nHeight, tip->GetSoftRejectedFor());
+                  tip->GetBlockHash().ToString(), tip->GetHeight(), tip->GetSoftRejectedFor());
     }
 
     return tip_disconnected;
@@ -4690,7 +4690,7 @@ bool SoftRejectBlockNL(const Config& config, CValidationState& state,
     assert(numBlocks>=0);
     AssertLockHeld(cs_main);
 
-    if(pindex->nHeight==0)
+    if(pindex->GetHeight() == 0)
     {
         // It is logically incorrect to consider genesis block soft rejected.
         return error("SoftRejectBlockNL(): Genesis block %s cannot be soft rejected\n",
@@ -4718,7 +4718,7 @@ bool SoftRejectBlockNL(const Config& config, CValidationState& state,
 
     // Find all descendants of block on all chains up to height after which this block
     // is no longer considered soft rejected.
-    const std::int32_t maxHeight = pindex->nHeight + numBlocks;
+    const std::int32_t maxHeight = pindex->GetHeight() + numBlocks;
     const BlockIndexWithDescendants blocks{pindex, mapBlockIndex, maxHeight};
 
     // Check that setting this block as soft rejected will not affect subsequent
@@ -4820,7 +4820,7 @@ bool AcceptSoftRejectedBlockNL(CBlockIndex* pindex, std::int32_t numBlocks)
     }
 
     // Find all descendants of block on all chains up to height after which this block was no longer considered soft rejected.
-    const std::int32_t maxHeight = pindex->nHeight + pindex->GetSoftRejectedFor();
+    const std::int32_t maxHeight = pindex->GetHeight() + pindex->GetSoftRejectedFor();
     const BlockIndexWithDescendants blocks{pindex, mapBlockIndex, maxHeight};
 
     // Unset (or change) soft rejection status of this block and update affected descendants.
@@ -4856,7 +4856,7 @@ void InvalidateBlocksFromConfig(const Config &config)
 bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
-    int32_t nHeight = pindex->nHeight;
+    int32_t nHeight = pindex->GetHeight();
 
     // Remove the invalidity flag from this block and all its descendants.
     BlockMap::iterator it = mapBlockIndex.begin();
@@ -4931,7 +4931,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
         // Tip candidates are only blocks above invalid block 
         // If we are invalid block is not on active chain than we 
         // need only fork tips not active tip
-        if (item.second->nHeight > pindexNew->nHeight &&
+        if (item.second->GetHeight() > pindexNew->GetHeight() &&
             (isInvalidBlockOnActiveChain || !chainActive.Contains(item.second)))
         {
             setTipCandidates.insert(item.second);
@@ -4949,7 +4949,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
     {
         // Check if pindexNew is in this chain
         CBlockIndex* pindexWalk = (*it);
-        while (pindexWalk->nHeight > pindexNew->nHeight)
+        while (pindexWalk->GetHeight() > pindexNew->GetHeight())
         {
             pindexWalk = pindexWalk->GetPrev();
         }
@@ -5006,11 +5006,11 @@ static bool ReceivedBlockTransactions(
     const CDiskBlockMetaData& metaData)
 {
     // Validate TTOR order for blocks that are MIN_TTOR_VALIDATION_DISTANCE blocks or more from active tip
-    if (chainActive.Tip() && chainActive.Tip()->nHeight - pindexNew->nHeight >= MIN_TTOR_VALIDATION_DISTANCE)
+    if (chainActive.Tip() && chainActive.Tip()->GetHeight() - pindexNew->GetHeight() >= MIN_TTOR_VALIDATION_DISTANCE)
     {
         if (!CheckBlockTTOROrder(block))
         {
-            LogPrintf("Block %s at height %d violates TTOR order.\n", block.GetHash().ToString(), pindexNew->nHeight);
+            LogPrintf("Block %s at height %d violates TTOR order.\n", block.GetHash().ToString(), pindexNew->GetHeight());
             // Mark the block itself as invalid.
             pindexNew->ModifyStatusWithFailed();
             setDirtyBlockIndex.insert(pindexNew);
@@ -5232,7 +5232,7 @@ static bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
                                         CValidationState &state,
                                         const CChainParams &chainparams,
                                         const uint256 &hash) {
-    int32_t nHeight = pindexPrev->nHeight + 1;
+    int32_t nHeight = pindexPrev->GetHeight() + 1;
     const CCheckpointData &checkpoints = chainparams.Checkpoints();
 
     // Check that the block chain matches the known block chain up to a
@@ -5247,7 +5247,7 @@ static bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
     // GetLastCheckpoint finds the last checkpoint in MapCheckpoints that's in
     // our MapBlockIndex.
     CBlockIndex *pcheckpoint = Checkpoints::GetLastCheckpoint(checkpoints);
-    if (pcheckpoint && nHeight < pcheckpoint->nHeight) {
+    if (pcheckpoint && nHeight < pcheckpoint->GetHeight()) {
         return state.DoS(
             100,
             error("%s: forked chain older than last checkpoint (height %d)",
@@ -5266,11 +5266,11 @@ static bool ContextualCheckBlockHeader(const Config &config,
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
-    const int32_t nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    const int32_t nHeight = pindexPrev == nullptr ? 0 : pindexPrev->GetHeight() + 1;
 
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, config)) {
-        LogPrintf("bad bits after height: %d\n", pindexPrev->nHeight);
+        LogPrintf("bad bits after height: %d\n", pindexPrev->GetHeight());
         return state.DoS(100, false, REJECT_INVALID, "bad-diffbits",
                          "incorrect proof of work");
     }
@@ -5367,7 +5367,7 @@ bool ContextualCheckTransactionForCurrentBlock(
 static bool ContextualCheckBlock(const Config &config, const CBlock &block,
                                  CValidationState &state,
                                  const CBlockIndex *pindexPrev) {
-    const int32_t nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    const int32_t nHeight = pindexPrev == nullptr ? 0 : pindexPrev->GetHeight() + 1;
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
@@ -5620,7 +5620,7 @@ static bool AcceptBlock(const Config& config,
     // regardless of whether pruning is enabled; it should generally be safe to
     // not process unrequested blocks.
     bool fTooFarAhead =
-        (pindex->nHeight > (chainActive.Height() + MIN_BLOCKS_TO_KEEP));
+        (pindex->GetHeight() > (chainActive.Height() + MIN_BLOCKS_TO_KEEP));
 
     // TODO: Decouple this function from the block download logic by removing
     // fRequested
@@ -5660,7 +5660,7 @@ static bool AcceptBlock(const Config& config,
         *fNewBlock = true;
     }
 
-    if (!CheckBlock(config, block, state, pindex->nHeight) ||
+    if (!CheckBlock(config, block, state, pindex->GetHeight()) ||
         !ContextualCheckBlock(config, block, state, pindex->GetPrev()))
     {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
@@ -5679,7 +5679,7 @@ static bool AcceptBlock(const Config& config,
         GetMainSignals().NewPoWValidBlock(pindex, pblock);
     }
 
-    int32_t nHeight = pindex->nHeight;
+    int32_t nHeight = pindex->GetHeight();
     const CChainParams& chainparams = config.GetChainParams();
 
     // Write block to history file
@@ -5741,7 +5741,7 @@ bool VerifyNewBlock(const Config &config,
         }
     }
 
-    bool ret = CheckBlock(config, *pblock, state, pindexPrev->nHeight + 1, validationOptions);
+    bool ret = CheckBlock(config, *pblock, state, pindexPrev->GetHeight() + 1, validationOptions);
 
     GetMainSignals().BlockChecked(*pblock, state);
 
@@ -5784,7 +5784,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
 
         // Ensure that CheckBlock() passes before calling AcceptBlock, as
         // belt-and-suspenders.
-        bool ret = CheckBlock(config, *pblock, state, pindexPrev->nHeight + 1);
+        bool ret = CheckBlock(config, *pblock, state, pindexPrev->GetHeight() + 1);
 
         LOCK(cs_main);
 
@@ -5876,7 +5876,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
         return error("%s: Consensus::ContextualCheckBlockHeader: %s", __func__,
                      FormatStateMessage(state));
     }
-    if (!CheckBlock(config, block, state, indexDummy->nHeight, validationOptions)) {
+    if (!CheckBlock(config, block, state, indexDummy->GetHeight(), validationOptions)) {
         return error("%s: Consensus::CheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
@@ -6002,7 +6002,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     vSortedByHeight.reserve(mapBlockIndex.size());
     for (const auto& item : mapBlockIndex) {
         CBlockIndex *pindex = item.second;
-        vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
+        vSortedByHeight.push_back(std::make_pair(pindex->GetHeight(), pindex));
     }
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int32_t, CBlockIndex *> &item : vSortedByHeight) {
@@ -6141,7 +6141,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         int percentageDone = std::max(
             1, std::min(
                    99,
-                   (int)(((double)(chainActive.Height() - pindex->nHeight)) /
+                   (int)(((double)(chainActive.Height() - pindex->GetHeight())) /
                          (double)nCheckDepth * (nCheckLevel >= 4 ? 50 : 100))));
 
         if (reportDone < percentageDone / 10) {
@@ -6151,7 +6151,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         }
 
         uiInterface.ShowProgress(_("Verifying blocks..."), percentageDone);
-        if (pindex->nHeight < chainActive.Height() - nCheckDepth) {
+        if (pindex->GetHeight() < chainActive.Height() - nCheckDepth) {
             break;
         }
 
@@ -6159,7 +6159,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
             // If pruning, only go back as far as we have data.
             LogPrintf("VerifyDB(): block verification stopping at height %d "
                       "(pruning, no data)\n",
-                      pindex->nHeight);
+                      pindex->GetHeight());
             break;
         }
 
@@ -6169,7 +6169,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         if (!pindex->ReadBlockFromDisk(block, config)) {
             return error(
                 "VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s",
-                pindex->nHeight, pindex->GetBlockHash().ToString());
+                pindex->GetHeight(), pindex->GetBlockHash().ToString());
         }
 
         if (shutdownToken.IsCanceled())
@@ -6178,9 +6178,9 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         }
 
         // check level 1: verify block validity
-        if (nCheckLevel >= 1 && !CheckBlock(config, block, state, pindex->nHeight)) {
+        if (nCheckLevel >= 1 && !CheckBlock(config, block, state, pindex->GetHeight())) {
             return error("%s: *** found bad block at %d, hash=%s (%s)\n",
-                         __func__, pindex->nHeight,
+                         __func__, pindex->GetHeight(),
                          pindex->GetBlockHash().ToString(),
                          FormatStateMessage(state));
         }
@@ -6213,7 +6213,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
             if (res == DISCONNECT_FAILED && !shutdownToken.IsCanceled()) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in "
                              "block data at %d, hash=%s",
-                             pindex->nHeight,
+                             pindex->GetHeight(),
                              pindex->GetBlockHash().ToString());
             }
             pindexState = pindex->GetPrev();
@@ -6233,7 +6233,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
     if (pindexFailure) {
         return error("VerifyDB(): *** coin database inconsistencies found "
                      "(last %i blocks, %zu good transactions before that)\n",
-                     chainActive.Height() - pindexFailure->nHeight + 1,
+                     chainActive.Height() - pindexFailure->GetHeight() + 1,
                      nGoodTransactions);
     }
 
@@ -6246,21 +6246,21 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                 std::max(1,
                          std::min(99,
                                   100 - (int)(((double)(chainActive.Height() -
-                                                        pindex->nHeight)) /
+                                                        pindex->GetHeight())) /
                                               (double)nCheckDepth * 50))));
             pindex = chainActive.Next(pindex);
             CBlock block;
             if (!pindex->ReadBlockFromDisk(block, config)) {
                 return error(
                     "VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s",
-                    pindex->nHeight, pindex->GetBlockHash().ToString());
+                    pindex->GetHeight(), pindex->GetBlockHash().ToString());
             }
             auto source = task::CCancellationSource::Make();
             if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, pindex->GetChainWork()))
             {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
-                    pindex->nHeight, pindex->GetBlockHash().ToString());
+                    pindex->GetHeight(), pindex->GetBlockHash().ToString());
             }
         }
     }
@@ -6268,7 +6268,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
     LogPrintf("[DONE].\n");
     LogPrintf("No coin database inconsistencies in last %i blocks (%zu "
               "transactions)\n",
-              chainActive.Height() - pindexState->nHeight, nGoodTransactions);
+              chainActive.Height() - pindexState->GetHeight(), nGoodTransactions);
 
     return true;
 }
@@ -6283,7 +6283,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
     auto blockStreamReader = pindex->GetDiskBlockStreamReader(config);
     if (!blockStreamReader) {
         return error("ReplayBlock(): GetDiskBlockStreamReader(CBlockIndex) failed at %d, hash=%s",
-                     pindex->nHeight, pindex->GetBlockHash().ToString());
+                     pindex->GetHeight(), pindex->GetBlockHash().ToString());
     }
 
     while (!blockStreamReader->EndOfStream()) {
@@ -6291,7 +6291,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
         if(!tx)
         {
             return error("ReplayBlock(): ReadTransaction failed at %d, hash=%s",
-                pindex->nHeight, pindex->GetBlockHash().ToString());
+                pindex->GetHeight(), pindex->GetBlockHash().ToString());
         }
         if (!tx->IsCoinBase()) {
             for (const CTxIn &txin : tx->vin) {
@@ -6300,7 +6300,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
         }
 
         // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, *tx, pindex->nHeight, config.GetGenesisActivationHeight(), true);
+        AddCoins(inputs, *tx, pindex->GetHeight(), config.GetGenesisActivationHeight(), true);
     }
 
     return true;
@@ -6349,23 +6349,23 @@ bool ReplayBlocks(const Config &config, CoinsDB& view) {
 
     // Rollback along the old branch.
     while (pindexOld != pindexFork) {
-        if (pindexOld->nHeight > 0) {
+        if (pindexOld->GetHeight() > 0) {
             // Never disconnect the genesis block.
             CBlock block;
             if (!pindexOld->ReadBlockFromDisk(block, config)) {
                 return error("RollbackBlock(): ReadBlockFromDisk() failed at "
                              "%d, hash=%s",
-                             pindexOld->nHeight,
+                             pindexOld->GetHeight(),
                              pindexOld->GetBlockHash().ToString());
             }
             LogPrintf("Rolling back %s (%i)\n",
-                      pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
+                      pindexOld->GetBlockHash().ToString(), pindexOld->GetHeight());
             // Use new private CancellationSource that can not be cancelled
             DisconnectResult res = ProcessingBlockIndex(const_cast<CBlockIndex&>(*pindexOld)).DisconnectBlock(block, cache, task::CCancellationSource::Make()->GetToken());
             if (res == DISCONNECT_FAILED) {
                 return error(
                     "RollbackBlock(): DisconnectBlock failed at %d, hash=%s",
-                    pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
+                    pindexOld->GetHeight(), pindexOld->GetBlockHash().ToString());
             }
             // If DISCONNECT_UNCLEAN is returned, it means a non-existing UTXO
             // was deleted, or an existing UTXO was overwritten. It corresponds
@@ -6379,8 +6379,8 @@ bool ReplayBlocks(const Config &config, CoinsDB& view) {
     }
 
     // Roll forward from the forking point to the new tip.
-    int32_t nForkHeight = pindexFork ? pindexFork->nHeight : 0;
-    for (int32_t nHeight = nForkHeight + 1; nHeight <= pindexNew->nHeight;
+    int32_t nForkHeight = pindexFork ? pindexFork->GetHeight() : 0;
+    for (int32_t nHeight = nForkHeight + 1; nHeight <= pindexNew->GetHeight();
          ++nHeight) {
         const CBlockIndex *pindex = pindexNew->GetAncestor(nHeight);
         LogPrintf("Rolling forward %s (%i)\n",
@@ -6424,7 +6424,7 @@ bool RewindBlockIndex(const Config &config) {
         if (!DisconnectTip(config, state, nullptr, changeSet)) {
             return error(
                 "RewindBlockIndex: unable to disconnect block at height %i",
-                pindex->nHeight);
+                pindex->GetHeight());
         }
         // Occasionally flush state to disk.
         if (!FlushStateToDisk(params, state, FLUSH_STATE_PERIODIC)) {
@@ -6673,11 +6673,11 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                     }
                 } else if (hash !=
                                chainparams.GetConsensus().hashGenesisBlock &&
-                           mapBlockIndex[hash]->nHeight % 1000 == 0) {
+                           mapBlockIndex[hash]->GetHeight() % 1000 == 0) {
                     LogPrint(
                         BCLog::REINDEX,
                         "Block Import: already had block %s at height %d\n",
-                        hash.ToString(), mapBlockIndex[hash]->nHeight);
+                        hash.ToString(), mapBlockIndex[hash]->GetHeight());
                 }
 
                 // Activate the genesis block so normal node progress can
@@ -6880,14 +6880,14 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         assert((pindexFirstNotTransactionsValid != nullptr) ==
                (pindex->GetChainTx() == 0));
         // nHeight must be consistent.
-        assert(pindex->nHeight == nHeight);
+        assert(pindex->GetHeight() == nHeight);
         // For every block except the genesis block, the chainwork must be
         // larger than the parent's.
         assert(pindex->IsGenesis() ||
                pindex->GetChainWork() >= pindex->GetPrev()->GetChainWork());
         // The pskip pointer must point back for all but the first 2 blocks.
         assert(nHeight < 2 ||
-               (pindex->GetSkip() && (pindex->GetSkip()->nHeight < nHeight)));
+               (pindex->GetSkip() && (pindex->GetSkip()->GetHeight() < nHeight)));
         // All mapBlockIndex entries must at least be TREE valid
         assert(pindexFirstNotTreeValid == nullptr);
         if (status.getValidity() >= BlockValidity::TREE) {
