@@ -23,6 +23,9 @@ class LeakyBucket
     LeakyBucket(size_t maxFill, LeakInterval leakInterval)
         : mMaxFillLevel{maxFill}, mLeakInterval{leakInterval}
     {}
+    LeakyBucket(size_t maxFill, size_t startFill, LeakInterval leakInterval)
+        : mMaxFillLevel{maxFill}, mFillLevel{startFill}, mLeakInterval{leakInterval}
+    {}
 
     // Topup the bucket and return whether or not we are overflowing
     bool operator+=(size_t amount)
