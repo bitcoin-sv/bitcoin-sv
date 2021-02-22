@@ -52,6 +52,7 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
     // Fetch the MSS for the underlying socket
     int mss {0};
     socklen_t mssLen { sizeof(mss) };
+#ifdef TCP_MAXSEG
 #ifdef WIN32
     if(getsockopt(mSocket, IPPROTO_TCP, TCP_MAXSEG, reinterpret_cast<char*>(&mss), &mssLen) != SOCKET_ERROR)
 #else
@@ -65,6 +66,7 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
             mMSS = sizeMss;
         }
     }
+#endif
 }
 
 Stream::~Stream()
