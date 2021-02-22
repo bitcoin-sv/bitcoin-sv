@@ -1534,7 +1534,10 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
     for (const auto& elem : vTxInputData) {
         // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
         if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
-            !(std::chrono::steady_clock::now() < end_time_point)) {
+            !(std::chrono::steady_clock::now() < end_time_point) &&
+            (results.empty() || results.back().first.mState.IsValid())) {
+            // it's safe to cancel (and retry) the chain only when the chain has processed OK.
+            // otherwise we rely on the error-copying approach below
             results.emplace_back(CTxnValResult{CValidationState(), elem.get()}, CTask::Status::Canceled);
             continue;
         }
