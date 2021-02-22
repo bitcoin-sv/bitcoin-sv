@@ -76,16 +76,54 @@ BOOST_AUTO_TEST_CASE(token_joining)
     }
 }
 
+// sleep for at least the specified duration
+void sleep_wait(std::chrono::milliseconds delay) {
+    using clock = std::chrono::steady_clock;
+    using namespace std::chrono_literals;
+    auto end = clock::now() + delay;
+    std::this_thread::sleep_for(delay);
+    while (clock::now() < end) {
+        std::this_thread::yield();
+    }
+}
+
 BOOST_AUTO_TEST_CASE(cancellation_after_500ms)
 {
     using namespace std::chrono_literals;
 
-    auto source = task::CTimedCancellationSource::Make(500ms);
+    auto source = task::CTimedCancellationSource::Make(50ms);
     auto token = source->GetToken();
 
     BOOST_CHECK_EQUAL(token.IsCanceled(), false);
-    std::this_thread::sleep_for(510ms);
+    sleep_wait(51ms);
     BOOST_CHECK_EQUAL(token.IsCanceled(), true);
 }
+
+
+
+#ifdef BOOST_CHRONO_HAS_THREAD_CLOCK
+
+void busy_wait(std::chrono::milliseconds delay) {
+    using clock = task::thread_clock;
+    volatile size_t jiffies = 0;
+    auto end = clock::now() + delay;
+    while (clock::now() < end) {
+        ++jiffies;
+    }
+}
+
+BOOST_AUTO_TEST_CASE(thread_cancellation_after_500ms_cpu)
+{
+    using namespace std::chrono_literals;
+
+    auto source = task::CThreadTimedCancellationSource::Make(50ms);
+    auto token = source->GetToken();
+
+    BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+    busy_wait(51ms);
+    BOOST_CHECK_EQUAL(token.IsCanceled(), true);
+}
+
+#endif
 
 BOOST_AUTO_TEST_SUITE_END()
