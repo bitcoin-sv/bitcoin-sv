@@ -92,6 +92,7 @@ BITCOIN_CORE_H = \
   blockindex_with_descendants.h \
   blockstreams.h \
   blockvalidation.h \
+  cfile_util.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -117,6 +118,7 @@ BITCOIN_CORE_H = \
   disk_tx_pos.h \
   dsattempt_handler.h \
   double_spend/dscallback_msg.h \
+  double_spend/dstxn_serialiser.h \
   dstencode.h \
   enum_cast.h \
   fs.h \
@@ -285,6 +287,7 @@ libbitcoin_server_a_SOURCES = \
   dbwrapper.cpp \
   dsattempt_handler.cpp \
   double_spend/dscallback_msg.cpp \
+  double_spend/dstxn_serialiser.cpp \
   mempooltxdb.cpp \
   merkleblock.cpp \
   merkletree.cpp \
@@ -402,6 +405,7 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.h \
   big_int.cpp \
   big_int.h \
+  cfile_util.cpp \
   cfile_util.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
@@ -506,6 +510,7 @@ endif
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
+  cfile_util.cpp \
   rpc/client.cpp \
   rpc/client_config.cpp \
   rpc/client_utils.cpp \

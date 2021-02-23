@@ -89,6 +89,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
 	dstencode_tests.cpp
+    dstxn_serialiser_tests.cpp
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp
@@ -103,6 +104,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	json_tests.cpp
 	jsonutil.cpp
 	key_tests.cpp
+    leaky_bucket_tests.cpp
 	limitedmap_tests.cpp
 	limitedstack_tests.cpp
 	locked_ref_tests.cpp

@@ -218,6 +218,7 @@ add_library(common
 	blockvalidation.h
 	bloom.h
 	cfile_util.h
+	cfile_util.cpp
 	chain.h
 	chainparams.cpp
 	chainparams.h
@@ -387,6 +388,8 @@ add_library(server
 	disk_tx_pos.h
     double_spend/dscallback_msg.cpp
     double_spend/dscallback_msg.h
+    double_spend/dstxn_serialiser.cpp
+    double_spend/dstxn_serialiser.h
 	httprpc.cpp
 	httprpc.h
 	httpserver.cpp
@@ -534,6 +537,8 @@ endif()
 
 # RPC client support
 add_library(rpcclient
+    cfile_util.cpp
+    cfile_util.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp
