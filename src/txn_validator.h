@@ -295,8 +295,6 @@ class CTxnValidator final
     TxnRecentRejectsSPtr mpTxnRecentRejects {nullptr};
     /** Double spend detector */
     TxnDoubleSpendDetectorSPtr mpTxnDoubleSpendDetector {nullptr};
-    /** A weak pointer to the TxIdTracker */
-    TxIdTrackerWPtr mpTxIdTracker {};
 
     /** Our main thread */
     std::thread mNewTxnsThread {};
