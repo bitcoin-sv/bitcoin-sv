@@ -7,7 +7,7 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 #include "util.h"
-#include "consensus/merkle.h"
+#include "merkletree.h"
 
 #include <boost/algorithm/string.hpp>
 #include <limits>

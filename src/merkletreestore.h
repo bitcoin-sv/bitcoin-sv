@@ -5,7 +5,7 @@
 #define BITCOIN_MERKLETREESTORE_H
 
 #include "validation.h"
-#include "consensus/merkle.h"
+#include "merkletree.h"
 #include "fs.h"
 #include "merkletreedb.h"
 #include <queue>

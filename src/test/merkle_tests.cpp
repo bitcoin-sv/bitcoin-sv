@@ -5,6 +5,7 @@
 #include "consensus/merkle.h"
 #include "test/test_bitcoin.h"
 #include "task_helpers.h"
+#include "merkletree.h"
 
 #include <boost/test/unit_test.hpp>
 

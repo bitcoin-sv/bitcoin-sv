@@ -32,6 +32,7 @@
 #include "validation.h"
 #include "merkletreestore.h"
 #include "rpc/blockchain.h"
+#include "consensus/merkle.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"

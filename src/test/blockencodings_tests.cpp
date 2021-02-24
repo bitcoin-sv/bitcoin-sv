@@ -7,6 +7,7 @@
 #include "config.h"
 #include "consensus/merkle.h"
 #include "random.h"
+#include "merkletree.h"
 
 #include "mempool_test_access.h"
 

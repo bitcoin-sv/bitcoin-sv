@@ -127,6 +127,7 @@ BITCOIN_CORE_H = \
   memusage.h \
   mempooltxdb.h \
   merkleblock.h \
+  merkletree.h \
   merkletreedb.h \
   merkletreestore.h \
   mining/assembler.h \
@@ -271,6 +272,7 @@ libbitcoin_server_a_SOURCES = \
   dbwrapper.cpp \
   mempooltxdb.cpp \
   merkleblock.cpp \
+  merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
   mining/assembler.cpp \

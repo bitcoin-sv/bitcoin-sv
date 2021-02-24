@@ -250,6 +250,7 @@ add_library(server
 	dbwrapper.cpp
 	mempooltxdb.cpp
 	merkleblock.cpp
+	merkletree.cpp
 	merkletreedb.cpp
 	merkletreestore.cpp
 	mining/assembler.cpp
