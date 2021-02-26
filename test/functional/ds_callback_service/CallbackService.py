@@ -13,16 +13,34 @@ class RECEIVE(Enum):
     YES = 1
     NO = 0
 
+class STATUS(Enum):
+    SUCCESS = 0
+    CLIENT_ERROR = 1
+    SERVER_ERROR = 2
+
 expectedProofs = []
 receivedProofs = []
 
 class CallbackService(BaseHTTPRequestHandler):
 
-    def __init__(self, receive, *args, **kwargs):
+    def __init__(self, receive, status, *args, **kwargs):
         self.receive = receive
+        self.status = status
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
+
+        if (self.status == STATUS.CLIENT_ERROR):
+            self.send_response(400, "Mocking client error.")
+            self.send_header('x-bsv-dsnt', 1)
+            self.end_headers()
+            return
+
+        if (self.status == STATUS.SERVER_ERROR):
+            self.send_response(500, "Mocking server error.")
+            self.send_header('x-bsv-dsnt', 1)
+            self.end_headers()
+            return
 
         request = self.path.split("/")
         if (len(request) == 5):

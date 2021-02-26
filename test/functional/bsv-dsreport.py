@@ -7,7 +7,7 @@ import threading, json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
-from ds_callback_service.CallbackService import CallbackService, RECEIVE
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, check_for_log_msg, assert_equal
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
@@ -272,7 +272,7 @@ class DoubleSpendReport(BitcoinTestFramework):
     def run_test(self):
 
         # Turn on CallbackService.
-        handler = partial(CallbackService, RECEIVE.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_service)
@@ -300,7 +300,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.kill_server()
 
         # Turn on CallbackService.
-        handler = partial(CallbackService, RECEIVE.NO)
+        handler = partial(CallbackService, RECEIVE.NO, STATUS.SUCCESS)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_service)

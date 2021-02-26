@@ -6,7 +6,7 @@
 import threading, json
 import http.client as httplib
 from functools import partial
-from ds_callback_service.CallbackService import CallbackService, RECEIVE
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS
 from http.server import HTTPServer
 from test_framework.util import assert_equal
 
@@ -67,7 +67,7 @@ class CallBackServiceTest():
         self.callback_service = "localhost:8080"
 
         #turn on server
-        handler = partial(CallbackService, RECEIVE.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_service)
@@ -139,6 +139,36 @@ class CallBackServiceTest():
         self.send_submit(tx_ids[0], 0, "randomhash", "abc", 400, "Malformed URL: output number should be positive int or 0.")
         self.send_submit(tx_ids[0], 0, "randomhash", 0, 400, "This txid was not asked for.")
         self.send_submit(tx_ids[0], 0, tx_ids[0], 0, 400, "Malformed URL: txid must not be the same as ctxid.")
+
+        self.kill_server()
+
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR)
+        self.server = HTTPServer(('localhost', 8080), handler)
+        self.start_server()
+
+        self.conn.request(
+            'GET',
+            "/dsnt/1/queried"
+        )
+
+        resp = self.conn.getresponse()
+        assert_equal(resp.status, 500)
+        resp.read()
+
+        self.kill_server()
+
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR)
+        self.server = HTTPServer(('localhost', 8080), handler)
+        self.start_server()
+
+        self.conn.request(
+            'GET',
+            "/dsnt/1/queried"
+        )
+
+        resp = self.conn.getresponse()
+        assert_equal(resp.status, 400)
+        resp.read()
 
         self.kill_server()
 
