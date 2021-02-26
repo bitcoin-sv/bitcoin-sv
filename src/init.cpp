@@ -135,8 +135,6 @@ task::CCancellationToken GetShutdownToken()
     return shutdownSource->GetToken();
 }
 
-static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
-
 void Interrupt(boost::thread_group &threadGroup) {
     InterruptHTTPServer();
     InterruptHTTPRPC();
@@ -236,8 +234,6 @@ void Shutdown() {
     }
     vpwallets.clear();
 #endif
-    globalVerifyHandle.reset();
-    ECC_Stop();
 
     {
         // Free block headers
@@ -2405,8 +2401,6 @@ bool AppInitSanityChecks() {
     std::string sha256_algo = SHA256AutoDetect();
     LogPrintf("Using the '%s' SHA256 implementation\n", sha256_algo);
     RandomInit();
-    ECC_Start();
-    globalVerifyHandle.reset(new ECCVerifyHandle());
 
     // Sanity check
     if (!InitSanityCheck()) {

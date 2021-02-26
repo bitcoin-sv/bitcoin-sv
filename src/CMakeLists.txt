@@ -240,6 +240,7 @@ add_library(common
 	disk_block_pos.h
 	dstencode.cpp
 	dstencode.h
+    ecc_guard.h
 	hash.h
 	indirectmap.h
 	invalid_txn_publisher.h

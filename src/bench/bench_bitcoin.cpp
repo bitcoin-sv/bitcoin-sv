@@ -8,16 +8,14 @@
 #include "random.h"
 #include "util.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
     SHA256AutoDetect();
     RandomInit();
-    ECC_Start();
     SetupEnvironment();
 
     // don't want to write to bitcoind.log file
     GetLogger().fPrintToDebugLog = false;
 
     benchmark::BenchRunner::RunAll();
-
-    ECC_Stop();
 }

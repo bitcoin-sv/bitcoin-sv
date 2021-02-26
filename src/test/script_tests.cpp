@@ -2426,4 +2426,197 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
     BOOST_TEST(duration.count() > (duration2.count() * 3));
 }
 
+BOOST_AUTO_TEST_CASE(mt_2_plus_2)
+{
+    using namespace std;
+
+    auto two_plus_two = []
+    {
+        const Config& config = GlobalConfig::GetConfig();
+
+        vector<uint8_t> args;
+        constexpr auto n{10};
+        for(int i{}; i < n; ++i)
+        {
+            args.push_back(OP_2);
+            args.push_back(OP_2);
+            args.push_back(OP_ADD);
+        }
+        CScript script(args.begin(), args.end());
+
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        ScriptError error;
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(config,
+                   false,
+                   source->GetToken(),
+                   stack,
+                   script,
+                   flags,
+                   BaseSignatureChecker{},
+                   &error);
+        assert(true == status.value());
+        assert(SCRIPT_ERR_OK == error);
+        assert(n == stack.size());
+        const auto frame = stack.front();
+        const auto actual = frame.GetElement();
+        assert(1 == actual.size());
+        assert(4 == actual[0]);
+    };
+
+    // Create n tasks to call two_plus_two at the same time
+    // via a promise (go) and shared_future (sf).
+    promise<void> go;
+    shared_future sf{go.get_future()};
+
+    constexpr size_t n{8};
+    array<promise<void>, n> promises;
+    array<future<void>, n> futures;
+    for(size_t i{}; i < n; ++i)
+    {
+        futures[i] = async(
+            std::launch::async,
+            [&sf, &two_plus_two](auto* ready) {
+                ready->set_value();
+                sf.wait();
+                two_plus_two();
+            },
+            &promises[i]);
+    }
+
+    // wait until all tasks are ready
+    for(auto& p : promises)
+        p.get_future().wait();
+
+    // All tasks are ready, go...
+    go.set_value();
+
+    // Wait until all tasks have finished
+    for(auto& f : futures)
+        f.get();
+}
+
+BOOST_AUTO_TEST_CASE(mt_p2pkh)
+{
+    using namespace std;
+
+    auto p2pkh = []
+    {
+        const Config& config = GlobalConfig::GetConfig();
+
+        // clang-format off
+        const array<uint8_t, 71> sig{0x30, 0x44, 0x02, 0x20, 0x1f, 
+                                     0xce, 0xfd, 0xc4, 0x42, 0x42, 
+                                     0x24, 0x19, 0x64, 0xb5, 0xca,
+                                     0x81, 0xa7, 0xe4, 0x80, 0x36, 
+                                     0x43, 0x64, 0xb1, 0x1a, 0x7f,
+                                     0x5a, 0x90, 0x16, 0x3c, 0x42, 
+                                     0xc0, 0xdb, 0x3f, 0x38, 0x86,
+                                     0x14, 0x02, 0x20, 0x38, 0x7c, 
+                                     0x07, 0x3f, 0x39, 0xd6, 0x3f,
+                                     0x60, 0xde, 0xb9, 0x3b, 0x79,
+                                     0x35, 0xa8, 0x4b, 0x93, 0xeb,
+                                     0x49, 0x8f, 0xc1, 0x2f, 0xbe, 
+                                     0x3d, 0x65, 0x55, 0x1b, 0x90,
+                                     0x5f, 0xc3, 0x60, 0x63, 0x7b,
+                                     0x01}; // <- last byte is sighash
+
+        vector<uint8_t> args;
+        
+        // inputs
+        args.push_back(sig.size());
+        copy(begin(sig), end(sig), back_inserter(args));
+
+        const array<uint8_t, 65> pubkey{0x04, 0x0b, 0x4c, 0x86, 0x65, 
+                                        0x85, 0xdd, 0x86, 0x8a, 0x9d, 
+                                        0x62, 0x34, 0x8a, 0x9c, 0xd0,
+                                        0x08, 0xd6, 0xa3, 0x12, 0x93, 
+                                        0x70, 0x48, 0xff, 0xf3, 0x16,
+                                        0x70, 0xe7, 0xe9, 0x20, 0xcf, 
+                                        0xc7, 0xa7, 0x44, 0x7b, 0x5f,
+                                        0x0b, 0xba, 0x9e, 0x01, 0xe6, 
+                                        0xfe, 0x47, 0x35, 0xc8, 0x38,
+                                        0x3e, 0x6e, 0x7a, 0x33, 0x47, 
+                                        0xa0, 0xfd, 0x72, 0x38, 0x1b,
+                                        0x8f, 0x79, 0x7a, 0x19, 0xf6, 
+                                        0x94, 0x05, 0x4e, 0x5a, 0x69};
+        
+        args.push_back(pubkey.size());
+        copy(begin(pubkey), end(pubkey), back_inserter(args));
+
+        // outputs/locking script/scriptPubKey
+        args.push_back(OP_DUP);
+        args.push_back(OP_HASH160);
+
+        const array<uint8_t, 20> pkhash{0xff, 0x19, 0x7b, 0x14, 0xe5, 
+                                        0x02, 0xab, 0x41, 0xf3, 0xbc,
+                                        0x8c, 0xcb, 0x48, 0xc4, 0xab,
+                                        0xac, 0x9e, 0xab, 0x35, 0xbc};
+
+        // clang-format on
+        args.push_back(pkhash.size());
+        copy(begin(pkhash), end(pkhash), back_inserter(args));
+        args.push_back(OP_EQUALVERIFY);
+        args.push_back(OP_CHECKSIGVERIFY);
+
+        CScript script(args.begin(), args.end());
+
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        ScriptError error;
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const string serialized_tx{
+            "0100000001d92670dd4ad598998595be2f1bec959de9a9f8b1fd97fb832965c96cd551"
+            "45e20000000000ffffffff010a000000000000000000000000"};
+        CMutableTransaction mtx;
+        DecodeHexTx(mtx, serialized_tx);
+        CTransaction tx{mtx};
+        Amount amount{10};
+        const TransactionSignatureChecker sig_checker{&tx, 0, amount};
+        const auto status = EvalScript(config,
+                   false,
+                   source->GetToken(),
+                   stack,
+                   script,
+                   flags,
+                   sig_checker,
+                   &error);
+        assert(true == status.value());
+        assert(SCRIPT_ERR_OK == error);
+        assert(0 == stack.size());
+    };
+
+    // Create n tasks to call p2pkh at the same time
+    // via a promise (go) and shared_future (sf).
+    promise<void> go;
+    shared_future sf{go.get_future()};
+
+    constexpr size_t n{8};
+    array<promise<void>, n> promises;
+    array<future<void>, n> futures;
+    for(size_t i{}; i < n; ++i)
+    {
+        futures[i] = async(
+            std::launch::async,
+            [&sf, &p2pkh](auto* ready) {
+                ready->set_value();
+                sf.wait();
+                p2pkh();
+            },
+            &promises[i]);
+    }
+
+    // wait until all tasks are ready
+    for(auto& p : promises)
+        p.get_future().wait();
+
+    // All tasks are ready, go...
+    go.set_value();
+
+    // Wait until all tasks have finished
+    for(auto& f : futures)
+        f.get();
+}
+
 BOOST_AUTO_TEST_SUITE_END()
