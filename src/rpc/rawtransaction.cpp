@@ -1271,12 +1271,23 @@ static UniValue sendrawtransaction(const Config &config,
             nMaxRawTxFee);                 // nAbsurdFee
     // Check if transaction is already received through p2p interface,
     // and thus, couldn't be added to the TxIdTracker.
+
+    // Check if txn is present in one of the mempools.
+    auto txid_in_mempool = [&](){return mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);};
+
+    if (dontCheckFee && (txid_in_mempool() || !pTxInputData->IsTxIdStored()))
+    {
+        CTxPrioritizer txPrioritizer{mempool, txid};
+        LogPrint(BCLog::TXNSRC, "got txn via rpc sendratransactin after same tx arrived from relaying: %s txnsrc user=%s\n",
+                 txid.ToString(), request.authUser.c_str());
+
+        return txid.GetHex();
+    }
     if (!pTxInputData->IsTxIdStored()) {
         throw JSONRPCError(RPC_TRANSACTION_REJECTED,
-                strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
+                           strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
     }
-    // Check if txn is present in one of the mempools.
-    if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
+    if (!txid_in_mempool()) {
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
@@ -1286,7 +1297,7 @@ static UniValue sendrawtransaction(const Config &config,
         //   if the prioritised txn was not accepted by the mempool
         // The mempool prioritisation is not executed on a null TxId
         // - no-op in terms of prioritise/clear operations
-        CTxPrioritizer txPrioritizer(mempool, dontCheckFee ? txid : TxId());
+        CTxPrioritizer txPrioritizer{mempool, dontCheckFee ? txid : TxId()};
         // Forward transaction to the validator and wait for results.
         const auto& txValidator = g_connman->getTxnValidator();
         const CValidationState& status {
@@ -1298,7 +1309,7 @@ static UniValue sendrawtransaction(const Config &config,
         // Check if the transaction was accepted by the mempool.
         // Due to potential race-condition we have to explicitly call exists() instead of
         // checking a result from the status variable.
-        if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
+        if (!txid_in_mempool()) {
             if (!status.IsValid()) {
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
@@ -1612,7 +1623,7 @@ void sendrawtransactions(const Config& config,
         // Prioritise transactions (if any were requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction
         //   for those txns which are not accepted by the mempool
-        CTxPrioritizer txPrioritizer(mempool, std::move(vTxToPrioritise));
+        CTxPrioritizer txPrioritizer{mempool, std::move(vTxToPrioritise)};
         // Run synch batch validation and wait for results.
         const auto& txValidator = g_connman->getTxnValidator();
         rejectedTxns =
