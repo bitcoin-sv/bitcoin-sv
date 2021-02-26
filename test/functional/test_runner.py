@@ -111,7 +111,7 @@ TEST_PARAMS = {
     "bsv-block-size-activation-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]]
 }
 
-TESTS_WITH_DISABLED_STDERROR_CHECK = ["bsv-callback-service.py", "bsv-dsreport.py"]
+TESTS_WITH_DISABLED_STDERROR_CHECK = ["bsv-callback-service.py", "bsv-dsreport.py", "bsv-ds-bad-callback-service.py"]
 
 # Used to limit the number of tests, when list of tests is not provided on command line
 # When --extended is specified, we run all tests, otherwise

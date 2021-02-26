@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+# Copyright (c) 2021 The Bitcoin SV developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+import threading, json
+import http.client as httplib
+from functools import partial
+from http.server import HTTPServer
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import p2p_port, check_for_log_msg, assert_equal
+from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
+from test_framework.mininode import *
+from test_framework.script import *
+
+import time
+
+# 127.0.0.1 as network-order bytes
+LOCAL_HOST_IP = 0x7F000001
+WRONG_IP = 0x7F000002
+
+class DoubleSpendHandlerErrors(BitcoinTestFramework):
+
+    def __del__(self):
+        self.kill_server()
+
+    def set_test_params(self):
+        self.num_nodes = 1
+        self.callback_service = "localhost:8080"
+        self.extra_args = [['-dsendpointport=8080',
+                            '-banscore=100000',
+                            '-genesisactivationheight=1'
+                            ]]
+
+    def start_server(self):
+        self.serverThread = threading.Thread(target=self.server.serve_forever)
+        self.serverThread.deamon = True
+        self.serverThread.start()
+
+    def kill_server(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.serverThread.join()
+
+    def create_and_send_transaction(self, inputs, outputs):
+        tx = CTransaction()
+        tx.vin = inputs
+        tx.vout = outputs
+        tx_hex =  self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
+        tx = FromHex(CTransaction(), tx_hex)
+
+        self.node0.send_message(msg_tx(tx))
+
+        return tx
+
+
+    def check_ds_enabled_error_msg(self, utxo, log_msg):
+
+        # tx1 is dsnt-enabled
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1,[LOCAL_HOST_IP], [0,3]).serialize()]))
+        ]
+        tx1 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
+
+
+        # tx2 spends the same output as tx1 (double spend)
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE]))
+        ]
+        tx2 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend passed", "/node0"))
+
+        wait_until(lambda: check_for_log_msg(self, log_msg, "/node0"))
+
+    def run_test(self):
+
+        self.nodes[0].generate(110)
+        utxo = self.nodes[0].listunspent()
+
+        self.stop_node(0)
+        with self.run_node_with_connections("Server returning 400", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+            # Turn on CallbackService.
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR)
+            self.server = HTTPServer(('localhost', 8080), handler)
+            self.start_server()
+            self.conn = httplib.HTTPConnection(self.callback_service)
+
+            self.node0 = p2p_connections[0]
+            self.check_ds_enabled_error_msg(utxo[0], "Got 400 response from endpoint")
+
+            self.kill_server()
+
+        with self.run_node_with_connections("Server returning 500", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+            # Turn on CallbackService.
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR)
+            self.server = HTTPServer(('localhost', 8080), handler)
+            self.start_server()
+            self.conn = httplib.HTTPConnection(self.callback_service)
+
+            self.node0 = p2p_connections[0]
+            self.check_ds_enabled_error_msg(utxo[1], "Got 500 response from endpoint")
+            self.check_ds_enabled_error_msg(utxo[2], "Skipping notification to blacklisted endpoint")
+
+            self.kill_server()
+
+if __name__ == '__main__':
+    DoubleSpendHandlerErrors().main()
