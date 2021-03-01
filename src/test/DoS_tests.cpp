@@ -251,9 +251,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         key.MakeNewKey(true);
         keystore.AddKey(key);
         // Get a random orphan txn
-        TxInputDataSPtr pRndTxInputData {
-            orphanTxns->getRndOrphanByLowerBound(InsecureRand256())
-        };
+        TxInputDataSPtr pRndTxInputData { orphanTxns->getRndOrphan() };
         BOOST_CHECK(pRndTxInputData);
 
         CTransactionRef txPrev = pRndTxInputData->GetTxnPtr();
@@ -286,9 +284,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         key.MakeNewKey(true);
         keystore.AddKey(key);
         // Get a random orphan txn
-        TxInputDataSPtr pRndTxInputData {
-            orphanTxns->getRndOrphanByLowerBound(InsecureRand256())
-        };
+        TxInputDataSPtr pRndTxInputData { orphanTxns->getRndOrphan() };
         BOOST_CHECK(pRndTxInputData);
 
         CTransactionRef txPrev = pRndTxInputData->GetTxnPtr();
