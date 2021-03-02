@@ -257,7 +257,7 @@ class CTxnValidator final
     }
 
     /** List of new transactions that need processing */
-    std::vector<TxInputDataSPtr> mStdTxns {};
+    std::deque<TxInputDataSPtr> mStdTxns {};
     std::atomic<uint64_t> mStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
     mutable std::shared_mutex mStdTxnsMtx {};
