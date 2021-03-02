@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 from enum import Enum
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
-import json
+import json, time
 
 class RECEIVE(Enum):
     YES = 1
@@ -18,14 +18,20 @@ class STATUS(Enum):
     CLIENT_ERROR = 1
     SERVER_ERROR = 2
 
+class RESPONSE_TIME(Enum):
+    FAST = 0
+    SLOW = 10
+    SLOWEST = 70
+
 expectedProofs = []
 receivedProofs = []
 
 class CallbackService(BaseHTTPRequestHandler):
 
-    def __init__(self, receive, status, *args, **kwargs):
+    def __init__(self, receive, status, response_time, *args, **kwargs):
         self.receive = receive
         self.status = status
+        self.response_time = response_time
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
@@ -41,6 +47,11 @@ class CallbackService(BaseHTTPRequestHandler):
             self.send_header('x-bsv-dsnt', 1)
             self.end_headers()
             return
+
+        if (self.response_time == RESPONSE_TIME.SLOW):
+            time.sleep(RESPONSE_TIME.SLOW.value)
+        elif (self.response_time == RESPONSE_TIME.SLOWEST):
+            time.sleep(RESPONSE_TIME.SLOWEST.value)
 
         request = self.path.split("/")
         if (len(request) == 5):

@@ -6,7 +6,7 @@
 import threading, json
 import http.client as httplib
 from functools import partial
-from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME
 from http.server import HTTPServer
 from test_framework.util import assert_equal
 
@@ -67,7 +67,7 @@ class CallBackServiceTest():
         self.callback_service = "localhost:8080"
 
         #turn on server
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_service)
@@ -142,7 +142,7 @@ class CallBackServiceTest():
 
         self.kill_server()
 
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
 
@@ -157,7 +157,7 @@ class CallBackServiceTest():
 
         self.kill_server()
 
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
 
