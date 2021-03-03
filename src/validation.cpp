@@ -206,9 +206,6 @@ const CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
 std::unique_ptr<CoinsDB> pcoinsTip;
 CBlockTreeDB *pblocktree = nullptr;
 
-static uint32_t GetBlockScriptFlags(const Config &config,
-                                    const CBlockIndex *pChainTip);
-
 /**
  * Test whether the given transaction is final for the given height and time.
  */
@@ -2849,9 +2846,8 @@ void ShutdownScriptCheckQueues()
     scriptCheckQueuePool.reset();
 }
 
-// Returns the script flags which should be checked for a given block
-static uint32_t GetBlockScriptFlags(const Config &config,
-                                    const CBlockIndex *pChainTip) {
+uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
+{
     const Consensus::Params &consensusparams =
         config.GetChainParams().GetConsensus();
 
