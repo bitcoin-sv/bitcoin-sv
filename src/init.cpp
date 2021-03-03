@@ -10,6 +10,7 @@
 #include "init.h"
 #include "addrman.h"
 #include "amount.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "compat/sanity.h"
@@ -235,14 +236,7 @@ void Shutdown() {
     vpwallets.clear();
 #endif
 
-    {
-        // Free block headers
-        LOCK(cs_main);
-        for(const auto& block : mapBlockIndex) {
-            delete block.second;
-        }
-        mapBlockIndex.clear();
-    }
+    mapBlockIndex.ForceClear();
 
     LogPrintf("%s: done\n", __func__);
 }
@@ -2832,9 +2826,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way
                 // around).
-                if (!mapBlockIndex.empty() &&
-                    mapBlockIndex.count(
-                        chainparams.GetConsensus().hashGenesisBlock) == 0) {
+                if (mapBlockIndex.Count() &&
+                    mapBlockIndex.Get(
+                        chainparams.GetConsensus().hashGenesisBlock) == nullptr)
+                {
                     return InitError(_("Incorrect or no genesis block found. "
                                        "Wrong datadir for network?"));
                 }
@@ -3047,7 +3042,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     //// debug print
     {
         LOCK(cs_main);
-        LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
+        LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.Count());
     }
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
 

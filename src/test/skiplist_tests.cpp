@@ -8,6 +8,7 @@
 #include "test/test_bitcoin.h"
 #include "util.h"
 
+#include <map>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -19,16 +20,8 @@ extern CCriticalSection cs_main;
 
 BOOST_FIXTURE_TEST_SUITE(skiplist_tests, BasicTestingSetup)
 
-void BlockMapCleanup(BlockMap& blockMap)
-{
-    for (auto& item : blockMap)
-    {
-        delete item.second;
-    }
-}
-
 BOOST_AUTO_TEST_CASE(skiplist_test) {
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CChain vIndex;
 
     // Genesis block.
@@ -42,14 +35,14 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
                     chainActive.Tip(),
                     &header,
                     GlobalConfig::GetConfig() );
-            return CBlockIndex::Make( header, blockIndexStore );
+            return &CBlockIndex::Make( header, blockIndexStore );
         }() );
 
     for (int i = 1; i < SKIPLIST_LENGTH; i++) {
         CBlockHeader header;
         header.hashPrevBlock = vIndex.Tip()->GetBlockHash();
         header.nBits = vIndex.Tip()->GetBits(); // leave same complexity as dummy bits
-        vIndex.SetTip( CBlockIndex::Make( header, blockIndexStore ) );
+        vIndex.SetTip( &CBlockIndex::Make( header, blockIndexStore ) );
     }
 
     for (int i = 0; i < SKIPLIST_LENGTH; i++) {
@@ -70,12 +63,10 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
         BOOST_CHECK(vIndex[from]->GetAncestor(to) == vIndex[to]);
         BOOST_CHECK(vIndex[from]->GetAncestor(0) == vIndex[0]);
     }
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 BOOST_AUTO_TEST_CASE(getlocator_test) {
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CBlockIndex* lastIndex =
         [&]
         {
@@ -87,7 +78,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
                     &header,
                     GlobalConfig::GetConfig() );
 
-            return CBlockIndex::Make( header, blockIndexStore );
+            return &CBlockIndex::Make( header, blockIndexStore );
         }();
 
     BOOST_CHECK( lastIndex->IsGenesis() );
@@ -104,7 +95,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             header.hashPrevBlock = lastIndex->GetBlockHash();
             header.nNonce = blockIndexStore.size();
             header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
-            lastIndex = CBlockIndex::Make( header, blockIndexStore );
+            lastIndex = &CBlockIndex::Make( header, blockIndexStore );
 
             BOOST_CHECK_EQUAL( i, lastIndex->GetHeight() );
             BOOST_CHECK(lastIndex->GetHeight() == lastIndex->GetPrev()->GetHeight() + 1);
@@ -117,7 +108,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             header.hashPrevBlock = lastIndex->GetBlockHash();
             header.nNonce = blockIndexStore.size();
             header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
-            lastIndex = CBlockIndex::Make( header, blockIndexStore );
+            lastIndex = &CBlockIndex::Make( header, blockIndexStore );
 
             BOOST_CHECK_EQUAL( i, lastIndex->GetHeight() );
             BOOST_CHECK(lastIndex->GetHeight() == lastIndex->GetPrev()->GetHeight() + 1);
@@ -130,7 +121,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         CBlockHeader header;
         header.hashPrevBlock = splitLastIndex->GetBlockHash();
         header.nBits = lastIndex->GetBits(); // leave same complexity as dummy bits
-        splitLastIndex = CBlockIndex::Make( header, blockIndexStore );
+        splitLastIndex = &CBlockIndex::Make( header, blockIndexStore );
 
         BOOST_CHECK_EQUAL( i, splitLastIndex->GetHeight() );
         BOOST_CHECK(splitLastIndex->GetHeight() == splitLastIndex->GetPrev()->GetHeight() + 1);
@@ -158,7 +149,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
 
         // Entries 1 through 11 (inclusive) go back one step each.
         for (unsigned int i = 1; i < 12 && i < locator.vHave.size() - 1; i++) {
-            BOOST_CHECK_EQUAL(blockIndexStore[ locator.vHave[i] ]->GetHeight(),
+            BOOST_CHECK_EQUAL(blockIndexStore.at( locator.vHave[i] ).GetHeight(),
                               tip->GetHeight() - i);
         }
 
@@ -166,18 +157,16 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         // steps.
         unsigned int dist = 2;
         for (unsigned int i = 12; i < locator.vHave.size() - 1; i++) {
-            BOOST_CHECK_EQUAL(blockIndexStore[ locator.vHave[i - 1] ]->GetHeight() -
-                              blockIndexStore[ locator.vHave[i] ]->GetHeight(),
+            BOOST_CHECK_EQUAL(blockIndexStore.at( locator.vHave[i - 1] ).GetHeight() -
+                              blockIndexStore.at( locator.vHave[i] ).GetHeight(),
                               dist);
             dist *= 2;
         }
     }
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CChain chain;
     chain.SetTip(
         [&]
@@ -189,7 +178,7 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
                     nullptr,
                     &header,
                     GlobalConfig::GetConfig() );
-            return CBlockIndex::Make( header, blockIndexStore );
+            return &CBlockIndex::Make( header, blockIndexStore );
         }() );
 
     for (unsigned int i = 1; i < 100000; ++i)
@@ -210,7 +199,7 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
                 &header,
                 GlobalConfig::GetConfig() );
 
-        chain.SetTip( CBlockIndex::Make( header, blockIndexStore ) );
+        chain.SetTip( &CBlockIndex::Make( header, blockIndexStore ) );
     }
 
     // Check that we set nTimeMax up correctly.
@@ -233,8 +222,6 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
                     ret->GetPrev()->GetBlockTimeMax() < test_time);
         BOOST_CHECK(chain[r]->GetAncestor(ret->GetHeight()) == ret);
     }
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

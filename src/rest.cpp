@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "block_index_store.h"
 #include "chain.h"
 #include "config.h"
 #include "httpserver.h"
@@ -154,13 +155,11 @@ static bool rest_headers(Config &config, HTTPRequest *req,
     headers.reserve(count);
     {
         LOCK(cs_main);
-        const CBlockIndex* tip = chainActive.Tip();
-        BlockMap::const_iterator it = mapBlockIndex.find(hash);
-        const CBlockIndex *pindex =
-            (it != mapBlockIndex.end()) ? it->second : nullptr;
+        auto pindex = mapBlockIndex.Get(hash);
         if (!pindex)
             return RESTERR(req, HTTP_BAD_REQUEST, "Block not found: " + hashStr);
-        
+
+        const CBlockIndex* tip = chainActive.Tip();
         confirmations = tip->GetHeight() - pindex->GetHeight() + 1;
 
         while (pindex != nullptr && chainActive.Contains(pindex)) {
@@ -248,10 +247,12 @@ static bool rest_block(const Config &config, HTTPRequest *req,
     {
         LOCK(cs_main);
 
-        if (mapBlockIndex.count(hash) == 0) {
+        pblockindex = mapBlockIndex.Get(hash);
+
+        if (!pblockindex) {
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
         }
-        pblockindex = mapBlockIndex[hash];
+
         if (fHavePruned && !pblockindex->getStatus().hasData() &&
             pblockindex->GetBlockTxCount() > 0) {
             return RESTERR(req, HTTP_NOT_FOUND,

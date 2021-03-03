@@ -5,6 +5,7 @@
 
 #include "base58.h"
 #include "block_file_access.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
@@ -225,10 +226,8 @@ void getrawtransaction(const Config& config,
     if (!hashBlock.IsNull())
     {
         CBlockDetailsData blockData;
-        auto mi = mapBlockIndex.find(hashBlock);
-        if (mi != mapBlockIndex.end() && mi->second) 
+        if (auto pindex = mapBlockIndex.Get(hashBlock); pindex)
         {
-            const CBlockIndex* pindex = mi->second;
             if (chainActive.Contains(pindex)) 
             {
                 blockData.confirmations = 1 + chainActive.Height() - pindex->GetHeight();
@@ -268,12 +267,12 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     if (!requestedBlockHash.IsNull())
     {
         LOCK(cs_main);
+        pblockindex = mapBlockIndex.Get(requestedBlockHash);
         // Find requested block
-        if (!mapBlockIndex.count(requestedBlockHash))
+        if (!pblockindex)
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
         }
-        pblockindex = mapBlockIndex[requestedBlockHash];
 
         if (verifyTxIds)
         {
@@ -333,11 +332,11 @@ static CBlockIndex* GetBlockIndex(const Config& config,
         }
 
         LOCK(cs_main);
-        if (!mapBlockIndex.count(foundBlockHash))
+        pblockindex = mapBlockIndex.Get(foundBlockHash);
+        if (!pblockindex)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
         }
-        pblockindex = mapBlockIndex[foundBlockHash];
     }
     return pblockindex;
 }
@@ -464,8 +463,9 @@ static UniValue verifytxoutproof(const Config &config,
 
     LOCK(cs_main);
 
-    if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-        !chainActive.Contains(mapBlockIndex[merkleBlock.header.GetHash()])) {
+    if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
+        !index || !chainActive.Contains(index))
+    {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Block not found in chain");
     }

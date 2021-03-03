@@ -4,6 +4,7 @@
 
 #include "wallet/wallet.h"
 
+#include "block_index_store.h"
 #include "chainparams.h"
 #include "config.h"
 #include "pow.h"
@@ -640,7 +641,7 @@ static int64_t AddTx(CWallet &wallet, uint32_t lockTime, int64_t mockTime,
                 nullptr,
                 &header,
                 GlobalConfig::GetConfig() );
-        block = CBlockIndex::Make( header, mapBlockIndex );
+        block = mapBlockIndex.Insert( header );
     }
 
     CWalletTx wtx(&wallet, MakeTransactionRef(tx));

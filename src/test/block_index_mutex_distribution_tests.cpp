@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "block_index.h"
+#include "block_index_store.h"
 #include "config.h"
 #include "pow.h"
 #include "validation.h"
@@ -25,13 +26,13 @@ using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
 
 BOOST_FIXTURE_TEST_SUITE(blockindexmutex_tests, TestingSetup)
 
-CBlockIndex* AddBlockIndex(CBlockIndex& prev, BlockMap& mapBlockIndex)
+CBlockIndex* AddBlockIndex(CBlockIndex& prev, BlockIndexStore& mapBlockIndex)
 {
     CBlockHeader header;
     header.nTime = GetTime();
     header.hashPrevBlock = prev.GetBlockHash();
     header.nBits = GetNextWorkRequired( &prev, &header, GlobalConfig::GetConfig() );
-    CBlockIndex* current = CBlockIndex::Make( header, mapBlockIndex );
+    CBlockIndex* current = mapBlockIndex.Insert( header );
 
     return current;
 }

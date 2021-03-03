@@ -12,6 +12,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <map>
+
 namespace{ class pow_tests_uid; } // only used as unique identifier
 
 template <>
@@ -27,14 +29,6 @@ struct CBlockIndex::UnitTestAccess<pow_tests_uid>
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<pow_tests_uid>;
 
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
-
-void BlockMapCleanup(BlockMap& blockMap)
-{
-    for (auto& item : blockMap)
-    {
-        delete item.second;
-    }
-}
 
 /* Test calculation of next difficulty target with no constraints applying */
 BOOST_AUTO_TEST_CASE(get_next_work) {
@@ -103,7 +97,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual) {
 BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
     DummyConfig config(CBaseChainParams::MAIN);
 
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CChain blocks;
 
     uint256 prev;
@@ -116,7 +110,7 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
         header.nBits = 0x207fffff; /* target 0x7fffff000... */
         header.hashPrevBlock = prev;
 
-        blocks.SetTip( CBlockIndex::Make( header, blockIndexStore ) );
+        blocks.SetTip( &CBlockIndex::Make( header, blockIndexStore ) );
 
         prev = blocks.Tip()->GetBlockHash();
     }
@@ -130,15 +124,13 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
             *p1, *p2, *p3, config.GetChainParams().GetConsensus());
         BOOST_CHECK_EQUAL(tdiff, p1->GetBlockTime() - p2->GetBlockTime());
     }
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 static CBlockIndex* GetBlockIndex(
     CBlockIndex* pindexPrev,
     int64_t nTimeInterval,
     uint32_t nBits,
-    BlockMap& blockIndexStore)
+    std::map<uint256, CBlockIndex>& blockIndexStore)
 {
     CBlockHeader header;
     header.nTime = pindexPrev->GetBlockTime() + nTimeInterval;
@@ -146,13 +138,13 @@ static CBlockIndex* GetBlockIndex(
     header.nNonce = blockIndexStore.size();
     header.hashPrevBlock = pindexPrev->GetBlockHash();
 
-    return CBlockIndex::Make( header, blockIndexStore );
+    return &CBlockIndex::Make( header, blockIndexStore );
 }
 
 BOOST_AUTO_TEST_CASE(retargeting_test) {
     DummyConfig config(CBaseChainParams::MAIN);
 
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CChain blocks;
 
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
@@ -165,7 +157,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
         CBlockHeader header;
         header.nTime = 1269211443;
         header.nBits = initialBits;
-        blocks.SetTip( CBlockIndex::Make( header, blockIndexStore ) );
+        blocks.SetTip( &CBlockIndex::Make( header, blockIndexStore ) );
     }
 
     // Pile up some blocks.
@@ -259,14 +251,12 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(blocks.Tip(), &blkHeaderDummy, config),
         powLimit.GetCompact());
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     DummyConfig config(CBaseChainParams::MAIN);
 
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CChain blocks;
 
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
@@ -280,7 +270,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
         CBlockHeader header;
         header.nTime = 1269211443;
         header.nBits = initialBits;
-        blocks.SetTip( CBlockIndex::Make( header, blockIndexStore ) );
+        blocks.SetTip( &CBlockIndex::Make( header, blockIndexStore ) );
     }
 
     // Pile up some blocks every 10 mins to establish some history.
@@ -509,8 +499,6 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
         BOOST_CHECK_EQUAL(nextBits, powLimitBits);
         nBits = nextBits;
     }
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

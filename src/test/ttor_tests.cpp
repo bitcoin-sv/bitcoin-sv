@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "block_index_store.h"
 #include "chainparams.h"
 #include "chain.h"
 #include "config.h"
@@ -35,10 +36,10 @@ using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
 CBlockIndex& AddToBlockIndex(CBlockIndex& prev)
 {
     CBlockHeader header;
-    header.nTime = mapBlockIndex.size(); // for uniqueness in current block hash
+    header.nTime = mapBlockIndex.Count(); // for uniqueness in current block hash
     header.hashPrevBlock = prev.GetBlockHash();
     header.nBits = GetNextWorkRequired( &prev, &header, GlobalConfig::GetConfig() );
-    CBlockIndex& current = *CBlockIndex::Make( header, mapBlockIndex );
+    CBlockIndex& current = *mapBlockIndex.Insert( header );
     TestAccessCBlockIndex::SetStatusWithValidity( current );
 
     return current;
@@ -72,14 +73,13 @@ BOOST_AUTO_TEST_CASE(invalidate_chain)
 {
     // Due to static assertion checking (in debug mode), It is required to explicitly lock cs_main.
     // The checks are done (explicitly and implicitly) through functions:
-    // - AddToBlockIndex
     // - IsValid
     // - InvalidateChain
     LOCK(cs_main);
     std::vector<std::reference_wrapper<CBlockIndex>> blocks;
 
     assert( chainActive.Genesis() );
-    assert( mapBlockIndex.find( chainActive.Genesis()->GetBlockHash() ) != mapBlockIndex.end() );
+    assert( mapBlockIndex.Get( chainActive.Genesis()->GetBlockHash() ) );
 
     // valid active chain
     blocks.push_back( AddToBlockIndex( *chainActive.Genesis() ) );

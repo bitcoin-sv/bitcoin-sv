@@ -3,6 +3,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "base58.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "config.h"
 #include "core_io.h"
@@ -337,9 +338,9 @@ UniValue importprunedfunds(const Config &config,
 
         LOCK(cs_main);
 
-        if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-            !chainActive.Contains(
-                mapBlockIndex[merkleBlock.header.GetHash()])) {
+        if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
+            !index || !chainActive.Contains(index))
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                "Block not found in chain");
         }

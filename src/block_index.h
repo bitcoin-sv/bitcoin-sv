@@ -246,6 +246,21 @@ public:
     CBlockIndex(const CBlockIndex&) = delete;
     CBlockIndex& operator=(const CBlockIndex&) = delete;
 
+    /**
+     * Class that guarantees that public constructors of this class can only be
+     * used from CBlockIndex internal functions.
+     *       It needs to be public for emplace construction inside containers.
+     */
+    class PrivateTag
+    {
+        // intentionally private
+        PrivateTag() = default;
+        friend class CBlockIndex;
+
+        public:
+            template<typename T> struct UnitTestAccess;
+    };
+
 private:
 
     /**
@@ -314,13 +329,17 @@ public:
     /**
      * T must be of std::map/std::unordered_map associative container interface
      * concept.
+     *
+     * Parent block index must already exist in the provided container.
+     * Trying to construct a CBlockIndex instance with hash that already exists
+     * in the container is considered no-op and we just return the existing
+     * entry.
      */
     template<typename T>
-    static CBlockIndex* Make( const CBlockHeader& block, T& container )
+    static CBlockIndex& Make( const CBlockHeader& block, T& container )
     {
         assert( !block.IsNull() );
 
-        // Construct new block index object
         auto prev = container.find(block.hashPrevBlock);
 
         // Only genesis blocks may have missing previous block!
@@ -328,34 +347,38 @@ public:
             (block.hashPrevBlock.IsNull() && prev == container.end() ) ||
             prev != container.end());
 
-        std::unique_ptr<CBlockIndex> pindexNew{
-                new CBlockIndex(
-                    block,
-                    (prev != container.end() ? prev->second : nullptr)) };
-
-        auto item = container.try_emplace( block.GetHash(), pindexNew.get() );
+        auto item =
+            container.try_emplace(
+                block.GetHash(),
+                block,
+                (prev != container.end() ? &prev->second : nullptr),
+                PrivateTag{} );
         assert( item.second );
-        pindexNew->phashBlock = &(item.first->first);
+        auto& indexNew = item.first->second;
+        indexNew.phashBlock = &(item.first->first);
 
-        return pindexNew.release(); // at this point index is guaranteed to be owned by the container
+        return indexNew;
     }
     /**
      * T must be of std::map/std::unordered_map associative container interface
      * concept.
+     *
+     * Trying to construct a CBlockIndex instance with hash that already exists
+     * in the container is considered no-op and we just return the existing
+     * entry.
      */
     template<typename T>
-    static CBlockIndex* UnsafeMakePartial( const uint256& hash, T& container )
+    static CBlockIndex& UnsafeMakePartial( const uint256& hash, T& container )
     {
-        assert( !hash.IsNull() );
-
-        // Construct new block index object
-        std::unique_ptr<CBlockIndex> pindexNew{ new CBlockIndex() };
-
-        auto item = container.try_emplace( hash, pindexNew.get() );
+        auto item =
+            container.try_emplace(
+                hash,
+                PrivateTag{} );
         assert( item.second );
-        pindexNew->phashBlock = &(item.first->first);
+        auto& indexNew = item.first->second;
+        indexNew.phashBlock = &item.first->first;
 
-        return pindexNew.release(); // at this point index is guaranteed to be owned by the container
+        return indexNew;
     }
 
     void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
@@ -755,6 +778,24 @@ public:
     std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk() const;
 
     friend class CDiskBlockIndex;
+
+    /**
+     * NOTE: Constructor is private and is expectedly not constructible outside
+     *       static make member functions!
+     *       It needs to be public for emplace construction inside containers.
+     */
+    CBlockIndex(PrivateTag) noexcept
+    {}
+
+    /**
+     * NOTE: Constructor is private and is expectedly not constructible outside
+     *       static make member functions!
+     *       It needs to be public for emplace construction inside containers.
+     */
+    CBlockIndex(const CBlockHeader& block, CBlockIndex* prev, PrivateTag) noexcept
+        : CBlockIndex{ block, prev }
+    {}
+
 protected:
     mutable CDiskBlockMetaData mDiskBlockMetaData;
 
@@ -786,8 +827,6 @@ protected:
     SteadyClockTimePoint mValidationCompletionTime{ SteadyClockTimePoint::max() };
 
 private:
-    CBlockIndex() = default;
-
     CBlockIndex(const CBlockHeader& block)
         : nVersion{ block.nVersion }
         , hashMerkleRoot{ block.hashMerkleRoot }
@@ -801,7 +840,7 @@ private:
         , nTimeReceived{ block.nTime }
     {}
 
-    CBlockIndex(const CBlockHeader& block, CBlockIndex* prev)
+    CBlockIndex(const CBlockHeader& block, CBlockIndex* prev) noexcept
         : CBlockIndex{ block }
     {
         // nSequenceId remains 0 to blocks only when the full data is available,
@@ -818,11 +857,6 @@ private:
             // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
             // constructor are OK.
             SetSoftRejectedFromParentNL();
-        }
-        else
-        {
-            // Only genesis blocks may have missing previous block!
-            assert( block.hashPrevBlock.IsNull() );
         }
         nTimeReceived = GetTime();
         nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
@@ -988,17 +1022,6 @@ private:
     uint256 mDummyHash;
     CBlockIndex mIndex;
 };
-
-
-/**
- * Maintain a map of CBlockIndex for all known headers.
- */
-struct BlockHasher {
-    size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
-};
-
-typedef std::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
-extern BlockMap mapBlockIndex;
 
 /**
  * Return the time it would take to redo the work difference between from and

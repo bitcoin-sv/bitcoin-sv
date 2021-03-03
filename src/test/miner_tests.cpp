@@ -6,6 +6,7 @@
 #include "mining/journal_builder.h"
 #include "mining/journaling_block_assembler.h"
 
+#include "block_index_store.h"
 #include "chainparams.h"
 #include "coins.h"
 #include "config.h"
@@ -376,18 +377,15 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.Clear();
 
     {
-        std::map<uint256, CBlockIndex*> blockIndexStore;
-
         // Subsidy changing.
         auto tipMarker = chainActive.Tip();
-        blockIndexStore.emplace( tipMarker->GetBlockHash(), tipMarker );
         // Create an actual 209999-long block chain (without valid blocks).
         while (chainActive.Tip()->GetHeight() < 209999) {
             CBlockHeader header;
             header.nTime = GetTime();
             header.hashPrevBlock = chainActive.Tip()->GetBlockHash();
             header.nBits = chainActive.Tip()->GetBits();
-            CBlockIndex *next = CBlockIndex::Make( header, blockIndexStore );
+            CBlockIndex* next = mapBlockIndex.Insert( header );
             TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
             chainActive.SetTip(next);
         }
@@ -398,7 +396,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
             header.nTime = GetTime();
             header.hashPrevBlock = chainActive.Tip()->GetBlockHash();
             header.nBits = chainActive.Tip()->GetBits();
-            CBlockIndex *next = CBlockIndex::Make( header, blockIndexStore );
+            CBlockIndex* next = mapBlockIndex.Insert( header );
             TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
             chainActive.SetTip(next);
         }
@@ -702,7 +700,7 @@ void Test_BlockAssembler_construction(TestingSetup& testingSetup)
 
 void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTime, uint64_t expectedSize)
 {
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
 
     {
         LOCK(cs_main);
@@ -721,7 +719,7 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
                     chainActive.Tip(),
                     &header,
                     GlobalConfig::GetConfig() );
-            CBlockIndex* next = CBlockIndex::Make( header, blockIndexStore );
+            CBlockIndex* next = &CBlockIndex::Make( header, blockIndexStore );
 
             prevHash = next->GetBlockHash();
 

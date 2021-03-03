@@ -5,6 +5,7 @@
 
 #include "rpc/mining.h"
 #include "amount.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "config.h"
@@ -509,11 +510,9 @@ void getblocktemplate(const Config& config,
             }
 
             uint256 hash = block.GetHash();
-            BlockMap::iterator mi = mapBlockIndex.find(hash);
             // result is of type UniValue because of BIP22ValidationResult return type
             UniValue result;
-            if (mi != mapBlockIndex.end()) {
-                CBlockIndex *pindex = mi->second;
+            if (auto pindex = mapBlockIndex.Get(hash); pindex) {
                 if (pindex->IsValid(BlockValidity::SCRIPTS))
                 {
                     result = "duplicate";
@@ -822,9 +821,7 @@ UniValue processBlock(
     bool fBlockPresent = false;
     {
         LOCK(cs_main);
-        BlockMap::iterator mi = mapBlockIndex.find(hash);
-        if (mi != mapBlockIndex.end()) {
-            CBlockIndex *pindex = mi->second;
+        if (auto pindex = mapBlockIndex.Get(hash); pindex) {
             if (pindex->IsValid(BlockValidity::SCRIPTS)) {
                 return "duplicate";
             }

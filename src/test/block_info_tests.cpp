@@ -4,6 +4,7 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <map>
 #include <vector>
 
 #include "chain.h"
@@ -15,19 +16,11 @@ using namespace std;
 
 BOOST_AUTO_TEST_SUITE(block_index_tests)
 
-void BlockMapCleanup(BlockMap& blockMap)
-{
-    for (auto& item : blockMap)
-    {
-        delete item.second;
-    }
-}
-
 BOOST_AUTO_TEST_CASE(mtp)
 {
     SelectParams( CBaseChainParams::REGTEST );
 
-    BlockMap blockIndexStore;
+    std::map<uint256, CBlockIndex> blockIndexStore;
     CChain blocks;
     CBlockIndex* prev{};
     uint256 prevHash;
@@ -38,7 +31,7 @@ BOOST_AUTO_TEST_CASE(mtp)
         header.hashPrevBlock = prevHash;
         header.nBits = GetNextWorkRequired( prev, &header, GlobalConfig::GetConfig() );
 
-        prev = CBlockIndex::Make( header, blockIndexStore );
+        prev = &CBlockIndex::Make( header, blockIndexStore );
         blocks.SetTip( prev );
         prevHash = prev->GetBlockHash();
     }
@@ -57,8 +50,6 @@ BOOST_AUTO_TEST_CASE(mtp)
     BOOST_CHECK_EQUAL(6, blocks[11]->GetMedianTimePast());
     BOOST_CHECK_EQUAL(7, blocks[12]->GetMedianTimePast());
     BOOST_CHECK_EQUAL(8, blocks[13]->GetMedianTimePast());
-
-    BlockMapCleanup(blockIndexStore);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
