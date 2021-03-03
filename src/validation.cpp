@@ -2258,7 +2258,6 @@ void CheckForkForInvalidBlocks(CBlockIndex* pindexForkTip)
         while (pindexWalk != pindexInvalidBlock)
         {
             pindexWalk->ModifyStatusWithFailedParent();
-            setDirtyBlockIndex.insert(pindexWalk);
             setBlockIndexCandidates.erase(pindexWalk);
             pindexWalk = pindexWalk->GetPrev();
         }
@@ -2530,7 +2529,6 @@ static void InvalidBlockFound(CBlockIndex *pindex,
                               const CValidationState &state) {
     if (!state.CorruptionPossible()) {
         pindex->ModifyStatusWithFailed();
-        setDirtyBlockIndex.insert(pindex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);
     }
@@ -3485,13 +3483,7 @@ bool FlushStateToDisk(
                 {
                     
                     std::vector<std::pair<int, const CBlockFileInfo *>> vFiles = pBlockFileInfoStore->GetAndClearDirtyFileInfo();
-                    std::vector<const CBlockIndex *> vBlocks;
-                    vBlocks.reserve(setDirtyBlockIndex.size());
-                    for (auto it = setDirtyBlockIndex.begin();
-                         it != setDirtyBlockIndex.end();) {
-                        vBlocks.push_back(*it);
-                        setDirtyBlockIndex.erase(it++);
-                    }
+                    auto vBlocks = mapBlockIndex.ExtractDirtyBlockIndices();
                     if (!pblocktree->WriteBatchSync(vFiles, pBlockFileInfoStore->GetnLastBlockFile(),
                                                     vBlocks)) {
                         return AbortNode(
@@ -4591,7 +4583,6 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
 
     // Mark the block itself as invalid.
     pindex->ModifyStatusWithFailed();
-    setDirtyBlockIndex.insert(pindex);
     setBlockIndexCandidates.erase(pindex);
 
     DisconnectedBlockTransactions disconnectpool;
@@ -4603,7 +4594,6 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         {
             CBlockIndex* pindexWalk = chainActive.Tip();
             pindexWalk->ModifyStatusWithFailedParent();
-            setDirtyBlockIndex.insert(pindexWalk);
             setBlockIndexCandidates.erase(pindexWalk);
             // ActivateBestChain considers blocks already in chainActive
             // unconditionally valid already, so force disconnect away from it.
@@ -4681,14 +4671,12 @@ void SetRootSoftRejectedForNL(const BlockIndexWithDescendants& blockIndexWithDes
     AssertLockHeld(cs_main);
     auto* item = blockIndexWithDescendants.Root();
     item->BlockIndex()->SetSoftRejectedFor(numBlocks);
-    setDirtyBlockIndex.insert(item->BlockIndex());
 
     item = item->Next();
     for(; item!=nullptr; item=item->Next())
     {
         // NOTE: tree is traversed depth first so that parents are always updated before children
         item->BlockIndex()->SetSoftRejectedFromParent();
-        setDirtyBlockIndex.insert(item->BlockIndex());
     }
 }
 
@@ -4879,7 +4867,6 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
             if (!index.IsValid() &&
                 index.GetAncestor(nHeight) == pindex) {
                 index.ModifyStatusWithClearedFailedFlags();
-                setDirtyBlockIndex.insert(&index);
                 if (index.IsValid(BlockValidity::TRANSACTIONS) &&
                     index.GetChainTx() &&
                     setBlockIndexCandidates.value_comp()(chainActive.Tip(),
@@ -4898,7 +4885,6 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     while (pindex != nullptr) {
         if (pindex->getStatus().isInvalid()) {
             pindex->ModifyStatusWithClearedFailedFlags();
-            setDirtyBlockIndex.insert(pindex);
         }
         pindex = pindex->GetPrev();
     }
@@ -4912,8 +4898,6 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
 
     // Construct new block index object
     auto pindexNew = mapBlockIndex.Insert( block );
-
-    setDirtyBlockIndex.insert(pindexNew);
 
     // Check if adding new block index triggers safe mode
     CheckSafeModeParameters(pindexNew);
@@ -4968,7 +4952,6 @@ void InvalidateChain(const CBlockIndex* pindexNew)
             while (pindexWalk != pindexNew)
             {
                 pindexWalk->ModifyStatusWithFailedParent();
-                setDirtyBlockIndex.insert(pindexWalk);
                 setBlockIndexCandidates.erase(pindexWalk);
                 pindexWalk = pindexWalk->GetPrev();
             }
@@ -5021,7 +5004,6 @@ static bool ReceivedBlockTransactions(
             LogPrintf("Block %s at height %d violates TTOR order.\n", block.GetHash().ToString(), pindexNew->GetHeight());
             // Mark the block itself as invalid.
             pindexNew->ModifyStatusWithFailed();
-            setDirtyBlockIndex.insert(pindexNew);
             setBlockIndexCandidates.erase(pindexNew);
             InvalidateChain(pindexNew);
             InvalidChainFound(pindexNew);
@@ -5030,7 +5012,6 @@ static bool ReceivedBlockTransactions(
     }
 
     pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData);
-    setDirtyBlockIndex.insert(pindexNew);
 
     if (pindexNew->IsGenesis() || pindexNew->GetPrev()->GetChainTx())
     {
@@ -5661,7 +5642,6 @@ static bool AcceptBlock(const Config& config,
     {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->ModifyStatusWithFailed();
-            setDirtyBlockIndex.insert(pindex);
         }
         return error("%s: %s (block %s)", __func__, FormatStateMessage(state),
             block.GetHash().ToString());
@@ -5894,13 +5874,11 @@ static void PruneOneBlockFile(const int fileNumber) {
         {
             if (index.ClearFileInfoIfFileNumberEquals(fileNumber))
             {
-                setDirtyBlockIndex.insert( &index );
-
                 // Prune from mapBlocksUnlinked -- any block we prune would have
                 // to be downloaded again in order to consider its chain, at which
                 // point it would be considered as a candidate for
                 // mapBlocksUnlinked or setBlockIndexCandidates.
-                auto range = mapBlocksUnlinked.equal_range(index.GetPrev());
+                auto range = mapBlocksUnlinked.equal_range( index.GetPrev() );
                 while (range.first != range.second) {
                     auto _it = range.first;
                     range.first++;
@@ -6447,7 +6425,6 @@ void UnloadBlockIndex() {
     mapBlocksUnlinked.clear();
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
-    setDirtyBlockIndex.clear();
 
     mapBlockIndex.ForceClear();
     fHavePruned = false;

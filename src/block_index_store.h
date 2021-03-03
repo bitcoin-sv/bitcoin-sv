@@ -11,6 +11,7 @@
 #include "primitives/block.h"
 #include "block_hasher.h"
 #include "chain.h"
+#include "dirty_block_index_store.h"
 #include "uint256.h"
 #include "utiltime.h"
 
@@ -38,13 +39,18 @@ public:
 
         mStore.clear();
         mBestHeader = nullptr;
+        mDirtyBlockIndex.Clear();
     }
 
     CBlockIndex* Insert( const CBlockHeader& block )
     {
         std::lock_guard lock{ mMutex };
 
-        auto& indexNew = CBlockIndex::Make( block, mStore );
+        auto& indexNew =
+            CBlockIndex::Make(
+                block,
+                mDirtyBlockIndex,
+                mStore );
 
         if (mBestHeader == nullptr ||
             mBestHeader->GetChainWork() < indexNew.GetChainWork())
@@ -89,6 +95,11 @@ public:
         {
             callback( item.second );
         }
+    }
+
+    std::vector<const CBlockIndex*> ExtractDirtyBlockIndices()
+    {
+        return mDirtyBlockIndex.Extract();
     }
 
     void SetBestHeader(const CBlockIndex& bestHeaderCandidate)
@@ -141,7 +152,11 @@ private:
             return *index;
         }
 
-        return CBlockIndex::UnsafeMakePartial( blockHash, mStore );
+        return
+            CBlockIndex::UnsafeMakePartial(
+                blockHash,
+                mDirtyBlockIndex,
+                mStore );
     }
 
     CBlockIndex* getNL( const uint256& blockHash )
@@ -162,6 +177,8 @@ private:
      * points).
      */
     const CBlockIndex* mBestHeader{ nullptr };
+
+    DirtyBlockIndexStore mDirtyBlockIndex;
 };
 
 /**

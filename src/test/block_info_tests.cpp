@@ -20,6 +20,7 @@ BOOST_AUTO_TEST_CASE(mtp)
 {
     SelectParams( CBaseChainParams::REGTEST );
 
+    DirtyBlockIndexStore dirty;
     std::map<uint256, CBlockIndex> blockIndexStore;
     CChain blocks;
     CBlockIndex* prev{};
@@ -31,7 +32,7 @@ BOOST_AUTO_TEST_CASE(mtp)
         header.hashPrevBlock = prevHash;
         header.nBits = GetNextWorkRequired( prev, &header, GlobalConfig::GetConfig() );
 
-        prev = &CBlockIndex::Make( header, blockIndexStore );
+        prev = &CBlockIndex::Make( header, dirty, blockIndexStore );
         blocks.SetTip( prev );
         prevHash = prev->GetBlockHash();
     }

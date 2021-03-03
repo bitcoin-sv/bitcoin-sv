@@ -6,11 +6,14 @@
 
 #include "arith_uint256.h"
 #include "consensus/params.h"
+#include "dirty_block_index_store.h"
 #include "disk_block_pos.h"
 #include "streams.h"
 #include "undo.h"
 #include "utiltime.h"
 #include <chrono>
+#include <functional>
+#include <optional>
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>
@@ -336,7 +339,10 @@ public:
      * entry.
      */
     template<typename T>
-    static CBlockIndex& Make( const CBlockHeader& block, T& container )
+    static CBlockIndex& Make(
+        const CBlockHeader& block,
+        DirtyBlockIndexStore& notifyDirty,
+        T& container )
     {
         assert( !block.IsNull() );
 
@@ -352,6 +358,7 @@ public:
                 block.GetHash(),
                 block,
                 (prev != container.end() ? &prev->second : nullptr),
+                std::ref(notifyDirty),
                 PrivateTag{} );
         assert( item.second );
         auto& indexNew = item.first->second;
@@ -368,12 +375,16 @@ public:
      * entry.
      */
     template<typename T>
-    static CBlockIndex& UnsafeMakePartial( const uint256& hash, T& container )
+    static CBlockIndex& UnsafeMakePartial(
+        const uint256& hash,
+        DirtyBlockIndexStore& notifyDirty,
+        T& container )
     {
         auto item =
             container.try_emplace(
                 hash,
-                PrivateTag{} );
+                PrivateTag{},
+                std::ref(notifyDirty) );
         assert( item.second );
         auto& indexNew = item.first->second;
         indexNew.phashBlock = &item.first->first;
@@ -568,6 +579,9 @@ public:
         // Data only needs to be stored on disk if block is soft rejected because
         // absence of this data means that block is not considered soft rejected.
         nStatus = nStatus.withDataForSoftRejection( IsSoftRejectedNL() );
+
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
     }
 
     /**
@@ -581,6 +595,7 @@ public:
     void SetSoftRejectedFromParent()
     {
         std::lock_guard lock { GetMutex() };
+
         SetSoftRejectedFromParentNL();
     }
 
@@ -606,6 +621,9 @@ public:
             nDataPos = 0;
             nUndoPos = 0;
             mDiskBlockMetaData = {};
+
+            assert( mNotifyDirty );
+            mNotifyDirty->get().Insert( *this );
 
             return true;
         }
@@ -690,16 +708,25 @@ public:
     void ModifyStatusWithFailed() {
         std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withFailed();
+
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
     }
 
     void ModifyStatusWithClearedFailedFlags() {
         std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withClearedFailureFlags();
+
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
     }
 
     void ModifyStatusWithFailedParent() {
         std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withFailedParent();
+
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
     }
 
     /**
@@ -784,7 +811,8 @@ public:
      *       static make member functions!
      *       It needs to be public for emplace construction inside containers.
      */
-    CBlockIndex(PrivateTag) noexcept
+    CBlockIndex(PrivateTag, DirtyBlockIndexStore& notifyDirty) noexcept
+        : mNotifyDirty{ notifyDirty }
     {}
 
     /**
@@ -792,8 +820,12 @@ public:
      *       static make member functions!
      *       It needs to be public for emplace construction inside containers.
      */
-    CBlockIndex(const CBlockHeader& block, CBlockIndex* prev, PrivateTag) noexcept
-        : CBlockIndex{ block, prev }
+    CBlockIndex(
+        const CBlockHeader& block,
+        CBlockIndex* prev,
+        DirtyBlockIndexStore& notifyDirty,
+        PrivateTag) noexcept
+        : CBlockIndex{ block, prev, notifyDirty }
     {}
 
 protected:
@@ -827,7 +859,7 @@ protected:
     SteadyClockTimePoint mValidationCompletionTime{ SteadyClockTimePoint::max() };
 
 private:
-    CBlockIndex(const CBlockHeader& block)
+    CBlockIndex(const CBlockHeader& block, DirtyBlockIndexStore& notifyDirty) noexcept
         : nVersion{ block.nVersion }
         , hashMerkleRoot{ block.hashMerkleRoot }
         , nTime{ block.nTime }
@@ -838,10 +870,14 @@ private:
         // Note that nTimeReceived isn't written to disk, so blocks read from
         // disk will be assumed to be honestly mined.
         , nTimeReceived{ block.nTime }
+        , mNotifyDirty{ notifyDirty }
     {}
 
-    CBlockIndex(const CBlockHeader& block, CBlockIndex* prev) noexcept
-        : CBlockIndex{ block }
+    CBlockIndex(
+        const CBlockHeader& block,
+        CBlockIndex* prev,
+        DirtyBlockIndexStore& notifyDirty) noexcept
+        : CBlockIndex{ block, notifyDirty }
     {
         // nSequenceId remains 0 to blocks only when the full data is available,
         // to avoid miners withholding blocks but broadcasting headers, to get a
@@ -856,12 +892,16 @@ private:
             // Note that if a parent of a block is not found in index, this must be a genesis block.
             // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
             // constructor are OK.
-            SetSoftRejectedFromParentNL();
+            SetSoftRejectedFromParentBaseNL();
         }
         nTimeReceived = GetTime();
         nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
         SetChainWorkNL();
-        RaiseValidityNL( BlockValidity::TREE );
+
+        // We don't want to trigger dirty marking since we've just created a
+        // new index that might never get block data (can be forgotten after
+        // restart) so we call Base version of RaiseValidity.
+        RaiseValidityBaseNL( BlockValidity::TREE );
     }
 
     bool PopulateBlockIndexBlockDiskMetaDataNL(FILE* file,
@@ -905,8 +945,17 @@ private:
     }
 
     // Raise the validity level of this block index entry.
-    // Returns true if the validity was changed.
+    // Returns true if the validity was changed and marks index as dirty.
     bool RaiseValidityNL(enum BlockValidity nUpTo) {
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
+        return RaiseValidityBaseNL(nUpTo);
+    }
+
+    // Same as RaiseValidityNL except that it doesn't flag as dirty so it can
+    // be used in constructor that is used for initial load from database
+    // without flagging it as dirty.
+    bool RaiseValidityBaseNL(enum BlockValidity nUpTo) {
         // Only validity flags allowed.
         if (nStatus.isInvalid()) {
             return false;
@@ -924,6 +973,7 @@ private:
         }
 
         nStatus = nStatus.withValidity(nUpTo);
+
         return true;
     }
 
@@ -934,7 +984,7 @@ private:
             GetBlockProof(*this);
     }
 
-    void SetSoftRejectedFromParentNL()
+    void SetSoftRejectedFromParentBaseNL()
     {
         if(ShouldBeConsideredSoftRejectedBecauseOfParentNL())
         {
@@ -949,6 +999,16 @@ private:
             nStatus = nStatus.withDataForSoftRejection(false);
         }
     }
+
+
+    void SetSoftRejectedFromParentNL()
+    {
+        SetSoftRejectedFromParentBaseNL();
+
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
+    }    
+
     //! Build the skiplist pointer for this entry.
     void BuildSkipNL();
 
@@ -959,9 +1019,14 @@ private:
 
         mDiskBlockMetaData = {hash, size};
         nStatus = nStatus.withDiskBlockMetaData();
+
+        assert( mNotifyDirty );
+        mNotifyDirty->get().Insert( *this );
     }
 
     std::mutex& GetMutex() const;
+
+    std::optional<std::reference_wrapper<DirtyBlockIndexStore>> mNotifyDirty;
 };
 
 /**
@@ -977,7 +1042,7 @@ public:
     // Creates a genesis like block without parent
     TemporaryBlockIndex( const CBlockHeader& block )
         : mDummyHash{ block.GetHash() }
-        , mIndex{ block }
+        , mIndex{ block, mNotifyDirty }
     {
         //pSkip is not set here intentionally: logic depends on pSkip to be nullptr at this point
         mIndex.phashBlock = &mDummyHash;
@@ -990,7 +1055,7 @@ public:
     // Creates a child block
     TemporaryBlockIndex(CBlockIndex& parent, const CBlockHeader& block )
         : mDummyHash{ block.GetHash() }
-        , mIndex{ block }
+        , mIndex{ block, mNotifyDirty }
     {
         //pSkip is not set here intentionally: logic depends on pSkip to be nullptr at this point
         mIndex.phashBlock = &mDummyHash;
@@ -1019,6 +1084,7 @@ public:
     CBlockIndex* get() { return &mIndex; }
 
 private:
+    DirtyBlockIndexStore mNotifyDirty;
     uint256 mDummyHash;
     CBlockIndex mIndex;
 };
@@ -1089,8 +1155,5 @@ struct CBlockIndexWorkComparator {
         return false;
     }
 };
-
-/** Dirty block index entries. */
-extern std::set<CBlockIndex *> setDirtyBlockIndex;
 
 #endif

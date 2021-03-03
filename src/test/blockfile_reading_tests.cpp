@@ -123,6 +123,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     CScopeSetupTeardown guard{"read_without_meta_info"};
     const DummyConfig config;
+    DirtyBlockIndexStore dummyDirty;
 
     auto block = BuildRandomTestBlock();
     CBlockIndex::TemporaryBlockIndex index{ block };
@@ -179,6 +180,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
     // termination
     CScopeSetupTeardown guard{"delete_block_file_while_reading"};
     const DummyConfig config;
+    DirtyBlockIndexStore dummyDirty;
 
     auto block = BuildRandomTestBlock();
     CBlockIndex::TemporaryBlockIndex index{ block };

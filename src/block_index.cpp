@@ -13,8 +13,6 @@
 #include "warnings.h"
 #include "abort_node.h"
 
-std::set<CBlockIndex *> setDirtyBlockIndex;
-
 /** Turn the lowest '1' bit in the binary representation of a number into a '0'.
  */
 static inline int InvertLowestOne(int n) {
@@ -213,8 +211,6 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
         }
 
         RaiseValidityNL(BlockValidity::SCRIPTS);
-
-        setDirtyBlockIndex.insert(this);
     }
 
     return true;
@@ -258,7 +254,6 @@ bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
     CDiskBlockMetaData metadata) const
 {
-    LOCK(cs_main);
     if (!nStatus.hasDiskBlockMetaData())
     {
         if (!nStatus.hasData())
@@ -268,9 +263,6 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
         SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
-
-        // TODO: this const_cast will be removed in the following commits along with inserting into setDirtyBlockIndex
-        setDirtyBlockIndex.insert(const_cast<CBlockIndex*>(this));
     }
 }
 

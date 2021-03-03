@@ -83,6 +83,7 @@ BITCOIN_CORE_H = \
   block_hasher.h \
   block_index.h \
   block_index_store.h \
+  dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
   block_file_access.h \
