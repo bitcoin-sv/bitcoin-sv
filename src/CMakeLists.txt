@@ -109,51 +109,51 @@ add_subdirectory(univalue)
 
 # Various completely unrelated features shared by all executables.
 add_library(util
-	amount.h                       # utilmoneystr.h
+	amount.h
 	chainparamsbase.cpp
-	chainparamsbase.h              # chainparamsbase.cpp
+	chainparamsbase.h
 	clientversion.cpp
-	clientversion.h                # clientversion.cpp
-	compat.h                       # util.h
-	compat/byteswap.h              # compat/endian.h
-	compat/endian.h                # serialize.h
+	clientversion.h
+	compat.h
+	compat/byteswap.h
+	compat/endian.h
 	compat/glibc_sanity.cpp
 	compat/glibcxx_sanity.cpp
 	compat/strnlen.cpp
-	compiler_warnings.h            # compat/glibcxx_sanity.cpp
-	enum_cast.h                    # threadpriority.h
+	compiler_warnings.h
+	enum_cast.h
 	fs.cpp
-	fs.h                           # fs.cpp
+	fs.h
 	logging.cpp
-	logging.h                      # logging.cpp
-	prevector.h                    # serialize.h
+	logging.h
+	prevector.h
 	random.cpp
-	random.h                       # random.cpp
+	random.h
 	rpc/protocol.cpp
-	rpc/protocol.h                 # rpc/protocol.cpp
-	rpc/text_writer.h              # utilstrencodings.h
-	serialize.h                    # util.cpp
+	rpc/protocol.h
+	rpc/text_writer.h
+	serialize.h
 	support/cleanse.cpp
-	support/cleanse.h              # support/cleanse.cpp
+	support/cleanse.h
 	support/lockedpool.cpp
-	support/lockedpool.h           # support/lockedpool.cpp
+	support/lockedpool.h
 	sync.cpp
-	sync.h                         # sync.cpp
+	sync.h
 	threadinterrupt.cpp
-	threadinterrupt.h              # threadinterrupt.cpp
+	threadinterrupt.h
 	threadpriority.cpp
-	threadpriority.h               # threadpriority.cpp
-	threadsafety.h                 # sync.h
-	tinyformat.h                   # chainparamsbase.cpp
-	uint256.h                      # random.h
+	threadpriority.h
+	threadsafety.h
+	tinyformat.h
+	uint256.h
 	util.cpp
-	util.h                         # util.cpp
+	util.h
 	utilmoneystr.cpp
-	utilmoneystr.h                 # utilmoneystr.cpp
+	utilmoneystr.h
 	utilstrencodings.cpp
-	utilstrencodings.h             # utilstrencodings.cpp
+	utilstrencodings.h
 	utiltime.cpp
-	utiltime.h                     # utiltime.cpp
+	utiltime.h
 )
 
 if(ENABLE_PROD_BUILD)
@@ -206,128 +206,128 @@ target_compile_definitions(util PUBLIC BOOST_SP_USE_STD_ATOMIC BOOST_AC_USE_STD_
 # More completely unrelated features shared by all executables.
 # Because nothing says this is different from util than "common"
 add_library(common
-	addrdb.h                       # net/net.h
-	addrman.h                      # net/net.h
+	addrdb.h
+	addrman.h
 	amount.cpp
-	arith_uint256.h                # key.cpp
+	arith_uint256.h
 	base58.cpp
-	base58.h                       # base58.cpp
-	big_int.h                      # script/script_num.h
-	block_file_info.h              # chain.h
-	blockstreams.h                 # validation.h
-	blockvalidation.h              # validation.h
-	bloom.h                        # net/net.h
-	cfile_util.h                   # streams.h
-	chain.h                        # validation.h
+	base58.h
+	big_int.h
+	block_file_info.h
+	blockstreams.h
+	blockvalidation.h
+	bloom.h
+	cfile_util.h
+	chain.h
 	chainparams.cpp
-	chainparams.h                  # chainparams.cpp
-	chainparamsseeds.h             # chainparams.cpp
+	chainparams.h
+	chainparamsseeds.h
 	coins.cpp
-	coins.h                        # coins.cpp
+	coins.h
 	compressor.cpp
-	compressor.h                   # compressor.cpp
+	compressor.h
 	config.cpp
-	config.h                       # config.cpp
-	consensus/consensus.h          # coins.cpp
+	config.h
+	consensus/consensus.h
 	consensus/merkle.cpp
-	consensus/merkle.h             # consensus/merkle.cpp
-	consensus/params.h             # chainparams.h
-	consensus/validation.h         # txn_validation_result.h
-	core_io.h                      # core_read.cpp
-	core_memusage.h                # coins.h
+	consensus/merkle.h
+	consensus/params.h
+	consensus/validation.h
+	core_io.h
+	core_memusage.h
 	core_read.cpp
 	core_write.cpp
-	disk_block_pos.h               # chain.h
+	disk_block_pos.h
 	dstencode.cpp
-	dstencode.h                    # dstencode.cpp
-	hash.h                         # base58.cpp
-	indirectmap.h                  # memusage.h
-	invalid_txn_publisher.h        # config.h
+	dstencode.h
+	hash.h
+	indirectmap.h
+	invalid_txn_publisher.h
 	key.cpp
-	key.h                          # key.cpp
+	key.h
 	keystore.cpp
-	keystore.h                     # keystore.cpp
-	limitedmap.h                   # net/net.h
-	memusage.h                     # coins.cpp
-	merkletree.h                   # config.cpp
-	mining/assembler.h             # mining/factory.h
-	mining/candidates.h            # mining/factory.h
-	mining/factory.h               # config.h
-	mining/journal.h               # mining/journal_change_set.h
-	mining/journal_builder.h       # txmempool.h
-	mining/journal_change_set.h    # validation.h
-	mining/journal_entry.h         # txmempool.h
-	net/association.h              # net/net.h
-	net/association_id.h           # net/association.h
-	net/net.h                      # config.h
-	net/net_message.h              # net/net.h
-	net/net_types.h                # protocol.h
+	keystore.h
+	limitedmap.h
+	memusage.h
+	merkletree.h
+	mining/assembler.h
+	mining/candidates.h
+	mining/factory.h
+	mining/journal.h
+	mining/journal_builder.h
+	mining/journal_change_set.h
+	mining/journal_entry.h
+	net/association.h
+	net/association_id.h
+	net/net.h
+	net/net_message.h
+	net/net_types.h
 	net/netaddress.cpp
-	net/netaddress.h               # net/netaddress.cpp
+	net/netaddress.h
 	net/netbase.cpp
-	net/netbase.h                  # net/netbase.cpp
-	net/node_stats.h               # net/net.h
-	net/send_queue_bytes.h         # net/stream.h
-	net/stream.h                   # net/association.h
-	net/stream_policy.h            # net/stream_policy_factory.h
-	net/stream_policy_factory.h    # net/net.h
-	orphan_txns.h                  # config.h
-	policy/policy.h                # chainparams.cpp
-	pow.h                          # chain.h
+	net/netbase.h
+	net/node_stats.h
+	net/send_queue_bytes.h
+	net/stream.h
+	net/stream_policy.h
+	net/stream_policy_factory.h
+	orphan_txns.h
+	policy/policy.h
+	pow.h
 	primitives/block.cpp
-	primitives/block.h             # primitives/block.cpp
-	primitives/transaction.h       # core_read.cpp
+	primitives/block.h
+	primitives/transaction.h
 	protocol.cpp
-	protocol.h                     # protocol.cpp
-	pubkey.h                       # compressor.cpp
-	reverselock.h                  # scheduler.cpp
+	protocol.h
+	pubkey.h
+	reverselock.h
 	rpc/jsonwriter.cpp
-	rpc/jsonwriter.h               # rpc/jsonwriter.cpp
+	rpc/jsonwriter.h
 	scheduler.cpp
-	scheduler.h                    # scheduler.cpp
-	script/int_serialization.h     # script/standard.cpp
-	script/interpreter.h           # script/standard.h
-	script/limitedstack.h          # script/interpreter.h
-	script/opcodes.h               # script/script.h
-	script/script.h                # core_read.cpp
-	script/script_error.h          # validation.h
-	script/script_flags.h          # script/interpreter.h
-	script/script_num.h            # chainparams.cpp
-	script/sighashtype.h           # script/sign.h
+	scheduler.h
+	script/int_serialization.h
+	script/interpreter.h
+	script/limitedstack.h
+	script/opcodes.h
+	script/script.h
+	script/script_error.h
+	script/script_flags.h
+	script/script_num.h
+	script/sighashtype.h
 	script/sign.cpp
-	script/sign.h                  # script/sign.cpp
+	script/sign.h
 	script/standard.cpp
-	script/standard.h              # script/standard.cpp
-	script_config.h                # config.h
-	span.h                         # script/int_serialization.h
-	streams.h                      # core_read.cpp
-	support/allocators/secure.h    # key.h
-	support/allocators/zeroafterfree.h # base58.h
-	task.h                         # validation.h
-	task_helpers.h                 # net/net.h
-	taskcancellation.h             # script/sign.cpp
-	thread_safe_queue.h            # invalid_txn_publisher.h
-	threadpool.h                   # task_helpers.h
-	threadpoolT.h                  # threadpool.h
-	time_locked_mempool.h          # txmempool.h
-	timedata.h                     # addrman.h
-	tx_mempool_info.h              # txmempool.h
+	script/standard.h
+	script_config.h
+	span.h
+	streams.h
+	support/allocators/secure.h
+	support/allocators/zeroafterfree.h
+	task.h
+	task_helpers.h
+	taskcancellation.h
+	thread_safe_queue.h
+	threadpool.h
+	threadpoolT.h
+	time_locked_mempool.h
+	timedata.h
+	tx_mempool_info.h
 	txhasher.cpp
-	txhasher.h                     # txhasher.cpp
-	txmempool.h                    # txn_validation_result.h
-	txn_double_spend_detector.h    # validation.h
-	txn_sending_details.h          # net/net.h
-	txn_util.h                     # txn_validation_data.h
-	txn_validation_config.h        # config.h
-	txn_validation_data.h          # txn_validation_result.h
-	txn_validation_result.h        # validation.h
-	validation.h                   # config.cpp
-	version.h                      # core_read.cpp
-	versionbits.h                  # validation.h
+	txhasher.h
+	txmempool.h
+	txn_double_spend_detector.h
+	txn_sending_details.h
+	txn_util.h
+	txn_validation_config.h
+	txn_validation_data.h
+	txn_validation_result.h
+	validation.h
+	version.h
+	versionbits.h
 	warnings.cpp
-	warnings.h                     # warnings.cpp
+	warnings.h
 	write_preferring_upgradable_mutex.cpp
-	write_preferring_upgradable_mutex.h # write_preferring_upgradable_mutex.cpp
+	write_preferring_upgradable_mutex.h
 )
 
 target_link_libraries(common util secp256k1)
@@ -340,9 +340,9 @@ add_library(bitcoinconsensus
 	primitives/transaction.cpp
 	pubkey.cpp
 	script/bitcoinconsensus.cpp
-	script/bitcoinconsensus.h      # script/bitcoinconsensus.cpp
-	script/instruction.h           # script/instruction_iterator.h
-	script/instruction_iterator.h  # script/script.cpp
+	script/bitcoinconsensus.h
+	script/instruction.h
+	script/instruction_iterator.h
 	script/interpreter.cpp
 	script/limitedstack.cpp
 	script/opcodes.cpp
@@ -361,46 +361,46 @@ target_include_directories(bitcoinconsensus
 add_library(server
 	addrdb.cpp
 	addrman.cpp
-	async_file_reader.h            # validation.cpp
+	async_file_reader.h
 	block_file_access.cpp
-	block_file_access.h            # block_file_access.cpp
+	block_file_access.h
 	block_file_info.cpp
 	blockencodings.cpp
-	blockencodings.h               # blockencodings.cpp
+	blockencodings.h
 	blockfileinfostore.cpp
-	blockfileinfostore.h           # blockfileinfostore.cpp
+	blockfileinfostore.h
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
-	checkpoints.h                  # checkpoints.cpp
-	checkqueue.h                   # checkqueuepool.h
-	checkqueuepool.h               # validation.cpp
-	compat/sanity.h                # init.cpp
-	cuckoocache.h                  # script/scriptcache.cpp
+	checkpoints.h
+	checkqueue.h
+	checkqueuepool.h
+	compat/sanity.h
+	cuckoocache.h
 	dbwrapper.cpp
-	dbwrapper.h                    # dbwrapper.cpp
-	disk_tx_pos.h                  # block_file_access.cpp
+	dbwrapper.h
+	disk_tx_pos.h
 	httprpc.cpp
-	httprpc.h                      # httprpc.cpp
+	httprpc.h
 	httpserver.cpp
-	httpserver.h                   # httpserver.cpp
+	httpserver.h
 	init.cpp
-	init.h                         # init.cpp
+	init.h
 	invalid_txn_publisher.cpp
 	invalid_txn_sinks/file_sink.cpp
-	invalid_txn_sinks/file_sink.h  # invalid_txn_sinks/file_sink.cpp
+	invalid_txn_sinks/file_sink.h
 	invalid_txn_sinks/zmq_sink.cpp
-	invalid_txn_sinks/zmq_sink.h   # invalid_txn_sinks/zmq_sink.cpp
-	locked_ref.h                   # net/net_processing.cpp
+	invalid_txn_sinks/zmq_sink.h
+	locked_ref.h
 	mempooltxdb.cpp
-	mempooltxdb.h                  # mempooltxdb.cpp
+	mempooltxdb.h
 	merkleblock.cpp
-	merkleblock.h                  # merkleblock.cpp
+	merkleblock.h
 	merkletree.cpp
 	merkletreedb.cpp
-	merkletreedb.h                 # merkletreedb.cpp
+	merkletreedb.h
 	merkletreestore.cpp
-	merkletreestore.h              # merkletreestore.cpp
+	merkletreestore.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
@@ -409,75 +409,75 @@ add_library(server
 	mining/journal_change_set.cpp
 	mining/journal_entry.cpp
 	mining/journaling_block_assembler.cpp
-	mining/journaling_block_assembler.h # mining/journaling_block_assembler.cpp
+	mining/journaling_block_assembler.h
 	net/association.cpp
 	net/association_id.cpp
 	net/block_download_tracker.cpp
-	net/block_download_tracker.h   # net/block_download_tracker.cpp
+	net/block_download_tracker.h
 	net/net.cpp
 	net/net_message.cpp
 	net/net_processing.cpp
-	net/net_processing.h           # net/net_processing.cpp
+	net/net_processing.h
 	net/node_state.cpp
-	net/node_state.h               # net/node_state.cpp
+	net/node_state.h
 	net/stream.cpp
 	net/stream_policy.cpp
 	net/stream_policy_factory.cpp
-	netmessagemaker.h              # net/block_download_tracker.cpp
+	netmessagemaker.h
 	noui.cpp
-	noui.h                         # noui.cpp
+	noui.h
 	orphan_txns.cpp
 	policy/fees.cpp
-	policy/fees.h                  # policy/fees.cpp
+	policy/fees.h
 	policy/policy.cpp
 	pow.cpp
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp
-	rpc/blockchain.h               # rpc/blockchain.cpp
-	rpc/http_protocol.h            # httprpc.cpp
+	rpc/blockchain.h
+	rpc/http_protocol.h
 	rpc/mining-fbb.cpp
 	rpc/mining.cpp
-	rpc/mining.h                   # rpc/mining.cpp
+	rpc/mining.h
 	rpc/misc.cpp
-	rpc/misc.h                     # rpc/misc.cpp
+	rpc/misc.h
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
-	rpc/register.h                 # init.cpp
+	rpc/register.h
 	rpc/server.cpp
-	rpc/server.h                   # rpc/server.cpp
-	rpc/tojson.h                   # rest.cpp
+	rpc/server.h
+	rpc/tojson.h
 	script/ismine.cpp
-	script/ismine.h                # script/ismine.cpp
+	script/ismine.h
 	script/scriptcache.cpp
-	script/scriptcache.h           # script/scriptcache.cpp
+	script/scriptcache.h
 	script/sigcache.cpp
-	script/sigcache.h              # script/sigcache.cpp
+	script/sigcache.h
 	time_locked_mempool.cpp
 	timedata.cpp
 	tx_mempool_info.cpp
 	txdb.cpp
-	txdb.h                         # txdb.cpp
+	txdb.h
 	txmempool.cpp
 	txmempoolevictioncandidates.cpp
-	txmempoolevictioncandidates.h  # txmempoolevictioncandidates.cpp
+	txmempoolevictioncandidates.h
 	txn_double_spend_detector.cpp
-	txn_handlers.h                 # txn_validator.h
+	txn_handlers.h
 	txn_propagator.cpp
-	txn_propagator.h               # txn_propagator.cpp
+	txn_propagator.h
 	txn_recent_rejects.cpp
-	txn_recent_rejects.h           # txn_recent_rejects.cpp
+	txn_recent_rejects.h
 	txn_validation_data.cpp
 	txn_validator.cpp
-	txn_validator.h                # txn_validator.cpp
+	txn_validator.h
 	ui_interface.cpp
-	ui_interface.h                 # ui_interface.cpp
-	undo.h                         # block_file_access.cpp
+	ui_interface.h
+	undo.h
 	validation.cpp
 	validationinterface.cpp
-	validationinterface.h          # validationinterface.cpp
+	validationinterface.h
 	vmtouch.cpp
-	vmtouch.h                      # vmtouch.cpp
+	vmtouch.h
 )
 
 # This require libevent
@@ -527,23 +527,22 @@ endif()
 # RPC client support
 add_library(rpcclient
 	rpc/client.cpp
-	rpc/client.h                   # rpc/client.cpp
+	rpc/client.h
 	rpc/client_config.cpp
-	rpc/client_config.h            # rpc/client_config.cpp
+	rpc/client_config.h
 	rpc/client_utils.cpp
-	rpc/client_utils.h             # rpc/client_utils.cpp
+	rpc/client_utils.h
 	rpc/http_request.cpp
-	rpc/http_request.h             # rpc/http_request.cpp
+	rpc/http_request.h
 	rpc/http_response.cpp
-	rpc/http_response.h            # rpc/http_response.cpp
-	support/events.h               # rpc/client.cpp
+	rpc/http_response.h
+	support/events.h
 )
 target_link_libraries(rpcclient univalue util)
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)
-	add_executable(bitcoin-cli
-	bitcoin-cli.cpp
+	add_executable(bitcoin-cli bitcoin-cli.cpp
 )
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-cli PRIVATE bitcoin-cli-res.rc)
@@ -555,8 +554,7 @@ endif()
 
 # bitcoin-tx
 if(BUILD_BITCOIN_TX)
-	add_executable(bitcoin-tx
-	bitcoin-tx.cpp
+	add_executable(bitcoin-tx bitcoin-tx.cpp
 )
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-tx PRIVATE bitcoin-tx-res.rc)
@@ -567,16 +565,14 @@ endif()
 
 # bitcoin-miner
 if(BUILD_BITCOIN_MINER)
-	add_executable(bitcoin-miner
-	bitcoin-miner.cpp
+	add_executable(bitcoin-miner bitcoin-miner.cpp
 )
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
 endif()
 
 # bitcoind
-add_executable(bitcoind
-	bitcoind.cpp
+add_executable(bitcoind bitcoind.cpp
 )
 target_link_libraries(
 	bitcoind
