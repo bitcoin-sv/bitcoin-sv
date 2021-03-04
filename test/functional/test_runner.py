@@ -84,7 +84,9 @@ SOLO_TESTS = {
     "bsv-ptv-txn-chains.py",
     "mining_api.py",
     "bsv-pbv-withsigops.py",
-    "bsv-broadcast_delay.py"
+    "bsv-broadcast_delay.py",
+    "bsv-dsreport.py",
+    "bsv-callback-service.py"
 }
 
 # This tests can be only run by explicitly specifying them on command line. 
