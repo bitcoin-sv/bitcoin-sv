@@ -23,15 +23,20 @@ class RESPONSE_TIME(Enum):
     SLOW = 10
     SLOWEST = 70
 
+class FLAG(Enum):
+    YES = 1
+    NO = 0
+
 expectedProofs = []
 receivedProofs = []
 
 class CallbackService(BaseHTTPRequestHandler):
 
-    def __init__(self, receive, status, response_time, *args, **kwargs):
+    def __init__(self, receive, status, response_time, add_flag, *args, **kwargs):
         self.receive = receive
         self.status = status
         self.response_time = response_time
+        self.add_flag = add_flag
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
@@ -64,6 +69,11 @@ class CallbackService(BaseHTTPRequestHandler):
 
                 self.send_response(200)
                 if (self.receive == RECEIVE.YES):
+                    if (self.add_flag == FLAG.NO):
+                        self.send_header('random-header', 1)
+                        self.end_headers()
+                        return
+
                     expectedProofs.append(txid)
                     self.send_header('x-bsv-dsnt', 1)
                     self.end_headers()

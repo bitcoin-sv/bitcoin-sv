@@ -7,7 +7,7 @@ import threading, json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
-from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, check_for_log_msg, assert_equal
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
@@ -329,7 +329,7 @@ class DoubleSpendReport(BitcoinTestFramework):
     def run_test(self):
 
         # Turn on CallbackService.
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
@@ -359,7 +359,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.kill_server()
 
         # Turn on CallbackService.
-        handler = partial(CallbackService, RECEIVE.NO, STATUS.SUCCESS, RESPONSE_TIME.FAST)
+        handler = partial(CallbackService, RECEIVE.NO, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
@@ -369,7 +369,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.kill_server()
 
         # Turn on CallbackService that runs on IPv6 address.
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
         self.server = HTTPServerV6(('::', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)
