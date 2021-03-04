@@ -17,8 +17,12 @@ from test_framework.script import *
 import time
 
 # 127.0.0.1 as network-order bytes
+LOCAL_HOST_IPV6 = 0x00000000000000000000000000000001
 LOCAL_HOST_IP = 0x7F000001
 WRONG_IP = 0x7F000002
+
+class HTTPServerV6(HTTPServer):
+        address_family = socket.AF_INET6
 
 class DoubleSpendReport(BitcoinTestFramework):
 
@@ -27,7 +31,8 @@ class DoubleSpendReport(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        self.callback_service = "localhost:8080"
+        self.callback_serviceIPv4 = "localhost:8080"
+        self.callback_serviceIPv6 = "[::]:8080"
         self.extra_args = [['-dsendpointport=8080',
                             '-banscore=100000',
                             '-genesisactivationheight=1',
@@ -266,8 +271,33 @@ class DoubleSpendReport(BitcoinTestFramework):
         ]
         tx2 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "Endpoint doesn't want proof", "/node0"))
-
         self.check_tx_not_received(tx1.hash)
+
+    def check_ipv6(self, utxo):
+
+        # tx1 is dsnt-enabled
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129,1,[LOCAL_HOST_IPV6],[0,3]).serialize()]))
+        ]
+        tx1 = self.create_and_send_transaction(vin, vout)
+        tx1.rehash()
+        wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
+
+
+        # tx2 spends the same output as tx1 (double spend)
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE]))
+        ]
+        tx2 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to ::1", "/node0"))
+        wait_until(lambda: self.check_tx_received(tx1.hash))
 
     def run_test(self):
 
@@ -275,7 +305,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
-        self.conn = httplib.HTTPConnection(self.callback_service)
+        self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
 
         self.nodes[0].generate(110)
         utxo = self.nodes[0].listunspent()
@@ -303,9 +333,19 @@ class DoubleSpendReport(BitcoinTestFramework):
         handler = partial(CallbackService, RECEIVE.NO, STATUS.SUCCESS, RESPONSE_TIME.FAST)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
-        self.conn = httplib.HTTPConnection(self.callback_service)
+        self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
 
         self.check_ds_enabled_no_proof(utxo[9])
+
+        self.kill_server()
+
+        # Turn on CallbackService that runs on IPv6 address.
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST)
+        self.server = HTTPServerV6(('::', 8080), handler)
+        self.start_server()
+        self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)
+
+        self.check_ipv6(utxo[11])
 
         self.kill_server()
 
