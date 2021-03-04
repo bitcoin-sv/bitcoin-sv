@@ -16,9 +16,10 @@ from test_framework.script import *
 
 import time
 
-# 127.0.0.1 as network-order bytes
 LOCAL_HOST_IPV6 = 0x00000000000000000000000000000001
+# 127.0.0.1 as network-order bytes
 LOCAL_HOST_IP = 0x7F000001
+# 127.0.0.2 as network-order bytes
 WRONG_IP = 0x7F000002
 
 class HTTPServerV6(HTTPServer):
@@ -248,6 +249,32 @@ class DoubleSpendReport(BitcoinTestFramework):
         # Wait for the callback service to process requests
         self.check_tx_not_received(tx3.hash)
 
+    def check_multiple_callback_services(self, utxo):
+
+        # tx1 is dsnt-enabled
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,2,[LOCAL_HOST_IP, WRONG_IP], [0,3]).serialize()]))
+        ]
+        tx1 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
+
+
+        # tx2 spends the same output as tx1 (double spend)
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE]))
+        ]
+        tx2 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Error sending slow-queue notification to endpoint 127.0.0.2", "/node0"), timeout=70)
+
+
     # Test that proof is not sent if callback server does not want it.
     def check_ds_enabled_no_proof(self, utxo):
 
@@ -324,6 +351,8 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.check_ds_not_enabled(utxo[7], CScript([OP_FALSE, OP_RETURN, CallbackMessage(1,1,[LOCAL_HOST_IP], [0]).serialize()]))
 
         self.check_invalid_transactions(utxo[8])
+
+        self.check_multiple_callback_services(utxo[9])
         
         self.check_long_lasting_transactions()
 
@@ -335,7 +364,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
 
-        self.check_ds_enabled_no_proof(utxo[9])
+        self.check_ds_enabled_no_proof(utxo[10])
 
         self.kill_server()
 
