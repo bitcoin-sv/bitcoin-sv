@@ -109,24 +109,51 @@ add_subdirectory(univalue)
 
 # Various completely unrelated features shared by all executables.
 add_library(util
+	amount.h
 	chainparamsbase.cpp
+	chainparamsbase.h
 	clientversion.cpp
+	clientversion.h
+	compat.h
+	compat/byteswap.h
+	compat/endian.h
 	compat/glibc_sanity.cpp
 	compat/glibcxx_sanity.cpp
 	compat/strnlen.cpp
+	compiler_warnings.h
+	enum_cast.h
 	fs.cpp
+	fs.h
 	logging.cpp
+	logging.h
+	prevector.h
 	random.cpp
+	random.h
 	rpc/protocol.cpp
+	rpc/protocol.h
+	rpc/text_writer.h
+	serialize.h
 	support/cleanse.cpp
+	support/cleanse.h
 	support/lockedpool.cpp
+	support/lockedpool.h
 	sync.cpp
+	sync.h
 	threadinterrupt.cpp
+	threadinterrupt.h
 	threadpriority.cpp
+	threadpriority.h
+	threadsafety.h
+	tinyformat.h
+	uint256.h
 	util.cpp
+	util.h
 	utilmoneystr.cpp
+	utilmoneystr.h
 	utilstrencodings.cpp
+	utilstrencodings.h
 	utiltime.cpp
+	utiltime.h
 )
 
 if(ENABLE_PROD_BUILD)
@@ -179,29 +206,128 @@ target_compile_definitions(util PUBLIC BOOST_SP_USE_STD_ATOMIC BOOST_AC_USE_STD_
 # More completely unrelated features shared by all executables.
 # Because nothing says this is different from util than "common"
 add_library(common
+	addrdb.h
+	addrman.h
 	amount.cpp
+	arith_uint256.h
 	base58.cpp
+	base58.h
+	big_int.h
+	block_file_info.h
+	blockstreams.h
+	blockvalidation.h
+	bloom.h
+	cfile_util.h
+	chain.h
 	chainparams.cpp
-	config.cpp
-	consensus/merkle.cpp
+	chainparams.h
+	chainparamsseeds.h
 	coins.cpp
+	coins.h
 	compressor.cpp
-	dstencode.cpp
+	compressor.h
+	config.cpp
+	config.h
+	consensus/consensus.h
+	consensus/merkle.cpp
+	consensus/merkle.h
+	consensus/params.h
+	consensus/validation.h
+	core_io.h
+	core_memusage.h
 	core_read.cpp
 	core_write.cpp
+	disk_block_pos.h
+	dstencode.cpp
+	dstencode.h
+	hash.h
+	indirectmap.h
+	invalid_txn_publisher.h
 	key.cpp
+	key.h
 	keystore.cpp
+	keystore.h
+	limitedmap.h
+	memusage.h
+	merkletree.h
+	mining/assembler.h
+	mining/candidates.h
+	mining/factory.h
+	mining/journal.h
+	mining/journal_builder.h
+	mining/journal_change_set.h
+	mining/journal_entry.h
+	net/association.h
+	net/association_id.h
+	net/net.h
+	net/net_message.h
+	net/net_types.h
 	net/netaddress.cpp
+	net/netaddress.h
 	net/netbase.cpp
+	net/netbase.h
+	net/node_stats.h
+	net/send_queue_bytes.h
+	net/stream.h
+	net/stream_policy.h
+	net/stream_policy_factory.h
+	orphan_txns.h
+	policy/policy.h
+	pow.h
 	primitives/block.cpp
+	primitives/block.h
+	primitives/transaction.h
 	protocol.cpp
+	protocol.h
+	pubkey.h
+	reverselock.h
 	rpc/jsonwriter.cpp
+	rpc/jsonwriter.h
 	scheduler.cpp
+	scheduler.h
+	script/int_serialization.h
+	script/interpreter.h
+	script/limitedstack.h
+	script/opcodes.h
+	script/script.h
+	script/script_error.h
+	script/script_flags.h
+	script/script_num.h
+	script/sighashtype.h
 	script/sign.cpp
+	script/sign.h
 	script/standard.cpp
+	script/standard.h
+	script_config.h
+	span.h
+	streams.h
+	support/allocators/secure.h
+	support/allocators/zeroafterfree.h
+	task.h
+	task_helpers.h
+	taskcancellation.h
+	thread_safe_queue.h
+	threadpool.h
+	threadpoolT.h
+	time_locked_mempool.h
+	timedata.h
+	tx_mempool_info.h
 	txhasher.cpp
+	txhasher.h
+	txmempool.h
+	txn_double_spend_detector.h
+	txn_sending_details.h
+	txn_util.h
+	txn_validation_config.h
+	txn_validation_data.h
+	txn_validation_result.h
+	validation.h
+	version.h
+	versionbits.h
 	warnings.cpp
-    write_preferring_upgradable_mutex.cpp
+	warnings.h
+	write_preferring_upgradable_mutex.cpp
+	write_preferring_upgradable_mutex.h
 )
 
 target_link_libraries(common util secp256k1)
@@ -209,18 +335,20 @@ target_link_libraries(common util secp256k1)
 # libbitcoinconsensus
 add_library(bitcoinconsensus
 	arith_uint256.cpp
-    big_int.cpp
+	big_int.cpp
 	hash.cpp
 	primitives/transaction.cpp
 	pubkey.cpp
 	script/bitcoinconsensus.cpp
+	script/bitcoinconsensus.h
+	script/instruction.h
+	script/instruction_iterator.h
 	script/interpreter.cpp
 	script/limitedstack.cpp
 	script/opcodes.cpp
 	script/script.cpp
-	script/script_num.cpp
 	script/script_error.cpp
-	utilstrencodings.cpp
+	script/script_num.cpp
 )
 
 target_link_libraries(bitcoinconsensus common)
@@ -231,28 +359,48 @@ target_include_directories(bitcoinconsensus
 
 # Bitcoin server facilities
 add_library(server
-	addrman.cpp
 	addrdb.cpp
-	bloom.cpp
-	blockencodings.cpp
-	block_file_info.cpp
-	blockfileinfostore.cpp
+	addrman.cpp
+	async_file_reader.h
 	block_file_access.cpp
+	block_file_access.h
+	block_file_info.cpp
+	blockencodings.cpp
+	blockencodings.h
+	blockfileinfostore.cpp
+	blockfileinfostore.h
+	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
-	config.cpp
-	httprpc.cpp
-	httpserver.cpp
-	init.cpp
-	invalid_txn_publisher.cpp
-    invalid_txn_sinks/file_sink.cpp
-    invalid_txn_sinks/zmq_sink.cpp
+	checkpoints.h
+	checkqueue.h
+	checkqueuepool.h
+	compat/sanity.h
+	cuckoocache.h
 	dbwrapper.cpp
+	dbwrapper.h
+	disk_tx_pos.h
+	httprpc.cpp
+	httprpc.h
+	httpserver.cpp
+	httpserver.h
+	init.cpp
+	init.h
+	invalid_txn_publisher.cpp
+	invalid_txn_sinks/file_sink.cpp
+	invalid_txn_sinks/file_sink.h
+	invalid_txn_sinks/zmq_sink.cpp
+	invalid_txn_sinks/zmq_sink.h
+	locked_ref.h
 	mempooltxdb.cpp
+	mempooltxdb.h
 	merkleblock.cpp
+	merkleblock.h
 	merkletree.cpp
 	merkletreedb.cpp
+	merkletreedb.h
 	merkletreestore.cpp
+	merkletreestore.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
@@ -261,48 +409,75 @@ add_library(server
 	mining/journal_change_set.cpp
 	mining/journal_entry.cpp
 	mining/journaling_block_assembler.cpp
-    net/association.cpp
-    net/association_id.cpp
-    net/block_download_tracker.cpp
+	mining/journaling_block_assembler.h
+	net/association.cpp
+	net/association_id.cpp
+	net/block_download_tracker.cpp
+	net/block_download_tracker.h
 	net/net.cpp
-    net/net_message.cpp
+	net/net_message.cpp
 	net/net_processing.cpp
-    net/node_state.cpp
-    net/stream.cpp
-    net/stream_policy.cpp
-    net/stream_policy_factory.cpp
+	net/net_processing.h
+	net/node_state.cpp
+	net/node_state.h
+	net/stream.cpp
+	net/stream_policy.cpp
+	net/stream_policy_factory.cpp
+	netmessagemaker.h
 	noui.cpp
+	noui.h
 	orphan_txns.cpp
 	policy/fees.cpp
+	policy/fees.h
 	policy/policy.cpp
 	pow.cpp
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp
-	rpc/mining.cpp
+	rpc/blockchain.h
+	rpc/http_protocol.h
 	rpc/mining-fbb.cpp
+	rpc/mining.cpp
+	rpc/mining.h
 	rpc/misc.cpp
+	rpc/misc.h
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
+	rpc/register.h
 	rpc/server.cpp
-	script/scriptcache.cpp
-	script/sigcache.cpp
+	rpc/server.h
+	rpc/tojson.h
 	script/ismine.cpp
+	script/ismine.h
+	script/scriptcache.cpp
+	script/scriptcache.h
+	script/sigcache.cpp
+	script/sigcache.h
+	time_locked_mempool.cpp
 	timedata.cpp
-    time_locked_mempool.cpp
+	tx_mempool_info.cpp
 	txdb.cpp
+	txdb.h
 	txmempool.cpp
 	txmempoolevictioncandidates.cpp
-    tx_mempool_info.cpp
+	txmempoolevictioncandidates.h
 	txn_double_spend_detector.cpp
+	txn_handlers.h
 	txn_propagator.cpp
+	txn_propagator.h
+	txn_recent_rejects.cpp
+	txn_recent_rejects.h
 	txn_validation_data.cpp
 	txn_validator.cpp
-	txn_recent_rejects.cpp
+	txn_validator.h
 	ui_interface.cpp
+	ui_interface.h
+	undo.h
 	validation.cpp
 	validationinterface.cpp
-    vmtouch.cpp
+	validationinterface.h
+	vmtouch.cpp
+	vmtouch.h
 )
 
 # This require libevent
@@ -351,17 +526,24 @@ endif()
 
 # RPC client support
 add_library(rpcclient
-    rpc/client.cpp
-    rpc/client_config.cpp
-    rpc/client_utils.cpp
-    rpc/http_request.cpp
-    rpc/http_response.cpp
+	rpc/client.cpp
+	rpc/client.h
+	rpc/client_config.cpp
+	rpc/client_config.h
+	rpc/client_utils.cpp
+	rpc/client_utils.h
+	rpc/http_request.cpp
+	rpc/http_request.h
+	rpc/http_response.cpp
+	rpc/http_response.h
+	support/events.h
 )
 target_link_libraries(rpcclient univalue util)
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)
-	add_executable(bitcoin-cli bitcoin-cli.cpp)
+	add_executable(bitcoin-cli bitcoin-cli.cpp
+)
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-cli PRIVATE bitcoin-cli-res.rc)
 	endif()
@@ -372,7 +554,8 @@ endif()
 
 # bitcoin-tx
 if(BUILD_BITCOIN_TX)
-	add_executable(bitcoin-tx bitcoin-tx.cpp)
+	add_executable(bitcoin-tx bitcoin-tx.cpp
+)
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-tx PRIVATE bitcoin-tx-res.rc)
 	endif()
@@ -382,13 +565,15 @@ endif()
 
 # bitcoin-miner
 if(BUILD_BITCOIN_MINER)
-	add_executable(bitcoin-miner bitcoin-miner.cpp)
+	add_executable(bitcoin-miner bitcoin-miner.cpp
+)
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
 endif()
 
 # bitcoind
-add_executable(bitcoind bitcoind.cpp)
+add_executable(bitcoind bitcoind.cpp
+)
 target_link_libraries(
 	bitcoind
 	server
