@@ -10,6 +10,10 @@ from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS
 from http.server import HTTPServer
 from test_framework.util import assert_equal
 
+'''
+Test the mock double-spend notification endpoint server.
+'''
+
 class CallBackServiceTest():
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)

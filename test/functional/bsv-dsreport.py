@@ -7,7 +7,7 @@ import threading, json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
-from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG, reset_proofs
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, check_for_log_msg, assert_equal
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
@@ -17,11 +17,33 @@ import platform
 import subprocess
 import time
 
+'''
+Test standard double-spend notification paths:
+
+1) Double-spend enabled transactions being double-spent, both when the enabled transaction is
+   seen first or second.
+2) Check no notifications are attempted for various error scenarios such as:
+    a) Missing callback message.
+    b) Bad callback message.
+    c) Input out of range.
+    d) Bad IP addresses.
+    e) Bad protocol version.
+3) Double-spend enabled transactions where the double-spending transaction is invalid.
+4) Double-spend enabled transactions where the double-spending transaction takes too long to
+   validate.
+5) Check multiple notification endpoints all get notified.
+6) Check if a notification endpoint declines the proof we don't send it.
+7) Check IPv6 support for endpoints.
+'''
+
+# ::1 as network-order bytes
 LOCAL_HOST_IPV6 = 0x00000000000000000000000000000001
 # 127.0.0.1 as network-order bytes
 LOCAL_HOST_IP = 0x7F000001
 # 127.0.0.2 as network-order bytes
 WRONG_IP = 0x7F000002
+# 127.0.0.3 as network-order bytes
+SKIP_IP = 0x7F000003
 
 # Returns True if host (str) responds to a ping6 request.
 def ping6(host):
@@ -52,7 +74,8 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.callback_serviceIPv4 = "localhost:8080"
         self.callback_serviceIPv6 = "[::]:8080"
         self.extra_args = [['-dsendpointport=8080',
-                            '-banscore=100000',
+                            '-dsendpointskiplist=127.0.0.3,::3',
+                            '-whitelist=127.0.0.1',
                             '-genesisactivationheight=1',
                             '-maxscriptsizepolicy=0',
                             "-maxnonstdtxvalidationduration=15000",
@@ -120,12 +143,11 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo[3]["txid"], 16), utxo[3]["vout"]), CScript([OP_FALSE]), 0xffffffff)
         ]
         vout = [
-            # inputs 0 and 3 are valid, input 9 is out of range
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1,[LOCAL_HOST_IP], [0,3,9]).serialize()]))
+            # inputs 0 and 2 are valid, input 9 is out of range
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0,2,9]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
-
 
         # tx2 spends the same output as tx1 (double spend)
         vin = [
@@ -141,16 +163,82 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend passed", "/node0"))
         wait_until(lambda: self.check_tx_received(tx1.hash))
 
-        # tx3 spends the same output as tx1 and tx2 (double spend) --> callback service is not notified twice
+        # again spend the same output as tx1 and tx2 (double spend) --> callback service is not notified twice
         vin = [
             CTxIn(COutPoint(int(utxo[0]["txid"], 16), utxo[0]["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
             CTxOut(25, CScript([OP_TRUE]))
         ]
-        tx3 = self.create_and_send_transaction(vin, vout)
+        self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "Already notified about txn {}".format(tx1.hash), "/node0"))
 
+
+        # tx4 is not dsnt enabled, and gets accepted to the mempool
+        vin = [
+            CTxIn(COutPoint(int(utxo[2]["txid"], 16), utxo[2]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE]))
+        ]
+        tx4 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx4.hash in self.nodes[0].getrawmempool())
+
+        # tx5 is dsnt enabled and double spends tx4. In this case because the txn in the mempool is not
+        # dsnt enabled, then the callback service specified by tx5 will be notified about tx4.
+        # Also test notification enabled output in position other than 0.
+        vin = [
+            CTxIn(COutPoint(int(utxo[2]["txid"], 16), utxo[2]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE])),
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
+        ]
+        tx5 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx5.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx5.hash), "/node0"))
+        wait_until(lambda: self.check_tx_received(tx5.hash))
+
+        # tx6 is dsnt enabled and double spends tx1. Both the txn in the mempool and the double-spend are dsnt
+        # enabled, so in this case just the callback service specified by tx1 will get notified about tx6
+        # (first seen rule).
+        reset_proofs()
+        self.check_tx_not_received(tx1.hash)
+        vin = [
+            CTxIn(COutPoint(int(utxo[3]["txid"], 16), utxo[3]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
+        ]
+        tx6 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx6.hash), "/node0"))
+        wait_until(lambda: self.check_tx_received(tx1.hash))
+
+        # tx7 is dsnt-enabled on multiple outputs
+        vin = [
+            CTxIn(COutPoint(int(utxo[4]["txid"], 16), utxo[4]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+            CTxIn(COutPoint(int(utxo[5]["txid"], 16), utxo[5]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()])),
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [1]).serialize()]))
+        ]
+        tx7 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx7.hash in self.nodes[0].getrawmempool())
+
+        # tx8 spends the same outputs as tx7 (double spend)
+        vin = [
+            CTxIn(COutPoint(int(utxo[4]["txid"], 16), utxo[4]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+            CTxIn(COutPoint(int(utxo[5]["txid"], 16), utxo[5]["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE]))
+        ]
+        tx8 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx8.hash), "/node0"))
+        wait_until(lambda: self.check_tx_received(tx7.hash))
+        wait_until(lambda: check_for_log_msg(self, "Txn {} is DS notification enabled on output 0".format(tx7.hash), "/node0"))
+        assert(not check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx7.hash), "/node0"))
 
     # Test that notifying callback server does not work for NOT dsnt-enabled transactions.
     # Pass in different output scripts with invalid/missing CallbackMessage.
@@ -187,7 +275,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, 1, [LOCAL_HOST_IP], [0,3]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -227,7 +315,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(ftx.sha256, 0), b'')
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1, [LOCAL_HOST_IP], [0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -273,7 +361,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,2,[LOCAL_HOST_IP, WRONG_IP], [0,3]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP,WRONG_IP,SKIP_IP], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -289,7 +377,8 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx2 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1", "/node0"))
-        wait_until(lambda: check_for_log_msg(self, "Error sending slow-queue notification to endpoint 127.0.0.2", "/node0"), timeout=70)
+        wait_until(lambda: check_for_log_msg(self, "Skipping notification to endpoint in skiplist 127.0.0.3", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Timeout sending slow-queue notification to endpoint 127.0.0.2", "/node0"), timeout=70)
 
 
     # Test that proof is not sent if callback server does not want it.
@@ -300,20 +389,20 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1,[LOCAL_HOST_IP], [0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
 
 
-        # tx2 spends the same output as tx1 (double spend)
+        # spend the same output as tx1 (double spend)
         vin = [
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
         ]
         vout = [
             CTxOut(25, CScript([OP_TRUE]))
         ]
-        tx2 = self.create_and_send_transaction(vin, vout)
+        self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "Endpoint doesn't want proof", "/node0"))
         self.check_tx_not_received(tx1.hash)
 
@@ -324,14 +413,14 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129,1,[LOCAL_HOST_IPV6],[0,3]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129, [LOCAL_HOST_IPV6],[0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         tx1.rehash()
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
 
 
-        # tx2 spends the same output as tx1 (double spend)
+        # spend the same output as tx1 (double spend)
         vin = [
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
@@ -351,25 +440,28 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
 
-        self.nodes[0].generate(110)
+        self.nodes[0].generate(120)
         utxo = self.nodes[0].listunspent()
 
         self.createConnection()
 
-        self.check_ds_enabled(utxo[:4])
+        self.check_ds_enabled(utxo[:6])
 
         # missing callback message
-        self.check_ds_not_enabled(utxo[4], CScript([OP_FALSE, OP_RETURN]))
+        self.check_ds_not_enabled(utxo[7], CScript([OP_FALSE, OP_RETURN]))
+        # badly formatted callback messages
+        self.check_ds_not_enabled(utxo[8], CScript([OP_FALSE, OP_RETURN, 0x746e7364]))
+        self.check_ds_not_enabled(utxo[9], CScript([OP_FALSE, OP_RETURN, 0x746e7364, 0x01FFFFFF]))
         # input out of range
-        self.check_ds_not_enabled(utxo[5], CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1,[LOCAL_HOST_IP], [6]).serialize()]))
+        self.check_ds_not_enabled(utxo[10], CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [6]).serialize()]))
         # wrong ip
-        self.check_ds_not_enabled(utxo[6], CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1,[WRONG_IP], [0]).serialize()]))
+        self.check_ds_not_enabled(utxo[11], CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [WRONG_IP], [0]).serialize()]))
         # missing protocol id
-        self.check_ds_not_enabled(utxo[7], CScript([OP_FALSE, OP_RETURN, CallbackMessage(1,1,[LOCAL_HOST_IP], [0]).serialize()]))
+        self.check_ds_not_enabled(utxo[12], CScript([OP_FALSE, OP_RETURN, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
 
-        self.check_invalid_transactions(utxo[8])
+        self.check_invalid_transactions(utxo[13])
 
-        self.check_multiple_callback_services(utxo[9])
+        self.check_multiple_callback_services(utxo[14])
         
         self.check_long_lasting_transactions()
 
@@ -381,7 +473,9 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
 
-        self.check_ds_enabled_no_proof(utxo[10])
+        # Refetch the available utxos because we've restarted the node during the last test
+        utxo = self.nodes[0].listunspent()
+        self.check_ds_enabled_no_proof(utxo[0])
 
         self.kill_server()
 
@@ -392,7 +486,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)
 
-            self.check_ipv6(utxo[11])
+            self.check_ipv6(utxo[1])
 
             self.kill_server()
         else:

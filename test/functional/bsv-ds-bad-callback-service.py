@@ -9,12 +9,21 @@ from functools import partial
 from http.server import HTTPServer
 from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import p2p_port, check_for_log_msg, assert_equal
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
+from test_framework.util import check_for_log_msg, assert_equal
 from test_framework.mininode import *
 from test_framework.script import *
 
 import time
+
+'''
+Test badly behaving double-spend endpoints:
+
+1) Endpoints returning HTTP codes other than 200.
+2) Endpoint that is slow just once.
+3) Endpoint that is always slow.
+4) Server is too slow to work with.
+5) Server doesn't contain x-bsv-dsnt in header.
+'''
 
 # 127.0.0.1 as network-order bytes
 LOCAL_HOST_IP = 0x7F000001
@@ -75,20 +84,16 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
         assert_equal(queried.status, 200)
         return tx_hash not in json.loads(queried.read())
 
-    def check_ds_enabled_error_msg(self, utxo, log_msg):
-
-        assert(not check_for_log_msg(self, log_msg, "/node0"))
-
+    def check_ds_enabled(self, utxo):
         # tx1 is dsnt-enabled
         vin = [
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1,1,[LOCAL_HOST_IP], [0,3]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
-
 
         # tx2 spends the same output as tx1 (double spend)
         vin = [
@@ -101,9 +106,13 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend passed", "/node0"))
 
-        wait_until(lambda: check_for_log_msg(self, log_msg, "/node0"), timeout=70)
-
         return tx1.hash
+
+    def check_ds_enabled_error_msg(self, utxo, log_msg):
+        assert(not check_for_log_msg(self, log_msg, "/node0"))
+        tx_hash = self.check_ds_enabled(utxo)
+        wait_until(lambda: check_for_log_msg(self, log_msg, "/node0"), timeout=70)
+        return tx_hash
 
     def run_test(self):
 
@@ -150,6 +159,29 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
+        with self.run_node_with_connections("Server is consistently slow, but functional", 0, ['-dsendpointport=8080','-dsendpointslowrateperhour=2'], 1) as p2p_connections:
+            # Turn on CallbackService.
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOW, FLAG.YES)
+            self.server = HTTPServer(('localhost', 8080), handler)
+            self.start_server()
+            self.conn = httplib.HTTPConnection(self.callback_service)
+            self.node0 = p2p_connections[0]
+
+            tx_hash = self.check_ds_enabled(utxo[0])
+            wait_until(lambda: check_for_log_msg(self, "Started tracking stats for a new potentially slow endpoint 127.0.0.1", "/node0"))
+            wait_until(lambda: self.check_tx_received(tx_hash))
+            tx_hash = self.check_ds_enabled(utxo[1])
+            wait_until(lambda: check_for_log_msg(self, "Updated stats for potentially slow endpoint 127.0.0.1, is slow: 0", "/node0"))
+            wait_until(lambda: self.check_tx_received(tx_hash))
+            tx_hash = self.check_ds_enabled(utxo[2])
+            wait_until(lambda: check_for_log_msg(self, "Updated stats for potentially slow endpoint 127.0.0.1, is slow: 1", "/node0"))
+            wait_until(lambda: self.check_tx_received(tx_hash))
+            tx_hash = self.check_ds_enabled(utxo[3])
+            wait_until(lambda: check_for_log_msg(self, "Endpoint 127.0.0.1 is currently slow, submitting via the slow queue", "/node0"))
+            wait_until(lambda: self.check_tx_received(tx_hash))
+
+            self.kill_server()
+
         with self.run_node_with_connections("Server is too slow, bitcoind ignores it", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
             # Turn on CallbackService.
             handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOWEST, FLAG.YES)
@@ -158,7 +190,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
             self.conn = httplib.HTTPConnection(self.callback_service)
 
             self.node0 = p2p_connections[0]
-            tx_hash = self.check_ds_enabled_error_msg(utxo[4], "Error sending slow-queue notification to endpoint")
+            tx_hash = self.check_ds_enabled_error_msg(utxo[4], "Timeout sending slow-queue notification to endpoint 127.0.0.1")
 
             self.check_tx_not_received(tx_hash)
 

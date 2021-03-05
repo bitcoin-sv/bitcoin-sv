@@ -30,6 +30,11 @@ class FLAG(Enum):
 expectedProofs = []
 receivedProofs = []
 
+# Function to reset the expected/received proofs
+def reset_proofs():
+    expectedProofs = []
+    receivedProofs = []
+
 class CallbackService(BaseHTTPRequestHandler):
 
     def __init__(self, receive, status, response_time, add_flag, *args, **kwargs):
@@ -53,11 +58,6 @@ class CallbackService(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        if (self.response_time == RESPONSE_TIME.SLOW):
-            time.sleep(RESPONSE_TIME.SLOW.value)
-        elif (self.response_time == RESPONSE_TIME.SLOWEST):
-            time.sleep(RESPONSE_TIME.SLOWEST.value)
-
         request = self.path.split("/")
         if (len(request) == 5):
             dsnt = request[1]
@@ -66,6 +66,11 @@ class CallbackService(BaseHTTPRequestHandler):
 
             if (dsnt == "dsnt" and ver == "1" and request_type == "query"):
                 txid = request[4]
+
+                if (self.response_time == RESPONSE_TIME.SLOW):
+                    time.sleep(RESPONSE_TIME.SLOW.value)
+                elif (self.response_time == RESPONSE_TIME.SLOWEST):
+                    time.sleep(RESPONSE_TIME.SLOWEST.value)
 
                 self.send_response(200)
                 if (self.receive == RECEIVE.YES):
@@ -125,11 +130,6 @@ class CallbackService(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        if (self.response_time == RESPONSE_TIME.SLOW):
-            time.sleep(RESPONSE_TIME.SLOW.value)
-        elif (self.response_time == RESPONSE_TIME.SLOWEST):
-            time.sleep(RESPONSE_TIME.SLOWEST.value)
-
         request = self.path.split("/")
         if (len(request) == 4):
             dsnt = request[1]
@@ -137,6 +137,11 @@ class CallbackService(BaseHTTPRequestHandler):
             request_type = request[3]
 
             if (dsnt == "dsnt" and ver == "1" and request_type.startswith("submit")):
+
+                if (self.response_time == RESPONSE_TIME.SLOW):
+                    time.sleep(RESPONSE_TIME.SLOW.value)
+                elif (self.response_time == RESPONSE_TIME.SLOWEST):
+                    time.sleep(RESPONSE_TIME.SLOWEST.value)
 
                 parsed = parse_qs(urlparse.urlparse(self.path).query)
                 if all (key in parsed for key in ('txid', 'n', 'ctxid', 'cn')):

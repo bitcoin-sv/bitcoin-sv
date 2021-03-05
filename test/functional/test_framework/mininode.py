@@ -895,10 +895,10 @@ class CallbackMessage():
     IPv6_version = 129
     IPv4_version = 1
 
-    def __init__(self, version=1, ip_address_count=1, ip_addresses=[LOCAL_HOST_IP], inputs=[0]):
+    def __init__(self, version=1, ip_addresses=[LOCAL_HOST_IP], inputs=[0]):
         self.version = version
-        self.ip_address_count = ip_address_count
         self.ip_addresses = ip_addresses
+        self.ip_address_count = len(ip_addresses)
         self.inputs = inputs
 
     def ser_addrs(self, addrs):
