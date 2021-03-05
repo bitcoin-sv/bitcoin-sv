@@ -1572,18 +1572,22 @@ void sendrawtransactions(const Config& config,
         // Read dontcheckfee.
         bool fTxToPrioritise = false;
         bool fTxInMempools = mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);
-        if (!fTxInMempools) {
-            const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
-            if (!dontcheckfee.isNull()) {
-                if (!dontcheckfee.isBool()) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,
-                            std::string("dontcheckfee: Invalid value"));
-                } else if (dontcheckfee.isTrue()) {
-                    fTxToPrioritise = true;
-                }
+        const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
+        if (!dontcheckfee.isNull()) {
+            if (!dontcheckfee.isBool()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        std::string("dontcheckfee: Invalid value"));
+            } else if (dontcheckfee.isTrue()) {
+                fTxToPrioritise = true;
             }
-        } else {
-            vKnownTxns.emplace_back(txid);
+        }
+
+        if (fTxInMempools) {
+            if (fTxToPrioritise) {
+                vTxToPrioritise.emplace_back(txid);
+            } else {
+                vKnownTxns.emplace_back(txid);
+            }
             continue;
         }
         // Create an object with transaction's input data.
@@ -1598,8 +1602,12 @@ void sendrawtransactions(const Config& config,
                 nMaxRawTxFee);                 // nAbsurdFee
         // Check if transaction is already known
         // - received through p2p interface or present in the mempools
-        if (!pTxInputData->IsTxIdStored() || fTxInMempools) {
-            vKnownTxns.emplace_back(txid);
+        if (!pTxInputData->IsTxIdStored()) {
+            if (fTxToPrioritise) {
+                vTxToPrioritise.emplace_back(txid);
+            } else {
+                vKnownTxns.emplace_back(txid);
+            }
         // Move it to the vector of transactions awaiting to be processed
         } else {
             vTxInputData.emplace_back(std::move(pTxInputData));
