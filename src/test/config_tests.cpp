@@ -310,6 +310,12 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), 2 * DEFAULT_MIN_BLOCK_STALLING_RATE);
     BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(0, &err));
     BOOST_CHECK(!config.SetBlockStallingMinDownloadSpeed(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), DEFAULT_BLOCK_STALLING_TIMEOUT);
+    BOOST_CHECK(config.SetBlockStallingTimeout(2 * DEFAULT_BLOCK_STALLING_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), 2 * DEFAULT_BLOCK_STALLING_TIMEOUT);
+    BOOST_CHECK(!config.SetBlockStallingTimeout(0, &err));
+    BOOST_CHECK(!config.SetBlockStallingTimeout(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(p2p_config)

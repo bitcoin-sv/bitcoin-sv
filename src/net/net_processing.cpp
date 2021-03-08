@@ -4225,7 +4225,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     }
 }
 
-bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStatePtr& state)
+bool DetectStalling(const Config& config, const CNodePtr& pto, const CNodeStatePtr& state)
 {
     assert(state);
     const Consensus::Params& consensusParams { config.GetChainParams().GetConsensus() };
@@ -4233,7 +4233,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
     // Detect whether we're stalling
     int64_t nNow = GetTimeMicros();
     if (state->nStallingSince &&
-        state->nStallingSince < nNow - MICROS_PER_SECOND * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
+        state->nStallingSince < nNow - MICROS_PER_SECOND * config.GetBlockStallingTimeout()) {
         // Stalling only triggers when the block download window cannot move.
         // During normal steady state, the download window should be much larger
         // than the to-be-downloaded set of blocks, so disconnection should only
