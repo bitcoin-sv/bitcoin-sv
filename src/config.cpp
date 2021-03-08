@@ -115,6 +115,9 @@ void GlobalConfig::Reset()
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
 
+    // Block download
+    blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
+
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
 
@@ -1046,6 +1049,26 @@ bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::s
 InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
 {
     return invalidTxFileSinkEvictionPolicy;
+}
+
+// Block download
+bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
+{
+    if(min < 0)
+    {
+        if(err)
+        {
+            *err = "Block stalling minimum download speed must be >= 0";
+        }
+        return false;
+    }
+
+    blockStallingMinDownloadSpeed = min;
+    return true;
+}
+uint64_t GlobalConfig::GetBlockStallingMinDownloadSpeed() const
+{
+    return blockStallingMinDownloadSpeed;
 }
 
 // P2P Parameters

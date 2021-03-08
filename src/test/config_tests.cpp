@@ -300,6 +300,18 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * testFactor);
 }
 
+BOOST_AUTO_TEST_CASE(block_download_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), DEFAULT_MIN_BLOCK_STALLING_RATE);
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(2 * DEFAULT_MIN_BLOCK_STALLING_RATE, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), 2 * DEFAULT_MIN_BLOCK_STALLING_RATE);
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(0, &err));
+    BOOST_CHECK(!config.SetBlockStallingMinDownloadSpeed(-1, &err));
+}
+
 BOOST_AUTO_TEST_CASE(p2p_config)
 {
     GlobalConfig config {};

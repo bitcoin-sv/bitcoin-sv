@@ -85,6 +85,10 @@ public:
     virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
+
+    // Block download
+    virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
+
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
 
@@ -160,6 +164,10 @@ public:
     virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+
+    // Block download
+    virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
+
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
@@ -349,6 +357,10 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    // Block download
+    bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
+    uint64_t GetBlockStallingMinDownloadSpeed() const override;
+
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
@@ -459,6 +471,9 @@ private:
     std::set<std::string> invalidTxSinks;
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
+
+    // Block download
+    uint64_t blockStallingMinDownloadSpeed;
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
@@ -813,6 +828,10 @@ public:
 
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
+
+    // Block download
+    bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }

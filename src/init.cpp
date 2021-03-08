@@ -529,6 +529,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+
+    /** Block download */
     strUsage += HelpMessageOpt("-blockstallingmindownloadspeed=<n>",
         strprintf(_("Minimum average download speed (Kbytes/s) we will allow a stalling "
                     "peer to fall to during IBD. A value of 0 means stall detection is "
@@ -548,6 +550,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                         "a block that has exceeded the slow fetch detection timeout (default: %u)"),
                         DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
     }
+
     strUsage += HelpMessageOpt(
         "-broadcastdelay=<n>",
         strprintf(
@@ -2030,6 +2033,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                 return InitError(err);
             }
         }
+    }
+
+    // Block download
+    if(std::string err; !config.SetBlockStallingMinDownloadSpeed(gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE), &err)) {
+        return InitError(err);
     }
 
     // P2P parameters

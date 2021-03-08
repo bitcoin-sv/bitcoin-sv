@@ -90,12 +90,10 @@ std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 
 namespace {
 
-bool IsBlockDownloadStallingFromPeer(const CNodePtr& node, uint64_t& avgbw)
+bool IsBlockDownloadStallingFromPeer(const Config& config, const CNodePtr& node, uint64_t& avgbw)
 {
     avgbw = node->GetAssociation().GetAverageBandwidth(StreamPolicy::MessageType::BLOCK).first;
-    int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
-    minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
-    return (avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000);
+    return (avgbw < config.GetBlockStallingMinDownloadSpeed() * 1000);
 }
 
 void UpdatePreferredDownload(const CNodePtr& pnode) {
@@ -323,12 +321,16 @@ bool PeerHasHeader(const CNodeStatePtr& state, const CBlockIndex *pindex) {
  * Update pindexLastCommonBlock and add not-in-flight missing successors to
  * vBlocks, until it has at most count entries.
  */
-void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
-                              std::vector<const CBlockIndex*>& vBlocks,
-                              NodeId &nodeStaller,
-                              const Consensus::Params& consensusParams,
-                              const CNodeStatePtr& state,
-                              CConnman& connman) {
+static void FindNextBlocksToDownload(
+    const Config& config,
+    NodeId nodeid,
+    unsigned int count,
+    std::vector<const CBlockIndex*>& vBlocks,
+    NodeId& nodeStaller,
+    const Consensus::Params& consensusParams,
+    const CNodeStatePtr& state,
+    CConnman& connman)
+{
     if (count == 0) {
         return;
     }
@@ -455,7 +457,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                         const CNodePtr& nodePtr { connman.FindNodeById(inFlightDetails.block.GetNode()) };
                         if(nodePtr) {
                             uint64_t avgbw {0};
-                            if(IsBlockDownloadStallingFromPeer(nodePtr, avgbw)) {
+                            if(IsBlockDownloadStallingFromPeer(config, nodePtr, avgbw)) {
                                 // This peer is stalling
                                 ++stallerCount;
                             }
@@ -4241,7 +4243,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // sufficient progress, as measured by the current download speed to this
         // peer.
         uint64_t avgbw {0};
-        if(IsBlockDownloadStallingFromPeer(pto, avgbw)) {
+        if(IsBlockDownloadStallingFromPeer(config, pto, avgbw)) {
             LogPrintf("Peer=%d is stalling block download (current speed %d), disconnecting\n", pto->id, avgbw);
             pto->fDisconnect = true;
             return true;
@@ -4293,7 +4295,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
         state->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
         std::vector<const CBlockIndex *> vToDownload;
         NodeId staller = -1;
-        FindNextBlocksToDownload(pto->GetId(),
+        FindNextBlocksToDownload(config, pto->GetId(),
                                  MAX_BLOCKS_IN_TRANSIT_PER_PEER - state->nBlocksInFlight,
                                  vToDownload, staller, consensusParams, state, connman);
         for (const CBlockIndex *pindex : vToDownload) {
