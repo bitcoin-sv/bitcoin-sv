@@ -16,18 +16,6 @@ struct COrphanTxnEntry {
     unsigned int size{};
 };
 
-struct IterComparator {
-    template <typename I> bool operator()(const I &a, const I &b) const {
-        return &(*a) < &(*b);
-    }
-};
-
-struct CTxnIdComparator {
-    bool operator ()(const TxInputDataSPtr& lhs, const TxInputDataSPtr& rhs) const {
-        return lhs->GetTxnPtr()->GetId() < rhs->GetTxnPtr()->GetId();
-    }
-};
-
 class COrphanTxns;
 using OrphanTxnsSPtr = std::shared_ptr<COrphanTxns>;
 using CompactExtraTxnsVec = std::vector<std::pair<uint256, CTransactionRef>>;
@@ -96,15 +84,16 @@ class COrphanTxns {
     std::vector<TxId> getTxIds() const;
     /** Get collected outpoints */
     std::vector<COutPoint> getCollectedOutpoints();
-    /** Get a random orphan txn by a lower bound (needed for UTs) */
-    TxInputDataSPtr getRndOrphanByLowerBound(const uint256& key);
+    /** Get a random orphan txn (used by UTs) */
+    TxInputDataSPtr getRndOrphan();
 
   private:
     // Private aliasis
-    using OrphanTxns = std::map<uint256, COrphanTxnEntry>;
+    using OrphanTxns = std::unordered_map<uint256, COrphanTxnEntry, SaltedTxidHasher>;
     using OrphanTxnsIter = OrphanTxns::iterator;
+    using DependentOrphanTxns = std::unordered_set<const COrphanTxnEntry*>;
     using OrphanTxnsByPrev =
-            std::map<COutPoint, std::set<OrphanTxnsIter, IterComparator>>;
+        std::unordered_map<COutPoint, DependentOrphanTxns, SaltedOutpointHasher>;
     using OrphanTxnsByPrevIter = OrphanTxnsByPrev::iterator;
     /** A non-locking version of addToCompactExtraTxns */
     void addToCompactExtraTxnsNL(const CTransactionRef &tx);

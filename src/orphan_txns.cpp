@@ -51,7 +51,7 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
             txid, COrphanTxnEntry{pTxInputData, GetTime() + ORPHAN_TX_EXPIRE_TIME, sz});
         assert(ret.second);
         for (const CTxIn &txin : tx.vin) {
-            mOrphanTxnsByPrev[txin.prevout].insert(ret.first);
+            mOrphanTxnsByPrev[txin.prevout].insert(&((*(ret.first)).second));
         }
         orphanTxnsTotal = mOrphanTxns.size();
         orphanTxnsByPrevTotal = mOrphanTxnsByPrev.size();
@@ -137,10 +137,7 @@ std::vector<uint256> COrphanTxns::getTxnsHash(const COutPoint& prevout) const {
         return vOrphanErase;
     }
     for (auto mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi) {
-        const CTransactionRef& ptx = (*mi)->second.pTxInputData->GetTxnPtr();
-        const CTransaction &orphanTx = *ptx;
-        const uint256 &orphanHash = orphanTx.GetHash();
-        vOrphanErase.emplace_back(orphanHash);
+        vOrphanErase.emplace_back((*mi)->pTxInputData->GetTxnPtr()->GetHash());
     }
     return vOrphanErase;
 }
@@ -189,16 +186,11 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
 
         // If the limit is still not reached then remove a random txn
         while (!fSkipRndEviction && nOrphanTxnsSize > nMaxOrphanTxnsSize) {
-            uint256 randomhash = GetRandHash();
-            OrphanTxnsIter it = mOrphanTxns.lower_bound(randomhash);
-            if (it == mOrphanTxns.end()) {
-                it = mOrphanTxns.begin();
-            }
-            
-            const CTransactionRef& ptx = it->second.pTxInputData->GetTxnPtr();
-            const CTransaction& tx = *ptx;
+            OrphanTxnsIter it = mOrphanTxns.begin();
             // Make sure we never go below 0 (causing overflow in uint)
-            unsigned int txTotalSize = tx.GetTotalSize();
+            const unsigned int txTotalSize {
+                it->second.pTxInputData->GetTxnPtr()->GetTotalSize()
+            };
             if (txTotalSize >= nOrphanTxnsSize)
             {
                 nOrphanTxnsSize = 0;
@@ -250,10 +242,8 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
                 ++collectedOutpointIter;
                 continue;
             }
-            for (const auto& iterOrphanTxn : outpointFoundIter->second) {
-               const auto& pTxInputData {
-                   (*iterOrphanTxn).second.pTxInputData
-               };
+            for (const COrphanTxnEntry* pOrphanEntry : outpointFoundIter->second) {
+               const TxInputDataSPtr& pTxInputData { pOrphanEntry->pTxInputData };
                if(usetTxnsToReprocess.insert(pTxInputData).second) {
                    pTxInputData->SetAcceptTime(GetTime());
                }
@@ -346,16 +336,9 @@ std::vector<COutPoint> COrphanTxns::getCollectedOutpoints() {
     return mCollectedOutpoints;
 }
 
-TxInputDataSPtr COrphanTxns::getRndOrphanByLowerBound(const uint256& key) {
+TxInputDataSPtr COrphanTxns::getRndOrphan() {
     std::shared_lock lock {mOrphanTxnsMtx};
-    if (mOrphanTxns.empty()) {
-        return {nullptr};
-    }
-    auto txIter = mOrphanTxns.lower_bound(key);
-    if (txIter == mOrphanTxns.end()) {
-        txIter = mOrphanTxns.begin();
-    }
-    return txIter->second.pTxInputData;
+    return !mOrphanTxns.empty() ? mOrphanTxns.begin()->second.pTxInputData : nullptr;
 }
 
 void COrphanTxns::addToCompactExtraTxnsNL(const CTransactionRef &tx) {
@@ -379,12 +362,13 @@ int COrphanTxns::eraseTxnNL(const uint256& hash) {
     if (it == mOrphanTxns.end()) {
         return 0;
     }
-    for (const CTxIn &txin : it->second.pTxInputData->GetTxnPtr()->vin) {
+    const COrphanTxnEntry* pOrphanEntry { &it->second };
+    for (const CTxIn &txin : pOrphanEntry->pTxInputData->GetTxnPtr()->vin) {
         auto itPrev = mOrphanTxnsByPrev.find(txin.prevout);
         if (itPrev == mOrphanTxnsByPrev.end()) {
             continue;
         }
-        itPrev->second.erase(it);
+        itPrev->second.erase(pOrphanEntry);
         if (itPrev->second.empty()) {
             mOrphanTxnsByPrev.erase(itPrev);
         }
