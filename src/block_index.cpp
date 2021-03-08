@@ -126,8 +126,8 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
                                     const Consensus::Params &params) {
     arith_uint256 r;
     int sign = 1;
-    auto fromChainWork = from.GetChainWork();
-    auto toChainWork = to.GetChainWork();
+    const auto fromChainWork = from.GetChainWork();
+    const auto toChainWork = to.GetChainWork();
     if (toChainWork > fromChainWork)
     {
         r = toChainWork - fromChainWork;
@@ -220,7 +220,7 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
     return true;
 }
 
-bool CBlockIndex::verifyUndoValidity()
+bool CBlockIndex::verifyUndoValidity() const
 {
     std::lock_guard lock { GetMutex() };
     CBlockUndo undo;

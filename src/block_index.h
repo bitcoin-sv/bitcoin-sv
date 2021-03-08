@@ -197,12 +197,12 @@ class CDiskBlockMetaData
 public:
     CDiskBlockMetaData() = default;
 
-    CDiskBlockMetaData( uint256&& hash, uint64_t size )
-        : diskDataHash{ std::move( hash ) }
+    CDiskBlockMetaData( const uint256& hash, uint64_t size )
+        : diskDataHash{ hash }
         , diskDataSize{ size }
     {
-        assert(!hash.IsNull());
-        assert(size > 0);
+        assert(!diskDataHash.IsNull());
+        assert(diskDataSize > 0);
     }
 
     const uint256& DiskDataHash() const { return diskDataHash; }
@@ -230,10 +230,8 @@ public:
     CDiskBlockMetaDataMutable() = default;
 
     CDiskBlockMetaDataMutable(const CDiskBlockMetaData &other)
-    {
-        diskDataHash = other.DiskDataHash();
-        diskDataSize = other.DiskDataSize();
-    } 
+         : CDiskBlockMetaData{ other }
+    {}
 
     uint256& MutableDiskDataHash() { return diskDataHash; }
     uint64_t& MutableDiskDataSize() { return diskDataSize; }
@@ -282,8 +280,7 @@ private:
      * because object cannot be created without this member being set.
      * This should be implemented properly in the future.
     **/
-    //! pointer to the hash of the block, if any. Memory is owned by this
-    //! CBlockIndex
+    //! pointer to the hash of the block, if any.
     const uint256* phashBlock{ nullptr };
 
     //! pointer to the index of the predecessor of this block
@@ -765,7 +762,7 @@ public:
     bool writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
                             bool fCheckForPruning, const Config &config);
 
-    bool verifyUndoValidity();
+    bool verifyUndoValidity() const;
 
     bool ReadBlockFromDisk(CBlock &block,
                             const Config &config) const;

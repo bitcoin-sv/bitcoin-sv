@@ -15,9 +15,10 @@
 class CDiskBlockIndex {
 public:
 
-    explicit CDiskBlockIndex(CBlockIndex &pindexIn) : blockIndex(pindexIn) {
-        hashPrev = (blockIndex.pprev ? blockIndex.pprev->GetBlockHash() : uint256());
-    }
+    explicit CDiskBlockIndex(CBlockIndex &pindexIn)
+        : hashPrev(pindexIn.pprev ? pindexIn.pprev->GetBlockHash() : uint256())
+        , blockIndex(pindexIn)
+    {}
 
     ADD_SERIALIZE_METHODS
 
