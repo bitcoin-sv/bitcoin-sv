@@ -13,7 +13,8 @@ from test_framework.util import p2p_port, check_for_log_msg, assert_equal
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 from test_framework.mininode import *
 from test_framework.script import *
-
+import platform
+import subprocess
 import time
 
 LOCAL_HOST_IPV6 = 0x00000000000000000000000000000001
@@ -21,6 +22,22 @@ LOCAL_HOST_IPV6 = 0x00000000000000000000000000000001
 LOCAL_HOST_IP = 0x7F000001
 # 127.0.0.2 as network-order bytes
 WRONG_IP = 0x7F000002
+
+# Returns True if host (str) responds to a ping6 request.
+def ping6(host):
+    # option for the number of packets
+    param = '-n' if platform.system().lower()=='windows' else '-c'
+
+    # building the command. Ex: "ping -c 1 google.com"
+    command = ['ping6', param, '1', host]
+
+    try:
+        success = subprocess.call(command) == 0
+    except Exception as e:
+        logger.info("Pinging IPv6 address not possible on this environment: {} \n".format(e))
+        return False
+
+    return success
 
 class HTTPServerV6(HTTPServer):
         address_family = socket.AF_INET6
@@ -368,15 +385,19 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.kill_server()
 
-        # Turn on CallbackService that runs on IPv6 address.
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
-        self.server = HTTPServerV6(('::', 8080), handler)
-        self.start_server()
-        self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)
+        if ping6("::1"):
+            # Turn on CallbackService that runs on IPv6 address.
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
+            self.server = HTTPServerV6(('::', 8080), handler)
+            self.start_server()
+            self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)
 
-        self.check_ipv6(utxo[11])
+            self.check_ipv6(utxo[11])
 
-        self.kill_server()
+            self.kill_server()
+        else:
+            logger.info("IPv6 loopback not enabled: test with IPv6 address in CallbackMessage skipped.\n")
+
 
 if __name__ == '__main__':
     DoubleSpendReport().main()
