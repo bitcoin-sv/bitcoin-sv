@@ -375,11 +375,7 @@ static void FindNextBlocksToDownload(
     // than BLOCK_DOWNLOAD_WINDOW + 1 beyond the last linked block we have in
     // common with this peer. The +1 is so we can detect stalling, namely if we
     // would be able to download that next block if the window were 1 larger.
-    int64_t nWindowSize { gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW) };
-    if(nWindowSize <= 0) {
-        nWindowSize = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
-    }
-    int32_t nWindowEnd = state->pindexLastCommonBlock->GetHeight() + nWindowSize;
+    int32_t nWindowEnd = state->pindexLastCommonBlock->GetHeight() + config.GetBlockDownloadWindow();
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->GetHeight(), nWindowEnd + 1);
     NodeId waitingfor = -1;
 

@@ -89,6 +89,7 @@ public:
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
     virtual int64_t GetBlockStallingTimeout() const = 0;
+    virtual int64_t GetBlockDownloadWindow() const = 0;
 
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
@@ -169,6 +170,7 @@ public:
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
     virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) = 0;
 
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
@@ -364,6 +366,8 @@ public:
     uint64_t GetBlockStallingMinDownloadSpeed() const override;
     bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetBlockStallingTimeout() const override;
+    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadWindow() const override;
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
@@ -479,6 +483,7 @@ private:
     // Block download
     uint64_t blockStallingMinDownloadSpeed;
     int64_t blockStallingTimeout;
+    int64_t blockDownloadWindow;
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
@@ -839,6 +844,8 @@ public:
     uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
     bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
     int64_t GetBlockStallingTimeout() const override { return DEFAULT_BLOCK_STALLING_TIMEOUT; }
+    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadWindow() const override { return DEFAULT_BLOCK_DOWNLOAD_WINDOW; }
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }

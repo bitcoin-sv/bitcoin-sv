@@ -2042,6 +2042,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetBlockStallingTimeout(gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetBlockDownloadWindow(gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW), &err)) {
+        return InitError(err);
+    }
 
     // P2P parameters
     if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
