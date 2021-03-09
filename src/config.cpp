@@ -119,6 +119,7 @@ void GlobalConfig::Reset()
     blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
     blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
     blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
 
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
@@ -1109,6 +1110,25 @@ bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
 int64_t GlobalConfig::GetBlockDownloadWindow() const
 {
     return blockDownloadWindow;
+}
+
+bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download slow fetch timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadSlowFetchTimeout = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadSlowFetchTimeout() const
+{
+    return blockDownloadSlowFetchTimeout;
 }
 
 // P2P Parameters

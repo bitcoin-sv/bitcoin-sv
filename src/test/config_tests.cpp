@@ -322,6 +322,12 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW);
     BOOST_CHECK(!config.SetBlockDownloadWindow(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadWindow(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
+    BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), 2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
+    BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(p2p_config)

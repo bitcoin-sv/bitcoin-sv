@@ -448,7 +448,7 @@ static void FindNextBlocksToDownload(
                 for(const auto& inFlightDetails : allInFlightDetails) {
                     // In flight for a while?
                     int64_t inFlightSecs { (GetTimeMicros() - inFlightDetails.inFlightSince) / MICROS_PER_SECOND };
-                    if(inFlightSecs >= gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT)) {
+                    if(inFlightSecs >= config.GetBlockDownloadSlowFetchTimeout()) {
                         // Are we getting (any) data from this peer?
                         const CNodePtr& nodePtr { connman.FindNodeById(inFlightDetails.block.GetNode()) };
                         if(nodePtr) {

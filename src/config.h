@@ -90,6 +90,7 @@ public:
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
     virtual int64_t GetBlockStallingTimeout() const = 0;
     virtual int64_t GetBlockDownloadWindow() const = 0;
+    virtual int64_t GetBlockDownloadSlowFetchTimeout() const = 0;
 
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
@@ -171,6 +172,7 @@ public:
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
     virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) = 0;
 
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
@@ -368,6 +370,8 @@ public:
     int64_t GetBlockStallingTimeout() const override;
     bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override;
     int64_t GetBlockDownloadWindow() const override;
+    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadSlowFetchTimeout() const override;
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
@@ -484,6 +488,7 @@ private:
     uint64_t blockStallingMinDownloadSpeed;
     int64_t blockStallingTimeout;
     int64_t blockDownloadWindow;
+    int64_t blockDownloadSlowFetchTimeout;
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
@@ -846,6 +851,8 @@ public:
     int64_t GetBlockStallingTimeout() const override { return DEFAULT_BLOCK_STALLING_TIMEOUT; }
     bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override { return true; }
     int64_t GetBlockDownloadWindow() const override { return DEFAULT_BLOCK_DOWNLOAD_WINDOW; }
+    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadSlowFetchTimeout() const override { return DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT; }
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
