@@ -95,6 +95,7 @@ public:
 
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
+    virtual int64_t GetStreamSendRateLimit() const = 0;
 
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -178,6 +179,8 @@ public:
 
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
+
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
 #if ENABLE_ZMQ
@@ -380,6 +383,8 @@ public:
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
+    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override;
+    int64_t GetStreamSendRateLimit() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -497,6 +502,7 @@ private:
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
+    int64_t streamSendRateLimit;
     unsigned int maxProtocolRecvPayloadLength;
     unsigned int maxProtocolSendPayloadLength;
     unsigned int recvInvQueueFactor;
@@ -864,6 +870,8 @@ public:
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
     int64_t GetP2PHandshakeTimeout() const override { return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL; }
+    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override { return true; }
+    int64_t GetStreamSendRateLimit() const override { return Stream::DEFAULT_SEND_RATE_LIMIT; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

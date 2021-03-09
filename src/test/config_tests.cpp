@@ -346,6 +346,13 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), 2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(0, &err));
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), Stream::DEFAULT_SEND_RATE_LIMIT);
+    BOOST_CHECK(config.SetStreamSendRateLimit(1000, &err));
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), 1000);
+    BOOST_CHECK(config.SetStreamSendRateLimit(0, &err));
+    BOOST_CHECK(config.SetStreamSendRateLimit(-1, &err));
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), -1);
 }
 
 BOOST_AUTO_TEST_CASE(disable_BIP30)

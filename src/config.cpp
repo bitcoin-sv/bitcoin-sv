@@ -124,6 +124,7 @@ void GlobalConfig::Reset()
 
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+    streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
 
     mDisableBIP30Checks = std::nullopt;
 
@@ -1156,12 +1157,25 @@ bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 {
     if(timeout <= 0)
     {
-        *err = "P2P handshake timeout must be greater than 0.";
+        if(err)
+        {
+            *err = "P2P handshake timeout must be greater than 0.";
+        }
         return false;
     }
 
     p2pHandshakeTimeout = timeout;
     return true;
+}
+
+bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
+{
+    streamSendRateLimit = limit;
+    return true;
+}
+int64_t GlobalConfig::GetStreamSendRateLimit() const
+{
+    return streamSendRateLimit;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)

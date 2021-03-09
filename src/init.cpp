@@ -2056,6 +2056,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetStreamSendRateLimit(gArgs.GetArg("-streamsendratelimit", Stream::DEFAULT_SEND_RATE_LIMIT), &err)) {
+        return InitError(err);
+    }
 
 #if ENABLE_ZMQ
     bool zmqSinkSpecified = (config.GetInvalidTxSinks().count("ZMQ") != 0);
