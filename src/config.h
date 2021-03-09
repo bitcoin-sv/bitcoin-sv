@@ -91,6 +91,7 @@ public:
     virtual int64_t GetBlockStallingTimeout() const = 0;
     virtual int64_t GetBlockDownloadWindow() const = 0;
     virtual int64_t GetBlockDownloadSlowFetchTimeout() const = 0;
+    virtual uint64_t GetBlockDownloadMaxParallelFetch() const = 0;
 
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
@@ -173,6 +174,7 @@ public:
     virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) = 0;
     virtual bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) = 0;
 
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
@@ -372,6 +374,8 @@ public:
     int64_t GetBlockDownloadWindow() const override;
     bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetBlockDownloadSlowFetchTimeout() const override;
+    bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) override;
+    uint64_t GetBlockDownloadMaxParallelFetch() const override;
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
@@ -489,6 +493,7 @@ private:
     int64_t blockStallingTimeout;
     int64_t blockDownloadWindow;
     int64_t blockDownloadSlowFetchTimeout;
+    uint64_t blockDownloadMaxParallelFetch;
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
@@ -853,6 +858,8 @@ public:
     int64_t GetBlockDownloadWindow() const override { return DEFAULT_BLOCK_DOWNLOAD_WINDOW; }
     bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
     int64_t GetBlockDownloadSlowFetchTimeout() const override { return DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT; }
+    bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockDownloadMaxParallelFetch() const override { return DEFAULT_MAX_BLOCK_PARALLEL_FETCH; }
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }

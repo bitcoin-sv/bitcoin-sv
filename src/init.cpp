@@ -2048,6 +2048,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetBlockDownloadSlowFetchTimeout(gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetBlockDownloadMaxParallelFetch(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH), &err)) {
+        return InitError(err);
+    }
 
     // P2P parameters
     if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {

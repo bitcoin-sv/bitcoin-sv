@@ -120,6 +120,7 @@ void GlobalConfig::Reset()
     blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
     blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
     blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
+    blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
 
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
@@ -1129,6 +1130,25 @@ bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string
 int64_t GlobalConfig::GetBlockDownloadSlowFetchTimeout() const
 {
     return blockDownloadSlowFetchTimeout;
+}
+
+bool GlobalConfig::SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download maximum parallel fetch must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadMaxParallelFetch = max;
+    return true;
+}
+uint64_t GlobalConfig::GetBlockDownloadMaxParallelFetch() const
+{
+    return blockDownloadMaxParallelFetch;
 }
 
 // P2P Parameters

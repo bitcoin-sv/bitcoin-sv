@@ -473,7 +473,7 @@ static void FindNextBlocksToDownload(
 
                 if(stalling) {
                     // Should we ask someone else for this block?
-                    size_t maxParallelFetch { static_cast<size_t>(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH)) };
+                    size_t maxParallelFetch { config.GetBlockDownloadMaxParallelFetch() };
                     if(stallerCount < maxParallelFetch && ! blockDownloadTracker.IsInFlight( {hash, nodeid} )) {
                         LogPrint(BCLog::NETMSG, "Triggering parallel block download for %s to peer=%d\n", hash.ToString(), nodeid);
                         if(! FetchBlock(pindex)) {
