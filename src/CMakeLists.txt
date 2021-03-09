@@ -373,7 +373,7 @@ add_library(server
 	blockfileinfostore.cpp
 	blockfileinfostore.h
 	block_file_access.cpp
-	block_index_store.cpp
+	block_index_store_loader.cpp
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp

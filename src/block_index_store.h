@@ -4,7 +4,6 @@
 #pragma once
 
 #include <functional>
-#include <memory>
 #include <mutex>
 #include <unordered_map>
 
@@ -15,8 +14,6 @@
 #include "uint256.h"
 #include "utiltime.h"
 
-class CDBIterator;
-
 class BlockIndexStore
 {
 public:
@@ -26,21 +23,6 @@ public:
     BlockIndexStore& operator=(BlockIndexStore&&) = delete;
     BlockIndexStore(const BlockIndexStore&) = delete;
     BlockIndexStore& operator=(const BlockIndexStore&) = delete;
-
-    // may only be used in contexts where we are certain that nobody is using
-    // CBlockIndex instances that are owned by this class
-    bool ForceLoad( const Config& config, std::unique_ptr<CDBIterator> cursor );
-
-    // may only be used in contexts where we are certain that nobody is using
-    // CBlockIndex instances that are owned by this class
-    void ForceClear()
-    {
-        std::lock_guard lock{ mMutex };
-
-        mStore.clear();
-        mBestHeader = nullptr;
-        mDirtyBlockIndex.Clear();
-    }
 
     /**
      * Insert new or return existing block index instance.
@@ -188,6 +170,8 @@ private:
     const CBlockIndex* mBestHeader{ nullptr };
 
     DirtyBlockIndexStore mDirtyBlockIndex;
+
+    friend class BlockIndexStoreLoader;
 };
 
 /**

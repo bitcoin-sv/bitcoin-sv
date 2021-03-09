@@ -11,6 +11,7 @@
 #include "addrman.h"
 #include "amount.h"
 #include "block_index_store.h"
+#include "block_index_store_loader.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "compat/sanity.h"
@@ -236,7 +237,7 @@ void Shutdown() {
     vpwallets.clear();
 #endif
 
-    mapBlockIndex.ForceClear();
+    BlockIndexStoreLoader(mapBlockIndex).ForceClear();
 
     LogPrintf("%s: done\n", __func__);
 }

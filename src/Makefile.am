@@ -83,6 +83,7 @@ BITCOIN_CORE_H = \
   block_hasher.h \
   block_index.h \
   block_index_store.h \
+  block_index_store_loader.h \
   dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
@@ -269,7 +270,7 @@ libbitcoin_server_a_SOURCES = \
   block_file_info.cpp \
   blockfileinfostore.cpp \
   block_file_access.cpp \
-  block_index_store.cpp \
+  block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \

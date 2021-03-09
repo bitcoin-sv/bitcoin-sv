@@ -259,6 +259,7 @@ public:
         explicit PrivateTag() = default;
 
         friend class BlockIndexStore;
+        friend class BlockIndexStoreLoader;
 
     public:
         template<typename T> struct UnitTestAccess;

@@ -9,6 +9,7 @@
 #include "arith_uint256.h"
 #include "async_file_reader.h"
 #include "block_index_store.h"
+#include "block_index_store_loader.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -5934,7 +5935,7 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes) {
 }
 
 static bool LoadBlockIndexDB(const CChainParams &chainparams) {
-    if (!mapBlockIndex.ForceLoad(
+    if (!BlockIndexStoreLoader(mapBlockIndex).ForceLoad(
             GlobalConfig::GetConfig(),
             pblocktree->GetIterator()))
     {
@@ -6426,7 +6427,7 @@ void UnloadBlockIndex() {
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
 
-    mapBlockIndex.ForceClear();
+    BlockIndexStoreLoader(mapBlockIndex).ForceClear();
     fHavePruned = false;
 }
 
