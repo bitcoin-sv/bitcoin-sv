@@ -1,0 +1,57 @@
+// Copyright (c) 2021 Bitcoin Association.
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+
+#include "block_index_store.h"
+
+#include "dbwrapper.h"
+#include "disk_block_index.h"
+#include "pow.h"
+#include "util.h"
+
+#include <utility>
+#include <boost/thread/thread.hpp>
+
+bool BlockIndexStore::ForceLoad(
+    const Config& config,
+    std::unique_ptr<CDBIterator> cursor )
+{
+    std::lock_guard lock{ mMutex };
+
+    assert( mStore.empty() );
+
+    constexpr char DB_BLOCK_INDEX = 'b';
+    cursor->Seek(std::make_pair(DB_BLOCK_INDEX, uint256()));
+
+    // Load mapBlockIndex
+    for (; cursor->Valid(); cursor->Next())
+    {
+        boost::this_thread::interruption_point();
+        std::pair<char, uint256> key;
+        if (!cursor->GetKey(key) || key.first != DB_BLOCK_INDEX) {
+            break;
+        }
+
+        CBlockIndex::TemporaryBlockIndex idx{ {} };
+        CDiskBlockIndex diskindex{ idx };
+        if (!cursor->GetValue(diskindex)) {
+            return error("LoadBlockIndex() : failed to read value");
+        }
+
+        // Construct block index object
+        auto& indexNew = GetOrInsertNL( diskindex.GetBlockHash() );
+
+        indexNew.LoadFromPersistentData(
+            idx,
+            diskindex.IsGenesis()
+            ? nullptr
+            : &GetOrInsertNL( diskindex.GetHashPrev() ));
+
+        if (!CheckProofOfWork(indexNew.GetBlockHash(), indexNew.GetBits(),
+                              config)) {
+            return error("LoadBlockIndex(): CheckProofOfWork failed: %s",
+                         indexNew.ToString());
+        }
+    }
+
+    return true;
+}

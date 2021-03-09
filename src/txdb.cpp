@@ -452,44 +452,9 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
-bool CBlockTreeDB::LoadBlockIndexGuts(
-    std::function<CBlockIndex *(const uint256 &)> insertBlockIndex) {
-    const Config &config = GlobalConfig::GetConfig();
-
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
-
-    pcursor->Seek(std::make_pair(DB_BLOCK_INDEX, uint256()));
-
-    // Load mapBlockIndex
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
-        if (!pcursor->GetKey(key) || key.first != DB_BLOCK_INDEX) {
-            break;
-        }
-
-        CBlockIndex::TemporaryBlockIndex idx{ {} };
-        CDiskBlockIndex diskindex{ idx };
-        if (!pcursor->GetValue(diskindex)) {
-            return error("LoadBlockIndex() : failed to read value");
-        }
-
-        // Construct block index object
-        CBlockIndex *pindexNew = insertBlockIndex(diskindex.GetBlockHash());
-        pindexNew->LoadFromPersistentData(
-            idx,
-            insertBlockIndex(diskindex.GetHashPrev()));
-
-        if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->GetBits(),
-                              config)) {
-            return error("LoadBlockIndex(): CheckProofOfWork failed: %s",
-                         pindexNew->ToString());
-        }
-
-        pcursor->Next();
-    }
-
-    return true;
+std::unique_ptr<CDBIterator> CBlockTreeDB::GetIterator()
+{
+    return std::unique_ptr<CDBIterator>{ NewIterator() };
 }
 
 bool CoinsDB::IsOldDBFormat()

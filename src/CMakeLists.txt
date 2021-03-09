@@ -372,6 +372,8 @@ add_library(server
 	blockencodings.h
 	blockfileinfostore.cpp
 	blockfileinfostore.h
+	block_file_access.cpp
+	block_index_store.cpp
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp

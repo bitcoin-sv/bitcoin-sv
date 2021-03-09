@@ -109,7 +109,12 @@ public:
         return block.GetHash();
     }
 
-    const uint256& GetHashPrev() const { return hashPrev; }
+    bool IsGenesis() const { return hashPrev.IsNull(); }
+    const uint256& GetHashPrev() const
+    {
+        assert( !hashPrev.IsNull() );
+        return hashPrev;
+    }
 
     std::string ToString() const {
         std::string str = "CDiskBlockIndex(";
@@ -120,7 +125,7 @@ public:
     }
 
 private:
-    uint256 hashPrev;
+    uint256 hashPrev; // hashPrev is not set only for genesis block
     CBlockIndex& blockIndex;
 };
 

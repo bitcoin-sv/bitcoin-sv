@@ -268,6 +268,7 @@ libbitcoin_server_a_SOURCES = \
   block_file_info.cpp \
   blockfileinfostore.cpp \
   block_file_access.cpp \
+  block_index_store.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \

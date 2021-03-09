@@ -4,6 +4,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 
@@ -12,6 +13,8 @@
 #include "chain.h"
 #include "uint256.h"
 #include "utiltime.h"
+
+class CDBIterator;
 
 class BlockIndexStore
 {
@@ -25,25 +28,16 @@ public:
 
     // may only be used in contexts where we are certain that nobody is using
     // CBlockIndex instances that are owned by this class
+    bool ForceLoad( const Config& config, std::unique_ptr<CDBIterator> cursor );
+
+    // may only be used in contexts where we are certain that nobody is using
+    // CBlockIndex instances that are owned by this class
     void ForceClear()
     {
         std::lock_guard lock{ mMutex };
 
         mStore.clear();
         mBestHeader = nullptr;
-    }
-
-    CBlockIndex* GetOrInsert( const uint256& blockHash )
-    {
-        std::lock_guard lock{ mMutex };
-
-        // Return existing
-        if (auto index = getNL( blockHash ); index)
-        {
-            return index;
-        }
-
-        return &CBlockIndex::UnsafeMakePartial( blockHash, mStore );
     }
 
     CBlockIndex* Insert( const CBlockHeader& block )
@@ -139,6 +133,17 @@ public:
     }
 
 private:
+    CBlockIndex& GetOrInsertNL( const uint256& blockHash )
+    {
+        // Return existing
+        if (auto index = getNL( blockHash ); index)
+        {
+            return *index;
+        }
+
+        return CBlockIndex::UnsafeMakePartial( blockHash, mStore );
+    }
+
     CBlockIndex* getNL( const uint256& blockHash )
     {
         if (auto it = mStore.find( blockHash ); it != mStore.end())

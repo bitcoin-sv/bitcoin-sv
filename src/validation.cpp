@@ -5957,17 +5957,11 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes) {
     return true;
 }
 
-CBlockIndex *InsertBlockIndex(uint256 hash) {
-    if (hash.IsNull()) {
-        return nullptr;
-    }
-
-    return mapBlockIndex.GetOrInsert( hash );
-}
-
-
 static bool LoadBlockIndexDB(const CChainParams &chainparams) {
-    if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex)) {
+    if (!mapBlockIndex.ForceLoad(
+            GlobalConfig::GetConfig(),
+            pblocktree->GetIterator()))
+    {
         return false;
     }
 
