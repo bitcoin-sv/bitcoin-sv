@@ -52,6 +52,7 @@
 #include "block_file_access.h"
 #include "invalid_txn_publisher.h"
 #include "blockindex_with_descendants.h"
+#include "metrics.h"
 
 #include <atomic>
 
@@ -1458,6 +1459,31 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
     CTxnHandlers& handlers,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
+#ifdef COLLECT_METRICS
+    static metrics::Histogram durations_t {"PTV_TX_TIME_MS", 5000};
+    static metrics::Histogram durations_cpu {"PTV_TX_CPU_MS", 5000};
+    static metrics::Histogram durations_chain_t {"PTV_CHAIN_TIME_MS", 5000};
+    static metrics::Histogram durations_chain_cpu {"PTV_CHAIN_CPU_MS", 5000};
+    static metrics::Histogram chainLengths {"PTV_CHAIN_LENGTH", 1000};
+    static metrics::Histogram durations_mempool_t_ms {"PTV_MEMPOOL_DURATION_TIME_MS", 5000};
+    static metrics::Histogram durations_mempool_t_s {"PTV_MEMPOOL_DURATION_TIME_S", 5000};
+    static metrics::Histogram durations_queue_t_ms {"PTV_QUEUE_DURATION_TIME_MS", 5000};
+    static metrics::Histogram durations_queue_t_s {"PTV_QUEUE_DURATION_TIME_S", 5000};
+    static metrics::HistogramWriter histogramLogger {"PTV", std::chrono::milliseconds {10000}, []() {
+        durations_t.dump();
+        durations_cpu.dump();
+        durations_chain_t.dump();
+        durations_chain_cpu.dump();
+        chainLengths.dump();
+        durations_mempool_t_ms.dump();
+        durations_mempool_t_s.dump();
+        durations_queue_t_ms.dump();
+        durations_queue_t_s.dump();
+    }};
+    chainLengths.count(vTxInputData.size());
+    auto chainTimeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> {durations_chain_t};
+    auto chainCpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> {durations_chain_cpu};
+#endif
     size_t chainLength = vTxInputData.size();
     if (chainLength > 1) {
         LogPrint(BCLog::TXNVAL,
@@ -1475,15 +1501,35 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
         CTxnValResult result {};
         try {
             // Execute validation for the given txn
-            result =
-                TxnValidation(
+            {
+#ifdef COLLECT_METRICS
+                auto timeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_t };
+                auto cpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
+                if (!elem.get()->IsOrphanTxn()) {
+                    // we are first time through validation === time in network queues
+                    auto e2e = elem.get()->GetLifetime();
+                    durations_queue_t_ms.count(std::chrono::duration_cast<std::chrono::milliseconds>(e2e).count());
+                    durations_queue_t_s.count(std::chrono::duration_cast<std::chrono::seconds>(e2e).count());
+                }
+#endif
+                result =
+                    TxnValidation(
                         elem,
                         config,
                         pool,
                         handlers.mpTxnDoubleSpendDetector,
                         fUseLimits);
+            }
             // Process validated results
             ProcessValidatedTxn(pool, result, handlers, false, config);
+#ifdef COLLECT_METRICS
+            if (result.mState.IsValid()) {
+                using namespace std::chrono;
+                auto e2e = result.mTxInputData->GetLifetime();
+                durations_mempool_t_ms.count(duration_cast<milliseconds>(e2e).count());
+                durations_mempool_t_s.count(duration_cast<seconds>(e2e).count());
+            }
+#endif
             // Forward results to the next processing stage
             results.emplace_back(std::move(result), CTask::Status::RanToCompletion);
         } catch (const std::exception& e) {

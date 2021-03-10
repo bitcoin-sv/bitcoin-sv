@@ -118,6 +118,12 @@ public:
         return mfTxIdStored;
     }
 
+    using clock = std::chrono::steady_clock;
+
+    clock::duration GetLifetime() const {
+        return clock::now() - mCreated;
+    }
+
     /**
      * Setters
      */
@@ -151,6 +157,7 @@ private:
     TxStorage mTxStorage {TxStorage::memory};
     Amount mnAbsurdFee {0};
     int64_t mnAcceptTime {0};
+    clock::time_point mCreated {clock::now()};
     TxSource mTxSource {TxSource::unknown};
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     bool mfOrphan {false};

@@ -10,6 +10,8 @@
 #include <mutex>
 #include <thread>
 
+#include "util.h"
+
 namespace metrics {
 
 /**
@@ -68,32 +70,44 @@ private:
     std::atomic_size_t mOverCount;
 };
 
-class OneThreadFromPool {
+class HistogramWriter {
     using clock = std::chrono::steady_clock;
-    OneThreadFromPool() = delete;
+    using Callable = std::function<void()>;
+    HistogramWriter() = delete;
 public:
-    OneThreadFromPool(std::chrono::milliseconds interval)
+    HistogramWriter(std::string name, std::chrono::milliseconds interval, Callable callable)
     : mInterval {interval}
-    , mNext {clock::now() + interval}
+    , mCallable {callable}
+    , mThread {[this, name](){run(name);}}
     {}
 
-    void operator()(std::function<void()> callable) {
-        if (chosen() && mNext < clock::now()) {
-            mNext += mInterval;
-            callable();
+    ~HistogramWriter() {
+        {
+            auto lock = std::unique_lock<std::mutex> { mLock };
+            mStopping = true;
         }
+        mWait.notify_all();
+        mThread.join();
     }
 
 private:
-    bool chosen() {
-        std::call_once(mOnce, [this](){mChosenOne = std::this_thread::get_id();});
-        return mChosenOne == std::this_thread::get_id();
+
+    void run(std::string name) {
+        RenameThread((std::string("HistogramWriter-") + name).c_str());
+        auto lock = std::unique_lock<std::mutex> { mLock };
+        auto next = clock::now() + mInterval;
+        while (!mWait.wait_until(lock, next, [this](){return mStopping;})) {
+            mCallable();
+            next += mInterval;
+        }
     }
 
+    std::mutex mLock {};
+    std::condition_variable mWait {};
+    bool mStopping {false};
     clock::duration mInterval;
-    clock::time_point mNext;
-    std::once_flag mOnce {};
-    std::thread::id mChosenOne;
+    Callable mCallable;
+    std::thread mThread;
 };
 
 template <typename Clock, typename Interval> class TimedScope {
