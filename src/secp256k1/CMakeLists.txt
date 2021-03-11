@@ -53,6 +53,7 @@ else()
 endif()
 
 # We check if amd64 asm is supported.
+include(CheckCSourceCompiles)
 check_c_source_compiles("
 	#include <stdint.h>
 	int main() {
