@@ -53,7 +53,6 @@ class GlobalConfig;
  * This just configures logging and chain parameters.
  */
 struct BasicTestingSetup {
-    ECCVerifyHandle globalVerifyHandle;
     GlobalConfig& testConfig;
     fs::path pathTemp;
 

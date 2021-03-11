@@ -50,7 +50,6 @@ extern void noui_connect();
 BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetConfig()) {
     SHA256AutoDetect();
     RandomInit();
-    ECC_Start();
     SetupEnvironment();
     SetupNetworking();
     InitSignatureCache();
@@ -80,7 +79,6 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
-    ECC_Stop();
 
     if(g_connman)
     {
