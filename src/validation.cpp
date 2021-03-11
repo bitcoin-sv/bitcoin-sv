@@ -974,7 +974,8 @@ static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
 static std::shared_ptr<task::CCancellationSource> MakeValidationCancellationSource(
     bool fUseLimits,
     const Config& config,
-    const TxValidationPriority txPriority)
+    const TxValidationPriority txPriority,
+    task::CTimedCancellationBudget& cancellationBudget)
 {
     if (!fUseLimits) {
         return task::CCancellationSource::Make();
@@ -983,9 +984,9 @@ static std::shared_ptr<task::CCancellationSource> MakeValidationCancellationSour
                    ? config.GetMaxStdTxnValidationDuration()
                    : config.GetMaxNonStdTxnValidationDuration();
     if (config.GetValidationClockCPU()) {
-        return task::CThreadTimedCancellationSource::Make( duration);
+        return task::CThreadTimedCancellationSource::Make( duration, cancellationBudget);
     } else {
-        return task::CTimedCancellationSource::Make( duration);
+        return task::CTimedCancellationSource::Make( duration, cancellationBudget);
     }
 }
 
@@ -994,8 +995,9 @@ CTxnValResult TxnValidation(
     const Config& config,
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fUseLimits) {
-
+    bool fUseLimits,
+    task::CTimedCancellationBudget& cancellationBudget)
+{
     using Result = CTxnValResult;
 
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
@@ -1056,7 +1058,7 @@ CTxnValResult TxnValidation(
         state.SetStandardTx();
     }
     // Set txn validation timeout if required.
-    auto source = MakeValidationCancellationSource(fUseLimits, config, pTxInputData->GetTxValidationPriority());
+    auto source = MakeValidationCancellationSource(fUseLimits, config, pTxInputData->GetTxValidationPriority(), cancellationBudget);
 
     bool acceptNonStandardOutput = config.GetAcceptNonStandardOutput(isGenesisEnabled);
     if(!fStandard)
@@ -1542,6 +1544,7 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
                 "A non-trivial chain detected, length=%zu\n", chainLength);
     }
     std::vector<std::pair<CTxnValResult, CTask::Status>> results {};
+    auto cancellationBudget = task::CTimedCancellationBudget {config.GetMaxTxnChainValidationBudget()};
     results.reserve(chainLength);
     for (const auto& elem : vTxInputData) {
         // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
@@ -1573,7 +1576,8 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
                         config,
                         pool,
                         handlers.mpTxnDoubleSpendDetector,
-                        fUseLimits);
+                        fUseLimits,
+                        cancellationBudget);
             } else {
                 // a parent in the chain failed validation, make sure the
                 // rest of the (dependant) chain meets the same fate. We do not

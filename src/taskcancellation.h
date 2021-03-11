@@ -102,6 +102,32 @@ namespace task
         std::atomic<bool> mCanceled = false;
     };
 
+    /** A time budget for chained transactions
+     *
+     * Accumulate unused part of one timed cancellation source to be available
+     * for the next cancellation source, upto a limit
+     */
+
+    class CTimedCancellationBudget final
+    {
+        static constexpr std::chrono::microseconds zero = std::chrono::microseconds{0};
+    public:
+        CTimedCancellationBudget(): mLimit {0} {}
+        CTimedCancellationBudget(std::chrono::milliseconds limit): mLimit {limit} {}
+
+        std::chrono::microseconds DrainBudget(std::chrono::milliseconds allowance) {
+            auto ret = mBudget;
+            mBudget = zero;
+            return ret + allowance;
+        }
+        void FillBudget(std::chrono::microseconds remaining) {
+            mBudget = std::min(mLimit, std::max(remaining, zero));
+        }
+    private:
+        std::chrono::microseconds mLimit;
+        std::chrono::microseconds mBudget {0};
+    };
+
 
     /**
      * A long running task cancellation source with same features as
@@ -112,11 +138,12 @@ namespace task
     {
     public:
         static std::shared_ptr<CCancellationSource> Make(
-            std::chrono::milliseconds const& after)
+            std::chrono::milliseconds const& after,
+            std::optional<std::reference_wrapper<CTimedCancellationBudget>> budget)
         {
             return
                 std::shared_ptr<CCancellationSource>{
-                    new CTimedCancellationSourceT<Clock>{after}};
+                    new CTimedCancellationSourceT<Clock>{after, budget}};
         }
         bool IsCanceled() override
         {
@@ -133,15 +160,23 @@ namespace task
 
             return false;
         }
+        ~CTimedCancellationSourceT() {
+            if (mBudget) {
+                mBudget.value().get().FillBudget(std::chrono::duration_cast<std::chrono::microseconds>(mStart_ + mCancelAfter - Clock::now()));
+            }
+        }
 
     private:
-        CTimedCancellationSourceT(std::chrono::milliseconds const& after)
+        CTimedCancellationSourceT(std::chrono::milliseconds const& after,
+                                 std::optional<std::reference_wrapper<CTimedCancellationBudget>> budget)
             : mStart_{Clock::now()}
-            , mCancelAfter {after}
+            , mCancelAfter{budget ? budget.value().get().DrainBudget(after) : after}
+            , mBudget{budget}
         {/**/}
 
         typename Clock::time_point mStart_;
         typename Clock::duration mCancelAfter;
+        std::optional<std::reference_wrapper<CTimedCancellationBudget>> mBudget;
     };
 
     using CTimedCancellationSource = CTimedCancellationSourceT<std::chrono::steady_clock>;

@@ -960,6 +960,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               " mempool (min 10ms, default: %dms)"),
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()));
 
+    strUsage += HelpMessageOpt(
+        "-maxtxchainvalidationbudget=<n>",
+        strprintf(
+            _("Set the upper limit of unused validation time to add to the next transaction validated in the chain "
+              "(min 0ms, default: %dms)"),
+            DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()));
+
     strUsage +=
         HelpMessageOpt("-validationclockcpu",
                        strprintf(_("Use CPU time instead of wall clock time for validation duration measurement (default: %d)"
@@ -2229,6 +2236,15 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         gArgs.GetArg(
             "-maxnonstdtxvalidationduration",
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
+    if(std::string err; !config.SetMaxTxnChainValidationBudget(
+        gArgs.GetArg(
+            "-maxtxchainvalidationbudget",
+            DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()),
         &err))
     {
         return InitError(err);

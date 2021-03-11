@@ -534,6 +534,8 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
     bool fLimitMempoolSize,
     bool fUseLimits) {
 
+    auto noBudget = task::CTimedCancellationBudget{};
+
     // Execute txn validation.
     CTxnValResult result =
         TxnValidation(
@@ -541,7 +543,8 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
             mConfig,
             mMempool,
             mpTxnDoubleSpendDetector,
-            fUseLimits);
+            fUseLimits,
+            noBudget);
     // Process validated results for the given txn
     ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize, mConfig);
     return result;

@@ -18,3 +18,6 @@ static constexpr std::chrono::milliseconds DEFAULT_MAX_STD_TXN_VALIDATION_DURATI
 /** The maximum time for non-standard transaction validation before we terminate the task */
 static constexpr std::chrono::milliseconds DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION =
 	std::chrono::seconds{1};
+/** The maximum unused validation time to carry over to the next transaction in the chain */
+static constexpr std::chrono::milliseconds DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET =
+    std::chrono::milliseconds{50};

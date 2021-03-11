@@ -753,6 +753,23 @@ std::chrono::milliseconds GlobalConfig::GetMaxNonStdTxnValidationDuration() cons
     return mMaxNonStdTxnValidationDuration;
 }
 
+bool GlobalConfig::SetMaxTxnChainValidationBudget(int ms, std::string* err)
+{
+    if(LessThanZero(ms, err, "Per chain max validation duration budget must be non-negative"))
+    {
+
+        return false;
+    }
+
+    mMaxTxnChainValidationBudget = std::chrono::milliseconds{ms};
+
+    return true;
+}
+
+std::chrono::milliseconds GlobalConfig::GetMaxTxnChainValidationBudget() const {
+    return mMaxTxnChainValidationBudget;
+}
+
 void GlobalConfig::SetValidationClockCPU(bool enable) {
     mValidationClockCPU = enable;
 }

@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(cancellation_after_500ms)
 {
     using namespace std::chrono_literals;
 
-    auto source = task::CTimedCancellationSource::Make(50ms);
+    auto source = task::CTimedCancellationSource::Make(50ms, {});
     auto token = source->GetToken();
 
     BOOST_CHECK_EQUAL(token.IsCanceled(), false);
@@ -99,6 +99,42 @@ BOOST_AUTO_TEST_CASE(cancellation_after_500ms)
     BOOST_CHECK_EQUAL(token.IsCanceled(), true);
 }
 
+BOOST_AUTO_TEST_CASE(cancellation_after_500ms_budget)
+{
+    using namespace std::chrono_literals;
+
+    auto budget = task::CTimedCancellationBudget {50ms};
+    budget.FillBudget(-100ms);
+    {
+        {
+            auto source = task::CTimedCancellationSource::Make(55ms, budget);
+            auto token = source->GetToken();
+
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+            sleep_wait(5ms);
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+        }
+        auto remains = budget.DrainBudget(0ms);
+        BOOST_CHECK(remains > 44ms);
+   }
+
+    budget.FillBudget(30ms);
+    {
+        {
+            auto source = task::CTimedCancellationSource::Make(20ms, budget);
+            auto token = source->GetToken();
+
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+            sleep_wait(40ms);
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+            sleep_wait(11ms);
+            BOOST_CHECK_EQUAL(token.IsCanceled(), true);
+        }
+        auto remains = budget.DrainBudget(0ms);
+        BOOST_CHECK(remains == 0us);
+    }
+
+}
 
 
 #ifdef BOOST_CHRONO_HAS_THREAD_CLOCK
@@ -116,7 +152,7 @@ BOOST_AUTO_TEST_CASE(thread_cancellation_after_500ms_cpu)
 {
     using namespace std::chrono_literals;
 
-    auto source = task::CThreadTimedCancellationSource::Make(50ms);
+    auto source = task::CThreadTimedCancellationSource::Make(50ms, {});
     auto token = source->GetToken();
 
     BOOST_CHECK_EQUAL(token.IsCanceled(), false);
@@ -124,6 +160,42 @@ BOOST_AUTO_TEST_CASE(thread_cancellation_after_500ms_cpu)
     BOOST_CHECK_EQUAL(token.IsCanceled(), true);
 }
 
+
+BOOST_AUTO_TEST_CASE(thread_cancellation_after_500ms_cpu_budget)
+{
+    using namespace std::chrono_literals;
+
+    auto budget = task::CTimedCancellationBudget {50ms};
+    budget.FillBudget(-100ms);
+    {
+        {
+            auto source = task::CThreadTimedCancellationSource::Make(55ms, budget);
+            auto token = source->GetToken();
+
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+            busy_wait(5ms);
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+        }
+        auto remains = budget.DrainBudget(0ms);
+        BOOST_CHECK(remains > 44ms);
+    }
+
+    budget.FillBudget(30ms);
+    {
+        {
+            auto source = task::CThreadTimedCancellationSource::Make(20ms, budget);
+            auto token = source->GetToken();
+
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+            busy_wait(40ms);
+            BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+            busy_wait(11ms);
+            BOOST_CHECK_EQUAL(token.IsCanceled(), true);
+        }
+        auto remains = budget.DrainBudget(0ms);
+        BOOST_CHECK(remains == 0us);
+    }
+}
 #endif
 
 BOOST_AUTO_TEST_SUITE_END()
