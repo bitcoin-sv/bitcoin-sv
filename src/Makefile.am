@@ -143,6 +143,7 @@ BITCOIN_CORE_H = \
   merkletree.h \
   merkletreedb.h \
   merkletreestore.h \
+  metrics.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
