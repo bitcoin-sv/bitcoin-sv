@@ -273,6 +273,9 @@ public:
         CDiskBlockMetaData metaData;
     };
 
+    CBlockIndex(const CBlockIndex&) = delete;
+    CBlockIndex& operator=(const CBlockIndex&) = delete;
+
 private:
 
     /**
