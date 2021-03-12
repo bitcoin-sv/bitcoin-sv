@@ -32,7 +32,7 @@ struct CBlockIndex::UnitTestAccess<class Unique>
     static uint256 CorruptDiskBlockMetaData( CBlockIndex& blockIndex )
     {
         uint256 randomHash = GetRandHash();
-        blockIndex.SetDiskBlockMetaData( {uint256{ randomHash }, 1} );
+        blockIndex.SetDiskBlockMetaData( randomHash, 1 );
 
         return randomHash;
     }
@@ -144,9 +144,9 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
         uint256 expectedHash =
             Hash(serializedData.begin(), serializedData.end());
 
-        BOOST_REQUIRE_EQUAL(data.metaData.DiskDataSize(), serializedData.size());
+        BOOST_REQUIRE_EQUAL(data.metaData.diskDataSize, serializedData.size());
         BOOST_REQUIRE_EQUAL(
-            data.metaData.DiskDataHash().GetCheapHash(),
+            data.metaData.diskDataHash.GetCheapHash(),
             expectedHash.GetCheapHash());
 
         BOOST_REQUIRE_EQUAL_COLLECTIONS(
@@ -163,9 +163,9 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
         auto streamCorruptMetaData =
             index->StreamBlockFromDisk(INIT_PROTO_VERSION);
-        BOOST_REQUIRE_EQUAL(streamCorruptMetaData.metaData.DiskDataSize(), 1);
+        BOOST_REQUIRE_EQUAL(streamCorruptMetaData.metaData.diskDataSize, 1);
         BOOST_REQUIRE_EQUAL(
-            streamCorruptMetaData.metaData.DiskDataHash().GetCheapHash(),
+            streamCorruptMetaData.metaData.diskDataHash.GetCheapHash(),
             randomHash.GetCheapHash());
         BOOST_REQUIRE_EQUAL(
             SerializeAsyncStream(*streamCorruptMetaData.stream, 5u).size(),

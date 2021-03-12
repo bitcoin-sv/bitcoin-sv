@@ -88,7 +88,7 @@ public:
 
         // After reading the last transactions, we can finalize the hash.
         if (EndOfStream() && mCalculateDiskBlockMetadata) {
-            hasher.Finalize(reinterpret_cast<uint8_t*>(&diskBlockMetaData.MutableDiskDataHash()));
+            hasher.Finalize(reinterpret_cast<uint8_t*>(&diskBlockMetaData.diskDataHash));
         }
 
         return *mTransaction;
@@ -150,13 +150,13 @@ public:
 
 private:
     CHash256 hasher;
-    CDiskBlockMetaDataMutable diskBlockMetaData;
+    CDiskBlockMetaData diskBlockMetaData;
     bool mCalculateDiskBlockMetadata;
 
     void updateDiskBlockMetadata(uint8_t* begin, size_t chunkSize)
     {
         hasher.Write(begin, chunkSize);
-        diskBlockMetaData.MutableDiskDataSize() += chunkSize;
+        diskBlockMetaData.diskDataSize += chunkSize;
     }
 
     Reader mReader;

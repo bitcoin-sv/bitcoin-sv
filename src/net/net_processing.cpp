@@ -722,13 +722,13 @@ namespace
                 0,
                 CBlockHeaderAndShortTxIDs{*mBlock}};
 
-            if(auto metaData = index.GetDiskBlockMetaData(); !metaData.IsNull())
+            if(auto metaData = index.GetDiskBlockMetaData(); !metaData.diskDataHash.IsNull())
             {
                 mCompactBlockMessage =
                     std::make_shared<const CCompactBlockMessageData>(
                         std::move(serializedData),
-                        metaData.DiskDataHash(),
-                        metaData.DiskDataSize());
+                        metaData.diskDataHash,
+                        metaData.diskDataSize);
             }
             else
             {
@@ -1059,8 +1059,8 @@ static void SendBlock(
 {
     CSerializedNetMsg blockMsg{
             NetMsgType::BLOCK,
-            std::move(data.metaData.DiskDataHash()),
-            data.metaData.DiskDataSize(),
+            std::move(data.metaData.diskDataHash),
+            data.metaData.diskDataSize,
             std::move(data.stream)
         };
 

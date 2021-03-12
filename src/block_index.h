@@ -192,24 +192,12 @@ public:
 /**
  * Structure for storing hash of the block data on disk and its size.
  */
-class CDiskBlockMetaData
+struct CDiskBlockMetaData
 {
-public:
-    CDiskBlockMetaData() = default;
+    uint256 diskDataHash;
+    uint64_t diskDataSize = 0;
 
-    CDiskBlockMetaData( const uint256& hash, uint64_t size )
-        : diskDataHash{ hash }
-        , diskDataSize{ size }
-    {
-        assert(!diskDataHash.IsNull());
-        assert(diskDataSize > 0);
-    }
-
-    const uint256& DiskDataHash() const { return diskDataHash; }
-    uint64_t DiskDataSize() const { return diskDataSize; }
-    bool IsNull() const { return diskDataHash.IsNull(); }
-
-    ADD_SERIALIZE_METHODS
+    ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
@@ -217,24 +205,6 @@ public:
         READWRITE(diskDataHash);
         READWRITE(diskDataSize);
     }
-
-protected:
-    uint256 diskDataHash;
-    uint64_t diskDataSize = 0;
-};
-
-class CDiskBlockMetaDataMutable : public CDiskBlockMetaData
-{
-public:
-
-    CDiskBlockMetaDataMutable() = default;
-
-    CDiskBlockMetaDataMutable(const CDiskBlockMetaData &other)
-         : CDiskBlockMetaData{ other }
-    {}
-
-    uint256& MutableDiskDataHash() { return diskDataHash; }
-    uint64_t& MutableDiskDataSize() { return diskDataSize; }
 };
 
 arith_uint256 GetBlockProof(const CBlockIndex &block);
@@ -514,7 +484,7 @@ public:
         nStatus = nStatus.withData();
         RaiseValidityNL(BlockValidity::TRANSACTIONS);
 
-        if (!metaData.DiskDataHash().IsNull() && metaData.DiskDataSize())
+        if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
         {
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
@@ -771,7 +741,7 @@ public:
                             const Config &config) const;
 
     void SetBlockIndexFileMetaDataIfNotSet(
-        CDiskBlockMetaData&& metadata) const;
+        CDiskBlockMetaData metadata) const;
 
     std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
                             bool calculateDiskBlockMetadata=false) const;
@@ -864,7 +834,7 @@ private:
                             int networkVersion) const;
 
     void SetBlockIndexFileMetaDataIfNotSetNL(
-        CDiskBlockMetaData&& metadata) const;
+        CDiskBlockMetaData metadata) const;
 
     CDiskBlockPos GetUndoPosNL() const
     {
@@ -948,11 +918,12 @@ private:
     //! Build the skiplist pointer for this entry.
     void BuildSkipNL();
 
-    void SetDiskBlockMetaData( CDiskBlockMetaData&& meta ) const
+    void SetDiskBlockMetaData(const uint256& hash, size_t size) const
     {
-        assert( !meta.IsNull() );
+        assert(!hash.IsNull());
+        assert(size > 0);
 
-        mDiskBlockMetaData = std::move( meta );
+        mDiskBlockMetaData = {hash, size};
         nStatus = nStatus.withDiskBlockMetaData();
     }
 

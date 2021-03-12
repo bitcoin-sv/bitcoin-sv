@@ -1252,8 +1252,8 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
     }
 
-    CDiskBlockMetaDataMutable metadata = blockIndex.GetDiskBlockMetaData();
-    bool hasDiskBlockMetaData = !metadata.IsNull();
+    CDiskBlockMetaData metadata = blockIndex.GetDiskBlockMetaData();
+    bool hasDiskBlockMetaData = !metadata.diskDataHash.IsNull();
 
     switch (rf)
     {
@@ -1261,7 +1261,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         {
             if (hasDiskBlockMetaData)
             {
-                req.WriteHeader("Content-Length", std::to_string(metadata.DiskDataSize()));
+                req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
             }
             req.WriteHeader("Content-Type", "application/octet-stream");
             break;
@@ -1270,7 +1270,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         {
             if (hasDiskBlockMetaData)
             {
-                req.WriteHeader("Content-Length", std::to_string(metadata.DiskDataSize() * 2));
+                req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize * 2));
             }
             req.WriteHeader("Content-Type", "text/plain");
             break;
@@ -1316,15 +1316,14 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         if (!hasDiskBlockMetaData)
         {
             hasher.Write(chunk.Begin(), chunk.Size());
-            metadata.MutableDiskDataSize() += chunk.Size();
+            metadata.diskDataSize += chunk.Size();
         }
     } while (!stream->EndOfStream());
 
     if (!hasDiskBlockMetaData)
     {
-        hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.MutableDiskDataHash()));
-        blockIndex.SetBlockIndexFileMetaDataIfNotSet(
-            std::move(metadata));
+        hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.diskDataHash));
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(metadata);
     }
 
     // RPC requests have additional layer around the actual response 
@@ -1347,7 +1346,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
 {
     CDiskBlockMetaData diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
 
-    auto reader = blockIndex.GetDiskBlockStreamReader(diskBlockMetaData.IsNull());
+    auto reader = blockIndex.GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
 
     if (!reader) 
     {
@@ -1390,11 +1389,10 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     CBlockHeader header = reader->GetBlockHeader();
 
     // set metadata so it is available when setting header in the next step
-    if (diskBlockMetaData.IsNull() && reader->EndOfStream())
+    if (diskBlockMetaData.diskDataHash.IsNull() && reader->EndOfStream())
     {
         diskBlockMetaData = reader->getDiskBlockMetadata();
-        blockIndex.SetBlockIndexFileMetaDataIfNotSet(
-            std::move(diskBlockMetaData));
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(diskBlockMetaData);
     }
     headerBlockToJSON(config, header, &blockIndex, diskBlockMetaData, confirmations, nextBlockHash, jWriter);
 
@@ -1426,9 +1424,9 @@ void headerBlockToJSON(const Config& config,
 {
     jWriter.pushKV("hash", blockindex->GetBlockHash().GetHex());
     jWriter.pushKV("confirmations", confirmations);
-    if (!diskBlockMetaData.IsNull())
+    if (!diskBlockMetaData.diskDataHash.IsNull())
     {
-        jWriter.pushKV("size", diskBlockMetaData.DiskDataSize());
+        jWriter.pushKV("size", diskBlockMetaData.diskDataSize);
     }
     jWriter.pushKV("height", blockindex->GetHeight());
     jWriter.pushKV("version", blockHeader.nVersion);

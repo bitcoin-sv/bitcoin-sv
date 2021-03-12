@@ -256,7 +256,7 @@ bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
-    CDiskBlockMetaData&& metadata) const
+    CDiskBlockMetaData metadata) const
 {
     LOCK(cs_main);
     if (!nStatus.hasDiskBlockMetaData())
@@ -267,7 +267,7 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
             return;
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
-        SetDiskBlockMetaData(std::move(metadata));
+        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
 
         // TODO: this const_cast will be removed in the following commits along with inserting into setDirtyBlockIndex
         setDirtyBlockIndex.insert(const_cast<CBlockIndex*>(this));
@@ -275,10 +275,10 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(
-    CDiskBlockMetaData&& metadata) const
+    CDiskBlockMetaData metadata) const
 {
     std::lock_guard lock { GetMutex() };
-    SetBlockIndexFileMetaDataIfNotSetNL(std::move(metadata));
+    SetBlockIndexFileMetaDataIfNotSetNL(metadata);
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
@@ -350,7 +350,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
 
     hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
 
-    SetBlockIndexFileMetaDataIfNotSetNL({std::move(hash), size});
+    SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size});
 
     if(fseek(file, GetBlockPosNL().Pos(), SEEK_SET) != 0)
     {
@@ -382,7 +382,8 @@ auto CBlockIndex::StreamBlockFromDisk(
         }
     }
 
-    assert(!mDiskBlockMetaData.IsNull());
+    assert(mDiskBlockMetaData.diskDataSize > 0);
+    assert(!mDiskBlockMetaData.diskDataHash.IsNull());
 
     // We expect that block data on disk is in same format as data sent over the
     // network. If this would change in the future then CBlockStream would need
@@ -390,7 +391,7 @@ auto CBlockIndex::StreamBlockFromDisk(
     return
         {
             std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
-                mDiskBlockMetaData.DiskDataSize(),
+                mDiskBlockMetaData.diskDataSize,
                 CAsyncFileReader{std::move(file)}),
             mDiskBlockMetaData
         };
@@ -410,7 +411,7 @@ std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk() c
     {
         return
             std::make_unique<CSyncFixedSizeStream<CFileReader>>(
-                mDiskBlockMetaData.DiskDataSize(),
+                mDiskBlockMetaData.diskDataSize,
                 CFileReader{std::move(file)});
     }
 
