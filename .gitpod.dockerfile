@@ -12,7 +12,7 @@ RUN sudo apt-get install -y libdb-dev
 RUN sudo apt-get install -y libdb++-dev
 
 # Build BitCoin
-RUN cd /workspace/bitcoin-sv/
+RUN cd /workspace
 RUN ./autogen.sh
 RUN ./configure
 RUN sudo make
