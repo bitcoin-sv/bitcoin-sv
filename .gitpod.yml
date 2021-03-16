@@ -1,5 +1,5 @@
 image:
   file:  .gitpod.dockerfile
 tasks:
-  - init: cd /workspace/bitcoin-sv/
+  - init: cd /workspace
     command:  ./autogen.sh && ./configure && make && make install
