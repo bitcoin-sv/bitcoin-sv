@@ -10,9 +10,11 @@
 static constexpr uint64_t DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO = 1000;
 /** A default ratio for max number of non-standard transactions per thread. */
 static constexpr uint64_t DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO = 1000;
-/** The maximum wall time for standard transaction validation before we terminate the task */
+/** Use CPU time used instead of wall clock time for validation duration measurement */
+static constexpr bool DEFAULT_VALIDATION_CLOCK_CPU = true;
+/** The maximum time for standard transaction validation before we terminate the task */
 static constexpr std::chrono::milliseconds DEFAULT_MAX_STD_TXN_VALIDATION_DURATION =
-	std::chrono::milliseconds{10};
-/** The maximum wall time for non-standard transaction validation before we terminate the task */
+	std::chrono::milliseconds{3};
+/** The maximum time for non-standard transaction validation before we terminate the task */
 static constexpr std::chrono::milliseconds DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION =
 	std::chrono::seconds{1};

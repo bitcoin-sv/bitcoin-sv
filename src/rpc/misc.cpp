@@ -1192,6 +1192,8 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
             "  \"maxnonstdtxvalidationduration\": xxxxx, (numeric) Time before terminating validation "
             "of non-standard transaction in milliseconds\n"
 
+            "  \"validationclockcpu\": xxxxx,            (boolean) Prefer CPU time over wall time for validation.\n"
+
             "  \"minconsolidationfactor\": xxxxx         (numeric) Minimum ratio between scriptPubKey inputs and outputs, "
             "0 disables consolidation transactions\n"
             "  \"maxconsolidationinputscriptsize\": xxxx (numeric) Maximum scriptSig length of input in bytes\n"
@@ -1237,6 +1239,8 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("blockmintxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));
     obj.push_back(Pair("maxnonstdtxvalidationduration", config.GetMaxNonStdTxnValidationDuration().count()));
+
+    obj.push_back(Pair("validationclockcpu", config.GetValidationClockCPU()));
 
     obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
     obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));

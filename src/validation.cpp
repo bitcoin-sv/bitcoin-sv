@@ -971,6 +971,24 @@ static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
     return false;
 }
 
+static std::shared_ptr<task::CCancellationSource> MakeValidationCancellationSource(
+    bool fUseLimits,
+    const Config& config,
+    const TxValidationPriority txPriority)
+{
+    if (!fUseLimits) {
+        return task::CCancellationSource::Make();
+    }
+    auto duration = (TxValidationPriority::high == txPriority || TxValidationPriority::normal == txPriority)
+                   ? config.GetMaxStdTxnValidationDuration()
+                   : config.GetMaxNonStdTxnValidationDuration();
+    if (config.GetValidationClockCPU()) {
+        return task::CThreadTimedCancellationSource::Make( duration);
+    } else {
+        return task::CTimedCancellationSource::Make( duration);
+    }
+}
+
 CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config& config,
@@ -1038,13 +1056,7 @@ CTxnValResult TxnValidation(
         state.SetStandardTx();
     }
     // Set txn validation timeout if required.
-    auto source =
-        fUseLimits ?
-            task::CTimedCancellationSource::Make(
-                (TxValidationPriority::high == pTxInputData->GetTxValidationPriority() ||
-                 TxValidationPriority::normal == pTxInputData->GetTxValidationPriority())
-                    ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration())
-            : task::CCancellationSource::Make();
+    auto source = MakeValidationCancellationSource(fUseLimits, config, pTxInputData->GetTxValidationPriority());
 
     bool acceptNonStandardOutput = config.GetAcceptNonStandardOutput(isGenesisEnabled);
     if(!fStandard)

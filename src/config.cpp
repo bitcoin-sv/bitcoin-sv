@@ -707,13 +707,13 @@ uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus)
 
 bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
 {
-    if(ms < 5)
+    if(ms < 1)
     {
         if(err)
         {
             *err =
                 strprintf(
-                    _("Per transaction max validation duration must be at least 5ms"));
+                    _("Per transaction max validation duration must be at least 1ms"));
         }
 
         return false;
@@ -752,6 +752,15 @@ std::chrono::milliseconds GlobalConfig::GetMaxNonStdTxnValidationDuration() cons
 {
     return mMaxNonStdTxnValidationDuration;
 }
+
+void GlobalConfig::SetValidationClockCPU(bool enable) {
+    mValidationClockCPU = enable;
+}
+
+bool GlobalConfig::GetValidationClockCPU() const {
+    return mValidationClockCPU;
+}
+
 
 /**
  * Compute the maximum number of sigops operations that can be contained in a block
