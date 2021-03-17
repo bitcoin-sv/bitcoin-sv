@@ -131,7 +131,7 @@ private:
      * subtree can be used to calculate a parent node and upper levels if needed.
      * Returns false if subtree is higher.
      */
-    bool MergeSubTree(const CMerkleTree& subTree);
+    bool MergeSubTree(CMerkleTree&& subTree);
 
     /**
      * Trees that do not have exactly 2^N leaves/transactions are incomplete.

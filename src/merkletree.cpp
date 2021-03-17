@@ -188,7 +188,7 @@ void CMerkleTree::AddNodeAtLevel(const uint256& hash, size_t level)
     4567 after the merge. They become siblings and their parent is calculated and stored
     to Level 3.
 */
-bool CMerkleTree::MergeSubTree(const CMerkleTree& subTree)
+bool CMerkleTree::MergeSubTree(CMerkleTree&& subTree)
 {
     size_t currentTreeHeight = merkleTreeLevelsWithNodeHashes.size();
     size_t subTreeHeight = subTree.merkleTreeLevelsWithNodeHashes.size();
@@ -205,8 +205,8 @@ bool CMerkleTree::MergeSubTree(const CMerkleTree& subTree)
         {
             --currentLevel;
             merkleTreeLevelsWithNodeHashes[currentLevel].insert(merkleTreeLevelsWithNodeHashes[currentLevel].cend(),
-                std::make_move_iterator(subTree.merkleTreeLevelsWithNodeHashes[currentLevel].cbegin()),
-                std::make_move_iterator(subTree.merkleTreeLevelsWithNodeHashes[currentLevel].cend()));
+                std::make_move_iterator(subTree.merkleTreeLevelsWithNodeHashes[currentLevel].begin()),
+                std::make_move_iterator(subTree.merkleTreeLevelsWithNodeHashes[currentLevel].end()));
         }
     }
     else
