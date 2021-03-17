@@ -2357,6 +2357,26 @@ UniValue getmempoolinfo(const Config &config, const JSONRPCRequest &request) {
     return mempoolInfoToJSON(config);
 }
 
+UniValue getorphaninfo(const Config &config, const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "getorphaninfo\n"
+            "\nReturns details on the active state of the orphan pool.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"size\": xxxxx,               (numeric) Current tx count\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getorphaninfo", "") +
+            HelpExampleRpc("getorphaninfo", ""));
+    }
+
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("size", (int64_t)g_connman->getTxnValidator()->getOrphanTxnsPtr()->getTxnsNumber()));
+    return ret;
+}
+
+
 UniValue preciousblock(const Config &config, const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
@@ -3453,7 +3473,8 @@ static const CRPCCommand commands[] = {
     { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
     { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
     { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
-    { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} }
+    { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
+    { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} }
 };
 // clang-format on
 
