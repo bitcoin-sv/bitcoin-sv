@@ -1060,6 +1060,18 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex);
 
+/**
+ * Mark a block and its descendants (up to numBlocks of them) as soft rejected.
+ */
+bool SoftRejectBlockNL(const Config& config, CValidationState& state,
+                       CBlockIndex* pindex, std::int32_t numBlocks);
+/**
+ * If numBlocks=-1, un-mark a block and its descendants as soft rejected.
+ *
+ * Otherwise, decrease number of descendants that are also considered soft rejected to numBlocks.
+ */
+bool AcceptSoftRejectedBlockNL(CBlockIndex* pindex, std::int32_t numBlocks=-1);
+
 /** Blocks that are in the Config::GetInvalidBlocks() will be marked as invalid.*/
 void InvalidateBlocksFromConfig(const Config &config);
 

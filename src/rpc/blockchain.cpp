@@ -2513,6 +2513,243 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
     return NullUniValue;
 }
 
+UniValue softrejectblock(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 2)
+    {
+        throw std::runtime_error(R"(softrejectblock "blockhash" numblocks
+
+Marks a block as soft rejected.
+Its descendants (up to num_blocks of them) are also automatically soft rejected. This is true for blocks that are already known as well as for future blocks.
+Chains whose tip is soft rejected are not considered when selecting best chain.
+If tip of active chain becomes soft rejected, it is reorged back to the first block that is not soft rejected.
+Block can only be marked as soft rejected if it is currently not considered soft rejected and it would not affect descendant blocks that are already marked as soft rejected.
+Value of numblocks can also be increased on a block that was previously marked as soft rejected by calling this function again on the same block. In this case the value of numblocks must be higher than existing value. acceptblock can be used to decrease the value. 
+
+Arguments:
+1. "blockhash"   (string, required)  The hash of the block to mark as soft rejected
+2. numblocks     (numeric, required) Number of blocks after this one that will also be considered soft rejected (on all possible branches derived from this block)
+
+Result:
+Nothing (JSON null value) if successful and an error code otherwise.
+    -1: Specified block cannot be marked as soft rejected.
+        Response contains general error description while details are provided in bitcoind log file.
+        Common reasons for this error are:
+            - Block is already considered soft rejected because of its parent and cannot be marked independently.
+            - Block is currently marked as soft rejected for the next N block(s) and this number can only be increased when rejecting.
+            - Marking block as soft rejected would affect a descendant block that is also marked as soft rejected.
+            - Genesis block cannot be soft rejected.
+    -8: Invalid parameter value
+    -5: Unknown block hash
+   -20: Database error. There was an error when trying to reorg active chain to a different tip.
+        Soft rejection status of a block was not changed, but active chain may be in unspecified state.
+
+Examples:
+)"
+            + HelpExampleCli("softrejectblock", "\"blockhash\" 2")
+            + HelpExampleRpc("softrejectblock", "\"blockhash\", 2"));
+    }
+
+    std::string strHash = request.params[0].get_str();
+    uint256 hash(uint256S(strHash));
+
+    int numBlocks = request.params[1].get_int();
+    if(numBlocks<0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Parameter numblocks must not be negative");
+    }
+
+    CValidationState state;
+    {
+        LOCK(cs_main);
+
+        CBlockIndex* pblockindex = [&hash]{
+            auto it = mapBlockIndex.find(hash);
+            if(it == mapBlockIndex.end())
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            }
+            return it->second;
+        }();
+
+        bool result = SoftRejectBlockNL(config, state, pblockindex, numBlocks);
+        if(!result)
+        {
+            throw JSONRPCError(RPC_MISC_ERROR, "Error marking block as soft rejected");
+        }
+    }
+
+    if (!state.IsValid())
+    {
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+
+    return NullUniValue;
+}
+
+UniValue acceptblock(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 2)
+    {
+        throw std::runtime_error(R"(acceptblock "blockhash" numblocks
+
+Unmarks a block as soft rejected and update soft rejection status of its descendants.
+If best chain is changed as a result of that, active chain is reorged.
+Only blocks that were previously marked as soft rejected can be unmarked. I.e.: It is not possible to unmark block that is considered soft rejected because of its parent.
+Value of numblocks can also be decreased on a block that was previously marked as soft rejected by calling this function again on the same block. In this case the value of numblocks must be lower than existing value. softrejectblock can be used to increase the value.
+
+Arguments:
+1. "blockhash"   (string, required)  The hash of the block that was previously marked as soft rejected
+2. numblocks     (numeric, optional) Number of blocks after this one that should still be considered soft rejected (on all possible branches derived from this block)
+
+Result:
+Nothing (JSON null value) if successful and an error code otherwise.
+    -1: Specified block cannot be unmarked as soft rejected.
+        Response contains general error description while details are provided in bitcoind log file.
+        Common reasons for this error are:
+            - Block is not soft rejected.
+            - Block is soft rejected because of its parent and cannot be accepted independently.
+            - Block is currently marked as soft rejected for the next N block(s) and this number can only be decreased when accepting.
+    -8: Invalid parameter value
+    -5: Unknown block hash
+   -20: Database error. There was an error when trying to reorg active chain to a different tip.
+        Soft rejection status of a block was changed, but active chain may be in unspecified state.
+
+Examples:
+)"
+            + HelpExampleCli("acceptblock", "\"blockhash\"")
+            + HelpExampleRpc("acceptblock", "\"blockhash\"")
+            + HelpExampleCli("acceptblock", "\"blockhash\" 2")
+            + HelpExampleRpc("acceptblock", "\"blockhash\", 2"));
+    }
+
+    std::string strHash = request.params[0].get_str();
+    uint256 hash(uint256S(strHash));
+
+    std::optional<int> numBlocks;
+    if (request.params.size() > 1)
+    {
+        numBlocks = request.params[1].get_int();
+        if(*numBlocks<0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Parameter numBlocks must not be negative");
+        }
+    }
+
+    {
+        LOCK(cs_main);
+
+        CBlockIndex* pblockindex = [&hash]{
+            auto it = mapBlockIndex.find(hash);
+            if(it == mapBlockIndex.end())
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            }
+            return it->second;
+        }();
+
+        bool result;
+        if(numBlocks.has_value())
+        {
+            result = AcceptSoftRejectedBlockNL(pblockindex, *numBlocks);
+        }
+        else
+        {
+            result = AcceptSoftRejectedBlockNL(pblockindex);
+        }
+        if(!result)
+        {
+            throw JSONRPCError(RPC_MISC_ERROR, "Error unmarking block as soft rejected");
+        }
+    }
+
+    // Activate best chain, since it may be different now when the block is no longer soft rejected.
+    // NOTE: We do the same thing as it is done in the function reconsiderblock.
+
+    CValidationState state;
+    mining::CJournalChangeSetPtr changeSet{
+        mempool.getJournalBuilder().getNewChangeSet(
+            mining::JournalUpdateReason::REORG)};
+
+    CScopedBlockOriginRegistry reg(hash, "acceptblock");
+
+    auto source = task::CCancellationSource::Make();
+    ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
+
+    if (!state.IsValid())
+    {
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+
+    return NullUniValue;
+}
+
+UniValue getsoftrejectedblocks(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+    {
+        throw std::runtime_error(R"(getsoftrejectedblocks onlymarked
+
+Returns information about blocks that are considered soft rejected. Order of blocks in returned array is unspecified.
+
+Arguments:
+1. onlymarked (boolean, optional, default=true) If true, only blocks that are explicitly marked as soft rejected are returned.
+                                                If false, blocks that are considered soft rejected because of parent are also returned.
+
+Result:
+[
+  {
+    "blockhash" : "<hash>",          (string)  The block hash
+    "height" : <n>,                  (numeric) The block height
+    "previousblockhash" : "<hash>",  (string)  The hash of the previous block
+    "numblocks": <n>                 (numeric) Number of blocks after this one that are also considered soft rejected (on all possible branches derived from this block)
+  }, ...
+]
+
+Examples:
+)"
+            + HelpExampleCli("getsoftrejectedblocks", "")
+            + HelpExampleRpc("getsoftrejectedblocks", "")
+            + HelpExampleCli("getsoftrejectedblocks", "false")
+            + HelpExampleRpc("getsoftrejectedblocks", "false"));
+    }
+
+    bool onlyMarked = true;
+    if (request.params.size() > 0)
+    {
+        onlyMarked = request.params[0].get_bool();
+    }
+
+    UniValue result(UniValue::VARR);
+    {
+        LOCK(cs_main);
+
+        for(const auto& mbi: mapBlockIndex)
+        {
+            const CBlockIndex* bi = mbi.second;
+
+            if(!bi->IsSoftRejected())
+            {
+                continue;
+            }
+
+            if(bi->ShouldBeConsideredSoftRejectedBecauseOfParent() && onlyMarked)
+            {
+                continue;
+            }
+
+            UniValue v(UniValue::VOBJ);
+            v.push_back(Pair("blockhash", bi->GetBlockHash().ToString()));
+            v.push_back(Pair("height", bi->nHeight));
+            v.push_back(Pair("previousblockhash", bi->pprev->GetBlockHash().ToString()));
+            v.push_back(Pair("numblocks", bi->GetSoftRejectedFor()));
+            result.push_back(v);
+        }
+    }
+
+    return result;
+}
+
 UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() > 2) {
         throw std::runtime_error(
@@ -3258,6 +3495,9 @@ static const CRPCCommand commands[] = {
     /* Not shown in help */
     { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
     { "hidden",             "reconsiderblock",        reconsiderblock,        true,  {"blockhash"} },
+    { "hidden",             "softrejectblock",        softrejectblock,        true,  {"blockhash","numblocks"} },
+    { "hidden",             "acceptblock",            acceptblock,            true,  {"blockhash","numblocks"} },
+    { "hidden",             "getsoftrejectedblocks",  getsoftrejectedblocks,  true,  {"onlymarked"} },
     { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
     { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
     { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
