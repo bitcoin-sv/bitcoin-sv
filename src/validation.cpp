@@ -1869,7 +1869,7 @@ static void HandleInvalidP2POrphanTxn(
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
-        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist\n");
         return;
     }
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
@@ -1921,7 +1921,7 @@ static void HandleInvalidP2PNonOrphanTxn(
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
-        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist\n");
         return;
     }
     const CValidationState& state = txStatus.mState;
@@ -2013,7 +2013,7 @@ static void PostValidationStepsForP2PTxn(
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
-        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist\n");
         return;
     }
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();

@@ -39,6 +39,7 @@ from test_framework.util import assert_equal, assert_raises_rpc_error, wait_unti
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, ToHex
 import random
+import itertools
 
 class RPCSendRawTransactions(ComparisonTestFramework):
 
@@ -49,6 +50,8 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         self.coinbase_key = CECKey()
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
+        self.wrong_key = CECKey()
+        self.wrong_key.set_secretbytes(b"horseradish")
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
         self.default_args = ['-debug', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight]
         self.extra_args = [self.default_args] * self.num_nodes
@@ -58,41 +61,55 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
-    def sign_tx(self, tx, spend_tx, n):
+    def sign_tx(self, tx, spend_tx, n, *, key):
         scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
         sighash = SignatureHashForkId(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
-            [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
+            [key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     def check_mempool(self, rpc, should_be_in_mempool, timeout=20):
         wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=timeout)
 
     # Generating transactions in order so first transaction's output will be an input for second transaction
-    def get_chained_transactions(self, spend, num_of_transactions, money_to_spend=5000000000):
-        txns = []
-        for _ in range(0, num_of_transactions):
+    def get_chained_transactions(self, spend, num_of_transactions, *, money_to_spend=5000000000, bad_chain=False):
+        ok = []
+        bad = []
+        orphan = []
+        bad_transaction = num_of_transactions // 2 if bad_chain else num_of_transactions
+        for i in range(0, num_of_transactions):
             money_to_spend = money_to_spend - 1000  # one satoshi to fee
             tx = create_transaction(spend.tx, spend.n, b"", money_to_spend, self.locking_script)
-            self.sign_tx(tx, spend.tx, spend.n)
+            self.sign_tx(tx, spend.tx, spend.n,
+                         key = self.coinbase_key if i != bad_transaction else self.wrong_key)
             tx.rehash()
+            txns = ok if i < bad_transaction else bad if i == bad_transaction else orphan
             txns.append(tx)
             spend = PreviousSpendableOutput(tx, 0)
-        return txns
+        return ok, bad, orphan
 
     # Create a required number of chains with equal length.
-    def get_txchains_n(self, num_of_chains, chain_length, spend):
+    def get_txchains_n(self, num_of_chains, chain_length, spend, *, num_of_bad_chains):
+        assert(0 <= num_of_bad_chains <= num_of_chains)
         if num_of_chains > len(spend):
             raise Exception('Insufficient number of spendable outputs.')
-        txchains = []
-        for x in range(0, num_of_chains):
-            txchains += self.get_chained_transactions(spend[x], chain_length)
-        return txchains
+        txok = []
+        txbad = []
+        txorphan = []
+        bad_chain_marker = ([True] * num_of_bad_chains +
+                            [False] * (num_of_chains - num_of_bad_chains))
+        random.shuffle(bad_chain_marker)
+        for x, bad_chain in enumerate(bad_chain_marker):
+            ok, bad, orphan = self.get_chained_transactions(spend[x], chain_length, bad_chain=bad_chain)
+            txok.extend(ok)
+            txbad.extend(bad)
+            txorphan.extend(orphan)
+        return txok, txbad, txorphan
 
     # Test an expected valid results, depending on node's configuration.
     def run_scenario1(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, listunconfirmedancestors=False, useRpcWithDefaults=False, shuffle_txs=False, timeout=30):
         # Create and send tx chains.
-        txchains = self.get_txchains_n(num_of_chains, chain_length, spend)
+        txchains, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=0)
         # Shuffle txs if it is required
         if shuffle_txs:
             random.shuffle(txchains)
@@ -220,7 +237,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
     #   - received earlier through the p2p interface and not processed yet
     def run_scenario3(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
         # Create and send tx chains.
-        txchains = self.get_txchains_n(num_of_chains, chain_length, spend)
+        txchains, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=0)
         # Prepare inputs for sendrawtransactions
         rpc_txs_bulk_input = []
         for tx in range(len(txchains)):
@@ -245,7 +262,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
     # - input data are shuffled
     def run_scenario4(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
         # Create and send tx chains.
-        txchains = self.get_txchains_n(num_of_chains, chain_length, spend)
+        txchains, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=0)
         # Prepare duplicated inputs for sendrawtransactions
         rpc_txs_bulk_input = []
         for tx in range(len(txchains)):
@@ -261,6 +278,39 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         assert(set(rejected_txns['known']) == {t.hash for t in txchains})
         # Check if required transactions are accepted by the mempool.
         self.check_mempool(conn.rpc, txchains, timeout)
+
+    # test an attempt to submit bad transactions in a chain through the rpc interface
+    def run_scenario5(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
+        # Create and send tx chains.
+        num_of_bad_chains = num_of_chains // 3
+        ok, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=num_of_bad_chains)
+        # Prepare inputs for sendrawtransactions
+        rpc_txs_bulk_input = []
+        for tx in orphan + bad + ok:
+            # Collect txn input data for bulk submit through rpc interface.
+            rpc_txs_bulk_input.append({'hex': ToHex(tx), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
+        # Submit a batch of txns through rpc interface.
+        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+        for k,v in rejected_txns.items():
+            self.log.info("====== rejected_txns[%s] = %s", k, v)
+        assert_equal(len(rejected_txns), 1)
+        assert_equal(len(rejected_txns['invalid']), len(bad) + len(orphan))
+        def reject_reason(x):
+            return x['reject_reason']
+        invalid = {k: list(v)
+                   for k,v in itertools.groupby(sorted(rejected_txns['invalid'],
+                                                       key=reject_reason),
+                                                key=reject_reason)
+                   }
+        self.log.info("invalid: %s", invalid)
+        missing_inputs = invalid.pop('missing-inputs')
+        assert_equal({x["txid"] for x in missing_inputs}, {x.hash for x in orphan})
+        reason, rejected = invalid.popitem()
+        assert_equal(reason.startswith('mandatory-script-verify-flag-failed '), True)
+        assert_equal({x["txid"] for x in rejected}, {x.hash for x in bad})
+        # Valid transactions should be in the mempool.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], len(ok))
+
 
 
     def get_tests(self):
@@ -468,6 +518,27 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario4(conn, num_of_chains, chain_length, out, timeout=20)
+
+        # Scenario 9 (TS9).
+        #
+        # This test case checks bulk submit of chains with bad transactions in
+        # the middle of the chain, through the rpc sendrawtransactions
+        # interface.
+        #
+        # Test case config
+        num_of_chains = 10
+        chain_length = 10
+        # Node's config
+        args = ['-txnvalidationasynchrunfreq=100',
+                '-maxorphantxsize=0',
+                '-limitancestorcount=100',
+                '-checkmempool=0',
+                '-persistmempool=0']
+        with self.run_node_with_connections('TS9: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario5(conn, num_of_chains, chain_length, out, timeout=30)
+
 
 if __name__ == '__main__':
     RPCSendRawTransactions().main()
