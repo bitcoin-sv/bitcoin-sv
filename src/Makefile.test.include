@@ -142,6 +142,7 @@ BITCOIN_TESTS =\
   test/thread_safe_queue_tests.cpp \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
+  test/time_limited_blacklist_tests.cpp \
   test/time_locked_mempool_tests.cpp \
   test/ttor_tests.cpp \
   test/transaction_tests.cpp \

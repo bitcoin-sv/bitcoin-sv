@@ -390,6 +390,7 @@ add_library(server
     double_spend/dscallback_msg.h
     double_spend/dstxn_serialiser.cpp
     double_spend/dstxn_serialiser.h
+    double_spend/time_limited_blacklist.h
 	httprpc.cpp
 	httprpc.h
 	httpserver.cpp

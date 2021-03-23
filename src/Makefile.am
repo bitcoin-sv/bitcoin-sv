@@ -119,6 +119,7 @@ BITCOIN_CORE_H = \
   dsattempt_handler.h \
   double_spend/dscallback_msg.h \
   double_spend/dstxn_serialiser.h \
+  double_spend/time_limited_blacklist.h \
   dstencode.h \
   enum_cast.h \
   fs.h \
