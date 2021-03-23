@@ -376,23 +376,23 @@ public:
     }
 
     /**
-     * Return true iff this block is soft rejected.
+     * Return true if this block is soft rejected.
      */
     bool IsSoftRejected() const
     {
-        return nSoftRejected >= 0;
+        std::lock_guard lock(blockIndexMutex);
+        return IsSoftRejectedNL();
     }
 
     /**
-     * Return true iff this block should be considered soft rejected because of its parent.
+     * Return true if this block should be considered soft rejected because of its parent.
      *
      * @note Parent of this block must be known and its value of nSoftRejected must be set correctly.
      */
     bool ShouldBeConsideredSoftRejectedBecauseOfParent() const
     {
-        assert(pprev);
-        return pprev->nSoftRejected > 0; // NOTE: Parent block makes this one soft rejected only if it affects one or more blocks after it.
-                                         //       If this value is 0 or -1, this block is not soft rejected because of its parent.
+        std::lock_guard lock(blockIndexMutex);
+        return ShouldBeConsideredSoftRejectedBecauseOfParentNL();
     }
 
     /**
@@ -402,6 +402,7 @@ public:
      */
     std::int32_t GetSoftRejectedFor() const
     {
+        std::lock_guard lock(blockIndexMutex);
         return nSoftRejected;
     }
 
@@ -419,14 +420,15 @@ public:
      */
     void SetSoftRejectedFor(std::int32_t numBlocks)
     {
+        std::lock_guard lock(blockIndexMutex);
         assert(numBlocks>=-1);
-        assert(!ShouldBeConsideredSoftRejectedBecauseOfParent()); // this block must not be soft rejected because of its parent
+        assert(!ShouldBeConsideredSoftRejectedBecauseOfParentNL()); // this block must not be soft rejected because of its parent
 
         nSoftRejected = numBlocks;
 
         // Data only needs to be stored on disk if block is soft rejected because
         // absence of this data means that block is not considered soft rejected.
-        nStatus = nStatus.withDataForSoftRejection( IsSoftRejected() );
+        nStatus = nStatus.withDataForSoftRejection( IsSoftRejectedNL() );
     }
 
     /**
@@ -439,7 +441,8 @@ public:
      */
     void SetSoftRejectedFromParent()
     {
-        if(ShouldBeConsideredSoftRejectedBecauseOfParent())
+        std::lock_guard lock(blockIndexMutex);
+        if(ShouldBeConsideredSoftRejectedBecauseOfParentNL())
         {
             // If previous block was marked soft rejected, this one is also soft rejected, but for one block less.
             nSoftRejected = pprev->nSoftRejected - 1;
@@ -650,6 +653,18 @@ private:
             return { nFile, nUndoPos };
         }
         return {};
+    }
+
+    bool IsSoftRejectedNL() const
+    {
+        return nSoftRejected >= 0;
+    }
+
+    bool ShouldBeConsideredSoftRejectedBecauseOfParentNL() const
+    {
+        assert(pprev);
+        return pprev->nSoftRejected > 0; // NOTE: Parent block makes this one soft rejected only if it affects one or more blocks after it.
+                                         //       If this value is 0 or -1, this block is not soft rejected because of its parent.
     }
 
     mutable std::mutex blockIndexMutex;
