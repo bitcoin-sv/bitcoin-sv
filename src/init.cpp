@@ -781,13 +781,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                 Stream::DEFAULT_SEND_RATE_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitancestorcount=<n>",
-            strprintf("Do not accept transactions if number of in-mempool "
-                      "ancestors is <n> or more (default: %u)",
+            strprintf("Do not accept transactions if maximum height of in-mempool "
+                      "ancestor chain is <n> or more (default: %lu)",
                       DEFAULT_ANCESTOR_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitcpfpgroupmemberscount=<n>",
             strprintf("Do not accept transactions if number of in-mempool transactions "
-                      "which we are not willing to mine due to a low fee is <n> or more (default: %u)",
+                      "which we are not willing to mine due to a low fee is <n> or more (default: %lu)",
                       DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
     strUsage += HelpMessageOpt(
