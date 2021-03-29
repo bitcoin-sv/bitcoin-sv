@@ -4,12 +4,50 @@
 
 #include "chainparams.h"
 #include "consensus/validation.h"
+#include "processing_block_index.h"
 #include "undo.h"
 #include "validation.h"
 
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+
+namespace{ class undo_tests_uid; } // only used as unique identifier
+
+template <>
+struct ProcessingBlockIndex::UnitTestAccess<undo_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void ApplyBlockUndo(const CBlockUndo &blockUndo,
+                            const CBlock &block,
+                            CBlockIndex* index,
+                            CCoinsViewCache &view,
+                            const task::CCancellationToken& shutdownToken)
+    {
+        ProcessingBlockIndex idx{ *index };
+        idx.ApplyBlockUndo(
+            blockUndo,
+            block,
+            view,
+            task::CCancellationSource::Make()->GetToken());
+
+    }
+
+};
+using TestAccessProcessingBlockIndex = ProcessingBlockIndex::UnitTestAccess<undo_tests_uid>;
+
+template <>
+struct CBlockIndex::UnitTestAccess<undo_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void SetHeight( CBlockIndex& index, int32_t height)
+    {
+        index.nHeight = height;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<undo_tests_uid>;
 
 BOOST_FIXTURE_TEST_SUITE(undo_tests, BasicTestingSetup)
 
@@ -32,9 +70,11 @@ static void UpdateUTXOSet(const CBlock &block, CCoinsViewCache &view,
 static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
                       const CBlockUndo &blockUndo,
                       const CChainParams &chainparams, uint32_t nHeight) {
-    CBlockIndex pindex;
-    pindex.nHeight = nHeight;
-    ApplyBlockUndo(blockUndo, block, &pindex, view, task::CCancellationSource::Make()->GetToken());
+
+    CBlockIndex::TemporaryBlockIndex index{ {} };
+
+    TestAccessCBlockIndex::SetHeight( index, nHeight );
+    TestAccessProcessingBlockIndex::ApplyBlockUndo(blockUndo, block, index.get(), view, task::CCancellationSource::Make()->GetToken());
 }
 
 static bool HasSpendableCoin(const CCoinsViewCache &view, const uint256 &txid) {

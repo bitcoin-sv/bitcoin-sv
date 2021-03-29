@@ -5,6 +5,7 @@
 
 #include "rpc/mining.h"
 #include "amount.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "config.h"
@@ -47,7 +48,7 @@ void IncrementExtraNonce(CBlock *pblock,
     }
     ++nExtraNonce;
     // Height first in coinbase required for block.version=2
-    unsigned int nHeight = pindexPrev->nHeight + 1;
+    unsigned int nHeight = pindexPrev->GetHeight() + 1;
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig =
         (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
@@ -71,27 +72,27 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
         pb = chainActive[height];
     }
 
-    if (pb == nullptr || !pb->nHeight) {
+    if (pb == nullptr || !pb->GetHeight()) {
         return 0;
     }
 
     // If lookup is -1, then use blocks since last difficulty change.
     if (lookup <= 0) {
-        lookup = pb->nHeight %
+        lookup = pb->GetHeight() %
                      Params().GetConsensus().DifficultyAdjustmentInterval() +
                  1;
     }
 
     // If lookup is larger than chain, then set it to chain length.
-    if (lookup > pb->nHeight) {
-        lookup = pb->nHeight;
+    if (lookup > pb->GetHeight()) {
+        lookup = pb->GetHeight();
     }
 
-    CBlockIndex *pb0 = pb;
+    const CBlockIndex* pb0 = pb;
     int64_t minTime = pb0->GetBlockTime();
     int64_t maxTime = minTime;
     for (int i = 0; i < lookup; i++) {
-        pb0 = pb0->pprev;
+        pb0 = pb0->GetPrev();
         int64_t time = pb0->GetBlockTime();
         minTime = std::min(time, minTime);
         maxTime = std::max(time, maxTime);
@@ -103,7 +104,7 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
         return 0;
     }
 
-    arith_uint256 workDiff = pb->nChainWork - pb0->nChainWork;
+    arith_uint256 workDiff = pb->GetChainWork() - pb0->GetChainWork();
     int64_t timeDiff = maxTime - minTime;
 
     return workDiff.getdouble() / timeDiff;
@@ -142,17 +143,9 @@ UniValue generateBlocks(const Config &config,
                         std::shared_ptr<CReserveScript> coinbaseScript,
                         int nGenerate, uint64_t nMaxTries, bool keepScript) {
     static const int nInnerLoopCount = 0x100000;
-    int32_t nHeightStart = 0;
-    int32_t nHeightEnd = 0;
-    int32_t nHeight = 0;
-
-    {
-        // Don't keep cs_main locked.
-        LOCK(cs_main);
-        nHeightStart = chainActive.Height();
-        nHeight = nHeightStart;
-        nHeightEnd = nHeightStart + nGenerate;
-    }
+    int32_t nHeightStart = chainActive.Height();
+    int32_t nHeightEnd = nHeightStart + nGenerate;
+    int32_t nHeight = nHeightStart;
 
     if(!mining::g_miningFactory)
     {
@@ -327,8 +320,6 @@ static UniValue prioritisetransaction(const Config &config,
             HelpExampleRpc("prioritisetransaction", "\"txid\", 0.0, 10000"));
     }
 
-    LOCK(cs_main);
-
     uint256 hash = ParseHashStr(request.params[0].get_str(), "txid");
     if(request.params[1].get_real() != 0)
     {
@@ -478,8 +469,6 @@ void getblocktemplate(const Config& config,
     if(httpReq == nullptr)
         return;
 
-    LOCK(cs_main);
-
     std::string strMode = "template";
     UniValue lpval = NullUniValue;
     std::set<std::string> setClientRules;
@@ -509,16 +498,14 @@ void getblocktemplate(const Config& config,
             }
 
             uint256 hash = block.GetHash();
-            BlockMap::iterator mi = mapBlockIndex.find(hash);
             // result is of type UniValue because of BIP22ValidationResult return type
             UniValue result;
-            if (mi != mapBlockIndex.end()) {
-                CBlockIndex *pindex = mi->second;
+            if (auto pindex = mapBlockIndex.Get(hash); pindex) {
                 if (pindex->IsValid(BlockValidity::SCRIPTS))
                 {
                     result = "duplicate";
                 }
-                else if (pindex->nStatus.isInvalid())
+                else if (pindex->getStatus().isInvalid())
                 {
                     result = "duplicate-invalid";
                 }
@@ -530,6 +517,8 @@ void getblocktemplate(const Config& config,
             }
             else
             {
+                LOCK(cs_main);
+
                 CBlockIndex *const pindexPrev = chainActive.Tip();
                 // TestBlockValidity only supports blocks built on the current Tip
                 if (block.hashPrevBlock != pindexPrev->GetBlockHash())
@@ -616,26 +605,21 @@ void getblocktemplate(const Config& config,
             nTransactionsUpdatedLastLP = nTransactionsUpdatedLast;
         }
 
-        // Release the wallet and main lock while waiting
-        LEAVE_CRITICAL_SECTION(cs_main);
-        {
-            checktxtime =
-                boost::get_system_time() + boost::posix_time::minutes(1);
+        checktxtime =
+            boost::get_system_time() + boost::posix_time::minutes(1);
 
-            boost::unique_lock<boost::mutex> lock(csBestBlock);
-            while (chainActive.Tip()->GetBlockHash() == hashWatchedChain &&
-                   IsRPCRunning()) {
-                if (!cvBlockChange.timed_wait(lock, checktxtime)) {
-                    // Timeout: Check transactions for update
-                    if (mempool.GetTransactionsUpdated() !=
-                        nTransactionsUpdatedLastLP) {
-                        break;
-                    }
-                    checktxtime += boost::posix_time::seconds(10);
+        boost::unique_lock<boost::mutex> lock(csBestBlock);
+        while (chainActive.Tip()->GetBlockHash() == hashWatchedChain &&
+               IsRPCRunning()) {
+            if (!cvBlockChange.timed_wait(lock, checktxtime)) {
+                // Timeout: Check transactions for update
+                if (mempool.GetTransactionsUpdated() !=
+                    nTransactionsUpdatedLastLP) {
+                    break;
                 }
+                checktxtime += boost::posix_time::seconds(10);
             }
         }
-        ENTER_CRITICAL_SECTION(cs_main);
 
         if (!IsRPCRunning()) {
             throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Shutting down");
@@ -647,31 +631,43 @@ void getblocktemplate(const Config& config,
     // Update block
     static CBlockIndex *pindexPrev;
     static int64_t nStart;
-    static std::unique_ptr<CBlockTemplate> pblocktemplate;
-    if (pindexPrev != chainActive.Tip() ||
-        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast &&
-         GetTime() - nStart > 5)) {
-        // Clear pindexPrev so future calls make a new block, despite any
-        // failures from here on
-        pindexPrev = nullptr;
+    static std::shared_ptr<CBlockTemplate> pblocktemplate;
 
-        // Update other fields for tracking state of this candidate
-        nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        nStart = GetTime();
+    const CBlockIndex* tip;
+    std::shared_ptr<CBlockTemplate> currentTemplate;
 
-        // Create new block
-        if(!mining::g_miningFactory) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+    {
+        LOCK(cs_main);
+
+        tip = chainActive.Tip();
+
+        if (pindexPrev != tip ||
+            (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast &&
+             GetTime() - nStart > 5)) {
+            // Clear pindexPrev so future calls make a new block, despite any
+            // failures from here on
+            pindexPrev = nullptr;
+
+            // Update other fields for tracking state of this candidate
+            nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+            nStart = GetTime();
+
+            // Create new block
+            if(!mining::g_miningFactory) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+            }
+            CScript scriptDummy = CScript() << OP_TRUE;
+            pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptDummy, pindexPrev);
+            if (!pblocktemplate) {
+                throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+            }
         }
-        CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptDummy, pindexPrev);
-        if (!pblocktemplate) {
-            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
-        }
+        
+        currentTemplate = pblocktemplate;
     }
 
     // pointer for convenience
-    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlockRef blockRef = currentTemplate->GetBlockRef();
     CBlock *pblock = blockRef.get();
 
     // Update nTime
@@ -733,7 +729,7 @@ void getblocktemplate(const Config& config,
             jWriter.writeEndArray();
 
             unsigned int index_in_template = i - 1;
-            jWriter.pushKV("fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis());
+            jWriter.pushKV("fee", currentTemplate->vTxFees[index_in_template].GetSatoshis());
 
             jWriter.writeEndObject();
         }
@@ -746,7 +742,7 @@ void getblocktemplate(const Config& config,
 
         jWriter.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue.GetSatoshis());
 
-        jWriter.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
+        jWriter.pushKV("longpollid", tip->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
 
         arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
         jWriter.pushKV("target", hashTarget.GetHex());
@@ -766,7 +762,7 @@ void getblocktemplate(const Config& config,
 
         jWriter.pushKV("curtime", pblock->GetBlockTime());
         jWriter.pushKV("bits", strprintf("%08x", pblock->nBits));
-        jWriter.pushKV("height", (int64_t)(pindexPrev->nHeight + 1));
+        jWriter.pushKV("height", (int64_t)(pindexPrev->GetHeight() + 1));
 
         jWriter.writeEndObject();
 
@@ -820,21 +816,17 @@ UniValue processBlock(
 
     uint256 hash = block.GetHash();
     bool fBlockPresent = false;
-    {
-        LOCK(cs_main);
-        BlockMap::iterator mi = mapBlockIndex.find(hash);
-        if (mi != mapBlockIndex.end()) {
-            CBlockIndex *pindex = mi->second;
-            if (pindex->IsValid(BlockValidity::SCRIPTS)) {
-                return "duplicate";
-            }
-            if (pindex->nStatus.isInvalid()) {
-                return "duplicate-invalid";
-            }
-            // Otherwise, we might only have the header - process the block
-            // before returning
-            fBlockPresent = true;
+
+    if (auto pindex = mapBlockIndex.Get(hash); pindex) {
+        if (pindex->IsValid(BlockValidity::SCRIPTS)) {
+            return "duplicate";
         }
+        if (pindex->getStatus().isInvalid()) {
+            return "duplicate-invalid";
+        }
+        // Otherwise, we might only have the header - process the block
+        // before returning
+        fBlockPresent = true;
     }
 
     submitblock_StateCatcher sc(block.GetHash());

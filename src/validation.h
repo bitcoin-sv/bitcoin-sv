@@ -12,7 +12,6 @@
 #endif
 
 #include "amount.h"
-#include "blockstreams.h"
 #include "blockvalidation.h"
 #include "chain.h"
 #include "coins.h"
@@ -215,7 +214,7 @@ extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
-extern bool fReindex;
+extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -244,11 +243,6 @@ extern uint256 hashAssumeValid;
  * Minimum work we will assume exists on some valid chain.
  */
 extern arith_uint256 nMinimumChainWork;
-
-/**
- * Best header we've seen so far (used for getheaders queries' starting points).
- */
-extern CBlockIndex *pindexBestHeader;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
@@ -469,7 +463,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp = nullptr);
 
 /** used for --reindex */
-void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex);
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, std::atomic_bool& fReindex);
 
 /**
  * Initialize a new block tree database + block data on disk.
@@ -558,7 +552,7 @@ Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams
  * candidates later on - in any case it indicates that we should wait to see if
  * it lands in the best chain or not.
  */
-bool IsBlockABestChainTipCandidate(CBlockIndex& index);
+bool IsBlockABestChainTipCandidate(const CBlockIndex& index);
 
 /**
  * Check whether there are any block index candidates that are older than
@@ -571,7 +565,7 @@ bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
  * Guess verification progress (as a fraction between 0.0=genesis and
  * 1.0=current tip).
  */
-double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex);
+double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pindex);
 
 /**
  * Unlink the specified files and mark associated block indices as pruned
@@ -598,11 +592,8 @@ void PruneAndFlush();
 /** Prune block files up to a given height */
 void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 
-/** Check if UAHF has activated. */
-bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
-
 /** Check if DAA HF has activated. */
-bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const Config &config, int32_t nHeight);
 
 /** Check if Genesis has activated. */
 bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
@@ -957,16 +948,6 @@ public:
     const CTransaction* GetTransaction() const { return ptxTo; }
 };
 
-/** Functions for disk access for blocks */
-bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
-                       const Config &config);
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
-std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
-    CBlockIndex& index,
-    int networkVersion);
-std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index);
-void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata);
 /** Functions for validating blocks and updating the block tree */
 
 /**
@@ -1042,7 +1023,7 @@ public:
 bool ReplayBlocks(const Config &config, CoinsDB& view);
 
 /** Find the last common block between the parameter chain and a locator. */
-CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
+const CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
                                    const CBlockLocator &locator);
 
 /**

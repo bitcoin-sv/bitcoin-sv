@@ -4,8 +4,10 @@
 
 #include "wallet/wallet.h"
 
+#include "block_index_store.h"
 #include "chainparams.h"
 #include "config.h"
+#include "pow.h"
 #include "rpc/server.h"
 #include "test/test_bitcoin.h"
 #include "validation.h"
@@ -632,12 +634,14 @@ static int64_t AddTx(CWallet &wallet, uint32_t lockTime, int64_t mockTime,
     SetMockTime(mockTime);
     CBlockIndex *block = nullptr;
     if (blockTime > 0) {
-        auto inserted = mapBlockIndex.emplace(GetRandHash(), new CBlockIndex);
-        assert(inserted.second);
-        const uint256 &hash = inserted.first->first;
-        block = inserted.first->second;
-        block->nTime = blockTime;
-        block->phashBlock = &hash;
+        CBlockHeader header;
+        header.nTime = blockTime;
+        header.nBits =
+            GetNextWorkRequired(
+                nullptr,
+                &header,
+                GlobalConfig::GetConfig() );
+        block = mapBlockIndex.Insert( header );
     }
 
     CWalletTx wtx(&wallet, MakeTransactionRef(tx));

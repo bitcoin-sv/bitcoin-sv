@@ -113,7 +113,7 @@ public:
         : InvalidTxnInfo{
             tx,
             blockIndex->GetBlockHash(),
-            blockIndex->nHeight,
+            blockIndex->GetHeight(),
             blockIndex->GetBlockTime(),
             state}
     {}
@@ -327,7 +327,7 @@ public:
         ,blockDetails(
             blockIndex ? InvalidTxnInfo::BlockDetails{{},
                                                       blockIndex->GetBlockHash(),
-                                                      blockIndex->nHeight,
+                                                      blockIndex->GetHeight(),
                                                       blockIndex->GetBlockTime()}
                        : InvalidTxnInfo::BlockDetails{})
         ,transaction( std::move(tx) )

@@ -360,16 +360,20 @@ target_include_directories(bitcoinconsensus
 
 # Bitcoin server facilities
 add_library(server
+	abort_node.cpp
 	addrdb.cpp
 	addrman.cpp
 	async_file_reader.h
 	block_file_access.cpp
 	block_file_access.h
 	block_file_info.cpp
+	block_index.cpp
 	blockencodings.cpp
 	blockencodings.h
 	blockfileinfostore.cpp
 	blockfileinfostore.h
+	block_file_access.cpp
+	block_index_store_loader.cpp
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
@@ -432,6 +436,7 @@ add_library(server
 	policy/fees.h
 	policy/policy.cpp
 	pow.cpp
+	processing_block_index.cpp
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp

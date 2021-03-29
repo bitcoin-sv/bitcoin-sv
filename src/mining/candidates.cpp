@@ -86,7 +86,7 @@ void CMiningCandidateManager::RemoveOldCandidates()
         if(height <= mPrevHeight)
             return;
 
-        tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
+        tdiff = GetTime() - (chainActive.Tip()->GetBlockTime() + NEW_CANDIDATE_INTERVAL);
     }
 
     if(tdiff >= 0)

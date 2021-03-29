@@ -74,11 +74,17 @@ endif
 .PHONY: FORCE check-symbols check-security
 # bitcoin core #
 BITCOIN_CORE_H = \
+  abort_node.h \
   addrdb.h \
   addrman.h \
   async_file_reader.h \
   base58.h \
   bloom.h \
+  block_hasher.h \
+  block_index.h \
+  block_index_store.h \
+  block_index_store_loader.h \
+  dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
   block_file_access.h \
@@ -106,6 +112,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  disk_block_index.h \
   disk_block_pos.h \
   disk_tx_pos.h \
   dstencode.h \
@@ -254,13 +261,16 @@ libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
+  abort_node.cpp \
   addrman.cpp \
   addrdb.cpp \
   bloom.cpp \
+  block_index.cpp \
   blockencodings.cpp \
   block_file_info.cpp \
   blockfileinfostore.cpp \
   block_file_access.cpp \
+  block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \
@@ -299,6 +309,7 @@ libbitcoin_server_a_SOURCES = \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
+  processing_block_index.cpp \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \

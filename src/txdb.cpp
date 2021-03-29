@@ -5,8 +5,10 @@
 
 #include "txdb.h"
 
+#include "block_file_info.h"
 #include "chainparams.h"
 #include "config.h"
+#include "disk_block_index.h"
 #include "disk_tx_pos.h"
 #include "hash.h"
 #include "init.h"
@@ -420,7 +422,7 @@ bool CBlockTreeDB::WriteBatchSync(
              blockinfo.begin();
          it != blockinfo.end(); it++) {
         batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()),
-                    CDiskBlockIndex(*it));
+                    CDiskBlockIndex(const_cast<CBlockIndex&>(**it)));
     }
     return WriteBatch(batch, true);
 }
@@ -450,43 +452,9 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
-bool CBlockTreeDB::LoadBlockIndexGuts(
-    std::function<CBlockIndex *(const uint256 &)> insertBlockIndex) {
-    const Config &config = GlobalConfig::GetConfig();
-
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
-
-    pcursor->Seek(std::make_pair(DB_BLOCK_INDEX, uint256()));
-
-    // Load mapBlockIndex
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
-        if (!pcursor->GetKey(key) || key.first != DB_BLOCK_INDEX) {
-            break;
-        }
-
-        CDiskBlockIndex diskindex;
-        if (!pcursor->GetValue(diskindex)) {
-            return error("LoadBlockIndex() : failed to read value");
-        }
-
-        // Construct block index object
-        CBlockIndex *pindexNew = insertBlockIndex(diskindex.GetBlockHash());
-        pindexNew->LoadFromPersistentData(
-            diskindex,
-            insertBlockIndex(diskindex.hashPrev));
-
-        if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits,
-                              config)) {
-            return error("LoadBlockIndex(): CheckProofOfWork failed: %s",
-                         pindexNew->ToString());
-        }
-
-        pcursor->Next();
-    }
-
-    return true;
+std::unique_ptr<CDBIterator> CBlockTreeDB::GetIterator()
+{
+    return std::unique_ptr<CDBIterator>{ NewIterator() };
 }
 
 bool CoinsDB::IsOldDBFormat()

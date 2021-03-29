@@ -120,7 +120,6 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
 // Get the maximum generated block size for the current config and chain tip
 uint64_t JournalingBlockAssembler::GetMaxGeneratedBlockSize() const
 {
-    LOCK(cs_main);
     return ComputeMaxGeneratedBlockSize(chainActive.Tip());
 }
 
@@ -163,7 +162,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         // Update chain state
         if(pindex)
         {
-            int32_t height { pindex->nHeight + 1 };
+            int32_t height { pindex->GetHeight() + 1 };
             mLockTimeCutoff = (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, height)) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }
@@ -329,7 +328,7 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     if(pindex)
     {
         CValidationState state {};
-        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff, false))
+        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->GetHeight() + 1, mLockTimeCutoff, false))
         {
             return 0;
         }

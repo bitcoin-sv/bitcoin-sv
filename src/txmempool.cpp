@@ -943,7 +943,7 @@ void CTxMemPool::RemoveForReorg(
     const CBlockIndex& tip,
     int flags) {
 
-    const int32_t nMemPoolHeight = tip.nHeight + 1;
+    const int32_t nMemPoolHeight = tip.GetHeight() + 1;
     const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
@@ -962,7 +962,7 @@ void CTxMemPool::RemoveForReorg(
         if (!ContextualCheckTransactionForCurrentBlock(
                 config,
                 *tx,
-                tip.nHeight,
+                tip.GetHeight(),
                 nMedianTimePast,
                 state,
                 flags) ||
@@ -2088,7 +2088,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             *pcoinsTip,
             changeSet,
             tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
 
     // Check mempool & journal
     CheckMempool(*pcoinsTip, changeSet);
@@ -2123,7 +2123,7 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
             *pcoinsTip,
             changeSet,
             tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
 
     // Check mempool & journal
     CheckMempool(*pcoinsTip, changeSet);

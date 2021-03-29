@@ -3,6 +3,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "base58.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "config.h"
 #include "core_io.h"
@@ -337,9 +338,9 @@ UniValue importprunedfunds(const Config &config,
 
         LOCK(cs_main);
 
-        if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-            !chainActive.Contains(
-                mapBlockIndex[merkleBlock.header.GetHash()])) {
+        if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
+            !index || !chainActive.Contains(index))
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                "Block not found in chain");
         }
@@ -595,7 +596,7 @@ UniValue importwallet(const Config &config, const JSONRPCRequest &request) {
         chainActive.FindEarliestAtLeast(nTimeBegin - TIMESTAMP_WINDOW);
 
     LogPrintf("Rescanning last %i blocks\n",
-              chainActive.Height() - pindex->nHeight + 1);
+              chainActive.Height() - pindex->GetHeight() + 1);
     pwallet->ScanForWalletTransactions(pindex);
     pwallet->MarkDirty();
 
@@ -1276,18 +1277,18 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
     }
 
     if (fRescan && fRunScan && requests.size()) {
-        CBlockIndex *pindex =
+        const CBlockIndex *pindex =
             nLowestTimestamp > minimumTimestamp
                 ? chainActive.FindEarliestAtLeast(
                       std::max<int64_t>(nLowestTimestamp - TIMESTAMP_WINDOW, 0))
                 : chainActive.Genesis();
-        CBlockIndex *scannedRange = nullptr;
+        const CBlockIndex *scannedRange = nullptr;
         if (pindex) {
             scannedRange = pwallet->ScanForWalletTransactions(pindex, true);
             pwallet->ReacceptWalletTransactions();
         }
 
-        if (!scannedRange || scannedRange->nHeight > pindex->nHeight) {
+        if (!scannedRange || scannedRange->GetHeight() > pindex->GetHeight()) {
             std::vector<UniValue> results = response.getValues();
             response.clear();
             response.setArray();

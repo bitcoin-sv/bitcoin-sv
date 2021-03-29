@@ -6,6 +6,7 @@
 #include "blockfileinfostore.h"
 
 #include "block_file_access.h"
+#include "block_file_info.h"
 #include "config.h"
 #include "util.h"
 #include "txdb.h"  // CBlockTreeDB
@@ -182,9 +183,9 @@ void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
     // last block to prune is the lesser of (user-specified height,
     // MIN_BLOCKS_TO_KEEP from the tip)
     int32_t nLastBlockWeCanPrune =
-        (chainActive.Tip()->nHeight < MIN_BLOCKS_TO_KEEP) ?
+        (chainActive.Tip()->GetHeight() < MIN_BLOCKS_TO_KEEP) ?
         nManualPruneHeight :
-        std::min(nManualPruneHeight, chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP);
+        std::min(nManualPruneHeight, chainActive.Tip()->GetHeight() - MIN_BLOCKS_TO_KEEP);
     int count = 0;
     for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
         if (vinfoBlockFile[fileNumber].Size() == 0 ||
@@ -226,12 +227,12 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
     if (chainActive.Tip() == nullptr || nPruneTarget == 0) {
         return;
     }
-    if (chainActive.Tip()->nHeight <= nPruneAfterHeight) {
+    if (chainActive.Tip()->GetHeight() <= nPruneAfterHeight) {
         return;
     }
 
     int32_t nLastBlockWeCanPrune =
-        chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP;
+        chainActive.Tip()->GetHeight() - MIN_BLOCKS_TO_KEEP;
     uint64_t nCurrentUsage = pBlockFileInfoStore->CalculateCurrentUsage();
     // We don't check to prune until after we've allocated new space for files,
     // so we should leave a buffer under our target to account for another

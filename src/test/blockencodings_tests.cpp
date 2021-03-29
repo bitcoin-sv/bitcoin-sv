@@ -6,6 +6,7 @@
 #include "chainparams.h"
 #include "config.h"
 #include "consensus/merkle.h"
+#include "pow.h"
 #include "random.h"
 #include "merkletree.h"
 

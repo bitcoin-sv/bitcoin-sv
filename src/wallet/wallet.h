@@ -887,7 +887,7 @@ public:
     bool AddToWalletIfInvolvingMe(const CTransactionRef &tx,
                                   const CBlockIndex *pIndex, int posInBlock,
                                   bool fUpdate);
-    CBlockIndex *ScanForWalletTransactions(CBlockIndex *pindexStart,
+    const CBlockIndex *ScanForWalletTransactions(const CBlockIndex *pindexStart,
                                            bool fUpdate = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime,

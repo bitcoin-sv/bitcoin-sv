@@ -8,21 +8,55 @@
 #include <algorithm>
 #include <random>
 
+
+namespace{ class Unique; }
+
+template<>
+struct CBlockIndex::PrivateTag::UnitTestAccess<class Unique>
+{
+public:
+    static PrivateTag GetPrivateTag() { return PrivateTag{}; }
+};
+using TestAccessCBlockIndexPrivateTag = CBlockIndex::PrivateTag::UnitTestAccess<class Unique>;
+
+template <>
+struct CBlockIndex::UnitTestAccess<class Unique>
+{
+    UnitTestAccess() = delete;
+
+    static void SetVersion( std::unique_ptr<CBlockIndex>& index, int32_t version )
+    {
+        index->nVersion = version;
+    }
+
+    static void SetHeight( std::unique_ptr<CBlockIndex>& index, int32_t height)
+    {
+        index->nHeight = height;
+    }
+
+    static void SetPrev( std::unique_ptr<CBlockIndex>& index, CBlockIndex* prev)
+    {
+        index->pprev = prev;
+    }
+
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+
 BOOST_AUTO_TEST_SUITE(blockindex_with_descendants_tests)
 
 // Helper to create block with given id and parent
-CBlockIndex CreateBlockIndex(std::int32_t id, CBlockIndex* pprev)
+std::unique_ptr<CBlockIndex> CreateBlockIndex(std::int32_t id, CBlockIndex* pprev)
 {
-    CBlockIndex bi;
-    bi.nVersion = id; // member nVersion is (ab)used to store id of a block to simplify referencing it
-    bi.pprev = pprev;
-    if(bi.pprev)
+    std::unique_ptr<CBlockIndex> bi = std::make_unique<CBlockIndex>(TestAccessCBlockIndexPrivateTag::GetPrivateTag());
+    TestAccessCBlockIndex::SetVersion(bi,id); // member nVersion is (ab)used to store id of a block to simplify referencing it
+    TestAccessCBlockIndex::SetPrev(bi, pprev);
+    if(bi->GetPrev())
     {
-        bi.nHeight = bi.pprev->nHeight + 1;
+        TestAccessCBlockIndex::SetHeight(bi, bi->GetPrev()->GetHeight() + 1);
     }
     else
     {
-        bi.nHeight = 0;
+        TestAccessCBlockIndex::SetHeight(bi, 0);
     }
     return bi;
 }
@@ -59,13 +93,22 @@ struct BlockIndexStorage
         storage.reserve(max_size);
     }
 
-    void Add(CBlockIndex block)
+    void Add(std::unique_ptr<CBlockIndex> block)
     {
         assert(storage.size()<storage.capacity());
-        storage.emplace_back(block);
-        index.emplace(block.nVersion, &storage.back());
-        mapBlockIndex.emplace_back(0, &storage.back());
+        storage.emplace_back(std::move(block));
+        index.emplace(storage.back().get()->GetVersion(), storage.back().get());
+        mapBlockIndex.emplace_back(0, storage.back().get());
     };
+
+    template<class Func>
+    void ForEach(Func callback) const
+    {
+        for (auto& item : mapBlockIndex)
+        {
+            callback( *item.second );
+        }
+    }
 
     // Access to CBlockIndex pointer from its id
     CBlockIndex* operator[](std::int32_t id) const
@@ -84,7 +127,7 @@ struct BlockIndexStorage
     std::vector< std::pair<int, CBlockIndex*> > mapBlockIndex; // first object in pair is not used
 
 private:
-    std::vector<CBlockIndex> storage;
+    std::vector<std::unique_ptr<CBlockIndex>> storage;
     std::map<std::int32_t, CBlockIndex*> index;
 };
 
@@ -129,9 +172,11 @@ BOOST_AUTO_TEST_CASE(basic) {
         // Create BlockIndexWithDescendants object for specified block, iterate over all descendant blocks,
         // and return an array of block ids that were visited.
         // Also check that each block is not visited more than once, and that parents are visited before their children.
+
+
         using TraverseResult = sset<std::int32_t>;
         auto Traverse = [&b](CBlockIndex* root_block, std::int32_t maxHeight=std::numeric_limits<std::int32_t>::max()) {
-            BlockIndexWithDescendants blocks{root_block, b.mapBlockIndex, maxHeight};
+            BlockIndexWithDescendants blocks{root_block, b, maxHeight};
 
             BOOST_REQUIRE_EQUAL( blocks.Root()->BlockIndex(), root_block );
             BOOST_REQUIRE_EQUAL( blocks.Root()->Parent(), nullptr );
@@ -140,15 +185,15 @@ BOOST_AUTO_TEST_CASE(basic) {
             for(auto* item=blocks.Root(); item!=nullptr; item=item->Next())
             {
                 // Each block must only be visited once
-                BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->nVersion), 0);
+                BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->GetVersion()), 0);
 
                 if(item->BlockIndex() != root_block)
                 {
                     // Parent of each block (except the root) must have been visited before
-                    BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->pprev->nVersion), 1);
+                    BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->GetPrev()->GetVersion()), 1);
                 }
 
-                result.insert(item->BlockIndex()->nVersion);
+                result.insert(item->BlockIndex()->GetVersion());
             }
 
             return result;
@@ -200,21 +245,21 @@ BOOST_AUTO_TEST_CASE(large) {
 
     // Find descendants of block 10 blocks from the tip
     auto tp0=clock::now();
-    BlockIndexWithDescendants blocks{b[N-10], b.mapBlockIndex, std::numeric_limits<std::int32_t>::max()};
+    BlockIndexWithDescendants blocks{b[N-10], b, std::numeric_limits<std::int32_t>::max()};
     BOOST_TEST_MESSAGE("Finding descendants of block that is 10 blocks from the tip took: " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(clock::now()-tp0 ).count())+"ms" );
 
     // Check that we got all of them
     std::int32_t count=0;
     for(auto* item=blocks.Root(); item!=nullptr; item=item->Next())
     {
-        BOOST_CHECK_EQUAL(item->BlockIndex()->nHeight, count+N-10);
+        BOOST_CHECK_EQUAL(item->BlockIndex()->GetHeight(), count+N-10);
         ++count;
     }
     BOOST_CHECK_EQUAL(count, 10);
 
     // Find all descendants of genesis block
     tp0=clock::now();
-    blocks = BlockIndexWithDescendants {b[0], b.mapBlockIndex, std::numeric_limits<std::int32_t>::max()};
+    blocks = BlockIndexWithDescendants {b[0], b, std::numeric_limits<std::int32_t>::max()};
     BOOST_TEST_MESSAGE("Finding all descendants ("+std::to_string(N)+") of genesis block descendants took: " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(clock::now()-tp0 ).count())+"ms" );
 
     // Iterate over all descendants
@@ -222,7 +267,7 @@ BOOST_AUTO_TEST_CASE(large) {
     count=0;
     for(auto* item=blocks.Root(); item!=nullptr; item=item->Next())
     {
-        assert(item->BlockIndex()->nHeight == count); // using assert because BOOST_CHECK_EQUAL is slow
+        assert(item->BlockIndex()->GetHeight() == count); // using assert because BOOST_CHECK_EQUAL is slow
         ++count;
     }
     BOOST_CHECK_EQUAL(count, N);

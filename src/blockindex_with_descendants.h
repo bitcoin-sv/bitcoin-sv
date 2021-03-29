@@ -163,14 +163,15 @@ public:
     {
         // Find and store all blocks with larger height than given block up to maxHeight.
         // These blocks could be descendants or they could be on a different chain.
-        for(auto& bi: mapBlockIndex)
+        mapBlockIndex.ForEach(
+        [&](const CBlockIndex& index)
         {
-            if(bi.second->nHeight > blockIndex->nHeight &&
-               bi.second->nHeight <= maxHeight)
+            if(index.GetHeight() > blockIndex->GetHeight() &&
+               index.GetHeight() <= maxHeight)
             {
-                blocks.emplace_back(bi.second);
+                blocks.emplace_back(const_cast<CBlockIndex*>(&index));
             }
-        }
+        });
 
         // Create temporary associative array to efficiently find an item in blocks array.
         std::unordered_map<CBlockIndex*, Item*> bi2item;
@@ -186,7 +187,7 @@ public:
         // array and pointer to parent.
         for(auto& item: blocks)
         {
-            auto it_parent = bi2item.find(item.BlockIndex()->pprev);
+            auto it_parent = bi2item.find(item.BlockIndex()->GetPrev());
             if(it_parent==bi2item.end())
             {
                 // Either this block is on a different chain than the one for which we're searching for descendants or

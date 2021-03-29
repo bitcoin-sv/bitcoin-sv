@@ -4,6 +4,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "amount.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h" // for GetConsensus.
 #include "config.h"
@@ -112,7 +113,7 @@ void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry) {
         entry.push_back(Pair("blockhash", wtx.hashBlock.GetHex()));
         entry.push_back(Pair("blockindex", wtx.nIndex));
         entry.push_back(
-            Pair("blocktime", mapBlockIndex[wtx.hashBlock]->GetBlockTime()));
+            Pair("blocktime", mapBlockIndex.Get(wtx.hashBlock)->GetBlockTime()));
     } else {
         entry.push_back(Pair("trusted", wtx.IsTrusted()));
     }
@@ -2119,10 +2120,9 @@ static UniValue listsinceblock(const Config &config,
         uint256 blockId;
 
         blockId.SetHex(request.params[0].get_str());
-        BlockMap::iterator it = mapBlockIndex.find(blockId);
-        if (it != mapBlockIndex.end()) {
-            pindex = it->second;
-            if (chainActive[pindex->nHeight] != pindex) {
+        if (pindex = mapBlockIndex.Get(blockId); pindex)
+        {
+            if (chainActive[pindex->GetHeight()] != pindex) {
                 // the block being asked for is a part of a deactivated chain;
                 // we don't want to depend on its perceived height in the block
                 // chain, we want to instead use the last common ancestor
@@ -2143,7 +2143,7 @@ static UniValue listsinceblock(const Config &config,
         filter = filter | ISMINE_WATCH_ONLY;
     }
 
-    int depth = pindex ? (1 + chainActive.Height() - pindex->nHeight) : -1;
+    int depth = pindex ? (1 + chainActive.Height() - pindex->GetHeight()) : -1;
 
     UniValue transactions(UniValue::VARR);
 

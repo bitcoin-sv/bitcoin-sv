@@ -39,6 +39,7 @@ BITCOIN_TESTS =\
   test/block_download_tracking_tests.cpp \
   test/blockencodings_tests.cpp \
   test/blockfile_reading_tests.cpp \
+  test/block_index_mutex_distribution_tests.cpp \
   test/block_info_tests.cpp \
   test/blockindex_with_descendants_tests.cpp \
   test/blockmaxsize_tests.cpp \

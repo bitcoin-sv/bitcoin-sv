@@ -13,6 +13,7 @@
 #include "streams.h"
 
 class CBlock;
+class CBlockFileInfo;
 class CBlockUndo;
 class Config;
 struct CDiskBlockMetaData;

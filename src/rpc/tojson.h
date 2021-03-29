@@ -14,7 +14,7 @@ class CScript;
 
 // Following functions are implemented in blockchain.cpp
 void headerBlockToJSON(const Config& config, const CBlockHeader& blockHeader,
-                       const CBlockIndex* blockindex, std::optional<CDiskBlockMetaData> diskBlockMetaData,
+                       const CBlockIndex* blockindex, const CDiskBlockMetaData& diskBlockMetaData,
                        const int confirmations, const std::optional<uint256>& nextBlockHash, CJSONWriter& jWriter);
 UniValue blockheaderToJSON(const CBlockIndex *blockindex, 
                            const int confirmations, 

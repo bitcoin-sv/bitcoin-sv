@@ -5,6 +5,7 @@
 
 #include "base58.h"
 #include "block_file_access.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
@@ -155,9 +156,6 @@ void getrawtransaction(const Config& config,
                        bool processedInBatch,
                        std::function<void()> httpCallback) 
 {
-    
-    LOCK(cs_main);
-
     TxId txid = TxId(ParseHashV(request.params[0], "parameter 1"));
 
     // Accept either a bool (true) or a num (>=1) to indicate verbose output.
@@ -225,16 +223,15 @@ void getrawtransaction(const Config& config,
     if (!hashBlock.IsNull())
     {
         CBlockDetailsData blockData;
-        auto mi = mapBlockIndex.find(hashBlock);
-        if (mi != mapBlockIndex.end() && mi->second) 
+        if (auto pindex = mapBlockIndex.Get(hashBlock); pindex)
         {
-            const CBlockIndex* pindex = mi->second;
+            LOCK(cs_main); // protecting chainActive
             if (chainActive.Contains(pindex)) 
             {
-                blockData.confirmations = 1 + chainActive.Height() - pindex->nHeight;
+                blockData.confirmations = 1 + chainActive.Height() - pindex->GetHeight();
                 blockData.time = pindex->GetBlockTime();
                 blockData.blockTime = pindex->GetBlockTime();
-                blockData.blockHeight = pindex->nHeight;
+                blockData.blockHeight = pindex->GetHeight();
             }
             else 
             {
@@ -267,20 +264,19 @@ static CBlockIndex* GetBlockIndex(const Config& config,
 
     if (!requestedBlockHash.IsNull())
     {
-        LOCK(cs_main);
+        pblockindex = mapBlockIndex.Get(requestedBlockHash);
         // Find requested block
-        if (!mapBlockIndex.count(requestedBlockHash))
+        if (!pblockindex)
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
         }
-        pblockindex = mapBlockIndex[requestedBlockHash];
 
         if (verifyTxIds)
         {
             // Check if all provided transactions are in the block
             CBlock block;
             bool allTxIdsFound = false;
-            if (ReadBlockFromDisk(block, pblockindex, config))
+            if (pblockindex->ReadBlockFromDisk(block, config))
             {
                 auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
                 for (const auto &tx : block.vtx)
@@ -332,12 +328,11 @@ static CBlockIndex* GetBlockIndex(const Config& config,
                                "Transaction not yet in block or -txindex is not enabled");
         }
 
-        LOCK(cs_main);
-        if (!mapBlockIndex.count(foundBlockHash))
+        pblockindex = mapBlockIndex.Get(foundBlockHash);
+        if (!pblockindex)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
         }
-        pblockindex = mapBlockIndex[foundBlockHash];
     }
     return pblockindex;
 }
@@ -347,8 +342,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
  */
 static std::unique_ptr<CBlockStreamReader<CFileReader>>  GetBlockStream(CBlockIndex& pblockindex)
 {
-    auto stream =
-        BlockFileAccess::GetDiskBlockStreamReader(pblockindex.GetBlockPos());
+    auto stream = pblockindex.GetDiskBlockStreamReader();
     if (!stream)
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
@@ -463,10 +457,11 @@ static UniValue verifytxoutproof(const Config &config,
         return res;
     }
 
-    LOCK(cs_main);
+    LOCK(cs_main); // protecting chainActive
 
-    if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-        !chainActive.Contains(mapBlockIndex[merkleBlock.header.GetHash()])) {
+    if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
+        !index || !chainActive.Contains(index))
+    {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Block not found in chain");
     }
@@ -723,8 +718,6 @@ void decoderawtransaction(const Config& config,
                           bool processedInBatch,
                           std::function<void()> httpCallback) 
 {
-
-    LOCK(cs_main);
     RPCTypeCheck(request.params, {UniValue::VSTR});
 
     CMutableTransaction mtx;
@@ -922,11 +915,6 @@ static UniValue signrawtransaction(const Config &config,
             HelpExampleRpc("signrawtransaction", "\"myhex\""));
     }
 
-#ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
-#else
-    LOCK(cs_main);
-#endif
     RPCTypeCheck(
         request.params,
         {UniValue::VSTR, UniValue::VARR, UniValue::VARR, UniValue::VSTR}, true);
@@ -951,6 +939,10 @@ static UniValue signrawtransaction(const Config &config,
     // mergedTx will end up with all the signatures; it starts as a clone of the
     // rawtx:
     CMutableTransaction mergedTx(txVariants[0]);
+
+#ifdef ENABLE_WALLET
+    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
+#endif
 
     // Fetch previous transactions (inputs):
     CoinsDBView tipView{ *pcoinsTip };
@@ -985,6 +977,9 @@ static UniValue signrawtransaction(const Config &config,
         EnsureWalletIsUnlocked(pwallet);
     }
 #endif
+    
+    // make sure that we consistently use the same height
+    auto activeChainHeight = chainActive.Height();
 
     // Add previous txouts given in the RPC call:
     if (request.params.size() > 1 && !request.params[1].isNull()) {
@@ -1054,7 +1049,7 @@ static UniValue signrawtransaction(const Config &config,
                 // We do not have coin height here. We assume that the coin is about to
                 // be mined using latest active rules.
                 const auto genesisActivationHeight = config.GetGenesisActivationHeight();
-                int32_t coinHeight = chainActive.Height() + 1;
+                int32_t coinHeight = activeChainHeight + 1;
 
                 // except if we are trying to sign transactions that spends p2sh transaction, which
                 // are non-standard (and therefore cannot be signed) after genesis upgrade
@@ -1133,7 +1128,7 @@ static UniValue signrawtransaction(const Config &config,
     // rehashing.
     const CTransaction txConst(mergedTx);
 
-    bool genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+    bool genesisEnabled = IsGenesisEnabled(config, activeChainHeight + 1);
 
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
@@ -1148,7 +1143,7 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), chainActive.Height() + 1);
+        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), activeChainHeight + 1);
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -1756,11 +1751,7 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
     }
 
-    int32_t currentChainHeight = 0;
-    {
-        LOCK(cs_main);
-        currentChainHeight = static_cast<int32_t>(chainActive.Height());
-    }
+    int32_t currentChainHeight = chainActive.Height();
 
     CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
 
