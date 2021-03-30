@@ -167,6 +167,7 @@ BITCOIN_CORE_H = \
   policy/fees.h \
   policy/policy.h \
   pow.h \
+  processing_block_index.h \
   protocol.h \
   random.h \
   reverselock.h \
