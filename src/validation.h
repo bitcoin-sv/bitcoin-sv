@@ -354,18 +354,46 @@ private:
 
     // If true; force block to be flagged as checked
     bool markChecked : 1;
+    // If false, check for max block size is skipped in CheckBlock().
+    bool checkMaxBlockSize : 1;
 
 public:
-    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}
-    {}
-
-    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn, bool markCheckedIn = false)
-        : checkPoW{checkPoWIn}, checkMerkleRoot{checkMerkleRootIn}, markChecked{markCheckedIn}
+    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}, checkMaxBlockSize{true}
     {}
 
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
+    bool shouldCheckMaxBlockSize() const { return checkMaxBlockSize; }
+    
+    [[nodiscard]]
+    BlockValidationOptions withCheckPoW(bool checkPoWIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkPoW = checkPoWIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withCheckMerkleRoot(bool checkMerkleRootIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkMerkleRoot = checkMerkleRootIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withMarkChecked(bool markCheckedIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.markChecked = markCheckedIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withCheckMaxBlockSize(bool checkMaxBlockSizeIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkMaxBlockSize = checkMaxBlockSizeIn;
+        return option;
+    }
 };
 
 /**
@@ -407,11 +435,13 @@ bool VerifyNewBlock(const Config &config,
  * for non-network block sources and whitelisted peers.
  * @param[out]  fNewBlock A boolean which is set to indicate if the block was
  *                        first received via this call.
+ * @param[in]   validationOptions Block validation options.
  * @return True if the block is accepted as a valid block.
  */
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
-                     bool fForceProcessing, bool *fNewBlock);
+                     bool fForceProcessing, bool *fNewBlock, 
+                     const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
  * Same as ProcessNewBlock but it doesn't activate best chain - it returns a
@@ -426,7 +456,8 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
-    bool* fNewBlock);
+    bool* fNewBlock,
+    const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
  * Process incoming block headers.

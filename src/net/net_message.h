@@ -58,7 +58,7 @@ public:
         vRecv.SetVersion(nVersionIn);
     }
 
-    int readHeader(const Config &config, const char *pch, uint32_t nBytes);
+    int readHeader(const Config &config, const char *pch, uint32_t nBytes, uint64_t maxBlockSize);
     int readData(const char *pch, uint32_t nBytes);
 };
 

@@ -54,8 +54,8 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Test whether we can add another transaction to the next block and
     // return the number of transactions actually added
-    size_t addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd);
-    size_t addTransaction(const CBlockIndex* pindex);
+    size_t addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd, uint64_t maxBlockSizeComputed);
+    size_t addTransaction(const CBlockIndex* pindex, uint64_t maxBlockSizeComputed);
 
     // Our internal mutex
     mutable std::mutex mMtx {};

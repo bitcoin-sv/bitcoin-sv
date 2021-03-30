@@ -368,7 +368,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 
 BOOST_AUTO_TEST_CASE(operands_too_large)
 {
-    GlobalConfig& config = GlobalConfig::GetConfig();
+    ConfigInit& config = GlobalConfig::GetModifiableGlobalConfig();
     using test_args = tuple<uint64_t, uint64_t, opcodetype, bool, ScriptError>;
     const auto max_arg_len{ MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS };
 

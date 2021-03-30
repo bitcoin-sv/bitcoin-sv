@@ -1656,7 +1656,7 @@ bool AppInitBasicSetup() {
     return true;
 }
 
-bool AppInitParameterInteraction(Config &config) {
+bool AppInitParameterInteraction(ConfigInit &config) {
     const CChainParams &chainparams = config.GetChainParams();
     // Step 2: parameter interactions
 
@@ -2483,7 +2483,7 @@ static size_t GetMaxNumberOfMerkleTreeThreads()
     return numberOfMerkleTreeCalculationThreads;
 }
 
-bool AppInitMain(Config &config, boost::thread_group &threadGroup,
+bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                  CScheduler &scheduler, const task::CCancellationToken& shutdownToken) {
     const CChainParams &chainparams = config.GetChainParams();
     // Step 4a: application initialization

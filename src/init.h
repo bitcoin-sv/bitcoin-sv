@@ -15,6 +15,7 @@
 #endif
 
 class Config;
+class ConfigInit;
 class CScheduler;
 class CWallet;
 
@@ -52,7 +53,7 @@ bool AppInitBasicSetup();
  * @pre Parameters should be parsed and config file should be read,
  * AppInitBasicSetup should have been called.
  */
-bool AppInitParameterInteraction(Config &config);
+bool AppInitParameterInteraction(ConfigInit &config);
 /**
  * Initialization sanity checks: ecc init, sanity checks, dir lock.
  * @note This can be done before daemonization.
@@ -66,7 +67,7 @@ bool AppInitSanityChecks();
  * @pre Parameters should be parsed and config file should be read,
  * AppInitSanityChecks should have been called.
  */
-bool AppInitMain(Config &config, boost::thread_group &threadGroup,
+bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                  CScheduler &scheduler, const task::CCancellationToken& shutdownToken);
 
 /** The help message mode determines what help message to show */

@@ -68,7 +68,7 @@ bool AppInit(int argc, char *argv[]) {
     // FIXME: Ideally, we'd like to build the config here, but that's currently
     // not possible as the whole application has too many global state. However,
     // this is a first step.
-    auto& config = GlobalConfig::GetConfig();
+    auto& config = GlobalConfig::GetModifiableGlobalConfig();
 
     bool fRet = false;
 

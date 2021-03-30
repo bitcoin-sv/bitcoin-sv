@@ -43,7 +43,7 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
     stream.write(&a, 1); // Prevent compaction
 
     SelectParams(CBaseChainParams::MAIN);
-    Config &config = GlobalConfig::GetConfig();
+    ConfigInit &config = GlobalConfig::GetModifiableGlobalConfig();
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     assert(AppInitParameterInteraction(config));
