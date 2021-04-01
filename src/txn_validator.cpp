@@ -439,13 +439,14 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
                             }
                         }
-                        // Clear the processing queue, as a result:
-                        // - destroy any CTxInputData objects which are no longer being referenced by the owning shared ptr
-                        {
-                            std::unique_lock lockPQ { mProcessingQueueMtx };
-                            mProcessingQueue.clear();
-                        }
                     }
+                    // This vector is used to keep track of all txs which were detected, at this stage, as
+                    // (and have to be reprocessed in the next PTV's cycle):
+                    // - resubmitted
+                    // - orphan
+                    // - cancelled
+                    TxInputDataSPtrVec vNextProcessingQueue {};
+
                     // If there are any low priority transactions then move them to the low priority queue.
                     size_t nDetectedLowPriorityTxnsNum = imdResult.mDetectedLowPriorityTxns.size();
                     if (nDetectedLowPriorityTxnsNum) {
@@ -464,11 +465,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: The number of re-submitted txns that need to be reprocessed is %d\n",
                                  nResubmittedTxnsNum);
-                        std::unique_lock lockPQ { mProcessingQueueMtx };
-                        mProcessingQueue = std::move_if_noexcept(imdResult.mResubmittedTxns);
+                        vNextProcessingQueue = std::move_if_noexcept(imdResult.mResubmittedTxns);
                     }
                     // Copy orphan p2p txns for reprocessing (if any exists)
-                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(imdResult.mCancelledTxns);
+                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(imdResult.mCancelledTxns, vNextProcessingQueue);
                     if (nOrphanP2PTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: The number of orphan %s txns that need to be reprocessed is %d\n",
@@ -482,15 +482,26 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 "Txnval-asynch: The number of %s txn(s) which were cancelled and moved to the next iteration is %d\n",
                                  enum_cast<std::string>(TxSource::p2p),
                                  nCancelledTxnsNum);
-                        std::unique_lock lockPQ { mProcessingQueueMtx };
                         if (nOrphanP2PTxnsNum || nResubmittedTxnsNum) {
-                            mProcessingQueue.insert(mProcessingQueue.end(),
+                            vNextProcessingQueue.insert(vNextProcessingQueue.end(),
                                 std::make_move_iterator(imdResult.mCancelledTxns.begin()),
                                 std::make_move_iterator(imdResult.mCancelledTxns.end()));
                         } else {
-                            mProcessingQueue = std::move_if_noexcept(imdResult.mCancelledTxns);
+                            vNextProcessingQueue = std::move_if_noexcept(imdResult.mCancelledTxns);
                         }
                     }
+                    // Swap the contents of the main processing queue and its temporary counterpart.
+                    // 1. It empties the processing queue if there are no txs to reprocess.
+                    // 2. It assigns txs, which need to be reprocessed, if there were any detected.
+                    //    a) doing it now ensures that executing queries, on the processing queue,
+                    //       won't return false negative results
+                    {
+                        std::scoped_lock lockPQ { mProcessingQueueMtx };
+                        std::swap(mProcessingQueue, vNextProcessingQueue);
+                    }
+                    // Clear the swapped content of the temporary vector
+                    // - destroy objects which are no longer being referenced by the owning shared ptr
+                    vNextProcessingQueue.clear();
                     // If no orphan, cancelled and resubmitted transactions were detected, then:
                     // - the processing queue is empty
                     // - unblock one of the waiting threads (if any exists)
@@ -667,8 +678,10 @@ void CTxnValidator::postProcessingStepsNL(
 // A p2p orphan txn can be scheduled if:
 // - it is not present in the set of cancelled txns.
 // - it was not detected before and scheduled as a non-stdandard txn.
-// Any detected orphan tx is forwarded to the processing queue as a shared_ptr to the basic CTxInputData instance.
-size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtrVec& vCancelledTxns) {
+// Detected orphan txs are moved to the result vector of shared_ptrs (to the basic CTxInputData instance).
+size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(
+    const TxInputDataSPtrVec& vCancelledTxns,
+    TxInputDataSPtrVec& vNextProcessingQueue) {
     /** Get p2p orphan txns */
     auto vOrphanTxns { mpOrphanTxnsP2PQ->collectDependentTxnsForRetry() };
     size_t nOrphanTxnsNum { vOrphanTxns.size() };
@@ -678,14 +691,13 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtr
             [this, &vCancelledTxns](const TxInputDataSPtr& txn){
                 const TxId& txid = txn->GetTxnPtr()->GetId();
                 return isTxnKnownInSetNL(txid, vCancelledTxns); });
-        // Move txns into the processing queue.
+        // Move ptrs to the result vector.
         nOrphanTxnsNum = vOrphanTxns.size();
         if (nOrphanTxnsNum) {
-            std::unique_lock lockPQ { mProcessingQueueMtx };
-            if (mProcessingQueue.empty()) {
-                mProcessingQueue = std::move_if_noexcept(vOrphanTxns);
+            if (vNextProcessingQueue.empty()) {
+                vNextProcessingQueue = std::move_if_noexcept(vOrphanTxns);
             } else {
-                mProcessingQueue.insert(mProcessingQueue.end(),
+                vNextProcessingQueue.insert(vNextProcessingQueue.end(),
                     std::make_move_iterator(vOrphanTxns.begin()),
                     std::make_move_iterator(vOrphanTxns.end()));
             }
