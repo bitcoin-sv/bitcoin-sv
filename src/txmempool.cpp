@@ -1030,8 +1030,6 @@ void CTxMemPool::RemoveForBlock(
     setEntriesTopoSorted childrenOfToRemoveGroupMembers; // immediate children of entries we will remove that are members of the cpfp group, need to be updated after removal
     setEntriesTopoSorted childrenOfToRemoveSecondaryMempool; // immediate children of entries we will remove that are in the secondary mempool, need to be updated after removal
 
-    std::unordered_set<TxId, SaltedTxidHasher> txidFromBlock; // spent outputs by tx from block
-
     for(auto vtxIter = vtx.rbegin();  vtxIter != vtx.rend();  vtxIter++)
     {
         auto& tx = *vtxIter;
@@ -1062,9 +1060,6 @@ void CTxMemPool::RemoveForBlock(
                     }
 
                     childrenOfToRemove.insert(child);
-
-                    // cutting connection from child tx to soon to be removed parent
-                    updateParentNL(child, found, false);
                 }
             }
         }
@@ -1086,6 +1081,7 @@ void CTxMemPool::RemoveForBlock(
                     for(txiter inConflict: conflictedWithDescendants)
                     {
                         // inConflict will be erased so remove it from the sets of txs that needs to be updated
+                        childrenOfToRemove.erase(inConflict);
                         childrenOfToRemoveGroupMembers.erase(inConflict);
                         childrenOfToRemoveSecondaryMempool.erase(inConflict);
                     }
@@ -1101,6 +1097,27 @@ void CTxMemPool::RemoveForBlock(
     // remove affected groups from primary mempool
     // we are ignoring members of "toRemove" (we will remove them in the removeUncheckedNL), so that "removedFromPrimary" can not contain transactions that will be removed
     auto removedFromPrimary = RemoveFromPrimaryMempoolNL(std::move(childrenOfToRemoveGroupMembers), nonNullChangeSet.Get(), true, &toRemove);
+
+    std::vector<txiter> tempEntries;
+    // disconnect children from its soon-to-be-removed parents
+    for(txiter child: childrenOfToRemove)
+    {
+        for(txiter parent: GetMemPoolParentsNL(child))
+        {            
+            // if soon-to-be-removed parent is in the parent's set collect it
+            if(toRemove.find(parent) != toRemove.end())
+            {
+                tempEntries.push_back(parent);
+            }
+        }
+
+        // now disconnect all parents that we found
+        for(txiter parentToRemove: tempEntries)
+        {
+            updateParentNL(child, parentToRemove, false);
+        }
+        tempEntries.clear();
+    }
 
     // now remove transactions from mempool
     removeUncheckedNL(toRemove, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::BLOCK);
