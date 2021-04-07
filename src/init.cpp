@@ -898,10 +898,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                 config.GetAcceptNonStandardOutput(true)));
         strUsage += HelpMessageOpt(
             "-dustrelayfee=<amt>",
-            strprintf("Fee rate (in %s/kB) used to defined dust, the value of "
-                      "an output such that it will cost about 1/3 of its value "
-                      "in fees at this fee rate to spend it. (default: %s)",
+            strprintf("Fee rate (in %s/kB) used to define dust. A transaction output paying less than "
+                      "(dustlimitfactor * output_dust_fee / 100) is considered dust. "
+                      "The output_dust_fee is calculated from the outputsize and"
+                      "the dustrelayfee. (default: %s)",
                       CURRENCY_UNIT, FormatMoney(DUST_RELAY_TX_FEE)));
+        strUsage += HelpMessageOpt(
+                "-dustlimitfactor=<n>",
+                strprintf(_("The dust limit factor (a value in percent) is applied to the dust relay fee to determine if an output is dust. "
+                            "Default value is %l%%, minimum value is 0%%, maximum value is %l%% "), DEFAULT_DUST_LIMIT_FACTOR, DEFAULT_DUST_LIMIT_FACTOR));
     }
     strUsage += HelpMessageOpt(
         "-datacarrier",
@@ -2211,6 +2216,20 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         config.SetMinFeePerKB(CFeeRate(n));
     } else {
         config.SetMinFeePerKB(CFeeRate(DEFAULT_MIN_RELAY_TX_FEE));
+    }
+
+    // Dust limit is expressed as a multiple in percent of the dust relay fee applied to
+    // an output.
+    if (gArgs.IsArgSet("-dustlimitfactor")) {
+        Amount n(0);
+        auto factor = gArgs.GetArg("-dustlimitfactor", DEFAULT_DUST_LIMIT_FACTOR);
+
+        if (std::string err; !config.SetDustLimitFactor(factor, &err))
+        {
+            return InitError(err);
+        }
+    } else {
+        config.SetDustLimitFactor(DEFAULT_DUST_LIMIT_FACTOR);
     }
 
     // Sanity check argument for min fee for including tx in block

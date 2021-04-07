@@ -46,6 +46,7 @@ public:
     virtual uint64_t GetMinConfConsolidationInput() const = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
+    virtual int64_t GetDustLimitFactor() const = 0;
     virtual CFeeRate GetBlockMinFeePerKB() const = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
@@ -124,6 +125,7 @@ public:
     virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
     virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
+    virtual bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) = 0;
     virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
@@ -237,6 +239,9 @@ public:
 
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
+
+    bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override;
+    int64_t GetDustLimitFactor() const override;
 
     void SetBlockMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetBlockMinFeePerKB() const override;
@@ -412,6 +417,7 @@ public:
 private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
+    int64_t dustLimitFactor;
     CFeeRate blockMinFeePerKB;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
@@ -591,6 +597,9 @@ public:
 
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
+
+    bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override{return true;};
+    int64_t GetDustLimitFactor() const override { return 0; }
 
     void SetBlockMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetBlockMinFeePerKB() const override { return CFeeRate(Amount(0)); }

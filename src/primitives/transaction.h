@@ -186,12 +186,15 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(const CFeeRate &minRelayTxFee, bool isGenesisEnabled) const {
+    Amount GetDustThreshold(const CFeeRate &minRelayTxFee, int64_t dustLimitFactor, bool isGenesisEnabled) const {
         /**
          * "Dust" is defined in terms of CTransaction::minRelayTxFee, which has
-         * units satoshis-per-kilobyte. If you'd pay more than 1/3 in fees to
-         * spend something, then we consider it dust. A typical spendable
-         * non-segwit txout is 34 bytes big, and will need a CTxIn of at least
+         * units satoshis-per-kilobyte. In the default case, if your transaction pays less than
+         * 3 times the dustrelayfee for any output, then the output is considered dust and the
+         * corresponding transaction will be rejected.
+         * The default factor of 3 (i.e. 300%) can be replaced via the dustlimitfactor which can be set
+         * to integral values between 0% and 300%.
+         * A typical spendable non-segwit txout is 34 bytes big, and will need a CTxIn of at least
          * 148 bytes to spend: so dust is a spendable txout less than
          * 546*minRelayTxFee/1000 (in satoshis). A typical spendable segwit
          * txout is 31 bytes big, and will need a CTxIn of at least 67 bytes to
@@ -205,11 +208,12 @@ public:
         // the 148 mentioned above
         nSize += (32 + 4 + 1 + 107 + 4);
 
-        return 3 * minRelayTxFee.GetFee(nSize);
+        // dust limit factor was previously hard coded to the default value 300%
+        return (dustLimitFactor * minRelayTxFee.GetFee(nSize)) / 100;
     }
 
-    bool IsDust(const CFeeRate &minRelayTxFee, bool isGenesisEnabled) const {
-        return (nValue < GetDustThreshold(minRelayTxFee, isGenesisEnabled));
+    bool IsDust(const CFeeRate &minRelayTxFee, int64_t dustLimitFactor, bool isGenesisEnabled) const {
+        return (nValue < GetDustThreshold(minRelayTxFee, dustLimitFactor, isGenesisEnabled));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {
