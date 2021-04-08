@@ -8,7 +8,7 @@ This test creates "spendable by anyone" scripts to easely tweak the script sizes
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.script import CScript, OP_NOP, OP_DROP, OP_2DROP, OP_TRUE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
+from test_framework.script import CScript, OP_NOP, OP_DROP, OP_2DROP, OP_TRUE, OP_FALSE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
 from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
@@ -62,7 +62,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         assert(int(network_info['minconfconsolidationinput']) == 5)
         assert(network_info['acceptnonstdconsolidationinput'] is True)
 
-    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations):
+    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations, is_donation = False):
 
         utxos = []
         addr = node.getnewaddress()
@@ -99,6 +99,8 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
                 if len(tx.vin) == utxo_count:
                     amount = amount - fee
+                    if is_donation:
+                        amount = 1  # 1 single sat
 
                     while True:
                         scriptPubKey = CScript([OP_DROP] + ([OP_NOP] * ((utxo_size // utxo_count) - adjust)) + [OP_TRUE])
@@ -131,9 +133,9 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         return tx
 
-    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam):
+    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam, is_donation = False):
 
-        utx = self.create_utxos_value100000 (node, in_count, in_size, min_confirmations)
+        utx = self.create_utxos_value100000 (node, in_count, in_size, min_confirmations, is_donation)
         sum_values_sats = 0
         assert (len(utx.vout) == in_count)
         tx = CTransaction()
@@ -170,15 +172,23 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             if i == out_count - 1:
                 x = x_rest + x
 
-            scriptPubKey = CScript([OP_NOP] * (x - 1) + [OP_TRUE])
+            if is_donation:
+                scriptPubKey = CScript([OP_FALSE])
+            else:
+                scriptPubKey = CScript([OP_NOP] * (x - 1) + [OP_TRUE])
+
             check_size = check_size + len(scriptPubKey)
 
-            amount = sum_values_sats // (out_count - i)
+            if is_donation:
+                amount = 0
+            else:
+                amount = sum_values_sats // (out_count - i)
+
             tx.vout.append(CTxOut(amount, scriptPubKey))
             sum_values_sats = sum_values_sats - amount
 
 
-        assert (check_size == out_size)
+        assert (is_donation or check_size == out_size)
         tx.rehash()
         return ToHex(tx)
 
@@ -263,6 +273,24 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     self.log.info ("test 1 - failing input_sizes > consolidation_factor * output_size: PASS")
 
                     tx_hex = self.create_and_sign_tx(node,
+                                                     in_count = enough_inputs - 1,
+                                                     out_count = output_count,
+                                                     in_size=enough_cumulated_inputsize,
+                                                     out_size = cumulated_outputsize,
+                                                     min_confirmations = enough_confirmations,
+                                                     spam = not_spam,
+                                                     is_donation = True
+                                                     )
+
+                    txid = node.sendrawtransaction(tx_hex)
+                    node.generate(1)
+                    tx = node.getrawtransaction(txid, 1)
+                    confirmations = tx.get('confirmations', 0)
+                    assert_equal (confirmations, 1)
+                    self.log.info("test 1b - donation with input count below consolidation factor:PASS")
+
+
+                    tx_hex = self.create_and_sign_tx(node,
                                                      in_count=enough_inputs,
                                                      out_count=output_count,
                                                      in_size=enough_cumulated_inputsize,
@@ -272,7 +300,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      )
 
                     assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info("test 2 - failing all inputs min conf > min conf: PASS")
+                    self.log.info("test 2 - failing all inputs conf > min conf: PASS")
 
                     tx_hex = self.create_and_sign_tx(node,
                                                      in_count=enough_inputs,
@@ -285,6 +313,23 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
                     assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
                     self.log.info("test 3 - faling cumulated input sizes > consolidation factor times output sizes: PASS")
+
+                    tx_hex = self.create_and_sign_tx(node,
+                                                     in_count=enough_inputs,
+                                                     out_count=output_count,
+                                                     in_size=enough_cumulated_inputsize - 1,
+                                                     out_size = cumulated_outputsize,
+                                                     min_confirmations=enough_confirmations,
+                                                     spam = not_spam,
+                                                     is_donation = True
+                                                     )
+
+                    txid = node.sendrawtransaction(tx_hex)
+                    node.generate(1)
+                    tx = node.getrawtransaction(txid, 1)
+                    confirmations = tx.get('confirmations', 0)
+                    assert_equal (confirmations, 1)
+                    self.log.info("test 3b - cumulated input sizes exceeding consolidation factor:PASS")
 
                     # FAILING CONDITION: no confirmed inputs
                     tx_hex = self.create_and_sign_tx(node,
@@ -314,6 +359,25 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     confirmations = tx.get('confirmations', 0)
                     assert_equal (confirmations, 1)
                     self.log.info("test 5 - all consolidation conditions met:PASS")
+
+                    # Donating single input to single output with false return (zero output)
+                    tx_hex = self.create_and_sign_tx(node,
+                                                     in_count = 1,
+                                                     out_count = 1,
+                                                     in_size = single_output_script_size,
+                                                     # out_size will be ignored (return OP_FALSE)
+                                                     out_size = single_output_script_size,
+                                                     min_confirmations = enough_confirmations,
+                                                     spam = not_spam,
+                                                     is_donation = True
+                                                     )
+                    txid = node.sendrawtransaction(tx_hex)
+                    node.generate(1)
+                    tx = node.getrawtransaction(txid, 1)
+                    confirmations = tx.get('confirmations', 0)
+                    assert_equal (confirmations, 1)
+                    self.log.info("test 6 - donation with one input and one output:PASS")
+
 
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()
