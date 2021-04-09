@@ -15,9 +15,12 @@ then
 fi
 
 # Determine if we are being built from a production git tag
-if [[ `git describe --tags` =~ ^v[0-9]+\.[0-9]+\.[0-9]$ ]]
+TAG=`git describe --tags`
+echo "Git tag is ${TAG}"
+if [[ ${TAG} =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 then
     # On production tag
+    echo "Got production tag"
     exit 0
 fi
 
