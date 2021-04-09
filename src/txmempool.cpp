@@ -1014,7 +1014,6 @@ void CTxMemPool::RemoveForReorg(
 
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
-    int32_t nBlockHeight,
     const CJournalChangeSetPtr& changeSet,
     const uint256& blockhash)
 {
