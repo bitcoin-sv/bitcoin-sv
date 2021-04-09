@@ -419,7 +419,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     // ... we should keep the same min fee until we get a block
 
     auto dummyBlockHash = uint256{};
-    pool.RemoveForBlock(vtx, 1, nullChangeSet, dummyBlockHash);
+    pool.RemoveForBlock(vtx, nullChangeSet, dummyBlockHash);
     SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 2);

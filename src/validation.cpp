@@ -4404,7 +4404,7 @@ static bool ConnectTip(
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet, blockConnecting.GetHash());
+            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash());
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
