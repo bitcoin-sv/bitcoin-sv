@@ -14,6 +14,7 @@
 
 #include <string>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/test/unit_test.hpp>
 
 class CAddrManSerializationMock : public CAddrMan {
@@ -209,7 +210,8 @@ BOOST_AUTO_TEST_CASE(test_userAgentLength) {
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
-                      "very very very very very very very v)/") != std::string::npos);
+                      "very very very very very very very") != std::string::npos);
+    BOOST_CHECK(boost::algorithm::ends_with(userAgent(), ")/"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
