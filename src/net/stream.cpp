@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <config.h>
 #include <net/net.h>
 #include <net/netbase.h>
 #include <net/stream.h>
@@ -48,7 +49,7 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 
     // Remember any sending rate limit that's been set
-    mSendRateLimit = gArgs.GetArg("-streamsendratelimit", DEFAULT_SEND_RATE_LIMIT);
+    mSendRateLimit = GlobalConfig::GetConfig().GetStreamSendRateLimit();
 
     // Fetch the MSS for the underlying socket
     int mss {0};

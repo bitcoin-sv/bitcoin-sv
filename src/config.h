@@ -85,8 +85,17 @@ public:
     virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
+
+    // Block download
+    virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
+    virtual int64_t GetBlockStallingTimeout() const = 0;
+    virtual int64_t GetBlockDownloadWindow() const = 0;
+    virtual int64_t GetBlockDownloadSlowFetchTimeout() const = 0;
+    virtual uint64_t GetBlockDownloadMaxParallelFetch() const = 0;
+
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
+    virtual int64_t GetStreamSendRateLimit() const = 0;
 
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -160,8 +169,18 @@ public:
     virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+
+    // Block download
+    virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
+    virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) = 0;
+
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
+
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
 #if ENABLE_ZMQ
@@ -349,9 +368,23 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    // Block download
+    bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
+    uint64_t GetBlockStallingMinDownloadSpeed() const override;
+    bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetBlockStallingTimeout() const override;
+    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadWindow() const override;
+    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadSlowFetchTimeout() const override;
+    bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) override;
+    uint64_t GetBlockDownloadMaxParallelFetch() const override;
+
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
+    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override;
+    int64_t GetStreamSendRateLimit() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -460,8 +493,16 @@ private:
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
+    // Block download
+    uint64_t blockStallingMinDownloadSpeed;
+    int64_t blockStallingTimeout;
+    int64_t blockDownloadWindow;
+    int64_t blockDownloadSlowFetchTimeout;
+    uint64_t blockDownloadMaxParallelFetch;
+
     // P2P parameters
     int64_t p2pHandshakeTimeout;
+    int64_t streamSendRateLimit;
     unsigned int maxProtocolRecvPayloadLength;
     unsigned int maxProtocolSendPayloadLength;
     unsigned int recvInvQueueFactor;
@@ -814,9 +855,23 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
 
+    // Block download
+    bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
+    bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockStallingTimeout() const override { return DEFAULT_BLOCK_STALLING_TIMEOUT; }
+    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadWindow() const override { return DEFAULT_BLOCK_DOWNLOAD_WINDOW; }
+    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadSlowFetchTimeout() const override { return DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT; }
+    bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockDownloadMaxParallelFetch() const override { return DEFAULT_MAX_BLOCK_PARALLEL_FETCH; }
+
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
     int64_t GetP2PHandshakeTimeout() const override { return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL; }
+    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override { return true; }
+    int64_t GetStreamSendRateLimit() const override { return Stream::DEFAULT_SEND_RATE_LIMIT; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

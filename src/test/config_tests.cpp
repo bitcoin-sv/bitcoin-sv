@@ -300,6 +300,42 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * testFactor);
 }
 
+BOOST_AUTO_TEST_CASE(block_download_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), DEFAULT_MIN_BLOCK_STALLING_RATE);
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(2 * DEFAULT_MIN_BLOCK_STALLING_RATE, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), 2 * DEFAULT_MIN_BLOCK_STALLING_RATE);
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(0, &err));
+    BOOST_CHECK(!config.SetBlockStallingMinDownloadSpeed(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), DEFAULT_BLOCK_STALLING_TIMEOUT);
+    BOOST_CHECK(config.SetBlockStallingTimeout(2 * DEFAULT_BLOCK_STALLING_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), 2 * DEFAULT_BLOCK_STALLING_TIMEOUT);
+    BOOST_CHECK(!config.SetBlockStallingTimeout(0, &err));
+    BOOST_CHECK(!config.SetBlockStallingTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), DEFAULT_BLOCK_DOWNLOAD_WINDOW);
+    BOOST_CHECK(config.SetBlockDownloadWindow(2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW);
+    BOOST_CHECK(!config.SetBlockDownloadWindow(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadWindow(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
+    BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), 2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
+    BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadMaxParallelFetch(), DEFAULT_MAX_BLOCK_PARALLEL_FETCH);
+    BOOST_CHECK(config.SetBlockDownloadMaxParallelFetch(2 * DEFAULT_MAX_BLOCK_PARALLEL_FETCH, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadMaxParallelFetch(), 2 * DEFAULT_MAX_BLOCK_PARALLEL_FETCH);
+    BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(-1, &err));
+}
+
 BOOST_AUTO_TEST_CASE(p2p_config)
 {
     GlobalConfig config {};
@@ -310,6 +346,13 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), 2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(0, &err));
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), Stream::DEFAULT_SEND_RATE_LIMIT);
+    BOOST_CHECK(config.SetStreamSendRateLimit(1000, &err));
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), 1000);
+    BOOST_CHECK(config.SetStreamSendRateLimit(0, &err));
+    BOOST_CHECK(config.SetStreamSendRateLimit(-1, &err));
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), -1);
 }
 
 BOOST_AUTO_TEST_CASE(disable_BIP30)

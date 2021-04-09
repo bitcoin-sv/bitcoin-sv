@@ -115,8 +115,16 @@ void GlobalConfig::Reset()
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
 
+    // Block download
+    blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
+    blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
+    blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
+    blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
+
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+    streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
 
     mDisableBIP30Checks = std::nullopt;
 
@@ -1048,17 +1056,126 @@ InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
     return invalidTxFileSinkEvictionPolicy;
 }
 
+// Block download
+bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
+{
+    if(min < 0)
+    {
+        if(err)
+        {
+            *err = "Block stalling minimum download speed must be >= 0";
+        }
+        return false;
+    }
+
+    blockStallingMinDownloadSpeed = min;
+    return true;
+}
+uint64_t GlobalConfig::GetBlockStallingMinDownloadSpeed() const
+{
+    return blockStallingMinDownloadSpeed;
+}
+
+bool GlobalConfig::SetBlockStallingTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block stalling timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockStallingTimeout = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockStallingTimeout() const
+{
+    return blockStallingTimeout;
+}
+
+bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
+{
+    if(window <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download window must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadWindow = window;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadWindow() const
+{
+    return blockDownloadWindow;
+}
+
+bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download slow fetch timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadSlowFetchTimeout = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadSlowFetchTimeout() const
+{
+    return blockDownloadSlowFetchTimeout;
+}
+
+bool GlobalConfig::SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download maximum parallel fetch must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadMaxParallelFetch = max;
+    return true;
+}
+uint64_t GlobalConfig::GetBlockDownloadMaxParallelFetch() const
+{
+    return blockDownloadMaxParallelFetch;
+}
+
 // P2P Parameters
 bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 {
     if(timeout <= 0)
     {
-        *err = "P2P handshake timeout must be greater than 0.";
+        if(err)
+        {
+            *err = "P2P handshake timeout must be greater than 0.";
+        }
         return false;
     }
 
     p2pHandshakeTimeout = timeout;
     return true;
+}
+
+bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
+{
+    streamSendRateLimit = limit;
+    return true;
+}
+int64_t GlobalConfig::GetStreamSendRateLimit() const
+{
+    return streamSendRateLimit;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)

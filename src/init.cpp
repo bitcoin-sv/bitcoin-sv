@@ -529,6 +529,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+
+    /** Block download */
     strUsage += HelpMessageOpt("-blockstallingmindownloadspeed=<n>",
         strprintf(_("Minimum average download speed (Kbytes/s) we will allow a stalling "
                     "peer to fall to during IBD. A value of 0 means stall detection is "
@@ -548,6 +550,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                         "a block that has exceeded the slow fetch detection timeout (default: %u)"),
                         DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
     }
+
     strUsage += HelpMessageOpt(
         "-broadcastdelay=<n>",
         strprintf(
@@ -2032,8 +2035,28 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
+    // Block download
+    if(std::string err; !config.SetBlockStallingMinDownloadSpeed(gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockStallingTimeout(gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadWindow(gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadSlowFetchTimeout(gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadMaxParallelFetch(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH), &err)) {
+        return InitError(err);
+    }
+
     // P2P parameters
     if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetStreamSendRateLimit(gArgs.GetArg("-streamsendratelimit", Stream::DEFAULT_SEND_RATE_LIMIT), &err)) {
         return InitError(err);
     }
 
