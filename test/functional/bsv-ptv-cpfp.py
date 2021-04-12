@@ -7,7 +7,7 @@ from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN
 from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, check_mempool_equals, assert_greater_than
+from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals, assert_greater_than
 
 import time
 
@@ -52,13 +52,13 @@ class PtvCpfp(BitcoinTestFramework):
     def check_mempool_with_subset(self, rpc, should_be_in_mempool, timeout=20):
         wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=timeout)
 
-    def send_txs(self, rpcsend, conn, txs, timeout=300, check_interval=0.1):
+    def send_txs(self, rpcsend, conn, txs, exp_mempool_size, timeout=300, check_interval=0.1):
         conn = None if rpcsend is not None else conn
         if conn is not None:
             req_start_time = time.time()
             for tx in txs:
                 conn.send_message(msg_tx(tx))
-            wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout, check_interval=check_interval)
+            wait_for_ptv_completion(conn, exp_mempool_size, timeout=timeout, check_interval=check_interval)
             elapsed = time.time() - req_start_time
         elif rpcsend is not None:
             elapsed = self.rpc_send_txs(rpcsend, txs)
@@ -175,7 +175,8 @@ class PtvCpfp(BitcoinTestFramework):
         #
         # Send low fee (paying relay_fee) txs to the node.
         #
-        elapsed1 = self.send_txs(rpcsend, conn, txchains, timeout)
+        exp_mempool_size = conn.rpc.getmempoolinfo()['size'] + len(txchains)
+        elapsed1 = self.send_txs(rpcsend, conn, txchains, exp_mempool_size, timeout)
         # Check if mempool contains all low fee txs.
         check_mempool_equals(conn.rpc, txchains, timeout)
 
@@ -191,7 +192,8 @@ class PtvCpfp(BitcoinTestFramework):
         for tx in last_descendant_from_each_txchain:
             cpfp_txs_pay_for_ancestors.append(self.create_tx([(tx, 0)], 2, (chain_length+1) * (mining_fee), locking_script))
         # Send cpfp txs.
-        elapsed2 = self.send_txs(rpcsend, conn, cpfp_txs_pay_for_ancestors, timeout)
+        exp_mempool_size = conn.rpc.getmempoolinfo()['size'] + len(cpfp_txs_pay_for_ancestors)
+        elapsed2 = self.send_txs(rpcsend, conn, cpfp_txs_pay_for_ancestors, exp_mempool_size, timeout)
         # Check if there is a required number of txs in the mempool.
         check_mempool_equals(conn.rpc, cpfp_txs_pay_for_ancestors + txchains, timeout)
 
@@ -229,8 +231,8 @@ class PtvCpfp(BitcoinTestFramework):
         # send the rest of txs.
         for idx in range(1, len(high_fee_tx.vout)):
             txs.append(self.create_tx([(high_fee_tx, idx)], 1, rolling_fee, locking_script))
-        self.send_txs(rpcsend, conn, txs, timeout)
-        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout, check_interval=1)
+        exp_min_mempool_size = conn.rpc.getmempoolinfo()['size']
+        self.send_txs(rpcsend, conn, txs, exp_min_mempool_size, timeout)
         txs.append(tx0)
         # All newly submitted txs should be present in the mempool.
         self.check_mempool_with_subset(conn.rpc, txs)
