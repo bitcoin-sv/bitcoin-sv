@@ -1754,7 +1754,7 @@ class NodeConnCB():
         def test_function(): return self.last_message.get("getheaders")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
-    def wait_for_inv(self, expected_inv, timeout=60):
+    def wait_for_inv(self, expected_inv, timeout=60, check_interval=0.05):
         """Waits for an INV message and checks that the first inv object in the message was as expected."""
         if len(expected_inv) > 1:
             raise NotImplementedError(
@@ -1763,7 +1763,7 @@ class NodeConnCB():
         def test_function(): return self.last_message.get("inv") and \
             self.last_message["inv"].inv[0].type == expected_inv[0].type and \
             self.last_message["inv"].inv[0].hash == expected_inv[0].hash
-        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+        wait_until(test_function, timeout=timeout, lock=mininode_lock, check_interval=check_interval)
 
     def wait_for_verack(self, timeout=60):
         def test_function(): return self.message_count["verack"]
@@ -2068,6 +2068,8 @@ def StopNetworkThread():
 
 class NetworkThread(Thread):
 
+    poll_timeout = 0.1
+
     def run(self):
         while mininode_socket_map and not NetworkThread_should_stop:
             with network_thread_loop_intent_lock:
@@ -2088,7 +2090,7 @@ class NetworkThread(Thread):
                         disconnected.append(obj)
                 [obj.handle_close() for obj in disconnected]
                 try:
-                    asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+                    asyncore.loop(NetworkThread.poll_timeout, use_poll=True, map=mininode_socket_map, count=1)
                 except Exception as e:
                     # All exceptions are caught to prevent them from taking down the network thread.
                     # Since the error cannot be easily reported, it is just logged assuming that if
