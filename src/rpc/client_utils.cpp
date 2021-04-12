@@ -128,6 +128,9 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"softrejectblock", 1, "numblocks"},
     {"acceptblock", 1, "numblocks"},
     {"getsoftrejectedblocks", 0, "onlymarked"},
+    {"verifyscript", 0, "scripts"},
+    {"verifyscript", 1, "stopOnFirstInvalid"},
+    {"verifyscript", 2, "totalTimeout"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},

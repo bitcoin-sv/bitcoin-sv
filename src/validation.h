@@ -642,6 +642,11 @@ bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t 
 int GetGenesisActivationHeight(const Config& config);
 
 /**
+ * Helper to return the script flags which should be checked for a block with given parent
+ */
+uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip);
+
+/**
  * A function used to produce a default value for a number of Low priority threads
  * (on the running hardware).
  *

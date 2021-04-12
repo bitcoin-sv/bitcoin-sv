@@ -79,6 +79,7 @@ LARGE_BLOCK_TESTS = [
 # - A test is vulnerable to CPU/RAM availability fluctuations
 
 SOLO_TESTS = {
+    "bsv-rpc-verifyscript.py",
     "wallet-encryption.py",
     "bsv-ptv-txn-chains.py",
     "mining_api.py",
