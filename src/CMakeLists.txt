@@ -218,6 +218,7 @@ add_library(common
 	blockvalidation.h
 	bloom.h
 	cfile_util.h
+	cfile_util.cpp
 	chain.h
 	chainparams.cpp
 	chainparams.h
@@ -385,6 +386,13 @@ add_library(server
 	dbwrapper.cpp
 	dbwrapper.h
 	disk_tx_pos.h
+    double_spend/dsattempt_handler.cpp
+    double_spend/dsattempt_handler.h
+    double_spend/dscallback_msg.cpp
+    double_spend/dscallback_msg.h
+    double_spend/dstxn_serialiser.cpp
+    double_spend/dstxn_serialiser.h
+    double_spend/time_limited_blacklist.h
 	httprpc.cpp
 	httprpc.h
 	httpserver.cpp
@@ -532,6 +540,8 @@ endif()
 
 # RPC client support
 add_library(rpcclient
+    cfile_util.cpp
+    cfile_util.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp
@@ -583,6 +593,7 @@ add_executable(bitcoind bitcoind.cpp
 target_link_libraries(
 	bitcoind
 	server
+    rpcclient
 	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)

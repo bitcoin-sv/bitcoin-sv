@@ -12,6 +12,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
+#include "rpc/client_config.h"
 #include "script/standard.h"
 #include "txn_validation_config.h"
 #include "validation.h"
@@ -96,6 +97,7 @@ public:
     // P2P parameters
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
     virtual int64_t GetStreamSendRateLimit() const = 0;
+    virtual unsigned int GetBanScoreThreshold() const = 0;
 
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -108,6 +110,19 @@ public:
     virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
     virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
     virtual bool GetDisableBIP30Checks() const = 0;
+
+    // Double-Spend processing parameters
+    virtual DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const = 0;
+    virtual int GetDoubleSpendEndpointFastTimeout() const = 0;
+    virtual int GetDoubleSpendEndpointSlowTimeout() const = 0;
+    virtual uint64_t GetDoubleSpendEndpointSlowRatePerHour() const = 0;
+    virtual int GetDoubleSpendEndpointPort() const = 0;
+    virtual uint64_t GetDoubleSpendTxnRemember() const = 0;
+    virtual uint64_t GetDoubleSpendEndpointBlacklistSize() const = 0;
+    virtual std::set<std::string> GetDoubleSpendEndpointSkipList() const = 0;
+    virtual uint64_t GetDoubleSpendNumFastThreads() const = 0;
+    virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
+    virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
 
 protected:
     ~Config() = default;
@@ -180,6 +195,7 @@ public:
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
+    virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
 
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
@@ -195,6 +211,19 @@ public:
     // Used in constructor and for unit testing to always start with a clean
     // state
     virtual void Reset() = 0;
+
+    // Double-Spend processing parameters
+    virtual bool SetDoubleSpendNotificationLevel(int level, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointPort(int port, std::string* err) = 0;
+    virtual bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) = 0;
+    virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
+    virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
+    virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
 
 protected:
     ~ConfigInit() = default;
@@ -385,6 +414,8 @@ public:
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
     bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override;
     int64_t GetStreamSendRateLimit() const override;
+    bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override;
+    unsigned int GetBanScoreThreshold() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -399,6 +430,30 @@ public:
     unsigned int GetMaxProtocolRecvPayloadLength() const override;
     unsigned int GetMaxProtocolSendPayloadLength() const override;
     unsigned int GetRecvInvQueueFactor() const override;
+
+    // Double-Spend processing parameters
+    bool SetDoubleSpendNotificationLevel(int level, std::string* err) override;
+    DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const override;
+    bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) override;
+    int GetDoubleSpendEndpointFastTimeout() const override;
+    bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) override;
+    int GetDoubleSpendEndpointSlowTimeout() const override;
+    bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) override;
+    uint64_t GetDoubleSpendEndpointSlowRatePerHour() const override;
+    bool SetDoubleSpendEndpointPort(int port, std::string* err) override;
+    int GetDoubleSpendEndpointPort() const override;
+    bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) override;
+    uint64_t GetDoubleSpendTxnRemember() const override;
+    bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) override;
+    uint64_t GetDoubleSpendEndpointBlacklistSize() const override;
+    bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) override;
+    std::set<std::string> GetDoubleSpendEndpointSkipList() const override;
+    bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override;
+    uint64_t GetDoubleSpendNumFastThreads() const override;
+    bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override;
+    uint64_t GetDoubleSpendNumSlowThreads() const override;
+    bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override;
+    uint64_t GetDoubleSpendQueueMaxMemory() const override;
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -506,6 +561,20 @@ private:
     unsigned int maxProtocolRecvPayloadLength;
     unsigned int maxProtocolSendPayloadLength;
     unsigned int recvInvQueueFactor;
+    unsigned int banScoreThreshold;
+
+    // Double-Spend parameters
+    DSAttemptHandler::NotificationLevel dsNotificationLevel;
+    int dsEndpointFastTimeout;
+    int dsEndpointSlowTimeout;
+    uint64_t dsEndpointSlowRatePerHour;
+    int dsEndpointPort;
+    uint64_t dsEndpointBlacklistSize;
+    std::set<std::string> dsEndpointSkipList;
+    uint64_t dsAttemptTxnRemember;
+    uint64_t dsAttemptNumFastThreads;
+    uint64_t dsAttemptNumSlowThreads;
+    uint64_t dsAttemptQueueMaxMemory;
 
     std::optional<bool> mDisableBIP30Checks;
 
@@ -872,6 +941,32 @@ public:
     int64_t GetP2PHandshakeTimeout() const override { return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL; }
     bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override { return true; }
     int64_t GetStreamSendRateLimit() const override { return Stream::DEFAULT_SEND_RATE_LIMIT; }
+    bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override { return true; }
+    unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
+
+    // Double-Spend processing parameters
+    bool SetDoubleSpendNotificationLevel(int level, std::string* err) override { return true; }
+    DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const override { return DSAttemptHandler::DEFAULT_NOTIFY_LEVEL; }
+    bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) override { return true; }
+    int GetDoubleSpendEndpointFastTimeout() const override { return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT; }
+    bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) override { return true; }
+    int GetDoubleSpendEndpointSlowTimeout() const override { return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT; }
+    bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendEndpointSlowRatePerHour() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR; }
+    bool SetDoubleSpendEndpointPort(int port, std::string* err) override { return true; }
+    int GetDoubleSpendEndpointPort() const override { return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT; }
+    bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendTxnRemember() const override { return DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT; }
+    bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendEndpointBlacklistSize() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE; }
+    bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) override { return true; }
+    std::set<std::string> GetDoubleSpendEndpointSkipList() const override { return {}; }
+    bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendNumFastThreads() const override { return DSAttemptHandler::DEFAULT_NUM_FAST_THREADS; }
+    bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendNumSlowThreads() const override { return DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS; }
+    bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendQueueMaxMemory() const override { return DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY * ONE_MEGABYTE; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

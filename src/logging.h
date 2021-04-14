@@ -51,6 +51,7 @@ enum LogFlags : uint32_t {
     NETMSGVERB = (1 << 24),
     NETMSGALL = NETMSG | NETMSGVERB,
     NET = NETCONN | NETMSGALL,
+    DOUBLESPEND = (1 << 25),
     ALL = ~uint32_t(0),
 };
 

@@ -20,7 +20,7 @@ class RPCClient
     explicit RPCClient(const RPCClientConfig& config) : mConfig{config} {}
 
     // Submit a request and wait for a response
-    void SubmitRequest(const HTTPRequest& request, HTTPResponse* response) const;
+    void SubmitRequest(HTTPRequest& request, HTTPResponse* response) const;
 
   private:
 

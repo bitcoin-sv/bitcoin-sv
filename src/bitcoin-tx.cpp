@@ -16,6 +16,7 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "rpc/client_utils.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "univalue.h"
@@ -30,7 +31,6 @@
 
 static bool fCreateBlank;
 static std::map<std::string, UniValue> registers;
-static const int CONTINUE_EXECUTION = -1;
 
 // not in use but required by config.h dependency
 bool fRequireStandard = true;

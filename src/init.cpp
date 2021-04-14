@@ -18,6 +18,7 @@
 #include "config.h"
 #include "consensus/validation.h"
 #include "consensus/consensus.h"
+#include "double_spend/dsattempt_handler.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -28,6 +29,7 @@
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
+#include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
@@ -1251,6 +1253,64 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-recvinvqueuefactor=<n>",
         strprintf("Set maximum number of full size inventory messages that we can store for each peer (default %d). Inventory message size can be set with -maxprotocolrecvpayloadlength. "
           "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
+
+    /** Double-Spend detection/reporting */
+    strUsage += HelpMessageGroup(_("Double-Spend detection options:"));
+    strUsage += HelpMessageOpt(
+        "-dsnotifylevel",
+        strprintf(_("Set how this node should handle double-spend notification sending. The options are: 0 Send no notifications, "
+                    "1 Send notifications only for standard transactions, 2 Send notifications for all transactions. (default %d)"),
+            static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)));
+    strUsage += HelpMessageOpt(
+        "-dsendpointfasttimeout=<n>",
+        strprintf(_("Timeout in seconds for high priority communications with a double-spend reporting endpoint (default: %u)"),
+            rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT));
+    strUsage += HelpMessageOpt(
+        "-dsendpointslowtimeout=<n>",
+        strprintf(_("Timeout in seconds for low priority communications with a double-spend reporting endpoint (default: %u)"),
+            rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT));
+    strUsage += HelpMessageOpt(
+        "-dsendpointslowrateperhour=<n>",
+        strprintf(_("The allowable number of timeouts per hour on a rolling basis to a double-spend reporting endpoint before "
+                    "we temporarily assume that endpoint is consistently slow and direct all communications for it to the "
+                    "slow / low priority queue. Must be between 1 and 60 (default: %u)"),
+            DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR));
+    if (showDebug) {
+        strUsage += HelpMessageOpt(
+            "-dsendpointport=<n>",
+            strprintf(_("Port to connect to double-spend reporting endpoint on (default: %u)"),
+                rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT));
+        strUsage += HelpMessageOpt(
+            "-dsendpointblacklistsize=<n>",
+            strprintf(_("Limits the maximum number of entries stored in the bad double-spend reporting endpoint server blacklist (default: %u)"),
+                DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE));
+    }
+    strUsage += HelpMessageOpt(
+        "-dsendpointskiplist=<list of ips>",
+        "A comma separated list of IP addresses for double-spend endpoints we should skip sending notifications to. This can be useful if (for example) "
+        "we are running a mAPI node locally which will already be receiving double-spend notification via ZMQ, then we don't need to also send such "
+        "notifications via HTTP.");
+    strUsage += HelpMessageOpt(
+        "-dsattempttxnremember=<n>",
+        strprintf(_("Limits the maximum number of previous double-spend transactions the node remembers. Setting this high uses more memory and is slower, "
+                    "setting it low increases the chances we may unnecessarily process and re-report duplicate double-spent transactions (default: %u)"),
+            DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT));
+    strUsage += HelpMessageOpt(
+        "-dsattemptnumfastthreads=<n>",
+        strprintf(_("Number of threads available for processing high priority double-spend notifications. Note that each additional thread also "
+            "requires a small amount of disk space for serialising transactions to. (default: %u, maximum: %u)"),
+            DSAttemptHandler::DEFAULT_NUM_FAST_THREADS, DSAttemptHandler::MAX_NUM_THREADS));
+    strUsage += HelpMessageOpt(
+        "-dsattemptnumslowthreads=<n>",
+        strprintf(_("Number of threads available for processing low priority double-spend notificationsi. Note that each additional thread also "
+            "requires a small amount of disk space for serialising transactions to. (default: %u, maximum: %u)"),
+            DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS, DSAttemptHandler::MAX_NUM_THREADS));
+    strUsage += HelpMessageOpt(
+        "-dsattemptqueuemaxmemory=<n>",
+        strprintf(_("Maximum memory usage for the queue of detected double-spend transactions (default: %uMB). "
+                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
+
     return strUsage;
 }
 
@@ -2059,6 +2119,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetStreamSendRateLimit(gArgs.GetArg("-streamsendratelimit", Stream::DEFAULT_SEND_RATE_LIMIT), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetBanScoreThreshold(gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), &err)) {
+        return InitError(err);
+    }
 
 #if ENABLE_ZMQ
     bool zmqSinkSpecified = (config.GetInvalidTxSinks().count("ZMQ") != 0);
@@ -2184,6 +2247,62 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
+    {
+        return InitError(err);
+    }
+
+    // Double-Spend processing parameters
+    if(std::string err; !config.SetDoubleSpendNotificationLevel(
+        gArgs.GetArg("-dsnotifylevel", static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointFastTimeout(
+        gArgs.GetArg("-dsendpointfasttimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointSlowTimeout(
+        gArgs.GetArg("-dsendpointslowtimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointSlowRatePerHour(
+        gArgs.GetArg("-dsendpointslowrateperhour", DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointPort(
+        gArgs.GetArg("-dsendpointport", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointBlacklistSize(
+        gArgs.GetArg("-dsendpointblacklistsize", DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointSkipList(gArgs.GetArg("-dsendpointskiplist", ""), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendTxnRemember(
+        gArgs.GetArg("-dsattempttxnremember", DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendNumFastThreads(
+        gArgs.GetArg("-dsattemptnumfastthreads", DSAttemptHandler::DEFAULT_NUM_FAST_THREADS), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendNumSlowThreads(
+        gArgs.GetArg("-dsattemptnumslowthreads", DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendQueueMaxMemory(
+        gArgs.GetArgAsBytes("-dsattemptqueuemaxmemory", DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY, ONE_MEBIBYTE), &err))
     {
         return InitError(err);
     }

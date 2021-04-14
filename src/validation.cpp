@@ -791,7 +791,7 @@ static bool CheckAncestorLimits(const CTxMemPool& pool,
                                     std::ref(errString));
 }
 
-static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
+uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
     // Check inputs based on the set of flags we activate.
     uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(genesisEnabled, false);
     if (!config.GetChainParams().RequireStandard()) {
@@ -1393,6 +1393,10 @@ CTxnValResult TxnValidation(
         // Clear any invalid state due to promiscuousmempool flags usage.
         state = CValidationState();
     }
+
+    // Finished all script checks
+    state.SetScriptsChecked();
+
     // Check a mempool conflict and a double spend attempt
     if(!dsDetector->insertTxnInputs(pTxInputData, pool, state, isFinal)) {
         if (state.IsMempoolConflictDetected()) {
@@ -2640,6 +2644,117 @@ static int32_t GetInputScriptBlockHeight(int32_t coinHeight) {
     return coinHeight;
 }
 
+std::optional<bool> CheckInputScripts(
+    const task::CCancellationToken& token,
+    const Config& config,
+    bool consensus,
+    const CScript& scriptPubKey,
+    const Amount& amount,
+    const CTransaction& tx,
+    CValidationState& state,
+    size_t input,
+    int32_t coinHeight,
+    int32_t spendHeight,
+    const uint32_t flags,
+    bool sigCacheStore,
+    const PrecomputedTransactionData& txdata,
+    std::vector<CScriptCheck>* pvChecks)
+{
+    int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coinHeight);
+    uint32_t perInputScriptFlags = 0;
+    bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
+    if (isGenesisEnabled)
+    {
+        perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
+    }
+
+    // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
+    // cache when we are about to cross genesis activation line (see function FinalizeGenesisCrossing).
+    // Verify signature
+    CScriptCheck check(config, consensus, scriptPubKey, amount, tx, input, flags | perInputScriptFlags, sigCacheStore, txdata);
+    if (pvChecks) 
+    {
+        pvChecks->push_back(std::move(check));
+    }
+    else if (auto res = check(token); !res.has_value())
+    {
+        return {};
+    }
+    else if (!res.value())
+    {
+        bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
+        const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
+        // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
+        // A failure is detected by a script number overflow in computations.
+        if (!genesisGracefulPeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
+            return state.DoS(
+                10, false, REJECT_INVALID,
+                strprintf("max-script-num-length-policy-limit-violated (%s)",
+                          ScriptErrorString(check.GetScriptError())));
+        }
+        // Checking script conditions with non-mandatory flags.
+        if (hasNonMandatoryFlags)
+        {
+            // Check whether the failure was caused by a non-mandatory
+            // script verification check, such as non-standard DER encodings
+            // or non-null dummy arguments; if so, don't trigger DoS
+            // protection to avoid splitting the network between upgraded
+            // and non-upgraded nodes.
+            // FIXME: CORE-257 has to check if genesis check is necessary also in check2
+            uint32_t flags2Check = flags | perInputScriptFlags;
+            // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
+            // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
+            CScriptCheck check2(
+                config, true,
+                scriptPubKey, amount, tx, input,
+                ((flags2Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
+                sigCacheStore, txdata);
+            if (auto res2 = check2(token); !res2.has_value())
+            {
+                return {};
+            }
+            else if (res2.value())
+            {
+                return state.Invalid(false, REJECT_NONSTANDARD,
+                        strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+            } 
+            else if (genesisGracefulPeriod)
+            {
+                uint32_t flags3Check = flags2Check ^ SCRIPT_UTXO_AFTER_GENESIS;
+
+                CScriptCheck check3(
+                    config, true,
+                    scriptPubKey, amount, tx, input,
+                    ((flags3Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
+                    sigCacheStore, txdata);
+
+                if (auto res3 = check3(token); !res3.has_value())
+                {
+                    return {};
+                }
+                else if (res3.value()) 
+                {
+                    return state.Invalid(false, REJECT_NONSTANDARD,
+                        strprintf("genesis-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
+                }
+            }
+        }
+
+        // Failures of other flags indicate a transaction that is invalid in
+        // new blocks, e.g. a invalid P2SH. We DoS ban such nodes as they
+        // are not following the protocol. That said during an upgrade
+        // careful thought should be taken as to the correct behavior - we
+        // may want to continue peering with non-upgraded nodes even after
+        // soft-fork super-majority signaling has occurred.
+        return state.DoS(
+            100, false, REJECT_INVALID,
+            strprintf("mandatory-script-verify-flag-failed (%s)",
+                      ScriptErrorString(check.GetScriptError())));
+    }
+
+    return true;
+}
+
 std::optional<bool> CheckInputs(
     const task::CCancellationToken& token,
     const Config& config,
@@ -2706,97 +2821,15 @@ std::optional<bool> CheckInputs(
         const CScript &scriptPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        uint32_t perInputScriptFlags = 0;
-        int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coin->GetHeight());
-        bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
-        if (isGenesisEnabled)
-        {
-            perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
-        }
-
-        // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
-        // cache when we are about to cross genesis activation line (see function FinalizeGenesisCrossing).
-        // Verify signature
-        CScriptCheck check(config, consensus, scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
-                           txdata);
-        if (pvChecks) 
-        {
-            pvChecks->push_back(std::move(check));
-        }
-        else if (auto res = check(token); !res.has_value())
+        auto res = CheckInputScripts(token, config, consensus, scriptPubKey, amount, tx, state, i, coin->GetHeight(),
+            spendHeight, flags, sigCacheStore, txdata, pvChecks);
+        if(!res.has_value())
         {
             return {};
         }
-        else if (!res.value())
+        else if(!res.value())
         {
-            bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
-            const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
-            // A failure is detected by a script number overflow in computations.
-            if (!genesisGracefulPeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
-                return state.DoS(
-                    10, false, REJECT_INVALID,
-                    strprintf("max-script-num-length-policy-limit-violated (%s)",
-                              ScriptErrorString(check.GetScriptError())));
-            }
-            // Checking script conditions with non-mandatory flags.
-            if (hasNonMandatoryFlags)
-            {
-                // Check whether the failure was caused by a non-mandatory
-                // script verification check, such as non-standard DER encodings
-                // or non-null dummy arguments; if so, don't trigger DoS
-                // protection to avoid splitting the network between upgraded
-                // and non-upgraded nodes.
-                // FIXME: CORE-257 has to check if genesis check is necessary also in check2
-                uint32_t flags2Check = flags | perInputScriptFlags;
-                // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
-                // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
-                CScriptCheck check2(
-                    config, true,
-                    scriptPubKey, amount, tx, i,
-                    ((flags2Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
-                    sigCacheStore, txdata);
-                if (auto res2 = check2(token); !res2.has_value())
-                {
-                    return {};
-                }
-                else if (res2.value())
-                {
-                    return state.Invalid(false, REJECT_NONSTANDARD,
-                            strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
-                } 
-                else if (genesisGracefulPeriod)
-                {
-                    uint32_t flags3Check = flags2Check ^ SCRIPT_UTXO_AFTER_GENESIS;
-
-                    CScriptCheck check3(
-                        config, true,
-                        scriptPubKey, amount, tx, i,
-                        ((flags3Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
-                        sigCacheStore, txdata);
-
-                    if (auto res3 = check3(token); !res3.has_value())
-                    {
-                        return {};
-                    }
-                    else if (res3.value()) 
-                    {
-                        return state.Invalid(false, REJECT_NONSTANDARD,
-                            strprintf("genesis-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
-                    }
-                }
-            }
-
-            // Failures of other flags indicate a transaction that is invalid in
-            // new blocks, e.g. a invalid P2SH. We DoS ban such nodes as they
-            // are not following the protocol. That said during an upgrade
-            // careful thought should be taken as to the correct behavior - we
-            // may want to continue peering with non-upgraded nodes even after
-            // soft-fork super-majority signaling has occurred.
-            return state.DoS(
-                100, false, REJECT_INVALID,
-                strprintf("mandatory-script-verify-flag-failed (%s)",
-                          ScriptErrorString(check.GetScriptError())));
+            return false;
         }
     }
 

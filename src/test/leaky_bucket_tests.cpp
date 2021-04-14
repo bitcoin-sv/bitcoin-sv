@@ -35,6 +35,11 @@ BOOST_AUTO_TEST_CASE(FillDrain)
     BOOST_CHECK(!(bucket += 1000));
     BOOST_CHECK(bucket += 1000);
     BOOST_CHECK(bucket.Overflowing());
+
+    // Test creating partially filled
+    LeakyBucket<std::chrono::milliseconds> bucket2 { 1000, 500, 1ms };
+    BOOST_CHECK(bucket2.GetFillLevel() > 0);
+    BOOST_CHECK(!bucket2.Overflowing());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

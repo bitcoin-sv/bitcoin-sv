@@ -399,4 +399,7 @@ struct PrecomputedTransactionData {
     PrecomputedTransactionData(const CTransaction &tx);
 };
 
+// Test for double-spend notification enabled output on a transaction
+[[nodiscard]] std::pair<bool, size_t> TxnHasDSNotificationOutput(const CTransaction& txn);
+
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H

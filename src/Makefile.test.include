@@ -60,6 +60,8 @@ BITCOIN_TESTS =\
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
+  test/dsattempt_tests.cpp \
+  test/dstxn_serialiser_tests.cpp \
   test/dbwrapper_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
@@ -141,6 +143,7 @@ BITCOIN_TESTS =\
   test/thread_safe_queue_tests.cpp \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
+  test/time_limited_blacklist_tests.cpp \
   test/time_locked_mempool_tests.cpp \
   test/ttor_tests.cpp \
   test/transaction_tests.cpp \

@@ -177,11 +177,30 @@ void InvalidTxnInfo::ToJson(CJSONWriter& writer, bool writeHex) const
     writer.writeEndObject();
 }
 
+InvalidTxnPublisher::InvalidTxnInfoWithTxn::InvalidTxnInfoWithTxn(
+    const CTransactionRef& tx,
+    const uint256& hash,
+    int64_t height,
+    int64_t time,
+    const CValidationState& state)
+    : InvalidTxnInfoWithTxn{
+        tx,
+        InvalidTxnInfo::BlockDetails{
+            CScopedBlockOriginRegistry::GetOrigins(hash),
+            hash,
+            height,
+            time},
+        std::time(nullptr),
+        state}
+{}
+
 CInvalidTxnPublisher::CInvalidTxnPublisher(
     std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>>&& sinks,
+    PublishCallback&& callback,
     std::size_t maxQueueSize)
     : txInfoQueue(maxQueueSize, [](const InvalidTxnInfo& txInfo) { return txInfo.DynamicMemoryUsage(); })
     , mSinks{ std::move(sinks) }
+    , mPublishCallback{ std::move(callback) }
 {
     if( mSinks.empty() )
     {
@@ -229,34 +248,54 @@ CInvalidTxnPublisher::~CInvalidTxnPublisher()
     mSinks.clear();
 }
 
-void CInvalidTxnPublisher::Publish(InvalidTxnInfo&& invalidTxnInfo)
+void CInvalidTxnPublisher::Publish(InvalidTxnPublisher::InvalidTxnInfoWithTxn&& invalidTxnInfo)
 {
+    if (mPublishCallback)
+    {
+        try
+        {
+            mPublishCallback(invalidTxnInfo);
+        }
+        catch(const std::exception& e)
+        {
+            LogPrintf(
+                "Error CInvalidTxnPublisher::Publish threw an unexpected exception: %s\n",
+                e.what());
+        }
+        catch(...)
+        {
+            LogPrintf("Error CInvalidTxnPublisher::Publish threw an unexpected exception!\n");
+        }
+    }
+
     if (txInfoQueue.IsClosed())
     {
         return;
     }
 
-    if (!txInfoQueue.PushNoWait(invalidTxnInfo))
+    InvalidTxnInfo info = invalidTxnInfo.GetInvalidTxnInfo();
+
+    if (!txInfoQueue.PushNoWait(info))
     {
-        for( auto& item : invalidTxnInfo.GetCollidedWithTruncationRange() )
+        for( auto& item : info.GetCollidedWithTruncationRange() )
         {
             if (!item.TruncateTransactionDetails())
             {
                 continue;
             }
 
-            if (txInfoQueue.PushNoWait(invalidTxnInfo))
+            if (txInfoQueue.PushNoWait(info))
             {
                 return;
             }
         }
 
         // maybe we don't have space in the queue, try without actual transaction
-        if (!invalidTxnInfo.TruncateTransactionDetails())
+        if (!info.TruncateTransactionDetails())
         {
             return;
         }
-        txInfoQueue.PushNoWait(invalidTxnInfo);
+        txInfoQueue.PushNoWait(info);
     }
 }
 

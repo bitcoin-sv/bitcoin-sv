@@ -14,6 +14,7 @@
 #include "prevector.h"
 
 #include <ctime>
+#include <functional>
 #include <list>
 #include <set>
 #include <string>
@@ -215,6 +216,75 @@ private:
 
 namespace InvalidTxnPublisher
 {
+    /**
+     * Class that is explicitly convertible to InvalidTxnInfo with guarantee that
+     * transaction and collided with transactions references are present.
+     */
+    class InvalidTxnInfoWithTxn
+    {
+    public:
+        InvalidTxnInfoWithTxn(
+            const CTransactionRef& tx,
+            const std::variant<InvalidTxnInfo::BlockDetails, InvalidTxnInfo::TxDetails>& details,
+            int64_t rejectionTime,
+            const CValidationState& state)
+            : mTransaction{ tx }
+            , mTxValidationState{ state }
+            , mDetails{ details }
+            , mRejectionTime{ rejectionTime }
+        {}
+
+        InvalidTxnInfoWithTxn(
+            const CTransactionRef& tx,
+            const uint256& hash,
+            int64_t height,
+            int64_t time,
+            const CValidationState& state);
+
+        InvalidTxnInfoWithTxn(
+            const CTransactionRef& tx,
+            const CBlockIndex* blockIndex,
+            const CValidationState& state)
+            : InvalidTxnInfoWithTxn{
+                tx,
+                blockIndex->GetBlockHash(),
+                blockIndex->GetHeight(),
+                blockIndex->GetBlockTime(),
+                state}
+        {}
+
+        InvalidTxnInfo GetInvalidTxnInfo() const
+        {
+            return { mTransaction, mDetails, mRejectionTime, mTxValidationState };
+        }
+
+        const CTransactionRef& GetTransaction() const
+        {
+            return mTransaction;
+        }
+
+        const std::set<CTransactionRef>& GetCollidedWithTransactions() const
+        {
+            return mTxValidationState.GetCollidedWithTx();
+        }
+
+        const CValidationState& GetValidationState() const
+        {
+            return mTxValidationState;
+        }
+
+        const std::variant<InvalidTxnInfo::BlockDetails, InvalidTxnInfo::TxDetails>& GetDetails() const
+        {
+            return mDetails;
+        }
+
+    private:
+        CTransactionRef mTransaction;
+        CValidationState mTxValidationState;
+        std::variant<InvalidTxnInfo::BlockDetails, InvalidTxnInfo::TxDetails> mDetails;
+        std::time_t mRejectionTime;
+    };
+
     class CInvalidTxnSink
     {
     protected:
@@ -248,6 +318,9 @@ public:
     static constexpr int64_t DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE = 500 * ONE_MEGABYTE;
 #endif
 
+    using PublishCallback =
+        std::function<void(const InvalidTxnPublisher::InvalidTxnInfoWithTxn&)>;
+
 private:
     // Queue for transactions which should be written to the sinks,
     // maximal size of transactions in the queue at any time is one gigabyte
@@ -259,10 +332,26 @@ private:
     // worker thread which takes a transaction from the queue and sends it to all sinks
     std::thread dumpingThread;
 
+    PublishCallback mPublishCallback;
+
 public:
-    // starts the dumpingThread
+    /**
+     * @param sinks to which info messages will be dumped either CTransactionRef
+     *        data or InvalidTxnInfo::TxData (depending on the remaining queue
+     *        size).
+     * @param callback that is guaranteed to be called with CTransactionRef data
+     *        before info is submitted to sinks. Callback is called from the
+     *        thread that calls Publish() function. Exceptions thrown from the
+     *        callback function are logged and ignored as they are not expected.
+     * @param maxQueueSize is cumulative size of queued InvalidTxnInfo. If size
+     *        is exceeded transaction data is truncated and if that doesn't make
+     *        it compact enough the info is silently discarded.
+     *
+     * Starts the dumpingThread.
+     */
     CInvalidTxnPublisher(
         std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>>&& sinks,
+        PublishCallback&& callback,
         std::size_t maxQueueSize = ONE_GIGABYTE);
 
     ~CInvalidTxnPublisher();
@@ -273,7 +362,7 @@ public:
     CInvalidTxnPublisher& operator=(const CInvalidTxnPublisher&) = delete;
 
     // Puts invalid transaction on the queue
-    void Publish(InvalidTxnInfo&& InvalidTxnInfo);
+    void Publish(InvalidTxnPublisher::InvalidTxnInfoWithTxn&& InvalidTxnInfo);
 
     // Removes locally stored invalid transactions
     int64_t ClearStored();
