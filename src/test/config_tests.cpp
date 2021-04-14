@@ -463,5 +463,24 @@ BOOST_AUTO_TEST_CASE(disable_BIP30)
     }
 }
 
+BOOST_AUTO_TEST_CASE(dust_config_test)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK(config.SetDustLimitFactor(0, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 0);
+    BOOST_CHECK(config.SetDustLimitFactor(100, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 100);
+    BOOST_CHECK(config.SetDustLimitFactor(200, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 200);
+    BOOST_CHECK(config.SetDustLimitFactor(300, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 300);
+
+    BOOST_CHECK(!config.SetDustLimitFactor(-1, &err));
+    BOOST_CHECK(!config.SetDustLimitFactor(301, &err));
+}
+
+
 
 BOOST_AUTO_TEST_SUITE_END()

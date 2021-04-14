@@ -1182,8 +1182,11 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
             "transactions to be included in block creation\n"
             "  \"minrelaytxfee\": xxxxx,                 (numeric) Fees (in BSV/kB) smaller "
             "than this are considered zero fee for relaying, mining and transaction creation\n"
-            "  \"dustrelayfee\": xxxxx,                  (numeric) Fee rate (in BSV/kB) used to defined dust, the value of "
-            "an output such that it will cost about 1/3 of its value in fees at this fee rate to spend it. \n"
+            "  \"dustrelayfee\": xxxxx,                  (numeric) Fee rate (in BSV/kB) used to define dust. A transaction "
+            "output paying less than (dustlimitfactor * output_dust_fee / 100) is considered dust. The output_dust_fee is "
+            "calculated from the dustrelayfee and the size of the transaction output\n"
+            "  \"dustlimitfactor\": xxxxx,               (numeric) The dustlimitfactor (a percent value) is applied to the dustrelayfee "
+            "to determine if a transaction output is dust\n"
             "  \"maxstdtxvalidationduration\": xxxxx,    (numeric) Time before terminating validation "
             "of standard transaction in milliseconds\n"
             "  \"maxnonstdtxvalidationduration\": xxxxx, (numeric) Time before terminating validation "
@@ -1230,6 +1233,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("datacarrier", fAcceptDatacarrier));
     obj.push_back(Pair("minrelaytxfee", ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
     obj.push_back(Pair("dustrelayfee", ValueFromAmount(dustRelayFee.GetFeePerK())));
+    obj.push_back(Pair("dustlimitfactor", config.GetDustLimitFactor()));
     obj.push_back(Pair("blockmintxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));
     obj.push_back(Pair("maxnonstdtxvalidationduration", config.GetMaxNonStdTxnValidationDuration().count()));

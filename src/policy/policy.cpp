@@ -168,7 +168,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
-        } else if (txout.IsDust(dustRelayFee, IsGenesisEnabled(config, nHeight))) {
+        } else if (txout.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, nHeight))) {
             reason = "dust";
             return false;
         }

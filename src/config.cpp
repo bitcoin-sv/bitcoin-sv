@@ -47,6 +47,7 @@ GlobalConfig::GlobalConfig() {
 void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
+    dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
     blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
@@ -1567,6 +1568,23 @@ void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
 
 CFeeRate GlobalConfig::GetMinFeePerKB() const {
     return feePerKB;
+}
+
+bool GlobalConfig::SetDustLimitFactor(int64_t factor, std::string* err) {
+    if (factor < 0 || factor > DEFAULT_DUST_LIMIT_FACTOR)
+    {
+        if (err)
+        {
+            *err = _("The dust limit factor must be between 0% and ") + std::to_string(DEFAULT_DUST_LIMIT_FACTOR) + "%";
+        }
+        return false;
+    }
+    dustLimitFactor = factor;
+    return true;
+}
+
+int64_t GlobalConfig::GetDustLimitFactor() const {
+    return dustLimitFactor;
 }
 
 void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {

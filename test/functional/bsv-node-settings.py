@@ -36,7 +36,7 @@ class BSVNodeSettings(BitcoinTestFramework):
 
         node_settings = self.nodes[0].getsettings()
         # check we received expected fields (parameter settings)
-        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput'])
+        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput','dustlimitfactor'])
         expected_settings = set(parameters).union(optional)
         actual_settings = set(node_settings)
         unexpected_settings = actual_settings - expected_settings

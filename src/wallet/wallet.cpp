@@ -2783,7 +2783,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     }
                 }
 
-                if (txout.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                if (txout.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     if (recipient.fSubtractFeeFromAmount &&
                         nFeeRet > Amount(0)) {
                         if (txout.nValue < Amount(0)) {
@@ -2867,8 +2867,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 // purpose of the all-inclusive feature. So instead we raise the
                 // change and deduct from the recipient.
                 if (nSubtractFeeFromAmount > 0 &&
-                    newTxOut.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
-                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1)) -
+                    newTxOut.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1)) -
                                    newTxOut.nValue;
                     // Raise change until no more dust.
                     newTxOut.nValue += nDust;
@@ -2876,7 +2876,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     for (unsigned int i = 0; i < vecSend.size(); i++) {
                         if (vecSend[i].fSubtractFeeFromAmount) {
                             txNew.vout[i].nValue -= nDust;
-                            if (txNew.vout[i].IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                            if (txNew.vout[i].IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
                                 strFailReason =
                                     _("The transaction amount is too small "
                                       "to send after the fee has been "
@@ -2891,7 +2891,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
                 // Never create dust outputs; if we would, just add the dust to
                 // the fee.
-                if (newTxOut.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                if (newTxOut.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     nChangePosInOut = -1;
                     nFeeRet += nChange;
                     reservekey.ReturnKey();
@@ -4311,6 +4311,7 @@ void CWallet::postInitProcess(CScheduler &scheduler) {
 
 bool CWallet::ParameterInteraction() {
     CFeeRate minRelayTxFee = GlobalConfig::GetConfig().GetMinFeePerKB();
+    int64_t dustLimitFactor = GlobalConfig::GetConfig().GetDustLimitFactor();
 
     gArgs.SoftSetArg("-wallet", DEFAULT_WALLET_DAT);
     const bool is_multiwallet = gArgs.GetArgs("-wallet").size() > 1;
