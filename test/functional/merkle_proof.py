@@ -41,12 +41,31 @@ class MerkleProofTest(BitcoinTestFramework):
     def verify_merkle_proof(self, txid, blockhash, node):
         a1 = self.nodes[node].getmerkleproof(txid)
         a2 = self.nodes[node].getmerkleproof(txid, blockhash)
-        b1 = self.nodes[node].getmerkleproof2(txid)
-        b2 = self.nodes[node].getmerkleproof2(txid, blockhash)
+        b1 = self.nodes[node].getmerkleproof2("", txid)
+        b2 = self.nodes[node].getmerkleproof2(blockhash,txid)
         assert self.nodes[node].verifymerkleproof(a1)
         assert self.nodes[node].verifymerkleproof(a2)
         assert(self.check_equivalence(a1, b1))
         assert(self.check_equivalence(a2, b2))
+
+        c1 = self.nodes[node].getmerkleproof2("",txid, False, "merkleroot")
+        c2 = self.nodes[node].getmerkleproof2(blockhash,txid, False, "merkleroot")
+
+        assert(c1["target"] == a1["target"]["merkleroot"])
+        assert(c2["target"] == a2["target"]["merkleroot"])
+
+        d1 = self.nodes[node].getmerkleproof2("",txid, False, "hash")
+        d2 = self.nodes[node].getmerkleproof2(blockhash,txid, False, "hash")
+
+        assert(d1["target"] == a1["target"]["hash"])
+        assert(d2["target"] == a2["target"]["hash"])
+
+        e1 = self.nodes[node].getmerkleproof2("",txid, False, "header")
+        e2 = self.nodes[node].getmerkleproof2(blockhash,txid, False, "header")
+
+        assert(e1["target"]["hash"] == a1["target"]["hash"])
+        assert(e2["target"]["hash"] == a2["target"]["hash"])
+
 
     # Calculate Merkle tree size in bytes
     def merkle_tree_size(self, number_of_transactions):
@@ -84,7 +103,7 @@ class MerkleProofTest(BitcoinTestFramework):
 
         # Try to get proof for one of the trasaction - should fail because transaction is not yet in a block
         assert_raises_rpc_error(-5, "Transaction not yet in block", self.nodes[0].getmerkleproof, txid1)
-        assert_raises_rpc_error(-5, "Transaction not yet in block", self.nodes[0].getmerkleproof2, txid1)
+        assert_raises_rpc_error(-5, "Transaction not yet in block", self.nodes[0].getmerkleproof2, "", txid1)
 
         # Mine a new block
         self.log.info("Mining 501st block...")
@@ -136,17 +155,17 @@ class MerkleProofTest(BitcoinTestFramework):
 
         # We can't find the block if transaction was spent because -txindex is not set on node[0]
         assert_raises_rpc_error(-5, "Transaction not yet in block", self.nodes[0].getmerkleproof, txid_spent)
-        assert_raises_rpc_error(-5, "Transaction not yet in block", self.nodes[0].getmerkleproof2, txid_spent)
+        assert_raises_rpc_error(-5, "Transaction not yet in block", self.nodes[0].getmerkleproof2, "", txid_spent)
 
         # We can get the proof if we specify proper block hash
         a = self.nodes[0].getmerkleproof(txid_spent, hash_of_block_501)
-        b = self.nodes[0].getmerkleproof2(txid_spent, hash_of_block_501)
+        b = self.nodes[0].getmerkleproof2(hash_of_block_501, txid_spent)
         assert self.nodes[0].verifymerkleproof(a)
         assert(self.check_equivalence(a,b))
 
         # We can't get the proof if we specify a non-existent block
         assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof,  txid_spent, "1234567890abcdef1234567890abcdef")
-        assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof2,  txid_spent, "1234567890abcdef1234567890abcdef")
+        assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof2,  "1234567890abcdef1234567890abcdef", txid_spent)
 
         # We can get the proof if the transaction is unspent
         self.verify_merkle_proof(txid_unspent, hash_of_block_501, 0)

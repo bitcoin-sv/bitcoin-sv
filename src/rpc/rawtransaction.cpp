@@ -41,6 +41,7 @@
 
 #include <cstdint>
 #include <univalue.h>
+#include <sstream>
 
 using namespace mining;
 
@@ -1868,11 +1869,7 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
     }
 
-    int32_t currentChainHeight = 0;
-    {
-        LOCK(cs_main);
-        currentChainHeight = static_cast<int32_t>(chainActive.Height());
-    }
+    int32_t currentChainHeight = chainActive.Height();
 
     CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
 
@@ -1912,21 +1909,23 @@ static UniValue getmerkleproof(const Config& config,
         LOCK(cs_main);
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
     }
-    // Target is block has as specified by (flags & (0x04 | 0x02)) == 2
+    // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
     callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
     callbackDataObject.pushKV("nodes", merkleProofArray);
     return callbackDataObject;
 }
 
 
-static UniValue getmerkleproof2(const Config& config,
-    const JSONRPCRequest& request)
+static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& request)
 {
-    if (request.fHelp ||
-        (request.params.size() != 1 && request.params.size() != 2))
-    {
-        throw std::runtime_error(
-            "getmerkleproof2 \"txid\" ( blockhash )\n"
+
+    // see also TSC description in  https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/?utm_source=Twitter&utm_medium=social&utm_campaign=Orlo
+    auto message_to_user = [](std::string hints) -> std::string {
+        std::ostringstream msg;
+        if (!hints.empty())
+            msg << hints << "\n" << "usage:\n";
+        msg <<
+            "getmerkleproof2 \"blockhash\" \"txid\"   ( includeFullTx targetType format )\n"
             "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
             "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
             "\n Merkle root can be used to prove that the transaction was included in a block.\n"
@@ -1936,83 +1935,169 @@ static UniValue getmerkleproof2(const Config& config,
             "\nindex is maintained (using the -txindex command line option).\n"
 
             "\nArguments:\n"
-            "1. \"txid\"      (string, required) The transaction id\n"
-            "2. \"blockhash\" (string, optional) If specified, looks for txid in the block with "
-            "this hash\n"
-            "\nResult:\n"
+            "1. \"blockhash\"       (string, required) Block in which tx has been mined, the current block if empty string\n"
+            "2. \"txid\"            (string, required) The transaction id\n"
+            "3. \"includeFullTx\"   (bool, optional, default=false) txid if false or whole transaction in hex otherwise\n"
+            "4. \"targetType\"      (string, optional, default=hash) \"hash\", \"header\" or \"merkleroot\"\n"
+            "5. \"format\"          (string, optional, default=json) \"json\" or \"binary is not allowed in this release\"\n"
+
+            "\nResult: (if format is set to \"json\"\n"
             "{\n"
-            "  \"flags\" : 0,                     (numeric) Flags is always 0 => \"txOrId\" is transaction ID and \"target\" is a block hash\n"
-            "  \"index\" : txIndex,               (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
-            "  \"txOrId\" : \"txid\",             (string) ID of the Tx in question\n"
-            "  \"target\" : \"block_hash\",       (string) Block hash, as returned by getBlockHeader RPC\n"
-            "  \"nodes\" :                        (json array) Merkle Proof for transaction txOrId as array of nodes\n"
-            "    [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
+            "  \"index\" :          (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
+            "  \"txOrId\" :         (string) txid or whole tx depending on parameter value\"includeFullTx\"\n"
+            "  \"target\" :         (string) Block hash, block header or merkleroot depending on parameter value\"targetType\"\n"
+            "  \"nodes\" :          (json array) Merkle Proof for transaction txOrId as array of nodes\n"
+            "  [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
             "}\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getmerkleproof2", "\"mytxid\"") +
-            HelpExampleCli("getmerkleproof2", "\"mytxid\" \"myblockhash\"") +
-            HelpExampleRpc("getmerkleproof2", "\"mytxid\", \"myblockhash\""));
-    }
 
-    TxId transactionId = TxId(ParseHashV(request.params[0], "txid"));
-    std::set<TxId> setTxIds;
-    setTxIds.insert(transactionId);
+            "\nResult: (if format is set to \"binary\"\n"
+            "\"data\"               (string) the binary form of the result instead of json\n"
+            "\nExamples:\n" <<
+            HelpExampleCli("getmerkleproof2", "\"\" \"txid\"") <<
+            HelpExampleRpc("getmerkleproof2", "\"blockhash\", \"txid\"");
 
-    uint256 requestedBlockHash;
-    if (request.params.size() > 1)
+        return msg.str();
+    };
+
+    // preliminary requirements
+
+    if (request.fHelp)
+        throw std::runtime_error (message_to_user (""));
+
+    size_t const n = request.params.size();
+    std::ostringstream hints;
+
+    if (n < 2 || n > 5)
     {
-        requestedBlockHash = uint256S(request.params[1].get_str());
+        hints << "Number of inputs is " << n << ",  must be between 2 and 5\n";
+        throw std::runtime_error(message_to_user(hints.str()));
     }
-    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds, false);
 
+    // retrive transactionid first (second param)
+    TxId txid = TxId(ParseHashV(request.params[1], "txid"));
+    std::set<TxId> setTxIds;
+    setTxIds.insert(txid);
+
+    // then get the block hash (first param)
+    std::string const blockHashString = request.params[0].get_str();
+    uint256 const requestedBlockHash = (blockHashString == "") ? uint256{}: uint256S(blockHashString);
+    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds, false);
     if (blockIndex == nullptr)
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
     }
 
+    // get optional parameters
+    bool const includeFullTx = (request.params.size() > 2) ? request.params[2].get_bool() : false;
+    std::string const targetType =  (request.params.size() > 3) ? request.params[3].get_str() : "hash";
+    std::string const format =  (request.params.size() > 4) ? request.params[4].get_str() : "json";
+
+    // test parameter values
+    if (targetType != "hash" && targetType != "header" && targetType != "merkleroot")
+    {
+        hints << "targetType is '"
+              << targetType
+              << "',  must be 'hash', 'header' or 'merkleroot'\n";
+        throw JSONRPCError(RPC_INVALID_PARAMS, message_to_user (hints.str()));
+    }
+
+    if (format != "json" /* && format != "binary" */) // enable binary in next version
+    {
+        hints << "format is '"
+              << format
+              //<< "',  must be 'json' or 'binary'\n";
+              << "',  must be 'json'\n";
+        throw JSONRPCError(RPC_INVALID_PARAMS, message_to_user (hints.str()));
+    }
+
+    // get merkle proof
     int32_t currentChainHeight = chainActive.Height();
-
     CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
-
     if (merkleTree == nullptr)
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
     }
 
-    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(transactionId, true);
+    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(txid, true);
     if (proof.merkleTreeHashes.size() == 0)
     {
         // The requested transaction was not found in the block/merkle tree
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
     }
-    // Result in JSON format
+
     UniValue merkleProofArray(UniValue::VARR);
     for (const uint256& node : proof.merkleTreeHashes)
     {
         if (node.IsNull())
-        {
             merkleProofArray.push_back("*");
+        else
+            merkleProofArray.push_back(node.GetHex());
+    }
+
+    // build result (only json for now)
+    UniValue callbackDataObject(UniValue::VOBJ);
+    if (format == "json" || true)
+    {
+
+        // index
+        callbackDataObject.pushKV("index", static_cast<uint64_t>(proof.transactionIndex));
+
+        //tx id or tx
+        if (!includeFullTx)
+        {
+            callbackDataObject.pushKV("txOrId", txid.GetHex());
         }
         else
         {
-            merkleProofArray.push_back(node.GetHex());
-        }
-    }
+            CTransactionRef tx;
+            uint256 hashBlock;
+            bool isGenesisEnabled;
+            if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled))
+            {
+                if (fTxIndex)
+                    hints << "No such mempool or blockchain transaction";
+                else
+                    hints << "No such mempool transaction. Use -txindex "
+                             "to enable blockchain transaction queries";
+                hints << ". Use gettransaction for wallet transactions.";
 
-    // CallbackData
-    UniValue callbackDataObject(UniValue::VOBJ);
-    //callbackDataObject.pushKV("flags", 0);
-    callbackDataObject.pushKV("index", static_cast<uint64_t>(proof.transactionIndex));
-    callbackDataObject.pushKV("txOrId", transactionId.GetHex());
-    int confirmations = 0;
-    std::optional<uint256> nextBlockHash;
-    {
-        LOCK(cs_main);
-        confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, hints.str());
+            }
+
+            if (!blockHashString.empty())
+                assert(requestedBlockHash == hashBlock);
+
+            CStringWriter writer;
+            EncodeHexTx(*tx, writer, RPCSerializationFlags());
+            std::string hex = writer.MoveOutString();
+            callbackDataObject.pushKV("txOrId", hex);
+        }
+
+        //target
+        if(targetType == "header") // Target is block hash as specified by (flags & (0x04 | 0x02)) == 2
+        {
+            int confirmations = 0;
+            std::optional<uint256> nextBlockHash;
+            {
+                LOCK(cs_main);
+                confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
+            }
+
+            callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
+        }
+        else if(targetType == "hash") // Target is block hash as specified by (flags & (0x04 | 0x02)) == 0
+        {
+
+            callbackDataObject.pushKV("target", blockIndex->GetBlockHash().GetHex());
+        }
+        else //if(targetType == "merkleroot")
+        {
+            callbackDataObject.pushKV("target", blockIndex->GetMerkleRoot().GetHex());
+        }
+
+        // nodes
+        callbackDataObject.pushKV("nodes", merkleProofArray);
     }
-    // Target is block has as specified by (flags & (0x04 | 0x02)) == 0
-    callbackDataObject.pushKV("target", blockIndex->GetBlockHash().GetHex());
-    callbackDataObject.pushKV("nodes", merkleProofArray);
     return callbackDataObject;
 }
 
@@ -2119,7 +2204,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
     { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
     { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
-    { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash"} },
+    { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
     { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
 };
 // clang-format on
