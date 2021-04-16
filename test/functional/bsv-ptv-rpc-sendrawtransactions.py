@@ -13,17 +13,20 @@ Test a new rpc interface sendrawtransactions which allows a bulk submit of trans
                             {
                                 "hex": "hexstring1",
                                 "allowhighfees": true|false,
-                                "dontcheckfee": true|false
+                                "dontcheckfee": true|false,
+                                "listunconfirmedancestors" : true|false
                             },
                             {
                                 "hex": "hexstring2",
                                 "allowhighfees": true|false,
-                                "dontcheckfee": true|false
+                                "dontcheckfee": true|false,
+                                "listunconfirmedancestors" : true|false
                             },
                             {
                                 "hex": "hexstring3",
                                 "allowhighfees": true|false,
-                                "dontcheckfee": true|false
+                                "dontcheckfee": true|false,
+                                "listunconfirmedancestors" : true|false
                             },
                             ...
                         ]
@@ -87,7 +90,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         return txchains
 
     # Test an expected valid results, depending on node's configuration.
-    def run_scenario1(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, useRpcWithDefaults=False, shuffle_txs=False, timeout=30):
+    def run_scenario1(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, listunconfirmedancestors=False, useRpcWithDefaults=False, shuffle_txs=False, timeout=30):
         # Create and send tx chains.
         txchains = self.get_txchains_n(num_of_chains, chain_length, spend)
         # Shuffle txs if it is required
@@ -100,11 +103,45 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             if useRpcWithDefaults:
                 rpc_txs_bulk_input.append({'hex': ToHex(txchains[tx])})
             else:
-                rpc_txs_bulk_input.append({'hex': ToHex(txchains[tx]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
+                rpc_txs_bulk_input.append({'hex': ToHex(txchains[tx]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee, 'listunconfirmedancestors': listunconfirmedancestors})
         # Submit bulk tranactions.
-        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
-        # There should be no rejected transactions.
-        assert_equal(len(rejected_txns), 0)
+        result = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+        if listunconfirmedancestors:
+            assert_equal(len(result), 1)
+            assert_equal(len(result['unconfirmed']), num_of_chains*chain_length)
+            first_in_chain = 0
+            expected_ancestors = []
+            # A map of transactions and their known parents to be checked in 'vin'
+            parentsMap = {}
+            parentTxId = ""
+            # All transactions and their unconfirmed ancestors are part of sendrawtransactions inputs
+            # First transaction in each chain should not have any unconfirmed ancestors
+            # Next transactions in the chain have increasing number of unconfirmed ancestors
+            for tx in result['unconfirmed']:
+                if len(tx['ancestors']) == 0:
+                    first_in_chain += 1
+                    # reset, since this is a new chain
+                    expected_ancestors = []
+                    parentsMap = {}
+                    parentTxId = ""
+                else:
+                    # we expect to have increasing number of unconfirmed ancestors by each transaction in this chain
+                    assert_equal(len(tx['ancestors']), len(expected_ancestors))
+                    for ancestor in tx['ancestors']:
+                      assert(ancestor['txid'] in expected_ancestors)
+                      # each ancestor has 1 input
+                      assert_equal(len(ancestor['vin']), 1)
+                      # check input
+                      if ancestor['txid'] in parentsMap:
+                        assert_equal(ancestor['vin'][0]['txid'], parentsMap[ancestor['txid']])
+                expected_ancestors.append(tx['txid'])
+                if parentTxId:
+                  parentsMap[tx['txid']] = parentTxId
+            # Each chain should have one transaction (first in chain) without any unconfirmed ancestors
+            assert_equal(first_in_chain, num_of_chains)
+        else:
+            # There should be no rejected transactions.
+            assert_equal(len(result), 0)
         # Check if required transactions are accepted by the mempool.
         self.check_mempool(conn.rpc, txchains, timeout)
 
@@ -170,6 +207,14 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             -8, "dontcheckfee: Invalid value", conn.rpc.sendrawtransactions, [{'hex': rawtx['hex'], 'dontcheckfee': -1}])
         assert_raises_rpc_error(
             -8, "dontcheckfee: Invalid value", conn.rpc.sendrawtransactions, [{'hex': rawtx['hex'], 'dontcheckfee': 'dummy_value'}])
+
+        #
+        # listunconfirmedancestors: Invalid value
+        #
+        assert_raises_rpc_error(
+            -8, "listunconfirmedancestors: Invalid value", conn.rpc.sendrawtransactions, [{'hex': rawtx['hex'], 'listunconfirmedancestors': -1}])
+        assert_raises_rpc_error(
+            -8, "listunconfirmedancestors: Invalid value", conn.rpc.sendrawtransactions, [{'hex': rawtx['hex'], 'listunconfirmedancestors': 'dummy_value'}])
 
     # Test an attempt to submit transactions (via rpc interface) which are already known
     #   - received earlier through the p2p interface and not processed yet
@@ -259,6 +304,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # - 1K txs used
         # - allowhighfees=False (default)
         # - dontcheckfee=False (default)
+        # - listunconfirmedancestors=False (default)
         # - txn chains are in ordered sequence (no orphans should be detected during processing)
         #
         # Test case config
@@ -280,6 +326,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # - 1K txs used
         # - allowhighfees=False (default)
         # - dontcheckfee=False (default)
+        # - listunconfirmedancestors=False (default)
         # - txn chains are shuffled (orphans should be detected during processing)
         #
         # Test case config
@@ -300,6 +347,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # - 10K txs used
         # - allowhighfees=False (default)
         # - dontcheckfee=False (default)
+        # - listunconfirmedancestors=False (default)
         # - txn chains are in ordered sequence (no orphans should be detected during processing)
         #
         # Test case config
@@ -321,6 +369,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # - 1K txs used
         # - allowhighfees=False (an explicit default value)
         # - dontcheckfee=False (an explicit default value)
+        # - listunconfirmedancestors=False (an explicit default value)
         # - txn chains are in ordered sequence (no orphans should be detected during processing)
         #
         # Test case config
@@ -328,22 +377,24 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         chain_length = 100
         allowhighfees=False
         dontcheckfee=False
+        listunconfirmedancestors=False
         # Node's config
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS4: {} chains of length {}. allowhighfees={}, dontcheckfee={}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee)),
+        with self.run_node_with_connections('TS4: {} chains of length {}. allowhighfees={}, dontcheckfee={}, listunconfirmedancestors{}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee), str(listunconfirmedancestors)),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario1(conn, num_of_chains, chain_length, out, allowhighfees, dontcheckfee, timeout=20)
+            self.run_scenario1(conn, num_of_chains, chain_length, out, allowhighfees, dontcheckfee, listunconfirmedancestors, timeout=20)
 
         # Scenario 5 (TS5).
         # This test case checks a bulk submit of txs, through rpc sendrawtransactions interface, with non-default params.
         # - 1K txs used
         # - allowhighfees=True
         # - dontcheckfee=True
+        # - listunconfirmedancestors=True
         # - txn chains are in ordered sequence (no orphans should be detected during processing)
         #
         # Test case config
@@ -351,16 +402,17 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         chain_length = 100
         allowhighfees=True
         dontcheckfee=True
+        listunconfirmedancestors=True
         # Node's config
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS5: {} chains of length {}. allowhighfees={}, dontcheckfee={}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee)),
+        with self.run_node_with_connections('TS5: {} chains of length {}. allowhighfees={}, dontcheckfee={}, listunconfirmedancestors{}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee), str(listunconfirmedancestors)),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario1(conn, num_of_chains, chain_length, out, allowhighfees, dontcheckfee, timeout=20)
+            self.run_scenario1(conn, num_of_chains, chain_length, out, allowhighfees, dontcheckfee, listunconfirmedancestors, timeout=20)
 
 
         #====================================================================

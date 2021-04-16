@@ -1199,6 +1199,31 @@ static UniValue signrawtransaction(const Config &config,
     return result;
 }
 
+// Constructs and returns an array of all unconfirmed ancestors' ids for a given transaction id
+static UniValue GetUnconfirmedAncestors(const TxId& txid)
+{
+    // If tx is still present in the mempool, list all of its unconfirmed ancestors
+    const auto kind = CTxMemPool::TxSnapshotKind::ONLY_ANCESTORS;
+    UniValue unconfirmedAncestors(UniValue::VARR);
+    for (const auto& entry : mempool.GetTxSnapshot(txid, kind))
+    {
+        UniValue ancestor(UniValue::VOBJ);
+        ancestor.pushKV("txid", entry.GetTxId().GetHex());
+        UniValue inputs(UniValue::VARR);
+        const auto transactionRef = entry.GetSharedTx();
+        for (const CTxIn &txin : transactionRef->vin)
+        {
+            UniValue input(UniValue::VOBJ);
+            input.pushKV("txid", txin.prevout.GetTxId().GetHex());
+            input.pushKV("vout", uint64_t(txin.prevout.GetN()));
+            inputs.push_back(input);
+        }
+        ancestor.pushKV("vin", inputs);
+        unconfirmedAncestors.push_back(ancestor);
+    }
+    return unconfirmedAncestors;
+}
+
 static UniValue sendrawtransaction(const Config &config,
                                    const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
@@ -1427,6 +1452,25 @@ static void KnownTxnsToJSON(const std::vector<TxId>& knownTxns, CJSONWriter& wri
     }
 }
 
+/**
+ * Pushes unconfirmed ancestors of given transactions to JSON writer.
+ */
+static void UnconfirmedAncestorsToJSON(const std::vector<TxId>& txns, CJSONWriter& writer)
+{
+    if (!txns.empty())
+    {
+        writer.writeBeginArray("unconfirmed");
+        for (const auto& txid : txns)
+        {
+            writer.writeBeginObject();
+            writer.pushKV("txid", txid.GetHex());
+            writer.pushKVJSONFormatted("ancestors", GetUnconfirmedAncestors(txid).write());
+            writer.writeEndObject();
+        }
+        writer.writeEndArray();
+    }
+}
+
 void sendrawtransactions(const Config& config,
                          const JSONRPCRequest& request,
                          HTTPRequest* httpReq,
@@ -1435,7 +1479,7 @@ void sendrawtransactions(const Config& config,
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 1) {
         throw std::runtime_error(
-            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false}, ...]\n"
+            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false, \"listunconfirmedancestors\": true|false}, ...]\n"
             "\nSubmits raw transactions (serialized, hex-encoded) to local node "
             "and network.\n"
             "\nTo maximise performance, transaction chains should be provided in inheritance order\n"
@@ -1450,8 +1494,10 @@ void sendrawtransactions(const Config& config,
             "The hex string of the raw transaction\n"
             "         \"allowhighfees\": true|false,  (boolean, optional, default=false) "
             "Allow high fees\n"
-            "         \"dontcheckfee\": true|false    (boolean, optional, default=false) "
+            "         \"dontcheckfee\": true|false,   (boolean, optional, default=false) "
             "Don't check fee\n"
+            "         \"listunconfirmedancestors\": true|false  (boolean, optional, default=false) "
+            "List transaction ids of unconfirmed ancestors\n"
             "       } \n"
             "       ,...\n"
             "     ]\n"
@@ -1490,6 +1536,26 @@ void sendrawtransactions(const Config& config,
             "      ]\n"
             "    }\n"
             "    ,...\n"
+            "  ],\n"
+            "  \"unconfirmed\" : [              (json array) List of transactions with their unconfirmed ancestors "
+            "(only if listunconfirmedancestors was set to true)\n"
+            "    {\n"
+            "      \"txid\" : xxxxxxxx,         (string) The transaction id\n"
+            "      \"ancestors\" : [            (json array) List of all ancestors that are still in the mempool\n"
+            "        {\n"
+            "          \"txid\" : xxxxxxxx,     (string) Ancestor's transaction id\n"
+            "          \"vin\" : [              (json array) List of onacestor's inputs\n"
+            "            {\n"
+            "              \"txid\" : xxxxxxxx, (string) Input's transaction id\n"
+            "              \"vout\" : x         (numeric) Input's vout index\n"
+            "            }\n"
+            "            ,...\n"
+            "          ]\n"
+            "        }\n"
+            "        ,...\n"
+            "      ]\n"
+            "    }\n"
+            "    ,...\n"
             "  ]\n"
             "}\n"
 
@@ -1500,12 +1566,16 @@ void sendrawtransactions(const Config& config,
                            "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true}]\"") +
             HelpExampleCli("sendrawtransactions",
                            "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true, \\\"dontcheckfee\\\":true}]\"") +
+            HelpExampleCli("sendrawtransactions",
+                           R"("[{\"hex\":\"hexstring\", \"listunconfirmedancestors\":true}]")") +
             HelpExampleRpc("sendrawtransactions",
                            "[{\"hex\":\"hexstring\"}]") +
             HelpExampleRpc("sendrawtransactions",
                            "[{\"hex\":\"hexstring\", \"allowhighfees\":true}]") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]"));
+                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]") +
+            HelpExampleRpc("sendrawtransactions",
+                           R"([{"hex":"hexstring", "listunconfirmedancestors":true}])"));
     }
 
     if(httpReq == nullptr)
@@ -1526,6 +1596,8 @@ void sendrawtransactions(const Config& config,
     std::vector<TxId> vTxToPrioritise {};
     // A vector to store already known transactions.
     std::vector<TxId> vKnownTxns {};
+    // A vector to store transactions that need a list of unconfirmed ancestors.
+    std::vector<TxId> vTxListUnconfirmedAncestors {};
 
     /**
      * Parse an input data
@@ -1564,9 +1636,10 @@ void sendrawtransactions(const Config& config,
                 nMaxRawTxFee = Amount(0);
             }
         }
-        // Read dontcheckfee.
         bool fTxToPrioritise = false;
+        bool listUnconfirmedAncestors = false;
         bool fTxInMempools = mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);
+        // Read dontcheckfee.
         const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
         if (!dontcheckfee.isNull()) {
             if (!dontcheckfee.isBool()) {
@@ -1584,6 +1657,22 @@ void sendrawtransactions(const Config& config,
                 vKnownTxns.emplace_back(txid);
             }
             continue;
+        }
+        else
+        {
+            // Read listunconfirmedancestors.
+            const UniValue& listunconfirmedancestors = find_value(o, "listunconfirmedancestors");
+            if (!listunconfirmedancestors.isNull())
+            {
+                if (!listunconfirmedancestors.isBool())
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("listunconfirmedancestors: Invalid value"));
+                }
+                else if (listunconfirmedancestors.isTrue())
+                {
+                    listUnconfirmedAncestors = true;
+                }
+            }
         }
         // Create an object with transaction's input data.
         TxInputDataSPtr pTxInputData =
@@ -1609,6 +1698,11 @@ void sendrawtransactions(const Config& config,
             // Check if txn needs to be prioritised
             if (fTxToPrioritise) {
                 vTxToPrioritise.emplace_back(txid);
+            }
+            // Remember a transaction for which we want to list its unconfirmed ancestors
+            if (listUnconfirmedAncestors)
+            {
+                vTxListUnconfirmedAncestors.emplace_back(txid);
             }
         }
     }
@@ -1678,6 +1772,8 @@ void sendrawtransactions(const Config& config,
      *   - reject reason
      * 3. txid of a transaction evicted from the mempool during processing:
      *   - txn which was accepted and then removed due to insufficient fee
+     * 4. txids of unconfirmed ancestors if transaction was marked with listunconfirmedancestors
+     *   - only if transaction is still in the mempool
      *
      * Accepted txids are not returned in the result set, as it could create false-positives,
      * for accepted txns, if:
@@ -1707,6 +1803,8 @@ void sendrawtransactions(const Config& config,
     InvalidTxnsToJSON(rejectedTxns.first, jWriter);
     // Evicted txns array.
     EvictedTxnsToJSON(rejectedTxns.second, jWriter);
+    // List unconfirmed ancestors.
+    UnconfirmedAncestorsToJSON(vTxListUnconfirmedAncestors, jWriter);
     jWriter.writeEndObject();
     jWriter.pushKV("error", nullptr);
     jWriter.pushKVJSONFormatted("id", request.id.write());

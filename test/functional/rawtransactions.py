@@ -48,6 +48,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         raw= conn.createrawtransaction(inputs, outputs)
         return conn.signrawtransaction(raw)["hex"]
 
+    # Get vout id for specific value from given transaction
+    def get_vout(self, conn, txid, value):
+        return next(i for i, vout in enumerate(conn.getrawtransaction(txid, 1)["vout"]) if vout["value"] == value)
+
     def run_test(self):
         # prepare some coins for multiple *rawtransaction commands
         self.nodes[2].generate(1)
@@ -276,9 +280,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[3].generate(101)
         self.sync_all()
         txId = self.nodes[3].sendtoaddress(self.nodes[3].getnewaddress(), 30)
-        rawtx = self.nodes[3].getrawtransaction(txId,1)
         # Identify the 30btc output
-        nOut = next(i for i, vout in enumerate(rawtx["vout"]) if vout["value"] == Decimal("30"))
+        nOut = self.get_vout(self.nodes[3], txId, Decimal("30"))
         inputs2 = []
         outputs2 = {}
         inputs2.append({"txid": txId, "vout": nOut})
@@ -357,6 +360,37 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(txid2 in mempool)
         assert(rejectedTxns['evicted'][0] not in mempool)
         assert(rejectedTxns['evicted'][1] not in mempool)
+        # Test listunconfirmedancestors option
+        # Create two parents and send one child
+        parent_tx_1 = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("0.1"))
+        parent_tx_1_vout = self.get_vout(self.nodes[0], parent_tx_1, Decimal("0.1"))
+        parent_tx_2 = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("0.2"))
+        parent_tx_2_vout = self.get_vout(self.nodes[0], parent_tx_2, Decimal("0.2"))
+        inputs = []
+        inputs.append({"txid": parent_tx_1, "vout": parent_tx_1_vout})
+        inputs.append({"txid": parent_tx_2, "vout": parent_tx_2_vout})
+        outputs = {}
+        outputs[self.nodes[0].getnewaddress()] = Decimal("0.09998")
+        outputs[self.nodes[0].getnewaddress()] = Decimal("0.2")
+        child_tx = self.nodes[0].signrawtransaction(self.nodes[0].createrawtransaction(inputs, outputs))["hex"]
+        # sendrawtransactions with listunconfirmedancestors set to true for specified transactions should:
+        # - contain "unconfirmed" array of elements with:
+        #   - "txid" of the specified transaction
+        #   - "ancestors" as an array of transaction's unconfirmed ancestors each containing its txid and inputs
+        unconfirmed = self.nodes[0].sendrawtransactions([{'hex': child_tx, 'listunconfirmedancestors': True }])
+        wait_until(lambda: unconfirmed["unconfirmed"][0]["txid"] in self.nodes[0].getrawmempool())
+        assert_equal(len(unconfirmed), 1)
+        assert_equal(len(unconfirmed["unconfirmed"]), 1)
+        assert_equal(len(unconfirmed["unconfirmed"][0]["ancestors"]), 2)
+        ancestors_txids = []
+        for ancestor in unconfirmed["unconfirmed"][0]["ancestors"]:
+          ancestors_txids.append(ancestor["txid"])
+          assert_equal(len(ancestor["vin"]), 1)
+          vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
+          assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
+          assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
+        assert(parent_tx_1 in ancestors_txids)
+        assert(parent_tx_2 in ancestors_txids)
 
 if __name__ == '__main__':
     RawTransactionsTest().main()
