@@ -174,8 +174,10 @@ class CTxnValidator final
         const std::vector<TxId>& vRemovedTxIds,
         CTxnHandlers& handlers);
 
-    /** Schedule orphan p2p txns for retry into the main queue */
-    size_t scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtrVec& vCancelledTxns);
+    /** Schedule orphan p2p txns for retry into the result vector */
+    size_t scheduleOrphanP2PTxnsForReprocessing(
+        const TxInputDataSPtrVec& vCancelledTxns,
+        TxInputDataSPtrVec& vNextProcessingQueue);
 
     /** Check if the given txn is known in the given set of txns */
 	template<typename T>
