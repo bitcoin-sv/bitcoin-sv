@@ -1945,6 +1945,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
             "{\n"
             "  \"index\" :          (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
             "  \"txOrId\" :         (string) txid or whole tx depending on parameter value\"includeFullTx\"\n"
+            "  \"targetType\" :     (string) implicitly \"hash\" if omitted, otherwise \"header\" or \"merkleroot\"\n"
             "  \"target\" :         (string) Block hash, block header or merkleroot depending on parameter value\"targetType\"\n"
             "  \"nodes\" :          (json array) Merkle Proof for transaction txOrId as array of nodes\n"
             "  [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
@@ -2074,7 +2075,9 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
         }
 
         //target
-        if(targetType == "header") // Target is block hash as specified by (flags & (0x04 | 0x02)) == 2
+        if (targetType != "hash")
+            callbackDataObject.pushKV("targetType", targetType);
+        if(targetType == "header") // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
         {
             int confirmations = 0;
             std::optional<uint256> nextBlockHash;
