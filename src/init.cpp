@@ -1179,6 +1179,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Keep at most <n> collected "
                     "outpoints in memory (default: %u)"),
             COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS));
+    strUsage += HelpMessageOpt(
+        "-maxorphansinbatchpercent=<n>",
+        strprintf(_("Maximal number of orphans scheduled for re-validation as percentage of max batch size. "
+                    "(1 to 100, default:%lu)"),
+            COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH));
+    strUsage += HelpMessageOpt(
+        "-maxinputspertransactionoutoffirstlayerorphan=<n>",
+        strprintf(_("Maximal number of inputs of a non-first-layer transaction that can be scheduled for re-validation. "
+                    "(default:%lu)"),
+            COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION));
 
     /** TxnValidator */
     strUsage += HelpMessageGroup(_("TxnValidator options:"));
@@ -1925,6 +1935,20 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (std::string err; !config.SetMaxOrphanTxSize(
         gArgs.GetArgAsBytes("-maxorphantxsize",
             COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+    
+    if (std::string err; !config.SetMaxOrphansInBatchPercentage(
+        gArgs.GetArg("-maxorphansinbatchpercent",
+            COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH), &err))
+    {
+        return InitError(err);
+    }
+
+    if (std::string err; !config.SetMaxInputsForSecondLayerOrphan(
+        gArgs.GetArgAsBytes("-maxinputspertransactionoutoffirstlayerorphan",
+            COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION), &err))
     {
         return InitError(err);
     }

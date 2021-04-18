@@ -9,11 +9,27 @@
 COrphanTxns::COrphanTxns(
     size_t maxCollectedOutpoints,
     size_t maxExtraTxnsForCompactBlock,
-    size_t maxTxSizePolicy)
+    size_t maxTxSizePolicy,
+    size_t maxPercentageOfOrphansInBatch,
+    size_t maxInputsOutputsPerTx)
 : mMaxCollectedOutpoints(maxCollectedOutpoints),
   mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock),
-  mMaxStandardTxSize(maxTxSizePolicy)
-{}
+  mMaxStandardTxSize(maxTxSizePolicy),
+  mMaxPercentageOfOrphansInBatch(maxPercentageOfOrphansInBatch),
+  mMaxInputsOutputsPerTx(maxInputsOutputsPerTx)
+{
+    size_t nMaxStdTxnsPerThreadRatio {
+        static_cast<size_t>(
+                gArgs.GetArg("-maxstdtxnsperthreadratio", DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO))
+    };
+
+    size_t nNumStdTxValidationThreads {
+        static_cast<size_t>(
+                gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
+    };
+
+    mMaxTxsPerBatch = nMaxStdTxnsPerThreadRatio * nNumStdTxValidationThreads;
+}
 
 void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
     if (!pTxInputData || pTxInputData->IsDeleted()) {
@@ -241,10 +257,12 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
 // The method is used to get any awaiting orphan txs that can be reprocessed.
 // - this decision is made based on outpoints which were produced by newly accepted txs
 // - the algorithm does not check if all missing outpoints are available
-// - the order of returned orphans is non-deterministic
+// - the order of returned orphans in the first layer is non-deterministic
 //   (including those from the direct parent)
+// - the order of returned orphans in layers above first is depending on the order in the first layer
 std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
-    std::unordered_set<TxInputDataSPtr> usetTxnsToReprocess {};
+    std::vector<TxInputDataSPtr> vecTxnsToReprocess {}; // maintaining order
+    std::unordered_set<TxInputDataSPtr> usetTxnsToReprocess {}; // preventing duplicates
     {
         std::unique_lock<std::shared_mutex> lock1(mOrphanTxnsMtx, std::defer_lock);
         std::unique_lock<std::mutex> lock2(mCollectedOutpointsMtx, std::defer_lock);
@@ -276,9 +294,62 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
             ++collectedOutpointIter;
         }
         mCollectedOutpoints.clear();
+
+        // We need to randomize first layer transactions, so we will fill vecTxnsToReprocess vector from the set 
+        assert(vecTxnsToReprocess.empty());
+        vecTxnsToReprocess.insert(vecTxnsToReprocess.end(), usetTxnsToReprocess.begin(), usetTxnsToReprocess.end());
+
+        // Limit of orphans in the batch
+        const auto maxOrphanInputsPerBatch = mMaxTxsPerBatch * mMaxPercentageOfOrphansInBatch / 100;
+
+        // Exit early if we are over the limit
+        if (vecTxnsToReprocess.size() > maxOrphanInputsPerBatch){
+            return vecTxnsToReprocess;
+        }
+
+        // queue of transactions to visit (FIFO)
+        std::queue<const CTransaction*> toCollectDescedantsFrom;
+        for (const auto& entry: vecTxnsToReprocess){
+            toCollectDescedantsFrom.push(entry->GetTxnPtr().get());
+        }
+
+        // Iterate over children of collected outpoints (breadth first) to find dependent orphans in next layers.
+        while(toCollectDescedantsFrom.size() > 0 && usetTxnsToReprocess.size() < maxOrphanInputsPerBatch){
+            auto tx = toCollectDescedantsFrom.front();
+            toCollectDescedantsFrom.pop();
+            for (uint32_t n = 0; n < tx->vout.size() && n < mMaxInputsOutputsPerTx; n++){
+                const COutPoint outpoint{tx->GetId(), n};
+                auto outpointFoundIter = mOrphanTxnsByPrev.find(outpoint);
+
+                if (outpointFoundIter == mOrphanTxnsByPrev.end()) {
+                    continue;
+                }
+
+                // do not reschedule double-spend orphans
+                if (outpointFoundIter->second.size() > 1) {
+                    continue;
+                }
+
+                const COrphanTxnEntry* pOrphanEntry = *(outpointFoundIter->second.begin());
+                const TxInputDataSPtr& pTxInputData { pOrphanEntry->pTxInputData };
+
+                // do not reschedule orphans with large number inputs
+                const CTransaction* orphanTx = pTxInputData->GetTxnPtr().get();
+                if(orphanTx->vin.size() > mMaxInputsOutputsPerTx) {
+                    continue;
+                }
+
+                if(usetTxnsToReprocess.insert(pTxInputData).second) {
+                    pTxInputData->SetAcceptTime(GetTime());
+                    vecTxnsToReprocess.push_back(pTxInputData);
+                    toCollectDescedantsFrom.push(orphanTx);
+                }
+            }
+        }
     }
-    return {usetTxnsToReprocess.begin(), usetTxnsToReprocess.end()};
+    return vecTxnsToReprocess;
 }
+
 
 void COrphanTxns::collectTxnOutpoints(const CTransaction& tx) {
     size_t nTxOutpointsNum = tx.vout.size();
