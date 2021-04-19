@@ -100,6 +100,7 @@ ENVIRONMENT_TYPE = {
 # test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
 # factor for release build is always 1; it is still present in this map for consistency
 TIMEOUT_FACTOR_FOR_TESTS = {
+    "bsv-block-propagation-priority.py" : [1,2,2,3],
 }
 
 # This tests can be only run by explicitly specifying them on command line. 
