@@ -3083,7 +3083,25 @@ public:
             After we obtain the lock once again we check if chain tip has changed
             in the meantime - if not we continue as if we had a lock all along,
             otherwise we skip chain tip update part and retry with a new candidate.*/
-            CTemporaryLeaveCriticalSectionGuard csGuard{ cs_main };
+            class LeaveCriticalSectionGuard
+            {
+            public:
+                LeaveCriticalSectionGuard( CCoinsViewCache& view )
+                    : mView{ view }
+                {
+                    LEAVE_CRITICAL_SECTION(cs_main)
+                }
+                ~LeaveCriticalSectionGuard()
+                {
+                    // Make sure that we aren't holding view locked before
+                    // re-obtaining cs_main as that could cause a dead lock.
+                    mView.ForceDetach();
+                    ENTER_CRITICAL_SECTION(cs_main)
+                }
+
+            private:
+                CCoinsViewCache& mView;
+            } csGuard{ view };
 
             if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
             {
