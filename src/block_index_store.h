@@ -58,6 +58,7 @@ public:
                 block.GetHash(),
                 block,
                 (prev != mStore.end() ? &prev->second : nullptr),
+                mDirtyBlockIndex,
                 CBlockIndex::PrivateTag{})
             .first;
 
