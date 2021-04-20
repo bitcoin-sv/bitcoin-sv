@@ -131,6 +131,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"verifyscript", 0, "scripts"},
     {"verifyscript", 1, "stopOnFirstInvalid"},
     {"verifyscript", 2, "totalTimeout"},
+    {"getmerkleproof2",2,"includeFullTx"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},
