@@ -908,7 +908,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt(
                 "-dustlimitfactor=<n>",
                 strprintf(_("The dust limit factor (a value in percent) is applied to the dust relay fee to determine if an output is dust. "
-                            "Default value is %l%%, minimum value is 0%%, maximum value is %l%% "), DEFAULT_DUST_LIMIT_FACTOR, DEFAULT_DUST_LIMIT_FACTOR));
+                            "Default value is %ld%%, minimum value is 0%%, maximum value is %ld%% "), DEFAULT_DUST_LIMIT_FACTOR, DEFAULT_DUST_LIMIT_FACTOR));
     }
     strUsage += HelpMessageOpt(
         "-datacarrier",
