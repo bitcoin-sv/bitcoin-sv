@@ -102,6 +102,7 @@ ENVIRONMENT_TYPE = {
 TIMEOUT_FACTOR_FOR_TESTS = {
     "bsv-block-propagation-priority.py" : [1,2,2,3],
     "bsv-consolidation-feefilter.py" : [1,4,4,5],
+    "bsv-genesis-general.py" : [1,2,2,3],
 }
 
 # This tests can be only run by explicitly specifying them on command line. 

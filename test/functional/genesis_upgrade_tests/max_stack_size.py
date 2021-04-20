@@ -14,7 +14,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + \
         ['-maxstackmemoryusagepolicy=%d' % (MAX_STACK_MEMORY_USAGE_POLICY + 2 * ELEMENT_OVERHEAD),
          '-maxstackmemoryusageconsensus=%d' % (MAX_STACK_MEMORY_USAGE_CONSENSUS + 2 * ELEMENT_OVERHEAD),
-         '-banscore=1000000', '-whitelist=127.0.0.1']
+         '-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
     NAME = "Max stack size with custom maxstackmemoryusagepolicy and maxstackmemoryusageconsensus"
 
     TESTS = [
@@ -78,7 +78,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
     ]
 
 class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
     NAME = "Max stack size before genesis: MAX_STACK_ELEMENTS_COUNT limit"
 
     TESTS = [
@@ -102,7 +102,7 @@ class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):
     ]
 
 class MaxStackSizeTest(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
     NAME = "Max stack size with default policy and consensus size"
 
     # After genesis, default max stack memory usage is MAX_INT. For policy 100 MB.

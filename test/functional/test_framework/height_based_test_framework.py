@@ -9,7 +9,11 @@ from test_framework.script import CScript, OP_CHECKSIG, OP_TRUE, SignatureHashFo
     OP_FALSE, OP_RETURN
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, try_rpc, loghash
+from test_framework.cdefs import DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION
 
+# For Release build with sanitizers enabled (TSAN / ASAN / UBSAN), recommended timeoutfactor is 2.
+# For Debug build, recommended timeoutfactor is 2.
+# For Debug build with sanitizers enabled, recommended timeoutfactor is 3.
 
 class TxCollection:
 
@@ -196,7 +200,6 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         self.tip_time = None
         super(SimplifiedTestFramework, self).__init__()
 
-
     def set_test_params(self):
         self.num_nodes = 1
         self.num_peers = 0
@@ -346,9 +349,8 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             return all((t.hash in mempool) for t in to_accept)
 
         wait_until(tt,
-                   timeout=p2p_accept_timeout, check_interval=0.2,
+                   timeout=(p2p_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
                    label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept) }")
-
         self.check_mp()
 
     def _assert_height(self, connection, desired_height):
@@ -413,10 +415,32 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
     def run_test(self):
 
+        def multiplyArg(arg, factor):
+            return arg.split("=")[0] + "=" + str(int(int(arg.split("=")[1])*factor))
+
         self.stop_node(0)
         for test in self._gen_tests:
             test.log = self.log
             self.coinbase_pubkey = test.COINBASE_KEY.get_pubkey() if test.COINBASE_KEY else None
+
+            # if specific tests set -maxstdtxvalidationduration, multiply set value with timeoutfactor to enable longer validation time in slower environments
+            test.ARGS = ([multiplyArg(arg, self.options.timeoutfactor) if arg.startswith("-maxstdtxvalidationduration=") else arg for arg in test.ARGS])
+            # if specific tests set -maxnonstdtxvalidationduration, multiply set value with timeoutfactor to enable longer validation time in slower environments
+            test.ARGS = ([multiplyArg(arg, self.options.timeoutfactor) if arg.startswith("-maxnonstdtxvalidationduration=") else arg for arg in test.ARGS])
+            # if specific tests set -maxtxnvalidatorasynctasksrunduration, multiply set value with timeoutfactor to enable longer validation time in slower environments
+            test.ARGS = ([multiplyArg(arg, self.options.timeoutfactor) if arg.startswith("-maxtxnvalidatorasynctasksrunduration=") else arg for arg in test.ARGS])
+
+            # maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration
+            # If we modiy maxnonstdtxvalidationduration due to slower circumstances, check if maxtxnvalidatorasynctasksrunduration should be implicitly increased.
+            if self.options.timeoutfactor > 1  and \
+               (not any("-maxtxnvalidatorasynctasksrunduration" in arg for arg in test.ARGS) and any("-maxnonstdtxvalidationduration" in arg for arg in test.ARGS)):
+                new_maxnonstdtxvalidationduration = [int(arg.split("=")[1]) for arg in test.ARGS if arg.startswith("-maxnonstdtxvalidationduration=")]
+                if len(new_maxnonstdtxvalidationduration) > 0:
+                    new_maxnonstdtxvalidationduration = new_maxnonstdtxvalidationduration[0]
+                    if (DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION * 1000 <= new_maxnonstdtxvalidationduration):
+                        self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration+1} ms.")
+                        test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration+1))
+
             with self.run_node_with_connections(title=test.NAME,
                                                 node_index=0,
                                                 args=test.ARGS,
