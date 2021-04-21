@@ -13,6 +13,7 @@ from test_framework.util import p2p_port, check_for_log_msg, assert_equal
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 from test_framework.mininode import *
 from test_framework.script import *
+import os
 import platform
 import subprocess
 import time
@@ -378,7 +379,10 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1", "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Skipping notification to endpoint in skiplist 127.0.0.3", "/node0"))
-        wait_until(lambda: check_for_log_msg(self, "Timeout sending slow-queue notification to endpoint 127.0.0.2", "/node0"), timeout=70)
+        if(os.name == "nt"):
+            wait_until(lambda: check_for_log_msg(self, "Error sending notification to endpoint 127.0.0.2", "/node0"))
+        else:
+            wait_until(lambda: check_for_log_msg(self, "Timeout sending slow-queue notification to endpoint 127.0.0.2", "/node0"))
 
 
     # Test that proof is not sent if callback server does not want it.
