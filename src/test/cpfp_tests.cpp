@@ -394,7 +394,7 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
-    mempool.RemoveForBlock({entryNotPaying1.GetSharedTx(), entryNotPaying3.GetSharedTx()}, 0, mining::CJournalChangeSetPtr{}, uint256{});
+    mempool.RemoveForBlock({entryNotPaying1.GetSharedTx(), entryNotPaying3.GetSharedTx()}, mining::CJournalChangeSetPtr{}, uint256{});
 
     for(auto entryIt: {notPaying2, paysFor2})
     {
@@ -522,4 +522,50 @@ BOOST_AUTO_TEST_CASE(journal_groups)
     BOOST_CHECK(entryGroup1Tx2.GetTxId() == vtx[2]->GetId());
 
 };
+
+BOOST_AUTO_TEST_CASE(conflicts)
+{
+    mempool.SetSanityCheck(0);
+    CTxMemPoolTestAccess testAccess(mempool);
+    auto journal = testAccess.getJournalBuilder().getCurrentJournal();
+    
+    //               |                            |
+    //     entryDoubleSpendMempool         entryToBeMined          
+    //               |                       |        | 
+    //     ------------------------------------------------------ CONTENT OF THE BLOCK(entryDoubleSpendBlock, entryToBeMined)
+    //               |                       |        | 
+    //               +-------+        +------+        +---+
+    //                       |        |                   |
+    //                   entryDoubleSpendChild        entryStayInMempool
+    //
+    // entryDoubleSpendMempool is in conflict with entryDoubleSpendBlock causing that entryDoubleSpendChild will be removed from the mempool
+    //
+    //
+
+    auto inputForDoubleSpend = MakeConfirmedInputs(1, Amount{1000000});
+
+    auto entryDoubleSpendMempool = MakeEntry(CFeeRate(CFeeRate()), inputForDoubleSpend, {}, 1);
+    auto entryDoubleSpendBlock = MakeEntry(CFeeRate(CFeeRate()), inputForDoubleSpend, {}, 2);
+    auto entryToBeMined = MakeEntry(CFeeRate(), MakeConfirmedInputs(1, Amount{1000000}), {}, 2);
+    auto entryDoubleSpendChild = MakeEntry(CFeeRate(Amount(20000)), {}, {std::make_tuple(entryDoubleSpendMempool.GetSharedTx(), 0), std::make_tuple(entryToBeMined.GetSharedTx(), 0)}, 1);
+    auto entryStayInMempool = MakeEntry(CFeeRate(Amount(20000)), {}, {std::make_tuple(entryToBeMined.GetSharedTx(), 1)}, 1);
+
+    auto tx1 = AddToMempool(entryDoubleSpendMempool);
+    auto tx2 = AddToMempool(entryToBeMined);
+    auto tx3 = AddToMempool(entryDoubleSpendChild);
+    auto tx4 = AddToMempool(entryStayInMempool);
+
+    for(auto entryIt: {tx1, tx2, tx3, tx4})
+    {
+        BOOST_CHECK(entryIt->IsInPrimaryMempool());
+        BOOST_CHECK(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
+    }
+
+    mempool.RemoveForBlock({entryDoubleSpendBlock.GetSharedTx(), entryToBeMined.GetSharedTx()}, mining::CJournalChangeSetPtr{}, uint256{});
+
+    BOOST_CHECK(tx4->IsInPrimaryMempool());
+    BOOST_CHECK(JournalTester(journal).checkTxnExists(JournalEntry{*tx4}));
+    BOOST_CHECK(mempool.GetTransactions().size() == 1);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

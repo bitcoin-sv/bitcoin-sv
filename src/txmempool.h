@@ -699,7 +699,6 @@ private:
 public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
-            int32_t nBlockHeight,
             const mining::CJournalChangeSetPtr& changeSet,
             const uint256& blockhash);
 
