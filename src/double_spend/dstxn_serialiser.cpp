@@ -32,13 +32,21 @@ DSTxnSerialiser::TxnHandle::~TxnHandle()
     // Tidy up and delete our underlying file (if we have one)
     if(!mTxnFile.empty())
     {
-        if(fs::remove(mTxnFile))
+        try
         {
-            LogPrint(BCLog::DOUBLESPEND, "Deleted serialised txn file %s\n", mTxnFile.string());
+            if(fs::remove(mTxnFile))
+            {
+                LogPrint(BCLog::DOUBLESPEND, "Deleted serialised txn file %s\n", mTxnFile.string());
+            }
+            else
+            {
+                LogPrint(BCLog::DOUBLESPEND, "Failed to delete serialised txn file %s\n", mTxnFile.string());
+            }
         }
-        else
+        catch(std::exception& e)
         {
-            LogPrint(BCLog::DOUBLESPEND, "Failed to delete serialised txn file %s\n", mTxnFile.string());
+            LogPrint(BCLog::DOUBLESPEND, "Error deleting serialised txn file %s : %s\n", mTxnFile.string(),
+                e.what());
         }
     }
 }
@@ -112,9 +120,17 @@ void DSTxnSerialiser::MakeDataDir() const
 // Remove our working data dir
 void DSTxnSerialiser::RemoveDataDir() const
 {
-    if(fs::remove_all(mTxnDir) > 0)
+    try
     {
-        LogPrint(BCLog::DOUBLESPEND, "Removed double-spend txns directory %s\n", mTxnDir.string());
+        if(fs::remove_all(mTxnDir) > 0)
+        {
+            LogPrint(BCLog::DOUBLESPEND, "Removed double-spend txns directory %s\n", mTxnDir.string());
+        }
+    }
+    catch(std::exception& e)
+    {
+        LogPrint(BCLog::DOUBLESPEND, "Error removing double-spend txns directory %s : %s\n",
+            mTxnDir.string(), e.what());
     }
 }
 
