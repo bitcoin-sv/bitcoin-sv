@@ -83,7 +83,7 @@ class CTxnValidator final
 
   public:
     // Default run frequency in asynch mode
-    static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {100};
+    static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {10};
     // Default maximum validation duration for async tasks in a single run
     static constexpr std::chrono::milliseconds DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION {
         std::chrono::seconds(10)
