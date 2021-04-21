@@ -2994,43 +2994,6 @@ public:
             return true;
         }
 
-        bool fScriptChecks = true;
-        if (!hashAssumeValid.IsNull()) {
-            // We've been configured with the hash of a block which has been
-            // externally verified to have a valid history. A suitable default value
-            // is included with the software and updated from time to time. Because
-            // validity relative to a piece of software is an objective fact these
-            // defaults can be easily reviewed. This setting doesn't force the
-            // selection of any particular chain but makes validating some faster by
-            // effectively caching the result of part of the verification.
-            if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
-            {
-                const auto& bestHeader = mapBlockIndex.GetBestHeader();
-                if (index->GetAncestor(pindex->GetHeight()) == pindex &&
-                    bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
-                    bestHeader.GetChainWork() >= nMinimumChainWork)
-                {
-                    // This block is a member of the assumed verified chain and an
-                    // ancestor of the best header. The equivalent time check
-                    // discourages hashpower from extorting the network via DOS
-                    // attack into accepting an invalid block through telling users
-                    // they must manually set assumevalid. Requiring a software
-                    // change or burying the invalid block, regardless of the
-                    // setting, makes it hard to hide the implication of the demand.
-                    // This also avoids having release candidates that are hardly
-                    // doing any signature verification at all in testing without
-                    // having to artificially set the default assumed verified block
-                    // further back. The test against nMinimumChainWork prevents the
-                    // skipping when denied access to any chain at least as good as
-                    // the expected chain.
-                    fScriptChecks =
-                        (GetBlockProofEquivalentTime(
-                             bestHeader, *pindex, bestHeader,
-                             consensusParams) <= 60 * 60 * 24 * 7 * 2);
-                }
-            }
-        }
-
         int64_t nTime1 = GetTimeMicros();
         nTimeCheck += nTime1 - nTimeStart;
         LogPrint(BCLog::BENCH, "    - Sanity checks: %.2fms [%.2fs]\n",
@@ -3099,13 +3062,6 @@ public:
             }
         }
 
-        // Start enforcing BIP68 (sequence locks).
-        int nLockTimeFlags = 0;
-        if (pindex->GetHeight() >= consensusParams.CSVHeight) {
-            nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->GetHeight()));
-        }
-        const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
-        bool isGenesisEnabled = IsGenesisEnabled(config, pindex->GetHeight());
         int64_t nTime2 = GetTimeMicros();
         nTimeForks += nTime2 - nTime1;
         LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs]\n",
@@ -3113,34 +3069,13 @@ public:
 
         CBlockUndo blockundo;
 
-        // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
-        using NullScriptChecker =
-            checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
-
-        // Token for use during functional testing
-        std::optional<task::CCancellationToken> checkPoolToken;
-
-        auto control =
-            fScriptChecks
-            ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
-            : NullScriptChecker{};
-
-        std::vector<int32_t> prevheights;
-        Amount nFees(0);
         size_t nInputs = 0;
 
-        // Sigops counting. We need to do it again because of P2SH.
-        uint64_t nSigOpsCount = 0;
-        const uint64_t currentBlockSize =
-            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        // Sigops are not counted after Genesis anymore
-        const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
-
-        CDiskTxPos pos(pindex->GetBlockPos(),
-                       GetSizeOfCompactSize(block.vtx.size()));
         std::vector<std::pair<uint256, CDiskTxPos>> vPos;
 
         int64_t nTime4; // This is set inside scope below
+
+        if (parallelBlockValidation)
         {
             /* Script validation is the most expensive part and is also not cs_main
             dependent so in case of parallel block validation we release it for
@@ -3148,203 +3083,19 @@ public:
             After we obtain the lock once again we check if chain tip has changed
             in the meantime - if not we continue as if we had a lock all along,
             otherwise we skip chain tip update part and retry with a new candidate.*/
-            std::unique_ptr<CTemporaryLeaveCriticalSectionGuard> csGuard =
-                parallelBlockValidation
-                ? std::make_unique<CTemporaryLeaveCriticalSectionGuard>(cs_main)
-                : nullptr;
+            CTemporaryLeaveCriticalSectionGuard csGuard{ cs_main };
 
-            vPos.reserve(block.vtx.size());
-            blockundo.vtxundo.reserve(block.vtx.size() - 1);
-
-            uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
-
-            for (size_t i = 0; i < block.vtx.size(); i++) {
-                auto& txRef = block.vtx[i];
-                const CTransaction &tx = *txRef;
-
-                CScopedInvalidTxSenderBlock dumper(
-                    g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr,
-                    txRef, pindex, state);
-
-                nInputs += tx.vin.size();
-
-                if (!tx.IsCoinBase()) {
-                    if (!view.HaveInputs(tx)) {
-                        return state.DoS(
-                            100, error("ConnectBlock(): inputs missing/spent"),
-                            REJECT_INVALID, "bad-txns-inputs-missingorspent");
-                    }
-
-                    // Check that transaction is BIP68 final BIP68 lock checks (as
-                    // opposed to nLockTime checks) must be in ConnectBlock because they
-                    // require the UTXO set.
-                    prevheights.resize(tx.vin.size());
-                    for (size_t j = 0; j < tx.vin.size(); j++) {
-                        prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
-                    }
-
-                    if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
-                        return state.DoS(
-                            100, error("%s: contains a non-BIP68-final transaction",
-                                       __func__),
-                            REJECT_INVALID, "bad-txns-nonfinal");
-                    }
-                }
-
-                // After Genesis we don't count sigops when connecting blocks
-                if (!isGenesisEnabled){
-                    // GetTransactionSigOpCount counts 2 types of sigops:
-                    // * legacy (always)
-                    // * p2sh (when P2SH enabled)
-                    bool sigOpCountError;
-                    uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
-                    if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
-                        return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
-                    }
-
-                    nSigOpsCount += txSigOpsCount;
-                    if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
-                        return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                            REJECT_INVALID, "bad-blk-sigops");
-                    }
-                }
-
-                if (!tx.IsCoinBase()) {
-                    Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
-                    nFees += fee;
-
-                    // Don't cache results if we're actually connecting blocks (still
-                    // consult the cache, though).
-                    bool fCacheResults = fJustCheck;
-
-                    std::vector<CScriptCheck> vChecks;
-
-                    auto res =
-                        CheckInputs(
-                            token,
-                            config,
-                            true,
-                            tx,
-                            state,
-                            view,
-                            fScriptChecks,
-                            flags,
-                            fCacheResults,
-                            fCacheResults,
-                            PrecomputedTransactionData(tx),
-                            &vChecks);
-                    if (!res.has_value())
-                    {
-                        // With current implementation this can never happen as providing
-                        // vChecks as parameter skips the path that checks the cancellation
-                        // token
-                        throw CBlockValidationCancellation{};
-                    }
-                    else if (!res.value())
-                    {
-                        return error("ConnectBlock(): CheckInputs on %s failed with %s",
-                                     tx.GetId().ToString(), FormatStateMessage(state));
-                    }
-
-                    if(fScriptChecks)
-                    {
-                        control.Add(vChecks);
-                    }
-                }
-
-                CTxUndo undoDummy;
-                if (i > 0) {
-                    blockundo.vtxundo.push_back(CTxUndo());
-                }
-                UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(),
-                            pindex->GetHeight());
-
-                vPos.push_back(std::make_pair(tx.GetId(), pos));
-                pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
-            }
-
-            if (parallelBlockValidation)
+            if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
             {
-                view.ForceDetach();
+                return false;
             }
-
-            int64_t nTime3 = GetTimeMicros();
-            nTimeConnect += nTime3 - nTime2;
-            LogPrint(BCLog::BENCH,
-                     "      - Connect %u transactions: %.2fms (%.3fms/tx, "
-                     "%.3fms/txin) [%.2fs]\n",
-                     (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
-                     0.001 * (nTime3 - nTime2) / block.vtx.size(),
-                     nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1),
-                     nTimeConnect * 0.000001);
-
-            Amount blockReward =
-                nFees + GetBlockSubsidy(pindex->GetHeight(), consensusParams);
-            if (block.vtx[0]->GetValueOut() > blockReward) {
-                auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
-                                                   "(actual=%d vs limit=%d)",
-                                                   block.vtx[0]->GetValueOut(), blockReward),
-                                        REJECT_INVALID, "bad-cb-amount");
-                if(!state.IsValid() && g_connman)
-                {
-                    g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
-                }
-                return result;
-
-            }
-
-            if(checkPoolToken)
+        }
+        else
+        {
+            if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
             {
-                // We only wait during tests and even then only if validation would
-                // be performed.
-                blockValidationStatus.waitIfRequired(
-                    pindex->GetBlockHash(),
-                    task::CCancellationToken::JoinToken(checkPoolToken.value(), token));
+                return false;
             }
-
-            std::vector<CScriptCheck> failedChecks;
-            auto controlValidationStatusOK = control.Wait(&failedChecks);
-
-            if (!controlValidationStatusOK.has_value())
-            {
-                // validation was terminated before it was able to complete so we should
-                // skip validity setting to SCRIPTS
-                throw CBlockValidationCancellation{};
-            }
-
-            if (!controlValidationStatusOK.value())
-            {
-                for(const auto& check : failedChecks)
-                {
-                    auto it = std::find_if(block.vtx.begin(), block.vtx.end(),
-                                    [&check](const CTransactionRef& tx)
-                                    {
-                                        return tx.get() == check.GetTransaction();
-                                    });
-                    if (it == block.vtx.end())
-                    {
-                        continue;
-                    }
-
-                    CValidationState state;
-                    state.Invalid( false,
-                                   REJECT_INVALID,
-                                   strprintf("blk-bad-inputs (%s)",
-                                             ScriptErrorString(check.GetScriptError())));
-                    if(g_connman)
-                    {
-                        g_connman->getInvalidTxnPublisher().Publish( { *it, pindex, state } );
-                    }
-                }
-
-                return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs",
-                                 "parallel script check failed");
-            }
-
-            // must be inside this scope as csGuard can take a while to re-obtain
-            // cs_main lock and we don't want that time to count to validation
-            // duration time
-            nTime4 = GetTimeMicros();
         }
 
         // this is the time needed to re-obtain cs_main lock after validation is
@@ -3422,6 +3173,282 @@ public:
     }
 
 private:
+    bool checkScripts(
+        const task::CCancellationToken& token,
+        size_t nInputs,
+        int64_t nTime2,
+        std::vector<std::pair<uint256, CDiskTxPos>>& vPos,
+        CBlockUndo& blockundo,
+        int64_t& nTime4 )
+    {
+        vPos.reserve(block.vtx.size());
+        blockundo.vtxundo.reserve(block.vtx.size() - 1);
+
+        const Consensus::Params& consensusParams =
+            config.GetChainParams().GetConsensus();
+        bool isGenesisEnabled = IsGenesisEnabled(config, pindex->GetHeight());
+
+        // Start enforcing BIP68 (sequence locks).
+        int nLockTimeFlags = 0;
+        if (pindex->GetHeight() >= consensusParams.CSVHeight) {
+            nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->GetHeight()));
+        }
+
+        uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
+        std::vector<int32_t> prevheights;
+        const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
+        uint64_t nSigOpsCount = 0;
+        Amount nFees(0);
+
+        // Sigops counting. We need to do it again because of P2SH.
+        const uint64_t currentBlockSize =
+            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        // Sigops are not counted after Genesis anymore
+        const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
+
+        bool fScriptChecks = true;
+        if (!hashAssumeValid.IsNull()) {
+            // We've been configured with the hash of a block which has been
+            // externally verified to have a valid history. A suitable default value
+            // is included with the software and updated from time to time. Because
+            // validity relative to a piece of software is an objective fact these
+            // defaults can be easily reviewed. This setting doesn't force the
+            // selection of any particular chain but makes validating some faster by
+            // effectively caching the result of part of the verification.
+            if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
+            {
+                const auto& bestHeader = mapBlockIndex.GetBestHeader();
+                if (index->GetAncestor(pindex->GetHeight()) == pindex &&
+                    bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
+                    bestHeader.GetChainWork() >= nMinimumChainWork)
+                {
+                    // This block is a member of the assumed verified chain and an
+                    // ancestor of the best header. The equivalent time check
+                    // discourages hashpower from extorting the network via DOS
+                    // attack into accepting an invalid block through telling users
+                    // they must manually set assumevalid. Requiring a software
+                    // change or burying the invalid block, regardless of the
+                    // setting, makes it hard to hide the implication of the demand.
+                    // This also avoids having release candidates that are hardly
+                    // doing any signature verification at all in testing without
+                    // having to artificially set the default assumed verified block
+                    // further back. The test against nMinimumChainWork prevents the
+                    // skipping when denied access to any chain at least as good as
+                    // the expected chain.
+                    fScriptChecks =
+                        (GetBlockProofEquivalentTime(
+                             bestHeader, *pindex, bestHeader,
+                             consensusParams) <= 60 * 60 * 24 * 7 * 2);
+                }
+            }
+        }
+
+        // Token for use during functional testing
+        std::optional<task::CCancellationToken> checkPoolToken;
+
+        // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
+        using NullScriptChecker =
+            checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
+
+        auto control =
+            fScriptChecks
+            ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
+            : NullScriptChecker{};
+
+        CDiskTxPos pos(pindex->GetBlockPos(),
+                       GetSizeOfCompactSize(block.vtx.size()));
+
+        for (size_t i = 0; i < block.vtx.size(); i++) {
+            auto& txRef = block.vtx[i];
+            const CTransaction &tx = *txRef;
+
+            CScopedInvalidTxSenderBlock dumper(
+                g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr,
+                txRef, pindex, state);
+
+            nInputs += tx.vin.size();
+
+            if (!tx.IsCoinBase()) {
+                if (!view.HaveInputs(tx)) {
+                    return state.DoS(
+                        100, error("ConnectBlock(): inputs missing/spent"),
+                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                }
+
+                // Check that transaction is BIP68 final BIP68 lock checks (as
+                // opposed to nLockTime checks) must be in ConnectBlock because they
+                // require the UTXO set.
+                prevheights.resize(tx.vin.size());
+                for (size_t j = 0; j < tx.vin.size(); j++) {
+                    prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
+                }
+
+                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
+                    return state.DoS(
+                        100, error("%s: contains a non-BIP68-final transaction",
+                                   __func__),
+                        REJECT_INVALID, "bad-txns-nonfinal");
+                }
+            }
+
+            // After Genesis we don't count sigops when connecting blocks
+            if (!isGenesisEnabled){
+                // GetTransactionSigOpCount counts 2 types of sigops:
+                // * legacy (always)
+                // * p2sh (when P2SH enabled)
+                bool sigOpCountError;
+                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
+                if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
+                }
+
+                nSigOpsCount += txSigOpsCount;
+                if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
+                    return state.DoS(100, error("ConnectBlock(): too many sigops"),
+                        REJECT_INVALID, "bad-blk-sigops");
+                }
+            }
+
+            if (!tx.IsCoinBase()) {
+                Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
+                nFees += fee;
+
+                // Don't cache results if we're actually connecting blocks (still
+                // consult the cache, though).
+                bool fCacheResults = fJustCheck;
+
+                std::vector<CScriptCheck> vChecks;
+
+                auto res =
+                    CheckInputs(
+                        token,
+                        config,
+                        true,
+                        tx,
+                        state,
+                        view,
+                        fScriptChecks,
+                        flags,
+                        fCacheResults,
+                        fCacheResults,
+                        PrecomputedTransactionData(tx),
+                        &vChecks);
+                if (!res.has_value())
+                {
+                    // With current implementation this can never happen as providing
+                    // vChecks as parameter skips the path that checks the cancellation
+                    // token
+                    throw CBlockValidationCancellation{};
+                }
+                else if (!res.value())
+                {
+                    return error("ConnectBlock(): CheckInputs on %s failed with %s",
+                                 tx.GetId().ToString(), FormatStateMessage(state));
+                }
+
+                if(fScriptChecks)
+                {
+                    control.Add(vChecks);
+                }
+            }
+
+            CTxUndo undoDummy;
+            if (i > 0) {
+                blockundo.vtxundo.push_back(CTxUndo());
+            }
+            UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(),
+                        pindex->GetHeight());
+
+            vPos.push_back(std::make_pair(tx.GetId(), pos));
+            pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
+        }
+
+        if (parallelBlockValidation)
+        {
+            view.ForceDetach();
+        }
+
+        int64_t nTime3 = GetTimeMicros();
+        nTimeConnect += nTime3 - nTime2;
+        LogPrint(BCLog::BENCH,
+                 "      - Connect %u transactions: %.2fms (%.3fms/tx, "
+                 "%.3fms/txin) [%.2fs]\n",
+                 (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
+                 0.001 * (nTime3 - nTime2) / block.vtx.size(),
+                 nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1),
+                 nTimeConnect * 0.000001);
+
+        Amount blockReward =
+            nFees + GetBlockSubsidy(pindex->GetHeight(), consensusParams);
+        if (block.vtx[0]->GetValueOut() > blockReward) {
+            auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
+                                               "(actual=%d vs limit=%d)",
+                                               block.vtx[0]->GetValueOut(), blockReward),
+                                    REJECT_INVALID, "bad-cb-amount");
+            if(!state.IsValid() && g_connman)
+            {
+                g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
+            }
+            return result;
+
+        }
+
+        if(checkPoolToken)
+        {
+            // We only wait during tests and even then only if validation would
+            // be performed.
+            blockValidationStatus.waitIfRequired(
+                pindex->GetBlockHash(),
+                task::CCancellationToken::JoinToken(checkPoolToken.value(), token));
+        }
+
+        std::vector<CScriptCheck> failedChecks;
+        auto controlValidationStatusOK = control.Wait(&failedChecks);
+
+        if (!controlValidationStatusOK.has_value())
+        {
+            // validation was terminated before it was able to complete so we should
+            // skip validity setting to SCRIPTS
+            throw CBlockValidationCancellation{};
+        }
+
+        if (!controlValidationStatusOK.value())
+        {
+            for(const auto& check : failedChecks)
+            {
+                auto it = std::find_if(block.vtx.begin(), block.vtx.end(),
+                                [&check](const CTransactionRef& tx)
+                                {
+                                    return tx.get() == check.GetTransaction();
+                                });
+                if (it == block.vtx.end())
+                {
+                    continue;
+                }
+
+                CValidationState state;
+                state.Invalid( false,
+                               REJECT_INVALID,
+                               strprintf("blk-bad-inputs (%s)",
+                                         ScriptErrorString(check.GetScriptError())));
+                if(g_connman)
+                {
+                    g_connman->getInvalidTxnPublisher().Publish( { *it, pindex, state } );
+                }
+            }
+
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs",
+                             "parallel script check failed");
+        }
+
+        // must be inside this scope as csGuard can take a while to re-obtain
+        // cs_main lock and we don't want that time to count to validation
+        // duration time
+        nTime4 = GetTimeMicros();
+
+        return true;
+    }
+
     const Config& config;
     const CBlock& block;
     CValidationState& state;
