@@ -2306,8 +2306,8 @@ namespace {
 
             void TestCompareToFaster(const Durations& faster) const
             {
-                BOOST_TEST(verify.count() > (faster.verify.count() * 10));
-                BOOST_TEST(check.count() > (faster.check.count() * 10));
+                BOOST_TEST(verify.count() > (faster.verify.count() * 5));
+                BOOST_TEST(check.count() > (faster.check.count() * 5));
             }
         };
 
@@ -2325,12 +2325,11 @@ namespace {
             const CPubKey& vchPubKey,
             const uint256& sighash) const override
         {
-            auto start = std::chrono::high_resolution_clock::now();
+            auto start = std::chrono::steady_clock::now();
             bool res = CachingTransactionSignatureChecker::VerifySignature(vchSig, vchPubKey, sighash);
             mDuration.verify +=
                 std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::high_resolution_clock::now() - start);
-
+                    std::chrono::steady_clock::now() - start);
             return res;
         }
 
@@ -2340,13 +2339,13 @@ namespace {
             const CScript& scriptCode,
             bool enabledSighashForkid) const override
         {
-            auto start = std::chrono::high_resolution_clock::now();
+            auto start = std::chrono::steady_clock::now();
             bool res =
                 CachingTransactionSignatureChecker::CheckSig(
                     scriptSig, vchPubKey, scriptCode, enabledSighashForkid);
             mDuration.check +=
                 std::chrono::duration_cast<std::chrono::microseconds>(
-                    std::chrono::high_resolution_clock::now() - start);
+                    std::chrono::steady_clock::now() - start);
 
             return res;
         }
@@ -2359,72 +2358,94 @@ namespace {
 BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
     ScriptError err;
     auto source = task::CCancellationSource::Make();
-    std::vector<CKey> keys(200); // Vector of 200 public keys
-    for(auto& key : keys)
-    {
-       key.MakeNewKey(false);
-    }
-    // Create scriptPubKey with 200 public keys
-    CScript scriptPubKey;
-    scriptPubKey << OP_1;
-    for(auto& key : keys){
-      scriptPubKey << ToByteVector(key.GetPubKey());
-    }
-    scriptPubKey << CScriptNum(keys.size()) << OP_CHECKMULTISIG;
-    scriptPubKey << OP_1;
-    CMutableTransaction creditingTx =
-        BuildCreditingTransaction(scriptPubKey, Amount(0));
-    CMutableTransaction spendingTx = BuildSpendingTransaction(CScript(), creditingTx);
+  
+    int iterations = 30;
+    std::size_t pubkeys_per_multisig = 200;
 
-    // Create scriptSig where the last key satisfies the conditions in scriptPubKey
-    CScript scriptSig = sign_multisig(scriptPubKey, keys[0], CTransaction(spendingTx));
+    std::chrono::microseconds duration_total_noncached{};
+    std::chrono::microseconds duration_total_cached{};
 
-    const CTransaction nmCreditingTx(creditingTx);
-    const CTransaction nmSpendingTx(spendingTx);
-
-    PrecomputedTransactionData txdata(nmSpendingTx);
-
-    // Verify the same script twice. In the second iteration it should run
-    // much faster, since we cached invalid signatures.
     InstrumentedChecker::Durations durations;
-    auto start = std::chrono::high_resolution_clock::now();
-    auto res =
-        VerifyScript(
-            testConfig,
-            true,
-            source->GetToken(),
-            scriptSig,
-            scriptPubKey,
-            flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-            InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
-            &err);
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
     InstrumentedChecker::Durations durationsCached;
-    auto start2 = std::chrono::high_resolution_clock::now();
-    auto res2 =
-        VerifyScript(
-            testConfig,
-            true,
-            source->GetToken(),
-            scriptSig,
-            scriptPubKey,
-            flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-            InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
-            &err);
-    auto stop2 = std::chrono::high_resolution_clock::now();
-    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2); 
-    
-    BOOST_CHECK(res2.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+
+    // Run test multiple times to make it more stable (it relies on timing)
+    for(int i=0; i < iterations; i++)
+    {
+        std::vector<CKey> keys(pubkeys_per_multisig);
+        for(auto& key : keys)
+        {
+           key.MakeNewKey(false);
+        }
+
+        // Create scriptPubKey with pubkeys_per_multisig public keys
+        CScript scriptPubKey;
+        scriptPubKey << OP_1;
+        for(auto& key : keys){
+          scriptPubKey << ToByteVector(key.GetPubKey());
+        }
+        scriptPubKey << CScriptNum(keys.size()) << OP_CHECKMULTISIG;
+        scriptPubKey << OP_1;
+        CMutableTransaction creditingTx =
+            BuildCreditingTransaction(scriptPubKey, Amount(0));
+        CMutableTransaction spendingTx = BuildSpendingTransaction(CScript(), creditingTx);
+
+        // Create scriptSig where the last key satisfies the conditions in scriptPubKey
+        CScript scriptSig = sign_multisig(scriptPubKey, keys[0], CTransaction(spendingTx));
+
+        const CTransaction nmCreditingTx(creditingTx);
+        const CTransaction nmSpendingTx(spendingTx);
+
+        PrecomputedTransactionData txdata(nmSpendingTx);
+
+        // Verify the same script twice. In the second iteration it should run
+        // much faster, since we cached invalid signatures.
+        auto start_noncached = std::chrono::steady_clock::now();
+        auto res =
+          VerifyScript(
+              testConfig,
+              true,
+              source->GetToken(),
+              scriptSig,
+              scriptPubKey,
+              flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
+              InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
+              &err);
+        auto stop_noncached = std::chrono::steady_clock::now();
+
+        // check if script successfully verified
+        BOOST_CHECK(res.value());
+        BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+
+        auto start_cached = std::chrono::steady_clock::now();
+        auto res2 =
+          VerifyScript(
+              testConfig,
+              true,
+              source->GetToken(),
+              scriptSig,
+              scriptPubKey,
+              flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
+              InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
+              &err);
+         auto stop_cached = std::chrono::steady_clock::now();
+
+         // check if script successfully verified
+        BOOST_CHECK(res2.value());
+        BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+
+        duration_total_noncached += std::chrono::duration_cast<std::chrono::microseconds>(
+                      stop_noncached - start_noncached);
+        duration_total_noncached += std::chrono::duration_cast<std::chrono::microseconds>(
+                      stop_cached - start_cached);
+
+    }
 
     durations.TestCompareToFaster(durationsCached);
 
     // Check if second time code runs much faster since invalid signatures are cached.
     // It usually runs 50-60 times faster.
-    BOOST_TEST(duration.count() > (duration2.count() * 3));
+    BOOST_TEST(duration_total_noncached.count() > duration_total_cached.count() * 3);
+
 }
 
 BOOST_AUTO_TEST_CASE(mt_2_plus_2)
