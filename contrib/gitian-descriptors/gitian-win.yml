@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-1.0.7.1-win"
+name: "bitcoin-sv-1.0.8-win"
 enable_cache: true
 suites:
 - "bionic"
