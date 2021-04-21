@@ -59,13 +59,19 @@ class MerkleProofTest(BitcoinTestFramework):
 
         assert(d1["target"] == a1["target"]["hash"])
         assert(d2["target"] == a2["target"]["hash"])
+        assert(d2["target"] == blockhash)
 
-        e1 = self.nodes[node].getmerkleproof2("",txid, False, "header")
-        e2 = self.nodes[node].getmerkleproof2(blockhash,txid, False, "header")
+        e1 = self.nodes[node].getmerkleproof2("", txid, False, "header")
+        e2 = self.nodes[node].getmerkleproof2(blockhash, txid, False, "header")
 
-        assert(e1["target"]["hash"] == a1["target"]["hash"])
-        assert(e2["target"]["hash"] == a2["target"]["hash"])
+        current_blockhash = d1["target"]
+        blockheader_func = self.nodes[node].getblockheader(current_blockhash, False)
+        blockheader_field = e1["target"]
+        assert(blockheader_func == blockheader_field)
 
+        blockheader_func = self.nodes[node].getblockheader(blockhash, False)
+        blockheader_field = e2["target"]
+        assert(blockheader_func == blockheader_field)
 
     # Calculate Merkle tree size in bytes
     def merkle_tree_size(self, number_of_transactions):

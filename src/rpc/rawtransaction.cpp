@@ -2079,18 +2079,13 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
             callbackDataObject.pushKV("targetType", targetType);
         if(targetType == "header") // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
         {
-            int confirmations = 0;
-            std::optional<uint256> nextBlockHash;
-            {
-                LOCK(cs_main);
-                confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
-            }
-
-            callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
+            CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+            ssBlock << blockIndex->GetBlockHeader();
+            std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
+            callbackDataObject.pushKV("target", strHex);
         }
         else if(targetType == "hash") // Target is block hash as specified by (flags & (0x04 | 0x02)) == 0
         {
-
             callbackDataObject.pushKV("target", blockIndex->GetBlockHash().GetHex());
         }
         else //if(targetType == "merkleroot")
