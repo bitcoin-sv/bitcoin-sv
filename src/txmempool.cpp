@@ -201,20 +201,18 @@ bool CTxMemPool::CheckAncestorLimitsNL(
         auto[it, inserted] = parents.emplace(piter);
         if(inserted)
         {
-            ancestorsCount += 1;
-            ancestorsCount += (*it)->ancestorsCount;
+            ancestorsCount = std::max(ancestorsCount, (*it)->ancestorsCount + 1);
 
             if(!(*it)->IsInPrimaryMempool())
             {
-                secondaryMempoolAncestorsCount += 1;
-                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount;
+                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount + 1;
             }
             
             if(ancestorsCount >= limitAncestorCount)
             {
                 if(errString.has_value())
                 {
-                    errString.value().get() = strprintf("too many unconfirmed parents [limit: %u]", limitAncestorCount);
+                    errString.value().get() = strprintf("too many unconfirmed parents, %u [limit: %lu]", ancestorsCount, limitAncestorCount);
                 }
                 return false;
             }
@@ -223,7 +221,7 @@ bool CTxMemPool::CheckAncestorLimitsNL(
             {
                 if(errString.has_value())
                 {
-                    errString.value().get() = strprintf("too many unconfirmed parents which we are not willing to mine [limit: %u]", limitSecondaryMempoolAncestorCount);
+                    errString.value().get() = strprintf("too many unconfirmed parents which we are not willing to mine, %lu [limit: %lu]", secondaryMempoolAncestorsCount, limitSecondaryMempoolAncestorCount);
                 }
                 return false;
             }
@@ -661,8 +659,7 @@ void CTxMemPool::UpdateAncestorsCountNL(CTxMemPool::setEntriesTopoSorted entries
         size_t ancestorsCount = 0;
         for(auto parent: GetMemPoolParentsNL(entry))
         {
-            ancestorsCount += 1;
-            ancestorsCount += parent->ancestorsCount;
+            ancestorsCount = std::max(ancestorsCount, parent->ancestorsCount + 1);
         }
         mapTx.modify(entry, [ancestorsCount](CTxMemPoolEntry& entry) {
                                 entry.ancestorsCount = ancestorsCount;
@@ -758,8 +755,7 @@ void CTxMemPool::AddUncheckedNL(
     for (const uint256 &phash : setParentTransactions) {
         txiter pit = mapTx.find(phash);
         if (pit != mapTx.end()) {
-            ancestorsCount += 1;
-            ancestorsCount += pit->ancestorsCount;
+            ancestorsCount = std::max(ancestorsCount, pit->ancestorsCount + 1);
             updateParentNL(newit, pit, true);
         }
     }
@@ -1276,8 +1272,7 @@ void CTxMemPool::CheckMempoolImplNL(
                        !tx2->vout[txin.prevout.GetN()].IsNull());
                 fDependsWait = true;
                 if (setParentCheck.insert(it2).second) {
-                    ancestorsCount += 1;
-                    ancestorsCount += it2->ancestorsCount;
+                    ancestorsCount = std::max(ancestorsCount, it2->ancestorsCount + 1);
                     if(!it2->IsInPrimaryMempool())
                     {
                         secondaryMempoolAncestorsCount += 1;
