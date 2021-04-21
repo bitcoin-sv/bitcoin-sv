@@ -2938,229 +2938,343 @@ static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 static int64_t nTimeObtainLock = 0;
 
-/**
- * Apply the effects of this block (with given index) on the UTXO set
- * represented by coins. Validity checks that depend on the UTXO set are also
- * done; ConnectBlock() can fail if those validity checks fail (among other
- * reasons).
- *
- * THROWS (only when parallelBlockValidation is set to true):
- *     - CBestBlockAttachmentCancellation when chain tip has changed while cs_main
- *       was unlocked (a different best block candidate has finished validation
- *       before we re-locked cs_main)
- *
- * THROWS:
- *     - CBlockValidationCancellation when validation was canceled through the
- *       cancellation token before it could finish. This can happen due to an
- *       external reason (e.g. shutting down the application) or internal (e.g.
- *       a better block candidate came in but all the checkers were already in
- *       use so check queue pool cancels the worst one for reuse with the better
- *       candidate).
- */
-static bool ConnectBlock(
-    const task::CCancellationToken& token,
-    bool parallelBlockValidation,
-    const Config &config,
-    const CBlock &block,
-    CValidationState &state,
-    CBlockIndex *pindex,
-    CCoinsViewCache &view,
-    const arith_uint256& mostWorkOnChain,
-    bool fJustCheck = false)
+
+
+class BlockConnector
 {
-    AssertLockHeld(cs_main);
+public:
+    BlockConnector(
+        bool parallelBlockValidation_,
+        const Config& config_,
+        const CBlock& block_,
+        CValidationState& state_,
+        CBlockIndex* pindex_,
+        CCoinsViewCache& view_,
+        const arith_uint256& mostWorkOnChain_,
+        bool fJustCheck_ )
+    : config{ config_ }
+    , block{ block_ }
+    , state{ state_ }
+    , pindex{ pindex_ }
+    , view{ view_ }
+    , mostWorkOnChain{ mostWorkOnChain_ }
+    , fJustCheck{ fJustCheck_ }
+    , parallelBlockValidation{ parallelBlockValidation_ }
+    {}
 
-    int64_t nTimeStart = GetTimeMicros();
+    bool Connect( const task::CCancellationToken& token )
+    {
+        AssertLockHeld(cs_main);
 
-    // Check it again in case a previous version let a bad block in
-    BlockValidationOptions validationOptions = BlockValidationOptions()
-        .withCheckPoW(!fJustCheck)
-        .withCheckMerkleRoot(!fJustCheck);
-    if (!CheckBlock(config, block, state, pindex->GetHeight(), validationOptions)) {
-        return error("%s: Consensus::CheckBlock: %s", __func__,
-                     FormatStateMessage(state));
-    }
+        int64_t nTimeStart = GetTimeMicros();
 
-    // Verify that the view's current state corresponds to the previous block
-    uint256 hashPrevBlock =
-        pindex->IsGenesis() ? uint256() : pindex->GetPrev()->GetBlockHash();
-    assert(hashPrevBlock == view.GetBestBlock());
-
-    // Special case for the genesis block, skipping connection of its
-    // transactions (its coinbase is unspendable)
-    const Consensus::Params &consensusParams =
-        config.GetChainParams().GetConsensus();
-    if (block.GetHash() == consensusParams.hashGenesisBlock) {
-        if (!fJustCheck) {
-            view.SetBestBlock(pindex->GetBlockHash());
+        // Check it again in case a previous version let a bad block in
+        BlockValidationOptions validationOptions = BlockValidationOptions()
+            .withCheckPoW(!fJustCheck)
+            .withCheckMerkleRoot(!fJustCheck);
+        if (!CheckBlock(config, block, state, pindex->GetHeight(), validationOptions)) {
+            return error("%s: Consensus::CheckBlock: %s", __func__,
+                         FormatStateMessage(state));
         }
+
+        // Verify that the view's current state corresponds to the previous block
+        uint256 hashPrevBlock =
+            pindex->IsGenesis() ? uint256() : pindex->GetPrev()->GetBlockHash();
+        assert(hashPrevBlock == view.GetBestBlock());
+
+        // Special case for the genesis block, skipping connection of its
+        // transactions (its coinbase is unspendable)
+        const Consensus::Params &consensusParams =
+            config.GetChainParams().GetConsensus();
+        if (block.GetHash() == consensusParams.hashGenesisBlock) {
+            if (!fJustCheck) {
+                view.SetBestBlock(pindex->GetBlockHash());
+            }
+
+            return true;
+        }
+
+        int64_t nTime1 = GetTimeMicros();
+        nTimeCheck += nTime1 - nTimeStart;
+        LogPrint(BCLog::BENCH, "    - Sanity checks: %.2fms [%.2fs]\n",
+                 0.001 * (nTime1 - nTimeStart), nTimeCheck * 0.000001);
+
+        // Do not allow blocks that contain transactions which 'overwrite' older
+        // transactions, unless those are already completely spent. If such
+        // overwrites are allowed, coinbases and transactions depending upon those
+        // can be duplicated to remove the ability to spend the first instance --
+        // even after being sent to another address. See BIP30 and
+        // http://r6.ca/blog/20120206T005236Z.html for more information. This logic
+        // is not necessary for memory pool transactions, as AcceptToMemoryPool
+        // already refuses previously-known transaction ids entirely. This rule was
+        // originally applied to all blocks with a timestamp after March 15, 2012,
+        // 0:00 UTC. Now that the whole chain is irreversibly beyond that time it is
+        // applied to all blocks except the two in the chain that violate it. This
+        // prevents exploiting the issue against nodes during their initial block
+        // download.
+        bool fEnforceBIP30 = !((pindex->GetHeight() == 91842 &&
+                                pindex->GetBlockHash() ==
+                                    uint256S("0x00000000000a4d0a398161ffc163c503763"
+                                             "b1f4360639393e0e4c8e300e0caec")) ||
+                               (pindex->GetHeight() == 91880 &&
+                                pindex->GetBlockHash() ==
+                                    uint256S("0x00000000000743f190a18c5577a3c2d2a1f"
+                                             "610ae9601ac046a38084ccb7cd721")));
+
+        // Once BIP34 activated it was not possible to create new duplicate
+        // coinbases and thus other than starting with the 2 existing duplicate
+        // coinbase pairs, not possible to create overwriting txs. But by the time
+        // BIP34 activated, in each of the existing pairs the duplicate coinbase had
+        // overwritten the first before the first had been spent. Since those
+        // coinbases are sufficiently buried its no longer possible to create
+        // further duplicate transactions descending from the known pairs either. If
+        // we're on the known chain at height greater than where BIP34 activated, we
+        // can save the db accesses needed for the BIP30 check.
+        const CBlockIndex* pindexBIP34height =
+            pindex->GetPrev()->GetAncestor(consensusParams.BIP34Height);
+        // Only continue to enforce if we're below BIP34 activation height or the
+        // block hash at that height doesn't correspond.
+        fEnforceBIP30 =
+            fEnforceBIP30 &&
+            (!pindexBIP34height ||
+             !(pindexBIP34height->GetBlockHash() == consensusParams.BIP34Hash));
+
+        if(config.GetDisableBIP30Checks())
+        {
+            fEnforceBIP30 = false;
+        }
+
+        if (fEnforceBIP30) {
+            for (const auto &tx : block.vtx) {
+                for (size_t o = 0; o < tx->vout.size(); o++) {
+                    if (view.HaveCoin(COutPoint(tx->GetId(), o))) {
+                        auto result = state.DoS(
+                            100,
+                            error("ConnectBlock(): tried to overwrite transaction"),
+                            REJECT_INVALID, "bad-txns-BIP30");
+                        if(!state.IsValid() && g_connman)
+                        {
+                            g_connman->getInvalidTxnPublisher().Publish( { tx, pindex, state } );
+                        }
+                        return result;
+                    }
+                }
+            }
+        }
+
+        int64_t nTime2 = GetTimeMicros();
+        nTimeForks += nTime2 - nTime1;
+        LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs]\n",
+                 0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);
+
+        CBlockUndo blockundo;
+
+        size_t nInputs = 0;
+
+        std::vector<std::pair<uint256, CDiskTxPos>> vPos;
+
+        int64_t nTime4; // This is set inside scope below
+
+        if (parallelBlockValidation)
+        {
+            /* Script validation is the most expensive part and is also not cs_main
+            dependent so in case of parallel block validation we release it for
+            the duration of validation.
+            After we obtain the lock once again we check if chain tip has changed
+            in the meantime - if not we continue as if we had a lock all along,
+            otherwise we skip chain tip update part and retry with a new candidate.*/
+            class LeaveCriticalSectionGuard
+            {
+            public:
+                LeaveCriticalSectionGuard( CCoinsViewCache& view )
+                    : mView{ view }
+                {
+                    LEAVE_CRITICAL_SECTION(cs_main)
+                }
+                ~LeaveCriticalSectionGuard()
+                {
+                    // Make sure that we aren't holding view locked before
+                    // re-obtaining cs_main as that could cause a dead lock.
+                    mView.ForceDetach();
+                    ENTER_CRITICAL_SECTION(cs_main)
+                }
+
+            private:
+                CCoinsViewCache& mView;
+            } csGuard{ view };
+
+            if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
+            {
+                return false;
+            }
+        }
+
+        // this is the time needed to re-obtain cs_main lock after validation is
+        // complete - bound to csGuard in the scope above
+        int64_t lockReObtainTime = GetTimeMicros() - nTime4;
+        nTimeObtainLock += lockReObtainTime;
+
+        nTimeVerify += nTime4 - nTime2;
+        LogPrint(BCLog::BENCH,
+                 "    - Verify %zu txins: %.2fms (%.3fms/txin) [%.2fs]\n",
+                 nInputs - 1, 0.001 * (nTime4 - nTime2),
+                 nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs - 1),
+                 nTimeVerify * 0.000001);
+
+        LogPrint(BCLog::BENCH, "    - Time to reobtain the lock: %.2fms [%.2fs]\n",
+                 0.001 * lockReObtainTime, nTimeObtainLock * 0.000001);
+
+        if (fJustCheck) {
+            return true;
+        }
+
+        // Write undo information to disk
+        {
+            // since we are changing validation time we need to update
+            // setBlockIndexCandidates as well - it sorts by that time
+            setBlockIndexCandidates.erase(pindex);
+
+            bool res =
+                 pindex->writeUndoToDisk(
+                    state,
+                    blockundo,
+                    fCheckForPruning,
+                    config,
+                    mapBlockIndex);
+
+            setBlockIndexCandidates.insert(pindex);
+
+            if (!res)
+            {
+                // Failed to write undo data.
+                return false;
+            }
+        }
+
+        if (fTxIndex && !pblocktree->WriteTxIndex(vPos)) {
+            return AbortNode(state, "Failed to write transaction index");
+        }
+
+        if (parallelBlockValidation)
+        {
+            // TryReattach() will succeed if best block in active chain hasn't
+            // changed since ForceDetach().
+            if (!view.TryReattach())
+            {
+                // a different block managed to become best block before this one
+                // so we should terminate connecting process
+                throw CBestBlockAttachmentCancellation{};
+            }
+        }
+
+        // add this block to the view's block chain
+        view.SetBestBlock(pindex->GetBlockHash());
+
+        int64_t nTime5 = GetTimeMicros();
+        nTimeIndex += nTime5 - nTime4;
+        LogPrint(BCLog::BENCH, "    - Index writing: %.2fms [%.2fs]\n",
+                 0.001 * (nTime5 - nTime4), nTimeIndex * 0.000001);
+
+        int64_t nTime6 = GetTimeMicros();
+        nTimeCallbacks += nTime6 - nTime5;
+        LogPrint(BCLog::BENCH, "    - Callbacks: %.2fms [%.2fs]\n",
+                 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
 
         return true;
     }
 
-    bool fScriptChecks = true;
-    if (!hashAssumeValid.IsNull()) {
-        // We've been configured with the hash of a block which has been
-        // externally verified to have a valid history. A suitable default value
-        // is included with the software and updated from time to time. Because
-        // validity relative to a piece of software is an objective fact these
-        // defaults can be easily reviewed. This setting doesn't force the
-        // selection of any particular chain but makes validating some faster by
-        // effectively caching the result of part of the verification.
-        if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
-        {
-            const auto& bestHeader = mapBlockIndex.GetBestHeader();
-            if (index->GetAncestor(pindex->GetHeight()) == pindex &&
-                bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
-                bestHeader.GetChainWork() >= nMinimumChainWork)
-            {
-                // This block is a member of the assumed verified chain and an
-                // ancestor of the best header. The equivalent time check
-                // discourages hashpower from extorting the network via DOS
-                // attack into accepting an invalid block through telling users
-                // they must manually set assumevalid. Requiring a software
-                // change or burying the invalid block, regardless of the
-                // setting, makes it hard to hide the implication of the demand.
-                // This also avoids having release candidates that are hardly
-                // doing any signature verification at all in testing without
-                // having to artificially set the default assumed verified block
-                // further back. The test against nMinimumChainWork prevents the
-                // skipping when denied access to any chain at least as good as
-                // the expected chain.
-                fScriptChecks =
-                    (GetBlockProofEquivalentTime(
-                         bestHeader, *pindex, bestHeader,
-                         consensusParams) <= 60 * 60 * 24 * 7 * 2);
-            }
-        }
-    }
-
-    int64_t nTime1 = GetTimeMicros();
-    nTimeCheck += nTime1 - nTimeStart;
-    LogPrint(BCLog::BENCH, "    - Sanity checks: %.2fms [%.2fs]\n",
-             0.001 * (nTime1 - nTimeStart), nTimeCheck * 0.000001);
-
-    // Do not allow blocks that contain transactions which 'overwrite' older
-    // transactions, unless those are already completely spent. If such
-    // overwrites are allowed, coinbases and transactions depending upon those
-    // can be duplicated to remove the ability to spend the first instance --
-    // even after being sent to another address. See BIP30 and
-    // http://r6.ca/blog/20120206T005236Z.html for more information. This logic
-    // is not necessary for memory pool transactions, as AcceptToMemoryPool
-    // already refuses previously-known transaction ids entirely. This rule was
-    // originally applied to all blocks with a timestamp after March 15, 2012,
-    // 0:00 UTC. Now that the whole chain is irreversibly beyond that time it is
-    // applied to all blocks except the two in the chain that violate it. This
-    // prevents exploiting the issue against nodes during their initial block
-    // download.
-    bool fEnforceBIP30 = !((pindex->GetHeight() == 91842 &&
-                            pindex->GetBlockHash() ==
-                                uint256S("0x00000000000a4d0a398161ffc163c503763"
-                                         "b1f4360639393e0e4c8e300e0caec")) ||
-                           (pindex->GetHeight() == 91880 &&
-                            pindex->GetBlockHash() ==
-                                uint256S("0x00000000000743f190a18c5577a3c2d2a1f"
-                                         "610ae9601ac046a38084ccb7cd721")));
-
-    // Once BIP34 activated it was not possible to create new duplicate
-    // coinbases and thus other than starting with the 2 existing duplicate
-    // coinbase pairs, not possible to create overwriting txs. But by the time
-    // BIP34 activated, in each of the existing pairs the duplicate coinbase had
-    // overwritten the first before the first had been spent. Since those
-    // coinbases are sufficiently buried its no longer possible to create
-    // further duplicate transactions descending from the known pairs either. If
-    // we're on the known chain at height greater than where BIP34 activated, we
-    // can save the db accesses needed for the BIP30 check.
-    const CBlockIndex* pindexBIP34height =
-        pindex->GetPrev()->GetAncestor(consensusParams.BIP34Height);
-    // Only continue to enforce if we're below BIP34 activation height or the
-    // block hash at that height doesn't correspond.
-    fEnforceBIP30 =
-        fEnforceBIP30 &&
-        (!pindexBIP34height ||
-         !(pindexBIP34height->GetBlockHash() == consensusParams.BIP34Hash));
-
-    if(config.GetDisableBIP30Checks())
+private:
+    bool checkScripts(
+        const task::CCancellationToken& token,
+        size_t nInputs,
+        int64_t nTime2,
+        std::vector<std::pair<uint256, CDiskTxPos>>& vPos,
+        CBlockUndo& blockundo,
+        int64_t& nTime4 )
     {
-        fEnforceBIP30 = false;
-    }
-
-    if (fEnforceBIP30) {
-        for (const auto &tx : block.vtx) {
-            for (size_t o = 0; o < tx->vout.size(); o++) {
-                if (view.HaveCoin(COutPoint(tx->GetId(), o))) {
-                    auto result = state.DoS(
-                        100,
-                        error("ConnectBlock(): tried to overwrite transaction"),
-                        REJECT_INVALID, "bad-txns-BIP30");
-                    if(!state.IsValid() && g_connman)
-                    {
-                        g_connman->getInvalidTxnPublisher().Publish( { tx, pindex, state } );
-                    }
-                    return result;
-                }
-            }
-        }
-    }
-
-    // Start enforcing BIP68 (sequence locks).
-    int nLockTimeFlags = 0;
-    if (pindex->GetHeight() >= consensusParams.CSVHeight) {
-        nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->GetHeight()));
-    }
-    const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
-    bool isGenesisEnabled = IsGenesisEnabled(config, pindex->GetHeight());
-    int64_t nTime2 = GetTimeMicros();
-    nTimeForks += nTime2 - nTime1;
-    LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs]\n",
-             0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);
-
-    CBlockUndo blockundo;
-
-    // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
-    using NullScriptChecker =
-        checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
-
-    // Token for use during functional testing
-    std::optional<task::CCancellationToken> checkPoolToken;
-
-    auto control =
-        fScriptChecks
-        ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
-        : NullScriptChecker{};
-
-    std::vector<int32_t> prevheights;
-    Amount nFees(0);
-    size_t nInputs = 0;
-
-    // Sigops counting. We need to do it again because of P2SH.
-    uint64_t nSigOpsCount = 0;
-    const uint64_t currentBlockSize =
-        ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-    // Sigops are not counted after Genesis anymore
-    const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
-
-    CDiskTxPos pos(pindex->GetBlockPos(),
-                   GetSizeOfCompactSize(block.vtx.size()));
-    std::vector<std::pair<uint256, CDiskTxPos>> vPos;
-
-    int64_t nTime4; // This is set inside scope below
-    {
-        /* Script validation is the most expensive part and is also not cs_main
-        dependent so in case of parallel block validation we release it for
-        the duration of validation.
-        After we obtain the lock once again we check if chain tip has changed
-        in the meantime - if not we continue as if we had a lock all along,
-        otherwise we skip chain tip update part and retry with a new candidate.*/
-        std::unique_ptr<CTemporaryLeaveCriticalSectionGuard> csGuard =
-            parallelBlockValidation
-            ? std::make_unique<CTemporaryLeaveCriticalSectionGuard>(cs_main)
-            : nullptr;
-
         vPos.reserve(block.vtx.size());
         blockundo.vtxundo.reserve(block.vtx.size() - 1);
 
+        const Consensus::Params& consensusParams =
+            config.GetChainParams().GetConsensus();
+        bool isGenesisEnabled = IsGenesisEnabled(config, pindex->GetHeight());
+
+        // Start enforcing BIP68 (sequence locks).
+        int nLockTimeFlags = 0;
+        if (pindex->GetHeight() >= consensusParams.CSVHeight) {
+            nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->GetHeight()));
+        }
+
         uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
+        std::vector<int32_t> prevheights;
+        const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
+        uint64_t nSigOpsCount = 0;
+        Amount nFees(0);
+
+        // Sigops counting. We need to do it again because of P2SH.
+        const uint64_t currentBlockSize =
+            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+        // Sigops are not counted after Genesis anymore
+        const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
+
+        bool fScriptChecks = true;
+        if (!hashAssumeValid.IsNull()) {
+            // We've been configured with the hash of a block which has been
+            // externally verified to have a valid history. A suitable default value
+            // is included with the software and updated from time to time. Because
+            // validity relative to a piece of software is an objective fact these
+            // defaults can be easily reviewed. This setting doesn't force the
+            // selection of any particular chain but makes validating some faster by
+            // effectively caching the result of part of the verification.
+            if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
+            {
+                const auto& bestHeader = mapBlockIndex.GetBestHeader();
+                if (index->GetAncestor(pindex->GetHeight()) == pindex &&
+                    bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
+                    bestHeader.GetChainWork() >= nMinimumChainWork)
+                {
+                    // This block is a member of the assumed verified chain and an
+                    // ancestor of the best header. The equivalent time check
+                    // discourages hashpower from extorting the network via DOS
+                    // attack into accepting an invalid block through telling users
+                    // they must manually set assumevalid. Requiring a software
+                    // change or burying the invalid block, regardless of the
+                    // setting, makes it hard to hide the implication of the demand.
+                    // This also avoids having release candidates that are hardly
+                    // doing any signature verification at all in testing without
+                    // having to artificially set the default assumed verified block
+                    // further back. The test against nMinimumChainWork prevents the
+                    // skipping when denied access to any chain at least as good as
+                    // the expected chain.
+                    fScriptChecks =
+                        (GetBlockProofEquivalentTime(
+                             bestHeader, *pindex, bestHeader,
+                             consensusParams) <= 60 * 60 * 24 * 7 * 2);
+                }
+            }
+        }
+
+        // Token for use during functional testing
+        std::optional<task::CCancellationToken> checkPoolToken;
+
+        // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
+        using NullScriptChecker =
+            checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
+
+        auto control =
+            fScriptChecks
+            ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
+            : NullScriptChecker{};
+
+        CDiskTxPos pos(pindex->GetBlockPos(),
+                       GetSizeOfCompactSize(block.vtx.size()));
 
         for (size_t i = 0; i < block.vtx.size(); i++) {
             auto& txRef = block.vtx[i];
@@ -3349,80 +3463,61 @@ static bool ConnectBlock(
         // cs_main lock and we don't want that time to count to validation
         // duration time
         nTime4 = GetTimeMicros();
-    }
 
-    // this is the time needed to re-obtain cs_main lock after validation is
-    // complete - bound to csGuard in the scope above
-    int64_t lockReObtainTime = GetTimeMicros() - nTime4;
-    nTimeObtainLock += lockReObtainTime;
-
-    nTimeVerify += nTime4 - nTime2;
-    LogPrint(BCLog::BENCH,
-             "    - Verify %zu txins: %.2fms (%.3fms/txin) [%.2fs]\n",
-             nInputs - 1, 0.001 * (nTime4 - nTime2),
-             nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs - 1),
-             nTimeVerify * 0.000001);
-
-    LogPrint(BCLog::BENCH, "    - Time to reobtain the lock: %.2fms [%.2fs]\n",
-             0.001 * lockReObtainTime, nTimeObtainLock * 0.000001);
-
-    if (fJustCheck) {
         return true;
     }
 
-    // Write undo information to disk
-    {
-        // since we are changing validation time we need to update
-        // setBlockIndexCandidates as well - it sorts by that time
-        setBlockIndexCandidates.erase(pindex);
+    const Config& config;
+    const CBlock& block;
+    CValidationState& state;
+    CBlockIndex* pindex;
+    CCoinsViewCache& view;
+    const arith_uint256& mostWorkOnChain;
+    bool fJustCheck;
+    bool parallelBlockValidation;
+};
 
-        bool res =
-             pindex->writeUndoToDisk(
-                state,
-                blockundo,
-                fCheckForPruning,
-                config,
-                mapBlockIndex);
+/**
+ * Apply the effects of this block (with given index) on the UTXO set
+ * represented by coins. Validity checks that depend on the UTXO set are also
+ * done; ConnectBlock() can fail if those validity checks fail (among other
+ * reasons).
+ *
+ * THROWS (only when parallelBlockValidation is set to true):
+ *     - CBestBlockAttachmentCancellation when chain tip has changed while cs_main
+ *       was unlocked (a different best block candidate has finished validation
+ *       before we re-locked cs_main)
+ *
+ * THROWS:
+ *     - CBlockValidationCancellation when validation was canceled through the
+ *       cancellation token before it could finish. This can happen due to an
+ *       external reason (e.g. shutting down the application) or internal (e.g.
+ *       a better block candidate came in but all the checkers were already in
+ *       use so check queue pool cancels the worst one for reuse with the better
+ *       candidate).
+ */
+static bool ConnectBlock(
+    const task::CCancellationToken& token,
+    bool parallelBlockValidation,
+    const Config &config,
+    const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *pindex,
+    CCoinsViewCache &view,
+    const arith_uint256& mostWorkOnChain,
+    bool fJustCheck = false)
+{
+    BlockConnector connector{
+        parallelBlockValidation,
+        config,
+        block,
+        state,
+        pindex,
+        view,
+        mostWorkOnChain,
+        fJustCheck };
 
-        setBlockIndexCandidates.insert(pindex);
-
-        if (!res)
-        {
-            // Failed to write undo data.
-            return false;
-        }
-    }
-
-    if (fTxIndex && !pblocktree->WriteTxIndex(vPos)) {
-        return AbortNode(state, "Failed to write transaction index");
-    }
-
-    if (parallelBlockValidation)
-    {
-        // TryReattach() will succeed if best block in active chain hasn't
-        // changed since ForceDetach().
-        if (!view.TryReattach())
-        {
-            // a different block managed to become best block before this one
-            // so we should terminate connecting process
-            throw CBestBlockAttachmentCancellation{};
-        }
-    }
-
-    // add this block to the view's block chain
-    view.SetBestBlock(pindex->GetBlockHash());
-
-    int64_t nTime5 = GetTimeMicros();
-    nTimeIndex += nTime5 - nTime4;
-    LogPrint(BCLog::BENCH, "    - Index writing: %.2fms [%.2fs]\n",
-             0.001 * (nTime5 - nTime4), nTimeIndex * 0.000001);
-
-    int64_t nTime6 = GetTimeMicros();
-    nTimeCallbacks += nTime6 - nTime5;
-    LogPrint(BCLog::BENCH, "    - Callbacks: %.2fms [%.2fs]\n",
-             0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
-
-    return true;
+    return connector.Connect( token );
 }
 
 

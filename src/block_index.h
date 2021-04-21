@@ -731,8 +731,9 @@ public:
     CBlockIndex(
         const CBlockHeader& block,
         CBlockIndex* prev,
+        DirtyBlockIndexStore& notifyDirty,
         PrivateTag) noexcept
-        : CBlockIndex{ block, prev }
+        : CBlockIndex{ block, prev, notifyDirty }
     {}
 
     /**
@@ -799,7 +800,8 @@ private:
 
     CBlockIndex(
         const CBlockHeader& block,
-        CBlockIndex* prev) noexcept
+        CBlockIndex* prev,
+        DirtyBlockIndexStore& notifyDirty ) noexcept
         : CBlockIndex{ block }
     {
         // nSequenceId remains 0 to blocks only when the full data is available,
@@ -821,10 +823,13 @@ private:
         nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
         SetChainWorkNL();
 
-        // We don't want to trigger dirty marking since we've just created a
-        // new index that might never get block data (can be forgotten after
-        // restart) so we call Base version of RaiseValidity.
-        RaiseValidityBaseNL( BlockValidity::TREE );
+        // We want to trigger dirty marking even though we've just created a
+        // new index that might never get block data as we might get a descendant
+        // index with requested block data that would be written to database
+        // and in that case if parent block index wouldn't exist in the database
+        // we'd get an incomplete chain which is not supported and would fail
+        // with an assert.
+        RaiseValidityNL( BlockValidity::TREE, notifyDirty );
     }
 
     void CBlockIndex_SetBlockHash(const uint256* blockhash)
@@ -880,15 +885,10 @@ private:
 
     // Raise the validity level of this block index entry.
     // Returns true if the validity was changed and marks index as dirty.
-    bool RaiseValidityNL(enum BlockValidity nUpTo, DirtyBlockIndexStore& notifyDirty) {
+    bool RaiseValidityNL(enum BlockValidity nUpTo, DirtyBlockIndexStore& notifyDirty)
+    {
         notifyDirty.Insert( *this );
-        return RaiseValidityBaseNL(nUpTo);
-    }
 
-    // Same as RaiseValidityNL except that it doesn't flag as dirty so it can
-    // be used in constructor that is used for initial load from database
-    // without flagging it as dirty.
-    bool RaiseValidityBaseNL(enum BlockValidity nUpTo) {
         // Only validity flags allowed.
         if (nStatus.isInvalid()) {
             return false;
