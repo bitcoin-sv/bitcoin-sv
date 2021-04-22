@@ -1333,7 +1333,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             DSAttemptHandler::DEFAULT_NUM_FAST_THREADS, DSAttemptHandler::MAX_NUM_THREADS));
     strUsage += HelpMessageOpt(
         "-dsattemptnumslowthreads=<n>",
-        strprintf(_("Number of threads available for processing low priority double-spend notificationsi. Note that each additional thread also "
+        strprintf(_("Number of threads available for processing low priority double-spend notifications. Note that each additional thread also "
             "requires a small amount of disk space for serialising transactions to. (default: %u, maximum: %u)"),
             DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS, DSAttemptHandler::MAX_NUM_THREADS));
     strUsage += HelpMessageOpt(
