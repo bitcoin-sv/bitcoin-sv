@@ -139,12 +139,19 @@ namespace task
     {
     public:
         static std::shared_ptr<CCancellationSource> Make(
-            std::chrono::milliseconds const& after,
-            std::optional<std::reference_wrapper<CTimedCancellationBudget>> budget)
+            std::chrono::milliseconds const& after)
         {
             return
                 std::shared_ptr<CCancellationSource>{
-                    new CTimedCancellationSourceT<Clock>{after, budget}};
+                    new CTimedCancellationSourceT<Clock>{after, nullptr}};
+        }
+        static std::shared_ptr<CCancellationSource> Make(
+            std::chrono::milliseconds const& after,
+            CTimedCancellationBudget& budget)
+        {
+            return
+                std::shared_ptr<CCancellationSource>{
+                    new CTimedCancellationSourceT<Clock>{after, &budget}};
         }
         bool IsCanceled() override
         {
@@ -163,21 +170,21 @@ namespace task
         }
         ~CTimedCancellationSourceT() {
             if (mBudget) {
-                mBudget.value().get().FillBudget(std::chrono::duration_cast<std::chrono::microseconds>(mStart_ + mCancelAfter - Clock::now()));
+                mBudget->FillBudget(std::chrono::duration_cast<std::chrono::microseconds>(mStart_ + mCancelAfter - Clock::now()));
             }
         }
 
     private:
         CTimedCancellationSourceT(std::chrono::milliseconds const& after,
-                                 std::optional<std::reference_wrapper<CTimedCancellationBudget>> budget)
+                                 CTimedCancellationBudget* budget)
             : mStart_{Clock::now()}
-            , mCancelAfter{budget ? budget.value().get().DrainBudget(after) : after}
+            , mCancelAfter{budget ? budget->DrainBudget(after) : after}
             , mBudget{budget}
         {/**/}
 
         typename Clock::time_point mStart_;
         typename Clock::duration mCancelAfter;
-        std::optional<std::reference_wrapper<CTimedCancellationBudget>> mBudget;
+        CTimedCancellationBudget* mBudget;
     };
 
     using CTimedCancellationSource = CTimedCancellationSourceT<std::chrono::steady_clock>;

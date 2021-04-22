@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(cancellation_after_500ms)
 {
     using namespace std::chrono_literals;
 
-    auto source = task::CTimedCancellationSource::Make(50ms, {});
+    auto source = task::CTimedCancellationSource::Make(50ms);
     auto token = source->GetToken();
 
     BOOST_CHECK_EQUAL(token.IsCanceled(), false);
@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(thread_cancellation_after_500ms_cpu)
 {
     using namespace std::chrono_literals;
 
-    auto source = task::CThreadTimedCancellationSource::Make(50ms, {});
+    auto source = task::CThreadTimedCancellationSource::Make(50ms);
     auto token = source->GetToken();
 
     BOOST_CHECK_EQUAL(token.IsCanceled(), false);
