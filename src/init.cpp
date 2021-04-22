@@ -2278,7 +2278,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 #ifndef BOOST_CHRONO_HAS_THREAD_CLOCK
     if (config.GetValidationClockCPU()) {
         return InitError(
-            strprintf("validationclockcpu enabled on a platform with no CPU clock. Start with -validationclockcpu=0"));
+            strprintf("validationclockcpu enabled on a platform with no CPU clock. Start with -validationclockcpu=0 -maxstdtxvalidationduration=10"));
     }
 #endif
 
