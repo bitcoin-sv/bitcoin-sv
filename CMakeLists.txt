@@ -28,6 +28,11 @@ if(enable_debug)
     add_definitions(-DDEBUG -DDEBUG_LOCKORDER)
 endif()
 
+option(enable_metrics "Enable metrics" OFF)
+if(enable_metrics)
+  add_definitions(-DCOLLECT_METRICS)
+endif()
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 

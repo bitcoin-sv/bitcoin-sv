@@ -9,6 +9,7 @@
 #include <chrono>
 #include <memory>
 #include <vector>
+#include <boost/chrono.hpp>
 
 namespace task
 {
@@ -101,22 +102,49 @@ namespace task
         std::atomic<bool> mCanceled = false;
     };
 
+    /** A time budget for chained transactions
+     *
+     * Accumulate unused part of one timed cancellation source to be available
+     * for the next cancellation source, upto a limit
+     */
+
+    class CTimedCancellationBudget final
+    {
+        static constexpr std::chrono::microseconds zero = std::chrono::microseconds{0};
+    public:
+        CTimedCancellationBudget(): mLimit {0} {}
+        CTimedCancellationBudget(std::chrono::milliseconds limit): mLimit {limit} {}
+
+        std::chrono::microseconds DrainBudget(std::chrono::milliseconds allowance) {
+            auto ret = mBudget;
+            mBudget = zero;
+            return ret + allowance;
+        }
+        void FillBudget(std::chrono::microseconds remaining) {
+            mBudget = std::min(mLimit, std::max(remaining, zero));
+        }
+    private:
+        std::chrono::microseconds mLimit;
+        std::chrono::microseconds mBudget {0};
+    };
+
+
     /**
      * A long running task cancellation source with same features as
      * CCancellationSource but can additionally be set so that it auto cancels
      * after N wall time elapsed.
      */
-    class CTimedCancellationSource final : public CCancellationSource
+    template <typename Clock> class CTimedCancellationSourceT final : public CCancellationSource
     {
     public:
         static std::shared_ptr<CCancellationSource> Make(
-            std::chrono::milliseconds const& after)
+            std::chrono::milliseconds const& after,
+            std::optional<std::reference_wrapper<CTimedCancellationBudget>> budget)
         {
             return
                 std::shared_ptr<CCancellationSource>{
-                    new CTimedCancellationSource{after}};
+                    new CTimedCancellationSourceT<Clock>{after, budget}};
         }
-
         bool IsCanceled() override
         {
             if(CCancellationSource::IsCanceled())
@@ -124,7 +152,7 @@ namespace task
                 return true;
             }
 
-            if(mCancelAfter < (std::chrono::steady_clock::now() - mStart_))
+            if(mCancelAfter < (Clock::now() - mStart_))
             {
                 Cancel();
                 return true;
@@ -132,17 +160,53 @@ namespace task
 
             return false;
         }
+        ~CTimedCancellationSourceT() {
+            if (mBudget) {
+                mBudget.value().get().FillBudget(std::chrono::duration_cast<std::chrono::microseconds>(mStart_ + mCancelAfter - Clock::now()));
+            }
+        }
 
     private:
-        CTimedCancellationSource(std::chrono::milliseconds const& after)
-            : mStart_{std::chrono::steady_clock::now()}
-            , mCancelAfter{after}
+        CTimedCancellationSourceT(std::chrono::milliseconds const& after,
+                                 std::optional<std::reference_wrapper<CTimedCancellationBudget>> budget)
+            : mStart_{Clock::now()}
+            , mCancelAfter{budget ? budget.value().get().DrainBudget(after) : after}
+            , mBudget{budget}
         {/**/}
 
-        std::chrono::time_point<std::chrono::steady_clock> mStart_;
-        std::chrono::milliseconds mCancelAfter;
-
+        typename Clock::time_point mStart_;
+        typename Clock::duration mCancelAfter;
+        std::optional<std::reference_wrapper<CTimedCancellationBudget>> mBudget;
     };
+
+    using CTimedCancellationSource = CTimedCancellationSourceT<std::chrono::steady_clock>;
+
+#ifdef BOOST_CHRONO_HAS_THREAD_CLOCK
+    // std::chrono adapter of boost::thread_clock
+    class thread_clock final
+    {
+        using btc = boost::chrono::thread_clock;
+    public:
+        using rep = btc::rep;
+        using period = std::ratio<btc::period::num, btc::period::den>;
+        using duration = std::chrono::duration<rep, period>;
+        using time_point = std::chrono::time_point<thread_clock, duration>;
+        static time_point now()
+        {
+            return time_point{} + duration{btc::now().time_since_epoch().count()};
+        }
+    };
+#else
+# ifdef _MSC_VER
+#  pragma message("boost::chrono::thread_clock not available using std::chrono::steady_clock")
+# else
+#  warning "boost::chrono::thread_clock not available using std::chrono::steady_clock"
+# endif
+    using thread_clock = std::chrono::steady_clock
+#endif
+
+    using CThreadTimedCancellationSource = CTimedCancellationSourceT<thread_clock>;
+
 }
 
 #endif // BITCOIN_TASKCANCELLATION_H

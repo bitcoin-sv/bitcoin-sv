@@ -35,6 +35,23 @@ class CTxnValidator final
     using RemovedTxns = std::vector<TxId>;
     using RejectedTxns = std::pair<InvalidTxnStateUMap, RemovedTxns>;
 
+    class QueueCounts {
+        size_t mStd {0};
+        size_t mNonStd {0};
+        size_t mProcessing {0};
+    public:
+        QueueCounts(size_t std, size_t nonStd, size_t processing)
+        : mStd {std}
+        , mNonStd {nonStd}
+        , mProcessing {processing}
+        {}
+        size_t GetStdQueueCount() const { return mStd; }
+        size_t GetNonStdQueueCount() const { return mNonStd; }
+        size_t GetProcessingQueueCount() const { return mProcessing; }
+
+        size_t GetTotal() const { return mStd + mNonStd + mProcessing; }
+    };
+
   private:
     /**
      * A local structure used to extend lifetime of CTxInputData objects (controlled by shared ptrs)
@@ -66,7 +83,7 @@ class CTxnValidator final
 
   public:
     // Default run frequency in asynch mode
-    static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {100};
+    static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {10};
     // Default maximum validation duration for async tasks in a single run
     static constexpr std::chrono::milliseconds DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION {
         std::chrono::seconds(10)
@@ -129,6 +146,7 @@ class CTxnValidator final
      * An interface to query validator's state.
      */
     /** Get number of transactions that are still unvalidated */
+    QueueCounts GetTransactionsInQueueCounts() const;
     size_t GetTransactionsInQueueCount() const;
 
     /** Get memory usage for still unvalidated transactions */
@@ -138,6 +156,8 @@ class CTxnValidator final
     /**
      * An interface to facilitate Unit Tests.
      */
+    /** Wait for the Validator until the predicate returns true (through asynch interface) */
+    void waitUntil(std::function<bool(const QueueCounts&)> predicate, bool fCheckOrphanQueueEmpty=true);
     /** Wait for the Validator to process all queued txns (through asynch interface) */
     void waitForEmptyQueue(bool fCheckOrphanQueueEmpty=true);
 
@@ -257,7 +277,7 @@ class CTxnValidator final
     }
 
     /** List of new transactions that need processing */
-    std::vector<TxInputDataSPtr> mStdTxns {};
+    std::deque<TxInputDataSPtr> mStdTxns {};
     std::atomic<uint64_t> mStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
     mutable std::shared_mutex mStdTxnsMtx {};

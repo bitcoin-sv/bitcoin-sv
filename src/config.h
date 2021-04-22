@@ -67,6 +67,8 @@ public:
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
+    virtual bool GetValidationClockCPU() const = 0;
+    virtual std::chrono::milliseconds GetMaxTxnChainValidationBudget() const = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
     virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
@@ -163,6 +165,8 @@ public:
     virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) = 0;
+    virtual void SetValidationClockCPU(bool enable) = 0;
     virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
@@ -331,6 +335,12 @@ public:
 
     bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override;
+
+    bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxTxnChainValidationBudget() const override;
+
+    void SetValidationClockCPU(bool enable) override;
+    bool GetValidationClockCPU() const override;
 
     bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
@@ -519,6 +529,9 @@ private:
 
     std::chrono::milliseconds mMaxStdTxnValidationDuration;
     std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
+    std::chrono::milliseconds mMaxTxnChainValidationBudget;
+
+    bool mValidationClockCPU;
 
     uint64_t maxStackMemoryUsagePolicy;
     uint64_t maxStackMemoryUsageConsensus;
@@ -781,6 +794,20 @@ public:
     {
         return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
     }
+
+    bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+
+        return false;
+    }
+    std::chrono::milliseconds GetMaxTxnChainValidationBudget() const override
+    {
+        return DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET;
+    }
+
+    void SetValidationClockCPU(bool enable) override {}
+    bool GetValidationClockCPU() const override { return DEFAULT_VALIDATION_CLOCK_CPU; }
 
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
     {

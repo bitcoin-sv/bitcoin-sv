@@ -628,7 +628,7 @@ Examples:
 
     // Timed cancellation source that will abort script verification if total allowed time is exceeded.
     // Timer is started now so that it also includes parsing scripts argument and getting TXO which could also take a while.
-    const auto cancellation_source = task::CTimedCancellationSource::Make( totalTimeout );
+    const auto cancellation_source = task::CTimedCancellationSource::Make( totalTimeout, {} );
 
     // Parse scripts argument
     struct ScriptToVerify
@@ -869,7 +869,7 @@ Examples:
             // Cancel if total allowed time is exceeded
             cancellation_source,
             // Cancel if it takes longer than longest allowed validation of standard transaction
-            task::CTimedCancellationSource::Make(config.GetMaxStdTxnValidationDuration())
+            task::CTimedCancellationSource::Make(config.GetMaxStdTxnValidationDuration(), {})
         ));
 
         if(!res.has_value())
@@ -1192,6 +1192,10 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
             "  \"maxnonstdtxvalidationduration\": xxxxx, (numeric) Time before terminating validation "
             "of non-standard transaction in milliseconds\n"
 
+            "  \"maxtxchainvalidationbudget\": xxxxx,    (numeric) Additional validation time that can be carried over "
+            "from previous transactions in the chain in milliseconds\n"
+            "  \"validationclockcpu\": xxxxx,            (boolean) Prefer CPU time over wall time for validation.\n"
+
             "  \"minconsolidationfactor\": xxxxx         (numeric) Minimum ratio between scriptPubKey inputs and outputs, "
             "0 disables consolidation transactions\n"
             "  \"maxconsolidationinputscriptsize\": xxxx (numeric) Maximum scriptSig length of input in bytes\n"
@@ -1237,6 +1241,10 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("blockmintxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));
     obj.push_back(Pair("maxnonstdtxvalidationduration", config.GetMaxNonStdTxnValidationDuration().count()));
+
+    obj.push_back(Pair("maxtxchainvalidationbudget", config.GetMaxTxnChainValidationBudget().count()));
+    obj.push_back(Pair("validationclockcpu", config.GetValidationClockCPU()));
+
 
     obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
     obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));

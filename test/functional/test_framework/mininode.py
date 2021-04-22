@@ -449,6 +449,12 @@ class COutPoint():
             struct.pack("<I", self.n),))
         return r
 
+    def __hash__(self):
+        return self.hash + self.n
+
+    def __eq__(self, other):
+        return self.n == other.n and self.hash == other.hash
+
     def __repr__(self):
         return "COutPoint(hash=%064x n=%i)" % (self.hash, self.n)
 

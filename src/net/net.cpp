@@ -3142,6 +3142,70 @@ CNodePtr CConnman::FindNodeById(int64_t nodeId) {
     return nullptr;
 }
 
+std::vector<CConnman::PrioritisedChain> CConnman::ScheduleChains(TxInputDataSPtrVec& txns) {
+    // Detect simple chains, transactions need to be in topo-order to get detected.
+    std::vector<CConnman::PrioritisedChain> chains;
+    chains.reserve(txns.size());
+    // We are running single threaded here so we need a bound for amount of work we do per-transaction.
+    const size_t maxBreadth = 5;
+    // Track chains just by the txid of the last chain item.
+    std::unordered_map<TxId, size_t> mentions {};
+    mentions.reserve(txns.size());
+    for (auto& input: txns) {
+        auto& txn = *input->GetTxnPtr();
+        // assume none of the inputs mentions a known chain
+        size_t found = chains.size();
+        for (uint32_t n = 0; n < std::min(maxBreadth, txn.vin.size()); ++n) {
+            // We *must not* put a tree or anything like that in the same chain.
+            if (auto spends = mentions.extract(txn.vin[n].prevout.GetTxId()); !spends.empty()) {
+                found = spends.mapped();
+                break;
+            }
+        }
+        if (found == chains.size()) {
+            TxInputDataSPtrRefVec first;
+            first.emplace_back(std::ref(input));
+            chains.push_back(std::make_pair(first, input->GetTxValidationPriority()));
+        } else {
+            auto& chain = chains.at(found);
+            chain.first.emplace_back(std::ref(input));
+            chain.second = std::min(chain.second, input->GetTxValidationPriority());
+        }
+        mentions[txn.GetId()] = found;
+    }
+    // Inter-transaction data dependencies cause 'stalls' in PTV and are
+    // resolved by the orphan pool. Chains resolve the most trivial dependencies
+    // between transactions. If we could *cheaply* detect inter-chain
+    // dependencies and schedule dependant chains in a smart order we could
+    // further improve throughput. Do not forget we are still single-threaded
+    // here so complex algorithms can hurt more than they benefit.
+    // We don't want to get bogged down if somebody is sending weird stuff
+    //
+    // A trivial example. Input transactions [A, B, C, D, ... X]
+    //
+    // Transactions B and C each spend one output of A, other transactions are
+    // independant.
+    //
+    // The above algorithm will detect two chains for example [A, C] and [B] and
+    // a chain of one for each of D to X.
+    //
+    // If we could move the [B] chain to the end of the `chains` vector away
+    // from [A, C] and fill the intervening space with other unrelated
+    // transactions we would increase the chance that A of chain [A, C] would be
+    // already validated when chain [B] would get processed by PTV and would
+    // enable B to go straight to mempool.
+    //
+    // Currently we schdule both chains in neighboring slots and they will both
+    // get picked up by the PTV at a similar time and it is quite likely that
+    // [B] inputs will be checked before A from [A, C] chain enters the mempool.
+    // This will throw B into the orphan pool and require another trip through
+    // here and the PTV to process it. The cost increases with the length of
+    // chain [B].
+    //
+    return chains;
+}
+
+
 /* Erase transaction from the given peer */
 void CConnman::EraseOrphanTxnsFromPeer(NodeId peer) {
     mTxnValidator->getOrphanTxnsPtr()->eraseTxnsFromPeer(peer);

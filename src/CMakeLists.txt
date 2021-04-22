@@ -414,6 +414,7 @@ add_library(server
 	merkletreedb.h
 	merkletreestore.cpp
 	merkletreestore.h
+	metrics.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp

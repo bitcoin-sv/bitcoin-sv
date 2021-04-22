@@ -95,12 +95,17 @@ std::shared_ptr<CTxnRecentRejects> CTxnValidator::getTxnRecentRejectsPtr() {
 }
 
 /** Get the number of transactions waiting to be processed. */
-size_t CTxnValidator::GetTransactionsInQueueCount() const {
+CTxnValidator::QueueCounts CTxnValidator::GetTransactionsInQueueCounts() const {
     // Take shared locks in the following order.
     std::shared_lock lock1 { mStdTxnsMtx };
     std::shared_lock lock2 { mNonStdTxnsMtx };
     std::shared_lock lock3 { mProcessingQueueMtx };
-    return mStdTxns.size() + mNonStdTxns.size() + mProcessingQueue.size();
+    return {mStdTxns.size(), mNonStdTxns.size(), mProcessingQueue.size()};
+}
+
+/** Get the number of transactions waiting to be processed. */
+size_t CTxnValidator::GetTransactionsInQueueCount() const {
+    return GetTransactionsInQueueCounts().GetTotal();
 }
 
 /** Handle a new transaction */
@@ -534,6 +539,8 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
     bool fLimitMempoolSize,
     bool fUseLimits) {
 
+    auto noBudget = task::CTimedCancellationBudget{};
+
     // Execute txn validation.
     CTxnValResult result =
         TxnValidation(
@@ -541,7 +548,8 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
             mConfig,
             mMempool,
             mpTxnDoubleSpendDetector,
-            fUseLimits);
+            fUseLimits,
+            noBudget);
     // Process validated results for the given txn
     ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize, mConfig);
     return result;
@@ -764,9 +772,9 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const {
     return true;
 }
 
-/** Wait for the Validator to process all queued txns.
+/** Wait for the Validator until the predicate returns true.
  * An interface to facilitate Unit Tests.*/
-void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
+void CTxnValidator::waitUntil(std::function<bool(const QueueCounts&)> predicate, bool fCheckOrphanQueueEmpty) {
     do {
        std::shared_lock lock { mProcessingQueueMtx };
        // Block the calling thread until notification is received and the predicate is not satisfied
@@ -774,5 +782,11 @@ void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
        mTxnsProcessedCV.wait(lock,
                [&] { return (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
     // Check that there is no transactions in the ptv queues after getting a notification from the processing queue.
-    } while (GetTransactionsInQueueCount());
+    } while (!predicate(GetTransactionsInQueueCounts()));
+}
+
+/** Wait for the Validator to process all queued txns.
+ * An interface to facilitate Unit Tests.*/
+void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
+    waitUntil([](const auto& counts) -> bool { return counts.GetTotal() == 0; }, fCheckOrphanQueueEmpty);
 }

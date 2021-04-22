@@ -52,6 +52,7 @@
 #include "block_file_access.h"
 #include "invalid_txn_publisher.h"
 #include "blockindex_with_descendants.h"
+#include "metrics.h"
 
 #include <atomic>
 
@@ -970,13 +971,33 @@ static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
     return false;
 }
 
+static std::shared_ptr<task::CCancellationSource> MakeValidationCancellationSource(
+    bool fUseLimits,
+    const Config& config,
+    const TxValidationPriority txPriority,
+    task::CTimedCancellationBudget& cancellationBudget)
+{
+    if (!fUseLimits) {
+        return task::CCancellationSource::Make();
+    }
+    auto duration = (TxValidationPriority::high == txPriority || TxValidationPriority::normal == txPriority)
+                   ? config.GetMaxStdTxnValidationDuration()
+                   : config.GetMaxNonStdTxnValidationDuration();
+    if (config.GetValidationClockCPU()) {
+        return task::CThreadTimedCancellationSource::Make( duration, cancellationBudget);
+    } else {
+        return task::CTimedCancellationSource::Make( duration, cancellationBudget);
+    }
+}
+
 CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config& config,
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fUseLimits) {
-
+    bool fUseLimits,
+    task::CTimedCancellationBudget& cancellationBudget)
+{
     using Result = CTxnValResult;
 
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
@@ -1037,13 +1058,7 @@ CTxnValResult TxnValidation(
         state.SetStandardTx();
     }
     // Set txn validation timeout if required.
-    auto source =
-        fUseLimits ?
-            task::CTimedCancellationSource::Make(
-                (TxValidationPriority::high == pTxInputData->GetTxValidationPriority() ||
-                 TxValidationPriority::normal == pTxInputData->GetTxValidationPriority())
-                    ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration())
-            : task::CCancellationSource::Make();
+    auto source = MakeValidationCancellationSource(fUseLimits, config, pTxInputData->GetTxValidationPriority(), cancellationBudget);
 
     bool acceptNonStandardOutput = config.GetAcceptNonStandardOutput(isGenesisEnabled);
     if(!fStandard)
@@ -1117,12 +1132,6 @@ CTxnValResult TxnValidation(
     CoinsDBView tipView{ *pcoinsTip };
     CCoinsViewMemPool viewMemPool(tipView, pool);
     CCoinsViewCache view(viewMemPool);
-    // Do we already have it?
-    if(!CheckTxOutputs(tx, *pcoinsTip, view, vCoinsToUncache)) {
-       state.Invalid(false, REJECT_ALREADY_KNOWN,
-                    "txn-already-known");
-       return Result{state, pTxInputData, vCoinsToUncache};
-    }
     // Prepare coins to uncache list for inputs
     for (const CTxIn& txin : tx.vin)
     {
@@ -1142,8 +1151,14 @@ CTxnValResult TxnValidation(
     }
     else if (!have.value())
     {
-        state.SetMissingInputs();
-        state.Invalid();
+        // Do we already have it?
+        if(!CheckTxOutputs(tx, *pcoinsTip, view, vCoinsToUncache)) {
+           state.Invalid(false, REJECT_ALREADY_KNOWN,
+                        "txn-already-known");
+        } else {
+            state.SetMissingInputs();
+            state.Invalid();
+        }
         return Result{state, pTxInputData, vCoinsToUncache};
     }
     // Bring the best block into scope.
@@ -1451,6 +1466,46 @@ CValidationState HandleTxnProcessingException(
     return state;
 }
 
+static CTxnValResult PropagateParentError(const CTxnValResult& parentResult, const TxInputDataSPtr& elem)
+{
+    const auto& parentState = parentResult.mState;
+    CValidationState newState;
+    assert(!parentState.IsValid());
+    // The performance part of this is important:
+    if (parentState.IsValidationTimeoutExceeded()) {
+        // when the parent fails due to exceeding the validation time limit it
+        // will get re-scheduled as a low-priority task. The child *has to* also
+        // be marked with the same status just to keep them together. If the child
+        // is processed in any other way the child will either enter the orphan
+        // pool, which is slow or will be re-scheduled as a high-priority task and
+        // will race with it's parent and often also enter the orphan pool, which
+        // is slow.
+        newState = parentState;
+    } else if (parentState.IsMissingInputs()) {
+        newState = parentState;
+        if (parentResult.mTxInputData->IsDeleted()) {
+            // see below
+            elem->SetDeleted(true);
+        }
+    } else {
+        // The parent was invalid. The child transaction can never become valid
+        // as it references an invalid parent. so failing the child, too is correct.
+        // Before this change, the second and further transactions in the chain,
+        // after the failing transaction would enter the orphan pool with
+        // no possibility of leaving it except by eviction...
+        newState.SetMissingInputs();
+        newState.Invalid();
+        // Mark subsequent transactions as orphans with an extra flag to drop them on entry to the orphan pool.
+        elem->SetDeleted(true);
+    }
+    if (elem->IsDeleted()) {
+        LogPrint(BCLog::TXNVAL, "Transaction %s gets dropped becasue %s failed\n",
+                             elem->GetTxnPtr()->GetId().ToString(),
+                             parentResult.mTxInputData->GetTxnPtr()->GetId().ToString());
+    }
+    return {newState, elem};
+}
+
 std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask(
     const TxInputDataSPtrRefVec& vTxInputData,
     const Config& config,
@@ -1458,32 +1513,87 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
     CTxnHandlers& handlers,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
+#ifdef COLLECT_METRICS
+    static metrics::Histogram durations_t {"PTV_TX_TIME_MS", 5000};
+    static metrics::Histogram durations_cpu {"PTV_TX_CPU_MS", 5000};
+    static metrics::Histogram durations_chain_t {"PTV_CHAIN_TIME_MS", 5000};
+    static metrics::Histogram durations_chain_cpu {"PTV_CHAIN_CPU_MS", 5000};
+    static metrics::Histogram chainLengths {"PTV_CHAIN_LENGTH", 1000};
+    static metrics::Histogram durations_mempool_t_ms {"PTV_MEMPOOL_DURATION_TIME_MS", 5000};
+    static metrics::Histogram durations_mempool_t_s {"PTV_MEMPOOL_DURATION_TIME_S", 5000};
+    static metrics::Histogram durations_queue_t_ms {"PTV_QUEUE_DURATION_TIME_MS", 5000};
+    static metrics::Histogram durations_queue_t_s {"PTV_QUEUE_DURATION_TIME_S", 5000};
+    static metrics::HistogramWriter histogramLogger {"PTV", std::chrono::milliseconds {10000}, []() {
+        durations_t.dump();
+        durations_cpu.dump();
+        durations_chain_t.dump();
+        durations_chain_cpu.dump();
+        chainLengths.dump();
+        durations_mempool_t_ms.dump();
+        durations_mempool_t_s.dump();
+        durations_queue_t_ms.dump();
+        durations_queue_t_s.dump();
+    }};
+    chainLengths.count(vTxInputData.size());
+    auto chainTimeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> {durations_chain_t};
+    auto chainCpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> {durations_chain_cpu};
+#endif
     size_t chainLength = vTxInputData.size();
     if (chainLength > 1) {
         LogPrint(BCLog::TXNVAL,
                 "A non-trivial chain detected, length=%zu\n", chainLength);
     }
     std::vector<std::pair<CTxnValResult, CTask::Status>> results {};
+    auto cancellationBudget = task::CTimedCancellationBudget {config.GetMaxTxnChainValidationBudget()};
     results.reserve(chainLength);
     for (const auto& elem : vTxInputData) {
         // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
         if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
-            !(std::chrono::steady_clock::now() < end_time_point)) {
+            !(std::chrono::steady_clock::now() < end_time_point) &&
+            (results.empty() || results.back().first.mState.IsValid())) {
+            // it's safe to cancel (and retry) the chain only when the chain has processed OK.
+            // otherwise we rely on the error-copying approach below
             results.emplace_back(CTxnValResult{CValidationState(), elem.get()}, CTask::Status::Canceled);
             continue;
         }
         CTxnValResult result {};
         try {
-            // Execute validation for the given txn
-            result =
-                TxnValidation(
+            if (results.empty() || results.back().first.mState.IsValid()) {
+#ifdef COLLECT_METRICS
+                auto timeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_t };
+                auto cpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
+                if (!elem.get()->IsOrphanTxn()) {
+                    // we are first time through validation === time in network queues
+                    auto e2e = elem.get()->GetLifetime();
+                    durations_queue_t_ms.count(std::chrono::duration_cast<std::chrono::milliseconds>(e2e).count());
+                    durations_queue_t_s.count(std::chrono::duration_cast<std::chrono::seconds>(e2e).count());
+                }
+#endif
+                // Execute validation for the given txn
+                result =
+                    TxnValidation(
                         elem,
                         config,
                         pool,
                         handlers.mpTxnDoubleSpendDetector,
-                        fUseLimits);
+                        fUseLimits,
+                        cancellationBudget);
+            } else {
+                // a parent in the chain failed validation, make sure the
+                // rest of the (dependant) chain meets the same fate. We do not
+                // need to actually run the validation to reach that conclusion.
+                result = PropagateParentError(results.back().first, elem);
+            }
             // Process validated results
             ProcessValidatedTxn(pool, result, handlers, false, config);
+#ifdef COLLECT_METRICS
+            if (result.mState.IsValid()) {
+                using namespace std::chrono;
+                auto e2e = result.mTxInputData->GetLifetime();
+                durations_mempool_t_ms.count(duration_cast<milliseconds>(e2e).count());
+                durations_mempool_t_s.count(duration_cast<seconds>(e2e).count());
+            }
+#endif
             // Forward results to the next processing stage
             results.emplace_back(std::move(result), CTask::Status::RanToCompletion);
         } catch (const std::exception& e) {
@@ -1778,7 +1888,8 @@ static void HandleOrphanAndRejectedP2PTxns(
         uint64_t nMaxOrphanTxnsSize{
             GlobalConfig::GetConfig().GetMaxOrphanTxSize()
         };
-        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize);
+        uint64_t nMaxOrphanTxnHysteresis { nMaxOrphanTxnsSize / 10 }; // 10% seems to work fine
+        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize, nMaxOrphanTxnHysteresis);
         if (nEvicted > 0) {
             LogPrint(BCLog::MEMPOOL,
                     "%s: mapOrphan overflow, removed %u tx\n",
@@ -1823,7 +1934,7 @@ static void HandleInvalidP2POrphanTxn(
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
-        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist\n");
         return;
     }
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
@@ -1875,7 +1986,7 @@ static void HandleInvalidP2PNonOrphanTxn(
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
-        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist\n");
         return;
     }
     const CValidationState& state = txStatus.mState;
@@ -1967,7 +2078,7 @@ static void PostValidationStepsForP2PTxn(
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
-        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist\n");
         return;
     }
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();

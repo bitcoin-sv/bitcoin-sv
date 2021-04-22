@@ -948,7 +948,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             _("Set the single standard transaction validation duration threshold in"
               " milliseconds after which the standard transaction validation will"
               " terminate with error and the transaction is not accepted to"
-              " mempool (min 5ms, default: %dms)"),
+              " mempool (min 1ms, default: %dms)"),
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()));
 
     strUsage += HelpMessageOpt(
@@ -959,6 +959,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               " terminate with error and the transaction is not accepted to"
               " mempool (min 10ms, default: %dms)"),
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()));
+
+    strUsage += HelpMessageOpt(
+        "-maxtxchainvalidationbudget=<n>",
+        strprintf(
+            _("Set the upper limit of unused validation time to add to the next transaction validated in the chain "
+              "(min 0ms, default: %dms)"),
+            DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()));
+
+    strUsage +=
+        HelpMessageOpt("-validationclockcpu",
+                       strprintf(_("Use CPU time instead of wall clock time for validation duration measurement (default: %d)"
+#ifndef BOOST_CHRONO_HAS_THREAD_CLOCK
+                                   " WARNING: this platform does not have CPU clock."
+#endif
+                                   ),
+                                 DEFAULT_VALIDATION_CLOCK_CPU));
 
     strUsage +=
         HelpMessageOpt("-maxtxsizepolicy=<n>",
@@ -2224,6 +2240,23 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
+
+    if(std::string err; !config.SetMaxTxnChainValidationBudget(
+        gArgs.GetArg(
+            "-maxtxchainvalidationbudget",
+            DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
+    config.SetValidationClockCPU(gArgs.GetBoolArg("-validationclockcpu", DEFAULT_VALIDATION_CLOCK_CPU));
+#ifndef BOOST_CHRONO_HAS_THREAD_CLOCK
+    if (config.GetValidationClockCPU()) {
+        return InitError(
+            strprintf("validationclockcpu enabled on a platform with no CPU clock. Start with -validationclockcpu=0"));
+    }
+#endif
 
     if (!(config.GetMaxStdTxnValidationDuration() < config.GetMaxNonStdTxnValidationDuration())) {
         return InitError(

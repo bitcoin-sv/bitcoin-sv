@@ -68,8 +68,12 @@ class COrphanTxns {
     std::vector<uint256> getTxnsHash(const COutPoint& prevout) const;
     /** Get extra transactions needed by block's reconstruction */
     CompactExtraTxnsVec getCompactExtraTxns() const;
-    /** Limit a number of orphan transactions size */
-    unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
+    /** Limit the size of orphan transactions pool.
+     *
+     *  After the call the size of orphan pool is guaranteed to be in the range
+     *  [nMaxOrphanTxnsSize - nMaxOrphanTxnsHysteresis, nMaxOrphanTxnsSize]
+     */
+    unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, uint64_t nMaxOrphanTxnsHysteresis, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
     std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
     /** Collect txn's outpoints which will be used to find any dependant orphan txn */
@@ -121,4 +125,7 @@ class COrphanTxns {
 
     /** Control txns limit by a time slot */
     int64_t mNextSweep {0};
+
+    /** amount of bytes added since last orphan pool trimming */
+    std::atomic_size_t mUntrimmedSize {0};
 };
