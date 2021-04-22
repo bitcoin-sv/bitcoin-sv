@@ -13,7 +13,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
 from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_ADD, OP_MUL
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
-from test_framework.util import assert_equal, assert_greater_than, wait_until
+from test_framework.util import assert_equal, assert_greater_than, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, CTransaction, CTxIn, CTxOut, COutPoint
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
@@ -128,8 +128,6 @@ class PTVP2PTest(ComparisonTestFramework):
         txchains = self.get_txchains_n(num_of_chains, chain_length, spend, CScript(), locking_script, money_to_spend, factor)
         for tx in range(len(txchains)):
             conn.send_message(msg_tx(txchains[tx]))
-        # Check if the validation queues are empty.
-        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
 
         return txchains
 
@@ -176,8 +174,6 @@ class PTVP2PTest(ComparisonTestFramework):
         if send_txs:
             for tx in all_txs:
                 conn.send_message(msg_tx(tx))
-            # Check if the validation queues are empty.
-            wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
         # Return ds set if was requested.
         if len(ds_txs):
             return nonstd_txs+additional_txs, ds_txs, rejected_txs
@@ -203,8 +199,6 @@ class PTVP2PTest(ComparisonTestFramework):
         # Send txs
         for tx in all_txs:
             conn.send_message(msg_tx(tx))
-        # Check if the validation queues are empty.
-        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
         # Return ds set if was required to create.
         if len(all_ds_txs):
             return all_nonstd_txs, all_ds_txs, rejected_txs
@@ -260,6 +254,7 @@ class PTVP2PTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             std_txs = self.run_scenario1(conn, spend_txs, tc1_txchains_num, tc1_tx_chain_length, self.locking_script_1, 5000000000, 1)
+            wait_for_ptv_completion(conn, tc1_txchains_num*tc1_tx_chain_length)
             # Check if required transactions are accepted by the mempool.
             self.check_mempool(conn.rpc, std_txs, timeout=30)
             assert_equal(conn.rpc.getmempoolinfo()['size'], tc1_txchains_num*tc1_tx_chain_length)
@@ -280,6 +275,7 @@ class PTVP2PTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc2_txs_num, self.locking_script_2)
+            wait_for_ptv_completion(conn, tc2_txs_num)
             # Check if required transactions are accepted by the mempool.
             self.check_mempool(conn.rpc, nonstd_txs, timeout=30)
             assert_equal(len(rejected_txs), 0)
@@ -304,6 +300,7 @@ class PTVP2PTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, _ = self.run_scenario2(conn, spend_txs, tc3_txs_num, self.locking_script_2, ds_txs_num)
+            wait_for_ptv_completion(conn, len(nonstd_txs)+1)
             # All txs from the nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=30)
             # There is one more transaction in the mempool, which is a random txn from the ds_txs set
@@ -336,6 +333,7 @@ class PTVP2PTest(ComparisonTestFramework):
             std_txs = self.get_txchains_n(tc4_1_txs_num, 1, spend_txs, CScript(), self.locking_script_1, 2000000, 10)
             # Create and send generated txs.
             std_and_nonstd_txs, ds_txs, _ = self.run_scenario2(conn, spend_txs2, tc4_2_txs_num, self.locking_script_2, ds_txs_num, std_txs, shuffle_txs=True)
+            wait_for_ptv_completion(conn, len(std_and_nonstd_txs)+1)
             # All txs from the std_and_nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, std_and_nonstd_txs, timeout=30)
             # There is one more transaction in the mempool. It is a random txn from the ds_txs set
@@ -365,6 +363,7 @@ class PTVP2PTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc5_txs_num, self.locking_script_2, ds_txs_num)
+            wait_for_ptv_completion(conn, len(nonstd_txs)+tc5_num_of_subsets, check_interval=0.5)
             # All txs from the nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=60)
             # There are tc5_num_of_subsets more transaction in the mempool (random txns from the ds_txs set)
@@ -396,6 +395,7 @@ class PTVP2PTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc6_txs_num, self.locking_script_2, ds_txs_num, shuffle_txs=True)
+            wait_for_ptv_completion(conn, len(nonstd_txs)+tc6_num_of_subsets, check_interval=0.5)
             # All txs from the nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=60)
             # There are tc6_num_of_subsets more transaction in the mempool (random txns from the ds_txs set)

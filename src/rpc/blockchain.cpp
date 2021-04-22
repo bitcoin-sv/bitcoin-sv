@@ -3431,6 +3431,24 @@ static UniValue getwaitingblocks(const Config &config,
     return blockHashes;
 }
 
+UniValue waitforptvcompletion(const Config &config, const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "waitforptvcompletion\n"
+            "\nWaits until the txn validation queues are empty (including the orphan pool).\n"
+            "\nResult:\n"
+            "NullUniValue\n"
+            "\nExamples:\n" +
+            HelpExampleCli("waitforptvcompletion", "") +
+            HelpExampleRpc("waitforptvcompletion", ""));
+    }
+
+    LogPrint(BCLog::TXNVAL,"waitforptvcompletion: before waitForEmptyQueue()\n");
+    g_connman->getTxnValidator()->waitForEmptyQueue();
+    LogPrint(BCLog::TXNVAL,"waitforptvcompletion: after waitForEmptyQueue()\n");
+    return NullUniValue;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -3474,7 +3492,8 @@ static const CRPCCommand commands[] = {
     { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
     { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
     { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
-    { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} }
+    { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
+    { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} }
 };
 // clang-format on
 

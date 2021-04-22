@@ -854,6 +854,18 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
     except ImportError:
         raise Exception("pyzmq module not available.")
 
+def wait_for_ptv_completion(conn, exp_mempool_size, check_interval=0.1, timeout=60):
+    """
+    The invocation of this function waits until the following conditions are met:
+    a) there is an expected amount of transactions in the mempool
+    b) there are no transactions in the ptv's queues, including: pending, being processed, detected orphans
+    Both conditions ensure that the call won't finish too early, because of race conditions such as:
+    - not sending all txs to the node through the connection
+    """
+    wait_until(lambda: conn.rpc.getmempoolinfo()['size'] >= exp_mempool_size,
+                    check_interval=check_interval, timeout=timeout)
+    conn.rpc.waitforptvcompletion()
+
 def wait_for_txn_propagator(node):
     # Wait for this node's transactions propagator to finish relaying transactions to other nodes.
     # Can be used to make sure current transactions are not relayed to nodes being reconnected later.
