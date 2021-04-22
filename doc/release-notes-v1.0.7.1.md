@@ -1,10 +1,9 @@
-# Bitcoin SV version 1.0.8 Release Notes
+# Bitcoin SV version 1.0.7.1 Release Notes
 
-## Headline changes since 1.0.7
-TODO: Will follow later
+Version 1.0.7.1 is a critical upgrade to version 1.0.7.
 
-## Full list of changes since 1.0.7
-TODO: Will follow later
+## List of changes since 1.0.7
+* Performance hardening changes to ensure performance remains stable under adverse network conditions.
 
 ## Scaling Test Network (STN) Reset
 N/A
@@ -23,4 +22,3 @@ N/A
 * [Version 1.0.5](release-notes-v1.0.5.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.5/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.5) - 2020-09-08
 * [Version 1.0.6](release-notes-v1.0.6.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.6/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.6) - 2020-11-17
 * [Version 1.0.7](release-notes-v1.0.7.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.7/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.7) - 2021-02-10
-* [Version 1.0.7.1](release-notes-v1.0.7.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.7.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.7.1) - 2021-04-22
