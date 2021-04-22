@@ -9,6 +9,7 @@
 #include <chrono>
 #include <memory>
 #include <vector>
+#include <optional>
 #include <boost/chrono.hpp>
 
 namespace task

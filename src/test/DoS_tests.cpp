@@ -186,13 +186,24 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
             gArgs.GetArgAsBytes("-maxtxsizepolicy",
                       MAX_TX_SIZE_POLICY_BEFORE_GENESIS))
     };
-
+    size_t maxOrphanPercent {
+        static_cast<size_t>(
+            gArgs.GetArg("-maxorphansinbatchpercent",
+                      COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH))
+    };
+    size_t maxInputsOutputs {
+        static_cast<size_t>(
+            gArgs.GetArg("-maxinputspertransactionoutoffirstlayerorphan",
+                      COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION))
+    };
     // A common buffer with orphan txns
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                             maxCollectedOutpoints,
                             maxExtraTxnsForCompactBlock,
-                            maxTxSizePolicy)
+                            maxTxSizePolicy,
+                            maxOrphanPercent,
+                            maxInputsOutputs)
     };
 
     CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};

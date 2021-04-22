@@ -37,7 +37,9 @@ CTxnValidator::CTxnValidator(
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
         maxCollectedOutpoints,
         maxExtraTxnsForCompactBlock,
-        config.GetMaxTxSize(true, false) /*orphan tx before genesis might not get accepted by mempool */);
+        config.GetMaxTxSize(true, false), /*orphan tx before genesis might not get accepted by mempool */
+        config.GetMaxOrphansInBatchPercentage(),
+        config.GetMaxInputsForSecondLayerOrphan());
     
     // Max memory usage for transaction queues
     mMaxQueueMemSize =
@@ -236,7 +238,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
         mpTxnDoubleSpendDetector, // Double Spend Detector
-        std::make_shared<COrphanTxns>(0, 0, 0), // A temporary orphan txns queue (unlimited)
+        std::make_shared<COrphanTxns>(0, 0, 0, 0, 0), // A temporary orphan txns queue (unlimited)
         std::make_shared<CTxnRecentRejects>() // A temporary recent rejects queue
     };
     // Process a set of given txns

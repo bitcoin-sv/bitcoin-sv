@@ -109,6 +109,8 @@ void GlobalConfig::Reset()
     mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
+    mMaxPercentageOfOrphansInMaxBatchSize = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
+    mMaxInputsForSecondLayerOrphan = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
     mStopAtHeight = DEFAULT_STOPATHEIGHT;
     mPromiscuousMempoolFlags = 0;
     mIsSetPromiscuousMempoolFlags = false;
@@ -1790,6 +1792,39 @@ uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
     return mMaxOrphanTxSize;
 }
 
+
+bool GlobalConfig::SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) {
+    if (percent < 1 || percent > 100)
+    {
+        if (err)
+        {
+            *err = "Max percentage of orphans as percentage of maximal batch size must be between 1 and 100.";
+        }
+        return false;
+    }
+
+    mMaxPercentageOfOrphansInMaxBatchSize = percent;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxOrphansInBatchPercentage() const {
+    return mMaxPercentageOfOrphansInMaxBatchSize;
+}
+
+bool GlobalConfig::SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) {
+    if (LessThanZero(maxInputs, err, "Max inputs for out of first layer orphan txs must not be less than 0."))
+    {
+        return false;
+    }
+
+    mMaxInputsForSecondLayerOrphan = maxInputs;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxInputsForSecondLayerOrphan() const {
+    return mMaxInputsForSecondLayerOrphan;
+}
+
 bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
     if (LessThanZero(stopAtHeight, err, "Policy value for stop at height in the main chain must not be less than 0."))
     {
@@ -1797,7 +1832,6 @@ bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
     }
 
     mStopAtHeight = stopAtHeight;
-
     return true;
 }
 

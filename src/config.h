@@ -82,6 +82,8 @@ public:
     virtual uint64_t GetMaxMempool() const = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
+    virtual uint64_t GetMaxOrphansInBatchPercentage() const = 0;
+    virtual uint64_t GetMaxInputsForSecondLayerOrphan() const = 0;
     virtual int32_t GetStopAtHeight() const = 0;
     virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
     virtual bool IsSetPromiscuousMempoolFlags() const = 0;
@@ -185,6 +187,8 @@ public:
     virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
     virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
+    virtual bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) = 0;
+    virtual bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) = 0;
     virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
     virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
     virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
@@ -395,6 +399,12 @@ public:
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
 
+    bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) override;
+    uint64_t GetMaxOrphansInBatchPercentage() const override;
+    
+    bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) override;
+    uint64_t GetMaxInputsForSecondLayerOrphan() const override;
+
     bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override;
     int32_t GetStopAtHeight() const override;
 
@@ -552,6 +562,8 @@ private:
     uint64_t mMempoolMaxPercentCPFP;
     uint64_t mMemPoolExpiry;
     uint64_t mMaxOrphanTxSize;
+    uint64_t mMaxPercentageOfOrphansInMaxBatchSize;
+    uint64_t mMaxInputsForSecondLayerOrphan;
     int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
     bool mIsSetPromiscuousMempoolFlags;
@@ -901,6 +913,23 @@ public:
         return true;
     }
     uint64_t GetMaxOrphanTxSize() const override { return COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE; }
+
+    bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+
+    uint64_t GetMaxOrphansInBatchPercentage() const override { return COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH; };
+    
+    bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxInputsForSecondLayerOrphan() const override { return COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION; };
 
     bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override
     {

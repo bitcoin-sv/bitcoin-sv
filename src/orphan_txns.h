@@ -37,11 +37,17 @@ class COrphanTxns {
     /** Default number of orphan+recently-replaced txn to keep around for block
      *  reconstruction */
     static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
+    /** Default for -maxinputspertransactionoutoffirstlayerorphan */
+    static constexpr uint64_t DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION = 5;
+    /** Default for -maxorphansinbatchpercent */
+    static constexpr uint64_t DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH = 60;
 
     COrphanTxns(
         size_t maxCollectedOutpoints,
         size_t maxExtraTxnsForCompactBlock,
-        size_t maxTxSizePolicy);
+        size_t maxTxSizePolicy,
+        size_t maxPercentageOfOrphansInBatch,
+        size_t maxInputsOutputsPerTx);
     ~COrphanTxns() = default;
 
     // Forbid copying/assignment
@@ -122,6 +128,9 @@ class COrphanTxns {
     size_t mExtraTxnsForCompactIdx {0};
     size_t mMaxExtraTxnsForCompactBlock {0};
     size_t mMaxStandardTxSize {0};
+    size_t mMaxTxsPerBatch {0};
+    size_t mMaxPercentageOfOrphansInBatch {0};
+    size_t mMaxInputsOutputsPerTx {0};
 
     /** Control txns limit by a time slot */
     int64_t mNextSweep {0};

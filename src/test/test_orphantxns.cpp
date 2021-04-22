@@ -20,6 +20,9 @@ namespace {
     size_t maxCollectedOutpoints = COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS;
     size_t maxExtraTxnsForCompactBlock = COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
     size_t maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
+    size_t maxOrphanPercent = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
+    size_t maxInputsOutputs = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
+
     // Create txn inputs
     std::vector<CTxIn> CreateTxnInputs(size_t nNumOfInputs, uint256 txid=InsecureRand256()) {
         std::vector<CTxIn> vin;
@@ -115,7 +118,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_creation) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     BOOST_REQUIRE(orphanTxns);
 }
@@ -127,7 +132,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
@@ -147,7 +154,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_size) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     size_t nTxnsNumber=1000;
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
@@ -178,7 +187,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
@@ -201,7 +212,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
@@ -229,7 +242,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     size_t nTxnsNumber=10;
     size_t nNodesNumber=10;
@@ -257,7 +272,9 @@ BOOST_AUTO_TEST_CASE(test_gettxids) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     // Create orphan transactions:
     auto txn1 = CreateOrphanTxn(TxSource::p2p);
@@ -287,7 +304,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
         std::make_shared<COrphanTxns>(
                 nMaxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     // Create txn with a max number of outpoints the OrphanTxn can collect
     auto txn1 = CreateOrphanTxn(
@@ -355,7 +374,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
         std::make_shared<COrphanTxns>(
                 nMaxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     // Create txn1
     auto txn1 = CreateOrphanTxn(
@@ -435,7 +456,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     size_t nTxnsNumber=5;
     // Create orphan transactions:
@@ -494,7 +517,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy)
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                maxInputsOutputs)
     };
     // Create orphan transaction of type 1-2 (one input - two outputs):
     auto txn1 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(2));
@@ -521,6 +546,209 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     // At this stage there is no orphans and collected outpoints in the queue.
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     BOOST_CHECK(!orphanTxns->getTxnsNumber());
+}
+
+// In this test we are testing prevention of collecting transactions wit too many inputs
+BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_inputs) {
+    // Create orphan txn's object.
+    std::shared_ptr<COrphanTxns> orphanTxns {
+        std::make_shared<COrphanTxns>(
+                maxCollectedOutpoints,
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                2)
+    };
+    // Create root transaction of type 1-1 (one input - one outputs):
+    auto txn1 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(2));
+    // Create a first layer orphan with two children
+    auto txn2 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->GetTxnPtr()->GetId(), 0)}), CreateTxnOutputs(5));
+    // Create a second layer orphan with 2 inputs, will be collected
+    auto txn3 = CreateOrphanTxn(TxSource::p2p, 
+        CreateTxnInputs({
+            COutPoint(txn2->GetTxnPtr()->GetId(), 0), 
+            COutPoint(txn2->GetTxnPtr()->GetId(), 1)
+        })
+    );
+    // Create a second layer orphan with 3 inputs, will not be collected
+    auto txn4 = CreateOrphanTxn(TxSource::p2p, 
+        CreateTxnInputs({
+            COutPoint(txn2->GetTxnPtr()->GetId(), 2), 
+            COutPoint(txn2->GetTxnPtr()->GetId(), 3),
+            COutPoint(txn2->GetTxnPtr()->GetId(), 4),
+        })
+    );
+    // Add orphans to the pool
+    orphanTxns->addTxn(txn2);
+    orphanTxns->addTxn(txn3);
+    orphanTxns->addTxn(txn4);
+    // We presume that txn1 is submitted to the mempool so collect it's outpoints
+    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+
+    // Get txs that need to be reprocessed.
+    auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    // txn2 and txn3 should be collected
+    BOOST_CHECK(vTxnsToReprocess.size() == 2);
+    // txn4 should stay
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 3);
+    
+    // Remove collected txs from the orphan pool.
+    for (const auto& tx: vTxnsToReprocess) {
+        orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
+    }
+
+    // Now pretend that tx2 has entered the mempool, tx4 is now a first layer transaction
+    // and will be collected
+    orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
+    vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    BOOST_CHECK(vTxnsToReprocess.size() == 1);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 1);
+
+    // Remove collected txs from the orphan pool.
+    for (const auto& tx: vTxnsToReprocess) {
+        orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
+    }
+
+    // At this stage there is no orphans and collected outpoints in the queue.
+    BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
+    BOOST_CHECK(!orphanTxns->getTxnsNumber());
+}
+
+// In this test we are testing prevention of collecting too many outputs of a single transaction
+BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_outputs) {
+    // Create orphan txn's object.
+    std::shared_ptr<COrphanTxns> orphanTxns {
+        std::make_shared<COrphanTxns>(
+                maxCollectedOutpoints,
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy,
+                maxOrphanPercent,
+                2)
+    };
+    // Create root transaction of type 1-1 (one input - one outputs):
+    auto txn1 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(2));
+    // Create a first layer orphan with three children
+    auto txn2 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->GetTxnPtr()->GetId(), 0)}), CreateTxnOutputs(3));
+    // Create three second layer orphans
+    auto txn3 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn2->GetTxnPtr()->GetId(), 0)}));
+    auto txn4 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn2->GetTxnPtr()->GetId(), 1)}));
+    auto txn5 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn2->GetTxnPtr()->GetId(), 2)}));
+
+    // Add orphans to the pool
+    orphanTxns->addTxn(txn2);
+    orphanTxns->addTxn(txn3);
+    orphanTxns->addTxn(txn4);
+    orphanTxns->addTxn(txn5);
+
+    // We presume that txn1 is submitted to the mempool so collect it's outpoints
+    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+
+    // Get txs that need to be reprocessed.
+    auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    // txn2, txn3 and txn4 should be collected, txn5 should not as it is third (limit is 2) output of txn2
+    BOOST_CHECK(vTxnsToReprocess.size() == 3);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 4);
+    
+    // Remove collected txs from the orphan pool.
+    for (const auto& tx: vTxnsToReprocess) {
+        orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
+    }
+
+    // Now pretend that tx2 has entered the mempool, tx5 is now a first layer transaction
+    // and will be collected
+    orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
+    vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    BOOST_CHECK(vTxnsToReprocess.size() == 1);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 1);
+
+    // Remove collected txs from the orphan pool.
+    for (const auto& tx: vTxnsToReprocess) {
+        orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
+    }
+
+    // At this stage there is no orphans and collected outpoints in the queue.
+    BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
+    BOOST_CHECK(!orphanTxns->getTxnsNumber());
+}
+
+// In this test we are testing limitation on number of transactions released at once (in single batch)
+BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch) {
+
+    const uint64_t MAX_PERCENTAGE_ORPHANS_IN_BATCH = 5;
+    // Create orphan txn's object.
+    std::shared_ptr<COrphanTxns> orphanTxns {
+        std::make_shared<COrphanTxns>(
+                maxCollectedOutpoints,
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy,
+                MAX_PERCENTAGE_ORPHANS_IN_BATCH,
+                maxInputsOutputs)
+    };
+
+    // calculate max txs released in single batch
+    const auto MAX_TXS_RELEASED = 
+        GetNumHighPriorityValidationThrs() * DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO * MAX_PERCENTAGE_ORPHANS_IN_BATCH / 100;
+    // Number of txs in first layer should be lower than MAX_TXS_RELEASED
+    const auto NUM_FIRST_LAYER_TXS = MAX_TXS_RELEASED * 3 / 4; 
+    BOOST_ASSERT(NUM_FIRST_LAYER_TXS < MAX_TXS_RELEASED);
+    BOOST_ASSERT(2 * NUM_FIRST_LAYER_TXS > MAX_TXS_RELEASED);
+    // Create root transaction with enough outputs for first layer:
+    auto txnRoot = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(NUM_FIRST_LAYER_TXS));
+    // Create first and second layer orphans 
+    for(uint64_t n = 0; n < NUM_FIRST_LAYER_TXS; n++){
+        auto firstLayerTxn = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txnRoot->GetTxnPtr()->GetId(), n)}));
+        orphanTxns->addTxn(firstLayerTxn);
+        auto secondLayerTxn = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(firstLayerTxn->GetTxnPtr()->GetId(), 0)}));
+        orphanTxns->addTxn(secondLayerTxn);
+    }
+     
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 2 * NUM_FIRST_LAYER_TXS);
+    // release and collect all outpoints from root txn
+    orphanTxns->collectTxnOutpoints(*(txnRoot->GetTxnPtr()));
+    auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    // We could release all transactions but we are limited to MAX_TXS_RELEASED
+    BOOST_CHECK(vTxnsToReprocess.size() == MAX_TXS_RELEASED);
+}
+
+// In this test we are testing limitation on number of transactions released at once (in single batch)
+// when the number of the first layer transactions is higher than this limit
+BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch_first_layer) {
+
+    const uint64_t MAX_PERCENTAGE_ORPHANS_IN_BATCH = 5;
+    // Create orphan txn's object.
+    std::shared_ptr<COrphanTxns> orphanTxns {
+        std::make_shared<COrphanTxns>(
+                maxCollectedOutpoints,
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy,
+                MAX_PERCENTAGE_ORPHANS_IN_BATCH,
+                maxInputsOutputs)
+    };
+
+    // calculate max txs released in single batch
+    const auto MAX_TXS_RELEASED = 
+        GetNumHighPriorityValidationThrs() * DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO * MAX_PERCENTAGE_ORPHANS_IN_BATCH / 100;
+    // Number of txs in first layer should be higher than MAX_TXS_RELEASED
+    const auto NUM_FIRST_LAYER_TXS = MAX_TXS_RELEASED * 4 / 3; 
+    BOOST_ASSERT(NUM_FIRST_LAYER_TXS > MAX_TXS_RELEASED);
+
+    // Create root transaction with enough outputs for first layer:
+    auto txnRoot = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(NUM_FIRST_LAYER_TXS));
+    // Create first and second layer orphans 
+    for(uint64_t n = 0; n < NUM_FIRST_LAYER_TXS; n++){
+        auto firstLayerTxn = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txnRoot->GetTxnPtr()->GetId(), n)}));
+        orphanTxns->addTxn(firstLayerTxn);
+        auto secondLayerTxn = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(firstLayerTxn->GetTxnPtr()->GetId(), 0)}));
+        orphanTxns->addTxn(secondLayerTxn);
+    }
+     
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 2 * NUM_FIRST_LAYER_TXS);
+    // release and collect all outpoints from root txn
+    orphanTxns->collectTxnOutpoints(*(txnRoot->GetTxnPtr()));
+    auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
+    // We could release all transactions but we are limited to MAX_TXS_RELEASED
+    // and we should always release first layer transactions
+    BOOST_CHECK(vTxnsToReprocess.size() == NUM_FIRST_LAYER_TXS);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
