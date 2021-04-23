@@ -902,7 +902,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "-dustrelayfee=<amt>",
             strprintf("Fee rate (in %s/kB) used to define dust. A transaction output paying less than "
                       "(dustlimitfactor * output_dust_fee / 100) is considered dust. "
-                      "The output_dust_fee is calculated from the outputsize and"
+                      "The output_dust_fee is calculated from the outputsize and "
                       "the dustrelayfee. (default: %s)",
                       CURRENCY_UNIT, FormatMoney(DUST_RELAY_TX_FEE)));
         strUsage += HelpMessageOpt(
