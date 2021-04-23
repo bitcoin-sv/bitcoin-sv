@@ -221,6 +221,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             0].softrejectblock, genesis_hash, 0)
 
         b1_hash = self.nodes[0].generate(1)[0]
+        sync_blocks(self.nodes)
         self.nodes[0].softrejectblock(b1_hash, 0)
         assert_equal(self.nodes[0].getbestblockhash(), genesis_hash)
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b1_hash})
@@ -780,6 +781,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         b1_hash = self.nodes[0].generate(1)[0]
         b2_hash = self.nodes[0].generate(1)[0]
         b3_hash = self.nodes[0].generate(1)[0]
+        sync_blocks(self.nodes)
 
         self.nodes[0].softrejectblock(b2_hash, 2)
         assert_equal(self.nodes[0].getbestblockhash(), b1_hash)
