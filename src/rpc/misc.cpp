@@ -628,7 +628,7 @@ Examples:
 
     // Timed cancellation source that will abort script verification if total allowed time is exceeded.
     // Timer is started now so that it also includes parsing scripts argument and getting TXO which could also take a while.
-    const auto cancellation_source = task::CTimedCancellationSource::Make( totalTimeout, {} );
+    const auto cancellation_source = task::CTimedCancellationSource::Make( totalTimeout );
 
     // Parse scripts argument
     struct ScriptToVerify
@@ -869,7 +869,7 @@ Examples:
             // Cancel if total allowed time is exceeded
             cancellation_source,
             // Cancel if it takes longer than longest allowed validation of standard transaction
-            task::CTimedCancellationSource::Make(config.GetMaxStdTxnValidationDuration(), {})
+            task::CTimedCancellationSource::Make(config.GetMaxStdTxnValidationDuration())
         ));
 
         if(!res.has_value())

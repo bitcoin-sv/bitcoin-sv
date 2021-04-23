@@ -160,7 +160,7 @@ std::optional<bool> DSAttemptHandler::ValidateDoubleSpend(
     uint32_t scriptVerifyFlags { GetScriptVerifyFlags(mConfig, IsGenesisEnabled(mConfig, chainActive.Height() + 1)) };
 
     // Set verification timeout to the longest we'll allow
-    task::CCancellationToken token { task::CTimedCancellationSource::Make(mConfig.GetMaxNonStdTxnValidationDuration(), {}) };
+    task::CCancellationToken token { task::CTimedCancellationSource::Make(mConfig.GetMaxNonStdTxnValidationDuration()) };
 
     // Do script verification
     const ScriptDetails& scriptdetails { notificationDetails.scriptDetails };
