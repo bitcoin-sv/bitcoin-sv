@@ -150,6 +150,25 @@ def deser_compact_size(f):
     return nit
 
 
+def ser_varint(v):
+    r = b""
+    length = 0
+    while True:
+        r += struct.pack("<B", (v & 0x7F) | (0x80 if length > 0 else 0x00))
+        if(v <= 0x7F):
+            return r[::-1] # Need as little-endian
+        v = (v >> 7) - 1
+        length += 1
+
+def deser_varint(f):
+    ntot = 0
+    while True:
+        n = struct.unpack("<B", f.read(1))[0]
+        ntot = (n << 7) | (n & 0x7F)
+        if((n & 0x80) == 0):
+            return ntot
+
+
 def deser_string(f):
     nit = deser_compact_size(f)
     return f.read(nit)
@@ -251,17 +270,18 @@ def ser_int_vector(l):
 
 
 def deser_varint_vector(f):
-    nit = deser_compact_size(f)
+    nit = deser_varint(f)
     r = []
     for i in range(nit):
-        t = deser_compact_size(f)
+        t = deser_varint(f)
         r.append(t)
     return r
 
-
-@generator_based_serializator
 def ser_varint_vector(l):
-    return (ser_compact_size(v) for v in l)
+    r = ser_varint(len(l))
+    for v in l:
+        r += ser_varint(v)
+    return r
 
 
 # Deserialize from a hex string representation (eg from RPC)
