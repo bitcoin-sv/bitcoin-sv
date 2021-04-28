@@ -7,6 +7,7 @@
 #include "config.h"
 #include "net/netbase.h"
 #include "rpc/http_protocol.h" // For HTTP status codes
+#include "task_helpers.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -39,106 +40,6 @@ static const size_t MAX_HEADERS_SIZE = 8192;
  */
 static const size_t MIN_SUPPORTED_BODY_SIZE = 0x02000000;
 
-/** HTTP request work item */
-class HTTPWorkItem final : public HTTPClosure {
-public:
-    HTTPWorkItem(Config &_config, std::unique_ptr<HTTPRequest> _req,
-                 const std::string &_path, const HTTPRequestHandler &_func)
-        : req(std::move(_req)), path(_path), func(_func), config(&_config) {}
-
-    void operator()() override { func(*config, req.get(), path); }
-
-    std::unique_ptr<HTTPRequest> req;
-
-private:
-    std::string path;
-    HTTPRequestHandler func;
-    Config *config;
-};
-
-/**
- * Simple work queue for distributing work over multiple threads.
- * Work items are simply callable objects.
- */
-template <typename WorkItem> class WorkQueue {
-private:
-    /** Mutex protects entire object */
-    std::mutex cs;
-    std::condition_variable cond;
-    std::deque<std::unique_ptr<WorkItem>> queue;
-    bool running;
-    size_t maxDepth;
-    int numThreads;
-
-    /** RAII object to keep track of number of running worker threads */
-    class ThreadCounter {
-    public:
-        WorkQueue &wq;
-        ThreadCounter(const ThreadCounter&) = delete;
-        ThreadCounter& operator=(const ThreadCounter&) = delete;
-        ThreadCounter(ThreadCounter&&) = delete;
-        ThreadCounter& operator=(ThreadCounter&&) = delete;
-        explicit ThreadCounter(WorkQueue &w) : wq(w) {
-            std::lock_guard<std::mutex> lock(wq.cs);
-            wq.numThreads += 1;
-        }
-        ~ThreadCounter() {
-            std::lock_guard<std::mutex> lock(wq.cs);
-            wq.numThreads -= 1;
-            wq.cond.notify_all();
-        }
-    };
-
-public:
-    WorkQueue(const WorkQueue&) = delete;
-    WorkQueue& operator=(const WorkQueue&) = delete;
-    WorkQueue(WorkQueue&&) = delete;
-    WorkQueue& operator=(WorkQueue&&) = delete;
-    explicit WorkQueue(size_t _maxDepth)
-        : running(true), maxDepth(_maxDepth), numThreads(0) {}
-    /** Precondition: worker threads have all stopped
-     * (call WaitExit)
-     */
-    /** Enqueue a work item */
-    bool Enqueue(WorkItem *item) {
-        std::unique_lock<std::mutex> lock(cs);
-        if (queue.size() >= maxDepth) {
-            return false;
-        }
-        queue.emplace_back(std::unique_ptr<WorkItem>(item));
-        cond.notify_one();
-        return true;
-    }
-    /** Thread function */
-    void Run() {
-        ThreadCounter count(*this);
-        while (true) {
-            std::unique_ptr<WorkItem> i;
-            {
-                std::unique_lock<std::mutex> lock(cs);
-                while (running && queue.empty())
-                    cond.wait(lock);
-                if (!running) break;
-                i = std::move(queue.front());
-                queue.pop_front();
-            }
-            (*i)();
-        }
-    }
-    /** Interrupt and exit loops */
-    void Interrupt() {
-        std::unique_lock<std::mutex> lock(cs);
-        running = false;
-        cond.notify_all();
-    }
-    /** Wait for worker threads to exit */
-    void WaitExit() {
-        std::unique_lock<std::mutex> lock(cs);
-        while (numThreads > 0)
-            cond.wait(lock);
-    }
-};
-
 struct HTTPPathHandler {
     HTTPPathHandler() {}
     HTTPPathHandler(std::string _prefix, bool _exactMatch,
@@ -158,7 +59,7 @@ struct evhttp *eventHTTP = 0;
 //! List of subnets to allow RPC connections from
 static std::vector<CSubNet> rpc_allow_subnets;
 //! Work queue for handling longer requests off the event loop thread
-static WorkQueue<HTTPClosure> *workQueue = 0;
+static std::unique_ptr<CThreadPool<CQueueAdaptor>> pWorkQueue {nullptr};
 //! Handlers for (sub)paths
 std::vector<HTTPPathHandler> pathHandlers;
 //! Bound listening sockets
@@ -229,7 +130,7 @@ static std::string RequestMethodString(HTTPRequest::RequestMethod m) {
 static void http_request_cb(struct evhttp_request *req, void *arg) {
     Config &config = *reinterpret_cast<Config *>(arg);
 
-    std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
+    std::unique_ptr<HTTPRequest> hreq { std::make_unique<HTTPRequest>(req) };
 
     LogPrint(BCLog::HTTP, "Received a %s request for %s from %s\n",
              RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(),
@@ -267,17 +168,21 @@ static void http_request_cb(struct evhttp_request *req, void *arg) {
 
     // Dispatch to worker thread.
     if (i != iend) {
-        std::unique_ptr<HTTPWorkItem> item(
-            new HTTPWorkItem(config, std::move(hreq), path, i->handler));
-        assert(workQueue);
-        if (workQueue->Enqueue(item.get())) {
-            /* if true, queue took ownership */
-            item.release();
-        } else {
+        size_t workQueueDepth = std::max(static_cast<size_t>(gArgs.GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE)), 1UL);
+
+        assert(pWorkQueue);
+        if(pWorkQueue->getTaskDepth() < workQueueDepth) {
+            auto handleTask = [&config, hreq = std::move(hreq), path, handler = i->handler]()
+            {
+                handler(config, hreq.get(), path);
+            };
+            make_task(*pWorkQueue, std::move(handleTask));
+        }
+        else {
             LogPrintf("WARNING: request rejected because http work queue depth "
                       "exceeded, it can be increased with the -rpcworkqueue= "
                       "setting\n");
-            item->req->WriteReply(HTTP_INTERNAL, "Work queue depth exceeded");
+            hreq->WriteReply(HTTP_INTERNAL, "Work queue depth exceeded");
         }
     } else {
         hreq->WriteReply(HTTP_NOTFOUND);
@@ -345,14 +250,6 @@ static bool HTTPBindAddresses(struct evhttp *http) {
         }
     }
     return !boundSockets.empty();
-}
-
-/** Simple wrapper to set thread name and run work queue */
-static void HTTPWorkQueueRun(WorkQueue<HTTPClosure> *queue, int workerNum)
-{
-    std::string s = strprintf("httpworker%d", workerNum);
-    RenameThread(s.c_str());
-    queue->Run();
 }
 
 /** libevent event log callback */
@@ -450,14 +347,14 @@ bool InitHTTPServer(Config &config) {
         return false;
     }
 
-    LogPrint(BCLog::HTTP, "Initialized HTTP server\n");
-    int workQueueDepth = std::max(
-        (long)gArgs.GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE), 1L);
-    LogPrintf("HTTP: creating work queue of depth %d\n", workQueueDepth);
-
-    workQueue = new WorkQueue<HTTPClosure>(workQueueDepth);
     eventBase = base;
     eventHTTP = http;
+    LogPrint(BCLog::HTTP, "Initialized HTTP server\n");
+
+    int rpcThreads = std::max(static_cast<long>(gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS)), 1L);
+    LogPrintf("HTTP: creating work queue with %d threads\n", rpcThreads);
+    pWorkQueue = std::make_unique<CThreadPool<CQueueAdaptor>>("HTTPServer", rpcThreads);
+
     return true;
 }
 
@@ -466,17 +363,10 @@ std::future<bool> threadResult;
 
 bool StartHTTPServer() {
     LogPrint(BCLog::HTTP, "Starting HTTP server\n");
-    int rpcThreads =
-        std::max((long)gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
-    LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
     std::packaged_task<bool(event_base *, evhttp *)> task(ThreadHTTP);
     threadResult = task.get_future();
     threadHTTP = std::thread(std::move(task), eventBase, eventHTTP);
 
-    for (int i = 0; i < rpcThreads; i++) {
-        std::thread rpc_worker(HTTPWorkQueueRun, workQueue, i);
-        rpc_worker.detach();
-    }
     return true;
 }
 
@@ -490,15 +380,16 @@ void InterruptHTTPServer() {
         // Reject requests on current connections
         evhttp_set_gencb(eventHTTP, http_reject_request_cb, nullptr);
     }
-    if (workQueue) workQueue->Interrupt();
+
+    if (pWorkQueue)
+        pWorkQueue->pause();
 }
 
 void StopHTTPServer() {
     LogPrint(BCLog::HTTP, "Stopping HTTP server\n");
-    if (workQueue) {
+    if (pWorkQueue) {
         LogPrint(BCLog::HTTP, "Waiting for HTTP worker threads to exit\n");
-        workQueue->WaitExit();
-        delete workQueue;
+        pWorkQueue.reset();
     }
     if (eventBase) {
         LogPrint(BCLog::HTTP, "Waiting for HTTP event thread to exit\n");
