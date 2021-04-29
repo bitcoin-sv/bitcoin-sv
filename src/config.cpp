@@ -1287,7 +1287,7 @@ bool GlobalConfig::SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* e
     {
         if(err)
         {
-            *err = "Double-Spend endpoint slow timeout must be grater than 0.";
+            *err = "Double-Spend endpoint slow timeout must be greater than 0.";
         }
         return false;
     }
@@ -1340,8 +1340,12 @@ int GlobalConfig::GetDoubleSpendEndpointPort() const
 
 bool GlobalConfig::SetDoubleSpendTxnRemember(int64_t size, std::string* err)
 {
-    if(LessThanZero(size, err, "Double-Spend maximum number of remembered transactions must not be negative."))
+    if(size <= 0)
     {
+        if(err)
+        {
+            *err = "Double-Spend maximum number of remembered transactions must be greater than 0.";
+        }
         return false;
     }
 
@@ -1355,8 +1359,12 @@ uint64_t GlobalConfig::GetDoubleSpendTxnRemember() const
 
 bool GlobalConfig::SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err)
 {
-    if(LessThanZero(size, err, "Double-Spend maximum size of endpoint blacklist must not be negative."))
+    if(size <= 0)
     {
+        if(err)
+        {
+            *err = "Double-Spend maximum size of endpoint blacklist must be greater than 0.";
+        }
         return false;
     }
 
