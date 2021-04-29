@@ -1287,7 +1287,7 @@ bool GlobalConfig::SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* e
     {
         if(err)
         {
-            *err = "Double-Spend endpoint slow timeout must be grater than 0.";
+            *err = "Double-Spend endpoint slow timeout must be greater than 0.";
         }
         return false;
     }
