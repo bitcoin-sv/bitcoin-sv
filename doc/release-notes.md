@@ -34,7 +34,6 @@
 * dev branch clang warning -Wdefaulted-function-deleted.
 * Initialize class members where clang requires.
 * Fix: P2P Messages In Multiple TCP Segments.
-* Create Invalid block repository.
 * Improve detection of longer chains.
 * Improved orphan transaction processing.
 * Reduce Logging Cost.
