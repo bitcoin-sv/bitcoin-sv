@@ -49,6 +49,7 @@
 * Remove maxcollectedoutpoints configuration parameter.
 * Updated default value for maxorphantxsize: from 100 MB to 1 GB
 * Updated default value for limitancestorcount: from 1000 to 10000
+* Improved stability when accepting transactions during the reorg.
 
 ## Functional tests
 * Fix: import-rescan.py - possible race condition during tip update signaling.
