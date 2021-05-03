@@ -11,13 +11,13 @@
 #include <boost/test/unit_test.hpp>
 
 namespace {
+
     CService ip(uint32_t i) {
         struct in_addr s;
         s.s_addr = i;
         return CService(CNetAddr(s), Params().GetDefaultPort());
     }
     // Use a default configuration
-    size_t maxCollectedOutpoints = COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS;
     size_t maxExtraTxnsForCompactBlock = COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
     size_t maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     size_t maxOrphanPercent = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
@@ -116,7 +116,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_creation) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -130,7 +129,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -152,7 +150,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_size) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -185,7 +182,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -210,7 +206,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -240,7 +235,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -270,7 +264,6 @@ BOOST_AUTO_TEST_CASE(test_gettxids) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -297,86 +290,16 @@ BOOST_AUTO_TEST_CASE(test_gettxids) {
     BOOST_CHECK(vKnownTxIds == vTxIds);
 }
 
-BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
-    size_t nMaxCollectedOutpoints = 100;
-    // Create orphan txn's object.
-    std::shared_ptr<COrphanTxns> orphanTxns {
-        std::make_shared<COrphanTxns>(
-                nMaxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy,
-                maxOrphanPercent,
-                maxInputsOutputs)
-    };
-    // Create txn with a max number of outpoints the OrphanTxn can collect
-    auto txn1 = CreateOrphanTxn(
-                    TxSource::p2p,
-                    CreateTxnInputs(1),
-                    CreateTxnOutputs(nMaxCollectedOutpoints));
-    // Create a vector with expected outpoints from txn1
-    std::vector<COutPoint> vExpectedOutpoints {};
-    auto txn1id = txn1->GetTxnPtr()->GetId();
-    for (size_t i=0; i<nMaxCollectedOutpoints; ++i) {
-        vExpectedOutpoints.emplace_back(COutPoint{txn1id, (uint32_t)i});
-    }
-    // Collect outpoints from txn1
-    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
-    // Get collected outpoints
-    auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
-    BOOST_CHECK(
-        std::equal(vExpectedOutpoints.begin(),
-                   vExpectedOutpoints.end(),
-                   vReturnedOutpoints.begin()));
-    BOOST_CHECK(vReturnedOutpoints.size() == nMaxCollectedOutpoints);
-
-    // Collect outpoints from a txn which creates nTxnNumOfOutpoints number of outpoints,
-    // where nTxnNumOfOutpoints is a random number from the range [1, nMaxCollectedOutpoints+1].
-    // The following loop helps to check if outpoints are collected properly.
-    std::mt19937 random_engine;
-    std::uniform_int_distribution<int> distribution(1, nMaxCollectedOutpoints+1);
-    for (int j=0; j<100; ++j) {
-        size_t nTxnNumOfOutpoints = distribution(random_engine);
-        auto txn = CreateOrphanTxn(
-                       TxSource::p2p,
-                       CreateTxnInputs(1),
-                       CreateTxnOutputs(nTxnNumOfOutpoints));
-        orphanTxns->collectTxnOutpoints(*(txn->GetTxnPtr()));
-        // Check if rotate can be applied to remove the oldest outpoints
-        if (nTxnNumOfOutpoints < nMaxCollectedOutpoints) {
-                std::rotate(
-                    vExpectedOutpoints.begin(),
-                    vExpectedOutpoints.begin() + nTxnNumOfOutpoints,
-                    vExpectedOutpoints.end());
-            vExpectedOutpoints.resize(vExpectedOutpoints.size() - nTxnNumOfOutpoints);
-        } else {
-            vExpectedOutpoints.clear();
-        }
-        auto txnid = txn->GetTxnPtr()->GetId();
-        for (size_t i=0; i<nTxnNumOfOutpoints; ++i) {
-            vExpectedOutpoints.emplace_back(COutPoint{txnid, (uint32_t)i});
-        }
-        auto vReturnedOutpoints2 = orphanTxns->getCollectedOutpoints();
-        BOOST_CHECK(
-            std::equal(
-                vExpectedOutpoints.begin(),
-                vExpectedOutpoints.end(),
-                vReturnedOutpoints2.begin()));
-    }
-}
-
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
-    size_t nMaxCollectedOutpoints = 100;
-    size_t nTxn1NumOfOutpoints = 10;
-    size_t nTxn2NumOfOutpoints = 2;
-    size_t nTxn3NumOfOutpoints = 3;
-    // Create orphan txn's object.
-    std::shared_ptr<COrphanTxns> orphanTxns {
-        std::make_shared<COrphanTxns>(
-                nMaxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock,
-                maxTxSizePolicy,
-                maxOrphanPercent,
-                maxInputsOutputs)
+    static constexpr uint32_t nTxn1NumOfOutpoints = 10;
+    static constexpr uint32_t nTxn2NumOfOutpoints = 2;
+    static constexpr uint32_t nTxn3NumOfOutpoints = 3;
+    // Make an object.
+    COrphanTxns orphanTxns {
+        maxExtraTxnsForCompactBlock,
+        maxTxSizePolicy,
+        maxOrphanPercent,
+        maxInputsOutputs
     };
     // Create txn1
     auto txn1 = CreateOrphanTxn(
@@ -396,52 +319,25 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
                     CreateTxnInputs(1),
                     CreateTxnOutputs(nTxn3NumOfOutpoints));
     auto txn3id = txn3->GetTxnPtr()->GetId();
-    // Create a vector with expected outpoints from txn1
-    std::vector<COutPoint> vTxn1ExpectedOutpoints {};
-    for (size_t i=0; i<nTxn1NumOfOutpoints; ++i) {
-        vTxn1ExpectedOutpoints.emplace_back(COutPoint{txn1id, (uint32_t)i});
-    }
-    // Create a vector with expected outpoints from txn3
-    std::vector<COutPoint> vTxn3ExpectedOutpoints {};
-    for (size_t i=0; i<nTxn3NumOfOutpoints; ++i) {
-        vTxn3ExpectedOutpoints.emplace_back(COutPoint{txn3id, (uint32_t)i});
-    }
     // Collect outpoints from txn1. Then, remove all outpoints from txn1
     {
-        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
-        orphanTxns->eraseCollectedOutpointsFromTxns(std::vector<TxId>{txn1id});
-        auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
-        BOOST_CHECK(vReturnedOutpoints.empty());
+        orphanTxns.collectTxnOutpoints(*(txn1->GetTxnPtr()));
+        orphanTxns.eraseCollectedOutpointsFromTxns({txn1id});
+        BOOST_CHECK(orphanTxns.getCollectedOutpoints().empty());
     }
-    // Collect outpoints from txn1 & txn2. Then, remove outpoints from txn2
-    {
-        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
-        orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
-        orphanTxns->eraseCollectedOutpointsFromTxns(std::vector<TxId>{txn2id});
-        auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
-        BOOST_CHECK(vReturnedOutpoints.size() == nTxn1NumOfOutpoints);
-        BOOST_CHECK(
-            std::equal(
-                vTxn1ExpectedOutpoints.begin(),
-                vTxn1ExpectedOutpoints.end(),
-                vReturnedOutpoints.begin()));
-    }
-    // Erase previously collected outpoints
-    orphanTxns->eraseCollectedOutpoints();
     // Collect outpoints from txn1, txn2 & txn3. Then, remove outpoints from txn2
     {
-        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
-        orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
-        orphanTxns->collectTxnOutpoints(*(txn3->GetTxnPtr()));
-        orphanTxns->eraseCollectedOutpointsFromTxns(std::vector<TxId>{txn2id});
-        auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
-        BOOST_CHECK(vReturnedOutpoints.size() == nTxn1NumOfOutpoints + nTxn3NumOfOutpoints);
+        orphanTxns.collectTxnOutpoints(*(txn1->GetTxnPtr()));
+        orphanTxns.collectTxnOutpoints(*(txn2->GetTxnPtr()));
+        orphanTxns.collectTxnOutpoints(*(txn3->GetTxnPtr()));
+        orphanTxns.eraseCollectedOutpointsFromTxns({txn2id});
+        auto vReturnedOutpoints = orphanTxns.getCollectedOutpoints();
+        BOOST_CHECK(vReturnedOutpoints.size() == 2);
         // Get outpoints from txn1 & txn3
-        auto vTxn1AndTxn3ExpectedOutpoints = vTxn1ExpectedOutpoints;
-        vTxn1AndTxn3ExpectedOutpoints.insert(
-                vTxn1AndTxn3ExpectedOutpoints.end(),
-                vTxn3ExpectedOutpoints.begin(),
-                vTxn3ExpectedOutpoints.end());
+        std::vector<COrphanTxns::CTxData> vTxn1AndTxn3ExpectedOutpoints {
+            {txn1id, nTxn1NumOfOutpoints},
+            {txn3id, nTxn3NumOfOutpoints}
+        };
         BOOST_CHECK(
             std::equal(
                 vTxn1AndTxn3ExpectedOutpoints.begin(),
@@ -450,11 +346,51 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
     }
 }
 
+BOOST_AUTO_TEST_CASE(test_orphantxns_getcollectedoutpoints) {
+    COrphanTxns orphanTxns {
+        maxExtraTxnsForCompactBlock,
+        maxTxSizePolicy,
+        maxOrphanPercent,
+        maxInputsOutputs
+    };
+    // Make N orphan txs and collect data from them.
+    static constexpr int N=1000;
+    for (int i=0; i<N; ++i) {
+        orphanTxns.
+            collectTxnOutpoints(
+                *(CreateOrphanTxn(
+                    TxSource::p2p,
+                    CreateTxnInputs(1),
+                    CreateTxnOutputs(10))->GetTxnPtr()));
+    }
+    std::vector<COrphanTxns::CTxData> vExpectedOutpoints {
+        orphanTxns.getCollectedOutpoints()
+    };
+    BOOST_CHECK(vExpectedOutpoints.size() == N);
+    // Erase K pseudo-randomly chosen elements.
+    static constexpr int K=10;
+    for (int i=0; i<K; ++i) {
+        auto rand_iter { vExpectedOutpoints.begin() };
+        std::advance(rand_iter, GetRandInt(vExpectedOutpoints.size()-1));
+        orphanTxns.eraseCollectedOutpointsFromTxns({rand_iter->mTxId});
+        vExpectedOutpoints.erase(rand_iter);
+    }
+    BOOST_CHECK(vExpectedOutpoints.size() == (N-K));
+    // Check if getCollectedOutpoints() returns the expected result.
+    auto vReturnedOutpoints {
+        orphanTxns.getCollectedOutpoints()
+    };
+    BOOST_CHECK(
+        std::equal(
+            vExpectedOutpoints.begin(),
+            vExpectedOutpoints.end(),
+            vReturnedOutpoints.begin()));
+}
+
 BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -515,7 +451,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -553,7 +488,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_inputs) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -619,7 +553,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_outputs) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 maxOrphanPercent,
@@ -678,7 +611,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 MAX_PERCENTAGE_ORPHANS_IN_BATCH,
@@ -718,7 +650,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch_first_layer) {
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                maxCollectedOutpoints,
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy,
                 MAX_PERCENTAGE_ORPHANS_IN_BATCH,

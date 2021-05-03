@@ -30,8 +30,21 @@ class COrphanTxns {
     static constexpr int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
 
   public:
-    /** A default max limit for collected outpoints */
-    static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
+    // This struct is used to store details of tx (accepted by the mempool),
+    // which are needed to find descendant txs in the orphan pool.
+    struct CTxData final {
+        TxId mTxId {};
+        uint32_t mOutputsCount {};
+        CTxData(const TxId& txid, uint32_t outputsCount)
+        : mTxId{txid},
+          mOutputsCount{outputsCount}
+        {}
+        // equality comparison
+        bool operator==(const COrphanTxns::CTxData& rhs) const {
+            return mTxId == rhs.mTxId && mOutputsCount == rhs.mOutputsCount;
+        }
+    };
+
     /** Default for -maxorphantxssize, maximum size of orphan transactions is 10 MB*/
     static constexpr uint64_t DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = 100 * ONE_MEGABYTE;
     /** Default number of orphan+recently-replaced txn to keep around for block
@@ -43,7 +56,6 @@ class COrphanTxns {
     static constexpr uint64_t DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH = 60;
 
     COrphanTxns(
-        size_t maxCollectedOutpoints,
         size_t maxExtraTxnsForCompactBlock,
         size_t maxTxSizePolicy,
         size_t maxPercentageOfOrphansInBatch,
@@ -93,7 +105,7 @@ class COrphanTxns {
     /** Get TxIds of known orphan transactions */
     std::vector<TxId> getTxIds() const;
     /** Get collected outpoints */
-    std::vector<COutPoint> getCollectedOutpoints();
+    std::vector<COrphanTxns::CTxData> getCollectedOutpoints();
     /** Get a random orphan txn (used by UTs) */
     TxInputDataSPtr getRndOrphan();
 
@@ -118,8 +130,7 @@ class COrphanTxns {
     mutable std::shared_mutex mOrphanTxnsMtx {};
 
     /** Txn outpoints collected and waiting to be used to find any dependant orphan txn */
-    std::vector<COutPoint> mCollectedOutpoints {};
-    size_t mMaxCollectedOutpoints {};
+    std::vector<COrphanTxns::CTxData> mCollectedOutpoints {};
     mutable std::mutex mCollectedOutpointsMtx {};
 
     /** Extra txns used by block reconstruction */

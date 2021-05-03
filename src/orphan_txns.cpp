@@ -7,13 +7,11 @@
 #include "config.h"
 
 COrphanTxns::COrphanTxns(
-    size_t maxCollectedOutpoints,
     size_t maxExtraTxnsForCompactBlock,
     size_t maxTxSizePolicy,
     size_t maxPercentageOfOrphansInBatch,
     size_t maxInputsOutputsPerTx)
-: mMaxCollectedOutpoints(maxCollectedOutpoints),
-  mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock),
+: mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock),
   mMaxStandardTxSize(maxTxSizePolicy),
   mMaxPercentageOfOrphansInBatch(maxPercentageOfOrphansInBatch),
   mMaxInputsOutputsPerTx(maxInputsOutputsPerTx)
@@ -280,16 +278,17 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
         auto collectedOutpointIter = mCollectedOutpoints.begin();
         while (collectedOutpointIter != mCollectedOutpoints.end()) {
             // Find if there is any dependent orphan txn.
-            auto outpointFoundIter = mOrphanTxnsByPrev.find(*collectedOutpointIter);
-            if (outpointFoundIter == mOrphanTxnsByPrev.end()) {
-                ++collectedOutpointIter;
-                continue;
-            }
-            for (const COrphanTxnEntry* pOrphanEntry : outpointFoundIter->second) {
-               const TxInputDataSPtr& pTxInputData { pOrphanEntry->pTxInputData };
-               if(usetTxnsToReprocess.insert(pTxInputData).second) {
-                   pTxInputData->SetAcceptTime(GetTime());
-               }
+            for (uint32_t n=0; n < collectedOutpointIter->mOutputsCount; ++n) {
+                auto outpointFoundIter = mOrphanTxnsByPrev.find(COutPoint{collectedOutpointIter->mTxId, n});
+                if (outpointFoundIter == mOrphanTxnsByPrev.end()) {
+                    continue;
+                }
+                for (const COrphanTxnEntry* pOrphanEntry : outpointFoundIter->second) {
+                   const TxInputDataSPtr& pTxInputData { pOrphanEntry->pTxInputData };
+                   if(usetTxnsToReprocess.insert(pTxInputData).second) {
+                       pTxInputData->SetAcceptTime(GetTime());
+                   }
+                }
             }
             ++collectedOutpointIter;
         }
@@ -352,28 +351,8 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
 
 
 void COrphanTxns::collectTxnOutpoints(const CTransaction& tx) {
-    size_t nTxOutpointsNum = tx.vout.size();
     std::lock_guard lock {mCollectedOutpointsMtx};
-    // Check if we need to make a room for new outpoints before adding them.
-    if (mMaxCollectedOutpoints &&
-        (mCollectedOutpoints.size() + nTxOutpointsNum > mMaxCollectedOutpoints)) {
-        if (nTxOutpointsNum < mMaxCollectedOutpoints) {
-            // Discard a set of the oldest elements (estimated by nTxOutpointsNum value)
-            std::rotate(
-                    mCollectedOutpoints.begin(),
-                    mCollectedOutpoints.begin() + nTxOutpointsNum,
-                    mCollectedOutpoints.end());
-            // Remove old elements to make a room for new outpoints.
-            mCollectedOutpoints.resize(mCollectedOutpoints.size() - nTxOutpointsNum);
-        } else {
-            mCollectedOutpoints.clear();
-        }
-    }
-    // Add new outpoints
-    auto txhash = tx.GetId();
-    for (size_t i=0; i<nTxOutpointsNum; ++i) {
-        mCollectedOutpoints.emplace_back(COutPoint{txhash, (uint32_t)i});
-    }
+    mCollectedOutpoints.emplace_back(tx.GetId(), static_cast<uint32_t>(tx.vout.size()));
 }
 
 void COrphanTxns::eraseCollectedOutpoints() {
@@ -383,29 +362,14 @@ void COrphanTxns::eraseCollectedOutpoints() {
 
 void COrphanTxns::eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemovedTxIds) {
     std::lock_guard lock {mCollectedOutpointsMtx};
-    for (const auto& txid : vRemovedTxIds) {
-        auto firstElemIter {
-            std::find_if(
-               mCollectedOutpoints.begin(),
-               mCollectedOutpoints.end(),
-               [&txid](const COutPoint& outpoint) {
-                   return txid == outpoint.GetTxId(); })
-        };
-        if (firstElemIter == mCollectedOutpoints.end()) {
-            continue;
-        }
-        // Find the first non-matching element (starting from firstElemIter)
-        // The outpoints are stored continously in the vector.
-        auto endOfRangeIter {
-            std::find_if(
-               firstElemIter,
-               mCollectedOutpoints.end(),
-               [&txid](const COutPoint& outpoint) {
-                   return txid != outpoint.GetTxId(); })
-        };
-        // Erase all elements from the range: [firstElemIter, endOfRangeIter)
-        mCollectedOutpoints.erase(firstElemIter, endOfRangeIter);
-    }
+    mCollectedOutpoints.erase(
+        std::remove_if(
+            mCollectedOutpoints.begin(),
+            mCollectedOutpoints.end(),
+            [&vRemovedTxIds] (const COrphanTxns::CTxData& elem) -> bool {
+                return std::find_if(vRemovedTxIds.begin(), vRemovedTxIds.end(),
+                          [&elem](const TxId& txid){ return txid == elem.mTxId; }) != vRemovedTxIds.end(); }),
+        mCollectedOutpoints.end());
 }
 
 /** Get TxIds of known orphan transactions */
@@ -427,7 +391,7 @@ size_t COrphanTxns::getTxnsNumber() {
     return mOrphanTxns.size();
 }
 
-std::vector<COutPoint> COrphanTxns::getCollectedOutpoints() {
+std::vector<COrphanTxns::CTxData> COrphanTxns::getCollectedOutpoints() {
     std::lock_guard lock {mCollectedOutpointsMtx};
     return mCollectedOutpoints;
 }
