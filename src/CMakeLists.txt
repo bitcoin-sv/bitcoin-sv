@@ -214,11 +214,12 @@ add_library(common
 	base58.h
 	big_int.h
 	block_file_info.h
+	block_index.h
 	blockstreams.h
 	blockvalidation.h
 	bloom.h
-	cfile_util.h
 	cfile_util.cpp
+	cfile_util.h
 	chain.h
 	chainparams.cpp
 	chainparams.h
@@ -238,10 +239,11 @@ add_library(common
 	core_memusage.h
 	core_read.cpp
 	core_write.cpp
+	dirty_block_index_store.h
 	disk_block_pos.h
 	dstencode.cpp
 	dstencode.h
-    ecc_guard.h
+	ecc_guard.h
 	hash.h
 	indirectmap.h
 	invalid_txn_publisher.h
@@ -362,19 +364,23 @@ target_include_directories(bitcoinconsensus
 # Bitcoin server facilities
 add_library(server
 	abort_node.cpp
+	abort_node.h
 	addrdb.cpp
 	addrman.cpp
 	async_file_reader.h
 	block_file_access.cpp
 	block_file_access.h
 	block_file_info.cpp
+	block_hasher.h
 	block_index.cpp
+	block_index_store.h
+	block_index_store_loader.cpp
+	block_index_store_loader.h
 	blockencodings.cpp
 	blockencodings.h
 	blockfileinfostore.cpp
 	blockfileinfostore.h
-	block_file_access.cpp
-	block_index_store_loader.cpp
+	blockindex_with_descendants.h
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
@@ -385,14 +391,15 @@ add_library(server
 	cuckoocache.h
 	dbwrapper.cpp
 	dbwrapper.h
+	disk_block_index.h
 	disk_tx_pos.h
-    double_spend/dsattempt_handler.cpp
-    double_spend/dsattempt_handler.h
-    double_spend/dscallback_msg.cpp
-    double_spend/dscallback_msg.h
-    double_spend/dstxn_serialiser.cpp
-    double_spend/dstxn_serialiser.h
-    double_spend/time_limited_blacklist.h
+	double_spend/dsattempt_handler.cpp
+	double_spend/dsattempt_handler.h
+	double_spend/dscallback_msg.cpp
+	double_spend/dscallback_msg.h
+	double_spend/dstxn_serialiser.cpp
+	double_spend/dstxn_serialiser.h
+	double_spend/time_limited_blacklist.h
 	httprpc.cpp
 	httprpc.h
 	httpserver.cpp
@@ -404,6 +411,7 @@ add_library(server
 	invalid_txn_sinks/file_sink.h
 	invalid_txn_sinks/zmq_sink.cpp
 	invalid_txn_sinks/zmq_sink.h
+	leaky_bucket.h
 	locked_ref.h
 	mempooltxdb.cpp
 	mempooltxdb.h
@@ -446,6 +454,7 @@ add_library(server
 	policy/policy.cpp
 	pow.cpp
 	processing_block_index.cpp
+	processing_block_index.h
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp
