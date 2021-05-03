@@ -541,8 +541,6 @@ endif()
 
 # RPC client support
 add_library(rpcclient
-    cfile_util.cpp
-    cfile_util.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp
