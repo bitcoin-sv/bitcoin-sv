@@ -1299,7 +1299,7 @@ static UniValue sendrawtransaction(const Config &config,
     if (dontCheckFee && (txid_in_mempool() || !pTxInputData->IsTxIdStored()))
     {
         CTxPrioritizer txPrioritizer{mempool, txid};
-        LogPrint(BCLog::TXNSRC, "got txn via rpc sendratransactin after same tx arrived from relaying: %s txnsrc user=%s\n",
+        LogPrint(BCLog::TXNSRC, "got txn via rpc sendrawtransaction after same tx arrived from relaying: %s txnsrc user=%s\n",
                  txid.ToString(), request.authUser.c_str());
 
         return txid.GetHex();
