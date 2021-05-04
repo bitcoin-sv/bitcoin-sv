@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(thread_cancellation_after_500ms_cpu_budget)
             BOOST_CHECK_EQUAL(token.IsCanceled(), false);
         }
         auto remains = budget.DrainBudget(0ms);
-        BOOST_CHECK_GE(remains, 44ms);
+        BOOST_CHECK_GE(remains, 20ms);
     }
 
     budget.FillBudget(30ms);
