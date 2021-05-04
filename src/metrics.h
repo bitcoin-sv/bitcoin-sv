@@ -100,6 +100,7 @@ private:
             mCallable();
             next += mInterval;
         }
+        mCallable();       // we're shutting down, record the final stats
     }
 
     std::mutex mLock {};
