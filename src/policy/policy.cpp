@@ -54,15 +54,19 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 // However, if a consolidation transaction is donated to the miner, then we do not need to honour the consolidation factor
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
+    static const std::vector<uint8_t> protocol_id = {'d','u','s','t','_','r','e','t','u','r','n'};
+    static const CScript dust_return = CScript() << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
     const bool isDonation =
-            tx.vout.size() == 1U &&
-            tx.vout[0].nValue.GetSatoshis() == 0U &&
-            tx.vout[0].scriptPubKey.size() == 1 &&
-            tx.vout[0].scriptPubKey[0] == OP_FALSE;
+            dust_return == tx.vout[0].scriptPubKey &&
+            tx.vout[0].nValue.GetSatoshis() == 0U;
+
     const uint64_t factor = isDonation
             ? tx.vin.size()
             : config.GetMinConsolidationFactor();
-    const int32_t minConf = static_cast<int32_t>(config.GetMinConfConsolidationInput());
+    const int32_t minConf = isDonation
+            ? int32_t(0)
+            : config.GetMinConfConsolidationInput();
+
     const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
     const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
 
@@ -89,10 +93,10 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
         assert(coin.has_value());
         const auto coinHeight = coin->GetHeight();
 
-        if (coinHeight == MEMPOOL_HEIGHT)
+        if (minConf > 0 && coinHeight == MEMPOOL_HEIGHT)
             return false;
 
-        if (coinHeight && (tipHeight + 1 - coinHeight < minConf)) // older versions did not store height
+        if (minConf > 0 && coinHeight && (tipHeight + 1 - coinHeight < minConf)) // older versions did not store height
             return false;
 
         // spam detection
