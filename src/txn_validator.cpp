@@ -669,12 +669,12 @@ void CTxnValidator::postProcessingStepsNL(
         }
     }
     /**
-     * We don't want to keep outpoints from txns which were
+     * We don't want to keep tx data from txns which were
      * removed from the mempool (because of insufficient fee).
      * It could schedule false-possitive orphans for re-try.
      */
     if (handlers.mpOrphanTxns && !vRemovedTxIds.empty()) {
-        handlers.mpOrphanTxns->eraseCollectedOutpointsFromTxns(vRemovedTxIds);
+        handlers.mpOrphanTxns->eraseCollectedTxDataFromTxns(vRemovedTxIds);
     }
 }
 

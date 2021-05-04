@@ -1834,9 +1834,9 @@ void ProcessValidatedTxn(
             pcoinsTip->Uncache(txStatus.mCoinsToUncache);
         }
     } else if (handlers.mpOrphanTxns) {
-        // At this stage we want to collect outpoints of successfully submitted txn.
+        // At this stage we want to collect tx data of successfully accepted txn.
         // There might be other related txns being validated at the same time.
-        handlers.mpOrphanTxns->collectTxnOutpoints(tx);
+        handlers.mpOrphanTxns->collectTxData(tx);
         // Remove tx if it was queued as an orphan txn.
         handlers.mpOrphanTxns->eraseTxn(tx.GetId());
     }

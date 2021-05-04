@@ -290,7 +290,7 @@ BOOST_AUTO_TEST_CASE(test_gettxids) {
     BOOST_CHECK(vKnownTxIds == vTxIds);
 }
 
-BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
+BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedtxdatafromtxns) {
     static constexpr uint32_t nTxn1NumOfOutpoints = 10;
     static constexpr uint32_t nTxn2NumOfOutpoints = 2;
     static constexpr uint32_t nTxn3NumOfOutpoints = 3;
@@ -319,34 +319,34 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
                     CreateTxnInputs(1),
                     CreateTxnOutputs(nTxn3NumOfOutpoints));
     auto txn3id = txn3->GetTxnPtr()->GetId();
-    // Collect outpoints from txn1. Then, remove all outpoints from txn1
+    // Collect tx data from txn1. Then, remove all tx data from txn1
     {
-        orphanTxns.collectTxnOutpoints(*(txn1->GetTxnPtr()));
-        orphanTxns.eraseCollectedOutpointsFromTxns({txn1id});
-        BOOST_CHECK(orphanTxns.getCollectedOutpoints().empty());
+        orphanTxns.collectTxData(*(txn1->GetTxnPtr()));
+        orphanTxns.eraseCollectedTxDataFromTxns({txn1id});
+        BOOST_CHECK(orphanTxns.getCollectedTxData().empty());
     }
-    // Collect outpoints from txn1, txn2 & txn3. Then, remove outpoints from txn2
+    // Collect tx data from txn1, txn2 & txn3. Then, remove tx data from txn2
     {
-        orphanTxns.collectTxnOutpoints(*(txn1->GetTxnPtr()));
-        orphanTxns.collectTxnOutpoints(*(txn2->GetTxnPtr()));
-        orphanTxns.collectTxnOutpoints(*(txn3->GetTxnPtr()));
-        orphanTxns.eraseCollectedOutpointsFromTxns({txn2id});
-        auto vReturnedOutpoints = orphanTxns.getCollectedOutpoints();
-        BOOST_CHECK(vReturnedOutpoints.size() == 2);
-        // Get outpoints from txn1 & txn3
-        std::vector<COrphanTxns::CTxData> vTxn1AndTxn3ExpectedOutpoints {
+        orphanTxns.collectTxData(*(txn1->GetTxnPtr()));
+        orphanTxns.collectTxData(*(txn2->GetTxnPtr()));
+        orphanTxns.collectTxData(*(txn3->GetTxnPtr()));
+        orphanTxns.eraseCollectedTxDataFromTxns({txn2id});
+        auto vReturnedTxData = orphanTxns.getCollectedTxData();
+        BOOST_CHECK(vReturnedTxData.size() == 2);
+        // Get tx data from txn1 & txn3
+        std::vector<COrphanTxns::CTxData> vExpectedTxDataFromTx1AndTx2 {
             {txn1id, nTxn1NumOfOutpoints},
             {txn3id, nTxn3NumOfOutpoints}
         };
         BOOST_CHECK(
             std::equal(
-                vTxn1AndTxn3ExpectedOutpoints.begin(),
-                vTxn1AndTxn3ExpectedOutpoints.end(),
-                vReturnedOutpoints.begin()));
+                vExpectedTxDataFromTx1AndTx2.begin(),
+                vExpectedTxDataFromTx1AndTx2.end(),
+                vReturnedTxData.begin()));
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_orphantxns_getcollectedoutpoints) {
+BOOST_AUTO_TEST_CASE(test_orphantxns_getcollectedtxdata) {
     COrphanTxns orphanTxns {
         maxExtraTxnsForCompactBlock,
         maxTxSizePolicy,
@@ -357,34 +357,34 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_getcollectedoutpoints) {
     static constexpr int N=1000;
     for (int i=0; i<N; ++i) {
         orphanTxns.
-            collectTxnOutpoints(
+            collectTxData(
                 *(CreateOrphanTxn(
                     TxSource::p2p,
                     CreateTxnInputs(1),
                     CreateTxnOutputs(10))->GetTxnPtr()));
     }
-    std::vector<COrphanTxns::CTxData> vExpectedOutpoints {
-        orphanTxns.getCollectedOutpoints()
+    std::vector<COrphanTxns::CTxData> vExpectedTxData {
+        orphanTxns.getCollectedTxData()
     };
-    BOOST_CHECK(vExpectedOutpoints.size() == N);
+    BOOST_CHECK(vExpectedTxData.size() == N);
     // Erase K pseudo-randomly chosen elements.
     static constexpr int K=10;
     for (int i=0; i<K; ++i) {
-        auto rand_iter { vExpectedOutpoints.begin() };
-        std::advance(rand_iter, GetRandInt(vExpectedOutpoints.size()-1));
-        orphanTxns.eraseCollectedOutpointsFromTxns({rand_iter->mTxId});
-        vExpectedOutpoints.erase(rand_iter);
+        auto rand_iter { vExpectedTxData.begin() };
+        std::advance(rand_iter, GetRandInt(vExpectedTxData.size()-1));
+        orphanTxns.eraseCollectedTxDataFromTxns({rand_iter->mTxId});
+        vExpectedTxData.erase(rand_iter);
     }
-    BOOST_CHECK(vExpectedOutpoints.size() == (N-K));
-    // Check if getCollectedOutpoints() returns the expected result.
-    auto vReturnedOutpoints {
-        orphanTxns.getCollectedOutpoints()
+    BOOST_CHECK(vExpectedTxData.size() == (N-K));
+    // Check if getCollectedTxData() returns the expected result.
+    auto vReturnedTxData {
+        orphanTxns.getCollectedTxData()
     };
     BOOST_CHECK(
         std::equal(
-            vExpectedOutpoints.begin(),
-            vExpectedOutpoints.end(),
-            vReturnedOutpoints.begin()));
+            vExpectedTxData.begin(),
+            vExpectedTxData.end(),
+            vReturnedTxData.begin()));
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
@@ -417,7 +417,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     orphanTxns->addTxn(dependent_txn1);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+1);
     // Test case 1: Collect dependent txns for retry
-    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn1->GetTxnPtr()));
     auto vOrphanTxnsForRetry = orphanTxns->collectDependentTxnsForRetry();
     // Check if txn1 was taken from the orphan set.
     size_t nDependentTxn1VoutSize = dependent_txn1->GetTxnPtr()->vout.size();
@@ -436,12 +436,12 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     auto txn6 = CreateOrphanTxn(TxSource::p2p);
     orphanTxns->addTxn(txn6);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+2);
-    orphanTxns->collectTxnOutpoints(*(txn6->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn6->GetTxnPtr()));
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     // Test case 3:
     // There is no newly added dependent orphan txn. There should be nothing for re-try.
     auto txn7 = CreateOrphanTxn(TxSource::p2p);
-    orphanTxns->collectTxnOutpoints(*(txn7->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn7->GetTxnPtr()));
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
 }
 
@@ -466,8 +466,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     orphanTxns->addTxn(txn2);
     // Add txn3 to orphans
     orphanTxns->addTxn(txn3);
-    // We presume that txn1 is submitted to the mempool so collect it's outpoints
-    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+    // We presume that txn1 is submitted to the mempool so collect it's tx data
+    orphanTxns->collectTxData(*(txn1->GetTxnPtr()));
 
     // Get txs that need to be reprocessed.
     auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
         orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
     }
 
-    // At this stage there is no orphans and collected outpoints in the queue.
+    // At this stage there is no orphans and txs to re-process.
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     BOOST_CHECK(!orphanTxns->getTxnsNumber());
 }
@@ -517,7 +517,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_inputs) {
     orphanTxns->addTxn(txn3);
     orphanTxns->addTxn(txn4);
     // We presume that txn1 is submitted to the mempool so collect it's outpoints
-    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn1->GetTxnPtr()));
 
     // Get txs that need to be reprocessed.
     auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
@@ -533,7 +533,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_inputs) {
 
     // Now pretend that tx2 has entered the mempool, tx4 is now a first layer transaction
     // and will be collected
-    orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn2->GetTxnPtr()));
     vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
     BOOST_CHECK(vTxnsToReprocess.size() == 1);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 1);
@@ -574,7 +574,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_outputs) {
     orphanTxns->addTxn(txn5);
 
     // We presume that txn1 is submitted to the mempool so collect it's outpoints
-    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn1->GetTxnPtr()));
 
     // Get txs that need to be reprocessed.
     auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
@@ -589,7 +589,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_outputs) {
 
     // Now pretend that tx2 has entered the mempool, tx5 is now a first layer transaction
     // and will be collected
-    orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
+    orphanTxns->collectTxData(*(txn2->GetTxnPtr()));
     vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
     BOOST_CHECK(vTxnsToReprocess.size() == 1);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 1);
@@ -599,7 +599,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_outputs) {
         orphanTxns->eraseTxn(tx->GetTxnPtr()->GetId());
     }
 
-    // At this stage there is no orphans and collected outpoints in the queue.
+    // At this stage there is no orphans and txs to re-process.
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     BOOST_CHECK(!orphanTxns->getTxnsNumber());
 }
@@ -635,8 +635,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch) {
     }
      
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 2 * NUM_FIRST_LAYER_TXS);
-    // release and collect all outpoints from root txn
-    orphanTxns->collectTxnOutpoints(*(txnRoot->GetTxnPtr()));
+    // release and collect tx data from root txn
+    orphanTxns->collectTxData(*(txnRoot->GetTxnPtr()));
     auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
     // We could release all transactions but we are limited to MAX_TXS_RELEASED
     BOOST_CHECK(vTxnsToReprocess.size() == MAX_TXS_RELEASED);
@@ -674,8 +674,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch_first_layer) {
     }
      
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 2 * NUM_FIRST_LAYER_TXS);
-    // release and collect all outpoints from root txn
-    orphanTxns->collectTxnOutpoints(*(txnRoot->GetTxnPtr()));
+    // release and collect tx data from root txn
+    orphanTxns->collectTxData(*(txnRoot->GetTxnPtr()));
     auto vTxnsToReprocess = orphanTxns->collectDependentTxnsForRetry();
     // We could release all transactions but we are limited to MAX_TXS_RELEASED
     // and we should always release first layer transactions

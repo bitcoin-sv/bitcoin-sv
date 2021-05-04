@@ -94,18 +94,18 @@ class COrphanTxns {
     unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, uint64_t nMaxOrphanTxnsHysteresis, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
     std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
-    /** Collect txn's outpoints which will be used to find any dependant orphan txn */
-    void collectTxnOutpoints(const CTransaction& tx);
-    /** Erase collected outpoints */
-    void eraseCollectedOutpoints();
-    /** Erase collected outpoints from the given txns */
-    void eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemovedTxIds);
+    /** Collect tx data which will be used to find any dependant orphan txn */
+    void collectTxData(const CTransaction& tx);
+    /** Erase collected tx data */
+    void eraseCollectedTxData();
+    /** Erase collected tx data from the given txns */
+    void eraseCollectedTxDataFromTxns(const std::vector<TxId>& vRemovedTxIds);
     /** Get a number of orphan transactions queued */
     size_t getTxnsNumber();
     /** Get TxIds of known orphan transactions */
     std::vector<TxId> getTxIds() const;
-    /** Get collected outpoints */
-    std::vector<COrphanTxns::CTxData> getCollectedOutpoints();
+    /** Get collected tx data */
+    std::vector<COrphanTxns::CTxData> getCollectedTxData();
     /** Get a random orphan txn (used by UTs) */
     TxInputDataSPtr getRndOrphan();
 
@@ -129,9 +129,9 @@ class COrphanTxns {
     OrphanTxnsByPrev mOrphanTxnsByPrev;
     mutable std::shared_mutex mOrphanTxnsMtx {};
 
-    /** Txn outpoints collected and waiting to be used to find any dependant orphan txn */
-    std::vector<COrphanTxns::CTxData> mCollectedOutpoints {};
-    mutable std::mutex mCollectedOutpointsMtx {};
+    /** Txn data collected to be used to find any dependant orphan txn */
+    std::vector<COrphanTxns::CTxData> mCollectedTxData {};
+    mutable std::mutex mCollectedTxDataMtx {};
 
     /** Extra txns used by block reconstruction */
     CompactExtraTxnsVec mExtraTxnsForCompact;
