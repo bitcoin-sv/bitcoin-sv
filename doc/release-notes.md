@@ -47,6 +47,8 @@
 * Fix: failure in CTxMemPool::GetMemPoolChildrenNL.
 * Fix: a possible false negative result during querying the PTV processing queue.
 * Remove maxcollectedoutpoints configuration parameter.
+* Updated default value for maxorphantxsize: from 100 MB to 1 GB
+* Updated default value for limitancestorcount: from 1000 to 10000
 
 ## Functional tests
 * Fix: import-rescan.py - possible race condition during tip update signaling.
