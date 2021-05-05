@@ -41,6 +41,7 @@
 * Global thread-local interferes with address sanitizer.
 * Remove libatomic dependency.
 * Undefined behaviour sanitiser reporting vector out of bounds access in CBlockFileInfoStore::FlushBlockFile.
+* May 2021 STN reset.
 * Fix: St16invalid_argument displays many times on startup.
 * Falsely logged error opening rev<xxxx>.dat in logs.
 * Fix: coredump at shutdown within logging.
@@ -68,7 +69,8 @@
 * Incorect usage of cs_main.
 
 ## Scaling Test Network (STN) Reset
-N/A
+The Scaling Test Network has been reset at block height 5. This block has hash 
+`00000000e9222ebe623bf53f6ec774619703c113242327bdc24ac830787873d6`.
 
 # Previous Releases
 * [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
