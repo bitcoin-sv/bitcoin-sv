@@ -171,11 +171,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
     CBasicKeyStore keystore;
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
 
-    size_t maxCollectedOutpoints {
-        static_cast<size_t>(
-            gArgs.GetArg("-maxcollectedoutpoints",
-                      COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS))
-    };
     size_t maxExtraTxnsForCompactBlock {
         static_cast<size_t>(
             gArgs.GetArg("-blockreconstructionextratxn",
@@ -199,7 +194,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
     // A common buffer with orphan txns
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                            maxCollectedOutpoints,
                             maxExtraTxnsForCompactBlock,
                             maxTxSizePolicy,
                             maxOrphanPercent,

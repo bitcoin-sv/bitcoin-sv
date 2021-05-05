@@ -22,12 +22,6 @@ CTxnValidator::CTxnValidator(
     LogPrint(BCLog::TXNVAL,
             "Txnval: Run frequency in asynchronous mode: %u milisec\n",
              runFreq);
-    // Create a shared object for orphan transaction
-    size_t maxCollectedOutpoints {
-        static_cast<size_t>(
-            gArgs.GetArg("-maxcollectedoutpoints",
-                        COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS))
-    };
     size_t maxExtraTxnsForCompactBlock {
         static_cast<size_t>(
                 gArgs.GetArg("-blockreconstructionextratxn",
@@ -35,7 +29,6 @@ CTxnValidator::CTxnValidator(
     };
    
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
-        maxCollectedOutpoints,
         maxExtraTxnsForCompactBlock,
         config.GetMaxTxSize(true, false), /*orphan tx before genesis might not get accepted by mempool */
         config.GetMaxOrphansInBatchPercentage(),
@@ -238,7 +231,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
         mpTxnDoubleSpendDetector, // Double Spend Detector
-        std::make_shared<COrphanTxns>(0, 0, 0, 0, 0), // A temporary orphan txns queue (unlimited)
+        std::make_shared<COrphanTxns>(0, 0, 0, 0), // A temporary orphan txns queue (unlimited)
         std::make_shared<CTxnRecentRejects>() // A temporary recent rejects queue
     };
     // Process a set of given txns
@@ -676,12 +669,12 @@ void CTxnValidator::postProcessingStepsNL(
         }
     }
     /**
-     * We don't want to keep outpoints from txns which were
+     * We don't want to keep tx data from txns which were
      * removed from the mempool (because of insufficient fee).
      * It could schedule false-possitive orphans for re-try.
      */
     if (handlers.mpOrphanTxns && !vRemovedTxIds.empty()) {
-        handlers.mpOrphanTxns->eraseCollectedOutpointsFromTxns(vRemovedTxIds);
+        handlers.mpOrphanTxns->eraseCollectedTxDataFromTxns(vRemovedTxIds);
     }
 }
 

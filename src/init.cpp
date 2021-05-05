@@ -1175,11 +1175,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "transactions in memory (default: %u MB). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
           COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
-        "-maxcollectedoutpoints=<n>",
-        strprintf(_("Keep at most <n> collected "
-                    "outpoints in memory (default: %u)"),
-            COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS));
-    strUsage += HelpMessageOpt(
         "-maxorphansinbatchpercent=<n>",
         strprintf(_("Maximal number of orphans scheduled for re-validation as percentage of max batch size. "
                     "(1 to 100, default:%lu)"),
