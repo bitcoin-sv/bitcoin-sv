@@ -46,6 +46,7 @@
 * Fix: coredump at shutdown within logging.
 * Fix: failure in CTxMemPool::GetMemPoolChildrenNL.
 * Fix: a possible false negative result during querying the PTV processing queue.
+* Remove maxcollectedoutpoints configuration parameter.
 
 ## Functional tests
 * Fix: import-rescan.py - possible race condition during tip update signaling.
