@@ -30,16 +30,10 @@ import json
 
 # Formatting. Default colors to empty strings.
 BOLD, BLUE, RED, GREY = ("", ""), ("", ""), ("", ""), ("", "")
-try:
-    # Make sure python thinks it can write unicode to its stdout
-    "\u2713".encode("utf_8").decode(sys.stdout.encoding)
-    TICK = "✓ "
-    CROSS = "✖ "
-    CIRCLE = "○ "
-except UnicodeDecodeError:
-    TICK = "P "
-    CROSS = "x "
-    CIRCLE = "o "
+
+TICK = "P "
+CROSS = "x "
+CIRCLE = "o "
 
 if os.name == 'posix':
     # primitive formatting on supported
