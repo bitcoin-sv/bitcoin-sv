@@ -1474,13 +1474,10 @@ static CTxnValResult PropagateParentError(const CTxnValResult& parentResult, con
     // The performance part of this is important:
     if (parentState.IsValidationTimeoutExceeded()) {
         // when the parent fails due to exceeding the validation time limit it
-        // will get re-scheduled as a low-priority task. The child *has to* also
-        // be marked with the same status just to keep them together. If the child
-        // is processed in any other way the child will either enter the orphan
-        // pool, which is slow or will be re-scheduled as a high-priority task and
-        // will race with it's parent and often also enter the orphan pool, which
-        // is slow.
-        newState = parentState;
+        // will get re-scheduled as a low-priority task.
+        // The child has to enter the orphan pool.
+        newState.SetMissingInputs();
+        newState.Invalid();
     } else if (parentState.IsMissingInputs()) {
         newState = parentState;
         if (parentResult.mTxInputData->IsDeleted()) {

@@ -766,9 +766,6 @@ BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
         };
         txnValidator->waitUntil( validationDone, false);
 
-        // We never expect orphans
-        BOOST_CHECK_EQUAL(txnValidator->getOrphanTxnsPtr()->getTxnsNumber(), 0);
-
         if (pool.Size() > 1 + oldPoolSize) {
             // machine is too fast. try a more difficult transaction
             nWidth *= 2;
@@ -783,7 +780,8 @@ BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
         BOOST_CHECK_EQUAL(pool.Size(), 1 + oldPoolSize);
         BOOST_CHECK_EQUAL(counts.GetStdQueueCount(), 0);
         BOOST_CHECK_EQUAL(counts.GetProcessingQueueCount(), 0);
-        BOOST_CHECK_EQUAL(counts.GetNonStdQueueCount(), 2);
+        BOOST_CHECK_EQUAL(counts.GetNonStdQueueCount(), 1);
+        BOOST_CHECK_EQUAL(txnValidator->getOrphanTxnsPtr()->getTxnsNumber(), 1);
         break;
     }
 }
