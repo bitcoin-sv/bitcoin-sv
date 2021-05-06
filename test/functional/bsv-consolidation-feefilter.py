@@ -7,10 +7,14 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
 import decimal
+from test_framework.cdefs import DEFAULT_MAX_STD_TXN_VALIDATION_DURATION
 
 '''
 Test if consolidation transactions pass the feefilter
 '''
+# For Release build with sanitizers enabled (TSAN / ASAN / UBSAN), recommended timeoutfactor is 4.
+# For Debug build, recommended timeoutfactor is 4.
+# For Debug build with sanitizers enabled, recommended timeoutfactor is 5.
 
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
@@ -41,6 +45,8 @@ class FeeFilterTest(BitcoinTestFramework):
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
         self.minrelaytxfee_sats = 250
+
+    def setup_nodes(self):
         self.extra_args = [[
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
@@ -48,7 +54,8 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            "-txindex=1"
+            "-txindex=1",
+            '-maxstdtxvalidationduration={}'.format(int(DEFAULT_MAX_STD_TXN_VALIDATION_DURATION * self.options.timeoutfactor)),
             ],[
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
@@ -56,9 +63,12 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            "-txindex=1"
+            "-txindex=1",
+            '-maxstdtxvalidationduration={}'.format(int(DEFAULT_MAX_STD_TXN_VALIDATION_DURATION * self.options.timeoutfactor)),
         ]]
 
+        self.add_nodes(self.num_nodes, self.extra_args)
+        self.start_nodes()
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations):
 
