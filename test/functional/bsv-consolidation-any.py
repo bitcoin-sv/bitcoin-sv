@@ -8,7 +8,7 @@ This test creates "spendable by anyone" scripts to easely tweak the script sizes
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.script import CScript, OP_NOP, OP_DROP, OP_2DROP, OP_TRUE, OP_FALSE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
+from test_framework.script import CScript, OP_NOP, OP_DROP, OP_RETURN, OP_TRUE, OP_FALSE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
 from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
@@ -24,6 +24,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.minrelaytxfee_sats = 250
         self.extra_args = [[
             "-whitelist=127.0.0.1",
+            "-txindex=1"
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
@@ -33,6 +34,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-acceptnonstdconsolidationinput=1"
             ],[
             "-whitelist=127.0.0.1",
+            "-txindex=1"
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
@@ -40,6 +42,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-acceptnonstdconsolidationinput=1"
             ],[
             "-whitelist=127.0.0.1",
+            "-txindex=1"
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=0",  #disables consolidation factor
@@ -47,6 +50,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-acceptnonstdconsolidationinput=1"
             ],[
             "-whitelist=127.0.0.1",
+            "-txindex=1"
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
@@ -173,7 +177,8 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 x = x_rest + x
 
             if is_donation:
-                scriptPubKey = CScript([OP_FALSE])
+                protocol_id = 'dust'
+                scriptPubKey = CScript([OP_FALSE, OP_RETURN, len(protocol_id), bytearray(protocol_id,'utf-8')])
             else:
                 scriptPubKey = CScript([OP_NOP] * (x - 1) + [OP_TRUE])
 
@@ -277,7 +282,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      out_count = output_count,
                                                      in_size=enough_cumulated_inputsize,
                                                      out_size = cumulated_outputsize,
-                                                     min_confirmations = enough_confirmations,
+                                                     min_confirmations = 0,
                                                      spam = not_spam,
                                                      is_donation = True
                                                      )
@@ -319,7 +324,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      out_count=output_count,
                                                      in_size=enough_cumulated_inputsize - 1,
                                                      out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations,
+                                                     min_confirmations = 0,
                                                      spam = not_spam,
                                                      is_donation = True
                                                      )
@@ -367,7 +372,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      in_size = single_output_script_size,
                                                      # out_size will be ignored (return OP_FALSE)
                                                      out_size = single_output_script_size,
-                                                     min_confirmations = enough_confirmations,
+                                                     min_confirmations = 0,
                                                      spam = not_spam,
                                                      is_donation = True
                                                      )
