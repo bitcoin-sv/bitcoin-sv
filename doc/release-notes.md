@@ -9,7 +9,7 @@
 * sendrawtransaction and sendrawtransactions RPC can be used with dontCheckFees even when a transaction is already known.
 * sendrawtransaction and sendrawtransactions RPC modified to optionally return list of unconfirmed parents.
 * New command line option -dustlimitfactor available to define dust.
-* Inputs with dust amounts can now be returned to miners as a fee even if below the miner fee rate, when sent via single zero amount OP_FALSE OP_RETURN 'dust_return' output.
+* Inputs with dust amounts can now be returned to miners as a fee even if below the miner fee rate, when sent via single zero amount OP_FALSE OP_RETURN 'dust' output.
 * Adjusted default maximum validation duration for async tasks to better handle chains and long graphs.
 * Change algorithm for using ancestor height rather than ancestor count.
 * Improve release rate from Oprhan pool.

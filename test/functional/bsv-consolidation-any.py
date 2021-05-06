@@ -177,7 +177,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 x = x_rest + x
 
             if is_donation:
-                protocol_id = 'dust_return'
+                protocol_id = 'dust'
                 scriptPubKey = CScript([OP_FALSE, OP_RETURN, len(protocol_id), bytearray(protocol_id,'utf-8')])
             else:
                 scriptPubKey = CScript([OP_NOP] * (x - 1) + [OP_TRUE])

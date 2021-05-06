@@ -54,7 +54,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 // However, if a consolidation transaction is donated to the miner, then we do not need to honour the consolidation factor
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
-    static const std::vector<uint8_t> protocol_id = {'d','u','s','t','_','r','e','t','u','r','n'};
+    static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
     static const CScript dust_return = CScript() << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
     const bool isDonation =
             dust_return == tx.vout[0].scriptPubKey &&
