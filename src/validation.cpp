@@ -3173,7 +3173,7 @@ public:
             }
         }
 
-        int64_t nTime2 = GetTimeMicros();
+        const int64_t nTime2 = GetTimeMicros();
         nTimeForks += nTime2 - nTime1;
         LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs]\n",
                  0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);
@@ -3214,17 +3214,24 @@ public:
                 CCoinsViewCache& mView;
             } csGuard{ view };
 
-            if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
+            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo ))
             {
                 return false;
             }
+
+            // must be inside this scope as csGuard can take a while to re-obtain
+            // cs_main lock and we don't want that time to count to validation
+            // duration time
+            nTime4 = GetTimeMicros();
         }
         else
         {
-            if (!checkScripts( token, nInputs, nTime2, vPos, blockundo, nTime4 ))
+            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo ))
             {
                 return false;
             }
+
+            nTime4 = GetTimeMicros();
         }
 
         // this is the time needed to re-obtain cs_main lock after validation is
@@ -3304,11 +3311,10 @@ public:
 private:
     bool checkScripts(
         const task::CCancellationToken& token,
-        size_t nInputs,
         int64_t nTime2,
         std::vector<std::pair<uint256, CDiskTxPos>>& vPos,
-        CBlockUndo& blockundo,
-        int64_t& nTime4 )
+        size_t& nInputs,
+        CBlockUndo& blockundo )
     {
         vPos.reserve(block.vtx.size());
         blockundo.vtxundo.reserve(block.vtx.size() - 1);
@@ -3569,11 +3575,6 @@ private:
             return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs",
                              "parallel script check failed");
         }
-
-        // must be inside this scope as csGuard can take a while to re-obtain
-        // cs_main lock and we don't want that time to count to validation
-        // duration time
-        nTime4 = GetTimeMicros();
 
         return true;
     }
