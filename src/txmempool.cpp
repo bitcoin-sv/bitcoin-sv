@@ -2035,6 +2035,9 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 {
     AssertLockHeld(cs_main);
     TxInputDataSPtrVec vTxInputData {};
+
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
     // block that was disconnected.
@@ -2048,6 +2051,43 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             // transactions that depend on it (which would now be orphans).
             RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         } else {
+
+            // We could receive transaction during the reorg (after the block is disconnected but before a new is connected) 
+            // because the PTV and PBV are running at the same time. 
+
+            // If we receive the same transaction that was in the disconnected block, we will remove transaction received in the mempool
+            if (auto duplicateIt = mapTx.find((*it)->GetId()); duplicateIt != mapTx.end()) {
+
+                // To be on the safe side, we should disband a group if the duplicate transaction is part of it,
+                if (duplicateIt->IsCPFPGroupMember())
+                {
+                    setEntriesTopoSorted duplicateTS;
+                    duplicateTS.insert(duplicateIt);
+                    RemoveFromPrimaryMempoolNL(duplicateTS, nonNullChangeSet.Get());
+                }
+                
+                // It is safe to remove this tx, as it for sure, at this point, does not have a parent inside mempool.
+                // If it had a parent it would be a duplicate also and it would be already removed (we are checking for duplicates in topo-order)
+                // If it has a child it could be: duplicate (will be handled later in this loop), double-spend (will be handled by following for-loop),
+                // or normal transaction (will be added to mempool in ResubmitEntriesToMempoolNL later on)
+                setEntries duplicate;
+                duplicate.insert(duplicateIt);
+                removeUncheckedNL(duplicate, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::REORG);
+            }
+
+            // If we receive transaction that spends the same output as a transaction in the disconnected block we will remove tx from the mempool
+            // together with its descedants, keeping transaction from the disconnected block
+            for (const CTxIn &txin : (*it)->vin) 
+            {
+                auto doubleSpend = mapNextTx.find(txin.prevout);
+                if (doubleSpend != mapNextTx.end())
+                {
+                    setEntries conflictedWithDescendants;
+                    GetDescendantsNL(mapTx.find(doubleSpend->spentBy->GetTxId()), conflictedWithDescendants);
+                    removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::REORG);
+                }
+            }
+
             vTxInputData.emplace_back(
                 std::make_shared<CTxInputData>(
                     TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
