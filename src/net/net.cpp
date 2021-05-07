@@ -2409,7 +2409,10 @@ CConnman::CConnman(
             }(),
             [this](const InvalidTxnPublisher::InvalidTxnInfoWithTxn& txnInfo)
             {
-                mDSHandler.HandleDoubleSpend(txnInfo);
+                if(!txnInfo.GetCollidedWithTransactions().empty())
+                {
+                    mDSHandler.HandleDoubleSpend(txnInfo);
+                }
             }}
 {
     fNetworkActive = true;
