@@ -16,6 +16,18 @@
 
 #include <boost/thread.hpp>
 
+// install boost test formatters for the popular durations
+namespace std { namespace chrono {
+    inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::microseconds const& us) {
+        return ostr << us.count() << "us";
+    }
+    inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::milliseconds const& ms) {
+        return ostr << ms.count() << "ms";
+    }
+}}
+
+
+
 extern uint256 insecure_rand_seed;
 extern FastRandomContext insecure_rand_ctx;
 
