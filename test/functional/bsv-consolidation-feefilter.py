@@ -23,6 +23,15 @@ def getInputScriptPubKey(node, input, index):
     tx.rehash()
     return tx.vout[index].scriptPubKey
 
+def expectedInvsReceived(invsExpected, testnode, timeout = 60):
+    expectedSet = set(invsExpected)
+    for x in range(timeout):
+        with mininode_lock:
+            if expectedSet.issubset(testnode.txinvs):
+                return True
+        time.sleep(1)
+    return False
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -54,8 +63,8 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            "-txindex=1",
-            '-maxstdtxvalidationduration={}'.format(int(DEFAULT_MAX_STD_TXN_VALIDATION_DURATION * self.options.timeoutfactor)),
+            #"-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+            "-txindex=1"
             ],[
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
@@ -63,8 +72,8 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            "-txindex=1",
-            '-maxstdtxvalidationduration={}'.format(int(DEFAULT_MAX_STD_TXN_VALIDATION_DURATION * self.options.timeoutfactor)),
+            #"-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+            "-txindex=1"
         ]]
 
         self.add_nodes(self.num_nodes, self.extra_args)
@@ -166,12 +175,13 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid2 in node0.getrawmempool(), timeout=5)
 
         # Check that tx1 and tx2 were relayed to test_node
-        wait_until(lambda: sorted([txid1, txid2]) == sorted(test_node.txinvs), lock=mininode_lock, timeout=60)
+        assert(expectedInvsReceived([txid1, txid2], test_node, 60))
 
         # Now the feefilter is set to blockmintxfee+1;
         # tx3 is not relayed as modified fees < feefilter
         # tx4 is relayed, as node1's txfee is set high enough - control tx
         test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+1))
+        test_node.clear_invs()
 
         txid3 = node1.sendrawtransaction(tx_hex3)
         txid4 = node1.sendtoaddress(node1.getnewaddress(), 1)
@@ -180,7 +190,8 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid4 in node0.getrawmempool(), timeout=5)
 
         # Check that tx3 was not relayed to test_node but tx4 was
-        wait_until(lambda: sorted([txid1, txid2, txid4]) == sorted(test_node.txinvs), lock=mininode_lock, timeout=60)
+        assert(expectedInvsReceived([txid4], test_node, 60))
+        assert(not expectedInvsReceived([txid3], test_node, 5))
 
 if __name__ == '__main__':
     FeeFilterTest().main()
