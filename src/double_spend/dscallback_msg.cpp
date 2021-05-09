@@ -27,6 +27,12 @@ DSCallbackMsg::DSCallbackMsg(uint8_t version, const std::vector<std::string>& ad
     const std::vector<uint32_t>& inputs)
 : mVersion{version}, mInputs{inputs}
 {
+    // 0 IP addresses are not allowed
+    if(addrs.empty())
+    {
+        throw std::runtime_error("DSCallbackMsg provided 0 IP addresses");
+    }
+
     Network addrsType { NET_UNROUTABLE };
 
     // Convert string addresses to bytes in network byte order

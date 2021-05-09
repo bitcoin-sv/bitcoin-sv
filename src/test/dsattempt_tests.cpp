@@ -112,5 +112,68 @@ BOOST_AUTO_TEST_CASE(CallbackEnabledTransaction)
     );
 }
 
+BOOST_AUTO_TEST_CASE(CallbackMallformed)
+{
+    std::array<uint8_t, 4> ipbytes { 0x7F, 0x00, 0x00, 0x01 };
+
+    // Check for missing version (empty message)
+    BOOST_CHECK_THROW(
+        DSCallbackMsg callback_msg_deserialised;
+        CDataStream ss(SER_NETWORK, 0);
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+
+    // Missing IP address count
+    BOOST_CHECK_THROW(
+        DSCallbackMsg callback_msg_deserialised;
+        CDataStream ss(SER_NETWORK, 0);
+        ss << 0x01;
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+
+    // IP address count is 0
+    BOOST_CHECK_THROW(
+        CDataStream ss(SER_NETWORK, 0);
+        ss << uint8_t(0x01) << VARINT(0) << VARINT(1) << VARINT(0);
+        DSCallbackMsg callback_msg_deserialised;
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+
+    // Missing IP address
+    BOOST_CHECK_THROW(
+        CDataStream ss(SER_NETWORK, 0);
+        ss << uint8_t(0x01) << VARINT(1) << VARINT(1) << VARINT(0);
+        DSCallbackMsg callback_msg_deserialised;
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+
+    // Extra IP address
+    BOOST_CHECK_THROW(
+        CDataStream ss(SER_NETWORK, 0);
+        ss << uint8_t(0x01) << VARINT(1) << FLATDATA(ipbytes) << FLATDATA(ipbytes) << VARINT(1) << VARINT(0);
+        DSCallbackMsg callback_msg_deserialised;
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+
+    // Missing input from list
+    BOOST_CHECK_THROW(
+        CDataStream ss(SER_NETWORK, 0);
+        ss << uint8_t(0x01) << VARINT(1) << FLATDATA(ipbytes) << VARINT(2) << VARINT(0);
+        DSCallbackMsg callback_msg_deserialised;
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+
+    // Check for trailing data beyond the end of the message
+    BOOST_CHECK_THROW(
+        DSCallbackMsg callback_msg(0x01, {"127.0.0.1"}, {});
+        CDataStream ss(SER_NETWORK, 0);
+        ss << callback_msg;
+        // Tack on an extra redundant byte to stream
+        ss << 0x00;
+        DSCallbackMsg callback_msg_deserialised;
+        ss >> callback_msg_deserialised;
+    , std::runtime_error);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
