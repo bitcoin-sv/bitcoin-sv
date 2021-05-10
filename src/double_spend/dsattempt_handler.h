@@ -133,6 +133,7 @@ class DSAttemptHandler final
         const NotificationDetails& notificationDetails,
         const DSTxnSerialiser::TxnHandleSPtr& handle,
         int httpTimeout,
+        bool& wantsProof,
         bool& retry);
 
     // Wrapper type for the double spend transaction details
@@ -156,6 +157,9 @@ class DSAttemptHandler final
     void UpdateSlowEndpoint(const std::string& endpoint);
     // Check to see whether an endpoint is currently considered slow
     bool IsEndpointSlow(const std::string& endpoint) const;
+
+    // Remember a txn we've already notified about
+    void RecordNotifiedTxn(const TxId& txid);
 
     // Reference to the global config
     const Config& mConfig;

@@ -294,6 +294,17 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.check_tx_not_received(tx2.hash)
 
+        # Check that another correct double-spend for tx1 does trigger a notification
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_TRUE]))
+        ]
+        tx2 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
+        wait_until(lambda: self.check_tx_received(tx1.hash))
+
     # Test that notifying callback server does not work for if double spend transaction validation timed-out.
     # Also test setting dsnotifylevel
     def check_long_lasting_transactions(self):

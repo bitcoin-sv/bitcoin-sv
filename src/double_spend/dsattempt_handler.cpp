@@ -386,17 +386,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                     dsEnabledTxnId.ToString(), inputToNotify.dsEnabledTxnInput,
                     inputToNotify.conflictingTxn->GetId().ToString(), inputToNotify.conflictingTxnInput);
 
-                // Check if we've already posted a notification for this conflicted txn
-                std::lock_guard lock { mMtx };
-                if(mTxnsNotified.contains(dsEnabledTxnId))
-                {
-                    LogPrint(BCLog::DOUBLESPEND, "Already notified about txn %s, skipping\n", dsEnabledTxnId.ToString());
-                }
-                else
-                {
-                    mTxnsNotified.insert(std::make_pair(dsEnabledTxnId, mTxnsNotifiedIndex++));
-                    inputsToNotify.push_back(std::move(inputToNotify));
-                }
+                inputsToNotify.push_back(std::move(inputToNotify));
             }
         }
 
@@ -408,8 +398,23 @@ void DSAttemptHandler::ProcessDoubleSpend()
             {
                 LogPrint(BCLog::DOUBLESPEND, "Script verification for double-spend passed\n");
 
-                // Send a notification for this double-spent input
-                SendNotification(input);
+                // Check if we've already posted a notification for this conflicted txn
+                const TxId& dsEnabledTxnId { input.dsEnabledTxn->GetId() };
+                bool sendNotification {true};
+                {
+                    std::lock_guard lock { mMtx };
+                    if(mTxnsNotified.contains(dsEnabledTxnId))
+                    {
+                        LogPrint(BCLog::DOUBLESPEND, "Already notified about txn %s, skipping\n", dsEnabledTxnId.ToString());
+                        sendNotification = false;
+                    }
+                }
+
+                if(sendNotification)
+                {
+                    // Send a notification for this double-spent input
+                    SendNotification(input);
+                }
             }
             else
             {
@@ -586,13 +591,14 @@ void DSAttemptHandler::SendNotification(const NotificationDetails& notificationD
             {
                 // Try to query endpoint and submit proof
                 bool submitSuccess {false};
+                bool wantsProof {false};
                 bool retry {true};
                 unsigned retryCount { MAX_PROOF_SUBMIT_ATTEMPTS };
                 while(!submitSuccess && retry && retryCount > 0)
                 {
                     try
                     {
-                        submitSuccess = QueryAndSubmitProof(endpointAddrStr, notificationDetails, handle, timeout, retry);
+                        submitSuccess = QueryAndSubmitProof(endpointAddrStr, notificationDetails, handle, timeout, wantsProof, retry);
                     }
                     catch(CConnectionTimeout& e)
                     {
@@ -608,6 +614,13 @@ void DSAttemptHandler::SendNotification(const NotificationDetails& notificationD
                     }
 
                     --retryCount;
+                }
+
+                // Did we send a notification, or is the endpoint not interested?
+                if(submitSuccess || !wantsProof)
+                {
+                    // Remember this transaction, we won't need to notify about it again
+                    RecordNotifiedTxn(notificationDetails.dsEnabledTxn->GetId());
                 }
             }
         }
@@ -632,10 +645,18 @@ void DSAttemptHandler::SendNotificationSlow(
         int timeout { mConfig.GetDoubleSpendEndpointSlowTimeout() };
 
         bool submitSuccess {false};
+        bool wantsProof {false};
         bool retry {true};
         while(!submitSuccess && retry && retryCount-- > 0)
         {
-            submitSuccess = QueryAndSubmitProof(endpointAddrStr, notificationDetails, handle, timeout, retry);
+            submitSuccess = QueryAndSubmitProof(endpointAddrStr, notificationDetails, handle, timeout, wantsProof, retry);
+        }
+
+        // Did we send a notification, or is the endpoint not interested?
+        if(submitSuccess || !wantsProof)
+        {
+            // Remember this transaction, we won't need to notify about it again
+            RecordNotifiedTxn(notificationDetails.dsEnabledTxn->GetId());
         }
     }
     catch(CConnectionTimeout& e)
@@ -655,9 +676,11 @@ bool DSAttemptHandler::QueryAndSubmitProof(
     const NotificationDetails& notificationDetails,
     const DSTxnSerialiser::TxnHandleSPtr& handle,
     int httpTimeout,
+    bool& wantsProof,
     bool& retry)
 {
     bool submitSuccess {false};
+    wantsProof = true;
     retry = false;
     const std::string& dsEnabledTxnId { notificationDetails.dsEnabledTxn->GetId().ToString() };
     unsigned protocolVer { notificationDetails.callbackMsg.GetProtocolVersion() };
@@ -694,6 +717,7 @@ bool DSAttemptHandler::QueryAndSubmitProof(
             if(!rs.wantsProof)
             {
                 LogPrint(BCLog::DOUBLESPEND, "Endpoint %s returned error and they don't want us to retry\n", endpointAddrStr);
+                wantsProof = false;
             }
             else
             {
@@ -708,7 +732,21 @@ bool DSAttemptHandler::QueryAndSubmitProof(
             submitSuccess = true;
         }
     }
+    else
+    {
+        wantsProof = false;
+    }
 
     return submitSuccess;
+}
+
+// Remember a txn we've already notified about
+void DSAttemptHandler::RecordNotifiedTxn(const TxId& txid)
+{
+    std::lock_guard lock { mMtx };
+    if(!mTxnsNotified.contains(txid))
+    {
+        mTxnsNotified.insert(std::make_pair(txid, mTxnsNotifiedIndex++));
+    }
 }
 
