@@ -10,6 +10,7 @@
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 #include "version.h"
+#include "merkletree.h"
 
 #include <vector>
 

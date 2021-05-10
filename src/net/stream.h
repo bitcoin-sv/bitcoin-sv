@@ -69,6 +69,9 @@ class BanStream : public std::exception
 class Stream
 {
   public:
+    // Default stream sending bandwidth rate limit to apply (no limit)
+    static constexpr int64_t DEFAULT_SEND_RATE_LIMIT {-1};
+
     Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize);
     ~Stream();
 
@@ -125,6 +128,12 @@ class Stream
 
   private:
 
+    // Minimum TCP maximum segment size. Used as the default maximum message
+    // size for header/payload combining if we can't read the real MSS.
+    static constexpr size_t MIN_MAX_SEGMENT_SIZE { 536 };
+    // Maximum TCP maximum segment size
+    static constexpr size_t MAX_MAX_SEGMENT_SIZE { 65535 };
+
     // Node we are for
     CNode* mNode {nullptr};
     mutable CCriticalSection cs_mNode {};
@@ -135,6 +144,9 @@ class Stream
     // Our socket
     SOCKET mSocket {0};
     mutable CCriticalSection cs_mSocket {};
+
+    // TCP maximum segment size for our underlying socket
+    size_t mMSS { MIN_MAX_SEGMENT_SIZE };
 
     // Send message queue
     std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> mSendMsgQueue {};
@@ -173,6 +185,10 @@ class Stream
     int64_t mLastSpotMeasurementTime { GetTimeMicros() };
     // Bytes received since last spot measurement
     uint64_t mBytesRecvThisSpot {0};
+
+    // Sending rate limiting
+    int64_t mSendRateLimit {DEFAULT_SEND_RATE_LIMIT};
+    int64_t mSendStartTime { GetTimeMicros() };
 
     /**
      * Storage for the last chunk being sent to the peer. This variable contains

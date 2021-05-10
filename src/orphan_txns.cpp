@@ -7,18 +7,30 @@
 #include "config.h"
 
 COrphanTxns::COrphanTxns(
-    size_t maxCollectedOutpoints,
     size_t maxExtraTxnsForCompactBlock,
-    size_t maxTxSizePolicy)
-: mMaxCollectedOutpoints(maxCollectedOutpoints),
-  mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock),
-  mMaxStandardTxSize(maxTxSizePolicy)
+    size_t maxTxSizePolicy,
+    size_t maxPercentageOfOrphansInBatch,
+    size_t maxInputsOutputsPerTx)
+: mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock),
+  mMaxStandardTxSize(maxTxSizePolicy),
+  mMaxPercentageOfOrphansInBatch(maxPercentageOfOrphansInBatch),
+  mMaxInputsOutputsPerTx(maxInputsOutputsPerTx)
 {
-    mGenerator.seed(std::chrono::system_clock::now().time_since_epoch().count());
+    size_t nMaxStdTxnsPerThreadRatio {
+        static_cast<size_t>(
+                gArgs.GetArg("-maxstdtxnsperthreadratio", DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO))
+    };
+
+    size_t nNumStdTxValidationThreads {
+        static_cast<size_t>(
+                gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
+    };
+
+    mMaxTxsPerBatch = nMaxStdTxnsPerThreadRatio * nNumStdTxValidationThreads;
 }
 
 void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
-    if (!pTxInputData) {
+    if (!pTxInputData || pTxInputData->IsDeleted()) {
         return;
     }
     // Mark txn as orphan
@@ -41,7 +53,8 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
         // but combined size of those transactions. limitTxnsSize is called after adding.
         unsigned int sz = tx.GetTotalSize();
         if (TxSource::p2p == pTxInputData->GetTxSource()) {
-            if (sz > mMaxStandardTxSize /*mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
+            if (mMaxStandardTxSize &&
+                sz > mMaxStandardTxSize /* mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
                 LogPrint(BCLog::MEMPOOL,
                          "ignoring large orphan tx (size: %u, hash: %s)\n", sz,
                          txid.ToString());
@@ -49,11 +62,12 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
             }
             addToCompactExtraTxns(ptx);
         }
+        mUntrimmedSize += sz;
         auto ret = mOrphanTxns.emplace(
             txid, COrphanTxnEntry{pTxInputData, GetTime() + ORPHAN_TX_EXPIRE_TIME, sz});
         assert(ret.second);
         for (const CTxIn &txin : tx.vin) {
-            mOrphanTxnsByPrev[txin.prevout].insert(ret.first);
+            mOrphanTxnsByPrev[txin.prevout].insert(&((*(ret.first)).second));
         }
         orphanTxnsTotal = mOrphanTxns.size();
         orphanTxnsByPrevTotal = mOrphanTxnsByPrev.size();
@@ -139,10 +153,7 @@ std::vector<uint256> COrphanTxns::getTxnsHash(const COutPoint& prevout) const {
         return vOrphanErase;
     }
     for (auto mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi) {
-        const CTransactionRef& ptx = (*mi)->second.pTxInputData->GetTxnPtr();
-        const CTransaction &orphanTx = *ptx;
-        const uint256 &orphanHash = orphanTx.GetHash();
-        vOrphanErase.emplace_back(orphanHash);
+        vOrphanErase.emplace_back((*mi)->pTxInputData->GetTxnPtr()->GetHash());
     }
     return vOrphanErase;
 }
@@ -153,14 +164,37 @@ CompactExtraTxnsVec COrphanTxns::getCompactExtraTxns() const {
 }
 
 unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
-                                          bool fSkipRndEviction) {
+                                        uint64_t nMaxOrphanTxnsHysteresis,
+                                        bool fSkipRndEviction) {
     unsigned int nEvicted {0};
     uint64_t nOrphanTxnsSize {0};
     int64_t nNow {0};
     int64_t nMinExpTime {0};
     int nErasedTimeLimit {0};
+    assert(nMaxOrphanTxnsHysteresis <= nMaxOrphanTxnsSize);
+    if ( mUntrimmedSize < nMaxOrphanTxnsHysteresis ) {
+        // exit early while we're below the hysteresis
+        return 0;
+    }
     {
         std::unique_lock lock {mOrphanTxnsMtx};
+        if ( mUntrimmedSize < nMaxOrphanTxnsHysteresis ) {
+            // we lost the race, exit early
+            return 0;
+        } else {
+            // mUntrimmedSize is only read outside the lock, we are not losing any updates
+            mUntrimmedSize = 0;
+        }
+        // this algo is really expensive in terms of number of entries, not the number
+        // of entries removed. Calling it per transaction kills paralelism.
+        // Trim more than requested to make headroom for skipping it in further calls, see above.
+        nMaxOrphanTxnsSize -= nMaxOrphanTxnsHysteresis;
+
+        // TODO: Replace the following loop with two separate dedicated data structures:
+        //       a good timer wheel to track expiry
+        //       move the accounting of size to add and remove so it's always up-to-date
+        // Note: it is too early to do this optimisation now as there are much bigger bottlenecks
+        // in the code so no JIRA is created for this for now.
         nNow = GetTime();
         nMinExpTime = nNow + ORPHAN_TX_EXPIRE_TIME - ORPHAN_TX_EXPIRE_INTERVAL;
         // Sweep out expired orphan pool entries:
@@ -191,16 +225,11 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
 
         // If the limit is still not reached then remove a random txn
         while (!fSkipRndEviction && nOrphanTxnsSize > nMaxOrphanTxnsSize) {
-            uint256 randomhash = GetRandHash();
-            OrphanTxnsIter it = mOrphanTxns.lower_bound(randomhash);
-            if (it == mOrphanTxns.end()) {
-                it = mOrphanTxns.begin();
-            }
-            
-            const CTransactionRef& ptx = it->second.pTxInputData->GetTxnPtr();
-            const CTransaction& tx = *ptx;
+            OrphanTxnsIter it = mOrphanTxns.begin();
             // Make sure we never go below 0 (causing overflow in uint)
-            unsigned int txTotalSize = tx.GetTotalSize();
+            const unsigned int txTotalSize {
+                it->second.pTxInputData->GetTxnPtr()->GetTotalSize()
+            };
             if (txTotalSize >= nOrphanTxnsSize)
             {
                 nOrphanTxnsSize = 0;
@@ -223,154 +252,125 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
     return nEvicted;
 }
 
-std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker) {
-    std::vector<TxInputDataSPtr> vRetryTxns {};
-    std::set<TxInputDataSPtr, CTxnIdComparator> setRetryTxns {};
+// The method is used to get any awaiting orphan txs that can be reprocessed.
+// - this decision is made based on outpoints which were produced by newly accepted txs
+// - the algorithm does not check if all missing outpoints are available
+// - the order of returned orphans in the first layer is non-deterministic
+//   (including those from the direct parent)
+// - the order of returned orphans in layers above first is depending on the order in the first layer
+std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
+    std::vector<TxInputDataSPtr> vecTxnsToReprocess {}; // maintaining order
+    std::unordered_set<TxInputDataSPtr> usetTxnsToReprocess {}; // preventing duplicates
     {
         std::unique_lock<std::shared_mutex> lock1(mOrphanTxnsMtx, std::defer_lock);
-        std::unique_lock<std::mutex> lock2(mCollectedOutpointsMtx, std::defer_lock);
+        std::unique_lock<std::mutex> lock2(mCollectedTxDataMtx, std::defer_lock);
         std::lock(lock1, lock2);
         // Return immediately if there is nothing to find.
-        if (mCollectedOutpoints.empty()) {
-            return vRetryTxns;
+        if (mCollectedTxData.empty()) {
+            return {};
         }
-        // If there is no orphan txns then remove any collected outpoints.
+        // If there is no orphan txns then remove any collected data.
         if (mOrphanTxns.empty()) {
-            mCollectedOutpoints.clear();
-            return vRetryTxns;
+            mCollectedTxData.clear();
+            return {};
         }
-
-        // Iterate over all collected outpoints to find dependent orphan txns.
-        std::vector<std::pair<COutPoint, OrphanTxnsByPrevIter>> vDependentOrphans {};
-        auto collectedOutpointIter = mCollectedOutpoints.begin();
-        while (collectedOutpointIter != mCollectedOutpoints.end()) {
-             // Find if there is any dependent orphan txn.
-             auto outpointFoundIter = mOrphanTxnsByPrev.find(*collectedOutpointIter);
-             if (outpointFoundIter == mOrphanTxnsByPrev.end()) {
-                 ++collectedOutpointIter;
-                 continue;
-             }
-             vDependentOrphans.emplace_back(std::make_pair(*collectedOutpointIter, outpointFoundIter));
-             ++collectedOutpointIter;
-        }
-
-        // Only outpoints for which a dependency was found will be kept.
-        mCollectedOutpoints.clear();
-
-        // Iterate over found dependent orphans and schedule them for retry.
-        // - due to descendant size & counter calculations we can take only one outpoint,
-        //   of the given parent, in the current call.
-        // - take all orphans only for the first found outpoint of the given parent
-        // - the remaining child txns of the given parent will be used by the next invocation
-        auto dependentOrphanIter = vDependentOrphans.begin();
-        while (dependentOrphanIter != vDependentOrphans.end()) {
-            // Take all matching orphans for the current outpoint.
-            // In this way we do not prioritize which orphan should be scheduled for retry.
-            // In batch processing, the Double Spend Detector (DSD) will allow to pass through validation only the first seen orphan
-            // (and reject the rest of them). The rejected orphans will be processed sequentially when batch processing is finished.
-            for (const auto& iterOrphanTxn : dependentOrphanIter->second->second) {
-                const auto& pTxInputData {
-                    (*iterOrphanTxn).second.pTxInputData
-                };
-                // Add txn to the result set if it's not there yet. Otherwise, a multiple entry of the same txn would be added,
-                // if it has more than one parent, for which outpoints were collected during the current interval.
-                setRetryTxns.
-                    insert(
-                        std::make_shared<CTxInputData>(
-                            pTxIdTracker,
-                            pTxInputData->GetTxnPtr(),        // a pointer to the tx
-                            pTxInputData->GetTxSource(),   // tx source
-                            pTxInputData->GetTxValidationPriority(),     // tx validation priority
-                            pTxInputData->GetTxStorage(),  // tx storage
-                            GetTime(),                 // nAcceptTime
-                            pTxInputData->GetAbsurdFee(), // nAbsurdFee
-                            pTxInputData->GetNodePtr(),      // pNode
-                            pTxInputData->IsOrphanTxn()));  // fOrphan
+        // Iterate over all collected tx data to find dependent orphan txns.
+        auto collectedTxDataIter = mCollectedTxData.begin();
+        while (collectedTxDataIter != mCollectedTxData.end()) {
+            // Find if there is any dependent orphan txn.
+            // - create outpoints in-flight
+            for (uint32_t n=0; n < collectedTxDataIter->mOutputsCount; ++n) {
+                auto outpointFoundIter = mOrphanTxnsByPrev.find(COutPoint{collectedTxDataIter->mTxId, n});
+                if (outpointFoundIter == mOrphanTxnsByPrev.end()) {
+                    continue;
+                }
+                for (const COrphanTxnEntry* pOrphanEntry : outpointFoundIter->second) {
+                   const TxInputDataSPtr& pTxInputData { pOrphanEntry->pTxInputData };
+                   if(usetTxnsToReprocess.insert(pTxInputData).second) {
+                       pTxInputData->SetAcceptTime(GetTime());
+                   }
+                }
             }
-            // We cannot simply return all dependent orphan txns to the given tx.vout of the parent tx.
-            // The limit for descendant size & counter would not be properly calculated/updated.
-            // Any remaining outpoints (of the current txid - the parent) will be used by the next invocation
-            // of the method.
-            // At this stage we don't want to allow the current outpoint to be used again.
-            auto txid = dependentOrphanIter->first.GetTxId();
-            auto nextTxnIter {
-                std::find_if(
-                   ++dependentOrphanIter,
-                   vDependentOrphans.end(),
-                   [&txid](const std::pair<COutPoint, OrphanTxnsByPrevIter>& elem) {
-                       return txid != elem.first.GetTxId(); })
-            };
-            // The remaining outpoints should be randomly shuffled.
-            std::shuffle(dependentOrphanIter, nextTxnIter, mGenerator);
-            // Store outpoints for a later usage.
-            while (dependentOrphanIter != nextTxnIter) {
-                mCollectedOutpoints.emplace_back(dependentOrphanIter->first);
-                ++dependentOrphanIter;
+            ++collectedTxDataIter;
+        }
+        mCollectedTxData.clear();
+
+        // We need to randomize first layer transactions, so we will fill vecTxnsToReprocess vector from the set 
+        assert(vecTxnsToReprocess.empty());
+        vecTxnsToReprocess.insert(vecTxnsToReprocess.end(), usetTxnsToReprocess.begin(), usetTxnsToReprocess.end());
+
+        // Limit of orphans in the batch
+        const auto maxOrphanInputsPerBatch = mMaxTxsPerBatch * mMaxPercentageOfOrphansInBatch / 100;
+
+        // Exit early if we are over the limit
+        if (vecTxnsToReprocess.size() > maxOrphanInputsPerBatch){
+            return vecTxnsToReprocess;
+        }
+
+        // queue of transactions to visit (FIFO)
+        std::queue<const CTransaction*> toCollectDescedantsFrom;
+        for (const auto& entry: vecTxnsToReprocess){
+            toCollectDescedantsFrom.push(entry->GetTxnPtr().get());
+        }
+
+        // Iterate over children of collected outpoints (breadth first) to find dependent orphans in next layers.
+        while(toCollectDescedantsFrom.size() > 0 && usetTxnsToReprocess.size() < maxOrphanInputsPerBatch){
+            auto tx = toCollectDescedantsFrom.front();
+            toCollectDescedantsFrom.pop();
+            for (uint32_t n = 0; n < tx->vout.size() && n < mMaxInputsOutputsPerTx; n++){
+                const COutPoint outpoint{tx->GetId(), n};
+                auto outpointFoundIter = mOrphanTxnsByPrev.find(outpoint);
+
+                if (outpointFoundIter == mOrphanTxnsByPrev.end()) {
+                    continue;
+                }
+
+                // do not reschedule double-spend orphans
+                if (outpointFoundIter->second.size() > 1) {
+                    continue;
+                }
+
+                const COrphanTxnEntry* pOrphanEntry = *(outpointFoundIter->second.begin());
+                const TxInputDataSPtr& pTxInputData { pOrphanEntry->pTxInputData };
+
+                // do not reschedule orphans with large number inputs
+                const CTransaction* orphanTx = pTxInputData->GetTxnPtr().get();
+                if(orphanTx->vin.size() > mMaxInputsOutputsPerTx) {
+                    continue;
+                }
+
+                if(usetTxnsToReprocess.insert(pTxInputData).second) {
+                    pTxInputData->SetAcceptTime(GetTime());
+                    vecTxnsToReprocess.push_back(pTxInputData);
+                    toCollectDescedantsFrom.push(orphanTx);
+                }
             }
         }
     }
-    // Move elements into vector.
-    vRetryTxns.insert(vRetryTxns.end(),
-        std::make_move_iterator(setRetryTxns.begin()),
-        std::make_move_iterator(setRetryTxns.end()));
-    return vRetryTxns;
+    return vecTxnsToReprocess;
 }
 
-void COrphanTxns::collectTxnOutpoints(const CTransaction& tx) {
-    size_t nTxOutpointsNum = tx.vout.size();
-    std::lock_guard lock {mCollectedOutpointsMtx};
-    // Check if we need to make a room for new outpoints before adding them.
-    if (mMaxCollectedOutpoints &&
-        (mCollectedOutpoints.size() + nTxOutpointsNum > mMaxCollectedOutpoints)) {
-        if (nTxOutpointsNum < mMaxCollectedOutpoints) {
-            // Discard a set of the oldest elements (estimated by nTxOutpointsNum value)
-            std::rotate(
-                    mCollectedOutpoints.begin(),
-                    mCollectedOutpoints.begin() + nTxOutpointsNum,
-                    mCollectedOutpoints.end());
-            // Remove old elements to make a room for new outpoints.
-            mCollectedOutpoints.resize(mCollectedOutpoints.size() - nTxOutpointsNum);
-        } else {
-            mCollectedOutpoints.clear();
-        }
-    }
-    // Add new outpoints
-    auto txhash = tx.GetId();
-    for (size_t i=0; i<nTxOutpointsNum; ++i) {
-        mCollectedOutpoints.emplace_back(COutPoint{txhash, (uint32_t)i});
-    }
+
+void COrphanTxns::collectTxData(const CTransaction& tx) {
+    std::lock_guard lock {mCollectedTxDataMtx};
+    mCollectedTxData.emplace_back(tx.GetId(), static_cast<uint32_t>(tx.vout.size()));
 }
 
-void COrphanTxns::eraseCollectedOutpoints() {
-    std::lock_guard lock {mCollectedOutpointsMtx};
-    mCollectedOutpoints.clear();
+void COrphanTxns::eraseCollectedTxData() {
+    std::lock_guard lock {mCollectedTxDataMtx};
+    mCollectedTxData.clear();
 }
 
-void COrphanTxns::eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemovedTxIds) {
-    std::lock_guard lock {mCollectedOutpointsMtx};
-    for (const auto& txid : vRemovedTxIds) {
-        auto firstElemIter {
-            std::find_if(
-               mCollectedOutpoints.begin(),
-               mCollectedOutpoints.end(),
-               [&txid](const COutPoint& outpoint) {
-                   return txid == outpoint.GetTxId(); })
-        };
-        if (firstElemIter == mCollectedOutpoints.end()) {
-            continue;
-        }
-        // Find the first non-matching element (starting from firstElemIter)
-        // The outpoints are stored continously in the vector.
-        auto endOfRangeIter {
-            std::find_if(
-               firstElemIter,
-               mCollectedOutpoints.end(),
-               [&txid](const COutPoint& outpoint) {
-                   return txid != outpoint.GetTxId(); })
-        };
-        // Erase all elements from the range: [firstElemIter, endOfRangeIter)
-        mCollectedOutpoints.erase(firstElemIter, endOfRangeIter);
-    }
+void COrphanTxns::eraseCollectedTxDataFromTxns(const std::vector<TxId>& vRemovedTxIds) {
+    std::lock_guard lock {mCollectedTxDataMtx};
+    mCollectedTxData.erase(
+        std::remove_if(
+            mCollectedTxData.begin(),
+            mCollectedTxData.end(),
+            [&vRemovedTxIds] (const COrphanTxns::CTxData& elem) -> bool {
+                return std::find_if(vRemovedTxIds.begin(), vRemovedTxIds.end(),
+                          [&elem](const TxId& txid){ return txid == elem.mTxId; }) != vRemovedTxIds.end(); }),
+        mCollectedTxData.end());
 }
 
 /** Get TxIds of known orphan transactions */
@@ -392,21 +392,14 @@ size_t COrphanTxns::getTxnsNumber() {
     return mOrphanTxns.size();
 }
 
-std::vector<COutPoint> COrphanTxns::getCollectedOutpoints() {
-    std::lock_guard lock {mCollectedOutpointsMtx};
-    return mCollectedOutpoints;
+std::vector<COrphanTxns::CTxData> COrphanTxns::getCollectedTxData() {
+    std::lock_guard lock {mCollectedTxDataMtx};
+    return mCollectedTxData;
 }
 
-TxInputDataSPtr COrphanTxns::getRndOrphanByLowerBound(const uint256& key) {
+TxInputDataSPtr COrphanTxns::getRndOrphan() {
     std::shared_lock lock {mOrphanTxnsMtx};
-    if (mOrphanTxns.empty()) {
-        return {nullptr};
-    }
-    auto txIter = mOrphanTxns.lower_bound(key);
-    if (txIter == mOrphanTxns.end()) {
-        txIter = mOrphanTxns.begin();
-    }
-    return txIter->second.pTxInputData;
+    return !mOrphanTxns.empty() ? mOrphanTxns.begin()->second.pTxInputData : nullptr;
 }
 
 void COrphanTxns::addToCompactExtraTxnsNL(const CTransactionRef &tx) {
@@ -430,12 +423,13 @@ int COrphanTxns::eraseTxnNL(const uint256& hash) {
     if (it == mOrphanTxns.end()) {
         return 0;
     }
-    for (const CTxIn &txin : it->second.pTxInputData->GetTxnPtr()->vin) {
+    const COrphanTxnEntry* pOrphanEntry { &it->second };
+    for (const CTxIn &txin : pOrphanEntry->pTxInputData->GetTxnPtr()->vin) {
         auto itPrev = mOrphanTxnsByPrev.find(txin.prevout);
         if (itPrev == mOrphanTxnsByPrev.end()) {
             continue;
         }
-        itPrev->second.erase(it);
+        itPrev->second.erase(pOrphanEntry);
         if (itPrev->second.empty()) {
             mOrphanTxnsByPrev.erase(itPrev);
         }

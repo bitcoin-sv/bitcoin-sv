@@ -1,6 +1,8 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "logging.h"
+
 #include <boost/iterator/filter_iterator.hpp>
 #include <mining/journal_builder.h>
 #include <mining/journal_change_set.h>

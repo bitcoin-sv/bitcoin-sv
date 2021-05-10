@@ -42,7 +42,7 @@ public:
     //! parameters to scrypt
     std::vector<uint8_t> vchOtherDerivationParameters;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

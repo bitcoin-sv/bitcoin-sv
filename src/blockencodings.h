@@ -23,7 +23,7 @@ private:
 public:
     TransactionCompressor(CTransactionRef &txIn) : tx(txIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -38,7 +38,7 @@ public:
     uint256 blockhash;
     std::vector<uint32_t> indices;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -90,7 +90,7 @@ public:
     BlockTransactions(const BlockTransactionsRequest &req)
         : blockhash(req.blockhash), txn(req.indices.size()) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -121,7 +121,7 @@ struct PrefilledTransaction {
     uint32_t index;
     CTransactionRef tx;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -176,7 +176,7 @@ public:
         return shorttxids.size() + prefilledtxn.size();
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

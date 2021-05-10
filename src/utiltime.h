@@ -6,7 +6,9 @@
 #ifndef BITCOIN_UTILTIME_H
 #define BITCOIN_UTILTIME_H
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <cstdint>
+#include <sstream>
 #include <string>
 
 /**
@@ -29,5 +31,15 @@ void SetMockTime(int64_t nMockTimeIn);
 void MilliSleep(int64_t n);
 
 std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime);
+
+class DateTimeFormatter
+{
+    std::locale locale_;
+
+public:
+    explicit DateTimeFormatter(const char* format);
+
+    std::ostringstream operator()(int64_t nTime) const;
+};
 
 #endif // BITCOIN_UTILTIME_H

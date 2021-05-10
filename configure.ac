@@ -2,8 +2,8 @@ dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
 define(_CLIENT_VERSION_MINOR, 0)
-define(_CLIENT_VERSION_REVISION, 7)
-define(_CLIENT_VERSION_BUILD, 1)
+define(_CLIENT_VERSION_REVISION, 8)
+define(_CLIENT_VERSION_BUILD, 0)
 define(_COPYRIGHT_YEAR, 2021)
 define(_COPYRIGHT_HOLDERS,[The %s Association])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin]])
@@ -216,6 +216,13 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
+# Enable metrics
+AC_ARG_ENABLE([metrics],
+     [AS_HELP_STRING([--enable-metrics],
+                     [collect metrics at runtime and log them (default is no)])],
+     [enable_metrics=$enableval],
+     [enable_metrics=no])
+
 # Enable ASAN
 AC_ARG_ENABLE([asan],
     [AS_HELP_STRING([--enable-asan],
@@ -317,6 +324,10 @@ if test "x$enable_debug" = xyes; then
     if test "x$GXX" = xyes; then
         CXXFLAGS="$CXXFLAGS -g3 -O0"
     fi
+fi
+
+if test "x$enable_metrics" = xyes; then
+    CPPFLAGS="$CPPFLAGS -DCOLLECT_METRICS"
 fi
 
 ERROR_CXXFLAGS=

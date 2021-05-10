@@ -416,7 +416,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_1) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0x74d681e0e03bafa802c8aa084379aa98d9fcd632ddc2ed9782b"
@@ -514,7 +514,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_2) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0xe980fe9f792d014e73b95203dc1335c5f9ce19ac537a419e6df"
@@ -628,7 +628,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_2_with_update_none) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0xe980fe9f792d014e73b95203dc1335c5f9ce19ac537a419e6df"
@@ -831,7 +831,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_4) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0x0a2a92f0bda4727d0a13eaddf4dd9ac6b5c61a1429e6b2b818f"

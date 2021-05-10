@@ -130,6 +130,13 @@ bool IsP2SH(const bsv::span<const uint8_t> script) {
            script[1] == 0x14 && script[22] == OP_EQUAL;
 }
 
+// Quick test for double-spend enabled OP_RETURN script
+bool IsDSNotification(bsv::span<const uint8_t> script) {
+    // OP_FALSE OP_RETURN OP_PUSHDATA 0x64736e74 OP_PUSHDATA Callback Msg
+    return script.size() >= 11 && script[0] == OP_FALSE && script[1] == OP_RETURN && script[2] == 0x04 &&
+       script[3] == 0x64 && script[4] == 0x73 && script[5] == 0x6e && script[6] == 0x74;
+}
+
 bool CScript::IsPushOnly(const_iterator pc) const {
     while (pc < end()) {
         opcodetype opcode;

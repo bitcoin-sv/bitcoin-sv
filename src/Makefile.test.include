@@ -6,7 +6,6 @@ TESTS += test/test_bitcoin
 LOG_DRIVER = $(srcdir)/test/test-bitcoin-driver
 EXTRA_DIST += test/test-bitcoin-driver
 bin_PROGRAMS += test/test_bitcoin
-noinst_PROGRAMS += test/test_bitcoin_fuzzy
 TEST_SRCDIR = test
 TEST_BINARY=test/test_bitcoin$(EXEEXT)
 
@@ -37,9 +36,12 @@ BITCOIN_TESTS =\
   test/bip32_tests.cpp \
   test/big_int_tests.cpp \
   test/blockcheck_tests.cpp \
+  test/block_download_tracking_tests.cpp \
   test/blockencodings_tests.cpp \
   test/blockfile_reading_tests.cpp \
+  test/block_index_mutex_distribution_tests.cpp \
   test/block_info_tests.cpp \
+  test/blockindex_with_descendants_tests.cpp \
   test/blockmaxsize_tests.cpp \
   test/blockstatus_tests.cpp \
   test/blockvalidationstatus_tests.cpp \
@@ -58,6 +60,8 @@ BITCOIN_TESTS =\
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
+  test/dsattempt_tests.cpp \
+  test/dstxn_serialiser_tests.cpp \
   test/dbwrapper_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
@@ -75,6 +79,7 @@ BITCOIN_TESTS =\
   test/json_tests.cpp \
   test/jsonutil.h \
   test/key_tests.cpp \
+  test/leaky_bucket_tests.cpp \
   test/limitedmap_tests.cpp \
   test/limitedstack_tests.cpp \
   test/locked_ref_tests.cpp \
@@ -82,6 +87,7 @@ BITCOIN_TESTS =\
   test/main_tests.cpp \
   test/mempool_test_access.h \
   test/mempool_dump_load_tests.cpp \
+  test/mempool_limit_tests.cpp \
   test/mempool_snapshot_tests.cpp \
   test/mempool_tests.cpp \
   test/mempooltxdb_tests.cpp \
@@ -137,6 +143,7 @@ BITCOIN_TESTS =\
   test/thread_safe_queue_tests.cpp \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
+  test/time_limited_blacklist_tests.cpp \
   test/time_locked_mempool_tests.cpp \
   test/ttor_tests.cpp \
   test/transaction_tests.cpp \
@@ -175,24 +182,6 @@ test_test_bitcoin_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)
 endif
 #
 
-# test_bitcoin_fuzzy binary #
-test_test_bitcoin_fuzzy_SOURCES = test/test_bitcoin_fuzzy.cpp
-test_test_bitcoin_fuzzy_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-test_test_bitcoin_fuzzy_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-test_test_bitcoin_fuzzy_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
-
-test_test_bitcoin_fuzzy_LDADD = \
-  $(LIBUNIVALUE) \
-  $(LIBBITCOIN_SERVER) \
-  $(LIBBITCOIN_COMMON) \
-  $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_CONSENSUS) \
-  $(LIBBITCOIN_CRYPTO) \
-  $(LIBSECP256K1)
-
-test_test_bitcoin_fuzzy_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS) $(AIO_LIBS)
-#
-
 nodist_test_test_bitcoin_SOURCES = $(GENERATED_TEST_FILES)
 
 $(BITCOIN_TESTS): $(GENERATED_TEST_FILES)
@@ -223,6 +212,6 @@ endif
 	 echo "namespace json_tests{" && \
 	 echo "static unsigned const char $(*F)[] = {" && \
 	 $(HEXDUMP) -v -e '8/1 "0x%02x, "' -e '"\n"' $< | $(SED) -e 's/0x  ,//g' && \
-	 echo "};};"; \
+	 echo "};}"; \
 	} > "$@.new" && mv -f "$@.new" "$@"
 	@echo "Generated $@"

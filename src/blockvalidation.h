@@ -107,7 +107,7 @@ public:
                 mCurrentlyValidatingBlocks.end(),
                 [&index](const CBlockIndex* other)
                 {
-                    return index.GetAncestor(other->nHeight) == other;
+                    return index.GetAncestor(other->GetHeight()) == other;
                 });
     }
 
@@ -123,7 +123,7 @@ public:
                 mCurrentlyValidatingBlocks.end(),
                 [&index](const CBlockIndex* other)
                 {
-                    return index.nHeight == other->nHeight;
+                    return index.GetHeight() == other->GetHeight();
                 });
 
         return count >= thresholdNumber;

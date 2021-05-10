@@ -119,7 +119,7 @@ static void do_WriteToFileDataTx() {
         LOGSTATS(std::cout << (GetTimeMillis() - startTime) / 1000.0 << std::endl);
     }
     FileCommit(file.Get());
-    file.fclose();
+    file.reset();
 }
 
 static void do_WriteToSeparateFilesDatatx() {
@@ -153,7 +153,7 @@ static void do_WriteToSeparateFilesDatatx() {
         file << tx;
         LOGSTATS(std::cout << (GetTimeMillis() - startTime) / 1000.0 << std::endl);
         FileCommit(file.Get());
-        file.fclose();
+        file.reset();
         i++;
     }
 }

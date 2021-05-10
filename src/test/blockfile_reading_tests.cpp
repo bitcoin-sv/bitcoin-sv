@@ -6,6 +6,7 @@
 #include "stream_test_helpers.h"
 #include "protocol.h"
 #include "blockfileinfostore.h"
+#include "block_file_access.h"
 #include "consensus/validation.h"
 #include "config.h"
 #include "chainparams.h"
@@ -21,13 +22,36 @@
 #include <optional>
 #include <vector>
 
+namespace{ class Unique; }
+
+template <>
+struct CBlockIndex::UnitTestAccess<class Unique>
+{
+    UnitTestAccess() = delete;
+
+    static uint256 CorruptDiskBlockMetaData( CBlockIndex& blockIndex, DirtyBlockIndexStore& notifyDirty )
+    {
+        uint256 randomHash = GetRandHash();
+        blockIndex.SetDiskBlockMetaData( randomHash, 1, notifyDirty );
+
+        return randomHash;
+    }
+
+    static int GetNFile(CBlockIndex& blockIndex)
+    {
+        return blockIndex.nFile;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+
 namespace
 {
     void WriteBlockToDisk(
         const Config& config,
         const CBlock& block,
         CBlockIndex& index,
-        CBlockFileInfoStore& blockFileInfoStore)
+        CBlockFileInfoStore& blockFileInfoStore,
+        DirtyBlockIndexStore& notifyDirty)
     {
         uint64_t nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
         uint64_t nBlockSizeWithHeader =
@@ -48,35 +72,18 @@ namespace
             throw std::runtime_error{"LoadBlockIndex(): FindBlockPos failed"};
         }
 
-        // Open history file to append
-        CAutoFile fileout{
-            CDiskFiles::OpenBlockFile(blockPos),
-            SER_DISK,
-            CLIENT_VERSION};
-        if (fileout.IsNull())
-        {
-            throw std::runtime_error{"WriteBlockToDisk: OpenBlockFile failed"};
-        }
+        CDiskBlockMetaData metaData;
 
-        // Write index header
-        //CMessageHeader::MessageMagic diskMagic{{0xde, 0xad, 0xbe, 0xef}};
-        const CChainParams& chainparams = config.GetChainParams();
-        unsigned int nSize = GetSerializeSize(fileout, block);
-        fileout << FLATDATA(chainparams.DiskMagic()) << nSize;
+        auto res =
+            BlockFileAccess::WriteBlockToDisk(
+                block,
+                blockPos,
+                config.GetChainParams().DiskMagic(),
+                metaData);
 
-        // Write block
-        long fileOutPos = ftell(fileout.Get());
-        if (fileOutPos < 0) {
-            throw std::runtime_error{"WriteBlockToDisk: ftell failed"};
-        }
+        BOOST_REQUIRE( res );
 
-        // set index data
-        index.nFile = blockPos.nFile;
-        index.nDataPos = fileOutPos;
-        index.nUndoPos = 0;
-        index.nStatus = index.nStatus.withData();
-
-        fileout << block;
+        index.SetDiskBlockData(block.vtx.size(), blockPos, metaData, notifyDirty);
     }
 
     struct CScopeSetupTeardown
@@ -117,14 +124,12 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     CScopeSetupTeardown guard{"read_without_meta_info"};
     const DummyConfig config;
+    DirtyBlockIndexStore dummyDirty;
 
     auto block = BuildRandomTestBlock();
-    CBlockIndex index{block};
-    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
-    index.phashBlock = randomHash.get();
-
+    CBlockIndex::TemporaryBlockIndex index{ block };
     CBlockFileInfoStore blockFileInfoStore;
-    WriteBlockToDisk(config, block, index, blockFileInfoStore);
+    WriteBlockToDisk(config, block, index, blockFileInfoStore, dummyDirty);
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
@@ -132,16 +137,18 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     // check that blockIndex was updated with disk content size and hash data
     {
-        auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
-        std::vector<uint8_t> serializedData{SerializeAsyncStream(*stream, 5u)};
+        auto data = index->StreamBlockFromDisk(INIT_PROTO_VERSION, dummyDirty);
+
+        BOOST_REQUIRE( data.stream );
+
+        std::vector<uint8_t> serializedData{SerializeAsyncStream(*data.stream, 5u)};
 
         uint256 expectedHash =
             Hash(serializedData.begin(), serializedData.end());
 
-        auto metaData = index.GetDiskBlockMetaData();
-        BOOST_REQUIRE_EQUAL(metaData.diskDataSize, serializedData.size());
+        BOOST_REQUIRE_EQUAL(data.metaData.diskDataSize, serializedData.size());
         BOOST_REQUIRE_EQUAL(
-            metaData.diskDataHash.GetCheapHash(),
+            data.metaData.diskDataHash.GetCheapHash(),
             expectedHash.GetCheapHash());
 
         BOOST_REQUIRE_EQUAL_COLLECTIONS(
@@ -153,18 +160,17 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
     // confirm that once the data is present it is not updated once again
     // (is read from block index cache instead)
     {
-        uint256 randomHash = GetRandHash();
-        index.SetDiskBlockMetaData(randomHash, 1);
+        uint256 randomHash =
+            TestAccessCBlockIndex::CorruptDiskBlockMetaData( index, dummyDirty );
 
         auto streamCorruptMetaData =
-            StreamBlockFromDisk(index, INIT_PROTO_VERSION);
-        auto metaData = index.GetDiskBlockMetaData();
-        BOOST_REQUIRE_EQUAL(metaData.diskDataSize, 1);
+            index->StreamBlockFromDisk(INIT_PROTO_VERSION, dummyDirty);
+        BOOST_REQUIRE_EQUAL(streamCorruptMetaData.metaData.diskDataSize, 1);
         BOOST_REQUIRE_EQUAL(
-            metaData.diskDataHash.GetCheapHash(),
+            streamCorruptMetaData.metaData.diskDataHash.GetCheapHash(),
             randomHash.GetCheapHash());
         BOOST_REQUIRE_EQUAL(
-            SerializeAsyncStream(*streamCorruptMetaData, 5u).size(),
+            SerializeAsyncStream(*streamCorruptMetaData.stream, 5u).size(),
             1);
     }
 }
@@ -175,19 +181,25 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
     // termination
     CScopeSetupTeardown guard{"delete_block_file_while_reading"};
     const DummyConfig config;
+    DirtyBlockIndexStore dummyDirty;
 
     auto block = BuildRandomTestBlock();
-    CBlockIndex index{block};
-    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
-    index.phashBlock = randomHash.get();
+    CBlockIndex::TemporaryBlockIndex index{ block };
 
-    WriteBlockToDisk(config, block, index, *pBlockFileInfoStore);
+    WriteBlockToDisk(config, block, index, *pBlockFileInfoStore, dummyDirty);
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
     LOCK(cs_main);
-    auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+    auto data = index->StreamBlockFromDisk(INIT_PROTO_VERSION, dummyDirty);
+
+    BOOST_REQUIRE( data.stream );
+
     std::vector<uint8_t> serializedData;
+
+    // prepare file ids set for pruning
+    std::set<int> fileIds;
+    fileIds.insert(TestAccessCBlockIndex::GetNFile(index));
 
     // start reading and inbetween the read try to delete the file on disk
     {
@@ -207,20 +219,24 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
                 ((expectedSerializedData.size() / 2) <= serializedData.size()))
             {
                 // we're half way through the file so it's time to delete it
-                std::set<int> fileIds;
-                fileIds.insert(index.nFile);
                 UnlinkPrunedFiles(fileIds);
                 deleted = true;
             }
 
-            auto chunk = stream->ReadAsync(5u);
+            auto chunk = data.stream->ReadAsync(5u);
 
             serializedData.insert(
                 serializedData.end(),
                 chunk.Begin(), chunk.Begin() + chunk.Size());
         }
-        while(!stream->EndOfStream());
+        while(!data.stream->EndOfStream());
     }
+
+    // Previously called UnlinkPrunedFiles might be unsuccessful because file was still open.
+    // With resetting the stream, file is closed and we can perform cleanup.
+    // On UNIX, pruning is performed successfully; resetting and unlinking is only needed for Windows.
+    data.stream.reset();
+    UnlinkPrunedFiles(fileIds);
 
     BOOST_REQUIRE_EQUAL_COLLECTIONS(
         serializedData.begin(), serializedData.end(),

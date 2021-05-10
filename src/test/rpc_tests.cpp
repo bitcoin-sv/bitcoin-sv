@@ -11,6 +11,7 @@
 
 #include "base58.h"
 #include "config.h"
+#include "double_spend/dscallback_msg.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
 #include "util.h"
@@ -643,104 +644,33 @@ BOOST_AUTO_TEST_CASE(getminingcandidate_low_height)
     nMaxTipAge = oldMaxAge;
 }
 
-// Create client configs for DS Authority
-BOOST_AUTO_TEST_CASE(client_config_dsa)
+// Create client configs for double-spend endpoint
+BOOST_AUTO_TEST_CASE(client_config_ds_endpoint)
 {
     using namespace rpc::client;
+    GlobalConfig config {};
 
-    {
-        // All good
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/DsAuthority/proof/");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof/");
+    BOOST_CHECK_NO_THROW(
+        // Create DSCallbackMsg to base config from
+        std::string ip {"127.0.0.1"};
+        DSCallbackMsg ipv4_callback(0x01, {ip}, {});
 
-            // Also just check other defaults
-            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_AUTHORITY_TIMEOUT);
-            BOOST_CHECK_EQUAL(config.GetCredentials(), "");
-            BOOST_CHECK(! config.UsesAuth());
-            BOOST_CHECK_EQUAL(config.GetWallet(), "");
-        );
-    }
+        // Create RPC config using DSCallbackMsg
+        RPCClientConfig clientConfig {
+            RPCClientConfig::CreateForDoubleSpendEndpoint(
+                config,
+                DSCallbackMsg::IPAddrToString(ipv4_callback.GetAddresses()[0]),
+                RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT,
+                ipv4_callback.GetProtocolVersion()
+            )
+        };
 
-    {
-        // Mimimal endpoint (and override timeout)
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/D");
-        gArgs.ForceSetArg("-dsauthoritytimeout", "10");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/D");
-            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 10);
-        );
-    }
-
-    {
-        // Missing endpoint
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/");
-        );
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
-        );
-    }
-
-    {
-        // Without http://
-        gArgs.ForceSetArg("-dsauthorityurl", "hostname:8080");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
-        );
-    }
-
-    {
-        // Missing port
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:/DsAuthority/proof");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname:");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
-        );
-    }
-
-    {
-        // Unspecified port
-        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname/DsAuthority/proof");
-        BOOST_CHECK_NO_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
-            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
-            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
-        );
-    }
-
-    {
-        // Missing server address
-        gArgs.ForceSetArg("-dsauthorityurl", "http://");
-        BOOST_CHECK_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-        , std::runtime_error);
-    }
-
-    {
-        // Unsupported protocol
-        gArgs.ForceSetArg("-dsauthorityurl", "https://hostname:8080/DsAuthority/proof");
-        BOOST_CHECK_THROW(
-            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
-        , std::runtime_error);
-    }
+        BOOST_CHECK_EQUAL(clientConfig.GetServerIP(), ip);
+        BOOST_CHECK_EQUAL(clientConfig.GetServerPort(), RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT);
+        BOOST_CHECK_EQUAL(clientConfig.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT);
+        BOOST_CHECK(! clientConfig.UsesAuth());
+        BOOST_CHECK_EQUAL(clientConfig.GetEndpoint(), "/dsnt/1/");
+    );
 }
 
 // Create client configs for bitcoind
@@ -778,16 +708,45 @@ BOOST_AUTO_TEST_CASE(http_requests)
     using namespace rpc::client;
 
     {
-        // REST requests to the DS authority
-        RPCClientConfig config { RPCClientConfig::CreateForDSA("http://127.0.0.1:8080/DsAuthority/proof") };
+        // RPC request to a double-spend endpoint
+        GlobalConfig config {};
+        DSCallbackMsg ipv4_callback(0x01, {"127.0.0.1"}, {});
+        RPCClientConfig clientConfig {
+            RPCClientConfig::CreateForDoubleSpendEndpoint(
+                config,
+                DSCallbackMsg::IPAddrToString(ipv4_callback.GetAddresses()[0]),
+                RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT,
+                ipv4_callback.GetProtocolVersion()
+            )
+        };
 
-        auto postRequest { rpc::client::HTTPRequest::CreateRESTPostRequest(config, params) };
-        BOOST_CHECK_EQUAL(postRequest.GetContents(), "{\"tx1\":\"1\",\"tx2\":\"2\"}\n");
-        BOOST_CHECK_EQUAL(postRequest.GetEndpoint(), "/DsAuthority/proof/submit");
+        auto queryRequest { rpc::client::HTTPRequest::CreateDSEndpointQueryRequest(clientConfig, "abcdef") };
+        BOOST_CHECK(queryRequest.GetCommand() == RequestCmdType::GET);
+        BOOST_CHECK_EQUAL(queryRequest.GetContents().size(), 0);
+        BOOST_CHECK_EQUAL(queryRequest.GetContentsSize(), 0);
+        BOOST_CHECK_EQUAL(queryRequest.GetContentsFD().Get(), -1);
+        BOOST_CHECK_EQUAL(queryRequest.GetEndpoint(), "/dsnt/1/query/abcdef");
 
-        auto getRequest { rpc::client::HTTPRequest::CreateRESTGetRequest(config, "a56fd", 5) };
-        BOOST_CHECK_EQUAL(getRequest.GetContents(), "");
-        BOOST_CHECK_EQUAL(getRequest.GetEndpoint(), "/DsAuthority/proof/a56fd/5");
+        auto submitRequest { rpc::client::HTTPRequest::CreateDSEndpointSubmitRequest(
+            clientConfig,
+            UniqueFileDescriptor{1}, 50,
+            std::make_pair("txid", "abcdef"),
+            std::make_pair("n", 0),
+            std::make_pair("ctxid", "fedcba"),
+            std::make_pair("cn", 1)
+        ) };
+        BOOST_CHECK(submitRequest.GetCommand() == RequestCmdType::POST);
+        BOOST_CHECK_EQUAL(submitRequest.GetEndpoint(), "/dsnt/1/submit?txid=abcdef&n=0&ctxid=fedcba&cn=1");
+        BOOST_CHECK_EQUAL(submitRequest.GetContents().size(), 0);
+        BOOST_CHECK_EQUAL(submitRequest.GetContentsSize(), 50);
+        BOOST_CHECK_EQUAL(submitRequest.GetContentsFD().Get(), 1);
+        auto headers { submitRequest.GetHeaders() };
+        BOOST_CHECK_EQUAL(headers.size(), 1);
+        BOOST_CHECK_EQUAL(headers[0].first, "Content-Type");
+        BOOST_CHECK_EQUAL(headers[0].second, "application/octet-stream");
+
+        // Ensure we don't actually try to close the fake file descriptor we've created above
+        (void)submitRequest.GetContentsFD().Release();
     }
 
     {
@@ -799,8 +758,11 @@ BOOST_AUTO_TEST_CASE(http_requests)
         RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
 
         auto rpcRequest { rpc::client::HTTPRequest::CreateJSONRPCRequest(config, method, params) };
-        BOOST_CHECK_EQUAL(rpcRequest.GetContents(), "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
+        std::string strContents { rpcRequest.GetContents().begin(), rpcRequest.GetContents().end() };
+        BOOST_CHECK_EQUAL(strContents, "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
+        BOOST_CHECK_EQUAL(rpcRequest.GetContentsSize(), strContents.size());
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
+        BOOST_CHECK_EQUAL(rpcRequest.GetHeaders().size(), 0);
     }
 }
 

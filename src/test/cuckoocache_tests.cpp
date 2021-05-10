@@ -27,7 +27,7 @@
  */
 FastRandomContext local_rand_ctx(true);
 
-BOOST_AUTO_TEST_SUITE(cuckoocache_tests);
+BOOST_AUTO_TEST_SUITE(cuckoocache_tests)
 
 /**
  * insecure_GetRandHash fills in a uint256 from local_rand_ctx
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(test_cuckoocache_no_fakes) {
         insecure_GetRandHash(v);
         BOOST_CHECK(!cc.contains(v, false));
     }
-};
+}
 
 /**
  * This helper returns the hit rate when megabytes*load worth of entries are
@@ -366,4 +366,4 @@ BOOST_AUTO_TEST_CASE(cuckoocache_generations) {
     test_cache_generations<CuckooCache::cache<uint256, SignatureCacheHasher>>();
 }
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()

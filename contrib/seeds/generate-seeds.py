@@ -17,7 +17,6 @@ These files must consist of lines in the format
     <ip>:<port>
     [<ipv6>]
     [<ipv6>]:<port>
-    <onion>.onion
     0xDDBBCCAA (IPv4 little-endian old pnSeeds format)
 
 The output will be two data structures with the peers in binary format:
@@ -40,17 +39,10 @@ import re
 
 # ipv4 in ipv6 prefix
 pchIPv4 = bytearray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff])
-# tor-specific ipv6 prefix
-pchOnionCat = bytearray([0xFD, 0x87, 0xD8, 0x7E, 0xEB, 0x43])
 
 
 def name_to_ipv6(addr):
-    if len(addr) > 6 and addr.endswith('.onion'):
-        vchAddr = b32decode(addr[0:-6], True)
-        if len(vchAddr) != 16 - len(pchOnionCat):
-            raise ValueError('Invalid onion %s' % s)
-        return pchOnionCat + vchAddr
-    elif '.' in addr:  # IPv4
+    if '.' in addr:  # IPv4
         return pchIPv4 + bytearray((int(x) for x in addr.split('.')))
     elif ':' in addr:  # IPv6
         sub = [[], []]  # prefix, suffix
@@ -131,7 +123,7 @@ def main():
     g.write(' *\n')
     g.write(' * Each line contains a 16-byte IPv6 address and a port.\n')
     g.write(
-        ' * IPv4 as well as onion addresses are wrapped inside a IPv6 address accordingly.\n')
+        ' * IPv4 addresses are wrapped inside a IPv6 address accordingly.\n')
     g.write(' */\n')
     with open(os.path.join(indir, 'nodes_main.txt'), 'r') as f:
         process_nodes(g, f, 'pnSeed6_main', 8333)

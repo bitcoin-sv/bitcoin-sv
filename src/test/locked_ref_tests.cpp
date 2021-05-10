@@ -11,7 +11,7 @@ namespace
 {
 }
 
-BOOST_AUTO_TEST_SUITE(LockedRef);
+BOOST_AUTO_TEST_SUITE(LockedRef)
 
 BOOST_AUTO_TEST_CASE(ConstructUnique)
 {
@@ -56,4 +56,4 @@ BOOST_AUTO_TEST_CASE(ConstructShared)
     }
 }
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()

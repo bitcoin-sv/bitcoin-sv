@@ -16,7 +16,9 @@
 #include <utility>
 #include <vector>
 
+class CBlockFileInfo;
 class CBlockIndex;
+struct CDiskTxPos;
 class uint256;
 
 //! No need to periodic flush if at least this much space still available.
@@ -38,48 +40,6 @@ static const int64_t nMaxBlockDBCache = 2;
 static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
-
-struct CDiskTxPos : public CDiskBlockPos {
-    uint64_t nTxOffset; // after header
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action) {
-        READWRITE(*(CDiskBlockPos *)this);
-
-        // Legacy 32 bit sizes used for reading and writing.
-        // When writing size larger or equal than max 32 bit value,
-        // max 32 bit value (0xFFFFFFFF) is written in 32 bit field
-        // and actual size is written in separate 64 bit field.
-        // When reading, separate 64 bit value should be read when 32 bit value
-        // is max (0xFFFFFFFF).
-        unsigned int offset =
-              nTxOffset >= std::numeric_limits<unsigned int>::max()
-            ? std::numeric_limits<unsigned int>::max()
-            : static_cast<unsigned int>(nTxOffset);
-        READWRITE(VARINT(offset));
-
-        if (offset == std::numeric_limits<unsigned int>::max())
-        {
-            READWRITE(VARINT(nTxOffset));
-        }
-        else
-        {
-            nTxOffset = offset;
-        }
-    }
-
-    CDiskTxPos(const CDiskBlockPos &blockIn, uint64_t nTxOffsetIn)
-        : CDiskBlockPos(blockIn.nFile, blockIn.nPos), nTxOffset(nTxOffsetIn) {}
-
-    CDiskTxPos() { SetNull(); }
-
-    void SetNull() {
-        CDiskBlockPos::SetNull();
-        nTxOffset = 0;
-    }
-};
 
 /** Iterate over coins in DB */
 class CCoinsViewDBCursor {
@@ -424,8 +384,8 @@ public:
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos>> &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
-    bool LoadBlockIndexGuts(
-        std::function<CBlockIndex *(const uint256 &)> insertBlockIndex);
+
+    std::unique_ptr<CDBIterator> GetIterator();
 };
 
 #endif // BITCOIN_TXDB_H

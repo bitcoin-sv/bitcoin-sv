@@ -108,6 +108,13 @@ static const unsigned int DEFAULT_MEMPOOL_MAX_PERCENT_CPFP = 10;
  */
 static constexpr Amount DUST_RELAY_TX_FEE(250);
 
+/**
+ * The threshold below which a transaction is considered dust.
+ * The dust limit factor expresses this value as a multiple (in percent) of the dust relay fee
+ * applied to a transaction output.
+ */
+static constexpr int64_t DEFAULT_DUST_LIMIT_FACTOR{300};
+
 /*
 * Number of blocks around GENESIS activation (72 blocks before and 72 blocks after) when
 * nodes will not be banned if they send a script that is not valid. That means if a node

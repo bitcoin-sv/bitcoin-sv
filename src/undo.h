@@ -107,7 +107,7 @@ public:
     // For all but the coinbase
     std::vector<CTxUndo> vtxundo;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -134,13 +134,5 @@ enum DisconnectResult {
 DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view,
                                const COutPoint &out, const Config &config);
 
-/**
- * Undo a block from the block and the undoblock data.
- * See DisconnectBlock for more details.
- */
-DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
-                                const CBlock &block, const CBlockIndex *pindex,
-                                CCoinsViewCache &coins,
-                                const task::CCancellationToken& shutdownToken);
 
 #endif // BITCOIN_UNDO_H

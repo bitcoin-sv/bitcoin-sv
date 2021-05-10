@@ -15,6 +15,7 @@
 #include "mining/factory.h"
 #include "mining/journal_builder.h"
 #include "net/net_processing.h"
+#include "pow.h"
 #include "pubkey.h"
 #include "random.h"
 #include "rpc/mining.h"
@@ -47,10 +48,9 @@ FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern void noui_connect();
 
-BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetConfig()) {
+BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetModifiableGlobalConfig()) {
     SHA256AutoDetect();
     RandomInit();
-    ECC_Start();
     SetupEnvironment();
     SetupNetworking();
     InitSignatureCache();
@@ -80,7 +80,6 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
-    ECC_Stop();
 
     if(g_connman)
     {

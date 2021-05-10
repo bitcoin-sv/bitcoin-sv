@@ -7,7 +7,7 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 #include "util.h"
-#include "consensus/merkle.h"
+#include "merkletree.h"
 
 #include <boost/algorithm/string.hpp>
 #include <limits>
@@ -47,6 +47,7 @@ GlobalConfig::GlobalConfig() {
 void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
+    dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
     blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
@@ -108,6 +109,8 @@ void GlobalConfig::Reset()
     mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
+    mMaxPercentageOfOrphansInMaxBatchSize = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
+    mMaxInputsForSecondLayerOrphan = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
     mStopAtHeight = DEFAULT_STOPATHEIGHT;
     mPromiscuousMempoolFlags = 0;
     mIsSetPromiscuousMempoolFlags = false;
@@ -115,8 +118,30 @@ void GlobalConfig::Reset()
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
 
+    // Block download
+    blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
+    blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
+    blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
+    blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
+
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+    streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
+    banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+
+    // Double-Spend parameters
+    dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
+    dsEndpointFastTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
+    dsEndpointSlowTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT;
+    dsEndpointSlowRatePerHour = DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR;
+    dsEndpointPort = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT;
+    dsEndpointBlacklistSize = DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE;
+    dsEndpointSkipList = {};
+    dsAttemptTxnRemember = DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT;
+    dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
+    dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
+    dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
 
     mDisableBIP30Checks = std::nullopt;
 
@@ -160,6 +185,7 @@ void GlobalConfig::CheckSetDefaultCalled() const
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
+    std::scoped_lock<std::shared_mutex> lock{configMtx};
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
     if (maxSize && maxSize <= LEGACY_MAX_BLOCK_SIZE) {
@@ -175,6 +201,7 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
+    std::shared_lock<std::shared_mutex> lock{configMtx};
     CheckSetDefaultCalled();
     return maxBlockSize;
 }
@@ -200,6 +227,7 @@ uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
 }
 
 bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
+    std::scoped_lock<std::shared_mutex> lock{configMtx};
     maxGeneratedBlockSizeAfter = maxSize;
     maxGeneratedBlockSizeOverridden = true;
 
@@ -207,11 +235,13 @@ bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) 
 }
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
+    std::shared_lock<std::shared_mutex> lock{configMtx};
     CheckSetDefaultCalled();
     return maxGeneratedBlockSizeAfter;
-};
+}
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
+    std::shared_lock<std::shared_mutex> lock{configMtx};
     CheckSetDefaultCalled();
     uint64_t maxSize;
     if (!maxGeneratedBlockSizeOverridden) {
@@ -224,17 +254,17 @@ uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
 }
 bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
     return maxGeneratedBlockSizeOverridden;
-};
+}
 
 bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* err) {
     blockSizeActivationTime = activationTime;
     return true;
-};
+}
 
 int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     CheckSetDefaultCalled();
     return blockSizeActivationTime;
-};
+}
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
@@ -473,10 +503,16 @@ uint64_t GlobalConfig::GetGenesisGracefulPeriod() const
     return genesisGracefulPeriod;
 }
 
-GlobalConfig& GlobalConfig::GetConfig()
+Config& GlobalConfig::GetConfig()
 {
     static GlobalConfig config {};
     return config;
+}
+
+ConfigInit& GlobalConfig::GetModifiableGlobalConfig() 
+{
+    static Config& config = GlobalConfig::GetConfig();
+    return static_cast<ConfigInit&>(config);
 }
 
 void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
@@ -673,13 +709,13 @@ uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus)
 
 bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
 {
-    if(ms < 5)
+    if(ms < 1)
     {
         if(err)
         {
             *err =
                 strprintf(
-                    _("Per transaction max validation duration must be at least 5ms"));
+                    _("Per transaction max validation duration must be at least 1ms"));
         }
 
         return false;
@@ -718,6 +754,32 @@ std::chrono::milliseconds GlobalConfig::GetMaxNonStdTxnValidationDuration() cons
 {
     return mMaxNonStdTxnValidationDuration;
 }
+
+bool GlobalConfig::SetMaxTxnChainValidationBudget(int ms, std::string* err)
+{
+    if(LessThanZero(ms, err, "Per chain max validation duration budget must be non-negative"))
+    {
+
+        return false;
+    }
+
+    mMaxTxnChainValidationBudget = std::chrono::milliseconds{ms};
+
+    return true;
+}
+
+std::chrono::milliseconds GlobalConfig::GetMaxTxnChainValidationBudget() const {
+    return mMaxTxnChainValidationBudget;
+}
+
+void GlobalConfig::SetValidationClockCPU(bool enable) {
+    mValidationClockCPU = enable;
+}
+
+bool GlobalConfig::GetValidationClockCPU() const {
+    return mValidationClockCPU;
+}
+
 
 /**
  * Compute the maximum number of sigops operations that can be contained in a block
@@ -1037,17 +1099,358 @@ InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
     return invalidTxFileSinkEvictionPolicy;
 }
 
+// Block download
+bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
+{
+    if(min < 0)
+    {
+        if(err)
+        {
+            *err = "Block stalling minimum download speed must be >= 0";
+        }
+        return false;
+    }
+
+    blockStallingMinDownloadSpeed = min;
+    return true;
+}
+uint64_t GlobalConfig::GetBlockStallingMinDownloadSpeed() const
+{
+    return blockStallingMinDownloadSpeed;
+}
+
+bool GlobalConfig::SetBlockStallingTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block stalling timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockStallingTimeout = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockStallingTimeout() const
+{
+    return blockStallingTimeout;
+}
+
+bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
+{
+    if(window <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download window must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadWindow = window;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadWindow() const
+{
+    return blockDownloadWindow;
+}
+
+bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download slow fetch timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadSlowFetchTimeout = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadSlowFetchTimeout() const
+{
+    return blockDownloadSlowFetchTimeout;
+}
+
+bool GlobalConfig::SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download maximum parallel fetch must be greater than 0.";
+        }
+        return false;
+    }
+
+    blockDownloadMaxParallelFetch = max;
+    return true;
+}
+uint64_t GlobalConfig::GetBlockDownloadMaxParallelFetch() const
+{
+    return blockDownloadMaxParallelFetch;
+}
+
 // P2P Parameters
 bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 {
     if(timeout <= 0)
     {
-        *err = "P2P handshake timeout must be greater than 0.";
+        if(err)
+        {
+            *err = "P2P handshake timeout must be greater than 0.";
+        }
         return false;
     }
 
     p2pHandshakeTimeout = timeout;
     return true;
+}
+
+bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
+{
+    streamSendRateLimit = limit;
+    return true;
+}
+int64_t GlobalConfig::GetStreamSendRateLimit() const
+{
+    return streamSendRateLimit;
+}
+
+bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
+{
+    auto maxThreshold { std::numeric_limits<decltype(banScoreThreshold)>::max() };
+    if(threshold <= 0 || threshold > maxThreshold)
+    {
+        if(err)
+        {
+            *err = "Ban score threshold must be greater than 0 and less then " + std::to_string(maxThreshold);
+        }
+        return false;
+    }
+
+    banScoreThreshold = static_cast<decltype(banScoreThreshold)>(threshold);
+    return true;
+}
+unsigned int GlobalConfig::GetBanScoreThreshold() const
+{
+    return banScoreThreshold;
+}
+
+// Double-Spend Parameters
+bool GlobalConfig::SetDoubleSpendNotificationLevel(int level, std::string* err)
+{
+    if(level < static_cast<int>(DSAttemptHandler::NotificationLevel::NONE) ||
+       level > static_cast<int>(DSAttemptHandler::NotificationLevel::ALL))
+    {
+        if(err)
+        {
+            *err = "Invalid value for double-spend notification level.";
+        }
+        return false;
+    }
+
+    dsNotificationLevel = static_cast<DSAttemptHandler::NotificationLevel>(level);
+    return true;
+}
+DSAttemptHandler::NotificationLevel GlobalConfig::GetDoubleSpendNotificationLevel() const
+{
+    return dsNotificationLevel;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint fast timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsEndpointFastTimeout = timeout;
+    return true;
+}
+int GlobalConfig::GetDoubleSpendEndpointFastTimeout() const
+{
+    return dsEndpointFastTimeout;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint slow timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsEndpointSlowTimeout = timeout;
+    return true;
+}
+int GlobalConfig::GetDoubleSpendEndpointSlowTimeout() const
+{
+    return dsEndpointSlowTimeout;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err)
+{
+    if(rate <= 0 || rate > 60)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint slow rate per hour must be between 1 and 60.";
+        }
+        return false;
+    }
+
+    dsEndpointSlowRatePerHour = static_cast<uint64_t>(rate);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendEndpointSlowRatePerHour() const
+{
+    return dsEndpointSlowRatePerHour;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointPort(int port, std::string* err)
+{
+    if(port <= 0 || port > 65535)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint port must be between 1 and 65535.";
+        }
+        return false;
+    }
+
+    dsEndpointPort = port;
+    return true;
+}
+int GlobalConfig::GetDoubleSpendEndpointPort() const
+{
+    return dsEndpointPort;
+}
+
+bool GlobalConfig::SetDoubleSpendTxnRemember(int64_t size, std::string* err)
+{
+    if(size <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum number of remembered transactions must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsAttemptTxnRemember = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendTxnRemember() const
+{
+    return dsAttemptTxnRemember;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err)
+{
+    if(size <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum size of endpoint blacklist must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsEndpointBlacklistSize = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendEndpointBlacklistSize() const
+{
+    return dsEndpointBlacklistSize;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err)
+{
+    // Split comma separated list of IPs and trim whitespace
+    std::vector<std::string> ips {};
+    boost::split(ips, skip, boost::is_any_of(","));
+    for(auto& ip : ips)
+    {
+        boost::algorithm::trim(ip);
+        dsEndpointSkipList.insert(ip);
+    }
+
+    return true;
+}
+std::set<std::string> GlobalConfig::GetDoubleSpendEndpointSkipList() const
+{
+    return dsEndpointSkipList;
+}
+
+bool GlobalConfig::SetDoubleSpendNumFastThreads(int64_t num, std::string* err)
+{
+    if(num <= 0 || num > static_cast<int64_t>(DSAttemptHandler::MAX_NUM_THREADS))
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum number of high priority processing threads must be between 1 and " +
+                std::to_string(DSAttemptHandler::MAX_NUM_THREADS);
+        }
+        return false;
+    }
+
+    dsAttemptNumFastThreads = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendNumFastThreads() const
+{
+    return dsAttemptNumFastThreads;
+}
+
+bool GlobalConfig::SetDoubleSpendNumSlowThreads(int64_t num, std::string* err)
+{
+    if(num <= 0 || num > static_cast<int64_t>(DSAttemptHandler::MAX_NUM_THREADS))
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum number of low priority processing threads must be between 1 and " +
+                std::to_string(DSAttemptHandler::MAX_NUM_THREADS);
+        }
+        return false;
+    }
+
+    dsAttemptNumSlowThreads = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendNumSlowThreads() const
+{
+    return dsAttemptNumSlowThreads;
+}
+
+bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum queue memory must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsAttemptQueueMaxMemory = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendQueueMaxMemory() const
+{
+    return dsAttemptQueueMaxMemory;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
@@ -1193,12 +1596,31 @@ int DummyConfig::GetPerBlockScriptValidationMaxBatchSize() const
     return DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
 }
 
+void DummyConfig::Reset() {}
+
 void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
     feePerKB = fee;
 }
 
 CFeeRate GlobalConfig::GetMinFeePerKB() const {
     return feePerKB;
+}
+
+bool GlobalConfig::SetDustLimitFactor(int64_t factor, std::string* err) {
+    if (factor < 0 || factor > DEFAULT_DUST_LIMIT_FACTOR)
+    {
+        if (err)
+        {
+            *err = _("The dust limit factor must be between 0% and ") + std::to_string(DEFAULT_DUST_LIMIT_FACTOR) + "%";
+        }
+        return false;
+    }
+    dustLimitFactor = factor;
+    return true;
+}
+
+int64_t GlobalConfig::GetDustLimitFactor() const {
+    return dustLimitFactor;
 }
 
 void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {
@@ -1378,6 +1800,39 @@ uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
     return mMaxOrphanTxSize;
 }
 
+
+bool GlobalConfig::SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) {
+    if (percent < 1 || percent > 100)
+    {
+        if (err)
+        {
+            *err = "Max percentage of orphans as percentage of maximal batch size must be between 1 and 100.";
+        }
+        return false;
+    }
+
+    mMaxPercentageOfOrphansInMaxBatchSize = percent;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxOrphansInBatchPercentage() const {
+    return mMaxPercentageOfOrphansInMaxBatchSize;
+}
+
+bool GlobalConfig::SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) {
+    if (LessThanZero(maxInputs, err, "Max inputs for out of first layer orphan txs must not be less than 0."))
+    {
+        return false;
+    }
+
+    mMaxInputsForSecondLayerOrphan = maxInputs;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxInputsForSecondLayerOrphan() const {
+    return mMaxInputsForSecondLayerOrphan;
+}
+
 bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
     if (LessThanZero(stopAtHeight, err, "Policy value for stop at height in the main chain must not be less than 0."))
     {
@@ -1385,7 +1840,6 @@ bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
     }
 
     mStopAtHeight = stopAtHeight;
-
     return true;
 }
 

@@ -101,7 +101,8 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factormaxsendqueuesbytes=num_peers.
         args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize), 
-                "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500']
+                "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500',
+                '-maxsendbuffer=1000']
         with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers", 0,
             args+["-factormaxsendqueuesbytes={}".format(self.num_peers)], self.num_peers) as connections:
 

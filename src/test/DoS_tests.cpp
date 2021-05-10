@@ -171,11 +171,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
     CBasicKeyStore keystore;
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
 
-    size_t maxCollectedOutpoints {
-        static_cast<size_t>(
-            gArgs.GetArg("-maxcollectedoutpoints",
-                      COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS))
-    };
     size_t maxExtraTxnsForCompactBlock {
         static_cast<size_t>(
             gArgs.GetArg("-blockreconstructionextratxn",
@@ -186,13 +181,23 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
             gArgs.GetArgAsBytes("-maxtxsizepolicy",
                       MAX_TX_SIZE_POLICY_BEFORE_GENESIS))
     };
-
+    size_t maxOrphanPercent {
+        static_cast<size_t>(
+            gArgs.GetArg("-maxorphansinbatchpercent",
+                      COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH))
+    };
+    size_t maxInputsOutputs {
+        static_cast<size_t>(
+            gArgs.GetArg("-maxinputspertransactionoutoffirstlayerorphan",
+                      COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION))
+    };
     // A common buffer with orphan txns
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
-                            maxCollectedOutpoints,
                             maxExtraTxnsForCompactBlock,
-                            maxTxSizePolicy)
+                            maxTxSizePolicy,
+                            maxOrphanPercent,
+                            maxInputsOutputs)
     };
 
     CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
@@ -251,9 +256,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         key.MakeNewKey(true);
         keystore.AddKey(key);
         // Get a random orphan txn
-        TxInputDataSPtr pRndTxInputData {
-            orphanTxns->getRndOrphanByLowerBound(InsecureRand256())
-        };
+        TxInputDataSPtr pRndTxInputData { orphanTxns->getRndOrphan() };
         BOOST_CHECK(pRndTxInputData);
 
         CTransactionRef txPrev = pRndTxInputData->GetTxnPtr();
@@ -286,9 +289,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         key.MakeNewKey(true);
         keystore.AddKey(key);
         // Get a random orphan txn
-        TxInputDataSPtr pRndTxInputData {
-            orphanTxns->getRndOrphanByLowerBound(InsecureRand256())
-        };
+        TxInputDataSPtr pRndTxInputData { orphanTxns->getRndOrphan() };
         BOOST_CHECK(pRndTxInputData);
 
         CTransactionRef txPrev = pRndTxInputData->GetTxnPtr();

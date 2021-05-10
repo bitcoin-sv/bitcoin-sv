@@ -4,6 +4,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "base58.h"
+#include "block_file_access.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
@@ -31,6 +33,7 @@
 #include "validation.h"
 #include "merkletreestore.h"
 #include "rpc/blockchain.h"
+#include "consensus/merkle.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -38,6 +41,7 @@
 
 #include <cstdint>
 #include <univalue.h>
+#include <sstream>
 
 using namespace mining;
 
@@ -153,9 +157,6 @@ void getrawtransaction(const Config& config,
                        bool processedInBatch,
                        std::function<void()> httpCallback) 
 {
-    
-    LOCK(cs_main);
-
     TxId txid = TxId(ParseHashV(request.params[0], "parameter 1"));
 
     // Accept either a bool (true) or a num (>=1) to indicate verbose output.
@@ -223,16 +224,15 @@ void getrawtransaction(const Config& config,
     if (!hashBlock.IsNull())
     {
         CBlockDetailsData blockData;
-        auto mi = mapBlockIndex.find(hashBlock);
-        if (mi != mapBlockIndex.end() && mi->second) 
+        if (auto pindex = mapBlockIndex.Get(hashBlock); pindex)
         {
-            const CBlockIndex* pindex = mi->second;
+            LOCK(cs_main); // protecting chainActive
             if (chainActive.Contains(pindex)) 
             {
-                blockData.confirmations = 1 + chainActive.Height() - pindex->nHeight;
+                blockData.confirmations = 1 + chainActive.Height() - pindex->GetHeight();
                 blockData.time = pindex->GetBlockTime();
                 blockData.blockTime = pindex->GetBlockTime();
-                blockData.blockHeight = pindex->nHeight;
+                blockData.blockHeight = pindex->GetHeight();
             }
             else 
             {
@@ -265,20 +265,19 @@ static CBlockIndex* GetBlockIndex(const Config& config,
 
     if (!requestedBlockHash.IsNull())
     {
-        LOCK(cs_main);
+        pblockindex = mapBlockIndex.Get(requestedBlockHash);
         // Find requested block
-        if (!mapBlockIndex.count(requestedBlockHash))
+        if (!pblockindex)
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
         }
-        pblockindex = mapBlockIndex[requestedBlockHash];
 
         if (verifyTxIds)
         {
             // Check if all provided transactions are in the block
             CBlock block;
             bool allTxIdsFound = false;
-            if (ReadBlockFromDisk(block, pblockindex, config))
+            if (pblockindex->ReadBlockFromDisk(block, config))
             {
                 auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
                 for (const auto &tx : block.vtx)
@@ -330,12 +329,11 @@ static CBlockIndex* GetBlockIndex(const Config& config,
                                "Transaction not yet in block or -txindex is not enabled");
         }
 
-        LOCK(cs_main);
-        if (!mapBlockIndex.count(foundBlockHash))
+        pblockindex = mapBlockIndex.Get(foundBlockHash);
+        if (!pblockindex)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
         }
-        pblockindex = mapBlockIndex[foundBlockHash];
     }
     return pblockindex;
 }
@@ -345,7 +343,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
  */
 static std::unique_ptr<CBlockStreamReader<CFileReader>>  GetBlockStream(CBlockIndex& pblockindex)
 {
-    auto stream = GetDiskBlockStreamReader(pblockindex.GetBlockPos());
+    auto stream = pblockindex.GetDiskBlockStreamReader();
     if (!stream)
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
@@ -460,10 +458,11 @@ static UniValue verifytxoutproof(const Config &config,
         return res;
     }
 
-    LOCK(cs_main);
+    LOCK(cs_main); // protecting chainActive
 
-    if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-        !chainActive.Contains(mapBlockIndex[merkleBlock.header.GetHash()])) {
+    if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
+        !index || !chainActive.Contains(index))
+    {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Block not found in chain");
     }
@@ -720,8 +719,6 @@ void decoderawtransaction(const Config& config,
                           bool processedInBatch,
                           std::function<void()> httpCallback) 
 {
-
-    LOCK(cs_main);
     RPCTypeCheck(request.params, {UniValue::VSTR});
 
     CMutableTransaction mtx;
@@ -919,11 +916,6 @@ static UniValue signrawtransaction(const Config &config,
             HelpExampleRpc("signrawtransaction", "\"myhex\""));
     }
 
-#ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
-#else
-    LOCK(cs_main);
-#endif
     RPCTypeCheck(
         request.params,
         {UniValue::VSTR, UniValue::VARR, UniValue::VARR, UniValue::VSTR}, true);
@@ -948,6 +940,10 @@ static UniValue signrawtransaction(const Config &config,
     // mergedTx will end up with all the signatures; it starts as a clone of the
     // rawtx:
     CMutableTransaction mergedTx(txVariants[0]);
+
+#ifdef ENABLE_WALLET
+    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
+#endif
 
     // Fetch previous transactions (inputs):
     CoinsDBView tipView{ *pcoinsTip };
@@ -982,6 +978,9 @@ static UniValue signrawtransaction(const Config &config,
         EnsureWalletIsUnlocked(pwallet);
     }
 #endif
+    
+    // make sure that we consistently use the same height
+    auto activeChainHeight = chainActive.Height();
 
     // Add previous txouts given in the RPC call:
     if (request.params.size() > 1 && !request.params[1].isNull()) {
@@ -1051,7 +1050,7 @@ static UniValue signrawtransaction(const Config &config,
                 // We do not have coin height here. We assume that the coin is about to
                 // be mined using latest active rules.
                 const auto genesisActivationHeight = config.GetGenesisActivationHeight();
-                int32_t coinHeight = chainActive.Height() + 1;
+                int32_t coinHeight = activeChainHeight + 1;
 
                 // except if we are trying to sign transactions that spends p2sh transaction, which
                 // are non-standard (and therefore cannot be signed) after genesis upgrade
@@ -1130,7 +1129,7 @@ static UniValue signrawtransaction(const Config &config,
     // rehashing.
     const CTransaction txConst(mergedTx);
 
-    bool genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+    bool genesisEnabled = IsGenesisEnabled(config, activeChainHeight + 1);
 
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
@@ -1145,7 +1144,7 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), chainActive.Height() + 1);
+        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), activeChainHeight + 1);
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -1199,6 +1198,31 @@ static UniValue signrawtransaction(const Config &config,
     }
 
     return result;
+}
+
+// Constructs and returns an array of all unconfirmed ancestors' ids for a given transaction id
+static UniValue GetUnconfirmedAncestors(const TxId& txid)
+{
+    // If tx is still present in the mempool, list all of its unconfirmed ancestors
+    const auto kind = CTxMemPool::TxSnapshotKind::ONLY_ANCESTORS;
+    UniValue unconfirmedAncestors(UniValue::VARR);
+    for (const auto& entry : mempool.GetTxSnapshot(txid, kind))
+    {
+        UniValue ancestor(UniValue::VOBJ);
+        ancestor.pushKV("txid", entry.GetTxId().GetHex());
+        UniValue inputs(UniValue::VARR);
+        const auto transactionRef = entry.GetSharedTx();
+        for (const CTxIn &txin : transactionRef->vin)
+        {
+            UniValue input(UniValue::VOBJ);
+            input.pushKV("txid", txin.prevout.GetTxId().GetHex());
+            input.pushKV("vout", uint64_t(txin.prevout.GetN()));
+            inputs.push_back(input);
+        }
+        ancestor.pushKV("vin", inputs);
+        unconfirmedAncestors.push_back(ancestor);
+    }
+    return unconfirmedAncestors;
 }
 
 static UniValue sendrawtransaction(const Config &config,
@@ -1268,12 +1292,23 @@ static UniValue sendrawtransaction(const Config &config,
             nMaxRawTxFee);                 // nAbsurdFee
     // Check if transaction is already received through p2p interface,
     // and thus, couldn't be added to the TxIdTracker.
+
+    // Check if txn is present in one of the mempools.
+    auto txid_in_mempool = [&](){return mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);};
+
+    if (dontCheckFee && (txid_in_mempool() || !pTxInputData->IsTxIdStored()))
+    {
+        CTxPrioritizer txPrioritizer{mempool, txid};
+        LogPrint(BCLog::TXNSRC, "got txn via rpc sendrawtransaction after same tx arrived from relaying: %s txnsrc user=%s\n",
+                 txid.ToString(), request.authUser.c_str());
+
+        return txid.GetHex();
+    }
     if (!pTxInputData->IsTxIdStored()) {
         throw JSONRPCError(RPC_TRANSACTION_REJECTED,
-                strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
+                           strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
     }
-    // Check if txn is present in one of the mempools.
-    if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
+    if (!txid_in_mempool()) {
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
@@ -1283,7 +1318,7 @@ static UniValue sendrawtransaction(const Config &config,
         //   if the prioritised txn was not accepted by the mempool
         // The mempool prioritisation is not executed on a null TxId
         // - no-op in terms of prioritise/clear operations
-        CTxPrioritizer txPrioritizer(mempool, dontCheckFee ? txid : TxId());
+        CTxPrioritizer txPrioritizer{mempool, dontCheckFee ? txid : TxId()};
         // Forward transaction to the validator and wait for results.
         const auto& txValidator = g_connman->getTxnValidator();
         const CValidationState& status {
@@ -1295,7 +1330,7 @@ static UniValue sendrawtransaction(const Config &config,
         // Check if the transaction was accepted by the mempool.
         // Due to potential race-condition we have to explicitly call exists() instead of
         // checking a result from the status variable.
-        if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
+        if (!txid_in_mempool()) {
             if (!status.IsValid()) {
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
@@ -1418,6 +1453,25 @@ static void KnownTxnsToJSON(const std::vector<TxId>& knownTxns, CJSONWriter& wri
     }
 }
 
+/**
+ * Pushes unconfirmed ancestors of given transactions to JSON writer.
+ */
+static void UnconfirmedAncestorsToJSON(const std::vector<TxId>& txns, CJSONWriter& writer)
+{
+    if (!txns.empty())
+    {
+        writer.writeBeginArray("unconfirmed");
+        for (const auto& txid : txns)
+        {
+            writer.writeBeginObject();
+            writer.pushKV("txid", txid.GetHex());
+            writer.pushKVJSONFormatted("ancestors", GetUnconfirmedAncestors(txid).write());
+            writer.writeEndObject();
+        }
+        writer.writeEndArray();
+    }
+}
+
 void sendrawtransactions(const Config& config,
                          const JSONRPCRequest& request,
                          HTTPRequest* httpReq,
@@ -1426,7 +1480,7 @@ void sendrawtransactions(const Config& config,
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 1) {
         throw std::runtime_error(
-            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false}, ...]\n"
+            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false, \"listunconfirmedancestors\": true|false}, ...]\n"
             "\nSubmits raw transactions (serialized, hex-encoded) to local node "
             "and network.\n"
             "\nTo maximise performance, transaction chains should be provided in inheritance order\n"
@@ -1441,8 +1495,10 @@ void sendrawtransactions(const Config& config,
             "The hex string of the raw transaction\n"
             "         \"allowhighfees\": true|false,  (boolean, optional, default=false) "
             "Allow high fees\n"
-            "         \"dontcheckfee\": true|false    (boolean, optional, default=false) "
+            "         \"dontcheckfee\": true|false,   (boolean, optional, default=false) "
             "Don't check fee\n"
+            "         \"listunconfirmedancestors\": true|false  (boolean, optional, default=false) "
+            "List transaction ids of unconfirmed ancestors\n"
             "       } \n"
             "       ,...\n"
             "     ]\n"
@@ -1481,6 +1537,26 @@ void sendrawtransactions(const Config& config,
             "      ]\n"
             "    }\n"
             "    ,...\n"
+            "  ],\n"
+            "  \"unconfirmed\" : [              (json array) List of transactions with their unconfirmed ancestors "
+            "(only if listunconfirmedancestors was set to true)\n"
+            "    {\n"
+            "      \"txid\" : xxxxxxxx,         (string) The transaction id\n"
+            "      \"ancestors\" : [            (json array) List of all ancestors that are still in the mempool\n"
+            "        {\n"
+            "          \"txid\" : xxxxxxxx,     (string) Ancestor's transaction id\n"
+            "          \"vin\" : [              (json array) List of onacestor's inputs\n"
+            "            {\n"
+            "              \"txid\" : xxxxxxxx, (string) Input's transaction id\n"
+            "              \"vout\" : x         (numeric) Input's vout index\n"
+            "            }\n"
+            "            ,...\n"
+            "          ]\n"
+            "        }\n"
+            "        ,...\n"
+            "      ]\n"
+            "    }\n"
+            "    ,...\n"
             "  ]\n"
             "}\n"
 
@@ -1491,12 +1567,16 @@ void sendrawtransactions(const Config& config,
                            "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true}]\"") +
             HelpExampleCli("sendrawtransactions",
                            "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true, \\\"dontcheckfee\\\":true}]\"") +
+            HelpExampleCli("sendrawtransactions",
+                           R"("[{\"hex\":\"hexstring\", \"listunconfirmedancestors\":true}]")") +
             HelpExampleRpc("sendrawtransactions",
                            "[{\"hex\":\"hexstring\"}]") +
             HelpExampleRpc("sendrawtransactions",
                            "[{\"hex\":\"hexstring\", \"allowhighfees\":true}]") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]"));
+                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]") +
+            HelpExampleRpc("sendrawtransactions",
+                           R"([{"hex":"hexstring", "listunconfirmedancestors":true}])"));
     }
 
     if(httpReq == nullptr)
@@ -1517,6 +1597,8 @@ void sendrawtransactions(const Config& config,
     std::vector<TxId> vTxToPrioritise {};
     // A vector to store already known transactions.
     std::vector<TxId> vKnownTxns {};
+    // A vector to store transactions that need a list of unconfirmed ancestors.
+    std::vector<TxId> vTxListUnconfirmedAncestors {};
 
     /**
      * Parse an input data
@@ -1555,22 +1637,43 @@ void sendrawtransactions(const Config& config,
                 nMaxRawTxFee = Amount(0);
             }
         }
-        // Read dontcheckfee.
         bool fTxToPrioritise = false;
+        bool listUnconfirmedAncestors = false;
         bool fTxInMempools = mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);
-        if (!fTxInMempools) {
-            const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
-            if (!dontcheckfee.isNull()) {
-                if (!dontcheckfee.isBool()) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,
-                            std::string("dontcheckfee: Invalid value"));
-                } else if (dontcheckfee.isTrue()) {
-                    fTxToPrioritise = true;
+        // Read dontcheckfee.
+        const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
+        if (!dontcheckfee.isNull()) {
+            if (!dontcheckfee.isBool()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        std::string("dontcheckfee: Invalid value"));
+            } else if (dontcheckfee.isTrue()) {
+                fTxToPrioritise = true;
+            }
+        }
+
+        if (fTxInMempools) {
+            if (fTxToPrioritise) {
+                vTxToPrioritise.emplace_back(txid);
+            } else {
+                vKnownTxns.emplace_back(txid);
+            }
+            continue;
+        }
+        else
+        {
+            // Read listunconfirmedancestors.
+            const UniValue& listunconfirmedancestors = find_value(o, "listunconfirmedancestors");
+            if (!listunconfirmedancestors.isNull())
+            {
+                if (!listunconfirmedancestors.isBool())
+                {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("listunconfirmedancestors: Invalid value"));
+                }
+                else if (listunconfirmedancestors.isTrue())
+                {
+                    listUnconfirmedAncestors = true;
                 }
             }
-        } else {
-            vKnownTxns.emplace_back(txid);
-            continue;
         }
         // Create an object with transaction's input data.
         TxInputDataSPtr pTxInputData =
@@ -1584,14 +1687,23 @@ void sendrawtransactions(const Config& config,
                 nMaxRawTxFee);                 // nAbsurdFee
         // Check if transaction is already known
         // - received through p2p interface or present in the mempools
-        if (!pTxInputData->IsTxIdStored() || fTxInMempools) {
-            vKnownTxns.emplace_back(txid);
+        if (!pTxInputData->IsTxIdStored()) {
+            if (fTxToPrioritise) {
+                vTxToPrioritise.emplace_back(txid);
+            } else {
+                vKnownTxns.emplace_back(txid);
+            }
         // Move it to the vector of transactions awaiting to be processed
         } else {
             vTxInputData.emplace_back(std::move(pTxInputData));
             // Check if txn needs to be prioritised
             if (fTxToPrioritise) {
                 vTxToPrioritise.emplace_back(txid);
+            }
+            // Remember a transaction for which we want to list its unconfirmed ancestors
+            if (listUnconfirmedAncestors)
+            {
+                vTxListUnconfirmedAncestors.emplace_back(txid);
             }
         }
     }
@@ -1609,7 +1721,7 @@ void sendrawtransactions(const Config& config,
         // Prioritise transactions (if any were requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction
         //   for those txns which are not accepted by the mempool
-        CTxPrioritizer txPrioritizer(mempool, std::move(vTxToPrioritise));
+        CTxPrioritizer txPrioritizer{mempool, std::move(vTxToPrioritise)};
         // Run synch batch validation and wait for results.
         const auto& txValidator = g_connman->getTxnValidator();
         rejectedTxns =
@@ -1661,6 +1773,8 @@ void sendrawtransactions(const Config& config,
      *   - reject reason
      * 3. txid of a transaction evicted from the mempool during processing:
      *   - txn which was accepted and then removed due to insufficient fee
+     * 4. txids of unconfirmed ancestors if transaction was marked with listunconfirmedancestors
+     *   - only if transaction is still in the mempool
      *
      * Accepted txids are not returned in the result set, as it could create false-positives,
      * for accepted txns, if:
@@ -1690,6 +1804,8 @@ void sendrawtransactions(const Config& config,
     InvalidTxnsToJSON(rejectedTxns.first, jWriter);
     // Evicted txns array.
     EvictedTxnsToJSON(rejectedTxns.second, jWriter);
+    // List unconfirmed ancestors.
+    UnconfirmedAncestorsToJSON(vTxListUnconfirmedAncestors, jWriter);
     jWriter.writeEndObject();
     jWriter.pushKV("error", nullptr);
     jWriter.pushKVJSONFormatted("id", request.id.write());
@@ -1703,41 +1819,41 @@ void sendrawtransactions(const Config& config,
 }
 
 static UniValue getmerkleproof(const Config& config,
-    const JSONRPCRequest& request)
+                               const JSONRPCRequest& request)
 {
     if (request.fHelp ||
         (request.params.size() != 1 && request.params.size() != 2))
     {
         throw std::runtime_error(
-            "getmerkleproof \"txid\" ( blockhash )\n"
-            "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
-            "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
-            "\n Merkle root can be used to prove that the transaction was included in a block.\n"
-            "\nNOTE: This only works if transaction was already included in a block and the block"
-            "\nwas found. When not specifying \"blockhash\", function will be able to find the block"
-            "\nonly if there is an unspent output in the utxo for this transaction or transaction"
-            "\nindex is maintained (using the -txindex command line option).\n"
+                "getmerkleproof \"txid\" ( blockhash )\n"
+                "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
+                "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
+                "\n Merkle root can be used to prove that the transaction was included in a block.\n"
+                "\nNOTE: This only works if transaction was already included in a block and the block"
+                "\nwas found. When not specifying \"blockhash\", function will be able to find the block"
+                "\nonly if there is an unspent output in the utxo for this transaction or transaction"
+                "\nindex is maintained (using the -txindex command line option).\n"
 
-            "\nArguments:\n"
-            "1. \"txid\"      (string, required) The transaction id\n"
-            "2. \"blockhash\" (string, optional) If specified, looks for txid in the block with "
-            "this hash\n"
-            "\nResult:\n"
-            "{\n"
-            "  \"flags\" : 2,                     (numeric) Flags is always 2 => \"txOrId\" is transaction ID and \"target\" is a block header\n"
-            "  \"index\" : txIndex,               (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
-            "  \"txOrId\" : \"txid\",             (string) ID of the Tx in question\n"
-            "  \"target\" : {blockheader},        (json) The block header, as returned by getBlockHeader(true) RPC (i.e. verbose = true)\n"
-            "  \"nodes\" :                        (json array) Merkle Proof for transaction txOrId as array of nodes\n"
-            "    [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
-            "}\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getmerkleproof", "\"mytxid\"") +
-            HelpExampleCli("getmerkleproof", "\"mytxid\" \"myblockhash\"") +
-            HelpExampleRpc("getmerkleproof", "\"mytxid\", \"myblockhash\""));
+                "\nArguments:\n"
+                "1. \"txid\"      (string, required) The transaction id\n"
+                "2. \"blockhash\" (string, optional) If specified, looks for txid in the block with "
+                "this hash\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"flags\" : 2,                     (numeric) Flags is always 2 => \"txOrId\" is transaction ID and \"target\" is a block header\n"
+                "  \"index\" : txIndex,               (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
+                "  \"txOrId\" : \"txid\",             (string) ID of the Tx in question\n"
+                "  \"target\" : {blockheader},        (json) The block header, as returned by getBlockHeader(true) RPC (i.e. verbose = true)\n"
+                "  \"nodes\" :                        (json array) Merkle Proof for transaction txOrId as array of nodes\n"
+                "    [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getmerkleproof", "\"mytxid\"") +
+                HelpExampleCli("getmerkleproof", "\"mytxid\" \"myblockhash\"") +
+                HelpExampleRpc("getmerkleproof", "\"mytxid\", \"myblockhash\""));
     }
 
-    TxId transactionId = TxId(ParseHashV(request.params[0], "hash"));
+    TxId transactionId = TxId(ParseHashV(request.params[0], "txid"));
     std::set<TxId> setTxIds;
     setTxIds.insert(transactionId);
 
@@ -1753,11 +1869,7 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
     }
 
-    int32_t currentChainHeight = 0;
-    {
-        LOCK(cs_main);
-        currentChainHeight = static_cast<int32_t>(chainActive.Height());
-    }
+    int32_t currentChainHeight = chainActive.Height();
 
     CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
 
@@ -1797,9 +1909,193 @@ static UniValue getmerkleproof(const Config& config,
         LOCK(cs_main);
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
     }
-
+    // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
     callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
     callbackDataObject.pushKV("nodes", merkleProofArray);
+    return callbackDataObject;
+}
+
+
+static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& request)
+{
+
+    // see also TSC description in  https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/?utm_source=Twitter&utm_medium=social&utm_campaign=Orlo
+    auto message_to_user = [](std::string hints) -> std::string {
+        std::ostringstream msg;
+        if (!hints.empty())
+            msg << hints << "\n" << "usage:\n";
+        msg <<
+            "getmerkleproof2 \"blockhash\" \"txid\"   ( includeFullTx targetType format )\n"
+            "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
+            "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
+            "\n Merkle root can be used to prove that the transaction was included in a block.\n"
+            "\nNOTE: This only works if transaction was already included in a block and the block"
+            "\nwas found. When not specifying \"blockhash\", function will be able to find the block"
+            "\nonly if there is an unspent output in the utxo for this transaction or transaction"
+            "\nindex is maintained (using the -txindex command line option).\n"
+
+            "\nArguments:\n"
+            "1. \"blockhash\"       (string, required) Block in which tx has been mined, the current block if empty string\n"
+            "2. \"txid\"            (string, required) The transaction id\n"
+            "3. \"includeFullTx\"   (bool, optional, default=false) txid if false or whole transaction in hex otherwise\n"
+            "4. \"targetType\"      (string, optional, default=hash) \"hash\", \"header\" or \"merkleroot\"\n"
+            "5. \"format\"          (string, optional, default=json) \"json\" or \"binary is not allowed in this release\"\n"
+
+            "\nResult: (if format is set to \"json\"\n"
+            "{\n"
+            "  \"index\" :          (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
+            "  \"txOrId\" :         (string) txid or whole tx depending on parameter value\"includeFullTx\"\n"
+            "  \"targetType\" :     (string) implicitly \"hash\" if omitted, otherwise \"header\" or \"merkleroot\"\n"
+            "  \"target\" :         (string) Block hash, block header or merkleroot depending on parameter value\"targetType\"\n"
+            "  \"nodes\" :          (json array) Merkle Proof for transaction txOrId as array of nodes\n"
+            "  [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
+            "}\n"
+
+            "\nResult: (if format is set to \"binary\"\n"
+            "\"data\"               (string) the binary form of the result instead of json\n"
+            "\nExamples:\n" <<
+            HelpExampleCli("getmerkleproof2", "\"\" \"txid\"") <<
+            HelpExampleRpc("getmerkleproof2", "\"blockhash\", \"txid\"");
+
+        return msg.str();
+    };
+
+    // preliminary requirements
+
+    if (request.fHelp)
+        throw std::runtime_error (message_to_user (""));
+
+    size_t const n = request.params.size();
+    std::ostringstream hints;
+
+    if (n < 2 || n > 5)
+    {
+        hints << "Number of inputs is " << n << ",  must be between 2 and 5\n";
+        throw std::runtime_error(message_to_user(hints.str()));
+    }
+
+    // retrive transactionid first (second param)
+    TxId txid = TxId(ParseHashV(request.params[1], "txid"));
+    std::set<TxId> setTxIds;
+    setTxIds.insert(txid);
+
+    // then get the block hash (first param)
+    std::string const blockHashString = request.params[0].get_str();
+    uint256 const requestedBlockHash = (blockHashString == "") ? uint256{}: uint256S(blockHashString);
+    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds, false);
+    if (blockIndex == nullptr)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
+    }
+
+    // get optional parameters
+    bool const includeFullTx = (request.params.size() > 2) ? request.params[2].get_bool() : false;
+    std::string const targetType =  (request.params.size() > 3) ? request.params[3].get_str() : "hash";
+    std::string const format =  (request.params.size() > 4) ? request.params[4].get_str() : "json";
+
+    // test parameter values
+    if (targetType != "hash" && targetType != "header" && targetType != "merkleroot")
+    {
+        hints << "targetType is '"
+              << targetType
+              << "',  must be 'hash', 'header' or 'merkleroot'\n";
+        throw JSONRPCError(RPC_INVALID_PARAMS, message_to_user (hints.str()));
+    }
+
+    if (format != "json" /* && format != "binary" */) // enable binary in next version
+    {
+        hints << "format is '"
+              << format
+              //<< "',  must be 'json' or 'binary'\n";
+              << "',  must be 'json'\n";
+        throw JSONRPCError(RPC_INVALID_PARAMS, message_to_user (hints.str()));
+    }
+
+    // get merkle proof
+    int32_t currentChainHeight = chainActive.Height();
+    CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
+    if (merkleTree == nullptr)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+    }
+
+    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(txid, true);
+    if (proof.merkleTreeHashes.size() == 0)
+    {
+        // The requested transaction was not found in the block/merkle tree
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+    }
+
+    UniValue merkleProofArray(UniValue::VARR);
+    for (const uint256& node : proof.merkleTreeHashes)
+    {
+        if (node.IsNull())
+            merkleProofArray.push_back("*");
+        else
+            merkleProofArray.push_back(node.GetHex());
+    }
+
+    // build result (only json for now)
+    UniValue callbackDataObject(UniValue::VOBJ);
+    if (format == "json" || true)
+    {
+
+        // index
+        callbackDataObject.pushKV("index", static_cast<uint64_t>(proof.transactionIndex));
+
+        //tx id or tx
+        if (!includeFullTx)
+        {
+            callbackDataObject.pushKV("txOrId", txid.GetHex());
+        }
+        else
+        {
+            CTransactionRef tx;
+            uint256 hashBlock;
+            bool isGenesisEnabled;
+            if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled))
+            {
+                if (fTxIndex)
+                    hints << "No such mempool or blockchain transaction";
+                else
+                    hints << "No such mempool transaction. Use -txindex "
+                             "to enable blockchain transaction queries";
+                hints << ". Use gettransaction for wallet transactions.";
+
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, hints.str());
+            }
+
+            if (!blockHashString.empty())
+                assert(requestedBlockHash == hashBlock);
+
+            CStringWriter writer;
+            EncodeHexTx(*tx, writer, RPCSerializationFlags());
+            std::string hex = writer.MoveOutString();
+            callbackDataObject.pushKV("txOrId", hex);
+        }
+
+        //target
+        if (targetType != "hash")
+            callbackDataObject.pushKV("targetType", targetType);
+        if(targetType == "header") // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
+        {
+            CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+            ssBlock << blockIndex->GetBlockHeader();
+            std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
+            callbackDataObject.pushKV("target", strHex);
+        }
+        else if(targetType == "hash") // Target is block hash as specified by (flags & (0x04 | 0x02)) == 0
+        {
+            callbackDataObject.pushKV("target", blockIndex->GetBlockHash().GetHex());
+        }
+        else //if(targetType == "merkleroot")
+        {
+            callbackDataObject.pushKV("target", blockIndex->GetMerkleRoot().GetHex());
+        }
+
+        // nodes
+        callbackDataObject.pushKV("nodes", merkleProofArray);
+    }
     return callbackDataObject;
 }
 
@@ -1906,6 +2202,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
     { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
     { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
+    { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
     { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
 };
 // clang-format on

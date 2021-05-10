@@ -88,9 +88,9 @@ public:
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
-    bool IsOversized(const Config &config) const;
+    bool IsOversized(const Config &config, uint64_t maxBlockSize) const;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -310,9 +310,9 @@ bool IsBlockLike(const std::string &strCommand);
 /**
  * Return the maximum message size for the given message type.
  */
-uint64_t GetMaxMessageLength(const std::string& command, const Config& config);
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config, uint64_t maxBlockSize);
 
-}; // namespace NetMsgType
+} // namespace NetMsgType
 
 /* Get a vector of all valid message types (see above) */
 const std::vector<std::string> &getAllNetMessageTypes();
@@ -362,16 +362,13 @@ enum ServiceFlags : uint64_t {
  */
 class CAddress : public CService {
 public:
-    CAddress();
+    CAddress() = default;
     explicit CAddress(CService ipIn, ServiceFlags nServicesIn);
 
-    void Init();
-
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
-        if (ser_action.ForRead()) Init();
         int nVersion = s.GetVersion();
         if (s.GetType() & SER_DISK) READWRITE(nVersion);
         if ((s.GetType() & SER_DISK) ||
@@ -385,10 +382,10 @@ public:
 
     // TODO: make private (improves encapsulation)
 public:
-    ServiceFlags nServices;
+    ServiceFlags nServices{NODE_NONE};
 
     // disk and network only
-    unsigned int nTime;
+    unsigned int nTime{100000000};
 };
 
 /** getdata message type flags */
@@ -420,7 +417,7 @@ public:
     CInv() : type(0), hash() {}
     CInv(uint32_t typeIn, const uint256 &hashIn) : type(typeIn), hash(hashIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -482,7 +479,7 @@ public:
     : numberOfFields{2}, maxRecvPayloadLength{maxRecvPayloadLengthIn}, streamPolicies{streamPoliciesIn}
     {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITECOMPACTSIZE(numberOfFields);

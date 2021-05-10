@@ -371,7 +371,7 @@ void CheckSpendCoin(Amount base_value, Amount cache_value,
     GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
-};
+}
 
 BOOST_AUTO_TEST_CASE(coin_spend) {
     /**

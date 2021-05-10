@@ -10,12 +10,15 @@
 #include "init.h"
 #include "addrman.h"
 #include "amount.h"
+#include "block_index_store.h"
+#include "block_index_store_loader.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "compat/sanity.h"
 #include "config.h"
 #include "consensus/validation.h"
 #include "consensus/consensus.h"
+#include "double_spend/dsattempt_handler.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -26,6 +29,7 @@
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
+#include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
@@ -34,7 +38,6 @@
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "timedata.h"
-#include "torcontrol.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "txn_validation_config.h"
@@ -62,6 +65,8 @@
 #ifndef WIN32
 #include <signal.h>
 #endif
+
+#include "compiler_warnings.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -134,14 +139,11 @@ task::CCancellationToken GetShutdownToken()
     return shutdownSource->GetToken();
 }
 
-static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
-
 void Interrupt(boost::thread_group &threadGroup) {
     InterruptHTTPServer();
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
-    InterruptTorControl();
     if (g_connman) g_connman->Interrupt();
     threadGroup.interrupt_all();
 }
@@ -188,7 +190,6 @@ void Shutdown() {
     // using it before that
     ShutdownScriptCheckQueues();
 
-    StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater &&
         gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
@@ -237,17 +238,8 @@ void Shutdown() {
     }
     vpwallets.clear();
 #endif
-    globalVerifyHandle.reset();
-    ECC_Stop();
 
-    {
-        // Free block headers
-        LOCK(cs_main);
-        for(const auto& block : mapBlockIndex) {
-            delete block.second;
-        }
-        mapBlockIndex.clear();
-    }
+    BlockIndexStoreLoader(mapBlockIndex).ForceClear();
 
     LogPrintf("%s: done\n", __func__);
 }
@@ -539,6 +531,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+
+    /** Block download */
     strUsage += HelpMessageOpt("-blockstallingmindownloadspeed=<n>",
         strprintf(_("Minimum average download speed (Kbytes/s) we will allow a stalling "
                     "peer to fall to during IBD. A value of 0 means stall detection is "
@@ -550,7 +544,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt("-blockdownloadwindow=<n>",
             strprintf(_("Size of block download window before considering we may be stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
+        strUsage += HelpMessageOpt("-blockdownloadslowfetchtimeout=<n>",
+            strprintf(_("Number of seconds to wait for a block to be received before triggering "
+                        "a slow fetch timeout (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT));
+        strUsage += HelpMessageOpt("-blockdownloadmaxparallelfetch=<n>",
+            strprintf(_("Maximum number of parallel requests to different peers we will issue for "
+                        "a block that has exceeded the slow fetch detection timeout (default: %u)"),
+                        DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
     }
+
     strUsage += HelpMessageOpt(
         "-broadcastdelay=<n>",
         strprintf(
@@ -580,10 +582,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-listen", _("Accept connections from outside (default: "
                                     "1 if no -proxy or -connect/-noconnect)"));
-    strUsage += HelpMessageOpt(
-        "-listenonion",
-        strprintf(_("Automatically create Tor hidden service (default: %d)"),
-                  DEFAULT_LISTEN_ONION));
     strUsage += HelpMessageOpt(
         "-maxconnections=<n>",
         strprintf(_("Maintain at most <n> connections to peers (default: %u)"),
@@ -625,14 +623,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("(available policies: %s, default: %s)"),
         StreamPolicyFactory{}.GetAllPolicyNamesStr(), DEFAULT_STREAM_POLICY_LIST));
 
-    strUsage +=
-        HelpMessageOpt("-onion=<ip:port>",
-                       strprintf(_("Use separate SOCKS5 proxy to reach peers "
-                                   "via Tor hidden services (default: %s)"),
-                                 "-proxy"));
     strUsage += HelpMessageOpt(
         "-onlynet=<net>",
-        _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"));
+        _("Only connect to nodes in network <net> (ipv4 or ipv6)"));
     strUsage +=
         HelpMessageOpt("-permitbaremultisig",
                        strprintf(_("Relay non-P2SH multisig (default: %d)"),
@@ -662,8 +655,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
     strUsage += HelpMessageOpt(
         "-proxyrandomize",
-        strprintf(_("Randomize credentials for every proxy connection. This "
-                    "enables Tor stream isolation (default: %d)"),
+        strprintf(_("Randomize credentials for every proxy connection. (default: %d)"),
                   DEFAULT_PROXYRANDOMIZE));
     strUsage += HelpMessageOpt(
         "-seednode=<ip>",
@@ -672,12 +664,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-timeout=<n>", strprintf(_("Specify connection timeout in "
                                     "milliseconds (minimum: 1, default: %d)"),
                                   DEFAULT_CONNECT_TIMEOUT));
-    strUsage += HelpMessageOpt("-torcontrol=<ip>:<port>",
-                               strprintf(_("Tor control port to use if onion "
-                                           "listening enabled (default: %s)"),
-                                         DEFAULT_TOR_CONTROL));
-    strUsage += HelpMessageOpt("-torpassword=<pass>",
-                               _("Tor control port password (default: empty)"));
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage +=
@@ -794,14 +780,19 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                        "height in the main chain (default: %u)",
                                        DEFAULT_STOPATHEIGHT));
         strUsage += HelpMessageOpt(
+            "-streamsendratelimit=<n>",
+            strprintf(_("Specify stream sending bandwidth upper rate limit in bytes/sec. "
+                "A negative value means no limit. (default: %d)"),
+                Stream::DEFAULT_SEND_RATE_LIMIT));
+        strUsage += HelpMessageOpt(
             "-limitancestorcount=<n>",
-            strprintf("Do not accept transactions if number of in-mempool "
-                      "ancestors is <n> or more (default: %u)",
+            strprintf("Do not accept transactions if maximum height of in-mempool "
+                      "ancestor chain is <n> or more (default: %lu)",
                       DEFAULT_ANCESTOR_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitcpfpgroupmemberscount=<n>",
             strprintf("Do not accept transactions if number of in-mempool transactions "
-                      "which we are not willing to mine due to a low fee is <n> or more (default: %u)",
+                      "which we are not willing to mine due to a low fee is <n> or more (default: %lu)",
                       DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
     strUsage += HelpMessageOpt(
@@ -909,10 +900,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                 config.GetAcceptNonStandardOutput(true)));
         strUsage += HelpMessageOpt(
             "-dustrelayfee=<amt>",
-            strprintf("Fee rate (in %s/kB) used to defined dust, the value of "
-                      "an output such that it will cost about 1/3 of its value "
-                      "in fees at this fee rate to spend it. (default: %s)",
+            strprintf("Fee rate (in %s/kB) used to define dust. A transaction output paying less than "
+                      "(dustlimitfactor * output_dust_fee / 100) is considered dust. "
+                      "The output_dust_fee is calculated from the outputsize and "
+                      "the dustrelayfee. (default: %s)",
                       CURRENCY_UNIT, FormatMoney(DUST_RELAY_TX_FEE)));
+        strUsage += HelpMessageOpt(
+                "-dustlimitfactor=<n>",
+                strprintf(_("The dust limit factor (a value in percent) is applied to the dust relay fee to determine if an output is dust. "
+                            "Default value is %ld%%, minimum value is 0%%, maximum value is %ld%% "), DEFAULT_DUST_LIMIT_FACTOR, DEFAULT_DUST_LIMIT_FACTOR));
     }
     strUsage += HelpMessageOpt(
         "-datacarrier",
@@ -952,7 +948,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             _("Set the single standard transaction validation duration threshold in"
               " milliseconds after which the standard transaction validation will"
               " terminate with error and the transaction is not accepted to"
-              " mempool (min 5ms, default: %dms)"),
+              " mempool (min 1ms, default: %dms)"),
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()));
 
     strUsage += HelpMessageOpt(
@@ -963,6 +959,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               " terminate with error and the transaction is not accepted to"
               " mempool (min 10ms, default: %dms)"),
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()));
+
+    strUsage += HelpMessageOpt(
+        "-maxtxchainvalidationbudget=<n>",
+        strprintf(
+            _("Set the upper limit of unused validation time to add to the next transaction validated in the chain "
+              "(min 0ms, default: %dms)"),
+            DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()));
+
+    strUsage +=
+        HelpMessageOpt("-validationclockcpu",
+                       strprintf(_("Use CPU time instead of wall clock time for validation duration measurement (default: %d)"
+#ifndef BOOST_CHRONO_HAS_THREAD_CLOCK
+                                   " WARNING: this platform does not have CPU clock."
+#endif
+                                   ),
+                                 DEFAULT_VALIDATION_CLOCK_CPU));
 
     strUsage +=
         HelpMessageOpt("-maxtxsizepolicy=<n>",
@@ -1163,10 +1175,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "transactions in memory (default: %u MB). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
           COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
-        "-maxcollectedoutpoints=<n>",
-        strprintf(_("Keep at most <n> collected "
-                    "outpoints in memory (default: %u)"),
-            COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS));
+        "-maxorphansinbatchpercent=<n>",
+        strprintf(_("Maximal number of orphans scheduled for re-validation as percentage of max batch size. "
+                    "(1 to 100, default:%lu)"),
+            COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH));
+    strUsage += HelpMessageOpt(
+        "-maxinputspertransactionoutoffirstlayerorphan=<n>",
+        strprintf(_("Maximal number of inputs of a non-first-layer transaction that can be scheduled for re-validation. "
+                    "(default:%lu)"),
+            COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION));
 
     /** TxnValidator */
     strUsage += HelpMessageGroup(_("TxnValidator options:"));
@@ -1262,6 +1279,64 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-recvinvqueuefactor=<n>",
         strprintf("Set maximum number of full size inventory messages that we can store for each peer (default %d). Inventory message size can be set with -maxprotocolrecvpayloadlength. "
           "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
+
+    /** Double-Spend detection/reporting */
+    strUsage += HelpMessageGroup(_("Double-Spend detection options:"));
+    strUsage += HelpMessageOpt(
+        "-dsnotifylevel",
+        strprintf(_("Set how this node should handle double-spend notification sending. The options are: 0 Send no notifications, "
+                    "1 Send notifications only for standard transactions, 2 Send notifications for all transactions. (default %d)"),
+            static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)));
+    strUsage += HelpMessageOpt(
+        "-dsendpointfasttimeout=<n>",
+        strprintf(_("Timeout in seconds for high priority communications with a double-spend reporting endpoint (default: %u)"),
+            rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT));
+    strUsage += HelpMessageOpt(
+        "-dsendpointslowtimeout=<n>",
+        strprintf(_("Timeout in seconds for low priority communications with a double-spend reporting endpoint (default: %u)"),
+            rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT));
+    strUsage += HelpMessageOpt(
+        "-dsendpointslowrateperhour=<n>",
+        strprintf(_("The allowable number of timeouts per hour on a rolling basis to a double-spend reporting endpoint before "
+                    "we temporarily assume that endpoint is consistently slow and direct all communications for it to the "
+                    "slow / low priority queue. Must be between 1 and 60 (default: %u)"),
+            DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR));
+    if (showDebug) {
+        strUsage += HelpMessageOpt(
+            "-dsendpointport=<n>",
+            strprintf(_("Port to connect to double-spend reporting endpoint on (default: %u)"),
+                rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT));
+        strUsage += HelpMessageOpt(
+            "-dsendpointblacklistsize=<n>",
+            strprintf(_("Limits the maximum number of entries stored in the bad double-spend reporting endpoint server blacklist (default: %u)"),
+                DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE));
+    }
+    strUsage += HelpMessageOpt(
+        "-dsendpointskiplist=<list of ips>",
+        "A comma separated list of IP addresses for double-spend endpoints we should skip sending notifications to. This can be useful if (for example) "
+        "we are running a mAPI node locally which will already be receiving double-spend notification via ZMQ, then we don't need to also send such "
+        "notifications via HTTP.");
+    strUsage += HelpMessageOpt(
+        "-dsattempttxnremember=<n>",
+        strprintf(_("Limits the maximum number of previous double-spend transactions the node remembers. Setting this high uses more memory and is slower, "
+                    "setting it low increases the chances we may unnecessarily process and re-report duplicate double-spent transactions (default: %u)"),
+            DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT));
+    strUsage += HelpMessageOpt(
+        "-dsattemptnumfastthreads=<n>",
+        strprintf(_("Number of threads available for processing high priority double-spend notifications. Note that each additional thread also "
+            "requires a small amount of disk space for serialising transactions to. (default: %u, maximum: %u)"),
+            DSAttemptHandler::DEFAULT_NUM_FAST_THREADS, DSAttemptHandler::MAX_NUM_THREADS));
+    strUsage += HelpMessageOpt(
+        "-dsattemptnumslowthreads=<n>",
+        strprintf(_("Number of threads available for processing low priority double-spend notifications. Note that each additional thread also "
+            "requires a small amount of disk space for serialising transactions to. (default: %u, maximum: %u)"),
+            DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS, DSAttemptHandler::MAX_NUM_THREADS));
+    strUsage += HelpMessageOpt(
+        "-dsattemptqueuemaxmemory=<n>",
+        strprintf(_("Maximum memory usage for the queue of detected double-spend transactions (default: %uMB). "
+                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
+
     return strUsage;
 }
 
@@ -1392,11 +1467,11 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         // hardcoded $DATADIR/bootstrap.dat
         fs::path pathBootstrap = GetDataDir() / "bootstrap.dat";
         if (fs::exists(pathBootstrap)) {
-            FILE *file = fsbridge::fopen(pathBootstrap, "rb");
+            UniqueCFile file{ fsbridge::fopen(pathBootstrap, "rb") };
             if (file) {
                 fs::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
                 LogPrintf("Importing bootstrap.dat...\n");
-                LoadExternalBlockFile(config, file);
+                LoadExternalBlockFile(config, std::move(file));
                 RenameOver(pathBootstrap, pathBootstrapOld);
             } else {
                 LogPrintf("Warning: Could not open bootstrap file %s\n",
@@ -1406,10 +1481,10 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
 
         // -loadblock=
         for (const fs::path &path : vImportFiles) {
-            FILE *file = fsbridge::fopen(path, "rb");
+            UniqueCFile file{ fsbridge::fopen(path, "rb") };
             if (file) {
                 LogPrintf("Importing blocks file %s...\n", path.string());
-                LoadExternalBlockFile(config, file);
+                LoadExternalBlockFile(config, std::move(file));
             } else {
                 LogPrintf("Warning: Could not open blocks file %s\n",
                           path.string());
@@ -1540,10 +1615,6 @@ void InitParameterInteraction() {
             LogPrintf(
                 "%s: parameter interaction: -listen=0 -> setting -discover=0\n",
                 __func__);
-        if (gArgs.SoftSetBoolArg("-listenonion", false))
-            LogPrintf("%s: parameter interaction: -listen=0 -> setting "
-                      "-listenonion=0\n",
-                      __func__);
     }
 
     if (gArgs.IsArgSet("-externalip")) {
@@ -1609,7 +1680,7 @@ ServiceFlags nLocalServices = NODE_NETWORK;
 
     // The log was successful, terminate now.
     std::terminate();
-};
+}
 
 bool AppInitBasicSetup() {
 // Step 1: setup
@@ -1634,8 +1705,11 @@ bool AppInitBasicSetup() {
 #define PROCESS_DEP_ENABLE 0x00000001
 #endif
     typedef BOOL(WINAPI * PSETPROCDEPPOL)(DWORD);
+    GCC_WARNINGS_PUSH
+    GCC_WARNINGS_IGNORE(-Wcast-function-type)
     PSETPROCDEPPOL setProcDEPPol = (PSETPROCDEPPOL)GetProcAddress(
         GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
+    GCC_WARNINGS_POP
     if (setProcDEPPol != nullptr) setProcDEPPol(PROCESS_DEP_ENABLE);
 #endif
 
@@ -1671,7 +1745,7 @@ bool AppInitBasicSetup() {
     return true;
 }
 
-bool AppInitParameterInteraction(Config &config) {
+bool AppInitParameterInteraction(ConfigInit &config) {
     const CChainParams &chainparams = config.GetChainParams();
     // Step 2: parameter interactions
 
@@ -1753,9 +1827,6 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(
             _("Unsupported argument -socks found. Setting SOCKS version isn't "
               "possible anymore, only SOCKS5 proxies are supported."));
-    // Check for -tor - as this is a privacy risk to continue, exit here
-    if (gArgs.GetBoolArg("-tor", false))
-        return InitError(_("Unsupported argument -tor found, use -onion."));
 
     if (gArgs.GetBoolArg("-benchmark", false))
         InitWarning(
@@ -1859,6 +1930,20 @@ bool AppInitParameterInteraction(Config &config) {
     if (std::string err; !config.SetMaxOrphanTxSize(
         gArgs.GetArgAsBytes("-maxorphantxsize",
             COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+    
+    if (std::string err; !config.SetMaxOrphansInBatchPercentage(
+        gArgs.GetArg("-maxorphansinbatchpercent",
+            COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH), &err))
+    {
+        return InitError(err);
+    }
+
+    if (std::string err; !config.SetMaxInputsForSecondLayerOrphan(
+        gArgs.GetArgAsBytes("-maxinputspertransactionoutoffirstlayerorphan",
+            COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION), &err))
     {
         return InitError(err);
     }
@@ -2050,8 +2135,31 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
+    // Block download
+    if(std::string err; !config.SetBlockStallingMinDownloadSpeed(gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockStallingTimeout(gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadWindow(gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadSlowFetchTimeout(gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadMaxParallelFetch(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH), &err)) {
+        return InitError(err);
+    }
+
     // P2P parameters
     if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetStreamSendRateLimit(gArgs.GetArg("-streamsendratelimit", Stream::DEFAULT_SEND_RATE_LIMIT), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBanScoreThreshold(gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), &err)) {
         return InitError(err);
     }
 
@@ -2152,6 +2260,23 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxTxnChainValidationBudget(
+        gArgs.GetArg(
+            "-maxtxchainvalidationbudget",
+            DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
+    config.SetValidationClockCPU(gArgs.GetBoolArg("-validationclockcpu", DEFAULT_VALIDATION_CLOCK_CPU));
+#ifndef BOOST_CHRONO_HAS_THREAD_CLOCK
+    if (config.GetValidationClockCPU()) {
+        return InitError(
+            strprintf("validationclockcpu enabled on a platform with no CPU clock. Start with -validationclockcpu=0 -maxstdtxvalidationduration=10"));
+    }
+#endif
+
     if (!(config.GetMaxStdTxnValidationDuration() < config.GetMaxNonStdTxnValidationDuration())) {
         return InitError(
             strprintf("maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration"));
@@ -2183,6 +2308,62 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
 
+    // Double-Spend processing parameters
+    if(std::string err; !config.SetDoubleSpendNotificationLevel(
+        gArgs.GetArg("-dsnotifylevel", static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointFastTimeout(
+        gArgs.GetArg("-dsendpointfasttimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointSlowTimeout(
+        gArgs.GetArg("-dsendpointslowtimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointSlowRatePerHour(
+        gArgs.GetArg("-dsendpointslowrateperhour", DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointPort(
+        gArgs.GetArg("-dsendpointport", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointBlacklistSize(
+        gArgs.GetArg("-dsendpointblacklistsize", DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointSkipList(gArgs.GetArg("-dsendpointskiplist", ""), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendTxnRemember(
+        gArgs.GetArg("-dsattempttxnremember", DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendNumFastThreads(
+        gArgs.GetArg("-dsattemptnumfastthreads", DSAttemptHandler::DEFAULT_NUM_FAST_THREADS), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendNumSlowThreads(
+        gArgs.GetArg("-dsattemptnumslowthreads", DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendQueueMaxMemory(
+        gArgs.GetArgAsBytes("-dsattemptqueuemaxmemory", DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY, ONE_MEBIBYTE), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -2206,6 +2387,20 @@ bool AppInitParameterInteraction(Config &config) {
         config.SetMinFeePerKB(CFeeRate(n));
     } else {
         config.SetMinFeePerKB(CFeeRate(DEFAULT_MIN_RELAY_TX_FEE));
+    }
+
+    // Dust limit is expressed as a multiple in percent of the dust relay fee applied to
+    // an output.
+    if (gArgs.IsArgSet("-dustlimitfactor")) {
+        Amount n(0);
+        auto factor = gArgs.GetArg("-dustlimitfactor", DEFAULT_DUST_LIMIT_FACTOR);
+
+        if (std::string err; !config.SetDustLimitFactor(factor, &err))
+        {
+            return InitError(err);
+        }
+    } else {
+        config.SetDustLimitFactor(DEFAULT_DUST_LIMIT_FACTOR);
     }
 
     // Sanity check argument for min fee for including tx in block
@@ -2414,8 +2609,6 @@ bool AppInitSanityChecks() {
     std::string sha256_algo = SHA256AutoDetect();
     LogPrintf("Using the '%s' SHA256 implementation\n", sha256_algo);
     RandomInit();
-    ECC_Start();
-    globalVerifyHandle.reset(new ECCVerifyHandle());
 
     // Sanity check
     if (!InitSanityCheck()) {
@@ -2503,7 +2696,7 @@ static size_t GetMaxNumberOfMerkleTreeThreads()
     return numberOfMerkleTreeCalculationThreads;
 }
 
-bool AppInitMain(Config &config, boost::thread_group &threadGroup,
+bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                  CScheduler &scheduler, const task::CCancellationToken& shutdownToken) {
     const CChainParams &chainparams = config.GetChainParams();
     // Step 4a: application initialization
@@ -2659,7 +2852,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // -noproxy (or -proxy=0) as well as the empty string can be used to not set
     // a proxy, this is the default
     std::string proxyArg = gArgs.GetArg("-proxy", "");
-    SetLimited(NET_TOR);
+
     if (proxyArg != "" && proxyArg != "0") {
         CService resolved(LookupNumeric(proxyArg.c_str(), 9050));
         proxyType addrProxy = proxyType(resolved, proxyRandomize);
@@ -2670,31 +2863,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
         SetProxy(NET_IPV4, addrProxy);
         SetProxy(NET_IPV6, addrProxy);
-        SetProxy(NET_TOR, addrProxy);
         SetNameProxy(addrProxy);
-        SetLimited(NET_TOR, false); // by default, -proxy sets onion as
-                                    // reachable, unless -noonion later
-    }
-
-    // -onion can be used to set only a proxy for .onion, or override normal
-    // proxy for .onion addresses.
-    // -noonion (or -onion=0) disables connecting to .onion entirely. An empty
-    // string is used to not override the onion proxy (in which case it defaults
-    // to -proxy set above, or none)
-    std::string onionArg = gArgs.GetArg("-onion", "");
-    if (onionArg != "") {
-        if (onionArg == "0") {   // Handle -noonion/-onion=0
-            SetLimited(NET_TOR); // set onions as unreachable
-        } else {
-            CService resolved(LookupNumeric(onionArg.c_str(), 9050));
-            proxyType addrOnion = proxyType(resolved, proxyRandomize);
-            if (!addrOnion.IsValid()) {
-                return InitError(
-                    strprintf(_("Invalid -onion address: '%s'"), onionArg));
-            }
-            SetProxy(NET_TOR, addrOnion);
-            SetLimited(NET_TOR, false);
-        }
     }
 
     // see Step 2: parameter interactions for more information about these
@@ -2871,9 +3040,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way
                 // around).
-                if (!mapBlockIndex.empty() &&
-                    mapBlockIndex.count(
-                        chainparams.GetConsensus().hashGenesisBlock) == 0) {
+                if (mapBlockIndex.Count() &&
+                    mapBlockIndex.Get(
+                        chainparams.GetConsensus().hashGenesisBlock) == nullptr)
+                {
                     return InitError(_("Incorrect or no genesis block found. "
                                        "Wrong datadir for network?"));
                 }
@@ -2939,7 +3109,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     CBlockIndex *tip = chainActive.Tip();
                     RPCNotifyBlockChange(true, tip);
                     if (tip &&
-                        tip->nTime >
+                        tip->GetBlockTime() >
                             GetAdjustedTime() + MAX_FUTURE_BLOCK_TIME) {
                         strLoadError =
                             _("The block database contains a block which "
@@ -3084,14 +3254,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Step 11: start node
 
     //// debug print
-    {
-        LOCK(cs_main);
-        LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
-    }
+    LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.Count());
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
-    if (gArgs.GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
-        StartTorControl(threadGroup, scheduler);
-    }
 
     Discover(threadGroup);
 

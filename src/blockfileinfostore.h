@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "sync.h"
+#include "block_file_info.h"
 #include "chain.h"
 #include "validation.h"
 
@@ -62,20 +63,6 @@ public:
     {
         return cs_LastBlockFile;
     }
-};
-
-
-/** Utility functions for opening disk and block files */
-class CDiskFiles
-{
-    static FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix,
-        bool fReadOnly);
-public:
-    /** Open a block file (blk?????.dat). */
-    static FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-
-    /** Open an undo file (rev?????.dat) */
-    static FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 };
 
 

@@ -103,7 +103,7 @@ protected:
 
 public:
     /** serialization implementation */
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -160,7 +160,7 @@ public:
     class CNotAllExpectedTransactionsFound : public std::exception {};
 
     /** Public only for unit testing and relay testing (not relayed) */
-    std::vector<std::pair<unsigned int, uint256>> vMatchedTxn;
+    std::vector<std::pair<size_t, uint256>> vMatchedTxn;
 
     /**
      * Create from a CBlock, filtering transactions according to filter. Note
@@ -183,7 +183,7 @@ public:
 
     CMerkleBlock() {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

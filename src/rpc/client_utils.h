@@ -36,8 +36,13 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params);
 //
 class CConnectionFailed : public std::runtime_error {
 public:
-    explicit inline CConnectionFailed(const std::string &msg)
-        : std::runtime_error(msg) {}
+    explicit CConnectionFailed(const std::string& msg) : std::runtime_error{msg} {}
+};
+
+// Exception thrown if comm's times out
+class CConnectionTimeout : public CConnectionFailed {
+public:
+    explicit CConnectionTimeout(const std::string& msg) : CConnectionFailed{msg} {}
 };
 
 static const char DEFAULT_RPCCONNECT[] = "127.0.0.1";

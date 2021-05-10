@@ -74,15 +74,25 @@ endif
 .PHONY: FORCE check-symbols check-security
 # bitcoin core #
 BITCOIN_CORE_H = \
+  abort_node.h \
   addrdb.h \
   addrman.h \
   async_file_reader.h \
   base58.h \
   bloom.h \
+  block_hasher.h \
+  block_index.h \
+  block_index_store.h \
+  block_index_store_loader.h \
+  dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
+  block_file_access.h \
+  block_file_info.h \
+  blockindex_with_descendants.h \
   blockstreams.h \
   blockvalidation.h \
+  cfile_util.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -96,12 +106,20 @@ BITCOIN_CORE_H = \
   compat/byteswap.h \
   compat/endian.h \
   compat/sanity.h \
+  compiler_warnings.h \
   compressor.h \
   config.h \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  disk_block_index.h \
+  disk_block_pos.h \
+  disk_tx_pos.h \
+  double_spend/dsattempt_handler.h \
+  double_spend/dscallback_msg.h \
+  double_spend/dstxn_serialiser.h \
+  double_spend/time_limited_blacklist.h \
   dstencode.h \
   enum_cast.h \
   fs.h \
@@ -115,14 +133,17 @@ BITCOIN_CORE_H = \
   key.h \
   keystore.h \
   dbwrapper.h \
+  leaky_bucket.h \
   limitedmap.h \
   locked_ref.h \
   logging.h \
   memusage.h \
   mempooltxdb.h \
   merkleblock.h \
+  merkletree.h \
   merkletreedb.h \
   merkletreestore.h \
+  metrics.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -133,12 +154,14 @@ BITCOIN_CORE_H = \
   mining/journaling_block_assembler.h \
   net/association.h \
   net/association_id.h \
+  net/block_download_tracker.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \
   net/net_message.h \
   net/net_processing.h \
   net/net_types.h \
+  net/node_state.h \
   net/node_stats.h \
   net/send_queue_bytes.h \
   net/stream.h \
@@ -150,6 +173,7 @@ BITCOIN_CORE_H = \
   policy/fees.h \
   policy/policy.h \
   pow.h \
+  processing_block_index.h \
   protocol.h \
   random.h \
   reverselock.h \
@@ -193,7 +217,6 @@ BITCOIN_CORE_H = \
   threadinterrupt.h \
   timedata.h \
   time_locked_mempool.h \
-  torcontrol.h \
   txdb.h \
   txhasher.h \
   txmempool.h \
@@ -245,14 +268,18 @@ libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
+  abort_node.cpp \
   addrman.cpp \
   addrdb.cpp \
   bloom.cpp \
+  block_index.cpp \
   blockencodings.cpp \
+  block_file_info.cpp \
   blockfileinfostore.cpp \
+  block_file_access.cpp \
+  block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
-  config.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -260,8 +287,12 @@ libbitcoin_server_a_SOURCES = \
   invalid_txn_sinks/file_sink.cpp \
   invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
+  double_spend/dsattempt_handler.cpp \
+  double_spend/dscallback_msg.cpp \
+  double_spend/dstxn_serialiser.cpp \
   mempooltxdb.cpp \
   merkleblock.cpp \
+  merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
   mining/assembler.cpp \
@@ -274,9 +305,11 @@ libbitcoin_server_a_SOURCES = \
   mining/journaling_block_assembler.cpp \
   net/association.cpp \
   net/association_id.cpp \
+  net/block_download_tracker.cpp \
   net/net.cpp \
   net/net_message.cpp \
   net/net_processing.cpp \
+  net/node_state.cpp \
   net/stream.cpp \
   net/stream_policy.cpp \
   net/stream_policy_factory.cpp \
@@ -285,6 +318,7 @@ libbitcoin_server_a_SOURCES = \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
+  processing_block_index.cpp \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
@@ -299,7 +333,6 @@ libbitcoin_server_a_SOURCES = \
   script/ismine.cpp \
   timedata.cpp \
   time_locked_mempool.cpp \
-  torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
   txmempoolevictioncandidates.cpp \
@@ -374,10 +407,13 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.h \
   big_int.cpp \
   big_int.h \
+  cfile_util.cpp \
+  cfile_util.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
   consensus/validation.h \
+  ecc_guard.h \
   hash.cpp \
   hash.h \
   prevector.h \
@@ -476,6 +512,7 @@ endif
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
+  cfile_util.cpp \
   rpc/client.cpp \
   rpc/client_config.cpp \
   rpc/client_utils.cpp \
@@ -495,6 +532,7 @@ endif
 
 bitcoind_LDADD = \
   $(LIBBITCOIN_SERVER) \
+  $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_COMMON) \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_UTIL) \

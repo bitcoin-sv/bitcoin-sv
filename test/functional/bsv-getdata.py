@@ -56,7 +56,9 @@ class GetDataTest(BitcoinTestFramework):
             wait_until(lambda: known_hash in receivedBlocks)
             # previously requested unknown block is not in the received list
             assert_equal(unknown_hash not in receivedBlocks, True)
-            assert_equal(len(receivedBlocks), 1)
+            # python automatically sends GETDATA for INV that it receives
+            # this means we can receive more blocks than just the one previously requested
+            assert_equal(len(receivedBlocks) >= 1, True)
 
             # 3. Check that sending GETDATA of unknown transaction returns NOTFOUND message.
             connection.cb.send_message(msg_getdata([CInv(CInv.TX, unknown_hash)]))

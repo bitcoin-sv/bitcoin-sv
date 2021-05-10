@@ -7,6 +7,7 @@
 #include <version.h>
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace rpc::client
@@ -19,12 +20,17 @@ class HTTPResponse
 {
   public:
     HTTPResponse() = default;
+    HTTPResponse(const std::vector<std::string>& expectedHeaders) : mExpectedHeaders{expectedHeaders} {}
     virtual ~HTTPResponse() = default;
 
     void SetStatus(int status) { mStatus = status; };
     void SetError(int error) { mError = error; }
     int GetStatus() const { return mStatus; }
     int GetError() const { return mError; }
+
+    const std::vector<std::string>& GetExpectedHeaders() const { return mExpectedHeaders; }
+    const std::unordered_map<std::string, std::string>& GetHeaders() const { return mHeaders; }
+    void SetHeaderValue(const std::string& header, const std::string& value) { mHeaders[header] = value; }
 
     virtual void SetBody(const unsigned char* body, size_t size) = 0;
     virtual bool IsEmpty() const = 0;
@@ -33,6 +39,9 @@ class HTTPResponse
 
     int mStatus {0};
     int mError  {0};
+
+    std::vector<std::string> mExpectedHeaders {};
+    std::unordered_map<std::string, std::string> mHeaders {};
 };
 
 /**
@@ -41,6 +50,9 @@ class HTTPResponse
 class StringHTTPResponse : public HTTPResponse
 {
   public:
+    StringHTTPResponse() = default;
+    StringHTTPResponse(const std::vector<std::string>& expectedHeaders) : HTTPResponse{expectedHeaders} {}
+
     const std::string& GetBody() const { return mBody; }
 
     void SetBody(const unsigned char* body, size_t size) override;
@@ -56,6 +68,9 @@ class StringHTTPResponse : public HTTPResponse
 class BinaryHTTPResponse : public HTTPResponse
 {
   public:
+    BinaryHTTPResponse() = default;
+    BinaryHTTPResponse(const std::vector<std::string>& expectedHeaders) : HTTPResponse{expectedHeaders} {}
+
     const std::vector<uint8_t>& GetBody() const { return mBody; }
 
     void SetBody(const unsigned char* body, size_t size) override;

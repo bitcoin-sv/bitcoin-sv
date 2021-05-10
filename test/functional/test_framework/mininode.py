@@ -28,7 +28,6 @@ from collections import defaultdict
 import copy
 import hashlib
 from contextlib import contextmanager
-from enum import Enum
 from io import BytesIO
 import logging
 import random
@@ -41,8 +40,8 @@ from threading import RLock, Thread
 import uuid
 
 from test_framework.siphash import siphash256
-from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB
 from test_framework.util import hex_str_to_bytes, bytes_to_hex_str, wait_until
+from test_framework.streams import StreamType
 
 BIP0031_VERSION = 60000
 MY_VERSION = 70015 # INVALID_CB_NO_BAN_VERSION
@@ -62,15 +61,6 @@ NODE_BLOOM = (1 << 2)
 NODE_WITNESS = (1 << 3)
 NODE_XTHIN = (1 << 4)
 NODE_BITCOIN_CASH = (1 << 5)
-
-# Stream types enumeration
-class StreamType(Enum):
-    UNKNOWN = 0
-    GENERAL = 1
-    DATA1 = 2
-    DATA2 = 3
-    DATA3 = 4
-    DATA4 = 5
 
 # Howmuch data will be read from the network at once
 READ_BUFFER_SIZE = 8192
@@ -158,6 +148,25 @@ def deser_compact_size(f):
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
     return nit
+
+
+def ser_varint(v):
+    r = b""
+    length = 0
+    while True:
+        r += struct.pack("<B", (v & 0x7F) | (0x80 if length > 0 else 0x00))
+        if(v <= 0x7F):
+            return r[::-1] # Need as little-endian
+        v = (v >> 7) - 1
+        length += 1
+
+def deser_varint(f):
+    ntot = 0
+    while True:
+        n = struct.unpack("<B", f.read(1))[0]
+        ntot = (n << 7) | (n & 0x7F)
+        if((n & 0x80) == 0):
+            return ntot
 
 
 def deser_string(f):
@@ -258,6 +267,22 @@ def deser_int_vector(f):
 @generator_based_serializator
 def ser_int_vector(l):
     return (struct.pack("<i", i) for i in l)
+
+
+def deser_varint_vector(f):
+    nit = deser_varint(f)
+    r = []
+    for i in range(nit):
+        t = deser_varint(f)
+        r.append(t)
+    return r
+
+def ser_varint_vector(l):
+    r = ser_varint(len(l))
+    for v in l:
+        r += ser_varint(v)
+    return r
+
 
 # Deserialize from a hex string representation (eg from RPC)
 
@@ -443,6 +468,12 @@ class COutPoint():
             ser_uint256(self.hash),
             struct.pack("<I", self.n),))
         return r
+
+    def __hash__(self):
+        return self.hash + self.n
+
+    def __eq__(self, other):
+        return self.n == other.n and self.hash == other.hash
 
     def __repr__(self):
         return "COutPoint(hash=%064x n=%i)" % (self.hash, self.n)
@@ -881,6 +912,54 @@ class HeaderAndShortIDs():
     def __repr__(self):
         return "HeaderAndShortIDs(header=%s, nonce=%d, shortids=%s, prefilledtxn=%s" % (repr(self.header), self.nonce, repr(self.shortids), repr(self.prefilled_txn))
 
+# callback message for dsnt-enabled transactions
+class CallbackMessage():
+
+    # 127.0.0.1 as network-order bytes
+    LOCAL_HOST_IP = 0x7F000001
+    MAX_INT64 = 0xFFFFFFFFFFFFFFFF
+    IPv6_version = 129
+    IPv4_version = 1
+
+    def __init__(self, version=1, ip_addresses=[LOCAL_HOST_IP], inputs=[0]):
+        self.version = version
+        self.ip_addresses = ip_addresses
+        self.ip_address_count = len(ip_addresses)
+        self.inputs = inputs
+
+    def ser_addrs(self, addrs):
+        rs = b""
+        for addr in addrs:
+            if (self.version == self.IPv6_version):
+                rs += struct.pack('>QQ', (addr >> 64) & self.MAX_INT64, addr & self.MAX_INT64)
+            else:
+                rs += struct.pack("!I", addr)
+        return rs
+
+    def deser_addrs(self, f):
+        addrs = []
+        for i in range(self.ip_address_count):
+            if (self.version == self.IPv6_version):
+                a, b = struct.unpack('>QQ', f.read(16))
+                unpacked = (a << 64) | b
+                addrs.append(unpacked)
+            else:
+                addrs.append(struct.unpack("!I", f.read(4))[0])
+        return addrs
+
+    def deserialize(self, f):
+        self.version = struct.unpack("<B", f.read(1))[0]
+        self.ip_address_count = deser_compact_size(f)
+        self.ip_addresses = self.deser_addrs(f)
+        self.inputs = deser_varint_vector(f)
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<B", self.version)
+        r += ser_compact_size(self.ip_address_count)
+        r += self.ser_addrs(self.ip_addresses)
+        r += ser_varint_vector(self.inputs)
+        return r
 
 class BlockTransactionsRequest():
 
@@ -1701,7 +1780,7 @@ class NodeConnCB():
         def test_function(): return self.last_message.get("getheaders")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
-    def wait_for_inv(self, expected_inv, timeout=60):
+    def wait_for_inv(self, expected_inv, timeout=60, check_interval=0.05):
         """Waits for an INV message and checks that the first inv object in the message was as expected."""
         if len(expected_inv) > 1:
             raise NotImplementedError(
@@ -1710,7 +1789,7 @@ class NodeConnCB():
         def test_function(): return self.last_message.get("inv") and \
             self.last_message["inv"].inv[0].type == expected_inv[0].type and \
             self.last_message["inv"].inv[0].hash == expected_inv[0].hash
-        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+        wait_until(test_function, timeout=timeout, lock=mininode_lock, check_interval=check_interval)
 
     def wait_for_verack(self, timeout=60):
         def test_function(): return self.message_count["verack"]
@@ -2015,6 +2094,8 @@ def StopNetworkThread():
 
 class NetworkThread(Thread):
 
+    poll_timeout = 0.1
+
     def run(self):
         while mininode_socket_map and not NetworkThread_should_stop:
             with network_thread_loop_intent_lock:
@@ -2035,7 +2116,7 @@ class NetworkThread(Thread):
                         disconnected.append(obj)
                 [obj.handle_close() for obj in disconnected]
                 try:
-                    asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+                    asyncore.loop(NetworkThread.poll_timeout, use_poll=True, map=mininode_socket_map, count=1)
                 except Exception as e:
                     # All exceptions are caught to prevent them from taking down the network thread.
                     # Since the error cannot be easily reported, it is just logged assuming that if

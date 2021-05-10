@@ -6,7 +6,9 @@
 #include "chainparams.h"
 #include "config.h"
 #include "consensus/merkle.h"
+#include "pow.h"
 #include "random.h"
+#include "merkletree.h"
 
 #include "mempool_test_access.h"
 
@@ -167,7 +169,7 @@ public:
         return base.GetShortID(txhash);
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

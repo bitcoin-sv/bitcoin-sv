@@ -125,6 +125,13 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"getminingcandidate", 0, "coinbase"},
     {"getblockbyheight", 0, "height"},
     {"verifymerkleproof", 0, "proof"},
+    {"softrejectblock", 1, "numblocks"},
+    {"acceptblock", 1, "numblocks"},
+    {"getsoftrejectedblocks", 0, "onlymarked"},
+    {"verifyscript", 0, "scripts"},
+    {"verifyscript", 1, "stopOnFirstInvalid"},
+    {"verifyscript", 2, "totalTimeout"},
+    {"getmerkleproof2",2,"includeFullTx"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},
@@ -234,7 +241,8 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 
     // Call RPC
     rpc::client::RPCClient client { config };
-    client.SubmitRequest(rpc::client::HTTPRequest::CreateJSONRPCRequest(config, strMethod, params), &response);
+    rpc::client::HTTPRequest request { rpc::client::HTTPRequest::CreateJSONRPCRequest(config, strMethod, params) };
+    client.SubmitRequest(request, &response);
 
     // Extract response
     UniValue valReply { UniValue::VSTR };

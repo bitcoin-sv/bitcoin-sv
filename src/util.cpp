@@ -123,8 +123,8 @@ public:
         OPENSSL_no_config();
 
 #ifdef WIN32
-        // Seed OpenSSL PRNG with current contents of the screen.
-        RAND_screen();
+        // Seed OpenSSL PRNG using random input obtained from polling various trusted entropy sources
+        RAND_poll();
 #endif
 
         // Seed OpenSSL PRNG with performance counter.
@@ -700,10 +700,18 @@ void runCommand(const std::string &strCommand) {
                   nErr);
 }
 
-thread_local std::string threadName;
+static std::string& ThreadName()
+{
+    // Declare the thread-local variable inside this function so that it's
+    // predictably initialized the first time control enters the function
+    // in any thread.
+    static thread_local std::string threadName {};
+    return threadName;
+}
+
 void RenameThread(const char *name)
 {
-    threadName = name;
+    ThreadName() = name;
 #if defined(PR_SET_NAME)
     // Only the first 15 characters are used (16 - NUL terminator)
     ::prctl(PR_SET_NAME, name, 0, 0, 0);
@@ -720,6 +728,7 @@ void RenameThread(const char *name)
 
 std::string GetThreadName()
 {
+    auto& threadName = ThreadName();
     if (threadName.empty()) {
 #ifdef WIN32
         return strprintf("thread-%d", GetCurrentThreadId());

@@ -5,6 +5,8 @@
 
 #include "wallet/wallet.h"
 
+#include "block_file_access.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "checkpoints.h"
 #include "config.h"
@@ -1271,10 +1273,10 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx) {
     LOCK2(cs_main, cs_wallet);
 
     int conflictconfirms = 0;
-    if (mapBlockIndex.count(hashBlock)) {
-        CBlockIndex *pindex = mapBlockIndex[hashBlock];
+    if (auto pindex = mapBlockIndex.Get(hashBlock); pindex)
+    {
         if (chainActive.Contains(pindex)) {
-            conflictconfirms = -(chainActive.Height() - pindex->nHeight + 1);
+            conflictconfirms = -(chainActive.Height() - pindex->GetHeight() + 1);
         }
     }
 
@@ -1716,14 +1718,14 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
  * before CWallet::nTimeFirstKey). Returns null if there is no such range, or
  * the range doesn't include chainActive.Tip().
  */
-CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
+const CBlockIndex *CWallet::ScanForWalletTransactions(const CBlockIndex *pindexStart,
                                                 bool fUpdate) {
     LOCK2(cs_main, cs_wallet);
 
     int64_t nNow = GetTime();
 
-    CBlockIndex *pindex = pindexStart;
-    CBlockIndex *ret = pindexStart;
+    const CBlockIndex *pindex = pindexStart;
+    const CBlockIndex *ret = pindexStart;
 
     // No need to read and scan block, if block was created before our wallet
     // birthday (as adjusted for block time variability)
@@ -1733,8 +1735,8 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
     }
 
     while (pindex) {
-        
-        auto stream = GetDiskBlockStreamReader(pindex->GetBlockPos());
+
+        auto stream = pindex->GetDiskBlockStreamReader();
 
         if (stream)
         {
@@ -1760,7 +1762,7 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
         if (GetTime() >= nNow + 60) {
             nNow = GetTime();
             LogPrintf("Still rescanning. At block %d. Progress=%f\n",
-                      pindex->nHeight,
+                      pindex->GetHeight(),
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
 
@@ -2781,7 +2783,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     }
                 }
 
-                if (txout.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                if (txout.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     if (recipient.fSubtractFeeFromAmount &&
                         nFeeRet > Amount(0)) {
                         if (txout.nValue < Amount(0)) {
@@ -2865,8 +2867,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 // purpose of the all-inclusive feature. So instead we raise the
                 // change and deduct from the recipient.
                 if (nSubtractFeeFromAmount > 0 &&
-                    newTxOut.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
-                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1)) -
+                    newTxOut.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1)) -
                                    newTxOut.nValue;
                     // Raise change until no more dust.
                     newTxOut.nValue += nDust;
@@ -2874,7 +2876,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     for (unsigned int i = 0; i < vecSend.size(); i++) {
                         if (vecSend[i].fSubtractFeeFromAmount) {
                             txNew.vout[i].nValue -= nDust;
-                            if (txNew.vout[i].IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                            if (txNew.vout[i].IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
                                 strFailReason =
                                     _("The transaction amount is too small "
                                       "to send after the fee has been "
@@ -2889,7 +2891,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
                 // Never create dust outputs; if we would, just add the dust to
                 // the fee.
-                if (newTxOut.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                if (newTxOut.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     nChangePosInOut = -1;
                     nFeeRet += nChange;
                     reservekey.ReturnKey();
@@ -3850,10 +3852,11 @@ void CWallet::GetKeyBirthTimes(
          it != mapWallet.end(); it++) {
         // Iterate over all wallet transactions...
         const CWalletTx &wtx = (*it).second;
-        BlockMap::const_iterator blit = mapBlockIndex.find(wtx.hashBlock);
-        if (blit != mapBlockIndex.end() && chainActive.Contains(blit->second)) {
+        if (auto bl = mapBlockIndex.Get(wtx.hashBlock);
+            bl && chainActive.Contains(bl))
+        {
             // ... which are already in a block.
-            int32_t nHeight = blit->second->nHeight;
+            int32_t nHeight = bl->GetHeight();
             for (const CTxOut &txout : wtx.tx->vout) {
                 // Iterate over all their outputs...
                 CAffectedKeysVisitor(*this, vAffected)
@@ -3863,8 +3866,8 @@ void CWallet::GetKeyBirthTimes(
                     std::map<CKeyID, CBlockIndex *>::iterator rit =
                         mapKeyFirstBlock.find(keyid);
                     if (rit != mapKeyFirstBlock.end() &&
-                        nHeight < rit->second->nHeight) {
-                        rit->second = blit->second;
+                        nHeight < rit->second->GetHeight()) {
+                        rit->second = bl;
                     }
                 }
                 vAffected.clear();
@@ -3905,7 +3908,8 @@ void CWallet::GetKeyBirthTimes(
 unsigned int CWallet::ComputeTimeSmart(const CWalletTx &wtx) const {
     unsigned int nTimeSmart = wtx.nTimeReceived;
     if (!wtx.hashUnset()) {
-        if (mapBlockIndex.count(wtx.hashBlock)) {
+        if (auto index = mapBlockIndex.Get(wtx.hashBlock); index)
+        {
             int64_t latestNow = wtx.nTimeReceived;
             int64_t latestEntry = 0;
 
@@ -3937,7 +3941,7 @@ unsigned int CWallet::ComputeTimeSmart(const CWalletTx &wtx) const {
                 }
             }
 
-            int64_t blocktime = mapBlockIndex[wtx.hashBlock]->GetBlockTime();
+            int64_t blocktime = index->GetBlockTime();
             nTimeSmart = std::max(latestEntry, std::min(blocktime, latestNow));
         } else {
             LogPrintf("%s: found %s in block %s not in index\n", __func__,
@@ -4207,7 +4211,7 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
 
     LOCK(cs_main);
 
-    CBlockIndex *pindexRescan = chainActive.Genesis();
+    const CBlockIndex *pindexRescan = chainActive.Genesis();
     if (!gArgs.GetBoolArg("-rescan", false)) {
         CWalletDB walletdb(*walletInstance->dbw);
         CBlockLocator locator;
@@ -4217,31 +4221,23 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
     }
 
     if (chainActive.Tip() && chainActive.Tip() != pindexRescan) {
-        // We can't rescan beyond non-pruned blocks, stop and throw an error.
-        // This might happen if a user uses a old wallet within a pruned node or
-        // if he ran -disablewallet for a longer time, then decided to
-        // re-enable.
-        if (fPruneMode) {
-            CBlockIndex *block = chainActive.Tip();
-            while (block && block->pprev && block->pprev->nStatus.hasData() &&
-                   block->pprev->nTx > 0 && pindexRescan != block) {
-                block = block->pprev;
-            }
-
-            if (pindexRescan != block) {
-                InitError(_("Prune: last wallet synchronisation goes beyond "
-                            "pruned data. You need to -reindex (download the "
-                            "whole blockchain again in case of pruned node)"));
-                return nullptr;
-            }
-        }
-
         uiInterface.InitMessage(_("Rescanning..."));
         LogPrintf("Rescanning last %i blocks (from block %i)...\n",
-                  chainActive.Height() - pindexRescan->nHeight,
-                  pindexRescan->nHeight);
+                  chainActive.Height() - pindexRescan->GetHeight(),
+                  pindexRescan->GetHeight());
         nStart = GetTimeMillis();
-        walletInstance->ScanForWalletTransactions(pindexRescan, true);
+        if (walletInstance->ScanForWalletTransactions(pindexRescan, true) == nullptr)
+        {
+            // We can't rescan beyond non-pruned blocks, stop and throw an error.
+            // This might happen if a user uses a old wallet within a pruned node or
+            // if he ran -disablewallet for a longer time, then decided to
+            // re-enable.
+            LogPrintf(" failed rescan      %15dms\n", GetTimeMillis() - nStart);
+            InitError(_("Prune: last wallet synchronisation goes beyond "
+                        "pruned data. You need to -reindex (download the "
+                        "whole blockchain again in case of pruned node)"));
+            return nullptr;
+        }
         LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         walletInstance->dbw->IncrementUpdateCounter();
@@ -4315,6 +4311,7 @@ void CWallet::postInitProcess(CScheduler &scheduler) {
 
 bool CWallet::ParameterInteraction() {
     CFeeRate minRelayTxFee = GlobalConfig::GetConfig().GetMinFeePerKB();
+    int64_t dustLimitFactor = GlobalConfig::GetConfig().GetDustLimitFactor();
 
     gArgs.SoftSetArg("-wallet", DEFAULT_WALLET_DAT);
     const bool is_multiwallet = gArgs.GetArgs("-wallet").size() > 1;
@@ -4523,17 +4520,13 @@ int CMerkleTx::GetHeightInMainChain() const {
     AssertLockHeld(cs_main);
 
     // Find the block it claims to be in.
-    auto mi = mapBlockIndex.find(hashBlock);
-    if (mi == mapBlockIndex.end()) {
+    auto pindex = mapBlockIndex.Get(hashBlock);
+    if (!pindex || !chainActive.Contains(pindex))
+    {
         return MEMPOOL_HEIGHT;
     }
 
-    const CBlockIndex *pindex = (*mi).second;
-    if (!pindex || !chainActive.Contains(pindex)) {
-        return MEMPOOL_HEIGHT;
-    }
-
-    return pindex->nHeight;
+    return pindex->GetHeight();
 }
 
 bool CMerkleTx::IsGenesisEnabled() const {

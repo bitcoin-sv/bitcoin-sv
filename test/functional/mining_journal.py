@@ -278,7 +278,7 @@ class MiningJournal(BitcoinTestFramework):
         self.nodes[node1].generate(1)
 
         # Link up nodes and check node1 syncs to the same block height
-        connect_nodes(self.nodes[node0], node1)
+        connect_nodes(self.nodes, node0, node1)
         sync_blocks(self.nodes)
 
         # Disconnect them again
@@ -300,7 +300,7 @@ class MiningJournal(BitcoinTestFramework):
         assert_equal(info1["size"], info1["journalsize"])
 
         # Reconnect to force node0 to reorg to node1s longer chain
-        connect_nodes(self.nodes[node0], node1)
+        connect_nodes(self.nodes, node0, node1)
         sync_blocks(self.nodes, timeout=300)
         info0 = self.nodes[node0].getmempoolinfo()
         info1 = self.nodes[node1].getmempoolinfo()

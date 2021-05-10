@@ -16,6 +16,18 @@
 
 #include <boost/thread.hpp>
 
+// install boost test formatters for the popular durations
+namespace std { namespace chrono {
+    inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::microseconds const& us) {
+        return ostr << us.count() << "us";
+    }
+    inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::milliseconds const& ms) {
+        return ostr << ms.count() << "ms";
+    }
+}}
+
+
+
 extern uint256 insecure_rand_seed;
 extern FastRandomContext insecure_rand_ctx;
 
@@ -46,15 +58,14 @@ static inline bool InsecureRandBool() {
 static inline std::vector<uint8_t> InsecureRandBytes(size_t len) {
     return insecure_rand_ctx.randbytes(len);
 }
-class GlobalConfig;
+class ConfigInit;
 
 /**
  * Basic testing setup.
  * This just configures logging and chain parameters.
  */
 struct BasicTestingSetup {
-    ECCVerifyHandle globalVerifyHandle;
-    GlobalConfig& testConfig;
+    ConfigInit& testConfig;
     fs::path pathTemp;
 
     BasicTestingSetup(const std::string &chainName = CBaseChainParams::MAIN);

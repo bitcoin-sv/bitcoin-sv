@@ -44,7 +44,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
 from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_ADD, OP_MUL
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
-from test_framework.util import assert_equal, wait_until
+from test_framework.util import assert_equal, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, CTransaction, CTxIn, CTxOut, COutPoint
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
@@ -135,7 +135,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         for tx in range(len(txchains)):
             conn.send_message(msg_tx(txchains[tx]))
         # Check if the validation queues are empty.
-        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
+        wait_for_ptv_completion(conn, num_of_chains*chain_length, timeout=timeout)
 
         return txchains
 
@@ -178,7 +178,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         for tx in all_txs:
             conn.send_message(msg_tx(tx))
         # Check if the validation queues are empty.
-        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
+        conn.rpc.waitforptvcompletion()
 
         return nonstd_txs+additional_txs, rejected_txs
 
@@ -252,6 +252,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc2_txs_num, self.locking_script_2)
+            wait_for_ptv_completion(conn, len(nonstd_txs))
             # No transactions should be rejected
             assert_equal(len(rejected_txs), 0)
             # Check if required transactions are accepted by the mempool.
@@ -280,6 +281,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc3_txs_num, self.locking_script_3)
+            wait_for_ptv_completion(conn, len(nonstd_txs))
             # No transactions should be rejected
             assert_equal(len(rejected_txs), 0)
             # Check if required transactions are accepted by the mempool.
@@ -308,6 +310,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc4_txs_num, self.locking_script_3)
+            wait_for_ptv_completion(conn, 0)
             # Check rejected transactions.
             self.check_rejected(rejected_txs, nonstd_txs)
             assert_equal(len(rejected_txs), tc4_txs_num)
@@ -336,6 +339,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
             # Run test case.
             std_txs = self.get_txchains_n(tc5_1_txs_num, 1, spend_txs, CScript(), self.locking_script_1, 2000000, 10)
             std_and_nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs2, tc5_2_txs_num, self.locking_script_2, std_txs, shuffle_txs=True)
+            wait_for_ptv_completion(conn, len(std_and_nonstd_txs))
             # Check if required transactions are accepted by the mempool.
             self.check_mempool(conn.rpc, std_and_nonstd_txs, timeout=30)
             assert_equal(conn.rpc.getmempoolinfo()['size'], tc5_1_txs_num+tc5_2_txs_num)

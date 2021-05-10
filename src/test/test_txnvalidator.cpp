@@ -39,28 +39,46 @@ namespace {
                                          << OP_CHECKSIG;
         return scriptPubKey;
     }
-    // Create a double spend txn
-    CMutableTransaction CreateDoubleSpendTxn(const CTransaction& fundTxn,
-                                       CKey& key,
-                                       CScript& scriptPubKey) {
+    // Create a transaction that spends first nInputs of the funding transaction
+    // and creates nOutputs (and pays a fixed fee of 1 cent)
+    CMutableTransaction CreateManyToManyTx(const int nInputs, const int nOutputs,
+                                           const CTransaction& fundTxn,
+                                           CKey& key,
+                                           CScript& scriptPubKey) {
         static uint32_t dummyLockTime = 0;
         CMutableTransaction spend_txn;
         spend_txn.nVersion = 1;
         spend_txn.nLockTime = ++dummyLockTime;
-        spend_txn.vin.resize(1);
-        spend_txn.vin[0].prevout = COutPoint(fundTxn.GetId(), 0);
-        spend_txn.vout.resize(1);
-        spend_txn.vout[0].nValue = 11 * CENT;
-        spend_txn.vout[0].scriptPubKey = scriptPubKey;
+        BOOST_REQUIRE_LE(nInputs, fundTxn.vout.size());
+        spend_txn.vin.resize(nInputs);
+        auto funds = Amount { 0 };
+        for (int input = 0; input < nInputs; ++input) {
+            spend_txn.vin[input].prevout = COutPoint(fundTxn.GetId(), input);
+            funds += fundTxn.vout[input].nValue;
+        }
+        funds -= CENT;
+        spend_txn.vout.resize(nOutputs);
+        for (int output = 0; output < nOutputs; ++output) {
+            spend_txn.vout[output].nValue = funds / nOutputs;
+            spend_txn.vout[output].scriptPubKey = scriptPubKey;
+        }
         // Sign:
-        std::vector<uint8_t> vchSig {};
-        uint256 hash = SignatureHash(scriptPubKey, CTransaction(spend_txn), 0,
-                                     SigHashType().withForkId(),
-                                     fundTxn.vout[0].nValue);
-        BOOST_CHECK(key.Sign(hash, vchSig));
-        vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
-        spend_txn.vin[0].scriptSig << vchSig;
+        for (int input = 0; input < nInputs; ++input) {
+            std::vector<uint8_t> vchSig {};
+            uint256 hash = SignatureHash(scriptPubKey, CTransaction(spend_txn), input,
+                                         SigHashType().withForkId(),
+                                         fundTxn.vout[input].nValue);
+            BOOST_CHECK(key.Sign(hash, vchSig));
+            vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
+            spend_txn.vin[input].scriptSig << vchSig;
+        }
         return spend_txn;
+    }
+    // Create a double spend txn
+    CMutableTransaction CreateDoubleSpendTxn(const CTransaction& fundTxn,
+                                       CKey& key,
+                                       CScript& scriptPubKey) {
+        return CreateManyToManyTx(1, 1, fundTxn, key, scriptPubKey);
     }
     // Make N unique large (but rubbish) transactions
     std::vector<CMutableTransaction> MakeNLargeTxns(size_t nNumTxns,
@@ -93,16 +111,18 @@ namespace {
         };
         return spends;
     }
+
     // Create txn input data for a given txn and source
     TxInputDataSPtr TxInputData(TxSource source,
                                 CMutableTransaction& spend,
-                                std::shared_ptr<CNode> pNode = nullptr) {
+                                std::shared_ptr<CNode> pNode = nullptr,
+                                TxValidationPriority priority = TxValidationPriority::normal) {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
                    g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
                    MakeTransactionRef(spend),// a pointer to the tx
                    source,   // tx source
-                   TxValidationPriority::normal, // tx validation priority
+                   priority, // tx validation priority
                    TxStorage::memory, // tx storage
                    GetTime(),// nAcceptTime
                    Amount(0), // nAbsurdFee
@@ -111,7 +131,8 @@ namespace {
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr) {
+                                                std::shared_ptr<CNode> pNode = nullptr,
+                                                TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
         // Get a pointer to the TxIdTracker.
         const TxIdTrackerSPtr& pTxIdTracker = g_connman->GetTxIdTracker();
@@ -122,7 +143,7 @@ namespace {
                         pTxIdTracker, // a pointer to the TxIdTracker
                         MakeTransactionRef(elem),  // a pointer to the tx
                         source,   // tx source
-                        TxValidationPriority::normal, // tx validation priority
+                        priority, // tx validation priority
                         TxStorage::memory, // tx storage
                         GetTime(),// nAcceptTime
                         Amount(0), // nAbsurdFee
@@ -227,6 +248,24 @@ namespace {
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
         return txnValidator->processValidation(TxInputDataVec(source, spends, pNode), changeSet);
+    }
+
+    CNodePtr DummyNode(ConfigInit& testConfig)
+    {
+        // Create a dummy address
+        CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
+        CConnman::CAsyncTaskPool asyncTaskPool{testConfig};
+        return CNode::Make(
+                0,
+                NODE_NETWORK,
+                0,
+                INVALID_SOCKET,
+                dummy_addr,
+                0u,
+                0u,
+                asyncTaskPool,
+                "",
+                true);
     }
     struct TestChain100Setup2 : TestChain100Setup {
         CScript scriptPubKey {
@@ -589,21 +628,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_asynch_api) {
     }
     // Test: Txns from p2p with a pointer to a dummy node.
     {
-        // Create a dummy address
-        CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-        CConnman::CAsyncTaskPool asyncTaskPool{testConfig};
-        CNodePtr pDummyNode =
-            CNode::Make(
-                0,
-                NODE_NETWORK,
-                0,
-                INVALID_SOCKET,
-                dummy_addr,
-                0u,
-                0u,
-                asyncTaskPool,
-                "",
-                true);
+        auto pDummyNode = DummyNode(testConfig);
         ProcessTxnsAsynchApi(testConfig, pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
         BOOST_CHECK_EQUAL(pool.Size(), 1);
     }
@@ -693,6 +718,71 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
         txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, doubleSpend10Txns));
         txnValidator->waitForEmptyQueue();
         BOOST_CHECK_EQUAL(pool.Size(), 1);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
+    // Test that the part of the chain containing a slow transaction will get processed by a low priority thread.
+    CTxMemPool pool;
+    // Update config params to prevent the failure of the test case
+    // - this could happen - due to runtime conditions - on an inefficient environment.
+    gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "1");
+    gArgs.ForceSetArg("-maxstdtxnsperthreadratio", "100");
+    // Disable processing of slow transactions
+    gArgs.ForceSetArg("-maxnonstdtxnsperthreadratio", "0");
+    testConfig.SetMaxStdTxnValidationDuration(3);
+    testConfig.SetMaxNonStdTxnValidationDuration(5000);
+    testConfig.SetMaxTxnChainValidationBudget(0);
+    // Create txn validator
+    std::shared_ptr<CTxnValidator> txnValidator {
+        std::make_shared<CTxnValidator>(
+                testConfig,
+                pool,
+                std::make_shared<CTxnDoubleSpendDetector>(),
+                g_connman->GetTxIdTracker())
+    };
+    auto dummyNode = DummyNode(testConfig);
+    auto fundTx = std::make_unique<CTransaction>(coinbaseTxns[0]);
+
+    int ridiculousWidth = 100000;
+    // autoscale transaction difficulty
+    for (int nWidth = 10; nWidth < ridiculousWidth; ) {
+        std::vector<CMutableTransaction> spends {};
+        // fast transaction
+        spends.push_back(CreateManyToManyTx(1, nWidth, *fundTx, coinbaseKey, scriptPubKey));
+        // slow transaction
+        spends.push_back(CreateManyToManyTx(nWidth, 1, CTransaction{spends.back()}, coinbaseKey, scriptPubKey));
+        // fast transaction
+        spends.push_back(CreateManyToManyTx(1, 1, CTransaction{spends.back()}, coinbaseKey, scriptPubKey));
+
+        auto oldPoolSize = pool.Size();
+
+        // only high priority transactions get downgraded to low priority transactions.
+        txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, spends, dummyNode, TxValidationPriority::high));
+
+        // wait until we have only non standard transactions to validate
+        auto validationDone = [](const auto& counts) -> bool {
+            return counts.GetStdQueueCount() + counts.GetProcessingQueueCount() == 0;
+        };
+        txnValidator->waitUntil( validationDone, false);
+
+        if (pool.Size() > 1 + oldPoolSize) {
+            // machine is too fast. try a more difficult transaction
+            nWidth *= 2;
+            fundTx = std::make_unique<CTransaction>(spends.back());
+            BOOST_REQUIRE_LT(nWidth, ridiculousWidth);
+            BOOST_TEST_MESSAGE("Trying width " << nWidth);
+            continue;
+        }
+
+        auto counts = txnValidator->GetTransactionsInQueueCounts();
+
+        BOOST_CHECK_EQUAL(pool.Size(), 1 + oldPoolSize);
+        BOOST_CHECK_EQUAL(counts.GetStdQueueCount(), 0);
+        BOOST_CHECK_EQUAL(counts.GetProcessingQueueCount(), 0);
+        BOOST_CHECK_EQUAL(counts.GetNonStdQueueCount(), 1);
+        BOOST_CHECK_EQUAL(txnValidator->getOrphanTxnsPtr()->getTxnsNumber(), 1);
+        break;
     }
 }
 

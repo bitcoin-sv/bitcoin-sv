@@ -20,7 +20,6 @@ enum Network {
     NET_UNROUTABLE = 0,
     NET_IPV4,
     NET_IPV6,
-    NET_TOR,
 
     NET_MAX,
 };
@@ -29,14 +28,13 @@ enum Network {
 class CNetAddr {
 protected:
     // in network byte order
-    uint8_t ip[16];
+    uint8_t ip[16] = {0};
     // for scoped/link-local ipv6 addresses
-    uint32_t scopeId;
+    uint32_t scopeId{0};
 
 public:
-    CNetAddr();
+    CNetAddr() = default;
     CNetAddr(const struct in_addr &ipv4Addr);
-    void Init();
     void SetIP(const CNetAddr &ip);
 
     /**
@@ -45,11 +43,9 @@ public:
      */
     void SetRaw(Network network, const uint8_t *data);
 
-    // for Tor addresses
-    bool SetSpecial(const std::string &strName);
     // IPv4 mapped address (::FFFF:0:0/96, 0.0.0.0/0)
     bool IsIPv4() const;
-    // IPv6 address (not mapped IPv4, not Tor)
+    // IPv6 address (not mapped IPv4)
     bool IsIPv6() const;
     // IPv4 private networks (10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12)
     bool IsRFC1918() const;
@@ -78,7 +74,6 @@ public:
     bool IsRFC6052() const;
     // IPv6 IPv4-translated address (::FFFF:0:0:0/96)
     bool IsRFC6145() const;
-    bool IsTor() const;
     bool IsLocal() const;
     bool IsRoutable() const;
     bool IsValid() const;
@@ -98,7 +93,7 @@ public:
     friend bool operator!=(const CNetAddr &a, const CNetAddr &b);
     friend bool operator<(const CNetAddr &a, const CNetAddr &b);
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -134,7 +129,7 @@ public:
     friend bool operator!=(const CSubNet &a, const CSubNet &b);
     friend bool operator<(const CSubNet &a, const CSubNet &b);
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -148,14 +143,13 @@ public:
 class CService : public CNetAddr {
 protected:
     // host order
-    unsigned short port;
+    unsigned short port{0};
 
 public:
-    CService();
+    CService() = default;
     CService(const CNetAddr &ip, unsigned short port);
     CService(const struct in_addr &ipv4Addr, unsigned short port);
     CService(const struct sockaddr_in &addr);
-    void Init();
     void SetPort(unsigned short portIn);
     unsigned short GetPort() const;
     bool GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const;
@@ -171,7 +165,7 @@ public:
     CService(const struct in6_addr &ipv6Addr, unsigned short port);
     CService(const struct sockaddr_in6 &addr);
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

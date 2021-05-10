@@ -30,8 +30,6 @@ import collections
 PATTERN_IPV4 = re.compile(
     r"^((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})):(\d+)$")
 PATTERN_IPV6 = re.compile(r"^\[([0-9a-z:]+)\]:(\d+)$")
-PATTERN_ONION = re.compile(
-    r"^([abcdefghijklmnopqrstuvwxyz234567]{16}\.onion):(\d+)$")
 
 # Used to only select nodes with a user agent string compatible with the
 # BCH/UAHF specification.
@@ -54,13 +52,7 @@ def parseline(line):
     if m is None:
         m = PATTERN_IPV6.match(sline[0])
         if m is None:
-            m = PATTERN_ONION.match(sline[0])
-            if m is None:
-                return None
-            else:
-                net = 'onion'
-                ipstr = sortkey = m.group(1)
-                port = int(m.group(2))
+            return None
         else:
             net = 'ipv6'
             if m.group(1) in ['::']:  # Not interested in localhost
@@ -126,7 +118,6 @@ def filterbyasn(ips, max_per_asn, max_total):
     # Sift out ips by type
     ips_ipv4 = [ip for ip in ips if ip['net'] == 'ipv4']
     ips_ipv6 = [ip for ip in ips if ip['net'] == 'ipv6']
-    ips_onion = [ip for ip in ips if ip['net'] == 'onion']
 
     # Filter IPv4 by ASN
     result = []
@@ -151,7 +142,6 @@ def filterbyasn(ips, max_per_asn, max_total):
 
     # Add back non-IPv4
     result.extend(ips_ipv6)
-    result.extend(ips_onion)
     return result
 
 

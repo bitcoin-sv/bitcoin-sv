@@ -79,11 +79,14 @@ LARGE_BLOCK_TESTS = [
 # - A test is vulnerable to CPU/RAM availability fluctuations
 
 SOLO_TESTS = {
+    "bsv-rpc-verifyscript.py",
     "wallet-encryption.py",
     "bsv-ptv-txn-chains.py",
     "mining_api.py",
     "bsv-pbv-withsigops.py",
-    "bsv-broadcast_delay.py"
+    "bsv-broadcast_delay.py",
+    "bsv-dsreport.py",
+    "bsv-callback-service.py"
 }
 
 # This tests can be only run by explicitly specifying them on command line. 
@@ -109,6 +112,8 @@ TEST_PARAMS = {
     "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]],
     "bsv-block-size-activation-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]]
 }
+
+TESTS_WITH_DISABLED_STDERROR_CHECK = ["bsv-callback-service.py", "bsv-dsreport.py", "bsv-ds-bad-callback-service.py"]
 
 # Used to limit the number of tests, when list of tests is not provided on command line
 # When --extended is specified, we run all tests, otherwise
@@ -496,7 +501,7 @@ class TestHandler:
                         [stdout, stderr] = [l.read().decode('utf-8')
                                             for l in (log_out, log_err)]
                         log_out.close(), log_err.close()
-                        if proc.returncode == TEST_EXIT_PASSED and stderr == "":
+                        if proc.returncode == TEST_EXIT_PASSED and (stderr == "" or name in TESTS_WITH_DISABLED_STDERROR_CHECK):
                             status = "Passed"
                         elif proc.returncode == TEST_EXIT_SKIPPED:
                             status = "Skipped"
