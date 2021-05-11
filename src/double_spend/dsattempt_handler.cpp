@@ -561,9 +561,18 @@ void DSAttemptHandler::SendNotification(const NotificationDetails& notificationD
         // Get IP address skip list
         std::set<std::string> ipSkipList { mConfig.GetDoubleSpendEndpointSkipList() };
 
-        // Notify every address listed in callback msg
+        // Notify every address listed in callback msg, upto a limit
+        uint64_t endpointCount {0};
+        std::unordered_set<std::string> ipsSeen {};
         for(const DSCallbackMsg::IPAddr& endpointAddr : notificationDetails.callbackMsg.GetAddresses())
         {
+            // Apply configured limit for the number of IPs we will notify for a single txn
+            if(++endpointCount > mConfig.GetDoubleSpendEndpointMaxCount())
+            {
+                LogPrint(BCLog::DOUBLESPEND, "Maximum number of notification endpoints reached, skipping the rest\n");
+                return;
+            }
+
             // Get IP address string and do the comm's to the endpoint
             const std::string& endpointAddrStr { DSCallbackMsg::IPAddrToString(endpointAddr) };
 
@@ -572,6 +581,17 @@ void DSAttemptHandler::SendNotification(const NotificationDetails& notificationD
             {
                 SendNotificationSlow(endpointAddrStr, retryCount, notificationDetails, handle);
             };
+
+            // Check for duplicate IP
+            if(ipsSeen.count(endpointAddrStr) != 0)
+            {
+                LogPrint(BCLog::DOUBLESPEND, "Skipping notification to duplicate endpoint %s\n", endpointAddrStr);
+                continue;
+            }
+            else
+            {
+                ipsSeen.insert(endpointAddrStr);
+            }
 
             // Check blacklist, skiplist and slow endpoint tracking
             if(mServerBlacklist.IsBlacklisted(endpointAddrStr))
