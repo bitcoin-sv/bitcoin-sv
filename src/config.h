@@ -125,6 +125,7 @@ public:
     virtual uint64_t GetDoubleSpendTxnRemember() const = 0;
     virtual uint64_t GetDoubleSpendEndpointBlacklistSize() const = 0;
     virtual std::set<std::string> GetDoubleSpendEndpointSkipList() const = 0;
+    virtual uint64_t GetDoubleSpendEndpointMaxCount() const = 0;
     virtual uint64_t GetDoubleSpendNumFastThreads() const = 0;
     virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
     virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
@@ -231,6 +232,7 @@ public:
     virtual bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) = 0;
     virtual bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) = 0;
     virtual bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) = 0;
     virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
@@ -473,6 +475,8 @@ public:
     uint64_t GetDoubleSpendEndpointBlacklistSize() const override;
     bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) override;
     std::set<std::string> GetDoubleSpendEndpointSkipList() const override;
+    bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) override;
+    uint64_t GetDoubleSpendEndpointMaxCount() const override;
     bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override;
     uint64_t GetDoubleSpendNumFastThreads() const override;
     bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override;
@@ -602,6 +606,7 @@ private:
     int dsEndpointPort;
     uint64_t dsEndpointBlacklistSize;
     std::set<std::string> dsEndpointSkipList;
+    uint64_t dsEndpointMaxCount;
     uint64_t dsAttemptTxnRemember;
     uint64_t dsAttemptNumFastThreads;
     uint64_t dsAttemptNumSlowThreads;
@@ -1026,6 +1031,8 @@ public:
     uint64_t GetDoubleSpendEndpointBlacklistSize() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE; }
     bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) override { return true; }
     std::set<std::string> GetDoubleSpendEndpointSkipList() const override { return {}; }
+    bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendEndpointMaxCount() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT; }
     bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override { return true; }
     uint64_t GetDoubleSpendNumFastThreads() const override { return DSAttemptHandler::DEFAULT_NUM_FAST_THREADS; }
     bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override { return true; }

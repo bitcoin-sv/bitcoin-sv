@@ -417,6 +417,12 @@ BOOST_AUTO_TEST_CASE(dsattempt_config)
     BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("127.0.0.1"), 1);
     BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("::1"), 1);
 
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointMaxCount(), DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT);
+    BOOST_CHECK(config.SetDoubleSpendEndpointMaxCount(2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointMaxCount(), 2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointMaxCount(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendEndpointMaxCount(-1, &err));
+
     BOOST_CHECK_EQUAL(config.GetDoubleSpendTxnRemember(), DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT);
     BOOST_CHECK(config.SetDoubleSpendTxnRemember(2 * DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT, &err));
     BOOST_CHECK_EQUAL(config.GetDoubleSpendTxnRemember(), 2 * DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT);

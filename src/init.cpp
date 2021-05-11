@@ -1317,6 +1317,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "we are running a mAPI node locally which will already be receiving double-spend notification via ZMQ, then we don't need to also send such "
         "notifications via HTTP.");
     strUsage += HelpMessageOpt(
+        "-dsendpointmaxcount=<n>",
+        strprintf(_("Maximum number of endpoint IPs we will consider notifying per transaction (default: %u)"),
+            DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT));
+    strUsage += HelpMessageOpt(
         "-dsattempttxnremember=<n>",
         strprintf(_("Limits the maximum number of previous double-spend transactions the node remembers. Setting this high uses more memory and is slower, "
                     "setting it low increases the chances we may unnecessarily process and re-report duplicate double-spent transactions (default: %u)"),
@@ -2340,6 +2344,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointSkipList(gArgs.GetArg("-dsendpointskiplist", ""), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointMaxCount(
+        gArgs.GetArg("-dsendpointmaxcount", DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT), &err))
     {
         return InitError(err);
     }
