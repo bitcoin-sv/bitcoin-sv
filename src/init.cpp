@@ -1285,7 +1285,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-dsnotifylevel",
         strprintf(_("Set how this node should handle double-spend notification sending. The options are: 0 Send no notifications, "
-                    "1 Send notifications only for standard transactions, 2 Send notifications for all transactions. (default %d)"),
+                    "1 Send notifications only for standard transactions, 2 Send notifications for all transactions. (default: %d)"),
             static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)));
     strUsage += HelpMessageOpt(
         "-dsendpointfasttimeout=<n>",
