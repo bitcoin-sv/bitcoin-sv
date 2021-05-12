@@ -4298,19 +4298,52 @@ static bool ActivateBestChainStep(
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
-
-    // Disconnect active blocks which are no longer in the best chain.
-    bool fBlocksDisconnected = false;
-    DisconnectedBlockTransactions disconnectpool;
+    
     try {
-        while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-            if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
-                // This is likely a fatal error, but keep the mempool consistent,
-                // just in case. Only remove from the mempool in this case.
-                mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
-                return false;
+
+        class RAIIUpdateMempool
+        {
+            const Config& config;
+            const CJournalChangeSetPtr& changeSet;
+            bool fBlocksDisconnected = false;
+            bool fDisconnectFailed = false;
+            DisconnectedBlockTransactions disconnectpool;
+        public:
+            RAIIUpdateMempool(const Config& c, const CJournalChangeSetPtr& cs, const CBlockIndex* pindexFork, CValidationState& state) 
+                :config{c}
+                ,changeSet{cs}
+            {
+                // we are diconnecting until we reach the fork point
+                while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
+                    if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+                        // This is likely a fatal error.
+                        fDisconnectFailed = true;
+                        return;
+                    }
+                    fBlocksDisconnected = true;
+                } 
             }
-            fBlocksDisconnected = true;
+
+            ~RAIIUpdateMempool() { UpdateIfNeeded(); }
+        
+            void UpdateIfNeeded()
+            {
+                if(fBlocksDisconnected) {
+                    changeSet->updateForReorg();
+                    mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
+                    fBlocksDisconnected = false;
+                }
+            }
+
+            DisconnectedBlockTransactions& GetDisconnectpool() {return disconnectpool;}
+        
+            bool DisconnectFailed() { return fDisconnectFailed;}
+        };
+        
+        RAIIUpdateMempool reorgUpdate {config, changeSet, pindexFork, state};
+
+        if (reorgUpdate.DisconnectFailed()) {
+            return false;
         }
 
         // Build list of new blocks to connect.
@@ -4333,14 +4366,26 @@ static bool ActivateBestChainStep(
             // Connect new blocks.
             for (CBlockIndex *pindexConnect :
                  boost::adaptors::reverse(vpindexToConnect)) {
+
+                /* We always want to get to the same nChainWork amount as
+                we started with before enabling parallel validation as we
+                don't want to end up in a situation where sibling blocks
+                from older chain items are once again eligible for parallel
+                validation thus wasting resources. We also don't wish to
+                end up announcing older chain items as new best tip.*/                        
+                bool parallelBlockValidation = pindexOldTip && chainActive.Tip()->GetChainWork() == pindexOldTip->GetChainWork();
+
+                if(parallelBlockValidation)
+                {
+                    // During the next call to ConnectTip we will release the cs_main. (parallelBlockValidation flag)
+                    // The mempool may not be consistent with current tip if we are in the reorg, 
+                    // because a mempool transaction can have a parent which is currently in the disconnectpool.
+                    // Here we are adding disconnected transactions to be in sync with current tip.
+                    reorgUpdate.UpdateIfNeeded();
+                }
+
                 if (!ConnectTip(
-                        /* We always want to get to the same nChainWork amount as
-                        we started with before enabling parallel validation as we
-                        don't want to end up in a situation where sibling blocks
-                        from older chain items are once again eligible for parallel
-                        validation thus wasting resources. We also don't wish to
-                        end up announcing older chain items as new best tip.*/
-                        pindexOldTip && chainActive.Tip()->GetChainWork() == pindexOldTip->GetChainWork(),
+                        parallelBlockValidation,
                         token,
                         config,
                         state,
@@ -4349,7 +4394,7 @@ static bool ActivateBestChainStep(
                             ? pblock
                             : std::shared_ptr<const CBlock>(),
                         connectTrace,
-                        disconnectpool,
+                        reorgUpdate.GetDisconnectpool(),
                         changeSet,
                         pindexMostWork->GetChainWork()))
                 {
@@ -4363,11 +4408,8 @@ static bool ActivateBestChainStep(
                         fContinue = false;
                         break;
                     } else {
-                        // A system error occurred (disk space, database error,
-                        // ...).
-                        // Make the mempool consistent with the current tip, just in
-                        // case any observers try to use it before shutdown.
-                        mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+                        // A system error occurred (disk space, database error, ...).
+                        // The mempool will be updated with reorgUpdate if needed.
                         return false;
                     }
                 } else {
@@ -4384,30 +4426,19 @@ static bool ActivateBestChainStep(
             }
         }
 
-        if (fBlocksDisconnected)
+        // We will soon exit this function, lets update the mempool before we check it.
+        reorgUpdate.UpdateIfNeeded();
+        mempool.CheckMempool(*pcoinsTip, changeSet);
+        // If we made any changes lets apply them now.
+        if(changeSet)
         {
-            // Whatever we thought this change set might be for, it's now definitely a reorg
-            changeSet->updateForReorg();
-
-            // If any blocks were disconnected, disconnectpool may be non empty. Add
-            // any disconnected transactions back to the mempool.
-            // This will also check the mempool and apply the changeSet
-            mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
-        } else {
-            mempool.CheckMempool(*pcoinsTip, changeSet);
-            if(changeSet)
-            {
-                changeSet->apply();
-            }
+            changeSet->apply();
         }
+
     }
     catch(...) {
-        // We were probably cancelled. Make the mempool consistent with the current tip.
-        if(fBlocksDisconnected)
-        {
-            LogPrintf("Exception caught during ActivateBestChainStep; updating mempool\n");
-            mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
-        }
+        // We were probably cancelled.
+        LogPrintf("Exception caught during ActivateBestChainStep;\n");
         throw;
     }
 
