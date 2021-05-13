@@ -436,6 +436,43 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to ::1", "/node0"))
         wait_until(lambda: self.check_tx_received(tx1.hash))
 
+    def check_doublespend_queue_size(self, utxo):
+        self.stop_node(0)
+        # Restart bitcoind with low limit on double-spend queue length
+        self.start_node(0, extra_args=['-dsendpointport=8080',
+                                       '-whitelist=127.0.0.1',
+                                       '-genesisactivationheight=1',
+                                       '-maxscriptsizepolicy=0',
+                                       '-maxnonstdtxvalidationduration=15000',
+                                       '-maxtxnvalidatorasynctasksrunduration=15001',
+                                       '-dsattemptqueuemaxmemory=1KB',
+                                       '-dsnotifylevel=2'])
+        self.createConnection()
+ 
+        assert(not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
+
+        # tx1 is dsnt-enabled
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
+        ]
+        tx1 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
+
+        # tx2 spends the same output as tx1 (double spend)
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
+        ]
+        vout = [
+            # Larger size than the queue is configured for
+            CTxOut(25, CScript([OP_TRUE] * 1100))
+        ]
+        tx2 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
+
     def run_test(self):
 
         # Turn on CallbackService.
@@ -481,6 +518,9 @@ class DoubleSpendReport(BitcoinTestFramework):
         utxo = self.nodes[0].listunspent()
         self.check_ds_enabled_no_proof(utxo[0])
 
+        # limited double-spend queue size
+        self.check_doublespend_queue_size(utxo[1])
+
         self.kill_server()
 
         if ping6("::1"):
@@ -490,7 +530,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)
 
-            self.check_ipv6(utxo[1])
+            self.check_ipv6(utxo[2])
 
             self.kill_server()
         else:
