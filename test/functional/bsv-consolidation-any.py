@@ -16,7 +16,7 @@ from decimal import Decimal
 class ConsolidationP2PKHTest(BitcoinTestFramework):
 
     def set_test_params(self):
-        self.num_nodes = 4
+        self.num_nodes = 2
         self.setup_clean_chain = True
         self.utxo_test_sats = 100000
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
@@ -40,22 +40,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
             "-acceptnonstdconsolidationinput=1"
-            ],[
-            "-whitelist=127.0.0.1",
-            "-txindex=1"
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=0",  #disables consolidation factor
-            "-acceptnonstdtxn=1",
-            "-acceptnonstdconsolidationinput=1"
-            ],[
-            "-whitelist=127.0.0.1",
-            "-txindex=1"
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-acceptnonstdconsolidationinput=0" # default, disable non std inputs
         ]]
 
     def test_extra_args_values (self):
@@ -197,8 +181,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         tx.rehash()
         return ToHex(tx)
 
-    # send 2 p2pkh transactions that must fail
-    # and one that must succeed
     def run_test(self):
 
         self.test_extra_args_values()
@@ -227,129 +209,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     enough_cumulated_inputsize = cumulated_outputsize * self.consolidation_factor
                     enough_confirmations = self.minConfirmations
 
-                    # if the minconsolidationfactor is 0 then consolidation transactions are disabled and
-                    # below transactions should fail
-                    # if the acceptnonstdconsolidationnput is set to 0 then following transactions should
-                    # also fail because our inputs are not standard in this test.
-
-                    # should fail. Our minimum/maximum calculations above fail for this factor
-                    # hence we need to build the parameters differently. e.g. instead of
-                    # insize becomes enough cumulated inputsize
-                    # we do
-                    # insize becomes cumulated outputsize times two
-                    if self.consolidation_factor == 0:
-                        tx_hex = self.create_and_sign_tx(node,
-                                                         in_count = output_count * 2,
-                                                         out_count = output_count,
-                                                         in_size=cumulated_outputsize * 2,
-                                                         out_size = cumulated_outputsize,
-                                                         min_confirmations = enough_confirmations,
-                                                         spam = not_spam
-                                                         )
-
-                        assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                        self.log.info ("test 1 - failing cnonsolidation transaction not disabled: PASS")
-                        break
-
-                    if self.acceptNonStandardInputs is False:
-                        tx_hex = self.create_and_sign_tx(node,
-                                                         in_count = output_count * 2,
-                                                         out_count = output_count,
-                                                         in_size=cumulated_outputsize * 2,
-                                                         out_size = cumulated_outputsize,
-                                                         min_confirmations = enough_confirmations,
-                                                         spam = not_spam
-                                                         )
-
-                        assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                        self.log.info ("test 2 - failing cnonsolidation transaction may not have std inputs: PASS")
-                        break
-
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count = enough_inputs - 1,
-                                                     out_count = output_count,
-                                                     in_size=enough_cumulated_inputsize,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations = enough_confirmations,
-                                                     spam = not_spam
-                                                     )
-
-                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info ("test 1 - failing input_sizes > consolidation_factor * output_size: PASS")
-
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count = enough_inputs - 1,
-                                                     out_count = output_count,
-                                                     in_size=enough_cumulated_inputsize,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations = 0,
-                                                     spam = not_spam,
-                                                     is_donation = True
-                                                     )
-
-                    txid = node.sendrawtransaction(tx_hex)
-                    node.generate(1)
-                    tx = node.getrawtransaction(txid, 1)
-                    confirmations = tx.get('confirmations', 0)
-                    assert_equal (confirmations, 1)
-                    self.log.info("test 1b - donation with input count below consolidation factor:PASS")
-
-
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count=enough_inputs,
-                                                     out_count=output_count,
-                                                     in_size=enough_cumulated_inputsize,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations - 1,
-                                                     spam = not_spam
-                                                     )
-
-                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info("test 2 - failing all inputs conf > min conf: PASS")
-
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count=enough_inputs,
-                                                     out_count=output_count,
-                                                     in_size=enough_cumulated_inputsize - 1,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations,
-                                                     spam = not_spam
-                                                     )
-
-                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info("test 3 - faling cumulated input sizes > consolidation factor times output sizes: PASS")
-
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count=enough_inputs,
-                                                     out_count=output_count,
-                                                     in_size=enough_cumulated_inputsize - 1,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations = 0,
-                                                     spam = not_spam,
-                                                     is_donation = True
-                                                     )
-
-                    txid = node.sendrawtransaction(tx_hex)
-                    node.generate(1)
-                    tx = node.getrawtransaction(txid, 1)
-                    confirmations = tx.get('confirmations', 0)
-                    assert_equal (confirmations, 1)
-                    self.log.info("test 3b - cumulated input sizes exceeding consolidation factor:PASS")
-
-                    # FAILING CONDITION: no confirmed inputs
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count=enough_inputs,
-                                                     out_count=output_count,
-                                                     in_size=enough_cumulated_inputsize,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations,
-                                                     spam = not_spam + 1
-                                                     )
-
-                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info("test 4 - failed scriptSig's of transaction < spam limit: PASS")
-
-                    # ALL CONDITIONS MET: must succeed
                     tx_hex = self.create_and_sign_tx(node,
                                                      in_count=enough_inputs,
                                                      out_count=output_count,
@@ -363,14 +222,12 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     tx = node.getrawtransaction(txid, 1)
                     confirmations = tx.get('confirmations', 0)
                     assert_equal (confirmations, 1)
-                    self.log.info("test 5 - all consolidation conditions met:PASS")
+                    self.log.info("test 1 - all consolidation conditions met:PASS")
 
-                    # Donating single input to single output with false return (zero output)
                     tx_hex = self.create_and_sign_tx(node,
                                                      in_count = 1,
                                                      out_count = 1,
                                                      in_size = single_output_script_size,
-                                                     # out_size will be ignored (return OP_FALSE)
                                                      out_size = single_output_script_size,
                                                      min_confirmations = 0,
                                                      spam = not_spam,
@@ -381,8 +238,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     tx = node.getrawtransaction(txid, 1)
                     confirmations = tx.get('confirmations', 0)
                     assert_equal (confirmations, 1)
-                    self.log.info("test 6 - donation with one input and one output:PASS")
-
+                    self.log.info("test 2 - donation with one input and one output:PASS")
 
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

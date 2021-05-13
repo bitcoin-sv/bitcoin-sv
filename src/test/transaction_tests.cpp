@@ -921,7 +921,187 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_OP_FALSE_OP_RETURN) {
     TestIsStandardWithScriptFactory([]() { return CScript() << OP_FALSE << OP_RETURN; }, 2);
 }
 
-// Create a transaction with given ouputput script, convert it to JSON and return vout/scriptpubkey/type
+static std::vector<CMutableTransaction>
+SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet, int32_t height, bool createNonStandardInput = false) {
+    std::vector<CMutableTransaction> dummyTransactions;
+    dummyTransactions.resize(2);
+
+    // Add some keys to the keystore:
+    CKey key[4];
+    for (int i = 0; i < 4; i++) {
+        key[i].MakeNewKey(i % 2);
+        keystoreRet.AddKey(key[i]);
+    }
+
+    // Create some dummy input transactions
+    dummyTransactions[0].vout.resize(2);
+    dummyTransactions[0].vout[0].nValue = 11 * CENT;
+    dummyTransactions[0].vout[0].scriptPubKey
+            << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
+    dummyTransactions[0].vout[1].nValue = 50 * CENT;
+    if (createNonStandardInput)
+        dummyTransactions[0].vout[1].scriptPubKey << OP_DROP << OP_NOP << OP_NOP << OP_NOP << OP_NOP << OP_TRUE;
+    else
+        dummyTransactions[0].vout[1].scriptPubKey << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
+
+    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), height, 0);
+
+    dummyTransactions[1].vout.resize(2);
+    dummyTransactions[1].vout[0].nValue = 21 * CENT;
+    dummyTransactions[1].vout[0].scriptPubKey =
+            GetScriptForDestination(key[2].GetPubKey().GetID());
+    dummyTransactions[1].vout[1].nValue = 22 * CENT;
+    dummyTransactions[1].vout[1].scriptPubKey =
+            GetScriptForDestination(key[3].GetPubKey().GetID());
+    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), height, 0);
+    return dummyTransactions;
+}
+
+void CreateDustReturnTransaction(CMutableTransaction & t, ConfigInit & config, std::vector<CMutableTransaction> const & inputTxns)
+{
+    config.SetMinConsolidationFactor(DEFAULT_MIN_CONSOLIDATION_FACTOR);
+    config.SetGenesisActivationHeight(1);
+    t.vin.resize(1);
+    t.vin[0].prevout = COutPoint(inputTxns[0].GetId(), 1);
+    t.vin[0].scriptSig = CScript();
+    t.vin[0].scriptSig << std::vector<uint8_t>(65, 0);
+    t.vout.resize(1);
+    t.vout[0].scriptPubKey = CScript();
+    t.vout[0].nValue = Amount(0);
+}
+
+BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
+
+    CBasicKeyStore keystore;
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
+    std::vector<CMutableTransaction> inputTxns = SetupDummyInputs(keystore, coins);
+    CMutableTransaction t;
+
+    static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
+
+    // Test IsDustReturnTxn function which is called by IsConsolidationTxn
+    // IsDustReturnTxn calls IsDustReturnScript which is tested in module script_tests.
+    // no dust return if amount > 0
+    t.vout.resize(1);
+    t.vout[0].nValue = Amount(1);
+    BOOST_CHECK(!IsDustReturnTxn(CTransaction(t)));
+
+    // only one output allowed
+    t.vout.resize(2);
+    t.vout[0].nValue = Amount(0);
+    BOOST_CHECK(!IsDustReturnTxn(CTransaction(t)));
+
+    // Test IsConsolidation Transaction
+    // Correct Dust transaction, Note that IsDustReturnScript is tested elsewhere
+    CreateDustReturnTransaction(t, testConfig, inputTxns);
+    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
+
+    /* testing switching dust on and of together with consolidation transactions */
+    CreateDustReturnTransaction(t, testConfig, inputTxns);
+    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    testConfig.SetMinConsolidationFactor(0);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
+}
+
+uint64_t CreateTestConsolidationTxn(CMutableTransaction & t, ConfigInit & config, size_t nbInputs, size_t outputScriptSize, const std::vector<CMutableTransaction> & inputTxns, size_t scriptSigLen)
+{
+    assert (nbInputs == 2 || nbInputs ==1);
+    config.SetGenesisActivationHeight(1);
+    config.SetMinConsolidationFactor(2);
+    config.SetMinConfConsolidationInput(DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+    config.SetMaxConsolidationInputScriptSize(DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+    config.SetAcceptNonStdConsolidationInput(false);
+
+    uint64_t sumInputScriptPubKeytSize{0};
+
+    t.vin.clear();
+    t.vin.resize(nbInputs);
+    for (size_t i = 0; i < nbInputs; ++i) {
+        t.vin[i].prevout = COutPoint(inputTxns[i].GetId(), 1);
+        while (t.vin[i].scriptSig.size() < scriptSigLen - 1)
+            t.vin[i].scriptSig << OP_NOP;
+        t.vin[i].scriptSig << OP_TRUE;
+        sumInputScriptPubKeytSize += inputTxns[i].vout[1].scriptPubKey.size();
+    }
+
+    t.vout.clear();
+    t.vout.resize(1);
+    t.vout[0].nValue = Amount(10);
+
+    assert (outputScriptSize > 0);
+    for (size_t i = 0; i < outputScriptSize - 1; ++i)
+        t.vout[0].scriptPubKey << OP_NOP;
+    t.vout[0].scriptPubKey <<  OP_TRUE;
+    return sumInputScriptPubKeytSize;
+}
+
+BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
+
+    static const int32_t tipHeight = 100;
+
+    CBasicKeyStore keystore;
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
+    std::vector<CMutableTransaction> inputTxns =
+            SetupDummyInputsForConsolidationTxns(keystore, coins, tipHeight - DEFAULT_MIN_CONF_CONSOLIDATION_INPUT + 1, false);
+
+    CMutableTransaction t;
+
+    // check correct consolidation transaction
+    uint64_t sumInputScriptPubKeySize = CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, 65);
+    CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2, inputTxns, 65);
+    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+
+    // consolidation transactions turned off
+    CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2, inputTxns, 65);
+    testConfig.SetMinConsolidationFactor(0);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+
+    // not enough confirmations
+    CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2 , inputTxns, 65);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight - 1));
+
+    // not enough inputs
+    CreateTestConsolidationTxn(t,  testConfig, 1, sumInputScriptPubKeySize / 2, inputTxns, 65);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+
+    // output script to big, i.e. sum of inputs sizes divided by sum of output sizes
+    // smaller than consolidation factor
+    CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2 + 1, inputTxns, 65);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+
+    // spam inputs
+    CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize() + 1);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+}
+
+BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
+
+    static const int32_t tipHeight = 100;
+
+    CBasicKeyStore keystore;
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
+    std::vector<CMutableTransaction> inputTxns =
+            SetupDummyInputsForConsolidationTxns(keystore, coins, tipHeight - DEFAULT_MIN_CONF_CONSOLIDATION_INPUT + 1, true);
+
+    CMutableTransaction t;
+
+    // non-standard transaction and non-standard inputs allowed
+    CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize());
+    testConfig.SetAcceptNonStdConsolidationInput(true);
+    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+
+    // non-standard transaction and non-standard inputs disallowed
+    CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize());
+    testConfig.SetAcceptNonStdConsolidationInput(false);
+    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+}
+
+
+// Create a transaction with given output script, convert it to JSON and return vout/scriptpubkey/type
 std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, bool isGenesisEnabled)
 {
     CMutableTransaction t;
