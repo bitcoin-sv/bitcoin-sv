@@ -1826,7 +1826,7 @@ static UniValue getmerkleproof(const Config& config,
     {
         throw std::runtime_error(
                 "getmerkleproof \"txid\" ( blockhash )\n"
-                "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
+                "\nDEPRECATED (use getmerkleproof2 instead): Returns a Merkle proof for a transaction represented by txid in a list of Merkle"
                 "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
                 "\n Merkle root can be used to prove that the transaction was included in a block.\n"
                 "\nNOTE: This only works if transaction was already included in a block and the block"
