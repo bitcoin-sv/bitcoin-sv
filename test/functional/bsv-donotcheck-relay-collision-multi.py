@@ -17,7 +17,8 @@ import time
 def allInvsMatch(invsExpected, testnode):
     for x in range(60):
         with mininode_lock:
-            if (sorted(invsExpected) == sorted(testnode.txinvs)):
+            invsrelayed = [e for e in invsExpected if e in testnode.txinvs]
+            if invsExpected == invsrelayed:
                 return True
         time.sleep(1)
     return False
@@ -81,6 +82,9 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         nb_test_transactions = 4
 
         utxos = create_confirmed_utxos(Decimal(1000)/Decimal(COIN), node1, nb_test_transactions, age=101)
+        sync_blocks(self.nodes)
+        test_node.clear_invs()
+
         relayfee = 0
         signed_txns = []
         txnids = []
