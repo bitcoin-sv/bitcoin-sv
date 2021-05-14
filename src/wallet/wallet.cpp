@@ -4311,7 +4311,6 @@ void CWallet::postInitProcess(CScheduler &scheduler) {
 
 bool CWallet::ParameterInteraction() {
     CFeeRate minRelayTxFee = GlobalConfig::GetConfig().GetMinFeePerKB();
-    int64_t dustLimitFactor = GlobalConfig::GetConfig().GetDustLimitFactor();
 
     gArgs.SoftSetArg("-wallet", DEFAULT_WALLET_DAT);
     const bool is_multiwallet = gArgs.GetArgs("-wallet").size() > 1;
