@@ -137,6 +137,16 @@ bool IsDSNotification(bsv::span<const uint8_t> script) {
        script[3] == 0x64 && script[4] == 0x73 && script[5] == 0x6e && script[6] == 0x74;
 }
 
+bool IsDustReturnScript (bsv::span<const uint8_t> script)
+{
+    static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
+    static const CScript dust_return = CScript() << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    if (script.size() != dust_return.size())
+        return false;
+
+    return std::equal(script.begin(), script.end(), dust_return.begin());
+}
+
 bool CScript::IsPushOnly(const_iterator pc) const {
     while (pc < end()) {
         opcodetype opcode;

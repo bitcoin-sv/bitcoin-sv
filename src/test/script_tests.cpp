@@ -2295,6 +2295,39 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
     BOOST_CHECK(CTxOut(Amount(10), opReturn).IsDust(feerate, dustLimitFactor, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
 }
 
+BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {
+
+    static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
+
+    // good test
+    CScript testScript;
+    testScript = CScript();
+    testScript << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    BOOST_CHECK(IsDustReturnScript(testScript));
+
+    // missing OP_FALSE
+    testScript = CScript();
+    testScript << OP_NOP << OP_RETURN << protocol_id.size() << protocol_id;
+    BOOST_CHECK(!IsDustReturnScript(testScript));
+
+    // missing OP_RETURN
+    testScript = CScript();
+    testScript << OP_FALSE << OP_NOP << protocol_id.size() << protocol_id;
+    BOOST_CHECK(!IsDustReturnScript(testScript));
+
+    // no OP_PUSHDATA allowed
+    testScript = CScript();
+    testScript << OP_FALSE << OP_RETURN << OP_PUSHDATA1 << protocol_id.size() << protocol_id;
+    BOOST_CHECK(!IsDustReturnScript(testScript));
+
+    static const std::vector<uint8_t> nonsense_id = {'n','o','n','s','e','n','s','e'};
+
+    // incorrect protocol id
+    testScript = CScript();
+    testScript << OP_FALSE << OP_RETURN << nonsense_id.size() << nonsense_id;
+    BOOST_CHECK(!IsDustReturnScript(testScript));
+}
+
 namespace {
     class InstrumentedChecker : public CachingTransactionSignatureChecker
     {

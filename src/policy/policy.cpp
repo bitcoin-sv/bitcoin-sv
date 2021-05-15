@@ -48,23 +48,26 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
     return whichType != TX_NONSTANDARD;
 }
 
+bool IsDustReturnTxn (const CTransaction &tx)
+{
+    return tx.vout.size() == 1
+        && tx.vout[0].nValue.GetSatoshis() == 0U
+        && IsDustReturnScript(tx.vout[0].scriptPubKey);
+}
+
+
 // Check if a transaction is a consolidation transaction.
 // A consolidation transaction is a transaction which reduces the size of the UTXO database to
 // an extent that is rewarding enough for the miner to mine the transaction for free.
 // However, if a consolidation transaction is donated to the miner, then we do not need to honour the consolidation factor
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
-
     // Allow disabling free consolidation txns via configuring
     // the consolidation factor to zero
     if (config.GetMinConsolidationFactor() == 0)
         return false;
 
-    static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
-    static const CScript dust_return = CScript() << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
-    const bool isDonation =
-            dust_return == tx.vout[0].scriptPubKey &&
-            tx.vout[0].nValue.GetSatoshis() == 0U;
+    const bool isDonation = IsDustReturnTxn(tx);
 
     const uint64_t factor = isDonation
             ? tx.vin.size()
