@@ -2302,29 +2302,34 @@ BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {
     // good test
     CScript testScript;
     testScript = CScript();
-    testScript << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    testScript << OP_FALSE << OP_RETURN << protocol_id;
     BOOST_CHECK(IsDustReturnScript(testScript));
 
     // missing OP_FALSE
     testScript = CScript();
-    testScript << OP_NOP << OP_RETURN << protocol_id.size() << protocol_id;
+    testScript << OP_NOP << OP_RETURN << protocol_id;
     BOOST_CHECK(!IsDustReturnScript(testScript));
 
     // missing OP_RETURN
     testScript = CScript();
-    testScript << OP_FALSE << OP_NOP << protocol_id.size() << protocol_id;
+    testScript << OP_FALSE << OP_NOP << protocol_id;
     BOOST_CHECK(!IsDustReturnScript(testScript));
 
     // no OP_PUSHDATA allowed
     testScript = CScript();
-    testScript << OP_FALSE << OP_RETURN << OP_PUSHDATA1 << protocol_id.size() << protocol_id;
+    testScript << OP_FALSE << OP_RETURN << OP_PUSHDATA1 << protocol_id;
     BOOST_CHECK(!IsDustReturnScript(testScript));
 
-    static const std::vector<uint8_t> nonsense_id = {'n','o','n','s','e','n','s','e'};
+    // do not add data length, it is done automatically
+    testScript = CScript();
+    testScript << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    BOOST_CHECK(!IsDustReturnScript(testScript));
+
+    static const std::vector<uint8_t> nonsense_id = {'n','o','n','s'};
 
     // incorrect protocol id
     testScript = CScript();
-    testScript << OP_FALSE << OP_RETURN << nonsense_id.size() << nonsense_id;
+    testScript << OP_FALSE << OP_RETURN << nonsense_id;
     BOOST_CHECK(!IsDustReturnScript(testScript));
 }
 

@@ -139,8 +139,8 @@ bool IsDSNotification(bsv::span<const uint8_t> script) {
 
 bool IsDustReturnScript (bsv::span<const uint8_t> script)
 {
-    static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
-    static const CScript dust_return = CScript() << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    // OP_FALSE, OP_RETURN, OP_PUSHDATA, 'dust'
+    static constexpr std::array<uint8_t, 7> dust_return = {0x00,0x6a,0x04,0x64,0x75,0x73,0x74};
     if (script.size() != dust_return.size())
         return false;
 

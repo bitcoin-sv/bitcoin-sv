@@ -982,8 +982,14 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
 
     // Test IsDustReturnTxn function which is called by IsConsolidationTxn
     // IsDustReturnTxn calls IsDustReturnScript which is tested in module script_tests.
-    // no dust return if amount > 0
+
+    // good
     t.vout.resize(1);
+    t.vout[0].nValue = Amount(0);
+    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
+    BOOST_CHECK(IsDustReturnTxn(CTransaction(t)));
+
+    // no dust return if amount > 0
     t.vout[0].nValue = Amount(1);
     BOOST_CHECK(!IsDustReturnTxn(CTransaction(t)));
 
@@ -995,12 +1001,12 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
     // Test IsConsolidation Transaction
     // Correct Dust transaction, Note that IsDustReturnScript is tested elsewhere
     CreateDustReturnTransaction(t, testConfig, inputTxns);
-    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
     BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
 
     /* testing switching dust on and of together with consolidation transactions */
     CreateDustReturnTransaction(t, testConfig, inputTxns);
-    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
     testConfig.SetMinConsolidationFactor(0);
     BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
 }
