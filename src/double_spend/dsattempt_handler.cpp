@@ -112,10 +112,10 @@ void DSAttemptHandler::HandleDoubleSpend(const InvalidTxnPublisher::InvalidTxnIn
     }
 
     // Calculate memory usage for storing this new transaction list
-    uint64_t txnsMemUsage { std::accumulate(conflictedTxns.begin(), conflictedTxns.end(), memusage::DynamicUsage(doubleSpendTxn),
+    uint64_t txnsMemUsage { std::accumulate(conflictedTxns.begin(), conflictedTxns.end(), RecursiveDynamicUsage(doubleSpendTxn),
         [](uint64_t tot, const CTransactionRef& txn)
         {
-            return tot += memusage::DynamicUsage(txn);
+            return tot += RecursiveDynamicUsage(txn);
         }
     ) };
 
