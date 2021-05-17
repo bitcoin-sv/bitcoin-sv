@@ -295,7 +295,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend failed", "/node0"))
 
-        self.check_tx_not_received(tx2.hash)
+        self.check_tx_not_received(tx1.hash)
 
         # Check that another correct double-spend for tx1 does trigger a notification
         vin = [
