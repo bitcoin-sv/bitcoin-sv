@@ -1285,7 +1285,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-dsnotifylevel",
         strprintf(_("Set how this node should handle double-spend notification sending. The options are: 0 Send no notifications, "
-                    "1 Send notifications only for standard transactions, 2 Send notifications for all transactions. (default %d)"),
+                    "1 Send notifications only for standard transactions, 2 Send notifications for all transactions. (default: %d)"),
             static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)));
     strUsage += HelpMessageOpt(
         "-dsendpointfasttimeout=<n>",
@@ -1316,6 +1316,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "A comma separated list of IP addresses for double-spend endpoints we should skip sending notifications to. This can be useful if (for example) "
         "we are running a mAPI node locally which will already be receiving double-spend notification via ZMQ, then we don't need to also send such "
         "notifications via HTTP.");
+    strUsage += HelpMessageOpt(
+        "-dsendpointmaxcount=<n>",
+        strprintf(_("Maximum number of endpoint IPs we will consider notifying per transaction (default: %u)"),
+            DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT));
     strUsage += HelpMessageOpt(
         "-dsattempttxnremember=<n>",
         strprintf(_("Limits the maximum number of previous double-spend transactions the node remembers. Setting this high uses more memory and is slower, "
@@ -2340,6 +2344,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointSkipList(gArgs.GetArg("-dsendpointskiplist", ""), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetDoubleSpendEndpointMaxCount(
+        gArgs.GetArg("-dsendpointmaxcount", DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT), &err))
     {
         return InitError(err);
     }
