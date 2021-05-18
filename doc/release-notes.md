@@ -53,6 +53,7 @@ enabled transactions can be found [here](https://github.com/bitcoin-sv-specs/pro
 * Updated default value for maxorphantxsize: from 100 MB to 1 GB
 * Updated default value for limitancestorcount: from 1000 to 10000
 * Improved stability when accepting transactions during the reorg.
+* Fixed the dust return script condition in IsDustReturnScript. The previous version incorrectly contained an OP_4
 
 ## Technical change details
 
