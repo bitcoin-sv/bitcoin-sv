@@ -202,8 +202,12 @@ class PruneTest(BitcoinTestFramework):
         sync_blocks(self.nodes[0:3], timeout=300)
 
         usage = calc_usage(self.prunedir)
-        self.log.info("Usage should be below target: %d" % usage)
-        if (usage > 550):
+        # NOTE: Although the last batch of blocks was generated specifically to prune stale blocks, the last time pruning is actually run,
+        #       may be before all blocks were received. At that time many of received blocks have not yet been validated and added to
+        #       the active chain. Also, blocks stored in block files are typically not ordered by height.
+        #       Consequently, usage could be higher than target.
+        self.log.info("Usage should be below target + 1 block file (128MB) + margin (48MB) to account for stale blocks: %d" % usage)
+        if (usage > 550 + 128 + 48):
             raise AssertionError("Pruning target not being met")
 
         return invalidheight, badhash
