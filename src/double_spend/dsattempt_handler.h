@@ -50,9 +50,10 @@ class DSAttemptHandler final
     // Default number of threads we reserve for processing double-spend notifications
     static constexpr size_t DEFAULT_NUM_FAST_THREADS { 2 };
     static constexpr size_t DEFAULT_NUM_SLOW_THREADS { 2 };
-
     // Default number of timeouts / hour before assuming an endpoint is slow
     static constexpr size_t DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR { 3 };
+    // Default maximum number of endpoint IPs we will notify per transaction
+    static constexpr size_t DEFAULT_DS_ENDPOINT_MAX_COUNT { 3 };
 
     // Maximum number of threads for each of the slow/fast submission queues
     static constexpr size_t MAX_NUM_THREADS { 64 };
@@ -133,6 +134,7 @@ class DSAttemptHandler final
         const NotificationDetails& notificationDetails,
         const DSTxnSerialiser::TxnHandleSPtr& handle,
         int httpTimeout,
+        bool& wantsProof,
         bool& retry);
 
     // Wrapper type for the double spend transaction details
@@ -156,6 +158,9 @@ class DSAttemptHandler final
     void UpdateSlowEndpoint(const std::string& endpoint);
     // Check to see whether an endpoint is currently considered slow
     bool IsEndpointSlow(const std::string& endpoint) const;
+
+    // Remember a txn we've already notified about
+    void RecordNotifiedTxn(const TxId& txid);
 
     // Reference to the global config
     const Config& mConfig;

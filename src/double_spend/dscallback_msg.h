@@ -57,6 +57,12 @@ class DSCallbackMsg
         {
             uint64_t numAddrs {0};
             READWRITE(VARINT(numAddrs));
+            // 0 addresses is an error
+            if(numAddrs == 0)
+            {
+                throw std::runtime_error("DSCallbackMsg has IP address count 0");
+            }
+
             mIPAddrs.clear();
             for(uint64_t i = 0; i < numAddrs; ++i)
             {
@@ -117,6 +123,27 @@ class DSCallbackMsg
             for(const auto& input : mInputs)
             {
                 READWRITE(VARINT(input));
+            }
+        }
+
+        // Strict encoding check; ensure there are no redundant trailing bytes left
+        // unprocessed after reading.
+        if(ser_action.ForRead())
+        {
+            bool ok {true};
+            try
+            {
+                // There's no uniform way to check whether a stream has been drained, so
+                // try reading a byte and see if the underlying stream complains.
+                uint8_t dummy;
+                READWRITE(dummy);
+                ok = false;
+            }
+            catch(...) {}
+
+            if(!ok)
+            {
+                throw std::runtime_error("DSCallbackMsg has trailing bytes");
             }
         }
     }
