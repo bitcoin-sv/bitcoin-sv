@@ -162,6 +162,8 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx2 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend passed", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Sending query to 127.0.0.1 for double-spend enabled txn {}".format(tx1.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Got 200 response from endpoint 127.0.0.1", "/node0"))
         wait_until(lambda: self.check_tx_received(tx1.hash))
 
         # again spend the same output as tx1 and tx2 (double spend) --> callback service is not notified twice
@@ -407,7 +409,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxOut(25, CScript([OP_TRUE]))
         ]
         self.create_and_send_transaction(vin, vout)
-        wait_until(lambda: check_for_log_msg(self, "Endpoint doesn't want proof", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Endpoint 127.0.0.1 doesn't want proof", "/node0"))
         self.check_tx_not_received(tx1.hash)
 
     def check_ipv6(self, utxo):
