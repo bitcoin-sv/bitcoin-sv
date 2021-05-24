@@ -458,6 +458,8 @@ add_library(server
 	net/stream.cpp
 	net/stream_policy.cpp
 	net/stream_policy_factory.cpp
+    net/validation_scheduler.cpp
+    net/validation_scheduler.h
 	netmessagemaker.h
 	noui.cpp
 	noui.h
