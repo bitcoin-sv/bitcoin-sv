@@ -36,7 +36,7 @@ class BSVNodeSettings(BitcoinTestFramework):
 
         node_settings = self.nodes[0].getsettings()
         # check we received expected fields (parameter settings)
-        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput'])
+        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput','dustlimitfactor'])
         expected_settings = set(parameters).union(optional)
         actual_settings = set(node_settings)
         unexpected_settings = actual_settings - expected_settings
@@ -47,7 +47,6 @@ class BSVNodeSettings(BitcoinTestFramework):
         # check that set policy parameters return expected values
 
         param_scales = defaultdict(lambda: 1, chain(
-            scale_params("limitdescendantsize", "limitancestorsize", scale=1000),
             scale_params("maxorphantxsize", "maxmempool", "maxmempoolsizedisk", scale=1000000)))
         for param in parameters:
             expected = (param, parameters[param] * param_scales[param])
@@ -66,6 +65,7 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxpubkeyspermultisigpolicy': 4294967295,
                        'maxtxsigopscountspolicy': 4294967295,
                        'maxstackmemoryusagepolicy': 100000000,
+                       'maxstackmemoryusageconsensus': 9223372036854775807,
                        'maxorphantxsize': 100,
                        'limitancestorcount': 25,
                        'limitcpfpgroupmemberscount': 13,
@@ -79,6 +79,8 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'blockmintxfee': Decimal('0.00000500'),
                        'maxstdtxvalidationduration': 10,
                        'maxnonstdtxvalidationduration': 1000,
+                       'maxtxchainvalidationbudget': 0,
+                       'validationclockcpu': 0,
                        'minconsolidationfactor': 20,
                        'maxconsolidationinputscriptsize': 150,
                        'minconfconsolidationinput': 10,
@@ -96,6 +98,7 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxpubkeyspermultisigpolicy': 42949,
                        'maxtxsigopscountspolicy': 42949,
                        'maxstackmemoryusagepolicy': 100000,
+                       'maxstackmemoryusageconsensus': 92233720,
                        'maxorphantxsize': 1000,
                        'limitancestorcount': 40,
                        'limitcpfpgroupmemberscount': 31,
@@ -107,8 +110,10 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'minrelaytxfee': Decimal('0.00000150'),
                        'dustrelayfee': Decimal('0.00000150'),
                        'blockmintxfee': Decimal('0.00000250'),
-                       'maxstdtxvalidationduration': 100,
-                       'maxnonstdtxvalidationduration': 2000,
+                       'maxstdtxvalidationduration': 3,
+                       'maxnonstdtxvalidationduration': 90,
+                       'maxtxchainvalidationbudget': 50,
+                       'validationclockcpu': 1,
                        'minconsolidationfactor': 25,
                        'maxconsolidationinputscriptsize': 250,
                        #'minconfconsolidationinput': 4, for convenience we test deprecated switch -minconsolidationinputmaturity

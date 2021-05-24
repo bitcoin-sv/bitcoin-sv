@@ -4,8 +4,10 @@
 
 #include "wallet/wallet.h"
 
+#include "block_index_store.h"
 #include "chainparams.h"
 #include "config.h"
+#include "pow.h"
 #include "rpc/server.h"
 #include "test/test_bitcoin.h"
 #include "validation.h"
@@ -454,8 +456,9 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
 
     // Cap last block file size, and mine new block in a new block file.
     CBlockIndex *oldTip = chainActive.Tip();
-    pBlockFileInfoStore->GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize =
-        DEFAULT_PREFERRED_BLOCKFILE_SIZE;
+    pBlockFileInfoStore
+        ->GetBlockFileInfo(oldTip->GetBlockPos().File())
+        ->AddNewBlock(1, 1, DEFAULT_PREFERRED_BLOCKFILE_SIZE);
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex *newTip = chainActive.Tip();
 
@@ -470,7 +473,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
     }
 
     // Prune the older block file.
-    UnlinkPrunedFiles({oldTip->GetBlockPos().nFile});
+    UnlinkPrunedFiles({oldTip->GetBlockPos().File()});
 
     // Verify ScanForWalletTransactions only picks transactions in the new block
     // file.
@@ -631,12 +634,14 @@ static int64_t AddTx(CWallet &wallet, uint32_t lockTime, int64_t mockTime,
     SetMockTime(mockTime);
     CBlockIndex *block = nullptr;
     if (blockTime > 0) {
-        auto inserted = mapBlockIndex.emplace(GetRandHash(), new CBlockIndex);
-        assert(inserted.second);
-        const uint256 &hash = inserted.first->first;
-        block = inserted.first->second;
-        block->nTime = blockTime;
-        block->phashBlock = &hash;
+        CBlockHeader header;
+        header.nTime = blockTime;
+        header.nBits =
+            GetNextWorkRequired(
+                nullptr,
+                &header,
+                GlobalConfig::GetConfig() );
+        block = mapBlockIndex.Insert( header );
     }
 
     CWalletTx wtx(&wallet, MakeTransactionRef(tx));

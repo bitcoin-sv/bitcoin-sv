@@ -2,73 +2,11 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <chainparamsbase.h>
+#include <config.h>
 #include <rpc/client_config.h>
 #include <rpc/protocol.h>
-#include <util.h>
-#include <utilstrencodings.h>
 
 #include <stdexcept>
-
-namespace
-{
-    // Split out host,port and method from DS authority URL
-    void SplitDSAuthorityURL(const std::string& url, std::string& host, int& port, std::string& endpoint)
-    {
-        auto urlLastPos { url.size() - 1 };
-
-        // Host and port either at the start or follow '://'
-        auto addrStart { url.find("://") };
-        if(addrStart == std::string::npos)
-        {
-            addrStart = 0;
-        }
-        else
-        {
-            // Check for any protocol other than http
-            std::string protocol { url.substr(0, addrStart) };
-            if(protocol != "http")
-            {
-                throw std::runtime_error("Unsupported protocol in URL: " + protocol);
-            }
-
-            addrStart += 3;
-        }
-
-        if(urlLastPos > addrStart)
-        {
-            // End of the address is either the rest of the URL or until a '/' seperator
-            auto addrEnd { url.find('/', addrStart) };
-            std::string::size_type addrLen {};
-            if(addrEnd == std::string::npos)
-            {
-                addrLen = url.size() - addrStart;
-            }
-            else
-            {
-                addrLen = addrEnd - addrStart;
-            }
-
-            if(addrLen > 0)
-            {
-                // Get address and split into host & port
-                std::string addr { url.substr(addrStart, addrLen) };
-                SplitHostPort(addr, port, host);
-
-                // Endpoint optionally follows address
-                auto endPointStart { addrStart + addrLen };
-                if(endPointStart < url.size())
-                {
-                    endpoint = url.substr(endPointStart);
-                }
-
-                // Got everything, so return without error
-                return;
-            }
-        }
-
-        throw std::runtime_error("Badly formatted URL: " + url);
-    }
-}
 
 namespace rpc::client
 {
@@ -109,35 +47,32 @@ RPCClientConfig RPCClientConfig::CreateForBitcoind()
     return config;
 }
 
-RPCClientConfig RPCClientConfig::CreateForDSA()
+RPCClientConfig RPCClientConfig::CreateForDoubleSpendEndpoint(
+    const Config& config,
+    const std::string& addr,
+    int timeout,
+    unsigned protocolVersion)
 {
-    RPCClientConfig config {};
+    RPCClientConfig clientConfig {};
 
-    // Firstly make sure all required config options have been provided
-    if(! gArgs.IsArgSet("-dsauthorityurl"))
-    {
-        throw std::runtime_error("Missing config parameter -dsauthorityurl");
-    }
+    // Get port
+    clientConfig.mServerPort = config.GetDoubleSpendEndpointPort();
 
-    // Get host,port and method from DS authority URL
-    config.mServerPort = DEFAULT_DS_AUTHORITY_PORT;
-    SplitDSAuthorityURL(gArgs.GetArg("-dsauthorityurl", ""), config.mServerIP, config.mServerPort, config.mEndpoint);
+    // Set timeout
+    clientConfig.mConnectionTimeout = timeout;
 
-    // Get timeout
-    config.mConnectionTimeout = gArgs.GetArg("-dsauthoritytimeout", DEFAULT_DS_AUTHORITY_TIMEOUT);
+    // Set IP
+    clientConfig.mServerIP = addr;
 
-    return config;
-}
+    // Initial endpoint
+    std::stringstream str {};
+    str << "/dsnt/" << protocolVersion << "/";
+    clientConfig.mEndpoint = str.str();
 
-RPCClientConfig RPCClientConfig::CreateForDSA(const std::string& url)
-{
-    RPCClientConfig config {};
+    // Server sends empty responses
+    clientConfig.mValidEmptyResponse = true;
 
-    // Get host,port and method from provided DS authority URL
-    config.mServerPort = DEFAULT_DS_AUTHORITY_PORT;
-    SplitDSAuthorityURL(url, config.mServerIP, config.mServerPort, config.mEndpoint);
-
-    return config;
+    return clientConfig;
 }
 
 } // namespace rpc::client

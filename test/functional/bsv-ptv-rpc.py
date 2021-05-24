@@ -11,7 +11,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
 from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
-from test_framework.util import assert_equal, assert_raises_rpc_error, wait_until
+from test_framework.util import assert_equal, assert_raises_rpc_error, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, ToHex
 
@@ -100,12 +100,11 @@ class PTVRPCTests(ComparisonTestFramework):
     def run_scenario2(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=60):
         # Create tx chains.
         txchains = self.run_scenario1(conn, num_of_chains, chain_length, spend, allowhighfees, dontcheckfee, timeout)
+        wait_for_ptv_completion(conn, len(txchains), timeout=timeout)
         # Check if txchains txns are in the mempool.
         self.check_mempool(conn.rpc, set(txchains), timeout=60)
         # Check if there is only num_of_chains * chain_length txns in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchains))
-        # At this stage PTV asynch queues should be empty.
-        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
         # Generate a single block.
         mined_block1 = conn.rpc.generate(1)
         # Mempool should be empty, all txns in the block.

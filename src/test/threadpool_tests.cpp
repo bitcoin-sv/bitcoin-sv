@@ -41,7 +41,7 @@ namespace
     auto lambdaTask { [](unsigned inc){ Function(inc); } };
 }
 
-BOOST_AUTO_TEST_SUITE(TestThreadPool);
+BOOST_AUTO_TEST_SUITE(TestThreadPool)
 
 // Test basic non-prioritised thread pool handling
 BOOST_AUTO_TEST_CASE(NonPrioritised)
@@ -262,5 +262,5 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase4)
 }
 
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()
 

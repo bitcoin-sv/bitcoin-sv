@@ -9,24 +9,11 @@
 
 #include <shared_mutex>
 #include <vector>
-#include <random>
 
 struct COrphanTxnEntry {
     TxInputDataSPtr pTxInputData {nullptr};
     int64_t nTimeExpire {};
     unsigned int size{};
-};
-
-struct IterComparator {
-    template <typename I> bool operator()(const I &a, const I &b) const {
-        return &(*a) < &(*b);
-    }
-};
-
-struct CTxnIdComparator {
-    bool operator ()(const TxInputDataSPtr& lhs, const TxInputDataSPtr& rhs) const {
-        return lhs->GetTxnPtr()->GetId() < rhs->GetTxnPtr()->GetId();
-    }
 };
 
 class COrphanTxns;
@@ -43,18 +30,36 @@ class COrphanTxns {
     static constexpr int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
 
   public:
-    /** A default max limit for collected outpoints */
-    static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
+    // This struct is used to store details of tx (accepted by the mempool),
+    // which are needed to find descendant txs in the orphan pool.
+    struct CTxData final {
+        TxId mTxId {};
+        uint32_t mOutputsCount {};
+        CTxData(const TxId& txid, uint32_t outputsCount)
+        : mTxId{txid},
+          mOutputsCount{outputsCount}
+        {}
+        // equality comparison
+        bool operator==(const COrphanTxns::CTxData& rhs) const {
+            return mTxId == rhs.mTxId && mOutputsCount == rhs.mOutputsCount;
+        }
+    };
+
     /** Default for -maxorphantxssize, maximum size of orphan transactions is 10 MB*/
-    static constexpr uint64_t DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = 100 * ONE_MEGABYTE;
+    static constexpr uint64_t DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = ONE_GIGABYTE;
     /** Default number of orphan+recently-replaced txn to keep around for block
      *  reconstruction */
     static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
+    /** Default for -maxinputspertransactionoutoffirstlayerorphan */
+    static constexpr uint64_t DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION = 5;
+    /** Default for -maxorphansinbatchpercent */
+    static constexpr uint64_t DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH = 60;
 
     COrphanTxns(
-        size_t maxCollectedOutpoints,
         size_t maxExtraTxnsForCompactBlock,
-        size_t maxTxSizePolicy);
+        size_t maxTxSizePolicy,
+        size_t maxPercentageOfOrphansInBatch,
+        size_t maxInputsOutputsPerTx);
     ~COrphanTxns() = default;
 
     // Forbid copying/assignment
@@ -81,31 +86,36 @@ class COrphanTxns {
     std::vector<uint256> getTxnsHash(const COutPoint& prevout) const;
     /** Get extra transactions needed by block's reconstruction */
     CompactExtraTxnsVec getCompactExtraTxns() const;
-    /** Limit a number of orphan transactions size */
-    unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
+    /** Limit the size of orphan transactions pool.
+     *
+     *  After the call the size of orphan pool is guaranteed to be in the range
+     *  [nMaxOrphanTxnsSize - nMaxOrphanTxnsHysteresis, nMaxOrphanTxnsSize]
+     */
+    unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, uint64_t nMaxOrphanTxnsHysteresis, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
-    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker = TxIdTrackerWPtr{});
-    /** Collect txn's outpoints which will be used to find any dependant orphan txn */
-    void collectTxnOutpoints(const CTransaction& tx);
-    /** Erase collected outpoints */
-    void eraseCollectedOutpoints();
-    /** Erase collected outpoints from the given txns */
-    void eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemovedTxIds);
+    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
+    /** Collect tx data which will be used to find any dependant orphan txn */
+    void collectTxData(const CTransaction& tx);
+    /** Erase collected tx data */
+    void eraseCollectedTxData();
+    /** Erase collected tx data from the given txns */
+    void eraseCollectedTxDataFromTxns(const std::vector<TxId>& vRemovedTxIds);
     /** Get a number of orphan transactions queued */
     size_t getTxnsNumber();
     /** Get TxIds of known orphan transactions */
     std::vector<TxId> getTxIds() const;
-    /** Get collected outpoints */
-    std::vector<COutPoint> getCollectedOutpoints();
-    /** Get a random orphan txn by a lower bound (needed for UTs) */
-    TxInputDataSPtr getRndOrphanByLowerBound(const uint256& key);
+    /** Get collected tx data */
+    std::vector<COrphanTxns::CTxData> getCollectedTxData();
+    /** Get a random orphan txn (used by UTs) */
+    TxInputDataSPtr getRndOrphan();
 
   private:
     // Private aliasis
-    using OrphanTxns = std::map<uint256, COrphanTxnEntry>;
+    using OrphanTxns = std::unordered_map<uint256, COrphanTxnEntry, SaltedTxidHasher>;
     using OrphanTxnsIter = OrphanTxns::iterator;
+    using DependentOrphanTxns = std::unordered_set<const COrphanTxnEntry*>;
     using OrphanTxnsByPrev =
-            std::map<COutPoint, std::set<OrphanTxnsIter, IterComparator>>;
+        std::unordered_map<COutPoint, DependentOrphanTxns, SaltedOutpointHasher>;
     using OrphanTxnsByPrevIter = OrphanTxnsByPrev::iterator;
     /** A non-locking version of addToCompactExtraTxns */
     void addToCompactExtraTxnsNL(const CTransactionRef &tx);
@@ -119,10 +129,9 @@ class COrphanTxns {
     OrphanTxnsByPrev mOrphanTxnsByPrev;
     mutable std::shared_mutex mOrphanTxnsMtx {};
 
-    /** Txn outpoints collected and waiting to be used to find any dependant orphan txn */
-    std::vector<COutPoint> mCollectedOutpoints {};
-    size_t mMaxCollectedOutpoints {};
-    mutable std::mutex mCollectedOutpointsMtx {};
+    /** Txn data collected to be used to find any dependant orphan txn */
+    std::vector<COrphanTxns::CTxData> mCollectedTxData {};
+    mutable std::mutex mCollectedTxDataMtx {};
 
     /** Extra txns used by block reconstruction */
     CompactExtraTxnsVec mExtraTxnsForCompact;
@@ -130,10 +139,13 @@ class COrphanTxns {
     size_t mExtraTxnsForCompactIdx {0};
     size_t mMaxExtraTxnsForCompactBlock {0};
     size_t mMaxStandardTxSize {0};
+    size_t mMaxTxsPerBatch {0};
+    size_t mMaxPercentageOfOrphansInBatch {0};
+    size_t mMaxInputsOutputsPerTx {0};
 
     /** Control txns limit by a time slot */
     int64_t mNextSweep {0};
 
-    /** A default generator */
-    std::default_random_engine mGenerator {};
+    /** amount of bytes added since last orphan pool trimming */
+    std::atomic_size_t mUntrimmedSize {0};
 };

@@ -58,30 +58,13 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <dirent.h>
 
 #include "fs.h"
+#include "cfile_util.h"
 
 #include <stdarg.h>
 
 #include <boost/noncopyable.hpp>
 #include <functional>
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
-
-// Takes ownership of file descriptor and closes it in destructor.
-class CAutoCloseFile : public boost::noncopyable {
-  int fd =-1;
-public:
-
-  CAutoCloseFile(int fd) : fd(fd)
-  {
-  }
-
-  ~CAutoCloseFile()
-  {
-    if (fd != -1)
-    {
-      close(fd);
-    }
-  }
-};
 
 // Takes ownership of result of opendir() and closes it in destructor.
 class CAutoCloseDir : public boost::noncopyable {
@@ -235,8 +218,8 @@ void VMTouch::vmtouch_file(const std::string& strPath)
       return;
     }
 
-    // File was sucesfully open. Make sure that ti is closed.
-    CAutoCloseFile file(fd);
+    // File was sucesfully open. Make sure that it is closed.
+    UniqueFileDescriptor file {fd};
     res = fstat(fd, &sb);
 
     if (res) {

@@ -3,6 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
 Check that orphan transaction with max allowed size is accepted.
+Check that the getorphaninfo rpc is working.
 """
 
 from test_framework.blocktools import create_transaction, create_coinbase, create_block
@@ -58,9 +59,14 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
             tx_orphan = make_big_orphan(tx_parent, DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
             assert_equal(len(tx_orphan.serialize()), DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
 
+            before = conn.rpc.getorphaninfo()["size"]
             conn.send_message(msg_tx(tx_orphan))
             # Making sure parent is not sent right away for bitcond to detect an orphan
-            time.sleep(1)
+            wait_until(lambda: conn.rpc.getorphaninfo()["size"]>before, timeout=2)
+
+            after = conn.rpc.getorphaninfo()["size"]
+            assert_equal(before + 1, after)
+
             conn.send_message(msg_tx(tx_parent))
             check_mempool_equals(conn.rpc, [tx_parent, tx_orphan])
 

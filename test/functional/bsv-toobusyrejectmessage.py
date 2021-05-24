@@ -32,6 +32,10 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
         block.solve()
         return block
 
+    def getDataLambda(self, conn, block_hash):
+        lm = conn.last_message.get("getdata")
+        return lm and lm.inv[0].hash == block_hash
+
     def run_test(self):
         self.stop_node(0)
 
@@ -57,8 +61,7 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
                 headers_message = msg_headers()
                 headers_message.headers = [CBlockHeader(block)]
                 connection.cb.send_message(headers_message)
-                connection.cb.wait_for_getdata(block.sha256)
-                connection.cb.sync_with_ping()
+                wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
 
             for key, value in askedFor.items():
                 assert_equal(value, 1)
@@ -80,10 +83,13 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             begin_test = datetime.datetime.now()
             connection.cb.send_message(headers_message)
 
-            connection.cb.wait_for_getdata(block.sha256)
+            wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
+
             connection.cb.last_message["getdata"] = []
 
-            connection.cb.wait_for_getdata(block.sha256)
+            # Bitcoind asks again after 5 seconds.
+            wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
+
             end_test = datetime.datetime.now()
             assert(end_test - begin_test > datetime.timedelta(seconds = 5))
 

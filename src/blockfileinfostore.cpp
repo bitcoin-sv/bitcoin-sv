@@ -4,6 +4,9 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "blockfileinfostore.h"
+
+#include "block_file_access.h"
+#include "block_file_info.h"
 #include "config.h"
 #include "util.h"
 #include "txdb.h"  // CBlockTreeDB
@@ -20,11 +23,11 @@ void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
     // LoadBlockIndexDB function where block file info is being loaded
     // and we can't be certain that it's the only case without more tests
     // and extensive refactoring
-    while (vinfoBlockFile[nFile].nSize &&
+    while (vinfoBlockFile[nFile].Size() &&
            // >= is here for legacy purposes - could possibly be changed to > as
            // currently max file size is one byte less than preferred block file size
            // but larger code analisys would be required
-           vinfoBlockFile[nFile].nSize + nAddSize >= config.GetPreferredBlockFileSize()) {
+           vinfoBlockFile[nFile].Size() + nAddSize >= config.GetPreferredBlockFileSize()) {
         nFile++;
         if (vinfoBlockFile.size() <= nFile) {
             vinfoBlockFile.resize(nFile + 1);
@@ -35,24 +38,19 @@ void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
 void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
     LOCK(cs_LastBlockFile);
 
-    CDiskBlockPos posOld(nLastBlockFile, 0);
+    if ( !vinfoBlockFile.empty() )
+    {
+        assert( nLastBlockFile >= 0 );
+        assert( vinfoBlockFile.size() > static_cast<std::size_t>(nLastBlockFile) );
 
-    FILE *fileOld = CDiskFiles::OpenBlockFile(posOld);
-    if (fileOld) {
-        if (fFinalize) {
-            TruncateFile(fileOld, vinfoBlockFile[nLastBlockFile].nSize);
-        }
-        FileCommit(fileOld);
-        fclose(fileOld);
+        BlockFileAccess::FlushBlockFile(
+            nLastBlockFile,
+            vinfoBlockFile[nLastBlockFile],
+            fFinalize );
     }
-
-    fileOld = CDiskFiles::OpenUndoFile(posOld);
-    if (fileOld) {
-        if (fFinalize) {
-            TruncateFile(fileOld, vinfoBlockFile[nLastBlockFile].nUndoSize);
-        }
-        FileCommit(fileOld);
-        fclose(fileOld);
+    else
+    {
+        assert( nLastBlockFile == 0 );
     }
 }
 
@@ -75,15 +73,14 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
     uint64_t nTime, bool& fCheckForPruning, bool fKnown) {
     LOCK(cs_LastBlockFile);
 
-    unsigned int nFile = fKnown ? pos.nFile : nLastBlockFile;
+    unsigned int nFile = fKnown ? pos.File() : nLastBlockFile;
     if (vinfoBlockFile.size() <= nFile) {
         vinfoBlockFile.resize(nFile + 1);
     }
 
     if (!fKnown) {
         FindNextFileWithEnoughEmptySpace(config, nAddSize, nFile);
-        pos.nFile = nFile;
-        pos.nPos = vinfoBlockFile[nFile].nSize;
+        pos = { static_cast<int>(nFile), static_cast<unsigned int>(vinfoBlockFile[nFile].Size()) };
     }
 
     if ((int)nFile != nLastBlockFile) {
@@ -95,38 +92,26 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
         nLastBlockFile = nFile;
     }
 
-    vinfoBlockFile[nFile].AddBlock(nHeight, nTime);
     if (fKnown) {
-        vinfoBlockFile[nFile].nSize =
-            std::max(pos.nPos + nAddSize, vinfoBlockFile[nFile].nSize);
+        vinfoBlockFile[nFile].AddKnownBlock( nHeight, nTime, nAddSize, pos.Pos() );
     }
     else {
-        vinfoBlockFile[nFile].nSize += nAddSize;
+        vinfoBlockFile[nFile].AddNewBlock( nHeight, nTime, nAddSize );
     }
 
     if (!fKnown) {
         uint64_t nOldChunks =
-            (pos.nPos + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
+            (pos.Pos() + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
         uint64_t nNewChunks =
-            (vinfoBlockFile[nFile].nSize + BLOCKFILE_CHUNK_SIZE - 1) /
+            (vinfoBlockFile[nFile].Size() + BLOCKFILE_CHUNK_SIZE - 1) /
             BLOCKFILE_CHUNK_SIZE;
         if (nNewChunks > nOldChunks) {
             if (fPruneMode) {
                 fCheckForPruning = true;
             }
-            if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
-                FILE *file = CDiskFiles::OpenBlockFile(pos);
-                if (file) {
-                    LogPrintf(
-                        "Pre-allocating up to position 0x%x in blk%05u.dat\n",
-                        nNewChunks * BLOCKFILE_CHUNK_SIZE, pos.nFile);
-                    AllocateFileRange(file, pos.nPos,
-                        nNewChunks * BLOCKFILE_CHUNK_SIZE -
-                        pos.nPos);
-                    fclose(file);
-                }
-            }
-            else {
+
+            if (!BlockFileAccess::PreAllocateBlock( nNewChunks, pos ))
+            {
                 return state.Error("out of disk space");
             }
         }
@@ -138,34 +123,24 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
 
 bool CBlockFileInfoStore::FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
     uint64_t nAddSize, bool& fCheckForPruning) {
-    pos.nFile = nFile;
 
     LOCK(cs_LastBlockFile);
 
-    uint64_t nNewSize;
-    pos.nPos = vinfoBlockFile[nFile].nUndoSize;
-    nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
+    pos = { nFile, static_cast<unsigned int>(vinfoBlockFile[nFile].UndoSize()) };
+    uint64_t nNewSize = vinfoBlockFile[nFile].AddUndoSize( nAddSize );
     setDirtyFileInfo.insert(nFile);
 
     uint64_t nOldChunks =
-        (pos.nPos + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
+        (pos.Pos() + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
     uint64_t nNewChunks =
         (nNewSize + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
     if (nNewChunks > nOldChunks) {
         if (fPruneMode) {
             fCheckForPruning = true;
         }
-        if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
-            FILE *file = CDiskFiles::OpenUndoFile(pos);
-            if (file) {
-                LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
-                    nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-                AllocateFileRange(file, pos.nPos,
-                    nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
-                fclose(file);
-            }
-        }
-        else {
+
+        if (!BlockFileAccess::PreAllocateUndoBlock( nNewChunks, pos ))
+        {
             return state.Error("out of disk space");
         }
     }
@@ -180,14 +155,14 @@ uint64_t CBlockFileInfoStore::CalculateCurrentUsage() {
     // TODO: this method currently required cs_LastBlockFile to be held. Consider moving locking code insied this method  
     uint64_t retval = 0;
     for (const CBlockFileInfo &file : vinfoBlockFile) {
-        retval += file.nSize + file.nUndoSize;
+        retval += file.Size() + file.UndoSize();
     }
     return retval;
 }
 
 void CBlockFileInfoStore::ClearFileInfo(int fileNumber)
 {
-    vinfoBlockFile[fileNumber].SetNull();
+    vinfoBlockFile[fileNumber] = {};
     setDirtyFileInfo.insert(fileNumber);
 }
 
@@ -208,13 +183,13 @@ void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
     // last block to prune is the lesser of (user-specified height,
     // MIN_BLOCKS_TO_KEEP from the tip)
     int32_t nLastBlockWeCanPrune =
-        (chainActive.Tip()->nHeight < MIN_BLOCKS_TO_KEEP) ?
+        (chainActive.Tip()->GetHeight() < MIN_BLOCKS_TO_KEEP) ?
         nManualPruneHeight :
-        std::min(nManualPruneHeight, chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP);
+        std::min(nManualPruneHeight, chainActive.Tip()->GetHeight() - MIN_BLOCKS_TO_KEEP);
     int count = 0;
     for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
-        if (vinfoBlockFile[fileNumber].nSize == 0 ||
-            vinfoBlockFile[fileNumber].nHeightLast > nLastBlockWeCanPrune) {
+        if (vinfoBlockFile[fileNumber].Size() == 0 ||
+            vinfoBlockFile[fileNumber].HeightLast() > nLastBlockWeCanPrune) {
             continue;
         }
         setFilesToPrune.insert(fileNumber);
@@ -252,12 +227,12 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
     if (chainActive.Tip() == nullptr || nPruneTarget == 0) {
         return;
     }
-    if (chainActive.Tip()->nHeight <= nPruneAfterHeight) {
+    if (chainActive.Tip()->GetHeight() <= nPruneAfterHeight) {
         return;
     }
 
     int32_t nLastBlockWeCanPrune =
-        chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP;
+        chainActive.Tip()->GetHeight() - MIN_BLOCKS_TO_KEEP;
     uint64_t nCurrentUsage = pBlockFileInfoStore->CalculateCurrentUsage();
     // We don't check to prune until after we've allocated new space for files,
     // so we should leave a buffer under our target to account for another
@@ -268,10 +243,11 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
 
     if (nCurrentUsage + nBuffer >= nPruneTarget) {
         for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
-            nBytesToPrune = vinfoBlockFile[fileNumber].nSize +
-                vinfoBlockFile[fileNumber].nUndoSize;
+            nBytesToPrune = vinfoBlockFile[fileNumber].Size() +
+                vinfoBlockFile[fileNumber].UndoSize();
 
-            if (vinfoBlockFile[fileNumber].nSize == 0) {
+            if (vinfoBlockFile[fileNumber].Size() == 0)
+            {
                 continue;
             }
 
@@ -282,7 +258,7 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
 
             // don't prune files that could have a block within
             // MIN_BLOCKS_TO_KEEP of the main chain's tip but keep scanning
-            if (vinfoBlockFile[fileNumber].nHeightLast > nLastBlockWeCanPrune) {
+            if (vinfoBlockFile[fileNumber].HeightLast() > nLastBlockWeCanPrune) {
                 continue;
             }
 

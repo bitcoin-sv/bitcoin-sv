@@ -26,7 +26,7 @@ static void interpreter_lshift_int32_max_minus_1(benchmark::State& state)
                    BaseSignatureChecker{}, &err);
     }
 }
-BENCHMARK(interpreter_lshift_int32_max_minus_1);
+BENCHMARK(interpreter_lshift_int32_max_minus_1)
 
 static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
 {
@@ -43,7 +43,7 @@ static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
                    BaseSignatureChecker{}, &err);
     }
 }
-BENCHMARK(interpreter_rshift_int32_max_minus_1);
+BENCHMARK(interpreter_rshift_int32_max_minus_1)
 
 static void interpreter_lshift_6m_minus_1(benchmark::State& state)
 {
@@ -61,7 +61,7 @@ static void interpreter_lshift_6m_minus_1(benchmark::State& state)
                    BaseSignatureChecker{}, &err);
     }
 }
-BENCHMARK(interpreter_lshift_6m_minus_1);
+BENCHMARK(interpreter_lshift_6m_minus_1)
 
 static void interpreter_rshift_6m_minus_1(benchmark::State& state)
 {
@@ -79,4 +79,4 @@ static void interpreter_rshift_6m_minus_1(benchmark::State& state)
                    BaseSignatureChecker{}, &err);
     }
 }
-BENCHMARK(interpreter_rshift_6m_minus_1);
+BENCHMARK(interpreter_rshift_6m_minus_1)

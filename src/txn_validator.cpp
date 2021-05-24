@@ -15,20 +15,13 @@ CTxnValidator::CTxnValidator(
     TxIdTrackerWPtr pTxIdTracker)
     : mConfig(config),
       mMempool(mpool),
-      mpTxnDoubleSpendDetector(dsDetector),
-      mpTxIdTracker(pTxIdTracker) {
+      mpTxnDoubleSpendDetector(dsDetector) {
     // Configure our running frequency
     auto runFreq { gArgs.GetArg("-txnvalidationasynchrunfreq", DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS) };
     mAsynchRunFrequency = std::chrono::milliseconds {runFreq};
     LogPrint(BCLog::TXNVAL,
             "Txnval: Run frequency in asynchronous mode: %u milisec\n",
              runFreq);
-    // Create a shared object for orphan transaction
-    size_t maxCollectedOutpoints {
-        static_cast<size_t>(
-            gArgs.GetArg("-maxcollectedoutpoints",
-                        COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS))
-    };
     size_t maxExtraTxnsForCompactBlock {
         static_cast<size_t>(
                 gArgs.GetArg("-blockreconstructionextratxn",
@@ -36,9 +29,10 @@ CTxnValidator::CTxnValidator(
     };
    
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
-        maxCollectedOutpoints,
         maxExtraTxnsForCompactBlock,
-        config.GetMaxTxSize(true, false) /*orphan tx before genesis might not get accepted by mempool */);
+        config.GetMaxTxSize(true, false), /*orphan tx before genesis might not get accepted by mempool */
+        config.GetMaxOrphansInBatchPercentage(),
+        config.GetMaxInputsForSecondLayerOrphan());
     
     // Max memory usage for transaction queues
     mMaxQueueMemSize =
@@ -96,12 +90,17 @@ std::shared_ptr<CTxnRecentRejects> CTxnValidator::getTxnRecentRejectsPtr() {
 }
 
 /** Get the number of transactions waiting to be processed. */
-size_t CTxnValidator::GetTransactionsInQueueCount() const {
+CTxnValidator::QueueCounts CTxnValidator::GetTransactionsInQueueCounts() const {
     // Take shared locks in the following order.
     std::shared_lock lock1 { mStdTxnsMtx };
     std::shared_lock lock2 { mNonStdTxnsMtx };
     std::shared_lock lock3 { mProcessingQueueMtx };
-    return mStdTxns.size() + mNonStdTxns.size() + mProcessingQueue.size();
+    return {mStdTxns.size(), mNonStdTxns.size(), mProcessingQueue.size()};
+}
+
+/** Get the number of transactions waiting to be processed. */
+size_t CTxnValidator::GetTransactionsInQueueCount() const {
+    return GetTransactionsInQueueCounts().GetTotal();
 }
 
 /** Handle a new transaction */
@@ -232,7 +231,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
         mpTxnDoubleSpendDetector, // Double Spend Detector
-        std::make_shared<COrphanTxns>(0, 0, 0), // A temporary orphan txns queue (unlimited)
+        std::make_shared<COrphanTxns>(0, 0, 0, 0), // A temporary orphan txns queue (unlimited)
         std::make_shared<CTxnRecentRejects>() // A temporary recent rejects queue
     };
     // Process a set of given txns
@@ -440,13 +439,14 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
                             }
                         }
-                        // Clear the processing queue, as a result:
-                        // - destroy any CTxInputData objects which are no longer being referenced by the owning shared ptr
-                        {
-                            std::unique_lock lockPQ { mProcessingQueueMtx };
-                            mProcessingQueue.clear();
-                        }
                     }
+                    // This vector is used to keep track of all txs which were detected, at this stage, as
+                    // (and have to be reprocessed in the next PTV's cycle):
+                    // - resubmitted
+                    // - orphan
+                    // - cancelled
+                    TxInputDataSPtrVec vNextProcessingQueue {};
+
                     // If there are any low priority transactions then move them to the low priority queue.
                     size_t nDetectedLowPriorityTxnsNum = imdResult.mDetectedLowPriorityTxns.size();
                     if (nDetectedLowPriorityTxnsNum) {
@@ -465,11 +465,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: The number of re-submitted txns that need to be reprocessed is %d\n",
                                  nResubmittedTxnsNum);
-                        std::unique_lock lockPQ { mProcessingQueueMtx };
-                        mProcessingQueue = std::move_if_noexcept(imdResult.mResubmittedTxns);
+                        vNextProcessingQueue = std::move_if_noexcept(imdResult.mResubmittedTxns);
                     }
                     // Copy orphan p2p txns for reprocessing (if any exists)
-                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(imdResult.mCancelledTxns);
+                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(imdResult.mCancelledTxns, vNextProcessingQueue);
                     if (nOrphanP2PTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: The number of orphan %s txns that need to be reprocessed is %d\n",
@@ -483,15 +482,26 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 "Txnval-asynch: The number of %s txn(s) which were cancelled and moved to the next iteration is %d\n",
                                  enum_cast<std::string>(TxSource::p2p),
                                  nCancelledTxnsNum);
-                        std::unique_lock lockPQ { mProcessingQueueMtx };
                         if (nOrphanP2PTxnsNum || nResubmittedTxnsNum) {
-                            mProcessingQueue.insert(mProcessingQueue.end(),
+                            vNextProcessingQueue.insert(vNextProcessingQueue.end(),
                                 std::make_move_iterator(imdResult.mCancelledTxns.begin()),
                                 std::make_move_iterator(imdResult.mCancelledTxns.end()));
                         } else {
-                            mProcessingQueue = std::move_if_noexcept(imdResult.mCancelledTxns);
+                            vNextProcessingQueue = std::move_if_noexcept(imdResult.mCancelledTxns);
                         }
                     }
+                    // Swap the contents of the main processing queue and its temporary counterpart.
+                    // 1. It empties the processing queue if there are no txs to reprocess.
+                    // 2. It assigns txs, which need to be reprocessed, if there were any detected.
+                    //    a) doing it now ensures that executing queries, on the processing queue,
+                    //       won't return false negative results
+                    {
+                        std::scoped_lock lockPQ { mProcessingQueueMtx };
+                        std::swap(mProcessingQueue, vNextProcessingQueue);
+                    }
+                    // Clear the swapped content of the temporary vector
+                    // - destroy objects which are no longer being referenced by the owning shared ptr
+                    vNextProcessingQueue.clear();
                     // If no orphan, cancelled and resubmitted transactions were detected, then:
                     // - the processing queue is empty
                     // - unblock one of the waiting threads (if any exists)
@@ -524,6 +534,8 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
     bool fLimitMempoolSize,
     bool fUseLimits) {
 
+    auto noBudget = task::CTimedCancellationBudget{};
+
     // Execute txn validation.
     CTxnValResult result =
         TxnValidation(
@@ -531,7 +543,8 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
             mConfig,
             mMempool,
             mpTxnDoubleSpendDetector,
-            fUseLimits);
+            fUseLimits,
+            noBudget);
     // Process validated results for the given txn
     ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize, mConfig);
     return result;
@@ -656,22 +669,24 @@ void CTxnValidator::postProcessingStepsNL(
         }
     }
     /**
-     * We don't want to keep outpoints from txns which were
+     * We don't want to keep tx data from txns which were
      * removed from the mempool (because of insufficient fee).
      * It could schedule false-possitive orphans for re-try.
      */
     if (handlers.mpOrphanTxns && !vRemovedTxIds.empty()) {
-        handlers.mpOrphanTxns->eraseCollectedOutpointsFromTxns(vRemovedTxIds);
+        handlers.mpOrphanTxns->eraseCollectedTxDataFromTxns(vRemovedTxIds);
     }
 }
 
 // A p2p orphan txn can be scheduled if:
 // - it is not present in the set of cancelled txns.
 // - it was not detected before and scheduled as a non-stdandard txn.
-// Collected orphnas are created as copies and not removed from the orphan's queue.
-size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtrVec& vCancelledTxns) {
+// Detected orphan txs are moved to the result vector of shared_ptrs (to the basic CTxInputData instance).
+size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(
+    const TxInputDataSPtrVec& vCancelledTxns,
+    TxInputDataSPtrVec& vNextProcessingQueue) {
     /** Get p2p orphan txns */
-    auto vOrphanTxns { mpOrphanTxnsP2PQ->collectDependentTxnsForRetry(mpTxIdTracker) };
+    auto vOrphanTxns { mpOrphanTxnsP2PQ->collectDependentTxnsForRetry() };
     size_t nOrphanTxnsNum { vOrphanTxns.size() };
     if (nOrphanTxnsNum) {
         // Remove those orphans which are present in the set of cancelled txns or already enqueued.
@@ -679,14 +694,13 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtr
             [this, &vCancelledTxns](const TxInputDataSPtr& txn){
                 const TxId& txid = txn->GetTxnPtr()->GetId();
                 return isTxnKnownInSetNL(txid, vCancelledTxns); });
-        // Move txns into the processing queue.
+        // Move ptrs to the result vector.
         nOrphanTxnsNum = vOrphanTxns.size();
         if (nOrphanTxnsNum) {
-            std::unique_lock lockPQ { mProcessingQueueMtx };
-            if (mProcessingQueue.empty()) {
-                mProcessingQueue = std::move_if_noexcept(vOrphanTxns);
+            if (vNextProcessingQueue.empty()) {
+                vNextProcessingQueue = std::move_if_noexcept(vOrphanTxns);
             } else {
-                mProcessingQueue.insert(mProcessingQueue.end(),
+                vNextProcessingQueue.insert(vNextProcessingQueue.end(),
                     std::make_move_iterator(vOrphanTxns.begin()),
                     std::make_move_iterator(vOrphanTxns.end()));
             }
@@ -753,9 +767,9 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const {
     return true;
 }
 
-/** Wait for the Validator to process all queued txns.
+/** Wait for the Validator until the predicate returns true.
  * An interface to facilitate Unit Tests.*/
-void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
+void CTxnValidator::waitUntil(std::function<bool(const QueueCounts&)> predicate, bool fCheckOrphanQueueEmpty) {
     do {
        std::shared_lock lock { mProcessingQueueMtx };
        // Block the calling thread until notification is received and the predicate is not satisfied
@@ -763,5 +777,11 @@ void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
        mTxnsProcessedCV.wait(lock,
                [&] { return (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
     // Check that there is no transactions in the ptv queues after getting a notification from the processing queue.
-    } while (GetTransactionsInQueueCount());
+    } while (!predicate(GetTransactionsInQueueCounts()));
+}
+
+/** Wait for the Validator to process all queued txns.
+ * An interface to facilitate Unit Tests.*/
+void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
+    waitUntil([](const auto& counts) -> bool { return counts.GetTotal() == 0; }, fCheckOrphanQueueEmpty);
 }

@@ -1,9 +1,11 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <config.h>
 #include <net/net.h>
 #include <net/netbase.h>
 #include <net/stream.h>
+#include "config.h"
 
 // Enable enum_cast for StreamType, so we can log informatively
 const enumTableT<StreamType>& enumTable(StreamType)
@@ -22,7 +24,7 @@ const enumTableT<StreamType>& enumTable(StreamType)
 
 namespace
 {
-    bool IsOversizedMessage(const Config& config, const CNetMessage& msg)
+    bool IsOversizedMessage(const Config& config, const CNetMessage& msg, uint64_t maxBlockSize)
     {   
         if(!msg.in_data)
         {   
@@ -30,7 +32,7 @@ namespace
             return false;
         }
 
-        return msg.hdr.IsOversized(config);
+        return msg.hdr.IsOversized(config, maxBlockSize);
     }
 
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
@@ -45,6 +47,28 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
         mRecvBytesPerMsgCmd[msg] = 0;
     }
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
+
+    // Remember any sending rate limit that's been set
+    mSendRateLimit = GlobalConfig::GetConfig().GetStreamSendRateLimit();
+
+    // Fetch the MSS for the underlying socket
+    int mss {0};
+    socklen_t mssLen { sizeof(mss) };
+#ifdef TCP_MAXSEG
+#ifdef WIN32
+    if(getsockopt(mSocket, IPPROTO_TCP, TCP_MAXSEG, reinterpret_cast<char*>(&mss), &mssLen) != SOCKET_ERROR)
+#else
+    if(getsockopt(mSocket, IPPROTO_TCP, TCP_MAXSEG, &mss, &mssLen) != SOCKET_ERROR)
+#endif
+    {
+        // Sanity check read mss before using it
+        size_t sizeMss { static_cast<size_t>(mss) };
+        if(sizeMss > MIN_MAX_SEGMENT_SIZE && sizeMss <= MAX_MAX_SEGMENT_SIZE)
+        {
+            mMSS = sizeMss;
+        }
+    }
+#endif
 }
 
 Stream::~Stream()
@@ -60,7 +84,7 @@ void Stream::Shutdown()
     LOCK(cs_mSocket);
     if(mSocket != INVALID_SOCKET)
     {
-        LogPrint(BCLog::NET, "closing %s stream to peer=%d\n", enum_cast<std::string>(mStreamType),
+        LogPrint(BCLog::NETCONN, "closing %s stream to peer=%d\n", enum_cast<std::string>(mStreamType),
             mNode->GetId());
         CloseSocket(mSocket);
     }
@@ -156,7 +180,7 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                 // socket closed gracefully
                 if (!mNode->GetDisconnect())
                 {   
-                    LogPrint(BCLog::NET, "stream socket closed\n");
+                    LogPrint(BCLog::NETCONN, "stream socket closed\n");
                 }
                 mNode->CloseSocketDisconnect();
             }
@@ -206,10 +230,30 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
     // Track send queue length
     mSendMsgQueueSize += nTotalSize;
 
-    mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
-    if(nPayloadLength)
-    {   
-        mSendMsgQueue.push_back(msg.MoveData());
+    // Combine short messages and their header into a single item in the queue.
+    // This helps to reduce the number of TCP segments sent and so reduces wastage.
+    if(nPayloadLength && nTotalSize <= mMSS)
+    {
+        // Extract all payload from the underlying stream and combine it with the header
+        serialisedHeader.reserve(nTotalSize);
+        auto payloadStream { msg.MoveData() };
+        while(!payloadStream->EndOfStream())
+        {
+            const CSpan& data { payloadStream->ReadAsync(msg.Size()) };
+            serialisedHeader.insert(serialisedHeader.end(), data.Begin(), data.Begin() + data.Size());
+        }
+
+        // Queue combined header & data
+        mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
+    }
+    else
+    {
+        // Queue header and payload separately
+        mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
+        if(nPayloadLength)
+        {   
+            mSendMsgQueue.push_back(msg.MoveData());
+        }
     }
 
     // If write queue empty, attempt "optimistic write"
@@ -336,6 +380,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     mLastRecvTime = nTimeMicros / MICROS_PER_SECOND;
     mTotalBytesRecv += nBytes;
     mBytesRecvThisSpot += nBytes;
+    uint64_t maxBlockSize = config.GetMaxBlockSize();
 
     while (nBytes > 0)
     {   
@@ -351,7 +396,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
         int handled;
         if (!msg.in_data)
         {   
-            handled = msg.readHeader(config, pch, nBytes);
+            handled = msg.readHeader(config, pch, nBytes, maxBlockSize);
             if (handled < 0)
             {   
                 return RECV_BAD_LENGTH;//Notify bad message as soon as seen in the header
@@ -367,9 +412,9 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
             return RECV_FAIL;
         }
 
-        if (IsOversizedMessage(config, msg))
+        if (IsOversizedMessage(config, msg, maxBlockSize))
         {   
-            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
+            LogPrint(BCLog::NETCONN, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
             return RECV_BAD_LENGTH;
         }
 
@@ -456,16 +501,30 @@ void Stream::GetNewMsgs()
 Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize)
 {
     AssertLockHeld(cs_mNode);
+    AssertLockHeld(cs_mSendMsgQueue);
 
-    if (maxChunkSize == 0)
+    if (maxChunkSize == 0 || mSendRateLimit >= 0)
     {   
-        // if maxChunkSize is 0 assign some default chunk size value
+        // If maxChunkSize is 0 or we're applying rate limiting for testing,
+        // assign some small default chunk size value
         maxChunkSize = 1024;
     }
     uint64_t sentSize = 0;
 
     do
-    {   
+    {
+        // See if we need to apply a sending rate limit
+        if(mSendRateLimit >= 0)
+        {
+            double timeSending { static_cast<double>(GetTimeMicros() - mSendStartTime) };
+            double avgBytesSec { (mTotalBytesSent / timeSending) * MICROS_PER_SECOND };
+            if(avgBytesSec >= mSendRateLimit)
+            {
+                // Don't send any more for now
+                return {false, sentSize};
+            }
+        }
+
         ssize_t nBytes = 0;
         if (!mSendChunk)
         {   

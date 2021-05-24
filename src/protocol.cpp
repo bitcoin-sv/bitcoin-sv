@@ -49,7 +49,7 @@ bool IsBlockLike(const std::string &strCommand) {
            strCommand == NetMsgType::BLOCKTXN;
 }
 
-uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config, uint64_t maxBlockSize)
 {
     if (command == NetMsgType::PROTOCONF)
     {
@@ -71,7 +71,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
 
         // If the message is GETBLOCKTXN, it is limited to an estimate of the maximum number of
         // short TXIDs the message could contain.
-        return (config.GetMaxBlockSize() / MIN_TX_SIZE * SHORT_TXID_SIZE) + CMessageHeader::HEADER_SIZE;
+        return (maxBlockSize / MIN_TX_SIZE * SHORT_TXID_SIZE) + CMessageHeader::HEADER_SIZE;
     }
     else if (!NetMsgType::IsBlockLike(command))
     {
@@ -82,11 +82,11 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
     else
     {
         // Maximum accepted block type message size
-        return config.GetMaxBlockSize();
+        return maxBlockSize;
     }
 }
 
-}; // namespace NetMsgType
+} // namespace NetMsgType
 
 /**
  * All known message types. Keep this in the same order as the list of messages
@@ -122,7 +122,15 @@ CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn,
     memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
+    GCC_WARNINGS_PUSH;
+    #if defined __GNUC__ && (__GNUC__ >= 8)
+        // -Wstringop-truncation was introduced in GCC 8
+        GCC_WARNINGS_IGNORE(-Wstringop-truncation);
+    #endif
+    // length of pszCommand is always smaller than COMMAND_SIZE
     strncpy(pchCommand, pszCommand, COMMAND_SIZE);
+    GCC_WARNINGS_POP;
+
     nPayloadLength = nPayloadLengthIn;
     memset(pchChecksum, 0, CHECKSUM_SIZE);
 }
@@ -168,7 +176,8 @@ bool CMessageHeader::IsValid(const Config &config) const {
     }
 
     // Message size
-    if (IsOversized(config)) {
+    uint64_t maxBlockSize = config.GetMaxBlockSize();
+    if (IsOversized(config, maxBlockSize)) {
         LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) is oversized\n",
                   GetCommand(), nPayloadLength);
         return false;
@@ -177,23 +186,12 @@ bool CMessageHeader::IsValid(const Config &config) const {
     return true;
 }
 
-bool CMessageHeader::IsOversized(const Config &config) const 
+bool CMessageHeader::IsOversized(const Config &config, uint64_t maxBlockSize) const
 {
-    return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config);
+    return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config, maxBlockSize);
 }
 
-CAddress::CAddress() : CService() {
-    Init();
-}
-
-CAddress::CAddress(CService ipIn, ServiceFlags nServicesIn) : CService(ipIn) {
-    Init();
-    nServices = nServicesIn;
-}
-
-void CAddress::Init() {
-    nServices = NODE_NONE;
-    nTime = 100000000;
+CAddress::CAddress(CService ipIn, ServiceFlags nServicesIn) : CService{ipIn}, nServices{nServicesIn} {
 }
 
 std::string CInv::GetCommand() const {

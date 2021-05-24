@@ -5,6 +5,7 @@
 #include "consensus/merkle.h"
 #include "test/test_bitcoin.h"
 #include "task_helpers.h"
+#include "merkletree.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -57,9 +58,9 @@ BlockGetMerkleBranch(const CBlock &block,
     return vMerkleBranch;
 }
 
-static inline int ctz(uint32_t i) {
+static inline size_t ctz(uint32_t i) {
     if (i == 0) return 0;
-    int j = 0;
+    size_t j = 0;
     while (!(i & 1)) {
         j++;
         i >>= 1;
@@ -68,14 +69,14 @@ static inline int ctz(uint32_t i) {
 }
 
 BOOST_AUTO_TEST_CASE(merkle_test) {
-    for (int i = 0; i < 32; i++) {
+    for (size_t i = 0; i < 32; i++) {
         // Try 32 block sizes: all sizes from 0 to 16 inclusive, and then 15
         // random sizes.
-        int ntx = (i <= 16) ? i : 17 + (InsecureRandRange(4000));
+        size_t ntx = (i <= 16) ? i : 17 + (InsecureRandRange(4000));
         // Try up to 3 mutations.
-        for (int mutate = 0; mutate <= 3; mutate++) {
+        for (size_t mutate = 0; mutate <= 3; mutate++) {
             // The last how many transactions to duplicate first.
-            int duplicate1 = mutate >= 1 ? 1 << ctz(ntx) : 0;
+            size_t duplicate1 = mutate >= 1 ? 1 << ctz(ntx) : 0;
             if (duplicate1 >= ntx) {
                 // Duplication of the entire tree results in a different root
                 // (it adds a level).
@@ -83,19 +84,21 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             }
 
             // The resulting number of transactions after the first duplication.
-            int ntx1 = ntx + duplicate1;
+            size_t ntx1 = ntx + duplicate1;
             // Likewise for the second mutation.
-            int duplicate2 = mutate >= 2 ? 1 << ctz(ntx1) : 0;
-            if (duplicate2 >= ntx1) break;
-            int ntx2 = ntx1 + duplicate2;
+            size_t duplicate2 = mutate >= 2 ? 1 << ctz(ntx1) : 0;
+            if (duplicate2 >= ntx1)
+                break;
+            size_t ntx2 = ntx1 + duplicate2;
             // And for the third mutation.
-            int duplicate3 = mutate >= 3 ? 1 << ctz(ntx2) : 0;
-            if (duplicate3 >= ntx2) break;
-            int ntx3 = ntx2 + duplicate3;
+            size_t duplicate3 = mutate >= 3 ? 1 << ctz(ntx2) : 0;
+            if (duplicate3 >= ntx2)
+                break;
+            size_t ntx3 = ntx2 + duplicate3;
             // Build a block with ntx different transactions.
             CBlock block;
             block.vtx.resize(ntx);
-            for (int j = 0; j < ntx; j++) {
+            for (size_t j = 0; j < ntx; j++) {
                 CMutableTransaction mtx;
                 mtx.nLockTime = j;
                 block.vtx[j] = MakeTransactionRef(std::move(mtx));
@@ -112,13 +115,13 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             // Optionally mutate by duplicating the last transactions, resulting
             // in the same merkle root.
             block.vtx.resize(ntx3);
-            for (int j = 0; j < duplicate1; j++) {
+            for (size_t j = 0; j < duplicate1; j++) {
                 block.vtx[ntx + j] = block.vtx[ntx + j - duplicate1];
             }
-            for (int j = 0; j < duplicate2; j++) {
+            for (size_t j = 0; j < duplicate2; j++) {
                 block.vtx[ntx1 + j] = block.vtx[ntx1 + j - duplicate2];
             }
-            for (int j = 0; j < duplicate3; j++) {
+            for (size_t j = 0; j < duplicate3; j++) {
                 block.vtx[ntx2 + j] = block.vtx[ntx2 + j - duplicate3];
             }
             // Compute the merkle root and merkle tree using the old mechanism.
@@ -144,8 +147,8 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             // If no mutation was done (once for every ntx value), try up to 16
             // branches.
             if (mutate == 0) {
-                for (int loop = 0; loop < std::min(ntx, 16); loop++) {
-                    // If ntx <= 16, try all branches. Otherise, try 16 random
+                for (size_t loop = 0; loop < std::min(ntx, size_t{16}); loop++) {
+                    // If ntx <= 16, try all branches. Otherwise, try 16 random
                     // ones.
                     size_t mtx = loop;
                     if (ntx > 16) {

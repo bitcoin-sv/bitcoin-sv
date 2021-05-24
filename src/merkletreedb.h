@@ -19,7 +19,7 @@ struct MerkleTreeDiskPosition
     int fileSuffix{0};
     uint64_t fileOffset{0};
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)
@@ -40,7 +40,7 @@ struct MerkleTreeFileInfo
     int32_t greatestBlockHeight{0};
     uint64_t fileSize{0};
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)

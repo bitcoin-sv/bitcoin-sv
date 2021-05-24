@@ -20,6 +20,7 @@ import time
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+from .streams import BlockPriorityStreamPolicy, DefaultStreamPolicy
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -335,7 +336,6 @@ def initialize_datadir(dirname, n):
         f.write("regtest=1\n")
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
-        f.write("listenonion=0\n")
         f.write("shrinkdebugfile=0\n")
     return datadir
 
@@ -396,18 +396,54 @@ def disconnect_nodes_bi(nodes, node_a_index, node_b_index):
     disconnect_nodes(nodes[node_a_index], node_b_index)
     disconnect_nodes(nodes[node_b_index], node_a_index)
 
-def connect_nodes(from_connection, node_num):
-    ip_port = "127.0.0.1:" + str(p2p_port(node_num))
-    from_connection.addnode(ip_port, "onetry")
-    # poll until version handshake complete to avoid race conditions
-    # with transaction relaying
-    while any(peer['version'] == 0 for peer in from_connection.getpeerinfo()):
-        time.sleep(0.1)
+# Returns False if node has -multistreams=0 set
+def is_multistreams_enabled(node):
+    for extra_arg in node.extra_args:
+        if '-multistreams' in extra_arg:
+            checkValueAt = extra_arg.find("=") + 1
+            return int(extra_arg[checkValueAt:])
+    return True
 
+# Returns the number of additional stream policies used by connecting nodes.
+def number_of_additional_streams(from_node, to_node):
+    streampolicies_from_node = from_node.getnetworkinfo()["streampolicies"].split(",")
+    streampolicies_to_node = to_node.getnetworkinfo()["streampolicies"].split(",")
+    # Find the first policy both nodes have in common and return the number of additional streams used by the matched policy
+    for policy_from_node in streampolicies_from_node:
+        for policy_to_node in streampolicies_to_node:
+            if policy_from_node == policy_to_node:
+                additional_streams = []
+                if policy_from_node == "BlockPriority":
+                    additional_streams = BlockPriorityStreamPolicy().additional_streams
+                elif  policy_from_node == "Default":
+                    additional_streams = DefaultStreamPolicy().additional_streams
+                else:
+                    raise AssertionError("Connecting test nodes are using an unexpected stream policy %s" % (policy_from_node))
+                return len(additional_streams)
+    return 0
+
+# Connects two nodes and waits for connection to be established
+# Set wait_multistreams to False to skip waiting for multistreams connection establishment
+def connect_nodes(nodes, from_node_num, to_node_num, wait_multistreams=True):
+    ip_port = "127.0.0.1:" + str(p2p_port(to_node_num))
+    nodes[from_node_num].addnode(ip_port, "onetry")
+
+    # check if both nodes use multistreams (True by default)
+    multiStreamsEnabled = wait_multistreams and is_multistreams_enabled(nodes[from_node_num]) and is_multistreams_enabled(nodes[to_node_num])
+
+    # Poll until version handshake complete to avoid race conditions with transaction relaying
+    # Wait for fully established associations if multistreams is set on both nodes:
+    # - only connections with 'testnode<to_node_num>' 'subver' are waited here
+    # - 'associd' must not be 'Not-Set'
+    # - 'streams' must contain predefined number of streams, depending on -multistreampolicies configuration parameter
+    subver = "testnode%d" % to_node_num
+    # Number of streams between nodes that will be established
+    number_of_streams = number_of_additional_streams(nodes[from_node_num], nodes[to_node_num]) + 1
+    wait_until(lambda: all(peer['version'] != 0 and (not multiStreamsEnabled or subver not in peer['subver'] or (peer['associd'] != 'Not-Set' and len(peer['streams']) == number_of_streams)) for peer in nodes[from_node_num].getpeerinfo()))
 
 def connect_nodes_bi(nodes, a, b):
-    connect_nodes(nodes[a], b)
-    connect_nodes(nodes[b], a)
+    connect_nodes(nodes, a, b)
+    connect_nodes(nodes, b, a)
 
 def connect_nodes_mesh(nodes, bi=False):
     for i in range(len(nodes)):
@@ -415,7 +451,7 @@ def connect_nodes_mesh(nodes, bi=False):
             if bi:
                 connect_nodes_bi(nodes, i, j)
             else:
-                connect_nodes(nodes[i], j)
+                connect_nodes(nodes, i, j)
 
 def sync_blocks(rpc_connections, *, wait=1, timeout=60):
     """
@@ -817,6 +853,18 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
         import zmq
     except ImportError:
         raise Exception("pyzmq module not available.")
+
+def wait_for_ptv_completion(conn, exp_mempool_size, check_interval=0.1, timeout=60):
+    """
+    The invocation of this function waits until the following conditions are met:
+    a) there is an expected amount of transactions in the mempool
+    b) there are no transactions in the ptv's queues, including: pending, being processed, detected orphans
+    Both conditions ensure that the call won't finish too early, because of race conditions such as:
+    - not sending all txs to the node through the connection
+    """
+    wait_until(lambda: conn.rpc.getmempoolinfo()['size'] >= exp_mempool_size,
+                    check_interval=check_interval, timeout=timeout)
+    conn.rpc.waitforptvcompletion()
 
 def wait_for_txn_propagator(node):
     # Wait for this node's transactions propagator to finish relaying transactions to other nodes.

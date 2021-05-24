@@ -108,3 +108,19 @@ std::string CTransaction::ToString() const {
         str += "    " + vout[i].ToString() + "\n";
     return str;
 }
+
+// Test for double-spend notification enabled output on a transaction
+std::pair<bool, size_t> TxnHasDSNotificationOutput(const CTransaction& txn)
+{
+    // Look for the first double-spend notification enabled output, there should only be 1
+    for(size_t output = 0; output < txn.vout.size(); ++output)
+    {
+        if(IsDSNotification(txn.vout[output].scriptPubKey))
+        {
+            return { true, output };
+        }
+    }
+
+    return { false, 0 };
+}
+

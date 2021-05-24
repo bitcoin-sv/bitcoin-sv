@@ -58,6 +58,9 @@ bool IsTxnKnown(const CInv &inv);
 /** Check if block is already known */
 bool IsBlockKnown(const CInv &inv);
 
+/** Possibly ban a misbehaving peer */
+void Misbehaving(NodeId pnode, int howmuch, const std::string& reason);
+
 /** Relay transaction */
 void RelayTransaction(const CTransaction &tx, CConnman &connman);
 

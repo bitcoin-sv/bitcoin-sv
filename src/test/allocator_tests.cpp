@@ -145,7 +145,10 @@ public:
             }
 
             // Fake address, do not actually use this memory
+            MSVC_WARNINGS_PUSH;
+            MSVC_WARNINGS_IGNORE(4312);
             return reinterpret_cast<void *>(0x08000000 + (count << 24));
+            MSVC_WARNINGS_POP;
         }
         return 0;
     }

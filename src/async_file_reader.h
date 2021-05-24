@@ -32,7 +32,7 @@
     class CAsyncFileReader
     {
     public:
-        CAsyncFileReader(std::unique_ptr<FILE, CCloseFile>&& file)
+        CAsyncFileReader(UniqueCFile file)
             : mFile{std::move(file)}
         {
             assert(mFile);
@@ -152,10 +152,18 @@
             return aio_error(&controllBlock) != EINPROGRESS;
         }
 
-        std::unique_ptr<FILE, CCloseFile> mFile;
+        UniqueCFile mFile;
         int mFileId;
         size_t mOffset;
+#if !defined(__clang__) && defined(__GNUC__)
+	//warning: invalid use of ‘struct aiocb’ with a zero-size array in ‘class CAsyncFileReader’ [-Wpedantic]
+        #pragma GCC diagnostic ignored "-Wpedantic"
+#endif
         aiocb mControllBlock;
+#if !defined(__clang__) && defined(__GNUC__)
+        #pragma GCC diagnostic pop
+#endif
+
         bool mReadInProgress = false;
         bool mEndOfStream = false;
     };

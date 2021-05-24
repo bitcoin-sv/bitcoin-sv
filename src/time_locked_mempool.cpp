@@ -233,7 +233,7 @@ void CTimeLockedMempool::dumpMempool() const
         }
 
         FileCommit(file.Get());
-        file.fclose();
+        file.reset();
         RenameOver(GetDataDir() / "non-final-mempool.dat.new", GetDataDir() / "non-final-mempool.dat");
         int64_t last { GetTimeMicros() };
         LogPrintf("Dumped %d txns to non-final mempool: %.6fs to dump\n", numTxns, (last - start) * 0.000001);
@@ -290,7 +290,7 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                     mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->nHeight + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->GetHeight() + 1, reason) };
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
@@ -555,16 +555,16 @@ void CTimeLockedMempool::periodicChecks()
         ++it;
 
         // Lock time passed?
-        if(IsFinalTx(*txn, chainTip->nHeight + 1, chainTip->GetMedianTimePast()))
+        if(IsFinalTx(*txn, chainTip->GetHeight() + 1, chainTip->GetMedianTimePast()))
         {
             LogPrint(BCLog::MEMPOOL, "Finalising non-final transaction %s at block height %d, mtp %d\n",
-                txn->GetId().ToString(), chainTip->nHeight + 1, chainTip->GetMedianTimePast());
+                txn->GetId().ToString(), chainTip->GetHeight() + 1, chainTip->GetMedianTimePast());
 
             removeNL(txn);
 
             // For full belt-and-braces safety, resubmit newly final transaction for revalidation
             std::string reason {};
-            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->nHeight + 1, reason) };
+            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->GetHeight() + 1, reason) };
             g_connman->EnqueueTxnForValidator(
                 std::make_shared<CTxInputData>(
                     pTxIdTracker,

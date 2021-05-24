@@ -12,6 +12,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
+#include "rpc/client_config.h"
 #include "script/standard.h"
 #include "txn_validation_config.h"
 #include "validation.h"
@@ -25,194 +26,222 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include <memory>
 #include <string>
 #include <orphan_txns.h>
+#include <shared_mutex>
 
 class CChainParams;
 struct DefaultBlockSizeParams;
 
 class Config : public boost::noncopyable, public CScriptConfig {
 public:
-    // used to specify default block size related parameters
-    virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
-    
-    virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
-    
-    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
+    virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
     virtual uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const = 0;
+    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
     virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
-
-    virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
-
     virtual const CChainParams &GetChainParams() const = 0;
-
-    virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
-
-    virtual bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConsolidationFactor() const = 0;
-
-    virtual bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
-
-    virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConfConsolidationInput() const = 0;
-
-    virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
-
-    virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
-
-    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
+    virtual int64_t GetDustLimitFactor() const = 0;
     virtual CFeeRate GetBlockMinFeePerKB() const = 0;
-
-    virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
-
-    virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
-
-    virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
-
-    virtual bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
-
-    virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
-
-    virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
     virtual uint64_t GetFactorMaxSendQueuesBytes() const = 0;
     virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
-
-    virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
-
-    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
     virtual int32_t GetGenesisActivationHeight() const = 0;
-
-    virtual bool SetMaxConcurrentAsyncTasksPerNode(
-        int maxConcurrentAsyncTasksPerNode,
-        std::string* error = nullptr) = 0;
     virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
-
-    virtual bool SetBlockScriptValidatorsParams(
-        int maxParallelBlocks,
-        int perValidatorThreadsCount,
-        int perValidatorThreadMaxBatchSize,
-        std::string* error = nullptr) = 0;
     virtual int GetMaxParallelBlocks() const = 0;
     virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
     virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
-
-    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
-
-    /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
-    virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
     virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
-
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
-
-    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
-
-    virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
-
-    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
+    virtual bool GetValidationClockCPU() const = 0;
+    virtual std::chrono::milliseconds GetMaxTxnChainValidationBudget() const = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
-
-    virtual void SetAcceptNonStandardOutput(bool accept) = 0;
     virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
-
-    virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
-
-    virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
-
-    virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
-    virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
-
-    virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
     virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
-
-    virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
     virtual bool IsClientUABanned(const std::string uaClient) const = 0;
-    virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxMerkleTreeDiskSpace() const = 0;
-    virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetPreferredMerkleTreeFileSize() const = 0;
-    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxMerkleTreeMemoryCacheSize() const = 0;
-
-    virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
-
-    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
-    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
-
-    virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
-    virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
-
-    virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
-
-    virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
-
-    virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
+    virtual uint64_t GetMaxOrphansInBatchPercentage() const = 0;
+    virtual uint64_t GetMaxInputsForSecondLayerOrphan() const = 0;
     virtual int32_t GetStopAtHeight() const = 0;
-
-    virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
     virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
     virtual bool IsSetPromiscuousMempoolFlags() const = 0;
-
-    virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
     virtual std::set<std::string> GetInvalidTxSinks() const = 0;
     virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
-
-    virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
-
-    virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
 
-    // P2P parameters
-    virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
-    virtual int64_t GetP2PHandshakeTimeout() const = 0;
+    // Block download
+    virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
+    virtual int64_t GetBlockStallingTimeout() const = 0;
+    virtual int64_t GetBlockDownloadWindow() const = 0;
+    virtual int64_t GetBlockDownloadSlowFetchTimeout() const = 0;
+    virtual uint64_t GetBlockDownloadMaxParallelFetch() const = 0;
 
-    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
-    virtual bool GetDisableBIP30Checks() const = 0;
+    // P2P parameters
+    virtual int64_t GetP2PHandshakeTimeout() const = 0;
+    virtual int64_t GetStreamSendRateLimit() const = 0;
+    virtual unsigned int GetBanScoreThreshold() const = 0;
 
 #if ENABLE_ZMQ
-    virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
 #endif
 
-    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
-    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
     virtual unsigned int GetMaxProtocolRecvPayloadLength() const = 0;
     virtual unsigned int GetMaxProtocolSendPayloadLength() const = 0;
     virtual unsigned int GetRecvInvQueueFactor() const = 0;
+    virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
+    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
+    virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
+    virtual bool GetDisableBIP30Checks() const = 0;
+
+    // Double-Spend processing parameters
+    virtual DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const = 0;
+    virtual int GetDoubleSpendEndpointFastTimeout() const = 0;
+    virtual int GetDoubleSpendEndpointSlowTimeout() const = 0;
+    virtual uint64_t GetDoubleSpendEndpointSlowRatePerHour() const = 0;
+    virtual int GetDoubleSpendEndpointPort() const = 0;
+    virtual uint64_t GetDoubleSpendTxnRemember() const = 0;
+    virtual uint64_t GetDoubleSpendEndpointBlacklistSize() const = 0;
+    virtual std::set<std::string> GetDoubleSpendEndpointSkipList() const = 0;
+    virtual uint64_t GetDoubleSpendEndpointMaxCount() const = 0;
+    virtual uint64_t GetDoubleSpendNumFastThreads() const = 0;
+    virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
+    virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
 
 protected:
     ~Config() = default;
 };
 
-class GlobalConfig final : public Config {
+class ConfigInit : public Config {
+public:
+    // used to specify default block size related parameters
+    virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams& params) = 0;
+    virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
+    virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
+    virtual void SetMinFeePerKB(CFeeRate amt) = 0;
+    virtual bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) = 0;
+    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
+    virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
+    virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
+    virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
+    virtual void SetTestBlockCandidateValidity(bool test) = 0;
+    virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
+    virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
+    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) = 0;
+    virtual bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) = 0;
+    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
+    /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
+    virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) = 0;
+    virtual void SetValidationClockCPU(bool enable) = 0;
+    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
+    virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
+    virtual void SetAcceptNonStandardOutput(bool accept) = 0;
+    virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
+    virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
+    virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
+    virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
+    virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
+    virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
+    virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
+    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
+    virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
+    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
+    virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
+    virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
+    virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
+    virtual bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) = 0;
+    virtual bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) = 0;
+    virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
+    virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
+    virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+
+    // Block download
+    virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
+    virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) = 0;
+
+    // P2P parameters
+    virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
+    virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
+
+    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
+
+#if ENABLE_ZMQ
+    virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
+#endif
+
+    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
+    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
+    virtual bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) = 0;
+
+    // Reset state of this object to match a newly constructed one.
+    // Used in constructor and for unit testing to always start with a clean
+    // state
+    virtual void Reset() = 0;
+
+    // Double-Spend processing parameters
+    virtual bool SetDoubleSpendNotificationLevel(int level, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointPort(int port, std::string* err) = 0;
+    virtual bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) = 0;
+    virtual bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) = 0;
+    virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
+    virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
+    virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
+
+protected:
+    ~ConfigInit() = default;
+};
+
+class GlobalConfig final : public ConfigInit {
 public:
     GlobalConfig();
 
@@ -249,6 +278,9 @@ public:
 
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
+
+    bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override;
+    int64_t GetDustLimitFactor() const override;
 
     void SetBlockMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetBlockMinFeePerKB() const override;
@@ -310,6 +342,12 @@ public:
     bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override;
 
+    bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxTxnChainValidationBudget() const override;
+
+    void SetValidationClockCPU(bool enable) override;
+    bool GetValidationClockCPU() const override;
+
     bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
 
@@ -363,6 +401,12 @@ public:
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
 
+    bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) override;
+    uint64_t GetMaxOrphansInBatchPercentage() const override;
+    
+    bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) override;
+    uint64_t GetMaxInputsForSecondLayerOrphan() const override;
+
     bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override;
     int32_t GetStopAtHeight() const override;
 
@@ -380,9 +424,25 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    // Block download
+    bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
+    uint64_t GetBlockStallingMinDownloadSpeed() const override;
+    bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetBlockStallingTimeout() const override;
+    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadWindow() const override;
+    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadSlowFetchTimeout() const override;
+    bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) override;
+    uint64_t GetBlockDownloadMaxParallelFetch() const override;
+
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
+    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override;
+    int64_t GetStreamSendRateLimit() const override;
+    bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override;
+    unsigned int GetBanScoreThreshold() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -398,14 +458,45 @@ public:
     unsigned int GetMaxProtocolSendPayloadLength() const override;
     unsigned int GetRecvInvQueueFactor() const override;
 
+    // Double-Spend processing parameters
+    bool SetDoubleSpendNotificationLevel(int level, std::string* err) override;
+    DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const override;
+    bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) override;
+    int GetDoubleSpendEndpointFastTimeout() const override;
+    bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) override;
+    int GetDoubleSpendEndpointSlowTimeout() const override;
+    bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) override;
+    uint64_t GetDoubleSpendEndpointSlowRatePerHour() const override;
+    bool SetDoubleSpendEndpointPort(int port, std::string* err) override;
+    int GetDoubleSpendEndpointPort() const override;
+    bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) override;
+    uint64_t GetDoubleSpendTxnRemember() const override;
+    bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) override;
+    uint64_t GetDoubleSpendEndpointBlacklistSize() const override;
+    bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) override;
+    std::set<std::string> GetDoubleSpendEndpointSkipList() const override;
+    bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) override;
+    uint64_t GetDoubleSpendEndpointMaxCount() const override;
+    bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override;
+    uint64_t GetDoubleSpendNumFastThreads() const override;
+    bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override;
+    uint64_t GetDoubleSpendNumSlowThreads() const override;
+    bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override;
+    uint64_t GetDoubleSpendQueueMaxMemory() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
-    void Reset(); 
-    static GlobalConfig& GetConfig();
+    void Reset() override;
+
+    // GetConfig() is used where read-only access to global configuration is needed.
+    static Config& GetConfig();
+    // GetModifiableGlobalConfig() should only be used in initialization and unit tests.
+    static ConfigInit& GetModifiableGlobalConfig();
 
 private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
+    int64_t dustLimitFactor;
     CFeeRate blockMinFeePerKB;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
@@ -452,6 +543,9 @@ private:
 
     std::chrono::milliseconds mMaxStdTxnValidationDuration;
     std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
+    std::chrono::milliseconds mMaxTxnChainValidationBudget;
+
+    bool mValidationClockCPU;
 
     uint64_t maxStackMemoryUsagePolicy;
     uint64_t maxStackMemoryUsageConsensus;
@@ -472,6 +566,8 @@ private:
     uint64_t mMempoolMaxPercentCPFP;
     uint64_t mMemPoolExpiry;
     uint64_t mMaxOrphanTxSize;
+    uint64_t mMaxPercentageOfOrphansInMaxBatchSize;
+    uint64_t mMaxInputsForSecondLayerOrphan;
     int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
     bool mIsSetPromiscuousMempoolFlags;
@@ -487,21 +583,48 @@ private:
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
+    // Block download
+    uint64_t blockStallingMinDownloadSpeed;
+    int64_t blockStallingTimeout;
+    int64_t blockDownloadWindow;
+    int64_t blockDownloadSlowFetchTimeout;
+    uint64_t blockDownloadMaxParallelFetch;
+
     // P2P parameters
     int64_t p2pHandshakeTimeout;
+    int64_t streamSendRateLimit;
     unsigned int maxProtocolRecvPayloadLength;
     unsigned int maxProtocolSendPayloadLength;
     unsigned int recvInvQueueFactor;
+    unsigned int banScoreThreshold;
+
+    // Double-Spend parameters
+    DSAttemptHandler::NotificationLevel dsNotificationLevel;
+    int dsEndpointFastTimeout;
+    int dsEndpointSlowTimeout;
+    uint64_t dsEndpointSlowRatePerHour;
+    int dsEndpointPort;
+    uint64_t dsEndpointBlacklistSize;
+    std::set<std::string> dsEndpointSkipList;
+    uint64_t dsEndpointMaxCount;
+    uint64_t dsAttemptTxnRemember;
+    uint64_t dsAttemptNumFastThreads;
+    uint64_t dsAttemptNumSlowThreads;
+    uint64_t dsAttemptQueueMaxMemory;
 
     std::optional<bool> mDisableBIP30Checks;
 
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
+
+    // Only for values that can change in runtime
+    mutable std::shared_mutex configMtx{};
+
 };
 
 // Dummy for subclassing in unittests
-class DummyConfig : public Config {
+class DummyConfig : public ConfigInit {
 public:
     DummyConfig();
     DummyConfig(std::string net);
@@ -573,6 +696,9 @@ public:
 
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
+
+    bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override{return true;};
+    int64_t GetDustLimitFactor() const override { return 0; }
 
     void SetBlockMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetBlockMinFeePerKB() const override { return CFeeRate(Amount(0)); }
@@ -686,6 +812,20 @@ public:
         return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
     }
 
+    bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+
+        return false;
+    }
+    std::chrono::milliseconds GetMaxTxnChainValidationBudget() const override
+    {
+        return DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET;
+    }
+
+    void SetValidationClockCPU(bool enable) override {}
+    bool GetValidationClockCPU() const override { return DEFAULT_VALIDATION_CLOCK_CPU; }
+
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
     {
         SetErrorMsg(err);
@@ -779,6 +919,23 @@ public:
     }
     uint64_t GetMaxOrphanTxSize() const override { return COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE; }
 
+    bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+
+    uint64_t GetMaxOrphansInBatchPercentage() const override { return COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH; };
+    
+    bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxInputsForSecondLayerOrphan() const override { return COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION; };
+
     bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override
     {
         SetErrorMsg(err);
@@ -837,9 +994,51 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
 
+    // Block download
+    bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
+    bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockStallingTimeout() const override { return DEFAULT_BLOCK_STALLING_TIMEOUT; }
+    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadWindow() const override { return DEFAULT_BLOCK_DOWNLOAD_WINDOW; }
+    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadSlowFetchTimeout() const override { return DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT; }
+    bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockDownloadMaxParallelFetch() const override { return DEFAULT_MAX_BLOCK_PARALLEL_FETCH; }
+
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
     int64_t GetP2PHandshakeTimeout() const override { return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL; }
+    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override { return true; }
+    int64_t GetStreamSendRateLimit() const override { return Stream::DEFAULT_SEND_RATE_LIMIT; }
+    bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override { return true; }
+    unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
+
+    // Double-Spend processing parameters
+    bool SetDoubleSpendNotificationLevel(int level, std::string* err) override { return true; }
+    DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const override { return DSAttemptHandler::DEFAULT_NOTIFY_LEVEL; }
+    bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) override { return true; }
+    int GetDoubleSpendEndpointFastTimeout() const override { return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT; }
+    bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) override { return true; }
+    int GetDoubleSpendEndpointSlowTimeout() const override { return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT; }
+    bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendEndpointSlowRatePerHour() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR; }
+    bool SetDoubleSpendEndpointPort(int port, std::string* err) override { return true; }
+    int GetDoubleSpendEndpointPort() const override { return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT; }
+    bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendTxnRemember() const override { return DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT; }
+    bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendEndpointBlacklistSize() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE; }
+    bool SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err) override { return true; }
+    std::set<std::string> GetDoubleSpendEndpointSkipList() const override { return {}; }
+    bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendEndpointMaxCount() const override { return DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT; }
+    bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendNumFastThreads() const override { return DSAttemptHandler::DEFAULT_NUM_FAST_THREADS; }
+    bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendNumSlowThreads() const override { return DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS; }
+    bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendQueueMaxMemory() const override { return DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY * ONE_MEGABYTE; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
@@ -885,6 +1084,8 @@ public:
     {
         return true;
     }
+
+    void Reset() override;
 
 private:
     std::unique_ptr<CChainParams> chainParams;

@@ -558,7 +558,7 @@ static UniValue getnetworkinfo(const Config &config,
             "per network\n"
             "  {\n"
             "    \"name\": \"xxx\",                     (string) network "
-            "(ipv4, ipv6 or onion)\n"
+            "(ipv4 or ipv6)\n"
             "    \"limited\": true|false,               (boolean) is the "
             "network limited using -onlynet?\n"
             "    \"reachable\": true|false,             (boolean) is the "

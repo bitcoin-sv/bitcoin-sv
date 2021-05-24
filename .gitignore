@@ -7,7 +7,6 @@ src/bitcoin-cli
 src/bitcoin-miner
 src/bitcoin-tx
 src/test/test_bitcoin
-src/test/test_bitcoin_fuzzy
 # autoreconf
 Makefile.in
 aclocal.m4

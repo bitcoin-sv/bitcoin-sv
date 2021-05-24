@@ -8,42 +8,41 @@
 #include "script/script.h"
 #include "serialize.h"
 #include "streams.h"
+#include "univalue.h"
 #include "utilstrencodings.h"
 #include "version.h"
-#include <univalue.h>
+
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
 
-CScript ParseScript(const std::string &s) {
-    CScript result;
-
-    static std::map<std::string, opcodetype> mapOpNames;
-
-    if (mapOpNames.empty()) {
-        for (int op = 0; op < FIRST_UNDEFINED_OP_VALUE; op++) {
-            if (op < OP_PUSHDATA1) {
-                continue;
-            }
-
-            const char *name = GetOpName((opcodetype)op);
-            if (strcmp(name, "OP_UNKNOWN") == 0) {
-                continue;
-            }
-
-            std::string strName(name);
-            mapOpNames[strName] = (opcodetype)op;
+static std::map<std::string, opcodetype> init_op_names()
+{
+    std::map<std::string, opcodetype> op_names;
+    for(int op = OP_PUSHDATA1; op < FIRST_UNDEFINED_OP_VALUE; op++)
+    {
+        std::string name{GetOpName((opcodetype)op)};
+        if(name != "OP_UNKNOWN")
+        {
+            op_names[name] = (opcodetype)op;
             // Convenience: OP_ADD and just ADD are both recognized:
-            boost::algorithm::replace_first(strName, "OP_", "");
-            mapOpNames[strName] = (opcodetype)op;
+            boost::algorithm::replace_first(name, "OP_", "");
+            op_names[name] = (opcodetype)op;
         }
     }
+    return op_names;
+}
+
+CScript ParseScript(const std::string& s)
+{
+    static const std::map<std::string, opcodetype> mapOpNames{init_op_names()};
 
     std::vector<std::string> words;
     boost::algorithm::split(words, s, boost::algorithm::is_any_of(" \t\n"),
                             boost::algorithm::token_compress_on);
 
+    CScript result;
     size_t push_size = 0, next_push_size = 0;
     size_t script_size = 0;
     // Deal with PUSHDATA1 operation with some more hacks.
@@ -102,11 +101,10 @@ CScript ParseScript(const std::string &s) {
             goto next;
         }
 
-        if (mapOpNames.count(w)) {
+        if(const auto it{mapOpNames.find(w)}; it != end(mapOpNames))
+        {
             // opcode, e.g. OP_ADD or ADD:
-            opcodetype op = mapOpNames[w];
-
-            result << op;
+            result << it->second;
             goto next;
         }
 

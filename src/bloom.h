@@ -73,7 +73,7 @@ public:
     CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,uint8_t nFlagsIn);
     CBloomFilter() : nHashFuncs(0), nTweak(0), nFlags(0) { return;}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

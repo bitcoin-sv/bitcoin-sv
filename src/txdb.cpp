@@ -5,8 +5,11 @@
 
 #include "txdb.h"
 
+#include "block_file_info.h"
 #include "chainparams.h"
 #include "config.h"
+#include "disk_block_index.h"
+#include "disk_tx_pos.h"
 #include "hash.h"
 #include "init.h"
 #include "pow.h"
@@ -419,7 +422,7 @@ bool CBlockTreeDB::WriteBatchSync(
              blockinfo.begin();
          it != blockinfo.end(); it++) {
         batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()),
-                    CDiskBlockIndex(*it));
+                    CDiskBlockIndex(const_cast<CBlockIndex&>(**it)));
     }
     return WriteBatch(batch, true);
 }
@@ -449,43 +452,9 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
-bool CBlockTreeDB::LoadBlockIndexGuts(
-    std::function<CBlockIndex *(const uint256 &)> insertBlockIndex) {
-    const Config &config = GlobalConfig::GetConfig();
-
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
-
-    pcursor->Seek(std::make_pair(DB_BLOCK_INDEX, uint256()));
-
-    // Load mapBlockIndex
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
-        if (!pcursor->GetKey(key) || key.first != DB_BLOCK_INDEX) {
-            break;
-        }
-
-        CDiskBlockIndex diskindex;
-        if (!pcursor->GetValue(diskindex)) {
-            return error("LoadBlockIndex() : failed to read value");
-        }
-
-        // Construct block index object
-        CBlockIndex *pindexNew = insertBlockIndex(diskindex.GetBlockHash());
-        pindexNew->LoadFromPersistentData(
-            diskindex,
-            insertBlockIndex(diskindex.hashPrev));
-
-        if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits,
-                              config)) {
-            return error("LoadBlockIndex(): CheckProofOfWork failed: %s",
-                         pindexNew->ToString());
-        }
-
-        pcursor->Next();
-    }
-
-    return true;
+std::unique_ptr<CDBIterator> CBlockTreeDB::GetIterator()
+{
+    return std::unique_ptr<CDBIterator>{ NewIterator() };
 }
 
 bool CoinsDB::IsOldDBFormat()
@@ -574,14 +543,23 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
             }
         }
 
-        // sleep for a while to give the other thread a chance to load the coin
-        // before re-attempting to access it
+        // All but the first reader will end up here. Give the initial thread a
+        // chance to load the coin before re-attempting to access it.
         //
-        // the code would get here extremely rarely (e.g. during parallel block
-        // validation and almost simultaneous request of the same coin) so we
-        // don't need to worry about this sleep penalty
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(5ms);
+        // The code would get here extremely rarely during parallel block
+        // validation and almost simultaneous request of the same coin.
+        //
+        // The other, more likely scenario is chain validation when we validate
+        // dependant transactions in parallel. Validation will look for the
+        // transaction outputs of the ancestor transaction, that we will
+        // normally not find, and in parallel in a separate task validation of
+        // the dependant transaction will load inputs that we will _also_ not
+        // find.
+        //
+        // Sleeping as little time as possible speeds up the more common
+        // not-found case.
+        //
+        std::this_thread::yield();
     }
 
     // Only one thread can reach this point for each distinct outpoint – this

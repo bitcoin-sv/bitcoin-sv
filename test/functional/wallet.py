@@ -436,31 +436,6 @@ class WalletTest(BitcoinTestFramework):
         assert(extra_txid not in self.nodes[0].getrawmempool())
         assert(extra_txid in [tx["txid"]
                               for tx in self.nodes[0].listtransactions()])
-        self.nodes[0].abandontransaction(extra_txid)
-        total_txs = len(self.nodes[0].listtransactions("*", 99999))
-
-        # Try with walletrejectlongchains
-        # Double chain limit but require combining inputs, so we pass SelectCoinsMinConf
-        self.stop_node(0)
-        self.start_node(0, extra_args=[
-                        "-walletrejectlongchains", "-limitancestorcount=" + str(2 * chainlimit)])
-
-        # wait for loadmempool
-        timeout = 10
-        while (timeout > 0 and len(self.nodes[0].getrawmempool()) < chainlimit * 2):
-            time.sleep(0.5)
-            timeout -= 0.5
-        assert_equal(len(self.nodes[0].getrawmempool()), chainlimit * 2)
-
-        node0_balance = self.nodes[0].getbalance()
-        # With walletrejectlongchains we will not create the tx and store it in our wallet.
-        assert_raises_rpc_error(-4, "Transaction has too long of a mempool chain",
-                                self.nodes[0].sendtoaddress, sending_addr, node0_balance - Decimal('0.01'))
-
-        # Verify nothing new in wallet
-        assert_equal(total_txs, len(
-            self.nodes[0].listtransactions("*", 99999)))
-
 
 if __name__ == '__main__':
     WalletTest().main()

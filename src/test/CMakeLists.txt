@@ -45,6 +45,9 @@ gen_json_header(JSON_HEADERS
 )
 
 include(TestSuite)
+include(CheckCXXCompilerFlag)
+include(CheckCCompilerFlag)
+
 create_test_suite(bitcoin)
 add_dependencies(check check-bitcoin)
 
@@ -60,8 +63,11 @@ add_test_to_suite(bitcoin test_bitcoin
     big_int_tests.cpp
 	bip32_tests.cpp
 	blockcheck_tests.cpp
+    block_download_tracking_tests.cpp
 	blockencodings_tests.cpp
+	block_index_mutex_distribution_tests.cpp
 	block_info_tests.cpp
+	blockindex_with_descendants_tests.cpp
 	blockmaxsize_tests.cpp
 	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
@@ -82,7 +88,9 @@ add_test_to_suite(bitcoin test_bitcoin
 	cuckoocache_tests.cpp
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
+    dsattempt_tests.cpp
 	dstencode_tests.cpp
+    dstxn_serialiser_tests.cpp
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp
@@ -97,6 +105,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	json_tests.cpp
 	jsonutil.cpp
 	key_tests.cpp
+    leaky_bucket_tests.cpp
 	limitedmap_tests.cpp
 	limitedstack_tests.cpp
 	locked_ref_tests.cpp
@@ -153,6 +162,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	thread_safe_queue_tests.cpp
     threadpool_tests.cpp
 	timedata_tests.cpp
+    time_limited_blacklist_tests.cpp
     time_locked_mempool_tests.cpp
 	ttor_tests.cpp
 	transaction_tests.cpp

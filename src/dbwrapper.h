@@ -181,7 +181,7 @@ private:
     }
 };
 
-}; // namespace dbwrapper_private
+} // namespace dbwrapper_private
 
 /** Batch of changes queued to be written to a CDBWrapper */
 class CDBBatch {

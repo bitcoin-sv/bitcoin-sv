@@ -6,6 +6,7 @@
 #include "mining/journal_builder.h"
 #include "mining/journaling_block_assembler.h"
 
+#include "block_index_store.h"
 #include "chainparams.h"
 #include "coins.h"
 #include "config.h"
@@ -13,6 +14,7 @@
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "policy/policy.h"
+#include "pow.h"
 #include "pubkey.h"
 #include "script/script_num.h"
 #include "script/standard.h"
@@ -63,6 +65,33 @@ struct CoinsDB::UnitTestAccess<miner_tests_uid>
 };
 using TestAccessCoinsDB = CoinsDB::UnitTestAccess<miner_tests_uid>;
 
+template <>
+struct CBlockIndex::UnitTestAccess<miner_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void SetTime( CBlockIndex& index, int64_t time)
+    {
+        index.nTime = time;
+    }
+
+    static void AddTime( CBlockIndex& index, int64_t time)
+    {
+        index.nTime += time;
+    }
+
+    static void SubTime( CBlockIndex& index, int64_t time)
+    {
+        index.nTime -= time;
+    }
+
+    static void SetHeight( CBlockIndex& index, int32_t height)
+    {
+        index.nHeight = height;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
+
 static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
 
 static struct {
@@ -99,29 +128,12 @@ static struct {
     {2, 0xbbbeb305}, {2, 0xfe1c810a},
 };
 
-CBlockIndex CreateBlockIndex(int32_t nHeight) {
-    CBlockIndex index;
-    index.nHeight = nHeight;
-    index.pprev = chainActive.Tip();
-    return index;
-}
-
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
     CoinsDBView view{ *pcoinsTip };
     CCoinsViewMemPool viewMemPool{view, mempool};
     CCoinsViewCache cache{viewMemPool};
 
     return CheckSequenceLocks(*chainActive.Tip(), tx, config, flags, nullptr, &cache);
-}
-
-static bool transactionInBlock(const CBlockTemplate& pBlockTemplate, const TxId& txId)
-{
-    for (const auto& txn : pBlockTemplate.GetBlockRef()->vtx) {
-        if (txn->GetId() == txId) {
-            return true;
-        }
-    }
-    return false;
 }
 
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
@@ -303,10 +315,11 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
         times[i] = chainActive.Tip()
-                       ->GetAncestor(chainActive.Tip()->nHeight - i)
-                       ->nTime;
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime =
-            P2SH_ACTIVATION_TIME;
+                       ->GetAncestor(chainActive.Tip()->GetHeight() - i)
+                       ->GetBlockTime();
+        TestAccessCBlockIndex::SetTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
+            P2SH_ACTIVATION_TIME);
     }
 
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
@@ -336,8 +349,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.Clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Restore the MedianTimePast.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime =
-            times[i];
+        TestAccessCBlockIndex::SetTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
+            times[i]);
     }
 
     // Double spend txn pair in mempool, template creation fails.
@@ -362,45 +376,40 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     BOOST_CHECK_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.Clear();
 
-    // Subsidy changing.
-    int32_t nHeight = chainActive.Height();
-    // Create an actual 209999-long block chain (without valid blocks).
-    while (chainActive.Tip()->nHeight < 209999) {
-        CBlockIndex *prev = chainActive.Tip();
-        CBlockIndex *next = new CBlockIndex();
-        next->phashBlock = new uint256(InsecureRand256());
-        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
-        next->pprev = prev;
-        next->nHeight = prev->nHeight + 1;
-        next->BuildSkip();
-        chainActive.SetTip(next);
-    }
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    // Extend to a 210000-long block chain.
-    while (chainActive.Tip()->nHeight < 210000) {
-        CBlockIndex *prev = chainActive.Tip();
-        CBlockIndex *next = new CBlockIndex();
-        next->phashBlock = new uint256(InsecureRand256());
-        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
-        next->pprev = prev;
-        next->nHeight = prev->nHeight + 1;
-        next->BuildSkip();
-        chainActive.SetTip(next);
-    }
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    
-    if (testingSetup.testConfig.GetMiningCandidateBuilder() == mining::CMiningFactory::BlockAssemblerType::JOURNALING)
     {
-        mining::g_miningFactory.reset();
-    }
-    
-    // Delete the dummy blocks again.
-    while (chainActive.Tip()->nHeight > nHeight) {
-        CBlockIndex *del = chainActive.Tip();
-        chainActive.SetTip(del->pprev);
-        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, del->pprev->GetBlockHash());
-        delete del->phashBlock;
-        delete del;
+        // Subsidy changing.
+        auto tipMarker = chainActive.Tip();
+        // Create an actual 209999-long block chain (without valid blocks).
+        while (chainActive.Tip()->GetHeight() < 209999) {
+            CBlockHeader header;
+            header.nTime = GetTime();
+            header.hashPrevBlock = chainActive.Tip()->GetBlockHash();
+            header.nBits = chainActive.Tip()->GetBits();
+            CBlockIndex* next = mapBlockIndex.Insert( header );
+            TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
+            chainActive.SetTip(next);
+        }
+        BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+        // Extend to a 210000-long block chain.
+        while (chainActive.Tip()->GetHeight() < 210000) {
+            CBlockHeader header;
+            header.nTime = GetTime();
+            header.hashPrevBlock = chainActive.Tip()->GetBlockHash();
+            header.nBits = chainActive.Tip()->GetBits();
+            CBlockIndex* next = mapBlockIndex.Insert( header );
+            TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
+            chainActive.SetTip(next);
+        }
+        BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+        
+        if (testingSetup.testConfig.GetMiningCandidateBuilder() == mining::CMiningFactory::BlockAssemblerType::JOURNALING)
+        {
+            mining::g_miningFactory.reset();
+        }
+
+        // Remove dummy blocks that were created in this scope from the active chain.
+        chainActive.SetTip( tipMarker );
+        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, tipMarker->GetBlockHash());
     }
 
     if (testingSetup.testConfig.GetMiningCandidateBuilder() == mining::CMiningFactory::BlockAssemblerType::JOURNALING)
@@ -422,7 +431,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
     tx.vin[0].scriptSig = CScript() << OP_1;
     // txFirst[0] is the 2nd block
-    tx.vin[0].nSequence = chainActive.Tip()->nHeight + 1;
+    tx.vin[0].nSequence = chainActive.Tip()->GetHeight() + 1;
     prevheights[0] = baseheight + 1;
     tx.vout.resize(1);
     tx.vout[0].nValue = BLOCKSUBSIDY - HIGHFEE;
@@ -449,10 +458,14 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     // Sequence locks fail.
     BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), testingSetup.testConfig, flags));
-    // Sequence locks pass on 2nd block.
-    BOOST_CHECK(
-        SequenceLocks(CTransaction(tx), flags, &prevheights,
-                      CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
+
+    {
+        CBlockIndex::TemporaryBlockIndex index{ *chainActive.Tip(), {} };
+
+        TestAccessCBlockIndex::SetHeight(index, index->GetHeight() + 1);
+        // Sequence locks pass on 2nd block.
+        BOOST_CHECK(SequenceLocks(CTransaction(tx), flags, &prevheights, index));
+    }
 
     // Relative time locked.
     tx.vin[0].prevout = COutPoint(txFirst[1]->GetId(), 0);
@@ -484,24 +497,31 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime +=
-            512;
+        TestAccessCBlockIndex::AddTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
+            512);
     }
-    // Sequence locks pass 512 seconds later.
-    BOOST_CHECK(
-        SequenceLocks(CTransaction(tx), flags, &prevheights,
-                      CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
+
+    {
+        CBlockIndex::TemporaryBlockIndex index{ *chainActive.Tip(), {} };
+
+        // Sequence locks pass 512 seconds later.
+        BOOST_CHECK(
+            SequenceLocks(CTransaction(tx), flags, &prevheights, index));
+    }
+
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Undo tricked MTP.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime -=
-            512;
+        TestAccessCBlockIndex::SubTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
+            512);
     }
 
     // Absolute height locked.
     tx.vin[0].prevout = COutPoint(txFirst[2]->GetId(), 0);
     tx.vin[0].nSequence = CTxIn::SEQUENCE_FINAL - 1;
     prevheights[0] = baseheight + 3;
-    tx.nLockTime = chainActive.Tip()->nHeight + 1;
+    tx.nLockTime = chainActive.Tip()->GetHeight() + 1;
     hash = tx.GetId();
     mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
 
@@ -526,7 +546,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
-            config, CTransaction(tx), state, chainActive.Tip()->nHeight + 2,
+            config, CTransaction(tx), state, chainActive.Tip()->GetHeight() + 2,
             chainActive.Tip()->GetMedianTimePast(), false));
     }
 
@@ -559,13 +579,13 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
-            config, CTransaction(tx), state, chainActive.Tip()->nHeight + 1,
+            config, CTransaction(tx), state, chainActive.Tip()->GetHeight() + 1,
             chainActive.Tip()->GetMedianTimePast() + 1, false));
     }
 
     // mempool-dependent transactions (not added)
     tx.vin[0].prevout = COutPoint(hash, 0);
-    prevheights[0] = chainActive.Tip()->nHeight + 1;
+    prevheights[0] = chainActive.Tip()->GetHeight() + 1;
     tx.nLockTime = 0;
     tx.vin[0].nSequence = 0;
 
@@ -605,16 +625,17 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // mined.
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime +=
-            512;
+        TestAccessCBlockIndex::AddTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
+            512);
     }
-    chainActive.Tip()->nHeight++;
+    TestAccessCBlockIndex::SetHeight( *chainActive.Tip(), chainActive.Tip()->GetHeight() + 1 );
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
     BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
 
-    chainActive.Tip()->nHeight--;
+    TestAccessCBlockIndex::SetHeight( *chainActive.Tip(), chainActive.Tip()->GetHeight() - 1 );
     SetMockTime(0);
     mempool.Clear();
 
@@ -679,32 +700,38 @@ void Test_BlockAssembler_construction(TestingSetup& testingSetup)
 
 void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTime, uint64_t expectedSize)
 {
-    std::vector<CBlockIndex> blocks(11);
-
-    // Construct chain  with desired median time. Set time of each block to 
-    // the same value to get desired median past time.
-    CBlockIndex* pprev{ nullptr };
-    int32_t height = 0;
-    for (auto& block : blocks)
-    {
-        block.nTime = medianPastTime;
-        block.pprev = pprev;
-        block.nHeight = height;
-
-        pprev = &block;
-        height++;
-    }
-
-
-    // Make sure that we got correct median past time.
-    BOOST_REQUIRE_EQUAL(blocks.back().GetMedianTimePast(), medianPastTime);
+    BlockIndexStore blockIndexStore;
 
     {
         LOCK(cs_main);
 
-        // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
-        chainActive.SetTip(&blocks.back());
+        // Construct chain  with desired median time. Set time of each block to 
+        // the same value to get desired median past time.
+        int32_t height = 0;
+        uint256 prevHash;
+        do
+        {   
+            CBlockHeader header;
+            header.nTime = medianPastTime;
+            header.hashPrevBlock = prevHash;
+            header.nBits =
+                GetNextWorkRequired(
+                    chainActive.Tip(),
+                    &header,
+                    GlobalConfig::GetConfig() );
+            CBlockIndex* next = blockIndexStore.Insert( header );
+
+            prevHash = next->GetBlockHash();
+
+            // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
+            chainActive.SetTip( next );
+        }
+        while(++height < 11);
     }
+
+    // Make sure that we got correct median past time.
+    BOOST_REQUIRE_EQUAL(chainActive.Tip()->GetMedianTimePast(), medianPastTime);
+
 
     BOOST_REQUIRE(mining::g_miningFactory.get() == nullptr);
     mining::CMiningFactory miningFactory { testingSetup.testConfig };

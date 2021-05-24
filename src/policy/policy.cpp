@@ -48,21 +48,36 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
     return whichType != TX_NONSTANDARD;
 }
 
+bool IsDustReturnTxn (const CTransaction &tx)
+{
+    return tx.vout.size() == 1
+        && tx.vout[0].nValue.GetSatoshis() == 0U
+        && IsDustReturnScript(tx.vout[0].scriptPubKey);
+}
+
+
 // Check if a transaction is a consolidation transaction.
 // A consolidation transaction is a transaction which reduces the size of the UTXO database to
 // an extent that is rewarding enough for the miner to mine the transaction for free.
+// However, if a consolidation transaction is donated to the miner, then we do not need to honour the consolidation factor
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
-    const uint64_t factor = config.GetMinConsolidationFactor();
-    const uint64_t minConf = config.GetMinConfConsolidationInput();
-    const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
-    const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
-
-
     // Allow disabling free consolidation txns via configuring
     // the consolidation factor to zero
-    if (factor == 0)
+    if (config.GetMinConsolidationFactor() == 0)
         return false;
+
+    const bool isDonation = IsDustReturnTxn(tx);
+
+    const uint64_t factor = isDonation
+            ? tx.vin.size()
+            : config.GetMinConsolidationFactor();
+    const int32_t minConf = isDonation
+            ? int32_t(0)
+            : config.GetMinConfConsolidationInput();
+
+    const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
+    const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
 
     if (tx.IsCoinBase())
         return false;
@@ -81,10 +96,10 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
         assert(coin.has_value());
         const auto coinHeight = coin->GetHeight();
 
-        if (coinHeight == MEMPOOL_HEIGHT)
+        if (minConf > 0 && coinHeight == MEMPOOL_HEIGHT)
             return false;
 
-        if (coinHeight && (tipHeight + 1 - coinHeight < minConf)) // older versions did not store height
+        if (minConf > 0 && coinHeight && (tipHeight + 1 - coinHeight < minConf)) // older versions did not store height
             return false;
 
         // spam detection
@@ -160,7 +175,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
-        } else if (txout.IsDust(dustRelayFee, IsGenesisEnabled(config, nHeight))) {
+        } else if (txout.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, nHeight))) {
             reason = "dust";
             return false;
         }

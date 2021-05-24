@@ -44,6 +44,16 @@ namespace
             response->SetBody(evbuffer_pullup(buf, size), size);
             evbuffer_drain(buf, size);
         }
+
+        // Pull out requested headers
+        struct evkeyvalq* headers { evhttp_request_get_input_headers(req) };
+        for(const auto& expected : response->GetExpectedHeaders())
+        {
+            if(const char* val = evhttp_find_header(headers, expected.c_str()))
+            {
+                response->SetHeaderValue(expected, val);
+            }
+        }
     }
 
     // Convert error codes to messages
@@ -87,7 +97,7 @@ namespace rpc::client
 {
 
 // Submit a request and wait for a response
-void RPCClient::SubmitRequest(const HTTPRequest& request, HTTPResponse* response) const
+void RPCClient::SubmitRequest(HTTPRequest& request, HTTPResponse* response) const
 {
     // Obtain event base
     raii_event_base base { obtain_event_base() };
@@ -114,12 +124,29 @@ void RPCClient::SubmitRequest(const HTTPRequest& request, HTTPResponse* response
         evhttp_add_header(output_headers, "Authorization",
             (std::string { "Basic " } + EncodeBase64(mConfig.GetCredentials())).c_str());
     }
+    for(const auto& [ header, value ]  : request.GetHeaders())
+    {
+        evhttp_add_header(output_headers, header.c_str(), value.c_str());
+    }
 
     // Attach request data
-    const std::string& strRequest { request.GetContents() };
     struct evbuffer* output_buffer { evhttp_request_get_output_buffer(req.get()) };
     assert(output_buffer);
-    evbuffer_add(output_buffer, strRequest.data(), strRequest.size());
+    if(request.GetContentsFD().Get() >= 0)
+    {
+        if(evbuffer_add_file(output_buffer, request.GetContentsFD().Release(), 0, request.GetContentsSize()) != 0)
+        {
+            throw std::runtime_error("Failed to add file contents to HTTP request");
+        }
+        std::stringstream contentLenStr {};
+        contentLenStr << request.GetContentsSize();
+        evhttp_add_header(output_headers, "Content-Length", contentLenStr.str().c_str());
+    }
+    else
+    {
+        const auto& contents { request.GetContents() };
+        evbuffer_add(output_buffer, contents.data(), contents.size());
+    }
 
     // Encode any endpoint to the URI and make the request
     const std::string& endPoint { request.GetEndpoint() };
@@ -138,11 +165,20 @@ void RPCClient::SubmitRequest(const HTTPRequest& request, HTTPResponse* response
     // Check response
     int responseStatus { response->GetStatus() };
     if(responseStatus == 0)
-    {   
-        throw CConnectionFailed(strprintf(
-            "couldn't connect to server: %s (code %d)\n(make sure server is "
-            "running and you are connecting to the correct RPC port)",
-            HTTPErrorString(response->GetError()), response->GetError()));
+    {
+        // Timeout or something else?
+        if(response->GetError() == EVREQ_HTTP_TIMEOUT)
+        {
+            throw CConnectionTimeout("Timeout communicating with HTTP server "
+                "(make sure server is running and you are connecting to the correct RPC port)");
+        }
+        else
+        {
+            throw CConnectionFailed(strprintf(
+                "couldn't connect to server: %s (code %d)\n(make sure server is "
+                "running and you are connecting to the correct RPC port)",
+                HTTPErrorString(response->GetError()), response->GetError()));
+        }
     }
     else if(responseStatus == HTTP_UNAUTHORIZED)
     {   
@@ -154,7 +190,7 @@ void RPCClient::SubmitRequest(const HTTPRequest& request, HTTPResponse* response
     {   
         throw std::runtime_error(strprintf("server returned HTTP error %d", responseStatus));
     }
-    else if(response->IsEmpty())
+    else if(response->IsEmpty() && !mConfig.GetValidEmptyResponse())
     {
         throw std::runtime_error("no response from server");
     }

@@ -60,7 +60,7 @@ public:
     CScript(const uint8_t *pbegin, const uint8_t *pend)
         : CScriptBase(pbegin, pend) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -305,6 +305,9 @@ std::ostream &operator<<(std::ostream &, const CScript &);
 std::string to_string(const CScript&);
 
 bool IsP2SH(bsv::span<const uint8_t>);
+bool IsDSNotification(bsv::span<const uint8_t>);
+bool IsDustReturnScript (bsv::span<const uint8_t> script);
+
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 

@@ -12,7 +12,6 @@
 #endif
 
 #include "amount.h"
-#include "blockstreams.h"
 #include "blockvalidation.h"
 #include "chain.h"
 #include "coins.h"
@@ -88,7 +87,7 @@ static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
  * satoshis */
 static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
-static const uint64_t DEFAULT_ANCESTOR_LIMIT = 1000;
+static const uint64_t DEFAULT_ANCESTOR_LIMIT = 10000;
 /** Default for -limitancestorcount, max number of secondary mempool ancestors */
 static const uint64_t DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT = 25;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in
@@ -98,10 +97,6 @@ static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
-/** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
-static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
-/** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
-static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 64;
@@ -219,7 +214,7 @@ extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
-extern bool fReindex;
+extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -248,11 +243,6 @@ extern uint256 hashAssumeValid;
  * Minimum work we will assume exists on some valid chain.
  */
 extern arith_uint256 nMinimumChainWork;
-
-/**
- * Best header we've seen so far (used for getheaders queries' starting points).
- */
-extern CBlockIndex *pindexBestHeader;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
@@ -364,18 +354,46 @@ private:
 
     // If true; force block to be flagged as checked
     bool markChecked : 1;
+    // If false, check for max block size is skipped in CheckBlock().
+    bool checkMaxBlockSize : 1;
 
 public:
-    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}
-    {}
-
-    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn, bool markCheckedIn = false)
-        : checkPoW{checkPoWIn}, checkMerkleRoot{checkMerkleRootIn}, markChecked{markCheckedIn}
+    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}, checkMaxBlockSize{true}
     {}
 
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
+    bool shouldCheckMaxBlockSize() const { return checkMaxBlockSize; }
+    
+    [[nodiscard]]
+    BlockValidationOptions withCheckPoW(bool checkPoWIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkPoW = checkPoWIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withCheckMerkleRoot(bool checkMerkleRootIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkMerkleRoot = checkMerkleRootIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withMarkChecked(bool markCheckedIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.markChecked = markCheckedIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withCheckMaxBlockSize(bool checkMaxBlockSizeIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkMaxBlockSize = checkMaxBlockSizeIn;
+        return option;
+    }
 };
 
 /**
@@ -417,11 +435,13 @@ bool VerifyNewBlock(const Config &config,
  * for non-network block sources and whitelisted peers.
  * @param[out]  fNewBlock A boolean which is set to indicate if the block was
  *                        first received via this call.
+ * @param[in]   validationOptions Block validation options.
  * @return True if the block is accepted as a valid block.
  */
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
-                     bool fForceProcessing, bool *fNewBlock);
+                     bool fForceProcessing, bool *fNewBlock, 
+                     const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
  * Same as ProcessNewBlock but it doesn't activate best chain - it returns a
@@ -436,7 +456,8 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
-    bool* fNewBlock);
+    bool* fNewBlock,
+    const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
  * Process incoming block headers.
@@ -467,18 +488,13 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize);
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 
 /**
- * Translation to a filesystem path.
- */
-fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
-
-/**
  * Import blocks from an external file.
  */
-bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
+bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp = nullptr);
 
 /** used for --reindex */
-void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex);
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, std::atomic_bool& fReindex);
 
 /**
  * Initialize a new block tree database + block data on disk.
@@ -567,7 +583,7 @@ Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams
  * candidates later on - in any case it indicates that we should wait to see if
  * it lands in the best chain or not.
  */
-bool IsBlockABestChainTipCandidate(CBlockIndex& index);
+bool IsBlockABestChainTipCandidate(const CBlockIndex& index);
 
 /**
  * Check whether there are any block index candidates that are older than
@@ -580,7 +596,7 @@ bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
  * Guess verification progress (as a fraction between 0.0=genesis and
  * 1.0=current tip).
  */
-double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex);
+double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pindex);
 
 /**
  * Unlink the specified files and mark associated block indices as pruned
@@ -607,11 +623,8 @@ void PruneAndFlush();
 /** Prune block files up to a given height */
 void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 
-/** Check if UAHF has activated. */
-bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
-
 /** Check if DAA HF has activated. */
-bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
+bool IsDAAEnabled(const Config &config, int32_t nHeight);
 
 /** Check if Genesis has activated. */
 bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
@@ -627,6 +640,15 @@ bool IsGenesisEnabled(const Config& config, int32_t nHeight);
  */
 bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight);
 int GetGenesisActivationHeight(const Config& config);
+
+/**
+ * Helper to return the script flags which should be checked for a block with given parent
+ */
+uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip);
+/**
+ * Get script verification flags to use.
+ */
+uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled);
 
 /**
  * A function used to produce a default value for a number of Low priority threads
@@ -739,7 +761,8 @@ CTxnValResult TxnValidation(
     const Config &config,
     CTxMemPool &pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fUseLimits);
+    bool fUseLimits,
+    task::CTimedCancellationBudget& timeBudget);
 
 /**
  * Handle an exception thrown during txn processing.
@@ -842,6 +865,25 @@ uint64_t GetTransactionSigOpCount(const Config &config,
                                   bool checkP2SH, 
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError);
+
+/**
+ * Check validity of scripts for a single input from a transaction.
+ */
+std::optional<bool> CheckInputScripts(
+    const task::CCancellationToken& token,
+    const Config& config,
+    bool consensus,
+    const CScript& scriptPubKey,
+    const Amount& amount,
+    const CTransaction& tx,
+    CValidationState& state,
+    size_t input,
+    int32_t coinHeight,
+    int32_t spendHeight,
+    const uint32_t flags,
+    bool sigCacheStore,
+    const PrecomputedTransactionData& txdata,
+    std::vector<CScriptCheck>* pvChecks);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends,
@@ -966,20 +1008,6 @@ public:
     const CTransaction* GetTransaction() const { return ptxTo; }
 };
 
-/** Functions for disk access for blocks */
-bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
-                       const Config &config);
-bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
-                       const Config &config);
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata=false);
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader( // Same as above except that pos is obtained from pindex and some additional checks are performed
-    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
-std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
-    CBlockIndex& index,
-    int networkVersion);
-std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index);
-void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata);
 /** Functions for validating blocks and updating the block tree */
 
 /**
@@ -1055,7 +1083,7 @@ public:
 bool ReplayBlocks(const Config &config, CoinsDB& view);
 
 /** Find the last common block between the parameter chain and a locator. */
-CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
+const CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
                                    const CBlockLocator &locator);
 
 /**
@@ -1072,6 +1100,18 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 /** Mark a block as invalid. */
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex);
+
+/**
+ * Mark a block and its descendants (up to numBlocks of them) as soft rejected.
+ */
+bool SoftRejectBlockNL(const Config& config, CValidationState& state,
+                       CBlockIndex* pindex, std::int32_t numBlocks);
+/**
+ * If numBlocks=-1, un-mark a block and its descendants as soft rejected.
+ *
+ * Otherwise, decrease number of descendants that are also considered soft rejected to numBlocks.
+ */
+bool AcceptSoftRejectedBlockNL(CBlockIndex* pindex, std::int32_t numBlocks=-1);
 
 /** Blocks that are in the Config::GetInvalidBlocks() will be marked as invalid.*/
 void InvalidateBlocksFromConfig(const Config &config);

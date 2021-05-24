@@ -105,7 +105,7 @@ public:
     CKeyPool();
     CKeyPool(const CPubKey &vchPubKeyIn, bool internalIn);
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -218,7 +218,7 @@ public:
 
     void SetTx(CTransactionRef arg) { tx = std::move(arg); }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -361,7 +361,7 @@ public:
         nOrderPos = -1;
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -499,7 +499,7 @@ public:
 
     CWalletKey(int64_t nExpires = 0);
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -540,7 +540,7 @@ public:
         nEntryNo = 0;
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -887,7 +887,7 @@ public:
     bool AddToWalletIfInvolvingMe(const CTransactionRef &tx,
                                   const CBlockIndex *pIndex, int posInBlock,
                                   bool fUpdate);
-    CBlockIndex *ScanForWalletTransactions(CBlockIndex *pindexStart,
+    const CBlockIndex *ScanForWalletTransactions(const CBlockIndex *pindexStart,
                                            bool fUpdate = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime,
@@ -1172,7 +1172,7 @@ public:
 
     void SetNull() { vchPubKey = CPubKey(); }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

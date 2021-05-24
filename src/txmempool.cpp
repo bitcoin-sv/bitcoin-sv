@@ -201,20 +201,18 @@ bool CTxMemPool::CheckAncestorLimitsNL(
         auto[it, inserted] = parents.emplace(piter);
         if(inserted)
         {
-            ancestorsCount += 1;
-            ancestorsCount += (*it)->ancestorsCount;
+            ancestorsCount = std::max(ancestorsCount, (*it)->ancestorsCount + 1);
 
             if(!(*it)->IsInPrimaryMempool())
             {
-                secondaryMempoolAncestorsCount += 1;
-                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount;
+                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount + 1;
             }
             
             if(ancestorsCount >= limitAncestorCount)
             {
                 if(errString.has_value())
                 {
-                    errString.value().get() = strprintf("too many unconfirmed parents [limit: %u]", limitAncestorCount);
+                    errString.value().get() = strprintf("too many unconfirmed parents, %u [limit: %lu]", ancestorsCount, limitAncestorCount);
                 }
                 return false;
             }
@@ -223,7 +221,7 @@ bool CTxMemPool::CheckAncestorLimitsNL(
             {
                 if(errString.has_value())
                 {
-                    errString.value().get() = strprintf("too many unconfirmed parents which we are not willing to mine [limit: %u]", limitSecondaryMempoolAncestorCount);
+                    errString.value().get() = strprintf("too many unconfirmed parents which we are not willing to mine, %lu [limit: %lu]", secondaryMempoolAncestorsCount, limitSecondaryMempoolAncestorCount);
                 }
                 return false;
             }
@@ -661,8 +659,7 @@ void CTxMemPool::UpdateAncestorsCountNL(CTxMemPool::setEntriesTopoSorted entries
         size_t ancestorsCount = 0;
         for(auto parent: GetMemPoolParentsNL(entry))
         {
-            ancestorsCount += 1;
-            ancestorsCount += parent->ancestorsCount;
+            ancestorsCount = std::max(ancestorsCount, parent->ancestorsCount + 1);
         }
         mapTx.modify(entry, [ancestorsCount](CTxMemPoolEntry& entry) {
                                 entry.ancestorsCount = ancestorsCount;
@@ -758,8 +755,7 @@ void CTxMemPool::AddUncheckedNL(
     for (const uint256 &phash : setParentTransactions) {
         txiter pit = mapTx.find(phash);
         if (pit != mapTx.end()) {
-            ancestorsCount += 1;
-            ancestorsCount += pit->ancestorsCount;
+            ancestorsCount = std::max(ancestorsCount, pit->ancestorsCount + 1);
             updateParentNL(newit, pit, true);
         }
     }
@@ -943,7 +939,7 @@ void CTxMemPool::RemoveForReorg(
     const CBlockIndex& tip,
     int flags) {
 
-    const int32_t nMemPoolHeight = tip.nHeight + 1;
+    const int32_t nMemPoolHeight = tip.GetHeight() + 1;
     const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
@@ -962,7 +958,7 @@ void CTxMemPool::RemoveForReorg(
         if (!ContextualCheckTransactionForCurrentBlock(
                 config,
                 *tx,
-                tip.nHeight,
+                tip.GetHeight(),
                 nMedianTimePast,
                 state,
                 flags) ||
@@ -1276,8 +1272,7 @@ void CTxMemPool::CheckMempoolImplNL(
                        !tx2->vout[txin.prevout.GetN()].IsNull());
                 fDependsWait = true;
                 if (setParentCheck.insert(it2).second) {
-                    ancestorsCount += 1;
-                    ancestorsCount += it2->ancestorsCount;
+                    ancestorsCount = std::max(ancestorsCount, it2->ancestorsCount + 1);
                     if(!it2->IsInPrimaryMempool())
                     {
                         secondaryMempoolAncestorsCount += 1;
@@ -2040,6 +2035,9 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 {
     AssertLockHeld(cs_main);
     TxInputDataSPtrVec vTxInputData {};
+
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
     // block that was disconnected.
@@ -2053,6 +2051,43 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             // transactions that depend on it (which would now be orphans).
             RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         } else {
+
+            // We could receive transaction during the reorg (after the block is disconnected but before a new is connected) 
+            // because the PTV and PBV are running at the same time. 
+
+            // If we receive the same transaction that was in the disconnected block, we will remove transaction received in the mempool
+            if (auto duplicateIt = mapTx.find((*it)->GetId()); duplicateIt != mapTx.end()) {
+
+                // To be on the safe side, we should disband a group if the duplicate transaction is part of it,
+                if (duplicateIt->IsCPFPGroupMember())
+                {
+                    setEntriesTopoSorted duplicateTS;
+                    duplicateTS.insert(duplicateIt);
+                    RemoveFromPrimaryMempoolNL(duplicateTS, nonNullChangeSet.Get());
+                }
+                
+                // It is safe to remove this tx, as it for sure, at this point, does not have a parent inside mempool.
+                // If it had a parent it would be a duplicate also and it would be already removed (we are checking for duplicates in topo-order)
+                // If it has a child it could be: duplicate (will be handled later in this loop), double-spend (will be handled by following for-loop),
+                // or normal transaction (will be added to mempool in ResubmitEntriesToMempoolNL later on)
+                setEntries duplicate;
+                duplicate.insert(duplicateIt);
+                removeUncheckedNL(duplicate, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::REORG);
+            }
+
+            // If we receive transaction that spends the same output as a transaction in the disconnected block we will remove tx from the mempool
+            // together with its descedants, keeping transaction from the disconnected block
+            for (const CTxIn &txin : (*it)->vin) 
+            {
+                auto doubleSpend = mapNextTx.find(txin.prevout);
+                if (doubleSpend != mapNextTx.end())
+                {
+                    setEntries conflictedWithDescendants;
+                    GetDescendantsNL(mapTx.find(doubleSpend->spentBy->GetTxId()), conflictedWithDescendants);
+                    removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::REORG);
+                }
+            }
+
             vTxInputData.emplace_back(
                 std::make_shared<CTxInputData>(
                     TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
@@ -2104,7 +2139,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             *pcoinsTip,
             changeSet,
             tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
 
     // Check mempool & journal
     CheckMempool(*pcoinsTip, changeSet);
@@ -2139,7 +2174,7 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
             *pcoinsTip,
             changeSet,
             tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
 
     // Check mempool & journal
     CheckMempool(*pcoinsTip, changeSet);
@@ -2701,10 +2736,9 @@ void CTxMemPool::InitMempoolTxDB()
 }
 
 
-FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
+UniqueCFile CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
 {
-    FILE* filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
-    CAutoFile file{filestr, SER_DISK, CLIENT_VERSION};
+    CAutoFile file{fsbridge::fopen(GetDataDir() / "mempool.dat", "rb"), SER_DISK, CLIENT_VERSION};
     if (file.IsNull())
     {
         throw std::runtime_error("Failed to open mempool file from disk");
@@ -2920,7 +2954,7 @@ void CTxMemPool::DumpMempool(uint64_t version) {
 
         file << mapDeltas;
         FileCommit(file.Get());
-        file.fclose();
+        file.reset();
         RenameOver(GetDataDir() / "mempool.dat.new",
                    GetDataDir() / "mempool.dat");
         int64_t last = GetTimeMicros();

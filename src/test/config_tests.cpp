@@ -10,6 +10,12 @@
 #include <boost/test/unit_test.hpp>
 #include <string>
 
+std::ostream& operator<<(std::ostream& str, DSAttemptHandler::NotificationLevel level)
+{
+    str << static_cast<int>(level);
+    return str;
+}
+
 BOOST_FIXTURE_TEST_SUITE(config_tests, BasicTestingSetup)
 
 static bool isSetDefaultBlockSizeParamsCalledException(const std::runtime_error &ex) {
@@ -300,6 +306,42 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * testFactor);
 }
 
+BOOST_AUTO_TEST_CASE(block_download_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), DEFAULT_MIN_BLOCK_STALLING_RATE);
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(2 * DEFAULT_MIN_BLOCK_STALLING_RATE, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), 2 * DEFAULT_MIN_BLOCK_STALLING_RATE);
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(0, &err));
+    BOOST_CHECK(!config.SetBlockStallingMinDownloadSpeed(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), DEFAULT_BLOCK_STALLING_TIMEOUT);
+    BOOST_CHECK(config.SetBlockStallingTimeout(2 * DEFAULT_BLOCK_STALLING_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), 2 * DEFAULT_BLOCK_STALLING_TIMEOUT);
+    BOOST_CHECK(!config.SetBlockStallingTimeout(0, &err));
+    BOOST_CHECK(!config.SetBlockStallingTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), DEFAULT_BLOCK_DOWNLOAD_WINDOW);
+    BOOST_CHECK(config.SetBlockDownloadWindow(2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW);
+    BOOST_CHECK(!config.SetBlockDownloadWindow(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadWindow(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
+    BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), 2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
+    BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadMaxParallelFetch(), DEFAULT_MAX_BLOCK_PARALLEL_FETCH);
+    BOOST_CHECK(config.SetBlockDownloadMaxParallelFetch(2 * DEFAULT_MAX_BLOCK_PARALLEL_FETCH, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadMaxParallelFetch(), 2 * DEFAULT_MAX_BLOCK_PARALLEL_FETCH);
+    BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(-1, &err));
+}
+
 BOOST_AUTO_TEST_CASE(p2p_config)
 {
     GlobalConfig config {};
@@ -310,6 +352,99 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), 2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(0, &err));
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), Stream::DEFAULT_SEND_RATE_LIMIT);
+    BOOST_CHECK(config.SetStreamSendRateLimit(1000, &err));
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), 1000);
+    BOOST_CHECK(config.SetStreamSendRateLimit(0, &err));
+    BOOST_CHECK(config.SetStreamSendRateLimit(-1, &err));
+    BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), -1);
+
+    BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), DEFAULT_BANSCORE_THRESHOLD);
+    BOOST_CHECK(config.SetBanScoreThreshold(2 * DEFAULT_BANSCORE_THRESHOLD, &err));
+    BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), 2 * DEFAULT_BANSCORE_THRESHOLD);
+    BOOST_CHECK(!config.SetBanScoreThreshold(0, &err));
+    BOOST_CHECK(!config.SetBanScoreThreshold(-1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(dsattempt_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendNotificationLevel(), DSAttemptHandler::DEFAULT_NOTIFY_LEVEL);
+    BOOST_CHECK(config.SetDoubleSpendNotificationLevel(static_cast<int>(DSAttemptHandler::NotificationLevel::NONE), &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendNotificationLevel(), DSAttemptHandler::NotificationLevel::NONE);
+    BOOST_CHECK(!config.SetDoubleSpendNotificationLevel(-1, &err));
+    BOOST_CHECK(!config.SetDoubleSpendNotificationLevel(3, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointFastTimeout(), rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT);
+    BOOST_CHECK(config.SetDoubleSpendEndpointFastTimeout(2 * rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointFastTimeout(), 2 * rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointFastTimeout(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendEndpointFastTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSlowTimeout(), rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT);
+    BOOST_CHECK(config.SetDoubleSpendEndpointSlowTimeout(2 * rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSlowTimeout(), 2 * rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointSlowTimeout(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendEndpointSlowTimeout(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSlowRatePerHour(), DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR);
+    BOOST_CHECK(config.SetDoubleSpendEndpointSlowRatePerHour(2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSlowRatePerHour(), 2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointSlowRatePerHour(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendEndpointSlowRatePerHour(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointPort(), rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT);
+    BOOST_CHECK(config.SetDoubleSpendEndpointPort(rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT + 1, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointPort(), rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT + 1);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointPort(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendEndpointPort(65536, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointBlacklistSize(), DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE);
+    BOOST_CHECK(config.SetDoubleSpendEndpointBlacklistSize(2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointBlacklistSize(), 2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointBlacklistSize(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 0);
+    BOOST_CHECK(config.SetDoubleSpendEndpointSkipList("127.0.0.1", &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 1);
+    BOOST_CHECK(config.SetDoubleSpendEndpointSkipList("127.0.0.1,::1", &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 2);
+    BOOST_CHECK(config.SetDoubleSpendEndpointSkipList("127.0.0.1 , ::1", &err));
+    BOOST_REQUIRE_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 2);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("127.0.0.1"), 1);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("::1"), 1);
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointMaxCount(), DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT);
+    BOOST_CHECK(config.SetDoubleSpendEndpointMaxCount(2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointMaxCount(), 2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT);
+    BOOST_CHECK(!config.SetDoubleSpendEndpointMaxCount(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendEndpointMaxCount(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendTxnRemember(), DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT);
+    BOOST_CHECK(config.SetDoubleSpendTxnRemember(2 * DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendTxnRemember(), 2 * DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT);
+    BOOST_CHECK(!config.SetDoubleSpendTxnRemember(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendNumFastThreads(), DSAttemptHandler::DEFAULT_NUM_FAST_THREADS);
+    BOOST_CHECK(config.SetDoubleSpendNumFastThreads(2 * DSAttemptHandler::DEFAULT_NUM_FAST_THREADS, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendNumFastThreads(), 2 * DSAttemptHandler::DEFAULT_NUM_FAST_THREADS);
+    BOOST_CHECK(!config.SetDoubleSpendNumFastThreads(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendNumFastThreads(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendNumSlowThreads(), DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS);
+    BOOST_CHECK(config.SetDoubleSpendNumSlowThreads(2 * DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendNumSlowThreads(), 2 * DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS);
+    BOOST_CHECK(!config.SetDoubleSpendNumSlowThreads(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendNumSlowThreads(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendQueueMaxMemory(), DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY);
+    BOOST_CHECK(config.SetDoubleSpendQueueMaxMemory(2 * DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendQueueMaxMemory(), 2 * DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY);
+    BOOST_CHECK(!config.SetDoubleSpendQueueMaxMemory(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendQueueMaxMemory(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(disable_BIP30)
@@ -333,6 +468,25 @@ BOOST_AUTO_TEST_CASE(disable_BIP30)
         BOOST_CHECK(config.GetDisableBIP30Checks() == false);
     }
 }
+
+BOOST_AUTO_TEST_CASE(dust_config_test)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK(config.SetDustLimitFactor(0, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 0);
+    BOOST_CHECK(config.SetDustLimitFactor(100, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 100);
+    BOOST_CHECK(config.SetDustLimitFactor(200, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 200);
+    BOOST_CHECK(config.SetDustLimitFactor(300, &err));
+    BOOST_CHECK_EQUAL(config.GetDustLimitFactor(), 300);
+
+    BOOST_CHECK(!config.SetDustLimitFactor(-1, &err));
+    BOOST_CHECK(!config.SetDustLimitFactor(301, &err));
+}
+
 
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -6,18 +6,23 @@ cmake_minimum_required(VERSION 3.5)
 project(secp256k1)
 
 # libsecp256k1 use a different set of flags.
-add_compiler_flag(
-	-pedantic
-	-Wshadow
-	-Wno-unused-function
-	-Wno-nonnull
-	-Wno-overlength-strings
-)
-
-add_c_compiler_flag(
-	-std=c89
-	-Wno-long-long
-)
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
+	set_property(DIRECTORY PROPERTY COMPILE_OPTIONS
+		-pedantic
+		-Wshadow
+		-Wno-unused-function
+		-Wno-nonnull
+		-Wno-overlength-strings
+		$<$<COMPILE_LANGUAGE:C>:-std=c89>
+		$<$<COMPILE_LANGUAGE:C>:-Wno-long-long>
+	)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+	set_property(DIRECTORY PROPERTY COMPILE_OPTIONS
+		/D_CRT_SECURE_NO_WARNINGS
+		/wd4244
+		/wd4267
+	)
+endif()
 
 # Default visibility is hidden on all targets.
 set(CMAKE_C_VISIBILITY_PRESET hidden)
