@@ -138,6 +138,7 @@ void GlobalConfig::Reset()
     dsEndpointPort = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT;
     dsEndpointBlacklistSize = DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE;
     dsEndpointSkipList = {};
+    dsEndpointMaxCount = DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT;
     dsAttemptTxnRemember = DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT;
     dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
     dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
@@ -1392,6 +1393,25 @@ bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::
 std::set<std::string> GlobalConfig::GetDoubleSpendEndpointSkipList() const
 {
     return dsEndpointSkipList;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint maximum count must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsEndpointMaxCount = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendEndpointMaxCount() const
+{
+    return dsEndpointMaxCount;
 }
 
 bool GlobalConfig::SetDoubleSpendNumFastThreads(int64_t num, std::string* err)

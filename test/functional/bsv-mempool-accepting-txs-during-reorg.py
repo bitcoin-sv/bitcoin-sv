@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
+from time import sleep
 
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
@@ -16,14 +17,14 @@ from test_framework.util import wait_until, check_mempool_equals
     We are testing acceptance of the transactions to the mempool during the reorg.
      - First, we are creating block structure like this:
     
-       +--root--+
-       |   |    |
-      a1   b1   c1
-           |    |
-           b2   c2
+       +-----root-----+
+       |    |    |    |   
+      a1    b1   c1   d1
+            |    |    |
+            b2   c2   d2
     
        a1 - a block with 2000 p2pk transactions       
-       b1,b2,c1,c2 each a block with two transactions where one has long evaluating script
+       b1,b2,c1,c2,d1,d2 each a block with several transactions with long evaluating scripts
     
        and we send a1 which becomes a tip.
        
@@ -39,7 +40,12 @@ from test_framework.util import wait_until, check_mempool_equals
        validating submitted transactions. So while the block a1 is disconnected we are accepting transactions to 
        the mempool resulting in having several transactions in the mempool which are in conflict with transactions 
        in the disconnectpool. Transactions in conflict should be removed from mempool.
-    
+
+    3. We set c1 as invalid forcing that a1 becomes a tip again and sending another 2000 transactions which are 
+       spending outputs of the a1 block transactions. When all transactions are in the mempool we are sending 
+       blocks d1 and d2 triggering the reorg. During the reorg we are calling rpc generate(1) to generate a block. 
+       This call would fail if the mempool is in inconsistent state during the reorg. 
+
 """
 
 class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
@@ -61,7 +67,8 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
-    long_eval_script = [bytearray([42] * DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP]
+
+    long_eval_script = [bytearray(b"x" * 300000), bytearray(b"y" * 290000), OP_MUL, OP_DROP]
 
     def create_tx(self, outpoints, noutput, feerate, make_long_eval_script=False):
         """creates p2pk transaction always using the same key (created in constructor), if make_long_eval_script is set
@@ -125,7 +132,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             conn.rpc.generate(150)
 
 
-            funding_tx = self.create_tx([(coinbase, 0)], 2004, mining_fee)
+            funding_tx = self.create_tx([(coinbase, 0)], 2006, mining_fee)
             conn.send_message(msg_tx(funding_tx))
             check_mempool_equals(conn.rpc, [funding_tx])
 
@@ -137,16 +144,23 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             for m in range(2000):
                 a1_txs.append(self.create_tx([(funding_tx, m)], 1, mining_fee))
 
+            a1_spends = []
+            for a1_tx in a1_txs:
+                a1_spends.append(self.create_tx([(a1_tx, 0)], 1, mining_fee))
+
             # create 2000 standard p2pk transactions which are spending the same outputs as a1_txs
             double_spend_txs = []
             for m in range(2000):
                 double_spend_txs.append(self.create_tx([(funding_tx, m)], 1, mining_fee))
 
+            TX_COUNT = 8
             # create for pairs of long-evaluating transactions for blocks b1, b2, c1, and c2
             long_eval_txs = []
-            for m in range(2000, 2004):
-                long_eval_txs.append(self.create_tx([(funding_tx, m)], 1, mining_fee, make_long_eval_script=True))
-                long_eval_txs.append(self.create_tx([(long_eval_txs[-1], 0)], 1, mining_fee))
+            for m in range(2000, 2006):
+                long_eval_txs.append(self.create_tx([(funding_tx, m)], 1, 0.0001, make_long_eval_script=True))
+                for _ in range(TX_COUNT - 1):
+                    long_eval_txs.append(self.create_tx([(long_eval_txs[-1], 0)], 1, 0.0001, make_long_eval_script=True))
+
 
             root_block_info = conn.rpc.getblock(conn.rpc.getbestblockhash())
             root_hash = root_block_info["hash"]
@@ -155,16 +169,18 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
             # create all blocks needed for this test
             block_a1 = self.make_block(a1_txs, root_hash, root_height, root_time)
-            block_b1 = self.make_block(long_eval_txs[0:2], root_hash, root_height, root_time)
-            block_b2 = self.make_block(long_eval_txs[2:4], block_b1.hash, root_height+1, root_time+100)
-            block_c1 = self.make_block(long_eval_txs[4:6], root_hash, root_height, root_time)
-            block_c2 = self.make_block(long_eval_txs[6:8], block_c1.hash, root_height+1, root_time+101)
+            block_b1 = self.make_block(long_eval_txs[0*TX_COUNT: 1*TX_COUNT], root_hash, root_height, root_time)
+            block_b2 = self.make_block(long_eval_txs[1*TX_COUNT: 2*TX_COUNT], block_b1.hash, root_height+1, root_time+100)
+            block_c1 = self.make_block(long_eval_txs[2*TX_COUNT: 3*TX_COUNT], root_hash, root_height, root_time)
+            block_c2 = self.make_block(long_eval_txs[3*TX_COUNT: 4*TX_COUNT], block_c1.hash, root_height+1, root_time+101)
+            block_d1 = self.make_block(long_eval_txs[4*TX_COUNT: 5*TX_COUNT], root_hash, root_height, root_time)
+            block_d2 = self.make_block(long_eval_txs[5*TX_COUNT: 6*TX_COUNT], block_d1.hash, root_height+1, root_time+102)
 
             conn.send_message(msg_block(block_a1))
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=0.3)
 
 
-        with self.run_node_with_connections("Try sending the same transaction that are in the disconnected block during the reorg",
+        with self.run_node_with_connections("1. Try sending the same transaction that are in the disconnected block during the reorg",
                                             0,
                                             ["-blockmintxfee=0.00001",
                                              "-relayfee=0.000005",
@@ -183,7 +199,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             for tx in a1_txs:
                 conn.send_message(msg_tx(tx))
 
-            # announce blocks b1, and b2 and send them triggering the PBV
+            # announce blocks b1, and b2 and send them triggering the reorg
             headers = msg_headers()
             headers.headers.append(block_b1)
             headers.headers.append(block_b2)
@@ -196,15 +212,19 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             # the a1 is disconnected
 
             # check if everything is as expected
-            wait_until(lambda: conn.rpc.getbestblockhash() == block_b2.hash, check_interval=1)
+            wait_until(lambda: conn.rpc.getbestblockhash() == block_b2.hash, timeout=60, check_interval=1)
             check_mempool_equals(conn.rpc, a1_txs)
 
             # now prepare for next scenario
             conn.rpc.invalidateblock(block_b1.hash)
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=1)
-            check_mempool_equals(conn.rpc, long_eval_txs[0:4], timeout=60, check_interval=1)
 
-        with self.run_node_with_connections("Try sending transaction that are spending same inputs as transactions in the disconnected block during the reorg",
+            # transactions from the disconnected blocks b1 and b2 will not be added to mempool because of
+            # the insufficient priority (zero fee)
+            check_mempool_equals(conn.rpc, [], timeout=60, check_interval=1)
+
+
+        with self.run_node_with_connections("2. Try sending transaction that are spending same inputs as transactions in the disconnected block during the reorg",
                                             0,
                                             ["-blockmintxfee=0.00001",
                                              "-relayfee=0.000005",
@@ -221,7 +241,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
             # see if everything is still as expected
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=1)
-            check_mempool_equals(conn.rpc, long_eval_txs[0:4], timeout=60, check_interval=1)
+            check_mempool_equals(conn.rpc, [], timeout=60, check_interval=1)
 
             # send all transactions that are the double-spends of txs form block a1
             for double_spend_tx in double_spend_txs:
@@ -240,10 +260,57 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             # while the a1 is disconnected
 
             # see if everything is as expected
-            wait_until(lambda: conn.rpc.getbestblockhash() == block_c2.hash, check_interval=1)
-            # in the mempool we want all transactions for blocks a1, b1, and b2
+            wait_until(lambda: conn.rpc.getbestblockhash() == block_c2.hash, timeout=60, check_interval=1)
+            # in the mempool we want all transactions for blocks a1
             # while no double_spend_txs should be present
-            check_mempool_equals(conn.rpc, a1_txs + long_eval_txs[0:4], timeout=60, check_interval=1)
+            check_mempool_equals(conn.rpc, a1_txs, timeout=60, check_interval=1)
+
+            # now prepare for next scenario
+            conn.rpc.invalidateblock(block_c1.hash)
+            wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=1)
+
+            # transactions from the disconnected blocks c1 and c2 will not be added to mempool because of
+            # the insufficient priority (zero fee)
+            check_mempool_equals(conn.rpc, [], timeout=60, check_interval=1)
+
+        with self.run_node_with_connections("3. Submit transactions that are spending ouputs from disconnecting block and try to mine a block during the reorg",
+                0,
+                ["-blockmintxfee=0.00001",
+                 "-relayfee=0.000005",
+                 "-maxtxsizepolicy=0",
+                 '-maxnonstdtxvalidationduration=100000',
+                 '-maxtxnvalidatorasynctasksrunduration=100001',
+                 '-genesisactivationheight=1',
+                 '-maxstackmemoryusageconsensus=2GB',
+                 "-maxscriptsizepolicy=2GB",
+                 "-acceptnonstdoutputs=1", ],
+                number_of_connections=1) as (conn,):
+
+            # see if everything is still as expected
+            wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=1)
+            check_mempool_equals(conn.rpc, [], timeout=60, check_interval=1)
+
+            for tx in a1_spends:
+                conn.send_message(msg_tx(tx))
+
+            # send transactions that are spending outputs from the soon-to-be-disconnected block (a1)
+            check_mempool_equals(conn.rpc, a1_spends, timeout=100)
+
+            # announce blocks d1, and d2 and send them triggering the reorg
+            headers = msg_headers()
+            headers.headers.append(block_d1)
+            headers.headers.append(block_d2)
+            conn.send_message(headers)
+
+            conn.send_message(msg_block(block_d1))
+            conn.send_message(msg_block(block_d2))
+
+            # lets give a chance for reorg to start
+            sleep(0.5)
+
+            # we are in the middle of the reorg, let try to mine a block
+            # if we are in inconsistent state this call would fail
+            conn.rpc.generate(1)
 
 
 if __name__ == '__main__':
