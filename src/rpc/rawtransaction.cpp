@@ -14,7 +14,6 @@
 #include "dstencode.h"
 #include "keystore.h"
 #include "merkleblock.h"
-#include "mining/journal_builder.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
@@ -1309,10 +1308,8 @@ static UniValue sendrawtransaction(const Config &config,
                            strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
     }
     if (!txid_in_mempool()) {
-        // Mempool Journal ChangeSet
-        CJournalChangeSetPtr changeSet {
-            mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
-        };
+        // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+        CJournalChangeSetPtr changeSet {nullptr};
         // Prioritise transaction (if it was requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction,
         //   if the prioritised txn was not accepted by the mempool
@@ -1714,10 +1711,8 @@ void sendrawtransactions(const Config& config,
     CTxnValidator::RejectedTxns rejectedTxns {};
     // Applay journal changeSet straight after processValidation call.
     {
-        // Mempool Journal ChangeSet
-        CJournalChangeSetPtr changeSet {
-            mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
-        };
+        // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+        CJournalChangeSetPtr changeSet {nullptr};
         // Prioritise transactions (if any were requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction
         //   for those txns which are not accepted by the mempool

@@ -409,8 +409,8 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 LogPrint(BCLog::TXNVAL, "Txnval-asynch: Got %d new transactions\n",
                                          mProcessingQueue.size());
                                 // Special handlers
-                                mining::CJournalChangeSetPtr changeSet {
-                                    mMempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::NEW_TXN) };
+                                // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+                                mining::CJournalChangeSetPtr changeSet {nullptr};
                                 CTxnHandlers handlers {
                                     changeSet,
                                     mpTxnDoubleSpendDetector,
