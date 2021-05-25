@@ -4,15 +4,22 @@
 
 #include "validation_scheduler.h"
 
-#include <util.h>
+#include "logging.h"
+#include "util.h"
+
 #include <thread>
 #include <algorithm>
 
-#include "logging.h"
+#ifdef COLLECT_METRICS
+#include "metrics.h"
+#endif
 
-//#define DEBUG_SCHEDULER
-
-size_t ValidationScheduler::_batchNum = 0;
+// For development/debugging.
+// If defined then graph of each input batch in Graphviz dot format is created in the working dir.
+//#define SCHEDULER_OUTPUT_GRAPH
+#ifdef SCHEDULER_OUTPUT_GRAPH
+void DrawGraph(const TxInputDataSPtrVec& txs);
+#endif
 
 ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadPool,
                                          TxInputDataSPtrVec &txs, TypeValidationFunc func)
@@ -31,7 +38,9 @@ ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadP
     // Build map of spenders on a separate thread. Until map is ready we schedule without it.
     buildSpendersThread = std::thread(&ValidationScheduler::BuildSpendersMap, this);
 
-    ++_batchNum;
+#ifdef SCHEDULER_OUTPUT_GRAPH
+    DrawGraph(txs);
+#endif
 }
 
 ValidationScheduler::~ValidationScheduler() {
@@ -42,13 +51,20 @@ ValidationScheduler::~ValidationScheduler() {
 }
 
 std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationScheduler::Schedule() {
-#ifdef DEBUG_SCHEDULER
-    const std::chrono::time_point tsStart = std::chrono::steady_clock::now();
-    LogPrint(BCLog::TXNVAL, "================== scheduler loop started. batch:%d, batch size:%d ==================\n", _batchNum, txs.size());
-    
-    DrawGraph();
+#ifdef COLLECT_METRICS
+    static metrics::Histogram durations_batch_t_ms {"PTV_SCHEDULER_BATCH_TIME_MS", 10000};
+    static metrics::Histogram durations_wait_task_complete_us {"PTV_SCHEDULER_WAIT_TIME_US", 10000};
+    static metrics::Histogram size_batch {"PTV_SCHEDULER_BATCH_SIZE", 20000};
+    static metrics::Histogram num_scheduled_tasks {"PTV_SCHEDULER_NUM_SCHEDULED_TASKS", MAX_TO_SCHEDULE*10};
+    static metrics::HistogramWriter histogramLogger {"PTV_SCHEDULER", std::chrono::milliseconds {10000}, []() {
+        durations_batch_t_ms.dump();
+        durations_wait_task_complete_us.dump();
+        size_batch.dump();
+        num_scheduled_tasks.dump();
+    }};
+    size_batch.count(txs.size());
+    auto batchTimeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_batch_t_ms };
 #endif
-
     // task results
     std::vector<std::future<TypeValidationResult>> taskResults;
     // Reserve a space for the result set (usually there is one task per transaction).
@@ -56,9 +72,6 @@ std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationSc
 
     // Keep running until all transactions are scheduled.
     while (posUnhandled < txs.size()) {
-#ifdef DEBUG_SCHEDULER
-        LogPrint(BCLog::TXNVAL, "== loop run ------------------------------------\n");
-#endif
         // Process task_results input queue if there are any task_results waiting
         std::vector<TaskCompletion> lastResults;
         {
@@ -93,34 +106,18 @@ std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationSc
         if (posUnhandled < txs.size()) {
             // We are not done yet as we scheduled as much as possible in this iteration. 
             // There is nothing else to do until we get some task result back.
-#if DEBUG_SCHEDULER
-            const std::chrono::time_point tsWaitStart = std::chrono::steady_clock::now();
+#ifdef COLLECT_METRICS
+            num_scheduled_tasks.count(numTasksScheduled);
+            auto waitTimeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::microseconds> { durations_wait_task_complete_us };
 #endif
             std::unique_lock<std::mutex> lock(taskCompletionMtx);
             taskCompletionCV.wait_for(lock, std::chrono::milliseconds (100), [this]{return !taskCompletionQueue.empty();});
-#if DEBUG_SCHEDULER
-            const std::chrono::time_point tsWaitEnd = std::chrono::steady_clock::now();
-            LogPrint(BCLog::TXNVAL, "== tasks running: %d, waiting for task results: %dus\n", 
-                     numTasksScheduled,
-                     std::chrono::duration_cast<std::chrono::microseconds>(tsWaitEnd-tsWaitStart).count());
-#endif
         }
     }
-
-#ifdef DEBUG_SCHEDULER
-    const std::chrono::time_point tsEnd = std::chrono::steady_clock::now();
-    LogPrint(BCLog::TXNVAL, "================== scheduler loop ended. batch:%d, num txs:%d, num tasks:%d, run time:%dus\n", _batchNum, txs.size(), taskResults.size(), std::chrono::duration_cast<std::chrono::microseconds>(tsEnd - tsStart).count());
-#endif
-
     return taskResults;
 }
 
 void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidationResult>>& taskResults) {
-#ifdef DEBUG_SCHEDULER
-    LogPrint(BCLog::TXNVAL, "==>> ScanTransactions\n");
-    const std::chrono::time_point tsStart = std::chrono::steady_clock::now();
-#endif
-
     if (scanPos >= txs.size()) {
         // Start new cycle.
         scanPos = posUnhandled;
@@ -144,20 +141,10 @@ void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidatio
         }
         ++scanPos;
     }
-
-#ifdef DEBUG_SCHEDULER
-    const std::chrono::time_point tsEnd = std::chrono::steady_clock::now();
-    LogPrint(BCLog::TXNVAL, "==<< ScanTransactions, run time:%dus\n", std::chrono::duration_cast<std::chrono::microseconds>(tsEnd-tsStart).count());
-#endif
 }
 
 void ValidationScheduler::ScheduleGraph(size_t rootPos,
                                         std::vector<std::future<TypeValidationResult>>& taskResults) {
-#ifdef DEBUG_SCHEDULER
-    LogPrint(BCLog::TXNVAL, "==>> ScheduleGraph: %d\n", rootPos);
-    const std::chrono::time_point tsStart = std::chrono::steady_clock::now();
-#endif
-
     auto &rootTx = txs[rootPos]->GetTxnPtr();
     auto txSpenders = spenders.equal_range(rootTx->GetId());
     for (auto iterSpender = txSpenders.first; iterSpender != txSpenders.second; ++iterSpender) {
@@ -166,20 +153,10 @@ void ValidationScheduler::ScheduleGraph(size_t rootPos,
             ScheduleChain(spenderPos, taskResults);
         }
     }
-
-#ifdef DEBUG_SCHEDULER
-    const std::chrono::time_point tsEnd = std::chrono::steady_clock::now();
-    LogPrint(BCLog::TXNVAL, "==<< ScheduleGraph, run time:%dus\n\n", std::chrono::duration_cast<std::chrono::microseconds>(tsEnd-tsStart).count());
-#endif
 }
 
 void ValidationScheduler::ScheduleChain(size_t rootPos,
                                         std::vector<std::future<TypeValidationResult>>& taskResults) {
-#ifdef DEBUG_SCHEDULER
-    LogPrint(BCLog::TXNVAL, "==>> ScheduleChain: %d\n", rootPos);
-    const std::chrono::time_point tsStart = std::chrono::steady_clock::now();
-#endif
-
     // transactions to schedule in this task
     std::vector<size_t> txsInTask;
     std::optional<size_t> iTxPos = rootPos;
@@ -200,11 +177,6 @@ void ValidationScheduler::ScheduleChain(size_t rootPos,
              && CanStartValidation(iTxPos.value(), assumedDone));
 
     SubmitTask(std::move(txsInTask), taskResults);
-
-#ifdef DEBUG_SCHEDULER
-    const std::chrono::time_point tsEnd = std::chrono::steady_clock::now();
-    LogPrint(BCLog::TXNVAL, "==<< ScheduleChain, run time:%dus\n\n", std::chrono::duration_cast<std::chrono::microseconds>(tsEnd-tsStart).count());
-#endif
 }
 
 bool ValidationScheduler::CanStartValidation(const size_t txPos, const std::unordered_set<TxId>& assumeDone) {
@@ -270,16 +242,6 @@ void ValidationScheduler::SubmitTask(std::vector<size_t>&& txPositions,
         txStatuses[tx->GetTxnPtr()->GetId()] = ScheduleStatus::IN_PROGRESS;
     }
 
-#ifdef DEBUG_SCHEDULER
-    {
-        std::stringstream strPositions;
-        for (size_t pos : txPositions) {
-            strPositions << pos << " ";
-        }
-        LogPrint(BCLog::TXNVAL, "====>> task %d: %s\n", numTasksScheduled, strPositions.str());
-    }
-#endif
-
     CTask task{priority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High};
     results.emplace_back(
             task.injectTask([weakSelf, func, txPositions=std::move(txPositions)](const TxInputDataSPtrRefVec& vTxInputData) mutable
@@ -338,9 +300,12 @@ void ValidationScheduler::BuildSpendersMap() {
     spendersReady = true;
 }
 
-void ValidationScheduler::DrawGraph() {
-#ifdef DEBUG_SCHEDULER
-    const auto fileName = strprintf("graph_batch_%d.gv", _batchNum);
+#ifdef SCHEDULER_OUTPUT_GRAPH
+// Outputs graph of the given transaction batch in the Graphviz dot format.
+// Only useful for development / debugging.
+void DrawGraph(const TxInputDataSPtrVec& txs) {
+    static std::atomic_size_t batchNum = 0;
+    const auto fileName = strprintf("graph_batch_%d.gv", ++batchNum);
     const fs::path &filePath = GetDataDir() / fileName;
     std::ofstream outfile;
     outfile.open(filePath.c_str());
@@ -378,5 +343,5 @@ void ValidationScheduler::DrawGraph() {
 
     outfile << "}" << std::endl;
     outfile.close();
-#endif
 }
+#endif

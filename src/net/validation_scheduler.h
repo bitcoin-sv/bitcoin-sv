@@ -83,16 +83,10 @@ private:
     std::thread buildSpendersThread;
     std::atomic_bool buildSpendersThreadRun = true;
 
-    static size_t _batchNum; // just for debugging/logging
-
 public:
     // Returns true if graph of spenders is ready.
     bool IsSpendersGraphReady() {
         return spendersReady;
-    }
-    
-    void BalaNjok() {
-        spendersReady = false;
     }
 
 private:
@@ -125,9 +119,5 @@ private:
 
     // Builds forward map from transaction to transactions that spend it.
     void BuildSpendersMap();
-    
-    // Outputs graph of the given transaction batch in the Graphviz dot format.
-    // Useful for development / debugging.
-    void DrawGraph();
 };
 
