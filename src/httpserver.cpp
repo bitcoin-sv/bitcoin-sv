@@ -130,7 +130,7 @@ static std::string RequestMethodString(HTTPRequest::RequestMethod m) {
 static void http_request_cb(struct evhttp_request *req, void *arg) {
     Config &config = *reinterpret_cast<Config *>(arg);
 
-    std::unique_ptr<HTTPRequest> hreq { std::make_unique<HTTPRequest>(req) };
+    std::shared_ptr<HTTPRequest> hreq { std::make_shared<HTTPRequest>(req) };
 
     LogPrint(BCLog::HTTP, "Received a %s request for %s from %s\n",
              RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(),
@@ -168,7 +168,7 @@ static void http_request_cb(struct evhttp_request *req, void *arg) {
 
     // Dispatch to worker thread.
     if (i != iend) {
-        size_t workQueueDepth = std::max(static_cast<size_t>(gArgs.GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE)), 1UL);
+        size_t workQueueDepth = std::max(static_cast<size_t>(gArgs.GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE)), size_t{1});
 
         assert(pWorkQueue);
         if(pWorkQueue->getTaskDepth() < workQueueDepth) {
