@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include <string.h>
-#include "util/coding.h"
 #include "util/hash.h"
+
+#include <cstring>
+
+#include "util/coding.h"
 
 #if __has_cpp_attribute(fallthrough)
 #define FALLTHROUGH [[fallthrough]]
@@ -33,19 +35,18 @@ uint32_t Hash(const char* data, size_t n, uint32_t seed) {
   // Pick up remaining bytes
   switch (limit - data) {
     case 3:
-      h += static_cast<unsigned char>(data[2]) << 16;
+      h += static_cast<uint8_t>(data[2]) << 16;
       FALLTHROUGH;
     case 2:
-      h += static_cast<unsigned char>(data[1]) << 8;
+      h += static_cast<uint8_t>(data[1]) << 8;
       FALLTHROUGH;
     case 1:
-      h += static_cast<unsigned char>(data[0]);
+      h += static_cast<uint8_t>(data[0]);
       h *= m;
       h ^= (h >> r);
       break;
   }
   return h;
 }
-
 
 }  // namespace leveldb

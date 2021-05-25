@@ -358,7 +358,7 @@ AX_CHECK_COMPILE_FLAG([-msse4.2],[[SSE42_CXXFLAGS="-msse4.2"]],,[[$CXXFLAG_WERRO
 
 TEMP_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS $SSE42_CXXFLAGS"
-AC_MSG_CHECKING(for assembler crc32 support)
+AC_MSG_CHECKING(for SSE4.2 intrinsics)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <stdint.h>
     #if defined(_MSC_VER)
@@ -373,7 +373,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     l = _mm_crc32_u64(l, 0);
     return l;
   ]])],
- [ AC_MSG_RESULT(yes); enable_hwcrc32=yes],
+ [ AC_MSG_RESULT(yes); enable_sse42=yes],
  [ AC_MSG_RESULT(no)]
 )
 CXXFLAGS="$TEMP_CXXFLAGS"
@@ -441,7 +441,6 @@ case $host in
      fi
 
      CPPFLAGS="$CPPFLAGS -D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB"
-     LEVELDB_TARGET_FLAGS="-DOS_WINDOWS"
      if test "x$CXXFLAGS_overridden" = "xno"; then
        CXXFLAGS="$CXXFLAGS -w"
      fi
@@ -463,7 +462,6 @@ case $host in
      ;;
   *darwin*)
      TARGET_OS=darwin
-     LEVELDB_TARGET_FLAGS="-DOS_MACOSX"
      if  test x$cross_compiling != xyes; then
        BUILD_OS=darwin
        AC_CHECK_PROG([PORT],port, port)
@@ -525,19 +523,11 @@ case $host in
      ;;
    *linux*)
      TARGET_OS=linux
-     LEVELDB_TARGET_FLAGS="-DOS_LINUX"
      AIO_LIBS="-lrt"
-     ;;
-   *freebsd*)
-     LEVELDB_TARGET_FLAGS="-DOS_FREEBSD"
-     ;;
-   *openbsd*)
-     LEVELDB_TARGET_FLAGS="-DOS_OPENBSD"
      ;;
    *)
      OTHER_OS=`echo ${host_os} | awk '{print toupper($0)}'`
      AC_MSG_WARN([Guessing LevelDB OS as OS_${OTHER_OS}, please check whether this is correct, if not add an entry to configure.ac.])
-     LEVELDB_TARGET_FLAGS="-DOS_${OTHER_OS}"
      ;;
 esac
 
@@ -775,6 +765,70 @@ if test x$use_reduce_exports = xyes; then
   AX_CHECK_COMPILE_FLAG([-fvisibility=hidden],[RE_CXXFLAGS="-fvisibility=hidden"],
   [AC_MSG_ERROR([Cannot set default symbol visibility. Use --disable-reduce-exports.])])
 fi
+
+dnl crc32c platform checks
+AC_MSG_CHECKING(for __builtin_prefetch)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[
+  char data = 0;
+  const char* address = &data;
+  __builtin_prefetch(address, 0, 0);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_BUILTIN_PREFETCH=1 ],
+ [ AC_MSG_RESULT(no); HAVE_BUILTIN_PREFETCH=0 ]
+)
+
+AC_MSG_CHECKING(for _mm_prefetch)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <xmmintrin.h>]], [[
+  char data = 0;
+  const char* address = &data;
+  _mm_prefetch(address, _MM_HINT_NTA);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_MM_PREFETCH=1 ],
+ [ AC_MSG_RESULT(no); HAVE_MM_PREFETCH=0 ]
+)
+
+AC_MSG_CHECKING(for strong getauxval support in the system headers)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    #include <sys/auxv.h>
+  ]], [[
+    getauxval(AT_HWCAP);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_STRONG_GETAUXVAL=1 ],
+ [ AC_MSG_RESULT(no); HAVE_STRONG_GETAUXVAL=0 ]
+)
+
+AC_MSG_CHECKING(for weak getauxval support in the compiler)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    unsigned long getauxval(unsigned long type) __attribute__((weak));
+    #define AT_HWCAP 16
+  ]], [[
+    getauxval(AT_HWCAP);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_WEAK_GETAUXVAL=1 ],
+ [ AC_MSG_RESULT(no); HAVE_WEAK_GETAUXVAL=0 ]
+)
+
+dnl LevelDB platform checks
+AC_MSG_CHECKING(for fdatasync)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>]],
+ [[ fdatasync(0); ]])],
+ [ AC_MSG_RESULT(yes); HAVE_FDATASYNC=1 ],
+ [ AC_MSG_RESULT(no); HAVE_FDATASYNC=0 ]
+)
+
+AC_MSG_CHECKING(for F_FULLFSYNC)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>]],
+ [[ fcntl(0, F_FULLFSYNC, 0); ]])],
+ [ AC_MSG_RESULT(yes); HAVE_FULLFSYNC=1 ],
+ [ AC_MSG_RESULT(no); HAVE_FULLFSYNC=0 ]
+)
+
+AC_MSG_CHECKING(for O_CLOEXEC)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>]],
+ [[ open("", O_CLOEXEC); ]])],
+ [ AC_MSG_RESULT(yes); HAVE_O_CLOEXEC=1 ],
+ [ AC_MSG_RESULT(no); HAVE_O_CLOEXEC=0 ]
+)
 
 LEVELDB_CPPFLAGS=
 LIBLEVELDB=
@@ -1200,8 +1254,10 @@ AM_CONDITIONAL([ENABLE_BENCH],[test x$use_bench = xyes])
 AM_CONDITIONAL([USE_LCOV],[test x$use_lcov = xyes])
 AM_CONDITIONAL([GLIBC_BACK_COMPAT],[test x$use_glibc_compat = xyes])
 AM_CONDITIONAL([HARDEN],[test x$use_hardening = xyes])
-AM_CONDITIONAL([ENABLE_HWCRC32],[test x$enable_hwcrc32 = xyes])
+AM_CONDITIONAL([ENABLE_HWCRC32],[test x$enable_sse42 = xyes])
+AM_CONDITIONAL([ENABLE_SSE42],[test x$enable_sse42 = xyes])
 AM_CONDITIONAL([USE_ASM],[test x$use_asm = xyes])
+AM_CONDITIONAL([WORDS_BIGENDIAN],[test x$ac_cv_c_bigendian = xyes])
 
 AC_DEFINE(CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MAJOR, [Major version])
 AC_DEFINE(CLIENT_VERSION_MINOR, _CLIENT_VERSION_MINOR, [Minor version])
@@ -1237,7 +1293,6 @@ AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(USE_UPNP)
 AC_SUBST(BOOST_LIBS)
 AC_SUBST(TESTDEFS)
-AC_SUBST(LEVELDB_TARGET_FLAGS)
 AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
 AC_SUBST(OPENSSL_LIBS)
@@ -1247,6 +1302,13 @@ AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
 AC_SUBST(AIO_LIBS)
+AC_SUBST(HAVE_BUILTIN_PREFETCH)
+AC_SUBST(HAVE_MM_PREFETCH)
+AC_SUBST(HAVE_STRONG_GETAUXVAL)
+AC_SUBST(HAVE_WEAK_GETAUXVAL)
+AC_SUBST(HAVE_FDATASYNC)
+AC_SUBST(HAVE_FULLFSYNC)
+AC_SUBST(HAVE_O_CLOEXEC)
 AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi test/config.ini])
 AC_CONFIG_FILES([contrib/devtools/split-debug.sh],[chmod +x contrib/devtools/split-debug.sh])
 AC_CONFIG_LINKS([test/functional/test_runner.py:test/functional/test_runner.py])

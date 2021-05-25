@@ -1,5 +1,5 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
-# Copyright (c) 2018-2020 Bitcoin Association
+# Copyright (c) 2018-2021 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 DIST_SUBDIRS = secp256k1 univalue
@@ -541,7 +541,7 @@ bitcoind_LDADD = \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
-  $(LIBLEVELDB_SSE42) \
+  $(LIBCRC32C) \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
@@ -693,6 +693,7 @@ endif
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(<D) $<
 
 if EMBEDDED_LEVELDB
+include Makefile.crc32c.include
 include Makefile.leveldb.include
 endif
 
