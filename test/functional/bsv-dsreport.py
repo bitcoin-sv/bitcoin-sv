@@ -244,6 +244,41 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "Txn {} is DS notification enabled on output 0".format(tx7.hash), "/node0"))
         assert(not check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx7.hash), "/node0"))
 
+    # Check double-spend of mempool txn
+    def check_ds_mempool_txn(self, utxo):
+
+        # tx1
+        vin = [
+            CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
+        ]
+        vout = [
+            CTxOut(10000, CScript([OP_TRUE]))
+        ]
+        tx1 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
+
+        # tx2 is dsnt-enabled & spends tx1 while still in the mempool
+        vin = [
+            CTxIn(COutPoint(tx1.sha256, 0), CScript([OP_DROP, OP_TRUE]), 0xffffffff)
+        ]
+        vout = [
+            CTxOut(100, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0]).serialize()]))
+        ]
+        tx2 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: tx2.hash in self.nodes[0].getrawmempool())
+
+        # tx3 spends the same output as tx2 (double spend)
+        vin = [
+            CTxIn(COutPoint(tx1.sha256, 0), CScript([OP_DROP, OP_TRUE]), 0xffffffff)
+        ]
+        vout = [
+            CTxOut(100, CScript([OP_TRUE]))
+        ]
+        tx3 = self.create_and_send_transaction(vin, vout)
+        wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx3.hash), "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "Verifying script for txn {}".format(tx3.hash), "/node0"))
+        wait_until(lambda: self.check_tx_received(tx2.hash))
+
     # Test that notifying callback server does not work for NOT dsnt-enabled transactions.
     # Pass in different output scripts with invalid/missing CallbackMessage.
     def check_ds_not_enabled(self, utxo, output):
@@ -523,6 +558,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.createConnection()
 
         self.check_ds_enabled(utxo[:6])
+        self.check_ds_mempool_txn(utxo[15])
 
         # missing callback message
         self.check_ds_not_enabled(utxo[7], CScript([OP_FALSE, OP_RETURN]))
