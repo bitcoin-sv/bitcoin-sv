@@ -285,10 +285,9 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
 
             if(nTime + mPurgeAge > nNow)
             {
-                // Mempool Journal ChangeSet
-                CJournalChangeSetPtr changeSet {
-                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
-                };
+                // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+                CJournalChangeSetPtr changeSet {nullptr};
+
                 std::string reason {};
                 bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->GetHeight() + 1, reason) };
                 const CValidationState& state {
