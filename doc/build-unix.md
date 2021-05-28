@@ -306,6 +306,15 @@ Revert gcc to original version (optional)
                              --slave /usr/bin/g++ g++ /usr/bin/g++-5*
     sudo update-alternatives --config gcc
 
+Portable Linux build
+-------------------
+    cd depends
+    make
+    cd ..
+    ./autogen.sh
+    ./configure --prefix=`pwd`/depends/x86_64-pc-linux-gnu LDFLAGS="-static-libstdc++"
+    make
+
 Building on Centos 7
 --------------------
 
