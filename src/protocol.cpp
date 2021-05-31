@@ -154,12 +154,14 @@ CheckHeaderMagicAndCommand(const CMessageHeader &header,
          p1 < header.pchCommand + CMessageHeader::COMMAND_SIZE; p1++) {
         if (*p1 == 0) {
             // Must be all zeros after the first zero
-            for (; p1 < header.pchCommand + CMessageHeader::COMMAND_SIZE;
-                 p1++) {
-                if (*p1 != 0) {
-                    return false;
-                }
+            if (!std::all_of(
+                    p1 + 1,
+                    header.pchCommand + CMessageHeader::COMMAND_SIZE,
+                    [](char i) { return i == 0; } ))
+            {
+                return false;
             }
+            break;
         } else if (*p1 < ' ' || *p1 > 0x7E) {
             return false;
         }
