@@ -1236,6 +1236,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf("Set run frequency in asynchronous mode (default: %dms)",
             CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
     strUsage += HelpMessageOpt(
+            "-usenewtxnvalidationscheduler",
+            strprintf("Use new graph detector validation task scheduler."
+                      " (default: %d)",
+                      DEFAULT_USE_NEW_TXN_VALIDATION_SCHEDULER)) ;
+    strUsage += HelpMessageOpt(
         "-maxtxnvalidatorasynctasksrunduration=<n>",
         strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
             CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count())) ;
@@ -2404,6 +2409,8 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
+
+    config.SetUseNewTxnValidationScheduler(gArgs.GetBoolArg("-usenewtxnvalidationscheduler", DEFAULT_USE_NEW_TXN_VALIDATION_SCHEDULER));
 
     if(std::string err; !config.SetMaxCoinsViewCacheSize(
         gArgs.GetArgAsBytes("-maxcoinsviewcachesize", 0), &err))

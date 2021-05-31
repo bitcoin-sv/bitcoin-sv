@@ -21,3 +21,5 @@ static constexpr std::chrono::milliseconds DEFAULT_MAX_NON_STD_TXN_VALIDATION_DU
 /** The maximum unused validation time to carry over to the next transaction in the chain */
 static constexpr std::chrono::milliseconds DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET =
     std::chrono::milliseconds{50};
+/** Default for which scheduler to use. false - Use legacy chain detector, true - Use new graph detector. */
+static constexpr bool DEFAULT_USE_NEW_TXN_VALIDATION_SCHEDULER = true;

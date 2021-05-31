@@ -75,6 +75,7 @@ public:
     virtual std::chrono::milliseconds GetMaxTxnValidatorAsyncTasksRunDuration() const = 0;
     virtual bool GetValidationClockCPU() const = 0;
     virtual std::chrono::milliseconds GetMaxTxnChainValidationBudget() const = 0;
+    virtual bool GetUseNewTxnValidationScheduler() const = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
     virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
@@ -199,6 +200,7 @@ public:
     virtual bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) = 0;
     virtual void SetValidationClockCPU(bool enable) = 0;
+    virtual void SetUseNewTxnValidationScheduler(bool enable) = 0;
     virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
@@ -421,6 +423,9 @@ public:
 
     void SetValidationClockCPU(bool enable) override;
     bool GetValidationClockCPU() const override;
+    
+    void SetUseNewTxnValidationScheduler(bool enable) override;
+    bool GetUseNewTxnValidationScheduler() const override;
 
     bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
@@ -659,6 +664,8 @@ private:
         std::chrono::milliseconds mMaxTxnChainValidationBudget;
 
         bool mValidationClockCPU;
+    
+        bool mUseNewTxnValidationScheduler;
 
         uint64_t maxStackMemoryUsagePolicy;
         uint64_t maxStackMemoryUsageConsensus;
@@ -984,6 +991,9 @@ public:
 
     void SetValidationClockCPU(bool enable) override {}
     bool GetValidationClockCPU() const override { return DEFAULT_VALIDATION_CLOCK_CPU; }
+
+    void SetUseNewTxnValidationScheduler(bool enable) override {}
+    bool GetUseNewTxnValidationScheduler() const override { return DEFAULT_USE_NEW_TXN_VALIDATION_SCHEDULER; }
 
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
     {

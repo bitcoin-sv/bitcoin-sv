@@ -376,7 +376,8 @@ public:
             TxInputDataSPtrVec& vNewTxns,
             CTxnHandlers& handlers,
             bool fUseTimedCancellationSource,
-            std::chrono::milliseconds maxasynctasksrunduration)
+            std::chrono::milliseconds maxasynctasksrunduration,
+            bool useNewGraphTaskScheduler)
         -> std::vector<std::future<typename std::result_of<
             Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
@@ -390,13 +391,43 @@ public:
             std::chrono::steady_clock::time_point(maxasynctasksrunduration) == zero_time_point
                 ? zero_time_point : std::chrono::steady_clock::now() + maxasynctasksrunduration;
 
-        ValidationScheduler::TypeValidationFunc validate =
-                [func, config, pool, &handlers, fUseTimedCancellationSource, end_time_point]
-                        (const TxInputDataSPtrRefVec &vTxInputData) {
-                    return func(vTxInputData, config, pool, handlers, fUseTimedCancellationSource, end_time_point);
-                };
-        auto scheduler = std::make_shared<ValidationScheduler>(mValidatorThreadPool, vNewTxns, validate);
-        return scheduler->Schedule();
+        if (useNewGraphTaskScheduler) {
+            ValidationScheduler::TypeValidationFunc validate =
+                    [func, config, pool, &handlers, fUseTimedCancellationSource, end_time_point]
+                            (const TxInputDataSPtrRefVec &vTxInputData) {
+                        return func(vTxInputData, config, pool, handlers, fUseTimedCancellationSource, end_time_point);
+                    };
+            auto scheduler = std::make_shared<ValidationScheduler>(mValidatorThreadPool, vNewTxns, validate);
+            return scheduler->Schedule();
+        } else {
+            using resultType = typename std::result_of<
+                    Callable(const TxInputDataSPtrRefVec&,
+                             const Config*,
+                             CTxMemPool*,
+                             CTxnHandlers&,
+                             bool,
+                             std::chrono::steady_clock::time_point)>::type;
+            auto chains = ScheduleChains(vNewTxns);
+            // Reserve a space for the result set (a pessimistic estimation).
+            std::vector<std::future<resultType>> results {};
+            results.reserve(chains.size());
+
+            for (auto& chain: chains) {
+                results.emplace_back(
+                        make_task(
+                                mValidatorThreadPool,
+                                chain.second == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
+                                func,
+                                std::move(chain.first),
+                                config,
+                                pool,
+                                handlers,
+                                fUseTimedCancellationSource,
+                                end_time_point));
+            }
+
+            return results;
+        }
     }
 
     /** Get a handle to the TxIdTracker */

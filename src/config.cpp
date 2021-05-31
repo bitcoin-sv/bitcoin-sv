@@ -835,6 +835,13 @@ bool GlobalConfig::GetValidationClockCPU() const {
     return data->mValidationClockCPU;
 }
 
+void GlobalConfig::SetUseNewTxnValidationScheduler(bool enable) {
+    mUseNewTxnValidationScheduler = enable;
+}
+
+bool GlobalConfig::GetUseNewTxnValidationScheduler() const {
+    return mUseNewTxnValidationScheduler;
+}
 
 /**
  * Compute the maximum number of sigops operations that can be contained in a block
