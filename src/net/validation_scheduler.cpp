@@ -26,8 +26,7 @@ ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadP
         : validationFunc(std::move(func)),
           txs(txs),
           validatorThreadPool(threadPool),
-          NUM_VALIDATORS{threadPool.getPoolSize()},
-          MAX_TO_SCHEDULE{NUM_VALIDATORS * 8}
+          MAX_TO_SCHEDULE{threadPool.getPoolSize() * MAX_TO_SCHEDULE_FACTOR}
 {
     // Initialize status for each transaction.
     txStatuses.reserve(txs.size());

@@ -68,12 +68,16 @@ private:
     // notifies that task just completed
     std::condition_variable taskCompletionCV;
 
-    // Number of validator threads
-    const size_t NUM_VALIDATORS;
-    // Useful to optimize scheduling of graphs. i.e. don't schedule all independent txs up front as this
+    // Desired number of concurrently scheduled tasks.
+    // Used to optimize scheduling of graphs and chains. i.e. don't schedule all independent txs up front as this
     // would delay validation of txs in chains to the end of batch.
+    // This is calculated from number of available validator threads and a factor.
+    // Higher number is better for isolated transactions. Lower number is better if chains are mixed in.
     const size_t MAX_TO_SCHEDULE;
-    const size_t MAX_SCAN_WINDOW = 256;
+    // Factor for number of concurrently scheduled tasks.
+    // Found with experiments. Higher value doesn't add any benefit.
+    static const size_t MAX_TO_SCHEDULE_FACTOR = 8;
+    static const size_t MAX_SCAN_WINDOW = 256;
 
     // Map of spenders i.e. links from transactions to transactions that spend its outputs.
     // Map is build out-of-band in a separate thread.
