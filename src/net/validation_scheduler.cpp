@@ -28,10 +28,13 @@ ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadP
           validatorThreadPool(threadPool),
           MAX_TO_SCHEDULE{threadPool.getPoolSize() * MAX_TO_SCHEDULE_FACTOR}
 {
-    // Initialize status for each transaction.
-    txStatuses.reserve(txs.size());
-    for (auto& tx : txs) {
-        txStatuses[tx->GetTxnPtr()->GetId()] = ScheduleStatus::NOT_STARTED;
+    // Initialize status for each transaction and build mapping from TxId to position.
+    size_t txsSize = txs.size();
+    txStatuses.reserve(txsSize);
+    txIdToPos.reserve(txsSize);
+    for (size_t i = 0; i < txsSize; ++i) {
+        txStatuses[i] = ScheduleStatus::NOT_STARTED;
+        txIdToPos[txs[i]->GetTxnPtr()->GetId()] = i;
     }
 
     // Build map of spenders on a separate thread. Until map is ready we schedule without it.
@@ -86,7 +89,7 @@ std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationSc
         for (const TaskCompletion &taskResult : lastResults) {
             --numTasksScheduled;
             for (auto pos : taskResult.positions) {
-                txStatuses[txs[pos]->GetTxnPtr()->GetId()] = taskResult.status;
+                txStatuses[pos] = taskResult.status;
             }
         }
 
@@ -122,7 +125,7 @@ void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidatio
         scanPos = posUnhandled;
 
         // Advance posUnhandled as far as possible.
-        while (scanPos < txs.size() && txStatuses[txs[posUnhandled]->GetTxnPtr()->GetId()] != ScheduleStatus::NOT_STARTED) {
+        while (scanPos < txs.size() && txStatuses[posUnhandled] != ScheduleStatus::NOT_STARTED) {
             posUnhandled = ++scanPos;
         }
     }
@@ -180,20 +183,19 @@ void ValidationScheduler::ScheduleChain(size_t rootPos,
 
 bool ValidationScheduler::CanStartValidation(const size_t txPos, const std::unordered_set<TxId>& assumeDone) {
     auto& tx = txs[txPos]->GetTxnPtr();
-    auto txStatus = txStatuses.find(tx->GetId());
-    if (txStatus != txStatuses.end() && txStatus->second != ScheduleStatus::NOT_STARTED) {
+    if (txStatuses[txPos] != ScheduleStatus::NOT_STARTED) {
         // tx is already processed or validation is running just now.
         return false;
     }
-    for (const auto& inputAAA : tx->vin) {
-        const COutPoint &outPoint = inputAAA.prevout;
-        auto inputStatus = txStatuses.find(outPoint.GetTxId());
-        if (inputStatus == txStatuses.end()) {
-            // This outPoint is not present in txs_statuses, therefore the outPoint tx is not present in the batch.
+    for (const auto& input : tx->vin) {
+        const COutPoint &outPoint = input.prevout;
+        auto inputPos = txIdToPos.find(outPoint.GetTxId());
+        if (inputPos == txIdToPos.end()) {
+            // This outPoint tx is not present in the batch of transactions to validate.
             // Therefore tx is still candidate to start validation. Continue checking other inputs.
             continue;
         } else {
-            switch (inputStatus->second) {
+            switch (txStatuses[inputPos->second]) {
                 case ScheduleStatus::IN_PROGRESS:
                     // If inputs are being validated then validation for tx can't start
                     return false;
@@ -238,7 +240,7 @@ void ValidationScheduler::SubmitTask(std::vector<size_t>&& txPositions,
         txsToValidate.emplace_back(tx);
         priority = std::min(priority, tx->GetTxValidationPriority());
         // Bookkeeping
-        txStatuses[tx->GetTxnPtr()->GetId()] = ScheduleStatus::IN_PROGRESS;
+        txStatuses[tx_pos] = ScheduleStatus::IN_PROGRESS;
     }
 
     CTask task{priority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High};
@@ -273,12 +275,6 @@ void ValidationScheduler::MarkResult(std::vector<size_t>&& positions, ScheduleSt
 }
 
 void ValidationScheduler::BuildSpendersMap() {
-    // Set of known txn ids.
-    std::unordered_set<TxId> txnIds{txs.size()};
-    for (auto& tx : txs) {
-        txnIds.emplace(tx->GetTxnPtr()->GetId());
-    }
-
     for (size_t i = 0; i < txs.size(); ++i) {
         if (!buildSpendersThreadRun) {
             // All transactions are already scheduled. Stop building the map as we don't need it any more.
@@ -290,7 +286,7 @@ void ValidationScheduler::BuildSpendersMap() {
         std::unordered_set<TxId> parents(std::min(txnPtr->vin.size(), (size_t)10));
         for (const CTxIn &txIn : txnPtr->vin) {
             const TxId &parentId = txIn.prevout.GetTxId();
-            if (parents.find(parentId) == parents.end() && txnIds.find(parentId) != txnIds.end()) {
+            if (parents.find(parentId) == parents.end() && txIdToPos.find(parentId) != txIdToPos.end()) {
                 spenders.emplace(parentId, i);
                 parents.emplace(parentId);
             }

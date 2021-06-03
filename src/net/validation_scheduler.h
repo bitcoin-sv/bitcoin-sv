@@ -50,7 +50,10 @@ private:
     TxInputDataSPtrVec& txs;
 
     // For each txn we must know if it was already scheduled.
-    std::unordered_map<TxId, ScheduleStatus> txStatuses;
+    std::vector<ScheduleStatus> txStatuses;
+    
+    // Mapping from TxId to position in input batch.
+    std::unordered_map<TxId, size_t> txIdToPos;
 
     // Counts how many tasks are currently scheduled.
     size_t numTasksScheduled = 0;
