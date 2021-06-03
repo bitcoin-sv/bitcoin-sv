@@ -84,7 +84,7 @@ private:
 
     // Map of spenders i.e. links from transactions to transactions that spend its outputs.
     // Map is build out-of-band in a separate thread.
-    std::unordered_multimap<TxId, size_t> spenders;
+    std::unordered_multimap<size_t, size_t> spenders;
     std::atomic_bool spendersReady = false;
     // thread to build spenders map
     std::thread buildSpendersThread;

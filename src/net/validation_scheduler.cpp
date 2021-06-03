@@ -146,8 +146,7 @@ void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidatio
 
 void ValidationScheduler::ScheduleGraph(size_t rootPos,
                                         std::vector<std::future<TypeValidationResult>>& taskResults) {
-    auto &rootTx = txs[rootPos]->GetTxnPtr();
-    auto txSpenders = spenders.equal_range(rootTx->GetId());
+    auto txSpenders = spenders.equal_range(rootPos);
     for (auto iterSpender = txSpenders.first; iterSpender != txSpenders.second; ++iterSpender) {
         size_t spenderPos = iterSpender->second;
         if (CanStartValidation(spenderPos, {})) {
@@ -168,8 +167,8 @@ void ValidationScheduler::ScheduleChain(size_t rootPos,
         // We only want to detect chains where only one tx in the batch spends output in parent tx.
         // If there are more than one spenders of one parent tx, then we want to schedule 
         // those in parallel. Which is handled by ScheduleGraph.
-        if (spenders.count(txId) == 1) {
-            iTxPos = spenders.find(txId)->second;
+        if (spenders.count(iTxPos.value()) == 1) {
+            iTxPos = spenders.find(iTxPos.value())->second;
             assumedDone = {txId};
         } else {
             iTxPos = {};
@@ -285,9 +284,11 @@ void ValidationScheduler::BuildSpendersMap() {
         std::unordered_set<TxId> parents(std::min(txnPtr->vin.size(), (size_t)10));
         for (const CTxIn &txIn : txnPtr->vin) {
             const TxId &parentId = txIn.prevout.GetTxId();
-            if (parents.find(parentId) == parents.end() && txIdToPos.find(parentId) != txIdToPos.end()) {
-                spenders.emplace(parentId, i);
-                parents.emplace(parentId);
+            if (parents.find(parentId) == parents.end()) {
+                if (auto parentPos = txIdToPos.find(parentId); parentPos != txIdToPos.end()) { 
+                    spenders.emplace(parentPos->second, i);
+                    parents.emplace(parentId);
+                }
             }
         }
     }
