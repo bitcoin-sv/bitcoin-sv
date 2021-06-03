@@ -80,8 +80,7 @@ std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationSc
             std::scoped_lock<std::mutex> resultsLock(taskCompletionMtx);
             if (!taskCompletionQueue.empty()) {
                 // move all task_results from input queue to local vector.
-                lastResults = std::move(taskCompletionQueue);
-                taskCompletionQueue = std::vector<TaskCompletion>();
+                std::swap(taskCompletionQueue, lastResults);
             }
         }
 
