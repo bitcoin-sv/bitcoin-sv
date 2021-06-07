@@ -23,9 +23,9 @@ void DrawGraph(const TxInputDataSPtrVec& txs);
 
 ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadPool,
                                          TxInputDataSPtrVec &txs, TypeValidationFunc func)
-        : validationFunc(std::move(func)),
-          txs(txs),
-          validatorThreadPool(threadPool),
+        : validationFunc{std::move(func)},
+          txs{txs},
+          validatorThreadPool{threadPool},
           MAX_TO_SCHEDULE{threadPool.getPoolSize() * MAX_TO_SCHEDULE_FACTOR}
 {
     // Initialize status for each transaction and build mapping from TxId to position.
