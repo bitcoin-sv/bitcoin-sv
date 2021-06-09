@@ -207,6 +207,10 @@ void Shutdown() {
         delete pblocktree;
         pblocktree = nullptr;
     }
+
+    // Flush/destroy miner ID database
+    g_minerIDs.reset();
+
 #ifdef ENABLE_WALLET
     for (CWalletRef pwallet : vpwallets) {
         pwallet->Flush(true);
@@ -3241,8 +3245,6 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
-
-
 // Step 8: load wallet
 #ifdef ENABLE_WALLET
     if (!CWallet::InitLoadWallet(chainparams)) return false;
@@ -3309,6 +3311,15 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     }
 
     preloadChainState(threadGroup);
+
+    // Create minerID database
+    try {
+        g_minerIDs = std::make_unique<MinerIdDatabase>(config);
+        ScheduleMinerIdPeriodicTasks(scheduler, *g_minerIDs);
+    }
+    catch(const std::exception& e) {
+        LogPrintf("Error creating miner ID database: %s\n", e.what());
+    }
 
     // Step 11: start node
 

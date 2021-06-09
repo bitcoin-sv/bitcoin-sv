@@ -427,6 +427,9 @@ add_library(server
 	metrics.h
 	miner_id/miner_id.cpp
 	miner_id/miner_id.h
+    miner_id/miner_id_db.cpp
+    miner_id/miner_id_db.h
+    miner_id/miner_id_db_defaults.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
