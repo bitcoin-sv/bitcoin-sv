@@ -144,6 +144,7 @@ BITCOIN_CORE_H = \
   merkletreedb.h \
   merkletreestore.h \
   metrics.h \
+  miner_id.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -295,6 +296,7 @@ libbitcoin_server_a_SOURCES = \
   merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
+  miner_id.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \

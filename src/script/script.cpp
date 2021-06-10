@@ -147,6 +147,19 @@ bool IsDustReturnScript (bsv::span<const uint8_t> script)
     return std::equal(script.begin(), script.end(), dust_return.begin());
 }
 
+/*
+ * Checks that the beginning of a script contains a valid OP_RETURN protocol id.
+ * The beginning of the script should look like this: OP_FALSE OP_RETURN OP_PUSHDATA protocol_id OP_PUSHDATA data
+ * Method only works for 4-byte protocol ids.
+ * It does not check data after OP_PUSHDATA (i.e. is length of data consistent with the chosen PUSHDATA). This should be done on the call-site.
+ */
+bool IsProtocolPrefixOP_RETURN(const uint8_t protocol_id[4], bsv::span<const uint8_t> script)
+{
+    return script.size() >= 8 && script[0] == OP_FALSE && script[1] == OP_RETURN && script[2] == 0x04 &&
+        script[3] == protocol_id[0] && script[4] == protocol_id[1] && script[5] == protocol_id[2] && script[6] == protocol_id[3] &&
+        script[7] <= OP_PUSHDATA4;
+}
+
 bool CScript::IsPushOnly(const_iterator pc) const {
     while (pc < end()) {
         opcodetype opcode;

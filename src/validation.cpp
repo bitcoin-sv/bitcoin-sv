@@ -31,6 +31,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "processing_block_index.h"
+#include "pubkey.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -550,12 +551,16 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled)
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t height)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
                          "first tx is not coinbase");
     }
+
+    // TODO: minerId is never used in SVN-1412.
+    // Using minerId is part of bigger MinerId epic.
+    std::optional<MinerId> minerId = MinerId::FindMinerId(tx, height);
 
     if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
         // CheckTransactionCommon fill in the state.
@@ -5411,7 +5416,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled, blockHeight)) {
         auto result = state.Invalid(false, state.GetRejectCode(),
                                     state.GetRejectReason(),
                                     strprintf("Coinbase check failed (txid %s) %s",

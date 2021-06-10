@@ -17,6 +17,7 @@
 #include "coins.h"
 #include "consensus/consensus.h"
 #include "fs.h"
+#include "miner_id.h"
 #include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "script/script_error.h"
@@ -923,7 +924,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
 bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
+bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t blockHeight = -1);
 
 namespace Consensus {
 
