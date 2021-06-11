@@ -49,6 +49,41 @@ private:
     class CTotalScopeGuard
     {
     public:
+
+        // CSubGuardNL should always be protected with mutex
+        class CSubGuardNL
+        {
+        public:
+            CSubGuardNL(CSubGuardNL&&) = delete;
+            CSubGuardNL(const CSubGuardNL&) = delete;
+            CSubGuardNL& operator=(CSubGuardNL&&) = delete;
+            CSubGuardNL& operator=(const CSubGuardNL&) = delete;
+
+            ~CSubGuardNL()
+            {
+                if (mRelease)
+                {
+                    --(parentGuard.mCounter);
+                    parentGuard.mRunning = false;
+                }
+            }
+
+            // Used when work is needed. Worker count should not decrease.
+            void DoNotReleaseNL()
+            {
+                mRelease = false;
+            }
+
+        private:
+            friend class CTotalScopeGuard;
+
+            CSubGuardNL(CTotalScopeGuard &scopeGuard)
+                : parentGuard{scopeGuard} {}
+
+            CTotalScopeGuard &parentGuard;
+            bool mRelease{true};
+        };
+
         CTotalScopeGuard(
             boost::mutex& mutex,
             int& counter)
@@ -70,10 +105,15 @@ private:
         CTotalScopeGuard(const CTotalScopeGuard&) = delete;
         CTotalScopeGuard& operator=(const CTotalScopeGuard&) = delete;
 
-        void runNL()
+        CSubGuardNL GetSubGuardNL()
         {
-            ++mCounter;
-            mRunning = true;
+            // Increase the count on first iteration only
+            if (!mRunning)
+            {
+                ++mCounter;
+                mRunning = true;
+            }
+            return {*this};
         }
 
     private:
@@ -151,6 +191,7 @@ private:
         do {
             {
                 boost::unique_lock<boost::mutex> lock(mutex);
+                auto subguard = guard.GetSubGuardNL();
                 // first do the clean-up of the previous loop run (allowing us
                 // to do it in the same critsect)
                 if (nNow) {
@@ -180,11 +221,6 @@ private:
                         // can exit and return the result
                         condMaster.notify_one();
                     }
-                }
-                else
-                {
-                    // first iteration
-                    guard.runNL();
                 }
 
                 // logically, the do loop starts here
@@ -241,6 +277,8 @@ private:
                 queue.erase(queue.begin(), it);
                 // Check whether we need to do work at all
                 fOk = fAllOk;
+                // Do not decrease the nTotal counter when work is needed
+                subguard.DoNotReleaseNL();
             }
             // execute work
             for (T &check : vChecks) {
