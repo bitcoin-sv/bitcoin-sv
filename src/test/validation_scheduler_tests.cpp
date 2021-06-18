@@ -236,7 +236,7 @@ BOOST_AUTO_TEST_CASE(txs_chains) {
 }
 
 // Transactions from the same chain are scheduled in one task.
-BOOST_AUTO_TEST_CASE(txs_chains2) {
+BOOST_AUTO_TEST_CASE(txs_twoParallelChains) {
     /*         0
      *        / \
      *       1   2
@@ -313,7 +313,7 @@ BOOST_AUTO_TEST_CASE(txs_graph) {
     CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2, v3, v4});
 }
 
-BOOST_AUTO_TEST_CASE(txs_graph2) {
+BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
     /*
      *                  0   1
      *                  |  /|
