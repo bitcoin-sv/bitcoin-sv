@@ -23,6 +23,8 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -564,12 +566,28 @@ template <typename Stream, typename K, typename T, typename Pred, typename A>
 void Unserialize(Stream &is, std::map<K, T, Pred, A> &m);
 
 /**
+ * unordered_map
+ */
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_map<K, T, Pred, A> &m);
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_map<K, T, Pred, A> &m);
+
+/**
  * set
  */
 template <typename Stream, typename K, typename Pred, typename A>
 void Serialize(Stream &os, const std::set<K, Pred, A> &m);
 template <typename Stream, typename K, typename Pred, typename A>
 void Unserialize(Stream &is, std::set<K, Pred, A> &m);
+
+/**
+ * unordered_set
+ */
+template <typename Stream, typename K, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_set<K, Pred, A> &m);
+template <typename Stream, typename K, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_set<K, Pred, A> &m);
 
 /**
  * shared_ptr
@@ -804,6 +822,28 @@ void Unserialize(Stream &is, std::map<K, T, Pred, A> &m) {
 }
 
 /**
+ * unordered_map
+ */
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_map<K, T, Pred, A> &m) {
+    WriteCompactSize(os, m.size());
+    for (const auto& p : m) {
+        Serialize(os, p);
+    }
+}
+
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_map<K, T, Pred, A> &m) {
+    m.clear();
+    size_t nSize = ReadCompactSize(is);
+    for (size_t i = 0; i < nSize; i++) {
+        std::pair<K, T> item;
+        Unserialize(is, item);
+        m.insert(item);
+    }
+}
+
+/**
  * set
  */
 template <typename Stream, typename K, typename Pred, typename A>
@@ -823,6 +863,28 @@ void Unserialize(Stream &is, std::set<K, Pred, A> &m) {
         K key;
         Unserialize(is, key);
         it = m.insert(it, key);
+    }
+}
+
+/**
+ * unordered_set
+ */
+template <typename Stream, typename K, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_set<K, Pred, A> &m) {
+    WriteCompactSize(os, m.size());
+    for (const K &i : m) {
+        Serialize(os, i);
+    }
+}
+
+template <typename Stream, typename K, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_set<K, Pred, A> &m) {
+    m.clear();
+    size_t nSize = ReadCompactSize(is);
+    for (size_t i = 0; i < nSize; i++) {
+        K key;
+        Unserialize(is, key);
+        m.insert(key);
     }
 }
 
