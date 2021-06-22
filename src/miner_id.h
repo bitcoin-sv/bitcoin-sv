@@ -104,13 +104,13 @@ class MinerId
     // Parse static coinbase document from coinbaseDocumentData and store it only if it is valid (if method returns true).
     // Parameter tx_out is used only for logging purposes.
     // Also set mStaticDocumentJson and mSignatureStaticDocument if validation was successful.
-    bool SetStaticCoinbaseDocument(const UniValue& coinbaseDocumentData, const COutPoint& tx_out, int32_t blockHeight);
+    bool SetStaticCoinbaseDocument(const UniValue& coinbaseDocumentData, std::vector<uint8_t>& signatureBytes, const COutPoint& tx_out, int32_t blockHeight);
 
     // Parse dynamic coinbase document from coinbaseDocumentData and store it only if it is valid (if method returns true).
     // Parameter tx_out is used only for logging purposes.
-    bool SetDynamicCoinbaseDocument(const UniValue& coinbaseDocumentData, const COutPoint& tx_out, int32_t blockHeight);
+    bool SetDynamicCoinbaseDocument(const UniValue& coinbaseDocumentData, std::vector<uint8_t>& signatureBytes, const COutPoint& tx_out, int32_t blockHeight);
 
-    bool parseCoinbaseDocument(std::string& coinbaseDocumentDataJson, const COutPoint& tx_out, int32_t blockHeight, bool dynamic);
+    bool parseCoinbaseDocument(std::string& coinbaseDocumentDataJson, std::vector<uint8_t>& signatureBytes, const COutPoint& tx_out, int32_t blockHeight, bool dynamic);
 
     static constexpr uint8_t protocol_id[] = { 0xac, 0x1e, 0xed, 0x88 };
 
