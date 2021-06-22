@@ -156,11 +156,6 @@ class FeeFilterTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
         sync_mempools(self.nodes)
 
-        tx1 = FromHex(CTransaction(), tx_hex)
-        tx1.rehash()
-
-        tx3 = FromHex(CTransaction(), tx_hex3)
-        tx3.rehash()
         test_node.clear_invs()
 
         # Consolidation transaction will be relayed,

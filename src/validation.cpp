@@ -1271,6 +1271,7 @@ CTxnValResult TxnValidation(
     }
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     Amount nModifiedFees = nFees;
+    pool.ApplyDeltas(txid, nModifiedFees);
 
     // Calculate tx's size.
     const unsigned int nTxSize = ptx->GetTotalSize();
@@ -1283,11 +1284,12 @@ CTxnValResult TxnValidation(
     if (skipFeeTest) {
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
-        pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
+        if (nModifiedFees == nFees) {
+            pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
+            pool.ApplyDeltas(txid, nModifiedFees);
+        }
         LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
     }
-
-    pool.ApplyDeltas(txid, nModifiedFees);
 
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
