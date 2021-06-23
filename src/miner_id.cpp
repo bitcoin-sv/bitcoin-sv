@@ -70,7 +70,7 @@ bool MinerId::SetStaticCoinbaseDocument(const UniValue& document, std::vector<ui
 
     // Check existence and validity of required fields of static coinbase document.
     auto& version = document["version"];
-    if(!version.isStr()) { LogInvalidDoc(); return false; }
+    if(!version.isStr() || !SUPPORTED_VERSIONS.count(version.get_str())) { LogInvalidDoc(); return false; }
 
     auto& height = document["height"];
     if(!height.isStr()) { LogInvalidDoc(); return false; }
@@ -122,15 +122,31 @@ bool MinerId::SetStaticCoinbaseDocument(const UniValue& document, std::vector<ui
         minerId.get_str() +
         vctxTxid.get_str();
 
-    std::vector<uint8_t> dataToSignBytes = std::vector<uint8_t>(dataToSign.begin(), dataToSign.end());
-
     uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE];
-    CSHA256().Write(dataToSignBytes.data(), dataToSignBytes.size()).Finalize(hashPrevSignature);
+
+    if (version.get_str() == "0.1")
+    {
+        std::vector<uint8_t> dataToSignBytes = std::vector<uint8_t>(dataToSign.begin(), dataToSign.end());
+        CSHA256().Write(dataToSignBytes.data(), dataToSignBytes.size()).Finalize(hashPrevSignature);
+
+    }
+    else if (version.get_str() == "0.2")
+    {
+        std::string dataToSignHex = HexStr(dataToSign);
+        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSignHex[0]), dataToSignHex.size()).Finalize(hashPrevSignature);
+    }
+    else
+    {
+        LogPrint(BCLog::TXNVAL,"Unsupported version in miner id in txid %s and output number %d. \n", tx_out.GetTxId().ToString(), tx_out.GetN());
+        return false;
+    }
+
     if (!prevMinerPubKey.Verify(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), signaturePrevMinerId))
     {
         LogPrint(BCLog::TXNVAL,"Signature of previous miner id in coinbase document is invalid in coinbase transaction with txid %s and output number %d. \n", tx_out.GetTxId().ToString(), tx_out.GetN());
         return false;
     }
+
     CoinbaseDocument coinbaseDocument(
         version.get_str(),
         std::stoi(height.get_str()),
@@ -164,7 +180,7 @@ bool MinerId::SetDynamicCoinbaseDocument(const UniValue& document, std::vector<u
 
     // Dynamic document has no required fields (except for dynamic miner id). Check field types if they exist.
     auto& version = document["version"];
-    if(!version.isNull() && !version.isStr()) { LogInvalidDoc(); return false; }
+    if(!version.isNull() && (!version.isStr() || !SUPPORTED_VERSIONS.count(version.get_str()))) { LogInvalidDoc(); return false; }
 
     auto& height = document["height"];
     if (!height.isNull())

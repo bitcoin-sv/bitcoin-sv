@@ -9,6 +9,8 @@
 #include "primitives/transaction.h"
 #include "univalue.h"
 
+static const std::set<std::string> SUPPORTED_VERSIONS = {"0.1", "0.2"};
+
 /**
  * Encapsulate miner id coinbase document as embedded in an OP_RETURN
  * output.
@@ -48,7 +50,7 @@ class CoinbaseDocument
     const std::optional<std::vector<DataRef>>& GetDataRefs() const { return mDataRefs; }
 
   private:
-    // MinerId implementation version number
+    // MinerId implementation version number: should be present in SUPPORTED_VERSIONS
     std::string mVersion;
     // block height in which MinerId document is included
     int32_t mHeight {-1};
