@@ -36,7 +36,7 @@ public:
 
     ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadPool, TxInputDataSPtrVec &txs, TypeValidationFunc func);
 
-    virtual ~ValidationScheduler();
+    ~ValidationScheduler();
 
     // Schedules transactions given in the constructor. Returns validation results when all transactions are scheduled.
     // Note: Method exits as soon as all transaction validations are scheduled. Method doesn't wait for 
@@ -89,6 +89,9 @@ private:
     // thread to build spenders map
     std::thread buildSpendersThread;
     std::atomic_bool buildSpendersThreadRun = true;
+    // Used when building spenders map for tracking parent transactions. 
+    // Space for up to this many parents is reserved up front.
+    static const size_t PARENTS_SET_RESERVE_SIZE = 10;
 
 public:
     // Returns true if graph of spenders is ready.

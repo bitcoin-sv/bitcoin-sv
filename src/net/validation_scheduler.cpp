@@ -25,15 +25,14 @@ ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadP
                                          TxInputDataSPtrVec &txs, TypeValidationFunc func)
         : validationFunc{std::move(func)},
           txs{txs},
+          txStatuses{txs.size(), ScheduleStatus::NOT_STARTED},
           validatorThreadPool{threadPool},
           MAX_TO_SCHEDULE{threadPool.getPoolSize() * MAX_TO_SCHEDULE_FACTOR}
 {
     // Initialize status for each transaction and build mapping from TxId to position.
     size_t txsSize = txs.size();
-    txStatuses.reserve(txsSize);
     txIdToPos.reserve(txsSize);
     for (size_t i = 0; i < txsSize; ++i) {
-        txStatuses[i] = ScheduleStatus::NOT_STARTED;
         txIdToPos[txs[i]->GetTxnPtr()->GetId()] = i;
     }
 
@@ -281,7 +280,7 @@ void ValidationScheduler::BuildSpendersMap() {
         auto& txnPtr = txs[i]->GetTxnPtr();
         // Transaction can spend several outputs of the parent transaction. 
         // In such case we want only one link from parent transaction to spending transaction.  
-        std::unordered_set<TxId> parents(std::min(txnPtr->vin.size(), (size_t)10));
+        std::unordered_set<TxId> parents(std::min(txnPtr->vin.size(), PARENTS_SET_RESERVE_SIZE));
         for (const CTxIn &txIn : txnPtr->vin) {
             const TxId &parentId = txIn.prevout.GetTxId();
             if (parents.find(parentId) == parents.end()) {
