@@ -3,12 +3,15 @@
 
 #include "miner_id/miner_id_db.h"
 
+#include "block_index_store.h"
 #include "blockstreams.h"
 #include "config.h"
 #include "logging.h"
 #include "miner_id/miner_id.h"
 #include "scheduler.h"
 #include "univalue.h"
+
+#include <algorithm>
 
 #include <boost/uuid/uuid_io.hpp>
 
@@ -164,6 +167,69 @@ bool MinerIdDatabase::CheckMinerReputation(const uint256& idHash) const
     }
 
     return false;
+}
+
+// Dump our contents out in JSON format.
+UniValue MinerIdDatabase::DumpJSON() const
+{
+    UniValue result { UniValue::VARR };
+
+    std::lock_guard lock {mMtx};
+
+    // Dump miner details
+    for(const auto& [ key, value ] : GetAllMinerUUIdsNL())
+    {
+        UniValue miner { UniValue::VOBJ };
+        miner.push_back(Pair("uuid", boost::uuids::to_string(key)));
+
+        // Lookup name from miner contact details
+        const auto& minerIdEntry { GetMinerIdEntryNL(value.mLatestMinerId) };
+        if(minerIdEntry.first)
+        {
+            const auto& minerContact { minerIdEntry.second.mCoinbaseDoc.GetMinerContact() };
+            if(minerContact)
+            {
+                const auto& name { (*minerContact)["name"] };
+                if(name.isStr())
+                {
+                    miner.push_back(Pair("name", name.get_str()));
+                }
+            }
+        }
+
+        // Other fields for miner
+        miner.push_back(Pair("firstblock", value.mFirstBlock.ToString()));
+        miner.push_back(Pair("latestblock", value.mLastBlock.ToString()));
+
+        std::stringstream numBlocksStr {};
+        numBlocksStr << GetNumRecentBlocksForMinerNL(key) << "/" << mConfig.GetMinerIdReputationN();
+        miner.push_back(Pair("numrecentblocks", numBlocksStr.str()));
+        miner.push_back(Pair("reputationvoid", value.mReputationVoid));
+
+        // Get and dump all ids for this miner
+        UniValue ids { UniValue::VARR };
+        std::vector<MinerIdEntry> minerIds { GetMinerIdsForMinerNL(key) };
+        for(const auto& minerId : minerIds)
+        {
+            UniValue id { UniValue::VOBJ };
+            id.push_back(Pair("minerid", HexStr(minerId.mPubKey)));
+            id.push_back(Pair("current", minerId.mCurrent));
+            if(minerId.mRotationBlock != uint256{})
+            {
+                id.push_back(Pair("rotationblock", minerId.mRotationBlock.ToString()));
+            }
+            else
+            {
+                id.push_back(Pair("rotationblock", UniValue { UniValue::VNULL }));
+            }
+            ids.push_back(id);
+        }
+        miner.push_back(Pair("minerids", ids));
+
+        result.push_back(miner);
+    }
+
+    return result;
 }
 
 // Check we agree with the chain tip, and if not rebuild ourselves from scratch

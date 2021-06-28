@@ -70,6 +70,11 @@ class MinerIdDatabase
      */
     void Prune();
 
+    /**
+     * Dump our contents out in JSON format.
+     */
+    UniValue DumpJSON() const;
+
     // Unit test support
     template<typename T> struct UnitTestAccess;
 
