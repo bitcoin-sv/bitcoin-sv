@@ -27,7 +27,7 @@
 #include "init.h"
 #include "invalid_txn_publisher.h"
 #include "metrics.h"
-#include "miner_id/miner_id.h"
+#include "miner_id/miner_id_db.h"
 #include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -2637,12 +2637,18 @@ static void InvalidChainFound(const CBlockIndex *pindexNew)
     CheckSafeModeParameters(pindexNew);
 }
 
-static void InvalidBlockFound(CBlockIndex *pindex,
-                              const CValidationState &state) {
+static void InvalidBlockFound(CBlockIndex* pindex,
+                              const CBlock& block, 
+                              const CValidationState& state) {
     if (!state.CorruptionPossible()) {
         pindex->ModifyStatusWithFailed(mapBlockIndex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);
+    }
+
+    // Update miner ID database if required
+    if(g_minerIDs) {
+        g_minerIDs->InvalidBlock(block, pindex->GetHeight());
     }
 }
 
@@ -3916,6 +3922,12 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 
     // Update chainActive and related variables.
     UpdateTip(config, pindexDelete->GetPrev());
+
+    // Update miner ID database if required
+    if(g_minerIDs) {
+        g_minerIDs->BlockRemoved(block);
+    }
+
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
     GetMainSignals().BlockDisconnected(pblock);
@@ -4100,11 +4112,17 @@ static bool ConnectTip(
         GetMainSignals().BlockChecked(blockConnecting, state);
         if (!rv) {
             if (state.IsInvalid()) {
-                InvalidBlockFound(pindexNew, state);
+                InvalidBlockFound(pindexNew, blockConnecting, state);
             }
             return error("ConnectTip(): ConnectBlock %s failed (%s)",
                          pindexNew->GetBlockHash().ToString(),
                          FormatStateMessage(state));
+        }
+        else {
+            // Update miner ID database if required
+            if(g_minerIDs) {
+                g_minerIDs->BlockAdded(blockConnecting, pindexNew->GetHeight());
+            }
         }
         nTime3 = GetTimeMicros();
         nTimeConnectTotal += nTime3 - nTime2;
