@@ -86,9 +86,9 @@ private:
     // Map is build out-of-band in a separate thread.
     std::unordered_multimap<size_t, size_t> spenders;
     std::atomic_bool spendersReady = false;
-    // thread to build spenders map
-    std::thread buildSpendersThread;
-    std::atomic_bool buildSpendersThreadRun = true;
+    // task to build spenders map
+    std::future<void> buildSpendersTask;
+    std::atomic_bool buildSpendersTaskRun = true;
     // Used when building spenders map for tracking parent transactions. 
     // Space for up to this many parents is reserved up front.
     static const size_t PARENTS_SET_RESERVE_SIZE = 10;

@@ -36,8 +36,13 @@ ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadP
         txIdToPos[txs[i]->GetTxnPtr()->GetId()] = i;
     }
 
-    // Build map of spenders on a separate thread. Until map is ready we schedule without it.
-    buildSpendersThread = std::thread(&ValidationScheduler::BuildSpendersMap, this);
+    // Build map of spenders asynchronously. Until map is ready or there is any error building it then we schedule without it.
+    try {
+        buildSpendersTask = std::async(std::launch::async, &ValidationScheduler::BuildSpendersMap, this);
+    }
+    catch (const std::exception& e) {
+        PrintExceptionContinue(&e, "ValidationScheduler");
+    }
 
 #ifdef SCHEDULER_OUTPUT_GRAPH
     DrawGraph(txs);
@@ -46,9 +51,14 @@ ValidationScheduler::ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadP
 
 ValidationScheduler::~ValidationScheduler() {
     // Note: In normal operation it should not happen that spenders graph is still being built when
-    // all transactions were already scheduled and scheduler is exiting. Just in case stop the thread.
-    buildSpendersThreadRun = false;
-    buildSpendersThread.join();
+    // all transactions were already scheduled and scheduler is exiting. Just in case stop building the map.
+    buildSpendersTaskRun = false;
+    try {
+        buildSpendersTask.get();
+    }
+    catch (const std::exception& e) {
+        PrintExceptionContinue(&e, "ValidationScheduler");
+    }
 }
 
 std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationScheduler::Schedule() {
@@ -273,7 +283,7 @@ void ValidationScheduler::MarkResult(std::vector<size_t>&& positions, ScheduleSt
 
 void ValidationScheduler::BuildSpendersMap() {
     for (size_t i = 0; i < txs.size(); ++i) {
-        if (!buildSpendersThreadRun) {
+        if (!buildSpendersTaskRun) {
             // All transactions are already scheduled. Stop building the map as we don't need it any more.
             return;
         }
