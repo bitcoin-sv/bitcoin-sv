@@ -153,7 +153,7 @@ void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidatio
     }
 }
 
-void ValidationScheduler::ScheduleGraph(size_t rootPos,
+void ValidationScheduler::ScheduleGraph(const size_t rootPos,
                                         std::vector<std::future<TypeValidationResult>>& taskResults) {
     auto txSpenders = spenders.equal_range(rootPos);
     for (auto iterSpender = txSpenders.first; iterSpender != txSpenders.second; ++iterSpender) {
@@ -164,26 +164,25 @@ void ValidationScheduler::ScheduleGraph(size_t rootPos,
     }
 }
 
-void ValidationScheduler::ScheduleChain(size_t rootPos,
+void ValidationScheduler::ScheduleChain(const size_t rootPos,
                                         std::vector<std::future<TypeValidationResult>>& taskResults) {
     // transactions to schedule in this task
     std::vector<size_t> txsInTask;
-    std::optional<size_t> iTxPos = rootPos;
+    size_t iTxPos = rootPos;
     std::unordered_set<TxId> assumedDone;
     do {
-        txsInTask.push_back(iTxPos.value());
-        const TxId& txId = txs[iTxPos.value()]->GetTxnPtr()->GetId();
+        txsInTask.push_back(iTxPos);
+        const TxId& txId = txs[iTxPos]->GetTxnPtr()->GetId();
         // We only want to detect chains where only one tx in the batch spends output in parent tx.
         // If there are more than one spenders of one parent tx, then we want to schedule 
         // those in parallel. Which is handled by ScheduleGraph.
-        if (spenders.count(iTxPos.value()) == 1) {
-            iTxPos = spenders.find(iTxPos.value())->second;
+        if (spenders.count(iTxPos) == 1) {
+            iTxPos = spenders.find(iTxPos)->second;
             assumedDone = {txId};
         } else {
-            iTxPos = {};
+            break;
         }
-    } while (iTxPos.has_value()
-             && CanStartValidation(iTxPos.value(), assumedDone));
+    } while (CanStartValidation(iTxPos, assumedDone));
 
     SubmitTask(std::move(txsInTask), taskResults);
 }
