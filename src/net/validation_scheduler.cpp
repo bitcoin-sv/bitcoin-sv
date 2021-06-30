@@ -254,14 +254,25 @@ void ValidationScheduler::SubmitTask(std::vector<size_t>&& txPositions,
             task.injectTask([weakSelf, func, txPositions=std::move(txPositions)](const TxInputDataSPtrRefVec& vTxInputData) mutable
                             {
                                 // First run validation.
-                                auto&& result = func(vTxInputData);
-                                // Then report back to scheduler that validation is finished.
+                                TypeValidationResult result;
+                                try {
+                                    result = func(vTxInputData);
+                                }
+                                // In case of exceptions just log the error.
+                                catch (const std::exception& e) {
+                                    PrintExceptionContinue(&e, "ValidationScheduler");
+                                }
+                                catch (...) {
+                                    PrintExceptionContinue(nullptr, "ValidationScheduler");
+                                }
+
+                                // Then report back to scheduler that validation is finished, successfully or not.
                                 auto strong_self = weakSelf.lock();
                                 if (strong_self) {
                                     strong_self->MarkResult(std::move(txPositions), ScheduleStatus::DONE);
                                 }
                                 // Finally return task result.
-                                return std::move(result);
+                                return result;
                             },
                             std::move(txsToValidate)));
 

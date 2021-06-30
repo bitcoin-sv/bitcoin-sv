@@ -127,20 +127,32 @@ namespace{
         // Remember executed tasks and ids of txns in the task.
         std::vector<std::vector<TxId>> executedTasks{};
         std::mutex executedTasksMtx;
+        // List of txns for which exception is thrown in the task.
+        std::set<TxId> failList;
 
         // Function executed in the tasks.
-        // Remembers the txn ids and returns dummy validation result.
         ValidationScheduler::TypeValidationFunc taskFunc = [this](const TxInputDataSPtrRefVec& vTxInputData){
+            // Remembers the txn ids in the task. So that we can check that validation was scheduled for each tx.
             std::vector<TxId> idsInTask;
-            ValidationScheduler::TypeValidationResult results;
             for (auto& tx : vTxInputData) {
-                // Return dummy validation result.
-                results.emplace_back(CTxnValResult{}, CTask::Status::RanToCompletion);
                 // Remember ids of txns in the task.
                 idsInTask.push_back(tx.get()->GetTxnPtr()->GetId());
             }
-            std::scoped_lock<std::mutex> l(executedTasksMtx);
-            executedTasks.push_back(idsInTask);
+            {
+                std::lock_guard<std::mutex> l(executedTasksMtx);
+                executedTasks.push_back(idsInTask);
+            }
+            
+            // Prepare results. If tx is on the fail list we throw, otherwise we return dummy results.
+            ValidationScheduler::TypeValidationResult results;
+            for (auto& tx : vTxInputData) {
+                if (failList.find(tx.get()->GetTxnPtr()->GetId()) != failList.end()) {
+                    throw std::runtime_error("Testing validation throwing exception.");
+                } else {
+                    // Return dummy validation result.
+                    results.emplace_back(CTxnValResult{}, CTask::Status::RanToCompletion);
+                }
+            }
             return results;
         };
 
@@ -431,6 +443,37 @@ BOOST_AUTO_TEST_CASE(txs_chainInTwoParts) {
     // tx2 and chain 1-3 are run in parallel and can finish in any order.
     std::vector<std::vector<size_t>> v1 {{0}, {1,3}, {2}, {4,5}};
     std::vector<std::vector<size_t>> v2 {{0}, {2}, {1,3}, {4,5}};
+
+    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2});
+}
+
+// Test that even if validation throws then spending txns are still scheduled.
+// I.e. all txs in the batch are scheduled even if there are exceptions thrown.
+BOOST_AUTO_TEST_CASE(txs_validationThrows) {
+    /*
+     *          0
+     *         / \
+     *        1   2
+     *         \ /
+     *          3
+     */
+    // Given
+    std::vector<CMutableTransaction> txsToValidate;
+    auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 2);
+    auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
+    auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 1);
+    auto tx3 = CreateMockTx({COutPoint{tx1.GetId(), 0}, COutPoint{tx2.GetId(), 0}}, 1);
+    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3});
+
+    // When validations for 2 and 3 throws
+    failList = {tx1.GetId(), tx2.GetId()};
+    RunScheduler(txsToValidate, taskFunc, threadPool);
+    failList.clear();
+
+    // Then
+    // tx3 is still scheduled even if 1 and 2 fails.
+    std::vector<std::vector<size_t>> v1 {{0}, {1}, {2}, {3}};
+    std::vector<std::vector<size_t>> v2 {{0}, {2}, {1}, {3}};
 
     CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2});
 }

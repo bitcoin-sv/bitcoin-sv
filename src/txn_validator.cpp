@@ -565,6 +565,7 @@ CTxnValidator::CIntermediateResult CTxnValidator::processNewTransactionsNL(
                     CTxnHandlers& handlers,
                     bool fUseLimits,
                     std::chrono::steady_clock::time_point end_time_point) {
+//                    throw std::runtime_error("BALA");
                     return TxnValidationProcessingTask(
                                 vTxInputData,
                                *config,
