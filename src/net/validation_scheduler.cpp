@@ -140,7 +140,7 @@ void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidatio
 
     while (numTasksScheduled < MAX_TO_SCHEDULE
            && scanPos < (numTasksScheduled == 0 ? txs.size() : std::min(scanPos + MAX_SCAN_WINDOW, txs.size()))) {
-        if (CanStartValidation(scanPos, {})) {
+        if (CanStartValidation(scanPos)) {
             if (IsSpendersGraphReady()) {
                 // If spender's graph is ready then schedule this transaction and the chain starting at it.
                 ScheduleChain(scanPos, taskResults);
@@ -158,7 +158,7 @@ void ValidationScheduler::ScheduleGraph(const size_t rootPos,
     auto txSpenders = spenders.equal_range(rootPos);
     for (auto iterSpender = txSpenders.first; iterSpender != txSpenders.second; ++iterSpender) {
         size_t spenderPos = iterSpender->second;
-        if (CanStartValidation(spenderPos, {})) {
+        if (CanStartValidation(spenderPos)) {
             ScheduleChain(spenderPos, taskResults);
         }
     }
@@ -169,25 +169,24 @@ void ValidationScheduler::ScheduleChain(const size_t rootPos,
     // transactions to schedule in this task
     std::vector<size_t> txsInTask;
     size_t iTxPos = rootPos;
-    std::unordered_set<TxId> assumedDone;
+    TxId prevTxId;
     do {
         txsInTask.push_back(iTxPos);
-        const TxId& txId = txs[iTxPos]->GetTxnPtr()->GetId();
+        prevTxId = txs[iTxPos]->GetTxnPtr()->GetId();
         // We only want to detect chains where only one tx in the batch spends output in parent tx.
         // If there are more than one spenders of one parent tx, then we want to schedule 
         // those in parallel. Which is handled by ScheduleGraph.
         if (spenders.count(iTxPos) == 1) {
             iTxPos = spenders.find(iTxPos)->second;
-            assumedDone = {txId};
         } else {
             break;
         }
-    } while (CanStartValidation(iTxPos, assumedDone));
+    } while (CanStartValidation(iTxPos, &prevTxId));
 
     SubmitTask(std::move(txsInTask), taskResults);
 }
 
-bool ValidationScheduler::CanStartValidation(const size_t txPos, const std::unordered_set<TxId>& assumeDone) {
+bool ValidationScheduler::CanStartValidation(const size_t txPos, const TxId* prevTxId) {
     auto& tx = txs[txPos]->GetTxnPtr();
     if (txStatuses[txPos] != ScheduleStatus::NOT_STARTED) {
         // tx is already processed or validation is running just now.
@@ -210,8 +209,8 @@ bool ValidationScheduler::CanStartValidation(const size_t txPos, const std::unor
                     continue;
                 case ScheduleStatus::NOT_STARTED:
                     // Check if this outPoint is to be validated before in the same task.
-                    if (assumeDone.find(outPoint.GetTxId()) == assumeDone.end()) {
-                        // Not validated yet and not in the same task
+                    if (prevTxId == nullptr || *prevTxId != outPoint.GetTxId()) {
+                        // Not validated yet and not the parent in the same task
                         return false;
                     }
             }

@@ -112,7 +112,8 @@ private:
 
     // Returns true if transaction at the given position can be scheduled now.
     // Validation can be started when all parent transactions in this batch are already validated.
-    bool CanStartValidation(size_t txPos, const std::unordered_set<TxId>& assumeDone);
+    // If set then prevTxId should be set to the id of the previous transaction in the same task.
+    bool CanStartValidation(size_t txPos, const TxId* prevTxId = nullptr);
 
     // Scans for yet unscheduled txn and schedules them if possible.
     void ScanTransactions(std::vector<std::future<TypeValidationResult>>& taskResults);
