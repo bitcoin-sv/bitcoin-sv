@@ -24,6 +24,8 @@
 #include "httpserver.h"
 #include "invalid_txn_publisher.h"
 #include "key.h"
+#include "miner_id/miner_id_db.h"
+#include "miner_id/miner_id_db_defaults.h"
 #include "mining/journaling_block_assembler.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -1341,6 +1343,32 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
 
+    /** MinerID */
+    strUsage += HelpMessageGroup(_("Miner ID database options:"));
+    strUsage += HelpMessageOpt(
+        "-mineridcachesize=<n>",
+        strprintf(_("Cache size to use for the miner ID database (default: %uMB, maximum: %uMB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE / ONE_MEBIBYTE, MinerIdDatabaseDefaults::MAX_CACHE_SIZE / ONE_MEBIBYTE));
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-mineridnumtokeep=<n>",
+            strprintf(_("Maximum number of old (rotated, expired) miner IDs we will keep in the database (default: %u)"),
+                MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP));
+    }
+    strUsage += HelpMessageOpt(
+        "-mineridreputation_m=<n>",
+        strprintf(_("Miners who identify themselves using miner ID can accumulate certain priviledges over time by gaining "
+            "a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. "
+            "This parameter sets the M value for that test. (default: %u, maximum %u)"),
+            MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_M));
+    strUsage += HelpMessageOpt(
+        "-mineridreputation_n=<n>",
+        strprintf(_("Miners who identify themselves using miner ID can accumulate certain priviledges over time by gaining "
+            "a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. "
+            "This parameter sets the N value for that test. (default: %u, maximum %u)"),
+            MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N));
+
     return strUsage;
 }
 
@@ -2369,6 +2397,28 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
     if(std::string err; !config.SetDoubleSpendQueueMaxMemory(
         gArgs.GetArgAsBytes("-dsattemptqueuemaxmemory", DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY, ONE_MEBIBYTE), &err))
+    {
+        return InitError(err);
+    }
+
+    // MinerID parameters
+    if(std::string err; !config.SetMinerIdCacheSize(
+        gArgs.GetArgAsBytes("-mineridcachesize", MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdsNumToKeep(
+        gArgs.GetArg("-mineridnumtokeep", MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationM(
+        gArgs.GetArg("-mineridreputation_m", MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationN(
+        gArgs.GetArg("-mineridreputation_n", MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N), &err))
     {
         return InitError(err);
     }

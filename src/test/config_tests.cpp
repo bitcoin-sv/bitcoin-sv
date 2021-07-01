@@ -447,6 +447,43 @@ BOOST_AUTO_TEST_CASE(dsattempt_config)
     BOOST_CHECK(!config.SetDoubleSpendQueueMaxMemory(-1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(minerid_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdCacheSize(), MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE);
+    BOOST_CHECK(config.SetMinerIdCacheSize(2 * MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdCacheSize(), 2 * MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE);
+    BOOST_CHECK(config.SetMinerIdCacheSize(0, &err));
+    BOOST_CHECK(config.SetMinerIdCacheSize(MinerIdDatabaseDefaults::MAX_CACHE_SIZE, &err));
+    BOOST_CHECK(!config.SetMinerIdCacheSize(-1, &err));
+    BOOST_CHECK(!config.SetMinerIdCacheSize(MinerIdDatabaseDefaults::MAX_CACHE_SIZE + 1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdsNumToKeep(), MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP);
+    BOOST_CHECK(config.SetMinerIdsNumToKeep(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdsNumToKeep(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP);
+    BOOST_CHECK(!config.SetMinerIdsNumToKeep(1, &err));
+    BOOST_CHECK(!config.SetMinerIdsNumToKeep(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationM(), MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M);
+    BOOST_CHECK(config.SetMinerIdReputationM(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationM(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M);
+    BOOST_CHECK(config.SetMinerIdReputationM(config.GetMinerIdReputationN(), &err));
+    BOOST_CHECK(!config.SetMinerIdReputationM(config.GetMinerIdReputationN() + 1, &err));
+    BOOST_CHECK(config.SetMinerIdReputationM(1, &err));
+    BOOST_CHECK(!config.SetMinerIdReputationM(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationN(), MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N);
+    BOOST_CHECK(config.SetMinerIdReputationN(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationN(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N);
+    BOOST_CHECK(config.SetMinerIdReputationN(1, &err));
+    BOOST_CHECK(!config.SetMinerIdReputationN(-1, &err));
+    config.SetMinerIdReputationM(MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err);
+    BOOST_CHECK(config.SetMinerIdReputationN(config.GetMinerIdReputationM(), &err));
+    BOOST_CHECK(!config.SetMinerIdReputationN(config.GetMinerIdReputationM() - 1, &err));
+}
+
 BOOST_AUTO_TEST_CASE(disable_BIP30)
 {
     GlobalConfig config {};

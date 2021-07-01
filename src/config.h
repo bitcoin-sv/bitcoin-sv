@@ -9,6 +9,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 
 #include "amount.h"
 #include "consensus/consensus.h"
+#include "miner_id/miner_id_db_defaults.h"
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
@@ -130,6 +131,12 @@ public:
     virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
     virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
 
+    // MinerID
+    virtual uint64_t GetMinerIdCacheSize() const = 0;
+    virtual uint64_t GetMinerIdsNumToKeep() const = 0;
+    virtual uint32_t GetMinerIdReputationM() const = 0;
+    virtual uint32_t GetMinerIdReputationN() const = 0;
+
 protected:
     ~Config() = default;
 };
@@ -236,6 +243,12 @@ public:
     virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
+
+    // MinerID
+    virtual bool SetMinerIdCacheSize(int64_t size, std::string* err) = 0;
+    virtual bool SetMinerIdsNumToKeep(int64_t num, std::string* err) = 0;
+    virtual bool SetMinerIdReputationM(int64_t num, std::string* err) = 0;
+    virtual bool SetMinerIdReputationN(int64_t num, std::string* err) = 0;
 
 protected:
     ~ConfigInit() = default;
@@ -484,6 +497,16 @@ public:
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override;
     uint64_t GetDoubleSpendQueueMaxMemory() const override;
 
+    // MinerID
+    bool SetMinerIdCacheSize(int64_t size, std::string* err) override;
+    uint64_t GetMinerIdCacheSize() const override;
+    bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override;
+    uint64_t GetMinerIdsNumToKeep() const override;
+    bool SetMinerIdReputationM(int64_t num, std::string* err) override;
+    uint32_t GetMinerIdReputationM() const override;
+    bool SetMinerIdReputationN(int64_t num, std::string* err) override;
+    uint32_t GetMinerIdReputationN() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset() override;
@@ -611,6 +634,12 @@ private:
     uint64_t dsAttemptNumFastThreads;
     uint64_t dsAttemptNumSlowThreads;
     uint64_t dsAttemptQueueMaxMemory;
+
+    // MinerID
+    uint64_t minerIdCacheSize;
+    uint64_t numMinerIdsToKeep;
+    uint32_t minerIdReputationM;
+    uint32_t minerIdReputationN;
 
     std::optional<bool> mDisableBIP30Checks;
 
@@ -1039,6 +1068,16 @@ public:
     uint64_t GetDoubleSpendNumSlowThreads() const override { return DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS; }
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override { return true; }
     uint64_t GetDoubleSpendQueueMaxMemory() const override { return DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY * ONE_MEGABYTE; }
+
+    // MinerID
+    bool SetMinerIdCacheSize(int64_t size, std::string* err) override { return true; }
+    uint64_t GetMinerIdCacheSize() const override { return MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE; }
+    bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override { return true; }
+    uint64_t GetMinerIdsNumToKeep() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP; }
+    bool SetMinerIdReputationM(int64_t num, std::string* err) override { return true; }
+    uint32_t GetMinerIdReputationM() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M; }
+    bool SetMinerIdReputationN(int64_t num, std::string* err) override { return true; }
+    uint32_t GetMinerIdReputationN() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
