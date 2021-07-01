@@ -10,6 +10,8 @@
 #include "validation.h"
 #include "logging.h"
 
+#include <future>
+
 // Schedule status for each transaction in the batch.
 enum class ScheduleStatus {
     NOT_STARTED = 0,
@@ -35,6 +37,11 @@ public:
     using TypeValidationFunc = std::function<TypeValidationResult(const TxInputDataSPtrRefVec& vTxInputData)>;
 
     ValidationScheduler(CThreadPool<CDualQueueAdaptor> &threadPool, TxInputDataSPtrVec &txs, TypeValidationFunc func);
+
+    ValidationScheduler(const ValidationScheduler&) = delete;
+    ValidationScheduler& operator=(const ValidationScheduler&) = delete;
+    ValidationScheduler(ValidationScheduler&&) = delete;
+    ValidationScheduler& operator=(ValidationScheduler&&) = delete;
 
     ~ValidationScheduler();
 

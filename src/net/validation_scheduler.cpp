@@ -7,7 +7,6 @@
 #include "logging.h"
 #include "util.h"
 
-#include <thread>
 #include <algorithm>
 
 #ifdef COLLECT_METRICS
@@ -86,7 +85,7 @@ std::vector<std::future<ValidationScheduler::TypeValidationResult>> ValidationSc
         // Process task_results input queue if there are any task_results waiting
         std::vector<TaskCompletion> lastResults;
         {
-            std::scoped_lock<std::mutex> resultsLock(taskCompletionMtx);
+            std::lock_guard<std::mutex> resultsLock(taskCompletionMtx);
             if (!taskCompletionQueue.empty()) {
                 // move all task_results from input queue to local vector.
                 std::swap(taskCompletionQueue, lastResults);
@@ -156,8 +155,8 @@ void ValidationScheduler::ScanTransactions(std::vector<std::future<TypeValidatio
 void ValidationScheduler::ScheduleGraph(const size_t rootPos,
                                         std::vector<std::future<TypeValidationResult>>& taskResults) {
     auto txSpenders = spenders.equal_range(rootPos);
-    for (auto iterSpender = txSpenders.first; iterSpender != txSpenders.second; ++iterSpender) {
-        size_t spenderPos = iterSpender->second;
+    for(; txSpenders.first != txSpenders.second; ++txSpenders.first) {
+        size_t spenderPos = txSpenders.first->second;
         if (CanStartValidation(spenderPos)) {
             ScheduleChain(spenderPos, taskResults);
         }
