@@ -52,15 +52,10 @@ namespace{
 
     // Runs the scheduler and waits for all tasks to complete.
     void RunScheduler(const std::vector<CMutableTransaction>& txsToValidate,
-                      ValidationScheduler::TypeValidationFunc taskFunc,
+                      const ValidationScheduler::TypeValidationFunc& taskFunc,
                       CThreadPool<CDualQueueAdaptor>& threadPool) {
         std::vector<TxInputDataSPtr> txInputDataVec = TxInputDataVec(TxSource::unknown,
                                                                      txsToValidate);
-        // Shuffle transaction in the batch. Scheduler is not dependent on the order of transaction in the batch.
-        std::random_device rd;
-        std::mt19937 rbg(rd());
-        std::shuffle(txInputDataVec.begin(), txInputDataVec.end(), rbg);
-
         auto scheduler = std::make_shared<ValidationScheduler>(threadPool, txInputDataVec, taskFunc);
         while (!scheduler->IsSpendersGraphReady()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -72,6 +67,10 @@ namespace{
         }
     }
 
+    bool CompareTxById(const CMutableTransaction& a, const CMutableTransaction& b) {
+        return a.GetId() < b.GetId();
+    }
+
     // Custom test criteria for executed tasks.
     // Purpose is check that executed tasks are one of the expected variants.
     // Most of the code deals with creating meaningful error message, i.e. use positions instead 
@@ -79,6 +78,7 @@ namespace{
     void CheckExecutionOrder(const std::vector<CMutableTransaction>& txsToValidate,
                              const std::vector<std::vector<TxId>>& executedTasks, 
                              const std::vector<std::vector<std::vector<size_t>>>& expectedVariants) {
+        // Prepare mapping from tx ids to human-readable positions.
         std::unordered_map<TxId, size_t> idToPos;
         for (size_t i = 0; i < txsToValidate.size(); ++i) {
             idToPos.emplace(txsToValidate[i].GetId(), i);
@@ -90,9 +90,9 @@ namespace{
                            [&idToPos](const TxId& id){ return idToPos.at(id); });
             executedTasksPos.push_back(std::move(taskPos));
         }
-        BOOST_TEST_MESSAGE("Executed tasks are: " << executedTasksPos);
+        // BOOST_TEST_MESSAGE("Executed tasks are: " << executedTasksPos);
 
-        // Flatten task into list of validated transactions.
+        // Flatten tasks into list of validated transactions.
         std::vector<TxId> executedTxs;
         for (const auto& task : executedTasks) {
             executedTxs.insert(executedTxs.end(), task.cbegin(), task.cend());
@@ -100,8 +100,10 @@ namespace{
 
         // Check that each input tx is validated exactly once.
         for (const auto& tx : txsToValidate) {
-            BOOST_TEST(std::count(executedTxs.cbegin(), executedTxs.cend(), tx.GetId()) == 1,
-                       "" << idToPos[tx.GetId()] << " is validated once.");
+            if (std::count(executedTxs.cbegin(), executedTxs.cend(), tx.GetId()) != 1) {
+                BOOST_TEST_MESSAGE("Executed tasks are: " << executedTasksPos);
+                BOOST_ERROR("" << idToPos[tx.GetId()] << " is validated more than once.");
+            }
         }
 
         // Check that transactions were validated in correct order.
@@ -111,15 +113,20 @@ namespace{
                 const auto& inputPos = std::find(executedTxs.cbegin(), executedTxs.cend(), input.prevout.GetTxId());
                 if (inputPos != executedTxs.cend()) {
                     // Input is in the batch.
-                    BOOST_TEST(std::distance(inputPos, txPos) > 0,
-                               "" << idToPos[tx.GetId()] << " is validated after " << idToPos[input.prevout.GetTxId()]);
+                    if (std::distance(inputPos, txPos) <= 0) {
+                        BOOST_TEST_MESSAGE("Executed tasks are: " << executedTasksPos);
+                        BOOST_ERROR("" << idToPos[tx.GetId()] << "should be validated after " << idToPos[input.prevout.GetTxId()]);
+                    }
                 }
             }
         }
 
-        // Check that tasks belong to one of expected variants. 
-        BOOST_TEST(std::any_of(expectedVariants.cbegin(), expectedVariants.cend(),
-                               [&executedTasksPos](const auto& v){ return(v == executedTasksPos); }));
+        // Check that tasks belong to one of expected variants.
+        if (!(std::any_of(expectedVariants.cbegin(), expectedVariants.cend(),
+                               [&executedTasksPos](const auto& v){ return(v == executedTasksPos); }))) {
+            BOOST_TEST_MESSAGE("Executed tasks are: " << executedTasksPos);
+            BOOST_ERROR("Executed tasks do not belong to any of the expected variants.");
+        }
 
     }
 
@@ -157,6 +164,31 @@ namespace{
         };
 
         CThreadPool<CDualQueueAdaptor> threadPool {"TestPool", 8, 8 };
+
+        void RunTest(const std::vector<CMutableTransaction>& txsToValidate,
+                             const std::vector<std::vector<std::vector<size_t>>>& expectedVariants) {
+            executedTasks.clear();
+
+            RunScheduler(txsToValidate, taskFunc, threadPool);
+
+            BOOST_TEST(!expectedVariants.empty());
+            CheckExecutionOrder(txsToValidate, executedTasks, expectedVariants);
+        }
+
+        void RunPermutedTest(const std::vector<CMutableTransaction>& txsToValidate,
+                             const std::vector<std::vector<std::vector<size_t>>>& expectedVariants) {
+            std::vector<CMutableTransaction> permutedTxsToValidate{txsToValidate};
+            std::sort(permutedTxsToValidate.begin(), permutedTxsToValidate.end(), CompareTxById);
+            BOOST_TEST(!expectedVariants.empty());
+            do {
+                executedTasks.clear();
+
+                // Run the scheduler for any permutation of input txs.
+                RunScheduler(permutedTxsToValidate, taskFunc, threadPool);
+
+                CheckExecutionOrder(txsToValidate, executedTasks, expectedVariants);
+            } while(std::next_permutation(permutedTxsToValidate.begin(), permutedTxsToValidate.end(), CompareTxById));
+        }
     };
 }
 
@@ -188,15 +220,11 @@ BOOST_FIXTURE_TEST_SUITE(validation_scheduler_tests, TestSetup)
 BOOST_AUTO_TEST_CASE(txs_isolated) {
     /*      0  1  2  3     */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 3);
     auto tx1 = CreateMockTx({COutPoint{coinbaseTxns[1].GetId(), 1}}, 3);
     auto tx2 = CreateMockTx({COutPoint{coinbaseTxns[2].GetId(), 1}}, 3);
     auto tx3 = CreateMockTx({COutPoint{coinbaseTxns[3].GetId(), 1}}, 3);
-    txsToValidate.push_back(tx0);
-    txsToValidate.push_back(tx1);
-    txsToValidate.push_back(tx2);
-    txsToValidate.push_back(tx3);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3};
 
     // When
     RunScheduler(txsToValidate, taskFunc, threadPool);
@@ -221,7 +249,6 @@ BOOST_AUTO_TEST_CASE(txs_chains) {
      *       3   7
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 0}}, 1);
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx2 = CreateMockTx({COutPoint{tx1.GetId(), 0}}, 1);
@@ -230,11 +257,8 @@ BOOST_AUTO_TEST_CASE(txs_chains) {
     auto tx5 = CreateMockTx({COutPoint{tx4.GetId(), 0}}, 1);
     auto tx6 = CreateMockTx({COutPoint{tx5.GetId(), 0}}, 1);
     auto tx7 = CreateMockTx({COutPoint{tx6.GetId(), 0}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7});
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7};
 
-    // When
-    RunScheduler(txsToValidate, taskFunc, threadPool);
-    
     // Then
     // There should be 2 tasks. One for each chain.
     std::vector<size_t> c1 {0, 1, 2, 3};
@@ -244,7 +268,7 @@ BOOST_AUTO_TEST_CASE(txs_chains) {
     std::vector<std::vector<size_t>> v1{c1, c2};
     std::vector<std::vector<size_t>> v2{c2, c1};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2});
+    RunTest(txsToValidate, {v1, v2});
 }
 
 // Transactions from the same chain are scheduled in one task.
@@ -260,7 +284,6 @@ BOOST_AUTO_TEST_CASE(txs_twoParallelChains) {
      *         7
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 2);
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 1);
@@ -269,10 +292,7 @@ BOOST_AUTO_TEST_CASE(txs_twoParallelChains) {
     auto tx5 = CreateMockTx({COutPoint{tx3.GetId(), 0}}, 1);
     auto tx6 = CreateMockTx({COutPoint{tx4.GetId(), 1}}, 1);
     auto tx7 = CreateMockTx({COutPoint{tx5.GetId(), 0}, COutPoint{tx6.GetId(), 0}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7});
-
-    // When
-    RunScheduler(txsToValidate, taskFunc, threadPool);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7};
 
     // Then
     // There should be 4 tasks. One for first tx, one for last tx. And two tasks for each chain.
@@ -284,9 +304,9 @@ BOOST_AUTO_TEST_CASE(txs_twoParallelChains) {
     // tx0 is always validated first, tx7 is always last.
     // Two chains are validated in parallel. Which tasks finishes first is impossible to predict.
     std::vector<std::vector<size_t>> v1 {{0}, {1,3,5}, {2,4,6}, {7}}; 
-    std::vector<std::vector<size_t>> v2 {{0}, {2,4,6}, {1,3,5}, {7}}; 
+    std::vector<std::vector<size_t>> v2 {{0}, {2,4,6}, {1,3,5}, {7}};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2});
+    RunTest(txsToValidate, {v1, v2});
 }
 
 BOOST_AUTO_TEST_CASE(txs_graph) {
@@ -300,16 +320,12 @@ BOOST_AUTO_TEST_CASE(txs_graph) {
      *          4
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 2);
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 2);
     auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx3 = CreateMockTx({COutPoint{tx1.GetId(), 0}}, 1);
     auto tx4 = CreateMockTx({COutPoint{tx2.GetId(), 0}, COutPoint{tx3.GetId(), 1}, COutPoint{tx1.GetId(), 1}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3, tx4});
-
-    // When
-    RunScheduler(txsToValidate, taskFunc, threadPool);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4};
 
     // Then
     // There can be 4 or 5 tasks.
@@ -322,7 +338,42 @@ BOOST_AUTO_TEST_CASE(txs_graph) {
     std::vector<std::vector<size_t>> v3 {{0}, {1}, {2}, {3, 4}};
     std::vector<std::vector<size_t>> v4 {{0}, {2}, {1}, {3, 4}};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2, v3, v4});
+    RunPermutedTest(txsToValidate, {v1, v2, v3, v4});
+}
+
+// Same as previous test except that transactions have many outputs and children spend many inputs.
+BOOST_AUTO_TEST_CASE(txs_graphManyLinks) {
+    /*
+     *          0
+     *        //||
+     *       // 1
+     *       2  ||\\
+     *       \\ 3 ||
+     *        \\||//
+     *          4
+     */
+    // Given
+    auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 4);
+    auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 2}, COutPoint{tx0.GetId(), 3}}, 4);
+    auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 0}, COutPoint{tx0.GetId(), 1}}, 2);
+    auto tx3 = CreateMockTx({COutPoint{tx1.GetId(), 0}, COutPoint{tx1.GetId(), 1}}, 2);
+    auto tx4 = CreateMockTx({COutPoint{tx2.GetId(), 0}, COutPoint{tx2.GetId(), 1}, 
+                             COutPoint{tx3.GetId(), 0}, COutPoint{tx3.GetId(), 1}, 
+                             COutPoint{tx1.GetId(), 2}, COutPoint{tx1.GetId(), 3}}, 1);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4};
+
+    // Then
+    // There can be 4 or 5 tasks.
+    // tx0, tx1, tx2 are always scheduled in own tasks.
+    // If tx2 is validated before tx1 or together with tx1, then tx3 and tx4 are validated as a chain in one task.
+    // If tx2 is not yet validated when tx1 is finished, then tx3 is scheduled next. tx4 is only 
+    // scheduled after tx2 and tx3 are finished.
+    std::vector<std::vector<size_t>> v1 {{0}, {1}, {2}, {3}, {4}};
+    std::vector<std::vector<size_t>> v2 {{0}, {2}, {1}, {3}, {4}};
+    std::vector<std::vector<size_t>> v3 {{0}, {1}, {2}, {3, 4}};
+    std::vector<std::vector<size_t>> v4 {{0}, {2}, {1}, {3, 4}};
+
+    RunPermutedTest(txsToValidate, {v1, v2, v3, v4});
 }
 
 BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
@@ -334,15 +385,11 @@ BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
      *                    3
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 1);
     auto tx1 = CreateMockTx({COutPoint{coinbaseTxns[1].GetId(), 1}}, 2);
     auto tx2 = CreateMockTx({COutPoint{tx1.GetId(), 1}}, 1);
     auto tx3 = CreateMockTx({COutPoint{tx0.GetId(), 0}, COutPoint{tx1.GetId(), 0}, COutPoint{tx2.GetId(), 0}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3});
-
-    // When
-    RunScheduler(txsToValidate, taskFunc, threadPool);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3};
 
     // Then
     // There can be 3 or 4 tasks.
@@ -352,7 +399,7 @@ BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
     std::vector<std::vector<size_t>> v2 {{1}, {0}, {2,3}};
     std::vector<std::vector<size_t>> v3 {{1}, {0}, {2}, {3}};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1,v2,v3});
+    RunPermutedTest(txsToValidate, {v1,v2,v3});
 }
 
 // Transactions from the same chain are scheduled in one task.
@@ -371,7 +418,6 @@ BOOST_AUTO_TEST_CASE(txs_graphAndChains) {
      *            9
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 2);
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 2);
@@ -382,10 +428,7 @@ BOOST_AUTO_TEST_CASE(txs_graphAndChains) {
     auto tx7 = CreateMockTx({COutPoint{tx4.GetId(), 0}}, 1);
     auto tx8 = CreateMockTx({COutPoint{tx5.GetId(), 0}}, 1);
     auto tx9 = CreateMockTx({COutPoint{tx6.GetId(), 0}, COutPoint{tx7.GetId(), 0}, COutPoint{tx8.GetId(), 0}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7, tx8, tx9});
-
-    // When
-    RunScheduler(txsToValidate, taskFunc, threadPool);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7, tx8, tx9};
 
     // Then
     // There should be 6 tasks. One for first tx, one for last tx, one for tx2.
@@ -408,7 +451,7 @@ BOOST_AUTO_TEST_CASE(txs_graphAndChains) {
     std::vector<std::vector<size_t>> v7 {t0, t2, c3, c1, c2, t9};
     std::vector<std::vector<size_t>> v8 {t0, t2, c3, c2, c1, t9};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2, v3, v4, v5, v6, v7, v8});
+    RunTest(txsToValidate, {v1, v2, v3, v4, v5, v6, v7, v8});
 }
 
 // Chain in two tasks due to dependency.
@@ -424,17 +467,13 @@ BOOST_AUTO_TEST_CASE(txs_chainInTwoParts) {
      *         5
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 2);
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 1);
     auto tx3 = CreateMockTx({COutPoint{tx1.GetId(), 0}}, 1);
     auto tx4 = CreateMockTx({COutPoint{tx3.GetId(), 0}, COutPoint{tx2.GetId(), 0}}, 1);
     auto tx5 = CreateMockTx({COutPoint{tx4.GetId(), 0}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3, tx4, tx5});
-
-    // When
-    RunScheduler(txsToValidate, taskFunc, threadPool);
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4, tx5};
 
     // Then
     // There should be 4 tasks. One for first tx, one for chain 1-3, one for tx2 and final one for chain 4-5
@@ -444,7 +483,7 @@ BOOST_AUTO_TEST_CASE(txs_chainInTwoParts) {
     std::vector<std::vector<size_t>> v1 {{0}, {1,3}, {2}, {4,5}};
     std::vector<std::vector<size_t>> v2 {{0}, {2}, {1,3}, {4,5}};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2});
+    RunPermutedTest(txsToValidate, {v1, v2});
 }
 
 // Test that even if validation throws then spending txns are still scheduled.
@@ -458,24 +497,21 @@ BOOST_AUTO_TEST_CASE(txs_validationThrows) {
      *          3
      */
     // Given
-    std::vector<CMutableTransaction> txsToValidate;
     auto tx0 = CreateMockTx({COutPoint{coinbaseTxns[0].GetId(), 1}}, 2);
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 1);
     auto tx3 = CreateMockTx({COutPoint{tx1.GetId(), 0}, COutPoint{tx2.GetId(), 0}}, 1);
-    txsToValidate.insert(txsToValidate.end(), {tx0, tx1, tx2, tx3});
-
-    // When validations for 2 and 3 throws
-    failList = {tx1.GetId(), tx2.GetId()};
-    RunScheduler(txsToValidate, taskFunc, threadPool);
-    failList.clear();
+    std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3};
 
     // Then
     // tx3 is still scheduled even if 1 and 2 fails.
     std::vector<std::vector<size_t>> v1 {{0}, {1}, {2}, {3}};
     std::vector<std::vector<size_t>> v2 {{0}, {2}, {1}, {3}};
 
-    CheckExecutionOrder(txsToValidate, executedTasks, {v1, v2});
+    // When validations for 2 and 3 throws
+    failList = {tx1.GetId(), tx2.GetId()};
+    RunTest(txsToValidate, {v1, v2});
+    failList.clear();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
