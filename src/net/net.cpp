@@ -2694,11 +2694,6 @@ void CConnman::DeleteNode(const CNodePtr& pnode) {
     }
 }
 
-CConnman::~CConnman() {
-    Interrupt();
-    Stop();
-}
-
 size_t CConnman::GetAddressCount() const {
     return addrman.size();
 }
