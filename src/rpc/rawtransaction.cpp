@@ -9,6 +9,7 @@
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
+#include "transaction_specific_config.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
@@ -1224,6 +1225,211 @@ static UniValue GetUnconfirmedAncestors(const TxId& txid)
     }
     return unconfirmedAncestors;
 }
+namespace
+{
+    bool getNumOrRejectReason(const UniValue& jsonConfig, const std::string& parameter, UniValue& value, std::string& rejectReason)
+    {
+        value = jsonConfig[parameter];
+        // optional int parameter
+        if(value.isNull() || value.isNum())
+        {
+            return true;
+        }
+    
+        rejectReason =  parameter + std::string(" must be a number");
+        return false;
+    }
+
+    bool getBoolOrRejectReason(const UniValue& jsonConfig, const std::string& parameter, UniValue& value, std::string& rejectReason)
+    {
+        value = jsonConfig[parameter];
+        // optional bool parameter
+        if(value.isNull() || value.isBool())
+        {
+            return true;
+        }
+    
+        rejectReason =  parameter + std::string(" must be a boolean");
+        return false;
+    }
+
+
+    // Parse UniValue and set TransactionSpecificConfig
+    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc, const UniValue& jsonConfig, std::string& rejectReason)
+    {
+        const std::set<std::string> allPolicySettings = {"maxtxsizepolicy","datacarriersize","maxscriptsizepolicy","maxscriptnumlengthpolicy",
+                                                         "maxstackmemoryusagepolicy","maxscriptnumlengthpolicy","limitancestorcount", "limitcpfpgroupmemberscount",
+                                                         "acceptnonstdoutputs", "datacarrier", "dustrelayfee", "maxstdtxvalidationduration", "maxnonstdtxvalidationduration",
+                                                         "minconsolidationfactor", "maxconsolidationinputscriptsize", "minconfconsolidationinput", "acceptnonstdconsolidationinput",
+                                                         "dustlimitfactor", "maxtxnvalidatorasynctasksrunduration", "skipscriptflags"};
+
+        // Check if we only have flags that are supported
+        for(UniValue jsonConfigValue : jsonConfig.getKeys())
+        {
+            std::string strJsonValue = jsonConfigValue.get_str();
+            if(allPolicySettings.find(strJsonValue) == allPolicySettings.end())
+            {
+                rejectReason =  strJsonValue + " is not a valid policy setting.";
+                return false;
+            }
+        }
+
+        // Check each flag and call setter, set reject_reason if something is not ok
+        if (UniValue maxtxsizepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxtxsizepolicy", maxtxsizepolicy_uv, rejectReason) || 
+            (!maxtxsizepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxTxSize(maxtxsizepolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+
+        if (UniValue datacarriersize_uv; getNumOrRejectReason(jsonConfig, "datacarriersize", datacarriersize_uv, rejectReason))
+        {
+            if(!datacarriersize_uv.isNull())
+            {
+                int64_t datacarriersize = datacarriersize_uv.get_int64();
+                if(datacarriersize < 0)
+                {
+                    rejectReason = " datacarriersize must not be less than 0";
+                    return false;
+                }
+                tsc.SetTransactionSpecificDataCarrierSize(datacarriersize);
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue maxscriptsizepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptsizepolicy", maxscriptsizepolicy_uv, rejectReason) ||
+            (!maxscriptsizepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptSizePolicy(maxscriptsizepolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) ||
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+    
+       if (UniValue maxstackmemoryusagepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxstackmemoryusagepolicy", maxstackmemoryusagepolicy_uv, rejectReason) || 
+           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
+       {
+          return false;
+       }
+
+        if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) || 
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue limitancestorcount_uv; !getNumOrRejectReason(jsonConfig, "limitancestorcount", limitancestorcount_uv, rejectReason) || 
+            (!limitancestorcount_uv.isNull() && !tsc.SetTransactionSpecificLimitAncestorCount(limitancestorcount_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue limitcpfpgroupmemberscount_uv; !getNumOrRejectReason(jsonConfig, "limitcpfpgroupmemberscount", limitcpfpgroupmemberscount_uv, rejectReason) ||
+            (!limitcpfpgroupmemberscount_uv.isNull() && !tsc.SetTransactionSpecificLimitSecondaryMempoolAncestorCount(limitcpfpgroupmemberscount_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue acceptnonstdoutputs_uv; getBoolOrRejectReason(jsonConfig, "acceptnonstdoutputs", acceptnonstdoutputs_uv, rejectReason))
+        {
+            if(!acceptnonstdoutputs_uv.isNull())
+            {
+                 tsc.SetTransactionSpecificAcceptNonStandardOutput(acceptnonstdoutputs_uv.get_bool());
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue datacarrier_uv; getBoolOrRejectReason(jsonConfig, "datacarrier", datacarrier_uv, rejectReason))
+        {
+            if(!datacarrier_uv.isNull())
+            {
+                tsc.SetTransactionSpecificDataCarrier(datacarrier_uv.get_bool());
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue dustrelayfee_uv; getNumOrRejectReason(jsonConfig, "dustrelayfee", dustrelayfee_uv, rejectReason))
+        {
+            if(!dustrelayfee_uv.isNull())
+            {
+                tsc.SetTransactionSpecificDustRelayFee(CFeeRate(Amount(dustrelayfee_uv.get_int64())));
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue maxstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxstdtxvalidationduration", maxstdtxvalidationduration_uv, rejectReason) ||
+            (!maxstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxStdTxnValidationDuration(maxstdtxvalidationduration_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxnonstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxnonstdtxvalidationduration", maxnonstdtxvalidationduration_uv, rejectReason) ||
+            (!maxnonstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxNonStdTxnValidationDuration(maxnonstdtxvalidationduration_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue minconsolidationfactor_uv; !getNumOrRejectReason(jsonConfig, "minconsolidationfactor", minconsolidationfactor_uv, rejectReason) ||
+            (!minconsolidationfactor_uv.isNull() && !tsc.SetTransactionSpecificMinConsolidationFactor(minconsolidationfactor_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxconsolidationinputscriptsize_uv; !getNumOrRejectReason(jsonConfig, "maxconsolidationinputscriptsize", maxconsolidationinputscriptsize_uv, rejectReason) || 
+            (!maxconsolidationinputscriptsize_uv.isNull() && !tsc.SetTransactionSpecificMaxConsolidationInputScriptSize(maxconsolidationinputscriptsize_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue minconfconsolidationinput_uv; !getNumOrRejectReason(jsonConfig, "minconfconsolidationinput", minconfconsolidationinput_uv, rejectReason) ||
+            (!minconfconsolidationinput_uv.isNull() && !tsc.SetTransactionSpecificMinConfConsolidationInput(minconfconsolidationinput_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+   
+        if (UniValue acceptnonstdconsolidationinput_uv; !getBoolOrRejectReason(jsonConfig, "acceptnonstdconsolidationinput", acceptnonstdconsolidationinput_uv, rejectReason) ||
+            (!acceptnonstdconsolidationinput_uv.isNull() && !tsc.SetTransactionSpecificAcceptNonStdConsolidationInput(acceptnonstdconsolidationinput_uv.get_bool(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue dustlimitfactor_uv; !getNumOrRejectReason(jsonConfig, "dustlimitfactor", dustlimitfactor_uv, rejectReason) ||
+            (!dustlimitfactor_uv.isNull() && !tsc.SetTransactionSpecificDustLimitFactor(dustlimitfactor_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxtxnvalidatorasynctasksrunduration_uv; !getNumOrRejectReason(jsonConfig, "maxtxnvalidatorasynctasksrunduration", maxtxnvalidatorasynctasksrunduration_uv, rejectReason) ||
+            (!maxtxnvalidatorasynctasksrunduration_uv.isNull() && !tsc.SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(maxtxnvalidatorasynctasksrunduration_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+         // check durations
+        if(!tsc.CheckTxValidationDurations(rejectReason))
+        {
+            return false;
+        }
+
+        return true;
+    }
+}
+
 
 static UniValue sendrawtransaction(const Config &config,
                                    const JSONRPCRequest &request) {
