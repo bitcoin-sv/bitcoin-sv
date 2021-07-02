@@ -324,7 +324,7 @@ BOOST_AUTO_TEST_CASE(txs_graph) {
     auto tx1 = CreateMockTx({COutPoint{tx0.GetId(), 1}}, 2);
     auto tx2 = CreateMockTx({COutPoint{tx0.GetId(), 0}}, 1);
     auto tx3 = CreateMockTx({COutPoint{tx1.GetId(), 0}}, 1);
-    auto tx4 = CreateMockTx({COutPoint{tx2.GetId(), 0}, COutPoint{tx3.GetId(), 1}, COutPoint{tx1.GetId(), 1}}, 1);
+    auto tx4 = CreateMockTx({COutPoint{tx2.GetId(), 0}, COutPoint{tx3.GetId(), 0}, COutPoint{tx1.GetId(), 1}}, 1);
     std::vector<CMutableTransaction> txsToValidate{tx0, tx1, tx2, tx3, tx4};
 
     // Then
@@ -337,8 +337,9 @@ BOOST_AUTO_TEST_CASE(txs_graph) {
     std::vector<std::vector<size_t>> v2 {{0}, {2}, {1}, {3}, {4}};
     std::vector<std::vector<size_t>> v3 {{0}, {1}, {2}, {3, 4}};
     std::vector<std::vector<size_t>> v4 {{0}, {2}, {1}, {3, 4}};
+    std::vector<std::vector<size_t>> v5 {{0}, {1}, {3}, {2}, {4}};
 
-    RunPermutedTest(txsToValidate, {v1, v2, v3, v4});
+    RunPermutedTest(txsToValidate, {v1, v2, v3, v4, v5});
 }
 
 // Same as previous test except that transactions have many outputs and children spend many inputs.
@@ -372,8 +373,9 @@ BOOST_AUTO_TEST_CASE(txs_graphManyLinks) {
     std::vector<std::vector<size_t>> v2 {{0}, {2}, {1}, {3}, {4}};
     std::vector<std::vector<size_t>> v3 {{0}, {1}, {2}, {3, 4}};
     std::vector<std::vector<size_t>> v4 {{0}, {2}, {1}, {3, 4}};
+    std::vector<std::vector<size_t>> v5 {{0}, {1}, {3}, {2}, {4}};
 
-    RunPermutedTest(txsToValidate, {v1, v2, v3, v4});
+    RunPermutedTest(txsToValidate, {v1, v2, v3, v4, v5});
 }
 
 BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
@@ -393,7 +395,7 @@ BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
 
     // Then
     // There can be 3 or 4 tasks.
-    // tx0, tx1, tx3 are always scheduled in own tasks.
+    // tx0, tx1 are always scheduled in own tasks.
     // If tx0 is validated before tx1 or in the same cycle then tx2 and tx3 are scheduled as a chain. 
     std::vector<std::vector<size_t>> v1 {{0}, {1}, {2,3}};
     std::vector<std::vector<size_t>> v2 {{1}, {0}, {2,3}};
