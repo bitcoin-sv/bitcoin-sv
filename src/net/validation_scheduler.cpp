@@ -289,6 +289,10 @@ void ValidationScheduler::MarkResult(std::vector<size_t>&& positions, ScheduleSt
     taskCompletionCV.notify_one();
 }
 
+// Used when building spenders map for tracking parent transactions. 
+// Space for up to this many parents is reserved up front.
+constexpr size_t PARENTS_SET_RESERVE_SIZE = 10;
+
 void ValidationScheduler::BuildSpendersMap() {
     for (size_t i = 0; i < txs.size(); ++i) {
         if (!buildSpendersTaskRun) {

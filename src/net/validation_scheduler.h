@@ -96,9 +96,6 @@ private:
     // task to build spenders map
     std::future<void> buildSpendersTask;
     std::atomic_bool buildSpendersTaskRun = true;
-    // Used when building spenders map for tracking parent transactions. 
-    // Space for up to this many parents is reserved up front.
-    static const size_t PARENTS_SET_RESERVE_SIZE = 10;
 
 public:
     // Returns true if graph of spenders is ready.
