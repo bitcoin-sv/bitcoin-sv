@@ -540,7 +540,7 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
     CTxnValResult result =
         TxnValidation(
             pTxInputData,
-            mConfig,
+            pTxInputData.get()->GetConfig(mConfig),
             mMempool,
             mpTxnDoubleSpendDetector,
             fUseLimits,

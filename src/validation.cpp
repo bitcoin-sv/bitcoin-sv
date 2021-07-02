@@ -794,9 +794,10 @@ static bool CheckMempoolMinFee(
 
 static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
-                                std::string& errString) {
-    const auto limitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-    const auto limitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
+                                std::string& errString,
+                                const Config& config) {
+    const auto limitAncestors = config.GetLimitAncestorCount();
+    const auto limitSecondaryMempoolAncestors = config.GetLimitSecondaryMempoolAncestorCount();
     return pool.CheckAncestorLimits(entry,
                                     limitAncestors,
                                     limitSecondaryMempoolAncestors,
@@ -1321,7 +1322,7 @@ CTxnValResult TxnValidation(
     }
     // Calculate in-mempool ancestors, up to a limit.
     std::string errString;
-    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString)) {
+    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString, config)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-mempool-chain",
                   errString);
