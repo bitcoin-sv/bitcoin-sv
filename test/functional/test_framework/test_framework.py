@@ -29,7 +29,9 @@ from .util import (
     assert_equal,
     check_json_precision,
     connect_nodes_bi,
+    connect_nodes,
     disconnect_nodes_bi,
+    disconnect_nodes,
     initialize_datadir,
     log_filename,
     p2p_port,
@@ -341,6 +343,60 @@ class BitcoinTestFramework():
         # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
         thr.join()
         self.stop_node(node_index)
+        logger.debug("finished %s", title)
+
+
+    # this method creates following network graph
+    #
+    #      NodeConnCB
+    #          |
+    #          v
+    #      self.node[0] ---> self.node[1]  ---> ... ---> self.node[n]
+    #
+    @contextlib.contextmanager
+    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True):
+        if not title:
+            title = "None"
+        logger.debug("setup %s", title)
+
+        if not args:
+            args = [[]] * self.num_nodes
+        else:
+            assert(len(args) == self.num_nodes)
+
+
+
+        connCb = NodeConnCB()  # one mininode connection  to node 0
+
+        self.start_nodes(args)
+
+        connections = []
+        connection = NodeConn(ip, p2p_port(0), self.nodes[0], connCb, strSubVer=strSubVer)
+        connections.append(connection)
+        connCb.add_connection(connection)
+
+        thr = NetworkThread()
+        thr.start()
+        if wait_for_verack:
+            connCb.wait_for_verack()
+
+        logger.debug("before %s", title)
+
+        for i in range(self.num_nodes - 1):
+            connect_nodes(self.nodes, i, i + 1)
+
+        yield tuple(connections)
+        logger.debug("after %s", title)
+
+        for i in range(self.num_nodes - 1):
+            disconnect_nodes(self.nodes[i], i + 1)
+
+        for connection in connections:
+            connection.close()
+        del connections
+        # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        self.stop_nodes()
         logger.debug("finished %s", title)
 
     # This method runs and stops bitcoind node with index 'node_index'.
