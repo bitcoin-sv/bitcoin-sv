@@ -393,42 +393,6 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId) {
     BOOST_CHECK(minerId == std::nullopt);
 }
 
-BOOST_AUTO_TEST_CASE(CheckMinerIdBytes) {
-
-    std::string sampleDocument = "{"
-        "\"minerId\":\"12345\""
-      "}";
-    std::vector<uint8_t> sampleProtocol { 0xac, 0x1e, 0xed };
-    CScript script = CScript() << OP_FALSE << OP_RETURN << sampleProtocol << std::vector<uint8_t>(sampleDocument.begin(), sampleDocument.end());
-    // Wrong protocol bytes
-    BOOST_CHECK(!IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-
-    // Too short script
-    script = CScript() << OP_FALSE << OP_RETURN << sampleProtocol;
-    BOOST_CHECK(!IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-
-    // Missing OP_RETURN
-    sampleProtocol = { 0xac, 0x1e, 0xed, 0x88 };
-    script = CScript() << OP_FALSE << sampleProtocol << std::vector<uint8_t>(sampleDocument.begin(), sampleDocument.end());
-    BOOST_CHECK(!IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-
-    // Missing data after protocol id
-    script = CScript() << OP_FALSE << OP_RETURN << sampleProtocol;
-    BOOST_CHECK(!IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-
-    // No PUSHDATA after protocol id (NOP instead of PUSHDATA)
-    script = CScript() << OP_FALSE << OP_RETURN << sampleProtocol << OP_NOP;
-    BOOST_CHECK(!IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-
-    // OP_0 after protocol id is valid (null data)
-    script = CScript() << OP_FALSE << OP_RETURN << sampleProtocol << OP_0;
-    BOOST_CHECK(IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-
-    // OK
-    script = CScript() << OP_FALSE << OP_RETURN << sampleProtocol << std::vector<uint8_t>(sampleDocument.begin(), sampleDocument.end());
-    BOOST_CHECK(IsProtocolPrefixOP_RETURN(MinerId::protocol_id, script));
-}
-
 BOOST_AUTO_TEST_CASE(production_example_tx) {
 
     const char* data = "006a04ac1eed884dc1017b2276657273696f6e223a22302e31222c22686569676874223a22363234343535222c22707265764d696e65724964223a22303232363034363635643361313836626539363930323331613237396638653138623830306634636537386361616332643531393430633863316339326138333534222c22707265764d696e65724964536967223a223330343430323230363734353266396439626165656633323731383365326635363563386334643736323939323837643663303235336161313333633735313530643738643330373032323032396339643933616330386331396532306130336463333233303763346630613032336537396135303563303262303138353763383464343936373061636636222c226d696e65724964223a22303232363034363635643361313836626539363930323331613237396638653138623830306634636537386361616332643531393430633863316339326138333534222c2276637478223a7b2274784964223a2236353834663533653133323136643334393739303938333632626461333462643336373730353863386234653036323162323433393563353736623662616164222c22766f7574223a307d7d473045022100ae0bc35173357a3afc52a39c7c6237a0b2f6fdaca3f76667bde966d3c00655ff02206767755766be7b7252a42a00eb3aa38d62aae6acf800faa6ff3ea1bb74f4cf05";

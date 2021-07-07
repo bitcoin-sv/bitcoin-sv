@@ -280,7 +280,7 @@ std::optional<MinerId> MinerId::FindMinerId(const CTransaction& tx, int32_t bloc
     for (size_t i = 0; i < tx.vout.size(); i++)
     {
         // OP_FALSE OP_RETURN 0x04 0xAC1EED88 OP_PUSHDATA Coinbase Document
-        if (IsProtocolPrefixOP_RETURN(MinerId::protocol_id, tx.vout[i].scriptPubKey))
+        if(IsMinerId(tx.vout[i].scriptPubKey))
         {
             const CScript& pubKey = tx.vout[i].scriptPubKey;
 

@@ -114,8 +114,6 @@ class MinerId
 
     bool parseCoinbaseDocument(std::string& coinbaseDocumentDataJson, std::vector<uint8_t>& signatureBytes, const COutPoint& tx_out, int32_t blockHeight, bool dynamic);
 
-    static constexpr uint8_t protocol_id[] = { 0xac, 0x1e, 0xed, 0x88 };
-
     /* Scan coinbase transaction outputs for minerId. When first valid miner id is found, stop scanning.
      * If miner id was not found (or it was invalid), return std::nullopt.
      * Parameter tx is coinbase transaction that we scan for miner id output.

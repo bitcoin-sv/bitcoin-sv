@@ -137,7 +137,7 @@ bool IsDSNotification(bsv::span<const uint8_t> script) {
        script[3] == 0x64 && script[4] == 0x73 && script[5] == 0x6e && script[6] == 0x74;
 }
 
-bool IsDustReturnScript (bsv::span<const uint8_t> script)
+bool IsDustReturnScript(const bsv::span<const uint8_t> script)
 {
     // OP_FALSE, OP_RETURN, OP_PUSHDATA, 'dust'
     static constexpr std::array<uint8_t, 7> dust_return = {0x00,0x6a,0x04,0x64,0x75,0x73,0x74};
@@ -149,15 +149,21 @@ bool IsDustReturnScript (bsv::span<const uint8_t> script)
 
 /*
  * Checks that the beginning of a script contains a valid OP_RETURN protocol id.
- * The beginning of the script should look like this: OP_FALSE OP_RETURN OP_PUSHDATA protocol_id OP_PUSHDATA data
- * Method only works for 4-byte protocol ids.
- * It does not check data after OP_PUSHDATA (i.e. is length of data consistent with the chosen PUSHDATA). This should be done on the call-site.
+ * The beginning of the script should look like this: OP_FALSE OP_RETURN
+ * OP_PUSHDATA protocol_id OP_PUSHDATA data Method only works for 4-byte
+ * protocol ids. It does not check data after OP_PUSHDATA (i.e. is length of
+ * data consistent with the chosen PUSHDATA). This should be done on the
+ * call-site.
  */
-bool IsProtocolPrefixOP_RETURN(const uint8_t protocol_id[4], bsv::span<const uint8_t> script)
+bool IsMinerId(const bsv::span<const uint8_t> script)
 {
-    return script.size() >= 8 && script[0] == OP_FALSE && script[1] == OP_RETURN && script[2] == 0x04 &&
-        script[3] == protocol_id[0] && script[4] == protocol_id[1] && script[5] == protocol_id[2] && script[6] == protocol_id[3] &&
-        script[7] <= OP_PUSHDATA4;
+    static constexpr std::array<uint8_t, 4> protocol_id{0xac, 0x1e, 0xed, 0x88};
+    return script.size() >= 8 && 
+           script[0] == OP_FALSE &&
+           script[1] == OP_RETURN && 
+           script[2] == protocol_id.size() &&
+           std::equal(protocol_id.begin(), protocol_id.end(), script.begin() + 3) &&
+           script[7] <= OP_PUSHDATA4;
 }
 
 bool CScript::IsPushOnly(const_iterator pc) const {
