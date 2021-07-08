@@ -280,13 +280,16 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         self.check_mempool(conn.rpc, txchains, timeout)
 
     # test an attempt to submit bad transactions in a chain through the rpc interface
-    def run_scenario5(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
+    def run_scenario5(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, reverseOrder=False, timeout=30):
         # Create and send tx chains.
         num_of_bad_chains = num_of_chains // 3
         ok, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=num_of_bad_chains)
         # Prepare inputs for sendrawtransactions
         rpc_txs_bulk_input = []
-        for tx in ok + bad + orphan:
+        txs = ok + bad + orphan
+        if reverseOrder:
+            txs.reverse()
+        for tx in txs:
             # Collect txn input data for bulk submit through rpc interface.
             rpc_txs_bulk_input.append({'hex': ToHex(tx), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
         # Submit a batch of txns through rpc interface.
@@ -537,7 +540,28 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         with self.run_node_with_connections('TS9: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario5(conn, num_of_chains, chain_length, out, timeout=30)
+            self.run_scenario5(conn, num_of_chains, chain_length, out, reverseOrder=False, timeout=30)
+
+        # Scenario 10 (TS10).
+        #
+        # This test case checks bulk submit of chains with bad transactions in
+        # the middle of the chain, through the rpc sendrawtransactions
+        # interface.
+        # Essentially the same as Scenario 9 but txns are submitted in reversed order.
+        #
+        # Test case config
+        num_of_chains = 10
+        chain_length = 10
+        # Node's config
+        args = ['-txnvalidationasynchrunfreq=100',
+                '-maxorphantxsize=0',
+                '-limitancestorcount=100',
+                '-checkmempool=0',
+                '-persistmempool=0']
+        with self.run_node_with_connections('TS9: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario5(conn, num_of_chains, chain_length, out, reverseOrder=True, timeout=30)
 
 
 if __name__ == '__main__':
