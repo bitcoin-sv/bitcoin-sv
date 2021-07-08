@@ -286,7 +286,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         ok, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=num_of_bad_chains)
         # Prepare inputs for sendrawtransactions
         rpc_txs_bulk_input = []
-        for tx in orphan + bad + ok:
+        for tx in ok + bad + orphan:
             # Collect txn input data for bulk submit through rpc interface.
             rpc_txs_bulk_input.append({'hex': ToHex(tx), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
         # Submit a batch of txns through rpc interface.
