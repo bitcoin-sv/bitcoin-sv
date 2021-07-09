@@ -8,6 +8,7 @@
 #include "test/test_bitcoin.h"
 #include "txmempool.h"
 #include "txn_validator.h"
+#include "test/mempool_test_access.h"
 
 #include <algorithm>
 #include <boost/test/unit_test.hpp>
@@ -724,13 +725,14 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
 BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
     // Test that the part of the chain containing a slow transaction will get processed by a low priority thread.
     CTxMemPool pool;
+    CTxMemPoolTestAccess{pool}.InitInMemoryMempoolTxDB();
     // Update config params to prevent the failure of the test case
     // - this could happen - due to runtime conditions - on an inefficient environment.
     gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "1");
     gArgs.ForceSetArg("-maxstdtxnsperthreadratio", "100");
     // Disable processing of slow transactions
     gArgs.ForceSetArg("-maxnonstdtxnsperthreadratio", "0");
-    testConfig.SetMaxStdTxnValidationDuration(3);
+    testConfig.SetMaxStdTxnValidationDuration(10);
     testConfig.SetMaxNonStdTxnValidationDuration(5000);
     testConfig.SetMaxTxnChainValidationBudget(0);
     // Create txn validator
@@ -746,7 +748,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
 
     int ridiculousWidth = 100000;
     // autoscale transaction difficulty
-    for (int nWidth = 10; nWidth < ridiculousWidth; ) {
+    for (int nWidth = 20; nWidth < ridiculousWidth; ) {
         std::vector<CMutableTransaction> spends {};
         // fast transaction
         spends.push_back(CreateManyToManyTx(1, nWidth, *fundTx, coinbaseKey, scriptPubKey));
@@ -771,11 +773,19 @@ BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
             nWidth *= 2;
             fundTx = std::make_unique<CTransaction>(spends.back());
             BOOST_REQUIRE_LT(nWidth, ridiculousWidth);
-            BOOST_TEST_MESSAGE("Trying width " << nWidth);
+            BOOST_TEST_MESSAGE("Machine too fast, trying width " << nWidth << ", remaining funds " << fundTx->vout[0].nValue.GetSatoshis());
             continue;
         }
 
         auto counts = txnValidator->GetTransactionsInQueueCounts();
+
+        if (pool.Size() == oldPoolSize && txnValidator->getOrphanTxnsPtr()->getTxnsNumber() == 2) {
+            BOOST_WARN_MESSAGE(false,
+                               "This machine is slow: testConfig.SetMaxStdTxnValidationDuration(" <<
+                               testConfig.GetMaxStdTxnValidationDuration().count() <<
+                               ") is too small. Skipping the test");
+            return;
+        }
 
         BOOST_CHECK_EQUAL(pool.Size(), 1 + oldPoolSize);
         BOOST_CHECK_EQUAL(counts.GetStdQueueCount(), 0);
