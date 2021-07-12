@@ -31,6 +31,7 @@
 #include "threadinterrupt.h"
 #include "txmempool.h"
 #include "txn_sending_details.h"
+#include "txn_validation_config.h"
 #include "uint256.h"
 #include "validation.h"
 #include "validation_scheduler.h"
@@ -377,7 +378,7 @@ public:
             CTxnHandlers& handlers,
             bool fUseTimedCancellationSource,
             std::chrono::milliseconds maxasynctasksrunduration,
-            bool useNewGraphTaskScheduler)
+            PTVTaskScheduleStrategy scheduleStrategy)
         -> std::vector<std::future<typename std::result_of<
             Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
@@ -391,7 +392,7 @@ public:
             std::chrono::steady_clock::time_point(maxasynctasksrunduration) == zero_time_point
                 ? zero_time_point : std::chrono::steady_clock::now() + maxasynctasksrunduration;
 
-        if (useNewGraphTaskScheduler) {
+        if (scheduleStrategy == PTVTaskScheduleStrategy::TOPO_SORT) {
             ValidationScheduler::TypeValidationFunc validate =
                     [func, config, pool, &handlers, fUseTimedCancellationSource, end_time_point]
                             (const TxInputDataSPtrRefVec &vTxInputData) {
