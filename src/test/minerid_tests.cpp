@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1) {
     std::vector<uint8_t> signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
 
-    std::optional<MinerId> minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    std::optional<MinerId> minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId);
 
     CoinbaseDocument comparingCD = CoinbaseDocument("0.1", 624455, HexStr(prevMinerIdPubKey), baseDocument["prevMinerIdSig"].get_str(), HexStr(minerIdPubKey), COutPoint(uint256S(vctxid), 7));
@@ -207,63 +207,71 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1) {
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0} };
     comparingCD.SetDataRefs(comparingDataRefs);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    auto expected_cd{minerId.value().GetCoinbaseDocument()};
+    BOOST_CHECK_EQUAL(expected_cd, comparingCD);
 
     // Wrong signature (with correct size)
     std::vector<uint8_t> wrongSig = std::vector<uint8_t>(signature.size(), 'a');
     prepareTransactionOutputStatic(baseDocument, wrongSig, tx, 1);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Missing required field "height"
     baseDocument = createValidCoinbaseDocument(prevMinerIdKey, std::nullopt, HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, dataRefs, "0.1");
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Incorrect required field "height"
     baseDocument = createValidCoinbaseDocument(prevMinerIdKey, "28", HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, dataRefs, "0.1");
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Missing dataRefs (no optional fields present)
     baseDocument = createValidCoinbaseDocument(prevMinerIdKey, "624455", HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, NullUniValue, "0.1");
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     comparingCD.SetDataRefs(std::nullopt);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    expected_cd = minerId.value().GetCoinbaseDocument();
+    BOOST_CHECK_EQUAL(expected_cd, comparingCD);
 
     // Invalid JSON
     baseDocument = createValidCoinbaseDocument(prevMinerIdKey, "624455", HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, dataRefs, "0.1");
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1, true);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Invalid prevMinerId signature
     baseDocument.push_back(Pair("prevMinerIdSig", std::string(baseDocument["prevMinerIdSig"].get_str().size(), 'b')));
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Even if first MinerId is invalid, we find the second one which is valid
     baseDocument = createValidCoinbaseDocument(prevMinerIdKey, "624455", HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, dataRefs, "0.1");
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 2);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     comparingCD.SetDataRefs(comparingDataRefs);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    expected_cd = minerId.value().GetCoinbaseDocument();
+    BOOST_CHECK_EQUAL(expected_cd, comparingCD);
 
     // If we add one more invalid miner id, it does not matter - we already found the valid one in previous output
     baseDocument = createValidCoinbaseDocument(prevMinerIdKey, "624455", HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, dataRefs, "0.1");
     signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 3, true);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    expected_cd = minerId.value().GetCoinbaseDocument();
+    BOOST_CHECK_EQUAL(expected_cd, comparingCD);
 }
 
 BOOST_AUTO_TEST_CASE(staticMinerId_v2) {
@@ -292,7 +300,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2) {
     std::vector<uint8_t> signature = createSignatureStaticCoinbaseDocument(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
 
-    std::optional<MinerId> minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    std::optional<MinerId> minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId);
 
     CoinbaseDocument comparingCD = CoinbaseDocument("0.2", 624455, HexStr(prevMinerIdPubKey), baseDocument["prevMinerIdSig"].get_str(), HexStr(minerIdPubKey), COutPoint(uint256S(vctxid), 7));
@@ -301,6 +309,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2) {
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0} };
     comparingCD.SetDataRefs(comparingDataRefs);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    const auto expected_cd{minerId.value().GetCoinbaseDocument()};
+    BOOST_CHECK_EQUAL(expected_cd, comparingCD);
 }
 
 BOOST_AUTO_TEST_CASE(dynamicMinerId) {
@@ -342,13 +352,14 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId) {
     prepareTransactionOutputDynamic(tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, dynamicSignature);
 
     // Check with valid dynamic document
-    std::optional<MinerId> minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    std::optional<MinerId> minerId = FindMinerId(CTransaction(tx), 624455);
     CoinbaseDocument comparingCD = CoinbaseDocument("0.1", 624455, HexStr(prevMinerIdPubKey), staticDocument["prevMinerIdSig"].get_str(), HexStr(minerIdPubKey), COutPoint(uint256S(vctxid), 7));
     std::vector<CoinbaseDocument::DataRef> comparingDataRefs = {
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1), 0},
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0} };
     comparingCD.SetDataRefs(comparingDataRefs);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), comparingCD);
 
     // Static document has no dataRefs
     staticDocument = createValidCoinbaseDocument(prevMinerIdKey, "624455", HexStr(prevMinerIdPubKey), HexStr(minerIdPubKey), vctxid, NullUniValue, "0.1");
@@ -357,31 +368,33 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId) {
     dynamicDocument.push_back(Pair("dataRefs", dataRefsDynamic));
     dynamicSignature = createSignatureDynamicCoinbaseDocument(dynamicMinerIdKey, staticDocument, staticSignatureBytes, dynamicDocument);
     prepareTransactionOutputDynamic(tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, dynamicSignature);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     comparingDataRefs = {
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1D), 0},
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2D), 0} };
     comparingCD.SetDataRefs(comparingDataRefs);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), comparingCD);
 
     // Check with wrong signature (with correct size)
     std::vector<uint8_t> wrongSig = std::vector<uint8_t>(dynamicSignature.size(), 'a');
     prepareTransactionOutputDynamic(tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, wrongSig);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Check that dynamic document cannot rewrite required field.
     dynamicDocument.push_back(Pair("version", "0.1"));
     dynamicSignature = createSignatureDynamicCoinbaseDocument(dynamicMinerIdKey, staticDocument, staticSignatureBytes, dynamicDocument);
     prepareTransactionOutputDynamic(tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, dynamicSignature);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), comparingCD);
 
     // Pass empty dynamic document (but with correct signature) : invalid result
     dynamicDocument = UniValue(UniValue::VOBJ);
     dynamicSignature = createSignatureDynamicCoinbaseDocument(dynamicMinerIdKey, staticDocument, staticSignatureBytes, dynamicDocument);
     prepareTransactionOutputDynamic(tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, dynamicSignature);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 
     // Pass in minerId as an object: invalid result
@@ -389,7 +402,7 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId) {
     dynamicDocument.push_back(Pair("minerId", UniValue(UniValue::VOBJ)));
     dynamicSignature = createSignatureDynamicCoinbaseDocument(dynamicMinerIdKey, staticDocument, staticSignatureBytes, dynamicDocument);
     prepareTransactionOutputDynamic(tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, dynamicSignature);
-    minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId == std::nullopt);
 }
 
@@ -409,11 +422,12 @@ BOOST_AUTO_TEST_CASE(production_example_tx) {
     tx.vout[1].scriptPubKey = ScriptFromHex(data);
     tx.vout[1].nValue = Amount(42);
 
-    std::optional<MinerId> minerId = MinerId::FindMinerId(CTransaction(tx), 624455);
+    std::optional<MinerId> minerId = FindMinerId(CTransaction(tx), 624455);
     BOOST_CHECK(minerId);
 
     CoinbaseDocument comparingCD = CoinbaseDocument("0.1", 624455, prevMinerIdPubKey, prevMinerIdSignature, minerIdPubKey, COutPoint(uint256S(vcTxId), 0));
     compareMinerIds(minerId.value().GetCoinbaseDocument(), comparingCD);
+    BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), comparingCD);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
