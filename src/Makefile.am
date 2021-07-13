@@ -102,6 +102,7 @@ BITCOIN_CORE_H = \
   checkqueuepool.h \
   clientversion.h \
   coins.h \
+  coinbase_doc.h \
   compat.h \
   compat/byteswap.h \
   compat/endian.h \
@@ -281,6 +282,7 @@ libbitcoin_server_a_SOURCES = \
   block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
+  coinbase_doc.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \

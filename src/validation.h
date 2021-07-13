@@ -17,7 +17,6 @@
 #include "coins.h"
 #include "consensus/consensus.h"
 #include "fs.h"
-#include "miner_id.h"
 #include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "script/script_error.h"

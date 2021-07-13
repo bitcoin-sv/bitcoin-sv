@@ -8,8 +8,11 @@
 #include "abort_node.h"
 #include "arith_uint256.h"
 #include "async_file_reader.h"
+#include "block_file_access.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
+#include "blockfileinfostore.h"
+#include "blockindex_with_descendants.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -22,6 +25,9 @@
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
+#include "invalid_txn_publisher.h"
+#include "metrics.h"
+#include "miner_id.h"
 #include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -49,11 +55,6 @@
 #include "validationinterface.h"
 #include "versionbits.h"
 #include "warnings.h"
-#include "blockfileinfostore.h"
-#include "block_file_access.h"
-#include "invalid_txn_publisher.h"
-#include "blockindex_with_descendants.h"
-#include "metrics.h"
 
 #include <atomic>
 

@@ -387,6 +387,8 @@ add_library(server
 	checkpoints.h
 	checkqueue.h
 	checkqueuepool.h
+	coinbase_doc.cpp
+	coinbase_doc.h
 	compat/sanity.h
 	cuckoocache.h
 	dbwrapper.cpp

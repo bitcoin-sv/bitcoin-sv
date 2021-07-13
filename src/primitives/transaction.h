@@ -11,6 +11,7 @@
 #include "serialize.h"
 #include "uint256.h"
 #include <optional>
+#include <ostream>
 
 struct TxId;
 /**
@@ -79,7 +80,11 @@ public:
     }
 
     std::string ToString() const;
+
+    friend std::ostream& operator<<(std::ostream&, const COutPoint&);
 };
+
+std::ostream& operator<<(std::ostream&, const COutPoint&);
 
 /**
  * An input of a transaction. It contains the location of the previous
