@@ -3,11 +3,16 @@
 
 #include "coinbase_doc.h"
 
+#include "miner_id.h"
+#include "primitives/transaction.h"
 #include "test/test_bitcoin.h"
 #include "univalue.h"
 
+#include <bits/stdint-intn.h>
+#include <bits/stdint-uintn.h>
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
+#include <string_view>
 
 using namespace std;
 
@@ -139,5 +144,91 @@ BOOST_AUTO_TEST_CASE(inequality)
     BOOST_CHECK_NE(cd_dr12, cd_dr11);
     BOOST_CHECK_EQUAL(cd_dr12, cd_dr12);
 }
+
+namespace
+{
+    CoinbaseDocument from_json_static(const string& s)
+    {
+        UniValue v;
+        v.read(s);
+
+        MinerId miner_id;
+        const vector<uint8_t> sig;
+        COutPoint cout;
+        int32_t block_height{42};
+        miner_id.SetStaticCoinbaseDocument(v, sig, cout, block_height);
+
+        return miner_id.GetCoinbaseDocument();
+    }
+
+    CoinbaseDocument from_json_dynamic(const string& s)
+    {
+        UniValue v;
+        v.read(s);
+
+        MinerId miner_id;
+        const vector<uint8_t> sig;
+        COutPoint cout;
+        int32_t block_height{42};
+        miner_id.SetDynamicCoinbaseDocument(v, sig, cout, block_height);
+
+        return miner_id.GetCoinbaseDocument();
+    }
+}
+
+BOOST_AUTO_TEST_CASE(to_and_from_json_static)
+{
+    const string v{"0.1"};
+    const int32_t h{42};
+    const string prev_id{"prev_miner_id"};
+    const string prev_id_sig{"prev_miner_id_sig"};
+    const string id{"miner_id"};
+    // const COutPoint op; cjg integer out of range?
+    auto x = uint256S("123456789abcdef0"
+                      "123456789abcdef0"
+                      "123456789abcdef0"
+                      "123456789abcdef0");
+    const COutPoint op{x, 0};
+    const optional<UniValue> contact;
+
+    CoinbaseDocument input{v, h, prev_id, prev_id_sig, id, op, contact};
+
+    vector<CoinbaseDocument::DataRef> dataRefs = {
+        CoinbaseDocument::DataRef{{"id1", "id2"}, x, 0},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, x, 0}};
+    input.SetDataRefs(dataRefs);
+
+    const auto json{to_json(input)};
+    const auto output{from_json_static(json)};
+    BOOST_CHECK_EQUAL(output, input);
+}
+
+// This doesn't work as only datarefs are actually set
+// BOOST_AUTO_TEST_CASE(to_and_from_json_dynamic)
+//{
+//    const string v{"0.1"};
+//    const int32_t h{42};
+//    const string prev_id{"prev_miner_id"};
+//    const string prev_id_sig{"prev_miner_id_sig"};
+//    const string id{"miner_id"};
+//    // const COutPoint op; cjg integer out of range?
+//    auto x = uint256S("123456789abcdef0"
+//                      "123456789abcdef0"
+//                      "123456789abcdef0"
+//                      "123456789abcdef0");
+//    const COutPoint op{x, 0};
+//    const optional<UniValue> contact;
+//
+//    CoinbaseDocument input{v, h, prev_id, prev_id_sig, id, op, contact};
+//
+//    vector<CoinbaseDocument::DataRef> dataRefs = {
+//        CoinbaseDocument::DataRef{{"id1", "id2"}, x, 0},
+//        CoinbaseDocument::DataRef{{"id1", "id2"}, x, 0}};
+//    input.SetDataRefs(dataRefs);
+//
+//    const auto json{to_json(input)};
+//    const auto output{from_json_dynamic(json)};
+//    BOOST_CHECK_EQUAL(output, input);
+//}
 
 BOOST_AUTO_TEST_SUITE_END()

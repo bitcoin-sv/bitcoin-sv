@@ -70,6 +70,7 @@ namespace
         return true;
     }
 
+    // cjg dry
     template <typename O>
     void hash_sha256(const string_view msg, O o)
     {
@@ -94,7 +95,7 @@ bool MinerId::SetStaticCoinbaseDocument(
     const UniValue& document,
     const std::vector<uint8_t>& signatureBytes,
     const COutPoint& tx_out,
-    int32_t blockHeight)
+    const int32_t blockHeight)
 {
     auto LogInvalidDoc = [&] {
         LogPrint(
@@ -115,12 +116,13 @@ bool MinerId::SetStaticCoinbaseDocument(
     }
 
     auto& height = document["height"];
-    if(!height.isStr())
+    if(!height.isNum())
     {
         LogInvalidDoc();
         return false;
     }
-    const auto block_height{std::stoi(height.get_str())};
+    // const auto block_height{std::stoi(height.get_str())};
+    const auto block_height{height.get_int()};
     if(block_height != blockHeight)
     {
         LogPrint(BCLog::TXNVAL,
@@ -175,20 +177,20 @@ bool MinerId::SetStaticCoinbaseDocument(
 
     // Verify signature of static document miner id.
     const std::string cd_json{document.write()};
-    const std::vector<uint8_t> minerIdBytes = ParseHex(minerId.get_str());
+    const std::vector<uint8_t> minerIdBytes{ParseHex(minerId.get_str())};
     if(!verify(cd_json, minerIdBytes, signatureBytes))
     {
         LogPrint(BCLog::TXNVAL,
-                 "Signature of static coinbase document is invalid in coinbase "
-                 "transaction with txid %s and output number %d. \n",
+                 "Signature of static coinbase document is invalid incoinbase "
+                 "transaction with txid %s and output number%d.\n",
                  tx_out.GetTxId().ToString(),
                  tx_out.GetN());
         return false;
     }
 
     // Verify signature of previous miner id.
-    std::string dataToSign{prevMinerId.get_str() + minerId.get_str() +
-                           vctxTxid.get_str()};
+    string dataToSign{prevMinerId.get_str() + minerId.get_str() +
+                      vctxTxid.get_str()};
     if(version.get_str() == "0.1")
     {
     }
@@ -216,7 +218,7 @@ bool MinerId::SetStaticCoinbaseDocument(
         LogPrint(
             BCLog::TXNVAL,
             "Signature of previous miner id in coinbase document is invalid in "
-            "coinbase transaction with txid %s and output number %d. \n",
+            "coinbase transaction with txid %s and outputnumber %d. \n",
             tx_out.GetTxId().ToString(),
             tx_out.GetN());
         return false;
@@ -236,7 +238,7 @@ bool MinerId::SetStaticCoinbaseDocument(
         LogInvalidDoc();
         return false;
     }
-    if(dataRefs.size() != 0)
+    if(!dataRefs.empty())
     {
         coinbaseDocument.SetDataRefs(dataRefs);
     }
@@ -255,7 +257,7 @@ bool MinerId::SetDynamicCoinbaseDocument(
     const UniValue& document,
     const std::vector<uint8_t>& signatureBytes,
     const COutPoint& tx_out,
-    int32_t blockHeight)
+    const int32_t blockHeight)
 {
     auto LogInvalidDoc = [&] {
         LogPrint(BCLog::TXNVAL,
@@ -349,31 +351,20 @@ bool MinerId::SetDynamicCoinbaseDocument(
     }
 
     // Verify signature of dynamic document miner id.
-    std::vector<uint8_t> dynamicMinerIdBytes =
-        ParseHex(dynamicMinerId.get_str());
-    CPubKey dynamicMinerIdPubKey(dynamicMinerIdBytes.begin(),
-                                 dynamicMinerIdBytes.end());
-    std::string dataToSign =
-        staticDocumentJson_ + signatureStaticDocument_ + document.write();
+    const vector<uint8_t> dynamicMinerIdBytes{
+        ParseHex(dynamicMinerId.get_str())};
+    const string dataToSign{staticDocumentJson_ + signatureStaticDocument_ +
+                            document.write()};
 
-    std::vector<uint8_t> dataToSignBytes =
-        std::vector<uint8_t>(dataToSign.begin(), dataToSign.end());
-    uint8_t hashSignature[CSHA256::OUTPUT_SIZE];
-    CSHA256()
-        .Write(dataToSignBytes.data(), dataToSignBytes.size())
-        .Finalize(hashSignature);
-
-    if(!dynamicMinerIdPubKey.Verify(
-           uint256(std::vector<uint8_t>{std::begin(hashSignature),
-                                        std::end(hashSignature)}),
-           signatureBytes))
+    const vector<uint8_t> dataToSignBytes{dataToSign.begin(), dataToSign.end()};
+    if(!verify(dataToSign, dynamicMinerIdBytes, signatureBytes))
     {
-        LogPrint(
-            BCLog::TXNVAL,
-            "Signature of dynamic miner id in coinbase document is invalid in "
-            "coinbase transaction with txid %s and output number %d. \n",
-            tx_out.GetTxId().ToString(),
-            tx_out.GetN());
+        LogPrint(BCLog::TXNVAL,
+                 "Signature of dynamic miner id in coinbase document is "
+                 "invalidin coinbase transaction with txid %s and output "
+                 "number %d.\n",
+                 tx_out.GetTxId().ToString(),
+                 tx_out.GetN());
         return false;
     }
 
@@ -386,7 +377,7 @@ bool MinerId::SetDynamicCoinbaseDocument(
             LogInvalidDoc();
             return false;
         }
-        if(dataRefs.size() != 0)
+        if(!dataRefs.empty())
         {
             coinbaseDocument_.SetDataRefs(dataRefs);
         }

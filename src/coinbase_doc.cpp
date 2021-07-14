@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include <ostream>
+#include <sstream>
 
 using namespace std;
 
@@ -35,15 +36,6 @@ bool operator==(const CoinbaseDocument& a, const CoinbaseDocument& b)
             ((a.mDataRefs && b.mDataRefs) &&
              (a.mDataRefs.value() == b.mDataRefs.value())));
     // clang-format on
-}
-
-namespace
-{
-    //    ostream& operator<<(ostream& os, const uint256& i)
-    //    {
-    //        os << i.ToString();
-    //        return os;
-    //    }
 }
 
 std::ostream& operator<<(std::ostream& os,
@@ -82,3 +74,63 @@ std::ostream& operator<<(std::ostream& os, const CoinbaseDocument& doc)
     return os;
 }
 
+void to_json(std::ostream& os, const CoinbaseDocument::DataRef& dataRef)
+{
+    os << R"({ "brfcIds": [ )";
+    for(size_t i{0}; i < dataRef.brfcIds.size(); ++i)
+    {
+        os << R"(")" << dataRef.brfcIds[i] << '"';
+        if(i != dataRef.brfcIds.size() - 1)
+            os << ',';
+    }
+    os << ']';
+
+    os << R"(, "txid": ")" << dataRef.txid.GetHex() << '"';
+    os << R"(, "vout": )" << dataRef.vout;
+    // cjg os << R"(, "compress": "gzip" })" << dataRef.;
+    os << '}';
+}
+
+void to_json(std::ostream& os,
+             const vector<CoinbaseDocument::DataRef>& data_refs)
+{
+    os << R"(, "dataRefs": { "refs" : [ )";
+    for(size_t i{}; i < data_refs.size(); ++i)
+    {
+        to_json(os, data_refs[i]);
+        if(i != data_refs.size() - 1)
+            os << ',';
+    }
+    os << "] }";
+}
+
+void to_json(std::ostream& os, const CoinbaseDocument& doc)
+{
+    // clang-format off
+    os << '{' 
+        << R"("version" : )" << '"' << doc.GetVersion() << '"' 
+        << R"(, "height" : )" << doc.GetHeight()
+        << R"(, "prevMinerId" : )" << '"' << doc.GetPrevMinerId() << '"' 
+        << R"(, "prevMinerIdSig" : )" << '"' << doc.GetPrevMinerIdSig() << '"' 
+        << R"(, "dynamicMinerId" : "")"
+        << R"(, "minerId" : )" << '"' << doc.GetMinerId() << '"' 
+        << R"(, "vctx" : )"
+        << R"({ "txId": ")" << doc.GetVctx().GetTxId().GetHex() << '"'
+        << R"(, "vout":)" << doc.GetVctx().GetN() << '}';
+
+    const auto& dataRefs{doc.GetDataRefs()};
+    if(dataRefs)
+    {
+        to_json(os, dataRefs.value());
+    }
+    // clang-format on
+
+    os << '}';
+}
+
+std::string to_json(const CoinbaseDocument& doc)
+{
+    ostringstream oss;
+    to_json(oss, doc);
+    return oss.str();
+}
