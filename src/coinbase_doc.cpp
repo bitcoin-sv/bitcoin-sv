@@ -25,15 +25,15 @@ bool operator==(const CoinbaseDocument::DataRef& a,
 bool operator==(const CoinbaseDocument& a, const CoinbaseDocument& b)
 {
     // clang-format off
-    return a.version_ == b.version_ && 
-           a.height_ == b.height_ &&
-           a.prevMinerId_ == b.prevMinerId_ &&
-           a.prevMinerIdSig_ == b.prevMinerIdSig_ && 
-           a.minerId_ == b.minerId_ &&
-           a.vctx_ == b.vctx_ &&
-           ((!a.dataRefs_ && !b.dataRefs_) ||
-            ((a.dataRefs_ && b.dataRefs_) &&
-             (a.dataRefs_.value() == b.dataRefs_.value())));
+    return a.mVersion == b.mVersion && 
+           a.mHeight == b.mHeight &&
+           a.mPrevMinerId == b.mPrevMinerId &&
+           a.mPrevMinerIdSig == b.mPrevMinerIdSig && 
+           a.mMinerId == b.mMinerId &&
+           a.mVctx == b.mVctx &&
+           ((!a.mDataRefs && !b.mDataRefs) ||
+            ((a.mDataRefs && b.mDataRefs) &&
+             (a.mDataRefs.value() == b.mDataRefs.value())));
     // clang-format on
 }
 
@@ -63,18 +63,18 @@ std::ostream& operator<<(std::ostream& os,
 std::ostream& operator<<(std::ostream& os, const CoinbaseDocument& doc)
 {
     // clang-format off
-    os << "version: " << doc.version_
-       << "\nheight: " << doc.height_
-       << "\nprev_miner_id: " << doc.prevMinerId_
-       << "\nprev_miner_sig: " << doc.prevMinerIdSig_
-       << "\nminer_id: " << doc.minerId_
-       << "\noutpoint: " << doc.vctx_;
+    os << "version: " << doc.mVersion
+       << "\nheight: " << doc.mHeight
+       << "\nprev_miner_id: " << doc.mPrevMinerId
+       << "\nprev_miner_sig: " << doc.mPrevMinerIdSig
+       << "\nminer_id: " << doc.mMinerId
+       << "\noutpoint: " << doc.mVctx;
     // clang-format on
 
-    if(!doc.dataRefs_)
+    if(!doc.mDataRefs)
         return os;
 
-    for(const auto& dataref : doc.dataRefs_.value())
+    for(const auto& dataref : doc.mDataRefs.value())
     {
         os << '\n' << dataref;
     }
