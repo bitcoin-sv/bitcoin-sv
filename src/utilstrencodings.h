@@ -9,10 +9,16 @@
 #ifndef BITCOIN_UTILSTRENCODINGS_H
 #define BITCOIN_UTILSTRENCODINGS_H
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include <algorithm>
 #include <array>
+#include <cassert>
+#include <cctype>
+#include <cstdint>
+#include <iterator>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "rpc/text_writer.h"
 
 #define BEGIN(a) ((char *)&(a))
@@ -148,6 +154,59 @@ template <typename T>
 inline void HexStr(const T& vch, CTextWriter& writer, bool fSpaces = false)
 {
     HexStr(vch.begin(), vch.end(), writer, fSpaces);
+}
+
+template <typename I, typename O, typename F>
+I transform_pairs(I f, I l, O o, F func)
+{
+    while(f != l)
+    {
+        I n = std::next(f);
+        if(n == l)
+            return f;
+
+        *o = func(*f, *n);
+        ++n;
+        if(n == l)
+            return l;
+
+        std::advance(f, 2);
+        ++n;
+        if(n == l)
+            return f;
+    }
+
+    return l;
+}
+
+// Precondition
+// I::value_type [0-9a-f]
+template <typename I, typename O>
+I transform_hex(I f, I l, O o)
+{
+    return transform_pairs(f, l, o, [](const auto a, const auto b) {
+        constexpr auto l = [](const char c) {
+            if(isdigit(c))
+                return c - '0';
+            else if(c >= 'a' && c <= 'f')
+                return c - 'W';
+            else
+                assert(false);
+        };
+        return (0xf0 & (l(a) << 4)) | (0xf & l(b));
+    });
+}
+
+template <typename O>
+auto transform_hex(const std::string_view s, O o)
+{
+    const auto it = std::find_if_not(s.begin(), s.end(), [](const auto& c) {
+        return isdigit(c) || (c >= 'a' && c <= 'f');
+    });
+    if(it != s.end())
+        return it;
+
+    return transform_hex(s.begin(), s.end(), o);
 }
 
 /**

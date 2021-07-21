@@ -5,11 +5,20 @@
 #include "miner_id.h"
 
 #include <array>
+#include <bits/stdint-uintn.h>
+#include <iterator>
 #include <string_view>
+
+#include "boost/algorithm/hex.hpp"
 
 #include "hash.h"
 #include "logging.h"
 #include "pubkey.h"
+#include "script/instruction.h"
+#include "script/instruction_iterator.h"
+#include "utilstrencodings.h"
+
+namespace ba = boost::algorithm;
 
 using namespace std;
 
@@ -70,7 +79,6 @@ namespace
         return true;
     }
 
-    // cjg dry
     template <typename O>
     void hash_sha256(const string_view msg, O o)
     {
@@ -81,7 +89,7 @@ namespace
 
     bool verify(const string_view msg,
                 const vector<uint8_t>& pub_key,
-                const vector<uint8_t>& sig)
+                const bsv::span<const uint8_t> sig)
     {
         std::vector<uint8_t> hash(CSHA256::OUTPUT_SIZE);
         hash_sha256(msg, hash.data());
@@ -89,11 +97,11 @@ namespace
         const CPubKey pubKey{pub_key.begin(), pub_key.end()};
         return pubKey.Verify(uint256{hash}, sig);
     }
-} // namespace
+}
 
 bool MinerId::SetStaticCoinbaseDocument(
     const UniValue& document,
-    const std::vector<uint8_t>& signatureBytes,
+    const bsv::span<const uint8_t> signatureBytes,
     const COutPoint& tx_out,
     const int32_t blockHeight)
 {
@@ -116,13 +124,20 @@ bool MinerId::SetStaticCoinbaseDocument(
     }
 
     auto& height = document["height"];
-    if(!height.isNum())
+    int32_t block_height{};
+    if(height.isNum())
+    {
+        block_height = height.get_int();
+    }
+    else if(height.isStr())
+    {
+        block_height = std::stoi(height.get_str());
+    }
+    else
     {
         LogInvalidDoc();
         return false;
     }
-    // const auto block_height{std::stoi(height.get_str())};
-    const auto block_height{height.get_int()};
     if(block_height != blockHeight)
     {
         LogPrint(BCLog::TXNVAL,
@@ -189,15 +204,19 @@ bool MinerId::SetStaticCoinbaseDocument(
     }
 
     // Verify signature of previous miner id.
-    string dataToSign{prevMinerId.get_str() + minerId.get_str() +
-                      vctxTxid.get_str()};
+    string dataToVerify;
     if(version.get_str() == "0.1")
     {
+        dataToVerify =
+            prevMinerId.get_str() + minerId.get_str() + vctxTxid.get_str();
     }
     else if(version.get_str() == "0.2")
     {
-        const std::string dataToSignHex = HexStr(dataToSign);
-        dataToSign = dataToSignHex;
+        vector<uint8_t> s;
+        transform_hex(prevMinerId.get_str(), back_inserter(s));
+        transform_hex(minerId.get_str(), back_inserter(s));
+        transform_hex(vctxTxid.get_str(), back_inserter(s));
+        dataToVerify = string(s.begin(), s.end());
     }
     else
     {
@@ -213,14 +232,13 @@ bool MinerId::SetStaticCoinbaseDocument(
         ParseHex(prevMinerIdSig.get_str())};
     const std::vector<uint8_t> prevMinerIdBytes{
         ParseHex(prevMinerId.get_str())};
-    if(!verify(dataToSign, prevMinerIdBytes, signaturePrevMinerId))
+    if(!verify(dataToVerify, prevMinerIdBytes, signaturePrevMinerId))
     {
         LogPrint(
             BCLog::TXNVAL,
             "Signature of previous miner id in coinbase document is invalid in "
-            "coinbase transaction with txid %s and outputnumber %d. \n",
-            tx_out.GetTxId().ToString(),
-            tx_out.GetN());
+            "coinbase transaction with txid %s and output number %d. \n",
+            tx_out.GetTxId().ToString(), tx_out.GetN());
         return false;
     }
 
@@ -255,7 +273,7 @@ bool MinerId::SetStaticCoinbaseDocument(
 
 bool MinerId::SetDynamicCoinbaseDocument(
     const UniValue& document,
-    const std::vector<uint8_t>& signatureBytes,
+    const bsv::span<const uint8_t> signatureBytes,
     const COutPoint& tx_out,
     const int32_t blockHeight)
 {
@@ -353,11 +371,12 @@ bool MinerId::SetDynamicCoinbaseDocument(
     // Verify signature of dynamic document miner id.
     const vector<uint8_t> dynamicMinerIdBytes{
         ParseHex(dynamicMinerId.get_str())};
-    const string dataToSign{staticDocumentJson_ + signatureStaticDocument_ +
-                            document.write()};
+    const string dataToVerify{staticDocumentJson_ + signatureStaticDocument_ +
+                              document.write()};
 
-    const vector<uint8_t> dataToSignBytes{dataToSign.begin(), dataToSign.end()};
-    if(!verify(dataToSign, dynamicMinerIdBytes, signatureBytes))
+    const vector<uint8_t> dataToVerifyBytes{dataToVerify.begin(),
+                                            dataToVerify.end()};
+    if(!verify(dataToVerify, dynamicMinerIdBytes, signatureBytes))
     {
         LogPrint(BCLog::TXNVAL,
                  "Signature of dynamic miner id in coinbase document is "
@@ -387,15 +406,16 @@ bool MinerId::SetDynamicCoinbaseDocument(
 }
 
 bool parseCoinbaseDocument(MinerId& minerId,
-                           const std::string& coinbaseDocumentDataJson,
-                           const std::vector<uint8_t>& signatureBytes,
+                           const std::string_view coinbaseDocumentDataJson,
+                           const bsv::span<const uint8_t> signatureBytes,
                            const COutPoint& tx_out,
                            int32_t blockHeight,
                            bool dynamic)
 {
 
     UniValue coinbaseDocumentData;
-    if(!coinbaseDocumentData.read(coinbaseDocumentDataJson))
+    if(!coinbaseDocumentData.read(coinbaseDocumentDataJson.data(),
+                                  coinbaseDocumentDataJson.size()))
     {
         LogPrint(BCLog::TXNVAL,
                  "Cannot parse coinbase document in coinbase transaction with "
@@ -430,17 +450,14 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
     // minerId
     for(size_t i = 0; i < tx.vout.size(); i++)
     {
+        const bsv::span<const uint8_t> script{tx.vout[i].scriptPubKey};
         // OP_FALSE OP_RETURN 0x04 0xAC1EED88 OP_PUSHDATA Coinbase Document
-        if(IsMinerId(tx.vout[i].scriptPubKey))
+        if(IsMinerId(script))
         {
-            const CScript& pubKey = tx.vout[i].scriptPubKey;
-
-            std::vector<uint8_t> msgBytes{};
-            opcodetype opcodeRet{};
             // MinerId coinbase documents starts at 7th byte of the output
             // message
-            CScript::const_iterator pc{pubKey.begin() + 7};
-            if(!pubKey.GetOp(pc, opcodeRet, msgBytes))
+            bsv::instruction_iterator it{script.last(script.size() - 7)};
+            if(!it.valid())
             {
                 LogPrint(
                     BCLog::TXNVAL,
@@ -451,7 +468,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                 continue;
             }
 
-            if(msgBytes.empty())
+            if(it->operand().empty())
             {
                 LogPrint(BCLog::TXNVAL,
                          "Invalid data for MinerId protocol from script with "
@@ -460,10 +477,10 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                          i);
                 continue;
             }
+            const std::string_view static_cd{to_sv(it->operand())};
 
-            std::vector<uint8_t> signature{};
-
-            if(!pubKey.GetOp(pc, opcodeRet, signature))
+            ++it;
+            if(!it.valid())
             {
                 LogPrint(
                     BCLog::TXNVAL,
@@ -474,7 +491,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                 continue;
             }
 
-            if(signature.empty())
+            if(it->operand().empty())
             {
                 LogPrint(BCLog::TXNVAL,
                          "Invalid data for MinerId signature from script with "
@@ -484,37 +501,38 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                 continue;
             }
 
-            std::string staticCoinbaseDocumentJson =
-                std::string(msgBytes.begin(), msgBytes.end());
-
             if(parseCoinbaseDocument(minerId,
-                                     staticCoinbaseDocumentJson,
-                                     signature,
+                                     static_cd,
+                                     it->operand(),
                                      COutPoint(tx.GetId(), i),
                                      blockHeight,
                                      false))
             {
-                // Static document of MinerId is successful. Check dynamic
-                // MinerId.
-                if(pc >= tx.vout[i].scriptPubKey.end())
+                // Static document of MinerId is successful. Check
+                // dynamic MinerId.
+                ++it;
+
+                if(!it.valid())
                 {
-                    // Dynamic miner id is empty. We found first successful
-                    // miner id - we can stop looking.
+                    // Dynamic miner id is empty. We found first
+                    // successful miner id - we can stop looking.
                     return minerId;
                 }
 
-                if(!pubKey.GetOp(pc, opcodeRet, msgBytes))
+                if(!it.valid())
                 {
                     LogPrint(BCLog::TXNVAL,
                              "Failed to extract data for dynamic document of "
                              "minerId from script with txid %s and output "
-                             "number %d.\n",
+                             " number % d.\n",
                              tx.GetId().ToString(),
                              i);
                     continue;
                 }
+                const string_view dynamic_cd{to_sv(it->operand())};
 
-                if(!pubKey.GetOp(pc, opcodeRet, signature))
+                ++it;
+                if(!it.valid())
                 {
                     LogPrint(BCLog::TXNVAL,
                              "Failed to extract signature of dynamic document "
@@ -525,20 +543,17 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                     continue;
                 }
 
-                std::string dynamicCoinbaseDocumentJson =
-                    std::string(msgBytes.begin(), msgBytes.end());
                 if(parseCoinbaseDocument(minerId,
-                                         dynamicCoinbaseDocumentJson,
-                                         signature,
+                                         dynamic_cd,
+                                         it->operand(),
                                          COutPoint(tx.GetId(), i),
                                          blockHeight,
                                          true))
                 {
                     return minerId;
                 }
-
-                // Successful static coinbase doc, but failed dynamic coinbase
-                // doc: let's reset miner id.
+                // Successful static coinbase doc, but failed dynamic
+                // coinbase doc: let's reset miner id.
                 minerId = MinerId();
             }
         }

@@ -87,7 +87,6 @@ void to_json(std::ostream& os, const CoinbaseDocument::DataRef& dataRef)
 
     os << R"(, "txid": ")" << dataRef.txid.GetHex() << '"';
     os << R"(, "vout": )" << dataRef.vout;
-    // cjg os << R"(, "compress": "gzip" })" << dataRef.;
     os << '}';
 }
 

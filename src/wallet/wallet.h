@@ -12,7 +12,7 @@
 #include "streams.h"
 #include "tinyformat.h"
 #include "ui_interface.h"
-#include "utilstrencodings.h"
+//#include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "wallet/crypter.h"
 #include "wallet/rpcwallet.h"

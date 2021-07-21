@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "coinbase_doc.h"
@@ -51,7 +52,7 @@ public:
     // only for logging purposes. Also set staticDocumentJson_ and
     // signatureStaticDocument_ if validation was successful.
     bool SetStaticCoinbaseDocument(const UniValue& coinbaseDocumentData,
-                                   const std::vector<uint8_t>& signatureBytes,
+                                   const bsv::span<const uint8_t> signature,
                                    const COutPoint& tx_out,
                                    int32_t blockHeight);
 
@@ -59,7 +60,7 @@ public:
     // only if it is valid (if method returns true). Parameter tx_out is used
     // only for logging purposes.
     bool SetDynamicCoinbaseDocument(const UniValue& coinbaseDocumentData,
-                                    const std::vector<uint8_t>& signatureBytes,
+                                    const bsv::span<const uint8_t> signature,
                                     const COutPoint& tx_out,
                                     int32_t blockHeight);
 
@@ -78,8 +79,8 @@ private:
 std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight);
 
 bool parseCoinbaseDocument(MinerId&,
-                           const std::string& coinbaseDocumentDataJson,
-                           const std::vector<uint8_t>& signatureBytes,
+                           const std::string_view coinbaseDocumentDataJson,
+                           const bsv::span<const uint8_t> signatureBytes,
                            const COutPoint& tx_out,
                            int32_t blockHeight,
                            bool dynamic);

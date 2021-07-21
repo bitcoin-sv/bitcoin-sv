@@ -170,9 +170,17 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     return 1;
 }
 
-bool CPubKey::Verify(const uint256 &hash,
-                     const std::vector<uint8_t> &vchSig) const {
-    if (!IsValid()) return false;
+bool CPubKey::Verify(const uint256& hash,
+                     const std::vector<uint8_t>& vchSig) const
+{
+    return Verify(hash, bsv::span<const uint8_t>{vchSig.data(), vchSig.size()});
+}
+
+bool CPubKey::Verify(const uint256& hash,
+                     const bsv::span<const uint8_t> signature) const
+{
+    if(!IsValid())
+        return false;
     secp256k1_pubkey pubkey;
     secp256k1_ecdsa_signature sig;
     if(!secp256k1_ec_pubkey_parse(
@@ -180,11 +188,14 @@ bool CPubKey::Verify(const uint256 &hash,
     {
         return false;
     }
-    if (vchSig.size() == 0) {
+    if(signature.size() == 0)
+    {
         return false;
     }
-    if(!ecdsa_signature_parse_der_lax(
-           secp256k1_context_verify.get(), &sig, &vchSig[0], vchSig.size()))
+    if(!ecdsa_signature_parse_der_lax(secp256k1_context_verify.get(),
+                                      &sig,
+                                      &signature[0],
+                                      signature.size()))
     {
         return false;
     }

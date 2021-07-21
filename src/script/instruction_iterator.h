@@ -4,68 +4,72 @@
 
 #pragma once
 
+#include <tuple>
+
 #include "instruction.h"
+#include <string_view>
 
 namespace bsv
 {
-    // Returns: opcode, offset to operand (see OP_PUSHDATA*), length of operand
-    inline constexpr std::tuple<opcodetype, int8_t, size_t>
+    // Returns: status, opcode, offset to operand (see OP_PUSHDATA*), length of operand
+    inline constexpr std::tuple<bool, opcodetype, int8_t, size_t>
     decode_instruction(span<const uint8_t> s)
     {
         if(s.empty())
-            return {OP_INVALIDOPCODE, 0, 0};
+            return {false, OP_INVALIDOPCODE, 0, 0};
 
         const opcodetype opcode{static_cast<opcodetype>(s[0])};
         if(opcode > OP_PUSHDATA4 || opcode == 0)
-            return std::make_tuple(opcode, 0, 0);
+            return std::make_tuple(true, opcode, 0, 0);
 
         s = {s.last(s.size() - 1)};
 
         if(s.empty())
-            return {OP_INVALIDOPCODE, 0, 0};
+            return {false, OP_INVALIDOPCODE, 0, 0};
 
         // for opcodes 0x0 to 0x75 the opcode is the length of
         // data to be pushed onto the stack
         if(opcode < OP_PUSHDATA1)
         {
             if(opcode <= s.size())
-                return {opcode, 0, opcode};
+                return {true, opcode, 0, opcode};
             else
-                return {OP_INVALIDOPCODE, 0, 0};
+                return {false, OP_INVALIDOPCODE, 0, 0};
         }
 
         if(opcode == OP_PUSHDATA1)
         {
             if(s[0] > s.size() - 1)
-                return {OP_INVALIDOPCODE, 0, 0};
+                return {false, OP_INVALIDOPCODE, 0, 0};
 
-            return {opcode, 1, s[0]};
+            return {true, opcode, 1, s[0]};
         }
 
         if(opcode == OP_PUSHDATA2)
         {
             if(s.size() < 2)
-                return {OP_INVALIDOPCODE, 0, 0};
+                return {false, OP_INVALIDOPCODE, 0, 0};
 
             const auto operand_len{ReadLE16(s.data())};
             if(operand_len > s.size() - 2)
-                return {OP_INVALIDOPCODE, 0, 0};
+                return {false, OP_INVALIDOPCODE, 0, 0};
 
-            return {opcode, 2, operand_len};
+            return {true, opcode, 2, operand_len};
+
         }
 
         if(opcode == OP_PUSHDATA4)
         {
             if(s.size() < 4)
-                return {OP_INVALIDOPCODE, 0, 0};
+                return {false, OP_INVALIDOPCODE, 0, 0};
 
             const auto operand_len{ReadLE32(s.data())};
             if(operand_len > s.size() - 4)
-                return {OP_INVALIDOPCODE, 0, 0};
+                return {false, OP_INVALIDOPCODE, 0, 0};
 
-            return {opcode, 4, operand_len};
+            return {true, opcode, 4, operand_len};
         }
-        return {opcode, 0, 0};
+        return {true, opcode, 0, 0};
     }
 
     class instruction_iterator
@@ -73,23 +77,30 @@ namespace bsv
 
     {
         span<const uint8_t> span_;
+        bool valid_{};
         instruction instruction_;
 
-        constexpr instruction next(span<const uint8_t> s)
+        constexpr std::tuple<bool, instruction> next(span<const uint8_t> s)
         {
-            const auto [opcode, offset, len]{decode_instruction(s)};
-            return instruction{opcode, offset, s.data() + 1 + offset, len};
+            const auto [status, opcode, offset, len]{decode_instruction(s)};
+            return {status, instruction{opcode, offset, s.data() + 1 + offset, len}};
         }
 
     public:
         constexpr instruction_iterator(span<const uint8_t> s) noexcept : 
-            span_{s}, 
-            instruction_(next(s))
-        {}
+            span_{s} 
+        {
+            const auto& [valid, instruction] = next(s);
+            valid_ = valid;
+            instruction_ = instruction;
+        }
+
+        constexpr bool valid() const noexcept { return valid_; }
+        const uint8_t* data() const { return span_.data(); }
 
         constexpr instruction_iterator& operator++() noexcept
         {
-            if(instruction_.opcode() == OP_INVALIDOPCODE)
+            if(!valid())
             {
                 // advance to end of script range
                 span_ = span_.last(0);
@@ -100,7 +111,9 @@ namespace bsv
             const auto delta{1 + instruction_.offset() +
                              instruction_.operand().size()};
             span_ = span_.last(span_.size() - delta);
-            instruction_ = next(span_);
+            const auto& [valid, instruction] = next(span_);
+            valid_ = valid;
+            instruction_ = instruction;
             return *this;
         }
 
@@ -134,5 +147,10 @@ namespace bsv
             return !(operator==(other));
         }
     };
-}
 
+    inline std::string_view to_sv(bsv::span<const uint8_t> s)
+    {
+        return std::string_view{reinterpret_cast<const char*>(s.data()),
+                                s.size()};
+    }
+}
