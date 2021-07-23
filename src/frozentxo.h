@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <string>
 
+class CBlockIndex;
 class COutPoint;
 class CTransaction;
 class uint256;
@@ -33,12 +34,7 @@ public:
     // NOTE: previousActiveBlockHash must remain stable until this class instance is destroyed
     // NOTE: blockHash must remain stable until this class instance is destroyed
     //       nHeight is the block height used to check if TXO is frozen. Typically this is the height of block that is currently being validated.
-    CFrozenTXOCheck(
-        std::int32_t nHeight,
-        const std::string& source,
-        const uint256& previousActiveBlockHash,
-        std::int64_t receivedTime,
-        const uint256& blockHash);
+    CFrozenTXOCheck( const CBlockIndex& blockIndex );
 
     /**
      * Helper base class used by Check() method
@@ -73,6 +69,8 @@ public:
      *                 call to GetTxData() or until Check() method returns.
      *                 Value TxData::receivedTime is the time when the tx was received and is used only
      *                 in case mReceivedTime is set to 0.
+     *
+     * NOTE: Function is a no-op if mBlockIndex->IsInExplicitSoftConsensusFreeze() returns true.
      */
     bool Check(const COutPoint& outpoint, TxGetter& txGetter);
 
@@ -80,6 +78,8 @@ public:
      * Same as above, except that transaction reference and the time it was received are provided directly.
      */
     bool Check(const COutPoint& outpoint, const CTransaction& tx, std::int64_t receivedTime = 0);
+
+    bool IsCheckOnBlock() const { return mBlockIndex != nullptr; }
 
     /**
      * Wrapper for CFrozenTXODB::Get_max_FrozenTXOData_enforceAtHeight_stop()
@@ -93,7 +93,7 @@ private:
     std::int64_t mReceivedTime{0};
 
     // only used for block level validation
-    const uint256* mBlockHash{nullptr};
+    const CBlockIndex* mBlockIndex{ nullptr };
 };
 
 #endif // BITCOIN_FROZENTXO_H

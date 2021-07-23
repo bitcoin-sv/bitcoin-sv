@@ -130,6 +130,8 @@ public:
     virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
     virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
 
+    virtual std::int32_t GetSoftConsensusFreezeDuration() const = 0;
+
 protected:
     ~Config() = default;
 };
@@ -236,6 +238,8 @@ public:
     virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
+
+    virtual bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) = 0;
 
 protected:
     ~ConfigInit() = default;
@@ -484,6 +488,9 @@ public:
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override;
     uint64_t GetDoubleSpendQueueMaxMemory() const override;
 
+    bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) override;
+    std::int32_t GetSoftConsensusFreezeDuration() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset() override;
@@ -617,6 +624,8 @@ private:
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
+
+    std::int32_t mSoftConsensusFreezeDuration;
 
     // Only for values that can change in runtime
     mutable std::shared_mutex configMtx{};
@@ -1083,6 +1092,16 @@ public:
     bool GetDisableBIP30Checks() const override
     {
         return true;
+    }
+
+    bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) override
+    {
+        return true;
+    }
+
+    std::int32_t GetSoftConsensusFreezeDuration() const override
+    {
+        return std::numeric_limits<std::int32_t>::max();
     }
 
     void Reset() override;

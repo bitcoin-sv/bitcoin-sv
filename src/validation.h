@@ -208,6 +208,8 @@ constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
 /** Default maximum size of script batches processed by a single checker thread */
 constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
 
+constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
+
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;

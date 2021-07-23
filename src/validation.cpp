@@ -2680,7 +2680,9 @@ static void InvalidChainFound(const CBlockIndex *pindexNew)
 
 static void InvalidBlockFound(CBlockIndex *pindex,
                               const CValidationState &state) {
-    if (!state.CorruptionPossible()) {
+    if (state.GetRejectCode() != REJECT_SOFT_CONSENSUS_FREEZE &&
+        !state.CorruptionPossible())
+    {
         pindex->ModifyStatusWithFailed(mapBlockIndex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);
@@ -2750,7 +2752,9 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
             return
                 state.Invalid(
                     false,
-                    REJECT_INVALID,
+                    frozenTXOCheck.IsCheckOnBlock() ?
+                        REJECT_SOFT_CONSENSUS_FREEZE :
+                        REJECT_INVALID,
                     "bad-txns-inputs-frozen",
                     "tried to spend blacklisted input");
         }
@@ -3446,12 +3450,7 @@ private:
         CDiskTxPos pos(pindex->GetBlockPos(),
                        GetSizeOfCompactSize(block.vtx.size()));
 
-        CFrozenTXOCheck frozenTXOCheck{
-            pindex->GetHeight(),
-            pindex->GetBlockSource().ToString(),
-            pindex->GetPrev()->GetBlockHash(),
-            pindex->GetHeaderReceivedTime(),
-            pindex->GetBlockHash()};
+        CFrozenTXOCheck frozenTXOCheck{ *pindex };
 
         for (size_t i = 0; i < block.vtx.size(); i++) {
             auto& txRef = block.vtx[i];
@@ -3538,6 +3537,13 @@ private:
                 }
                 else if (!res.value())
                 {
+                    if (state.GetRejectCode() == REJECT_SOFT_CONSENSUS_FREEZE)
+                    {
+                        softConsensusFreeze(
+                            *pindex,
+                            config.GetSoftConsensusFreezeDuration() );
+                    }
+
                     return error("ConnectBlock(): CheckInputs on %s failed with %s",
                                  tx.GetId().ToString(), FormatStateMessage(state));
                 }
@@ -3638,6 +3644,26 @@ private:
         }
 
         return true;
+    }
+
+    void softConsensusFreeze( CBlockIndex& index, std::int32_t duration )
+    {
+        LogPrintf(
+            "Soft consensus freezing block %s for %d blocks.\n",
+            index.GetBlockHash().ToString(),
+            duration );
+
+        index.SoftConsensusFreeze( duration );
+
+        BlockIndexWithDescendants blocks{
+            &index,
+            mapBlockIndex,
+            index.GetHeight() + duration };
+
+        for(auto* item=blocks.Root()->Next(); item!=nullptr; item=item->Next())
+        {
+            item->BlockIndex()->UpdateSoftConsensusFreezeFromParent();
+        }
     }
 
     const Config& config;
@@ -4251,7 +4277,8 @@ static CBlockIndex *FindMostWorkChain() {
                     return nullptr;
                 }
 
-                if((*it)->IsSoftRejected())
+                if ((*it)->IsSoftRejected() ||
+                    (*it)->IsInSoftConsensusFreeze())
                 {
                     // This block is marked as soft rejected and should not be considered.
                     // Try the next one.
@@ -4325,6 +4352,14 @@ static CBlockIndex *FindMostWorkChain() {
 /** Delete all entries in setBlockIndexCandidates that are worse than the
  * current tip. */
 static void PruneBlockIndexCandidates() {
+    if (chainActive.Tip()->IsInSoftConsensusFreeze())
+    {
+        // Wait with the cleaning until the tip is back in the "guaranteed
+        // not soft rejected" zone and we no longer expect that reorg will
+        // fall back on a block that should not be at the tip.
+        return;
+    }
+
     // Note that we can't delete the current block itself, as we may need to
     // return to it later in case a reorganization to a better block fails.
     std::set<CBlockIndex *, CBlockIndexWorkComparator>::iterator it =
@@ -4342,6 +4377,36 @@ static void PruneBlockIndexCandidates() {
     // Either the current tip or a successor of it we're working towards is left
     // in setBlockIndexCandidates.
     assert(!setBlockIndexCandidates.empty());
+}
+
+static std::optional<bool> RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+    const Config& config,
+    const CJournalChangeSetPtr& changeSet,
+    CValidationState& state,
+    DisconnectedBlockTransactions& disconnectpool )
+{
+    std::int32_t disconnectCounter = 0;
+    const CBlockIndex* walkIndex = chainActive.Tip();
+    while ( walkIndex->IsInSoftConsensusFreeze() )
+    {
+        if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+            // This is likely a fatal error, but keep the mempool consistent,
+            // just in case. Only remove from the mempool in this case.
+            mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+
+            return {};
+        }
+
+        ++disconnectCounter;
+        walkIndex = chainActive.Tip();
+    }
+
+    LogPrintf(
+        "Disconnected %d consensus frozen blocks back to tip %s.\n",
+        disconnectCounter,
+        chainActive.Tip()->GetBlockHash().ToString() );
+
+    return disconnectCounter;
 }
 
 /**
@@ -4372,10 +4437,16 @@ static bool ActivateBestChainStep(
             bool fBlocksDisconnected = false;
             bool fDisconnectFailed = false;
             DisconnectedBlockTransactions disconnectpool;
+            CValidationState& state;
         public:
-            RAIIUpdateMempool(const Config& c, const CJournalChangeSetPtr& cs, const CBlockIndex* pindexFork, CValidationState& state) 
+            RAIIUpdateMempool(
+                const Config& c,
+                const CJournalChangeSetPtr& cs,
+                const CBlockIndex* pindexFork,
+                CValidationState& st)
                 :config{c}
                 ,changeSet{cs}
+                ,state{ st }
             {
                 // we are diconnecting until we reach the fork point
                 while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
@@ -4388,7 +4459,19 @@ static bool ActivateBestChainStep(
                 } 
             }
 
-            ~RAIIUpdateMempool() { UpdateIfNeeded(); }
+            ~RAIIUpdateMempool()
+            {
+                if (std::uncaught_exceptions())
+                {
+                    RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+                        config,
+                        changeSet,
+                        state,
+                        disconnectpool );
+                }
+
+                UpdateIfNeeded();
+            }
         
             void UpdateIfNeeded()
             {
@@ -4398,6 +4481,8 @@ static bool ActivateBestChainStep(
                     fBlocksDisconnected = false;
                 }
             }
+
+            void MarkBlocksDisconnected() { fBlocksDisconnected = true; }
 
             DisconnectedBlockTransactions& GetDisconnectpool() {return disconnectpool;}
         
@@ -4460,8 +4545,26 @@ static bool ActivateBestChainStep(
                         connectTrace,
                         reorgUpdate.GetDisconnectpool(),
                         changeSet,
-                        pindexMostWork->GetChainWork()))
+                        pindexMostWork->GetChainWork() ))
                 {
+                    auto result =
+                        RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+                            config,
+                            changeSet,
+                            state,
+                            reorgUpdate.GetDisconnectpool() );
+                    if (result.has_value())
+                    {
+                        if (result.value() == true)
+                        {
+                            reorgUpdate.MarkBlocksDisconnected();
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+
                     if (state.IsInvalid()) {
                         // The block violates a consensus rule.
                         if (!state.CorruptionPossible()) {
@@ -4557,7 +4660,8 @@ static CBlockIndex* ConsiderBlockForMostWorkChain(
 
     if(mostWork.GetChainWork() > indexOfNewBlock->GetChainWork()
         || !indexOfNewBlock->IsValid(BlockValidity::TRANSACTIONS)
-        || !indexOfNewBlock->GetChainTx())
+        || !indexOfNewBlock->GetChainTx()
+        || indexOfNewBlock->IsInSoftConsensusFreeze())
     {
         return &mostWork;
     }
@@ -4942,6 +5046,19 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         // Also disconnect any blocks from tip that may have become
         // soft rejected because the height is now lower
         if(!DisconnectSoftRejectedTipsNL(config, state, disconnectpool, changeSet).has_value())
+        {
+            // Disconnecting tip has failed.
+            mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+            return false;
+        }
+
+        auto result =
+            RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+                config,
+                changeSet,
+                state,
+                disconnectpool );
+        if (!result.has_value())
         {
             // Disconnecting tip has failed.
             mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
