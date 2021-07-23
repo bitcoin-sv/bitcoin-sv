@@ -1086,6 +1086,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                   "disabled and block is frozen indefinitely).",
                   DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
 
+    strUsage += HelpMessageOpt(
+        "-enableassumewhitelistedblockdepth=<n>",
+        strprintf("Assume confiscation transaction to be whitelisted if it is in block that is at least as deep under tip as specified by option 'assumewhitelistedblockdepth'. (default: %d)",
+            DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH));
+
+    strUsage += HelpMessageOpt(
+        "-assumewhitelistedblockdepth=<n>",
+        strprintf("Set minimal depth of block under tip at which confiscation transaction is assumed to be whitelisted. (default: %d)",
+            DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -2427,6 +2437,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         {
             return InitError(err);
         }
+    }
+
+    config.SetEnableAssumeWhitelistedBlockDepth(gArgs.GetBoolArg("-enableassumewhitelistedblockdepth", DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH));
+    if(std::string err; !config.SetAssumeWhitelistedBlockDepth(gArgs.GetArg("-assumewhitelistedblockdepth", DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH), &err)) {
+        return InitError(err);
     }
 
 #if ENABLE_ZMQ

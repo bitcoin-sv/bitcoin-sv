@@ -117,6 +117,8 @@ void GlobalConfig::Reset()
 
     data->invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     data->invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+    data->enableAssumeWhitelistedBlockDepth = DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH;
+    data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
     // Block download
     data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
@@ -1203,6 +1205,38 @@ bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::s
 InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
 {
     return data->invalidTxFileSinkEvictionPolicy;
+}
+
+void GlobalConfig::SetEnableAssumeWhitelistedBlockDepth(bool enabled)
+{
+    data->enableAssumeWhitelistedBlockDepth = enabled;
+}
+
+bool GlobalConfig::GetEnableAssumeWhitelistedBlockDepth() const
+{
+    return data->enableAssumeWhitelistedBlockDepth;
+}
+
+bool GlobalConfig::SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err)
+{
+    // Note that every value is logically correct (e.g. -1 means one block above current tip).
+    // Here we just check for non-sensical values.
+    if(depth<0 || depth>INT32_MAX)
+    {
+        if(err)
+        {
+            *err = "Invalid value ("+std::to_string(depth)+") for 'assume whitelisted block depth' policy";
+        }
+        return false;
+    }
+
+    data->assumeWhitelistedBlockDepth = depth;
+    return true;
+}
+
+int32_t GlobalConfig::GetAssumeWhitelistedBlockDepth() const
+{
+    return data->assumeWhitelistedBlockDepth;
 }
 
 // Safe mode activation

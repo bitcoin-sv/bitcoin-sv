@@ -2507,22 +2507,56 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
         return state.Invalid(false, 0, "", "Inputs unavailable");
     }
 
+    // Are we checking inputs for confiscation transaction?
+    const bool isConfiscationTx = CFrozenTXOCheck::IsConfiscationTx(tx);
+    if(isConfiscationTx)
+    {
+        // Validate contents of confiscation transaction
+        if(!CFrozenTXOCheck::ValidateConfiscationTxContents(tx))
+        {
+            return
+                state.Invalid(
+                    false,
+                    REJECT_INVALID,
+                    "bad-ctx-invalid",
+                    "confiscation transaction is invalid");
+        }
+
+        // Confiscation transaction must be whitelisted and valid at given height
+        if(!frozenTXOCheck.CheckConfiscationTxWhitelisted(tx))
+        {
+            return
+                state.Invalid(
+                    false,
+                    REJECT_INVALID,
+                    "bad-ctx-not-whitelisted",
+                    "confiscation transaction is not whitelisted");
+        }
+    }
+
     Amount nValueIn(0);
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
 
-        if(!frozenTXOCheck.Check(prevout, tx))
+        if(!isConfiscationTx)
         {
-            return
-                state.Invalid(
-                    false,
+            // For normal transaction no input must be frozen
+            if(!frozenTXOCheck.Check(prevout, tx))
+            {
+                return
+                    state.Invalid(
+                        false,
                     frozenTXOCheck.IsCheckOnBlock() ?
                         REJECT_SOFT_CONSENSUS_FREEZE :
                         REJECT_INVALID,
-                    "bad-txns-inputs-frozen",
-                    "tried to spend blacklisted input");
+                        "bad-txns-inputs-frozen",
+                        "tried to spend blacklisted input");
+            }
         }
+        // For confiscation transaction all inputs must be frozen, but this is implicitly guaranteed here,
+        // since confiscation transaction is whitelisted and consequently all of its inputs are on Confiscation
+        // blacklist and therefore consensus frozen on every height.
 
         auto coin = inputs.GetCoin(prevout);
         assert(coin.has_value() && !coin->IsSpent());
@@ -2711,6 +2745,13 @@ std::optional<bool> CheckInputs(
         return false;
     }
 
+    if(CFrozenTXOCheck::IsConfiscationTx(tx))
+    {
+        // If we're checking inputs for confiscation transaction, scripts are valid by definition and do not need to be checked.
+        // Note that here we already know that confiscation transaction is valid (whitelisted, valid contents, unspent inputs...) because this was checked by CheckTxInputs() above.
+        return true;
+    }
+
     if (pvChecks) 
     {
         pvChecks->reserve(tx.vin.size());
@@ -2883,6 +2924,7 @@ public:
         CValidationState& state_,
         CBlockIndex* pindex_,
         CCoinsViewCache& view_,
+        std::int32_t mostWorkBlockHeight_,
         const arith_uint256& mostWorkOnChain_,
         bool fJustCheck_ )
     : config{ config_ }
@@ -2890,6 +2932,7 @@ public:
     , state{ state_ }
     , pindex{ pindex_ }
     , view{ view_ }
+    , mostWorkBlockHeight{ mostWorkBlockHeight_ }
     , mostWorkOnChain{ mostWorkOnChain_ }
     , fJustCheck{ fJustCheck_ }
     , parallelBlockValidation{ parallelBlockValidation_ }
@@ -3036,7 +3079,7 @@ public:
                 CCoinsViewCache& mView;
             } csGuard{ view };
 
-            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo ))
+            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo, mostWorkBlockHeight ))
             {
                 return false;
             }
@@ -3048,7 +3091,7 @@ public:
         }
         else
         {
-            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo ))
+            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo, mostWorkBlockHeight ))
             {
                 return false;
             }
@@ -3136,7 +3179,8 @@ private:
         int64_t nTime2,
         std::vector<std::pair<uint256, CDiskTxPos>>& vPos,
         size_t& nInputs,
-        CBlockUndo& blockundo )
+        CBlockUndo& blockundo,
+        std::int32_t mostWorkBlockHeight )
     {
         vPos.reserve(block.vtx.size());
         blockundo.vtxundo.reserve(block.vtx.size() - 1);
@@ -3216,6 +3260,38 @@ private:
                        GetSizeOfCompactSize(block.vtx.size()));
 
         CFrozenTXOCheck frozenTXOCheck{ *pindex };
+        if( config.GetEnableAssumeWhitelistedBlockDepth() )
+        {
+            if( (mostWorkBlockHeight - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() )
+            {
+                // This block is deep enough under the block with most work to assume that a confiscation transaction is whitelisted
+                // even if its TxId is not present in our frozen TXO database.
+                // Note that block with most work is only available after its contents have already been downloaded.
+                // Consequently this check may not work during IBD where descendant blocks have not been downloaded so that
+                // block with most work is the same as block currently being validated.
+                // Checking against most work block, however, does provide a guarantee that this block extends the chain towards
+                // the block with most work, which means that (small) reorgs are handled properly.
+                frozenTXOCheck.DisableEnforcingConfiscationTransactionChecks();
+            }
+            else if( const auto& bestHeader = mapBlockIndex.GetBestHeader();
+                     (bestHeader.GetHeight() - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() &&
+                     bestHeader.GetAncestor(pindex->GetHeight()) == pindex )
+            {
+                // This block is deep enough under the block with best known header to assume that a confiscation transaction is whitelisted
+                // even if its TxId is not present in our frozen TXO database.
+                // Best known header is always available, but this block may not necessarily extend the chain towards it (e.g. in
+                // case of soft consensus freeze). Therefore the ancestor check also needs to be performed here.
+                // But checking depth against the best known header will work properly during IBD, which is the primary use case for
+                // configuration option -assumewhitelistedblockdepth.
+                frozenTXOCheck.DisableEnforcingConfiscationTransactionChecks();
+            }
+            // NOTE: It is also possible to have a large reorg towards the block whose header is not the best and also not have block
+            //       with most work available during reorg. In this case confiscation transactions in blocks on new chain will not
+            //       not be assumed whitelisted (even if block is deep enough) because here we do not yet know how deep the block is
+            //       in the new chain.
+            //       Such cases are rare and are assumed to be handled manually by the node operator in the same way as if a new block
+            //       with non-whitelisted confiscation transaction is mined.
+        }
 
         for (size_t i = 0; i < block.vtx.size(); i++) {
             auto& txRef = block.vtx[i];
@@ -3438,6 +3514,7 @@ private:
     CValidationState& state;
     CBlockIndex* pindex;
     CCoinsViewCache& view;
+    std::int32_t mostWorkBlockHeight;
     const arith_uint256& mostWorkOnChain;
     bool fJustCheck;
     bool parallelBlockValidation;
@@ -3470,6 +3547,7 @@ static bool ConnectBlock(
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
+    std::int32_t mostWorkBlockHeight,
     const arith_uint256& mostWorkOnChain,
     bool fJustCheck = false)
 {
@@ -3480,6 +3558,7 @@ static bool ConnectBlock(
         state,
         pindex,
         view,
+        mostWorkBlockHeight,
         mostWorkOnChain,
         fJustCheck };
 
@@ -3889,6 +3968,7 @@ static bool ConnectTip(
     ConnectTrace &connectTrace,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet,
+    std::int32_t mostWorkBlockHeight,
     const arith_uint256& mostWorkOnChain)
 {
     auto guard =
@@ -3934,6 +4014,7 @@ static bool ConnectTip(
                 state,
                 pindexNew,
                 pCoinsTipSpan,
+                mostWorkBlockHeight,
                 mostWorkOnChain);
 
         // re-enable tracing of events if it was disabled
@@ -4333,6 +4414,7 @@ static bool ActivateBestChainStep(
                         connectTrace,
                         reorgUpdate.GetDisconnectpool(),
                         changeSet,
+                        pindexMostWork->GetHeight(),
                         pindexMostWork->GetChainWork() ))
                 {
                     auto result =
@@ -6155,7 +6237,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
     }
     auto source = task::CCancellationSource::Make();
 
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, indexDummy.get(), viewNew, indexDummy->GetChainWork(), true))
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, indexDummy.get(), viewNew, chainActive.Height(), indexDummy->GetChainWork(), true))
     {
         return false;
     }
@@ -6512,7 +6594,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                     pindex->GetHeight(), pindex->GetBlockHash().ToString());
             }
             auto source = task::CCancellationSource::Make();
-            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, pindex->GetChainWork()))
+            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, chainActive.Height(), pindex->GetChainWork()))
             {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
