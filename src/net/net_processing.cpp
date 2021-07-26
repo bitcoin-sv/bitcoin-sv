@@ -196,7 +196,6 @@ void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectI
             std::forward_as_tuple(nodeid),
             std::forward_as_tuple(std::make_shared<CNodeState>(addr, std::move(addrName))));
     }
-
     if (!pnode->fInbound) {
         if(connectInfo && connectInfo->fNewStream) {
             PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
@@ -1867,6 +1866,18 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
+        // Create and send the authch network message.
+        uint256 rndMsgHash { GetRandHash() };
+        {
+            LOCK(pfrom->cs_authconn);
+            pfrom->authConnData.msgHash = rndMsgHash;
+        }
+        using namespace authconn;
+        connman.
+            PushMessage(pfrom, msgMaker.Make(NetMsgType::AUTHCH, AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash));
+        // Add a log message.
+        LogPrint(BCLog::NETCONN, "Sent authch message (version: %d, nMsgLen: %d, msg: %s), to peer=%d\n",
+            AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash.ToString(), pfrom->id);
     }
     else {
         LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
@@ -1895,6 +1906,191 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
                                           nCMPCTBLOCKVersion));
     }
     pfrom->fSuccessfullyConnected = true;
+}
+
+/**
+* Process authch message.
+*/
+static bool ProcessAuthChMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
+    const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
+{
+    // Skip the message if the AuthConn has already been established.
+    if (pfrom->fAuthConnEstablished) {
+        return true;
+    }
+    using namespace authconn;
+    uint32_t nVersion {0};
+    uint32_t nMsgLen {0};
+    uint256 msg {};
+
+    try {
+        // Read data from the message.
+        vRecv >> nVersion;
+        vRecv >> nMsgLen;
+        vRecv >> msg;
+        // Add a log message.
+        LogPrint(BCLog::NETCONN, "Got authch message (version: %d, nMsgLen: %d, msg: %s), from peer=%d\n",
+            nVersion, nMsgLen, msg.ToString(), pfrom->id);
+        if (AUTHCH_V1 != nVersion) {
+            throw std::runtime_error("Unsupported authch message version= "+ std::to_string(AUTHCH_V1));
+        }
+        // If the inbound connection is detected then it means that our node is the Connection Acceptor.
+        if (pfrom->fInbound) {
+            uint256 rndMsgHash { GetRandHash() };
+            {
+                LOCK(pfrom->cs_authconn);
+                pfrom->authConnData.msgHash = rndMsgHash;
+            }
+            // Send our authch message to the Connection Initiator.
+            connman.
+                PushMessage(pfrom, msgMaker.Make(NetMsgType::AUTHCH, AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash));
+            // Add a log message.
+            LogPrint(BCLog::NETCONN, "Sent authch message (version: %d, nMsgLen: %d, msg: %s), to peer=%d\n",
+                AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash.ToString(), pfrom->id);
+        }
+        /**
+         * Create signature.
+         *
+         * Make a hash of the following data and sign it:
+         * (a) the received auth challenge message, (b) the nonce we've generated.
+         */
+        // Generate our nonce.
+        uint64_t nClientNonce {0};
+        while (nClientNonce == 0) {
+            GetRandBytes((uint8_t *)&nClientNonce, sizeof(nClientNonce));
+        }
+        // Create the message to be signed.
+        uint256 hash {};
+        CHash256()
+            .Write(msg.begin(), msg.size()) // (a)
+            .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
+            .Finalize(hash.begin());
+        // Create the DER-encoded signature of the expected minimal size.
+        std::vector<uint8_t> vSign {};
+        do {
+            vSign.clear();
+            uint32_t randv {0};
+            GetRandBytes((uint8_t *)&randv, sizeof(randv));
+            if (!connman.SignAuthConnMsgHash(hash, vSign, randv)) {
+                throw std::runtime_error("Signature creation has failed.");
+            }
+        } while (!(vSign.size() >= SECP256K1_DER_SIGN_MIN_SIZE_IN_BYTES));
+        // Check if the signature is correct before sending it.
+        CPubKey pubKey { connman.GetAuthConnPubKey() };
+        if (!pubKey.Verify(hash, vSign)) {
+            throw std::runtime_error("Signature verification has failed.");
+        }
+        // Get the public key as a byte's vector.
+        std::vector<uint8_t> vPubKey { ToByteVector(pubKey) };
+        // Send the authresp message.
+        connman.
+            PushMessage(pfrom,
+                msgMaker.Make(NetMsgType::AUTHRESP, SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES, vPubKey, nClientNonce, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES, vSign));
+        // Add a log message.
+        LogPrint(BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
+            SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES, HexStr(vPubKey).c_str(), nClientNonce, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES, HexStr(vSign).c_str(), pfrom->id);
+    } catch(std::exception& e) {
+        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authch: (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, msgMaker
+            .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+    return true;
+}
+
+/**
+* Process authresp messages.
+*/
+static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& strCommand,
+    CDataStream& vRecv, CConnman& connman)
+{
+    // Skip the message if the AuthConn has already been established.
+    if (pfrom->fAuthConnEstablished) {
+        return true;
+    }
+    using namespace authconn;
+    uint32_t nPubKeyLen {0};
+    std::vector<uint8_t> vPubKey {};
+    uint64_t nClientNonce {0};
+    uint32_t nSignLen {0};
+    std::vector<uint8_t> vSign {};
+
+    try {
+        // Read data from the message.
+        vRecv >> nPubKeyLen;
+        if (SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES != nPubKeyLen) {
+            throw std::runtime_error("Incorrect nPubKeyLen="+std::to_string(nPubKeyLen));
+        }
+        vRecv >> LIMITED_BYTE_VEC(vPubKey, SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES);
+        if (vPubKey.size() != nPubKeyLen) {
+            throw std::runtime_error("Incorrect vPubKey.size()="+std::to_string(vPubKey.size()));
+        }
+        vRecv >> nClientNonce;
+        vRecv >> nSignLen;
+        if (SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES != nSignLen) {
+            throw std::runtime_error("Incorrect nSignLen=" + std::to_string(nSignLen));
+        }
+        vRecv >> LIMITED_BYTE_VEC(vSign, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES);
+        size_t vSignSize {vSign.size()};
+        if (!(SECP256K1_DER_SIGN_MIN_SIZE_IN_BYTES <= vSignSize && vSignSize <= nSignLen)) {
+            throw std::runtime_error("Incorrect vSign.size()="+std::to_string(vSignSize));
+        }
+        // Add a log message.
+        LogPrint(BCLog::NETCONN, "Got authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), from peer=%d\n",
+            nPubKeyLen, HexStr(vPubKey).c_str(), nClientNonce, nSignLen, HexStr(vSign).c_str(), pfrom->id);
+        /**
+         * Verify signature.
+         *
+         * Recreate the original message and verify the received signature using sender's public key.
+         * The message contains: (a) the authch challenge message, (b) the client's nonce.
+         */
+        uint256 msgHash {};
+        {
+            LOCK(pfrom->cs_authconn);
+            msgHash = pfrom->authConnData.msgHash;
+        }
+        // Check if the public key has been correctly recreated.
+        CPubKey recvPubKey(vPubKey);
+        if (!recvPubKey.IsValid()) {
+            throw std::runtime_error("Invalid public key data");
+        }
+        // Does the miner identified with the given miner ID have a good reputation?
+        // 1. true (if all listed conditions are met):
+        //    - the public key is present and marked as a valid key in the MinerID DB
+        //    - the miner identified by the public key passes further criterion, such as 'the M of the last N' check
+        // 2. false (if any of the listed conditions is met):
+        //    - the public key is not present or it is marked as an invalid key in the MinerID DB
+        //    - the miner identified by the public key doesn't pass further criterion, such as 'the M of the last N' check
+        if (g_minerIDs && !MinerHasGoodReputation(*g_minerIDs, recvPubKey)) {
+            LogPrint(BCLog::NETCONN, "Authentication has failed. The miner identified with the minerId= %s doesn't have a good reputation, peer= %d\n",
+                HexStr(ToByteVector(recvPubKey)).c_str(), pfrom->id);
+            return true;
+        }
+        // Recreate the message.
+        uint256 hash;
+        CHash256()
+            .Write(msgHash.begin(), msgHash.size()) // (a)
+            .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
+            .Finalize(hash.begin());
+        // Execute verification.
+        if (!recvPubKey.Verify(hash, vSign)) {
+            throw std::runtime_error("Signature verification has failed.");
+        }
+    } catch(std::exception& e) {
+        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    // Mark the connection as successfully established.
+    pfrom->fAuthConnEstablished = true;
+    // Add a log message.
+    LogPrint(BCLog::NETCONN, "Authenticated connection has been established with the remote peer=%d\n", pfrom->id);
+
+    return true;
 }
 
 /**
@@ -4003,6 +4199,14 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     if (strCommand == NetMsgType::VERACK) {
         ProcessVerAckMessage(pfrom, msgMaker, connman);
+    }
+
+    else if (strCommand == NetMsgType::AUTHCH) {
+        return ProcessAuthChMessage(pfrom, msgMaker, strCommand, vRecv, connman);
+    }
+
+    else if (strCommand == NetMsgType::AUTHRESP) {
+        return ProcessAuthRespMessage(pfrom, strCommand, vRecv, connman);
     }
 
     else if (!pfrom->fSuccessfullyConnected) {

@@ -2701,6 +2701,14 @@ void CConnman::DeleteNode(const CNodePtr& pnode) {
     }
 }
 
+// AuthConn functions
+bool CConnman::SignAuthConnMsgHash(const uint256 &hash, std::vector<uint8_t> &vchSign, uint32_t randv) const {
+    return authConnKeys.Sign(hash, vchSign, randv);
+}
+const CPubKey& CConnman::GetAuthConnPubKey() const {
+    return authConnKeys.getPubKey();
+}
+
 size_t CConnman::GetAddressCount() const {
     return addrman.size();
 }

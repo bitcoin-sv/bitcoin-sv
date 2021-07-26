@@ -266,6 +266,7 @@ add_library(common
 	mining/journal_entry.h
 	net/association.h
 	net/association_id.h
+	net/authconn.h
 	net/net.h
 	net/net_message.h
 	net/net_types.h
@@ -467,6 +468,7 @@ add_library(server
 	mining/journaling_block_assembler.h
 	net/association.cpp
 	net/association_id.cpp
+	net/authconn.cpp
 	net/block_download_tracker.cpp
 	net/block_download_tracker.h
 	net/net.cpp

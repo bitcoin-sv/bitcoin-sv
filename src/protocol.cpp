@@ -48,6 +48,8 @@ const char *STREAMACK = "streamack";
 const char *DSDETECTED = "dsdetected";
 const char *EXTMSG = "extmsg";
 const char *REVOKEMID = "revokemid";
+const char *AUTHCH = "authch";
+const char *AUTHRESP = "authresp";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -112,7 +114,7 @@ static const std::string allNetMessageTypes[] = {
     NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
     NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
     NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,  NetMsgType::DSDETECTED,
-    NetMsgType::EXTMSG
+    NetMsgType::EXTMSG,       NetMsgType::AUTHCH,     NetMsgType::AUTHRESP
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,
