@@ -729,6 +729,7 @@ void CNode::copyStats(NodeStats &stats)
     }
     stats.fPauseSend = GetPausedForSending();
     stats.fUnpauseSend = stats.fPauseSend && !GetPausedForSending(true);
+    stats.fAuthConnEstablished = fAuthConnEstablished;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();

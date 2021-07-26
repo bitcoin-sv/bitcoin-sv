@@ -109,6 +109,8 @@ static UniValue getpeerinfo(const Config &config,
             "       }\n"
             "       ...\n"
             "    ],\n"
+            "    \"authconn\": true|false,    (boolean) The authenticated connection is established (true) or "
+            "the public connection is in use (false)\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -211,6 +213,7 @@ static UniValue getpeerinfo(const Config &config,
         }
         obj.push_back(Pair("streams", streams));
 
+        obj.push_back(Pair("authconn", stats.fAuthConnEstablished));
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
