@@ -15,7 +15,7 @@ the candidate size
 from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad, create_block_from_candidate
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import CBlock, ToHex
-from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error, assert_equal, wait_until
+from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error, assert_equal, wait_until, sync_blocks, sync_mempools
 from decimal import Decimal
 import math
 import time
@@ -31,7 +31,7 @@ def get_any_unspent(listunspent, threshold_amount=0.0):
         'Could not find any unspent with threshold={}'.format(threshold_amount))
 
 # Split some UTXOs into some number of spendable outputs
-def split_utxos(fee, node, count, utxos):
+def split_utxos(fee, node, count, utxos, nodes):
     # Split each UTXO into this many outputs
     split_into = max(2, math.ceil(count / len(utxos)))
 
@@ -64,6 +64,10 @@ def split_utxos(fee, node, count, utxos):
         # Mine all the generated txns into blocks
         while (node.getmempoolinfo()['size'] > 0):
             node.generate(1)
+
+        # If running multiple nodes they have to be synced regularly to prevent simultaneous syncing of blocks and txs
+        if nodes is not None:
+            sync_blocks(nodes)
 
     utxos = node.listunspent()
     return utxos
@@ -150,11 +154,11 @@ class MiningTest(BitcoinTestFramework):
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
         self.relayfee = node.getnetworkinfo()['relayfee']
-        utxos = create_confirmed_utxos(self.relayfee, node, 100)
+        utxos = create_confirmed_utxos(self.relayfee, node, 100, nodes=self.nodes)
         self.sync_all()
 
         # Create a lot of transactions from the UTXOs
-        newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos)
+        newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, self.nodes)
         fill_mempool(self.relayfee, node, newutxos)
 
 
