@@ -27,7 +27,7 @@
 #include "init.h"
 #include "invalid_txn_publisher.h"
 #include "metrics.h"
-#include "miner_id.h"
+#include "miner_id/miner_id.h"
 #include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/net_processing.h"

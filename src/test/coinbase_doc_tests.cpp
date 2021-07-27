@@ -1,9 +1,8 @@
 // Copyright (c) 2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "coinbase_doc.h"
-
-#include "miner_id.h"
+#include "miner_id/coinbase_doc.h"
+#include "miner_id/miner_id.h"
 #include "primitives/transaction.h"
 #include "test/test_bitcoin.h"
 #include "univalue.h"

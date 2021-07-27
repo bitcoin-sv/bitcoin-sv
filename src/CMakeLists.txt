@@ -387,8 +387,8 @@ add_library(server
 	checkpoints.h
 	checkqueue.h
 	checkqueuepool.h
-	coinbase_doc.cpp
-	coinbase_doc.h
+	miner_id/coinbase_doc.cpp
+	miner_id/coinbase_doc.h
 	compat/sanity.h
 	cuckoocache.h
 	dbwrapper.cpp
@@ -425,8 +425,8 @@ add_library(server
 	merkletreestore.cpp
 	merkletreestore.h
 	metrics.h
-	miner_id.cpp
-	miner_id.h
+	miner_id/miner_id.cpp
+	miner_id/miner_id.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp

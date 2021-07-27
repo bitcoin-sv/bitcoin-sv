@@ -16,7 +16,7 @@
 #include "consensus/validation.h"
 #include "key.h"
 #include "keystore.h"
-#include "miner_id.h"
+#include "miner_id/miner_id.h"
 #include "script/script.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
