@@ -2395,15 +2395,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 #endif
 
-    if (!(config.GetMaxStdTxnValidationDuration() < config.GetMaxNonStdTxnValidationDuration())) {
-        return InitError(
-            strprintf("maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration"));
-    }
-
-    if (!(gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration", CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()) >
-        config.GetMaxNonStdTxnValidationDuration().count())) {
-        return InitError(
-            strprintf("maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration"));
+    if(std::string err; !config.CheckTxValidationDurations(err))
+    {
+        return InitError(err);
     }
 
     if(std::string err; !config.SetMaxCoinsViewCacheSize(
