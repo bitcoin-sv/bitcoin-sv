@@ -27,6 +27,7 @@ class NetTest(BitcoinTestFramework):
     def run_test(self):
         self._test_connection_count()
         self._test_authconnestablished()
+        self._test_getauthconninfo()
         self._test_getnettotals()
         self._test_getnetworkinginfo()
         self._test_getaddednodeinfo()
@@ -39,6 +40,11 @@ class NetTest(BitcoinTestFramework):
         peer_info = self.nodes[0].getpeerinfo()
         assert_equal(len(peer_info), 2)
         assert_equal([peer['authconn'] for peer in peer_info], [False, False])
+
+    def _test_getauthconninfo(self):
+        acinfo = self.nodes[0].getauthconninfo()
+        assert_equal(len(bytearray.fromhex(acinfo['pubkey'])), 33)
+        assert_equal(acinfo['compressed'], True)
 
     def _test_getnettotals(self):
         # check that getnettotals totalbytesrecv and totalbytessent
