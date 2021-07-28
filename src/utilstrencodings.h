@@ -181,6 +181,19 @@ I transform_pairs(I f, I l, O o, F func)
 
 // Precondition
 // I::value_type [0-9a-f]
+// Return Value: Input iterator set to one-past the end of the range
+// transformed.
+//
+// Converts a closed range of hexadecimal characters (lowercase a-f) to an
+// output iterator of bytes. Each character is transformed into the nibble of a
+// byte. e.g.
+//    "1289abef" -> {0x12, 0x89, 0xab, 0xef}
+//
+// A nibble can hold 16 values (0x0->0xf) which represent the characters
+// '0' -> 'f' respectively.
+// The characters are transformed pair-wise. If an odd number of characters
+// is supplied then the last character is not transformed.
+//
 template <typename I, typename O>
 I transform_hex(I f, I l, O o)
 {
@@ -197,6 +210,12 @@ I transform_hex(I f, I l, O o)
     });
 }
 
+// Converts a string_view of hexadecimal characters (lowercase a-f) to an output
+// iterator of bytes. See overload for more details.
+// The input is checked to ensure that it only contains characters '0'->'9' or
+// 'a' -> 'f'.
+// Return Value: Input iterator set to the first invalid character or one-past
+// the end of the range transformed.
 template <typename O>
 auto transform_hex(const std::string_view s, O o)
 {

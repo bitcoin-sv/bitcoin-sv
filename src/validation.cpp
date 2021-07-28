@@ -559,10 +559,6 @@ bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t max
                          "first tx is not coinbase");
     }
 
-    // TODO: minerId is never used in SVN-1412.
-    // Using minerId is part of bigger MinerId epic.
-    std::optional<MinerId> minerId = FindMinerId(tx, height);
-
     if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
         // CheckTransactionCommon fill in the state.
         return false;

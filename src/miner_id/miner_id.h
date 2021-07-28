@@ -40,7 +40,7 @@ public:
     MinerId() = default;
 
     MinerId(const CoinbaseDocument& coinbaseDocument)
-        : coinbaseDocument_(coinbaseDocument){};
+        : coinbaseDocument_{coinbaseDocument} {};
 
     const CoinbaseDocument& GetCoinbaseDocument() const
     {

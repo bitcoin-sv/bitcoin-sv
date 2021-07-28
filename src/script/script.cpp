@@ -148,7 +148,6 @@ bool IsDustReturnScript(const bsv::span<const uint8_t> script)
 }
 
 /*
- * Checks that the beginning of a script contains a valid OP_RETURN protocol id.
  * The beginning of the script should look like this: OP_FALSE OP_RETURN
  * OP_PUSHDATA protocol_id OP_PUSHDATA data Method only works for 4-byte
  * protocol ids. It does not check data after OP_PUSHDATA (i.e. is length of
