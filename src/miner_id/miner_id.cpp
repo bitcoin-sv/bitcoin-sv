@@ -107,7 +107,7 @@ bool MinerId::SetStaticCoinbaseDocument(
 {
     auto LogInvalidDoc = [&] {
         LogPrint(
-            BCLog::TXNVAL,
+            BCLog::MINERID,
             "One or more required parameters from coinbase document missing or "
             "incorrect. Coinbase transaction txid %s and output number %d. \n",
             tx_out.GetTxId().ToString(),
@@ -140,7 +140,7 @@ bool MinerId::SetStaticCoinbaseDocument(
     }
     if(block_height != blockHeight)
     {
-        LogPrint(BCLog::TXNVAL,
+        LogPrint(BCLog::MINERID,
                  "Block height in coinbase document is incorrect in coinbase "
                  "transaction with txid %s and output number %d. \n",
                  tx_out.GetTxId().ToString(),
@@ -195,7 +195,7 @@ bool MinerId::SetStaticCoinbaseDocument(
     const std::vector<uint8_t> minerIdBytes{ParseHex(minerId.get_str())};
     if(!verify(cd_json, minerIdBytes, signatureBytes))
     {
-        LogPrint(BCLog::TXNVAL,
+        LogPrint(BCLog::MINERID,
                  "Signature of static coinbase document is invalid incoinbase "
                  "transaction with txid %s and output number%d.\n",
                  tx_out.GetTxId().ToString(),
@@ -220,7 +220,7 @@ bool MinerId::SetStaticCoinbaseDocument(
     }
     else
     {
-        LogPrint(BCLog::TXNVAL,
+        LogPrint(BCLog::MINERID,
                  "Unsupported version in miner id in txid %s and output number "
                  "%d. \n",
                  tx_out.GetTxId().ToString(),
@@ -235,10 +235,11 @@ bool MinerId::SetStaticCoinbaseDocument(
     if(!verify(dataToVerify, prevMinerIdBytes, signaturePrevMinerId))
     {
         LogPrint(
-            BCLog::TXNVAL,
+            BCLog::MINERID,
             "Signature of previous miner id in coinbase document is invalid in "
             "coinbase transaction with txid %s and output number %d. \n",
-            tx_out.GetTxId().ToString(), tx_out.GetN());
+            tx_out.GetTxId().ToString(),
+            tx_out.GetN());
         return false;
     }
 
@@ -278,7 +279,7 @@ bool MinerId::SetDynamicCoinbaseDocument(
     const int32_t blockHeight)
 {
     auto LogInvalidDoc = [&] {
-        LogPrint(BCLog::TXNVAL,
+        LogPrint(BCLog::MINERID,
                  "Structure in coinbase document is incorrect (incorrect field "
                  "type) in coinbase transaction with txid %s and output number "
                  "%d. \n",
@@ -307,7 +308,7 @@ bool MinerId::SetDynamicCoinbaseDocument(
         if(height.get_int() != blockHeight)
         {
             LogPrint(
-                BCLog::TXNVAL,
+                BCLog::MINERID,
                 "Block height in coinbase document is incorrect in coinbase "
                 "transaction with txid %s and output number %d. \n",
                 tx_out.GetTxId().ToString(),
@@ -378,7 +379,7 @@ bool MinerId::SetDynamicCoinbaseDocument(
                                             dataToVerify.end()};
     if(!verify(dataToVerify, dynamicMinerIdBytes, signatureBytes))
     {
-        LogPrint(BCLog::TXNVAL,
+        LogPrint(BCLog::MINERID,
                  "Signature of dynamic miner id in coinbase document is "
                  "invalidin coinbase transaction with txid %s and output "
                  "number %d.\n",
@@ -417,7 +418,7 @@ bool parseCoinbaseDocument(MinerId& minerId,
     if(!coinbaseDocumentData.read(coinbaseDocumentDataJson.data(),
                                   coinbaseDocumentDataJson.size()))
     {
-        LogPrint(BCLog::TXNVAL,
+        LogPrint(BCLog::MINERID,
                  "Cannot parse coinbase document in coinbase transaction with "
                  "txid %s and output number %d.\n",
                  tx_out.GetTxId().ToString(),
@@ -460,7 +461,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
             if(!it.valid())
             {
                 LogPrint(
-                    BCLog::TXNVAL,
+                    BCLog::MINERID,
                     "Failed to extract data for static document of minerId "
                     "from script with txid %s and output number %d.\n",
                     tx.GetId().ToString(),
@@ -470,7 +471,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
 
             if(it->operand().empty())
             {
-                LogPrint(BCLog::TXNVAL,
+                LogPrint(BCLog::MINERID,
                          "Invalid data for MinerId protocol from script with "
                          "txid %s and output number %d.\n",
                          tx.GetId().ToString(),
@@ -483,7 +484,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
             if(!it.valid())
             {
                 LogPrint(
-                    BCLog::TXNVAL,
+                    BCLog::MINERID,
                     "Failed to extract signature of static document of minerId "
                     "from script with txid %s and output number %d.\n",
                     tx.GetId().ToString(),
@@ -493,7 +494,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
 
             if(it->operand().empty())
             {
-                LogPrint(BCLog::TXNVAL,
+                LogPrint(BCLog::MINERID,
                          "Invalid data for MinerId signature from script with "
                          "txid %s and output number %d.\n",
                          tx.GetId().ToString(),
@@ -521,7 +522,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
 
                 if(!it.valid())
                 {
-                    LogPrint(BCLog::TXNVAL,
+                    LogPrint(BCLog::MINERID,
                              "Failed to extract data for dynamic document of "
                              "minerId from script with txid %s and output "
                              " number % d.\n",
@@ -534,7 +535,7 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                 ++it;
                 if(!it.valid())
                 {
-                    LogPrint(BCLog::TXNVAL,
+                    LogPrint(BCLog::MINERID,
                              "Failed to extract signature of dynamic document "
                              "of minerId from script with txid %s and output "
                              "number %d.\n",
