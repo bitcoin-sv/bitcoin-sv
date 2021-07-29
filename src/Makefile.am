@@ -102,6 +102,7 @@ BITCOIN_CORE_H = \
   checkqueuepool.h \
   clientversion.h \
   coins.h \
+  miner_id/coinbase_doc.h \
   compat.h \
   compat/byteswap.h \
   compat/endian.h \
@@ -144,6 +145,7 @@ BITCOIN_CORE_H = \
   merkletreedb.h \
   merkletreestore.h \
   metrics.h \
+  miner_id/miner_id.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -280,6 +282,7 @@ libbitcoin_server_a_SOURCES = \
   block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
+  miner_id/coinbase_doc.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -295,6 +298,7 @@ libbitcoin_server_a_SOURCES = \
   merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
+  miner_id/miner_id.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \

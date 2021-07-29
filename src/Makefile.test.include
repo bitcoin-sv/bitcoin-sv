@@ -55,6 +55,7 @@ BITCOIN_TESTS =\
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
+  test/coinbase_doc_tests.cpp \
   test/core_io_tests.cpp \
   test/cpfp_tests.cpp \
   test/crypto_tests.cpp \
@@ -94,6 +95,7 @@ BITCOIN_TESTS =\
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
   test/miner_tests.cpp \
+  test/minerid_tests.cpp \
   test/multisig_tests.cpp \
   test/net_association_tests.cpp \
   test/net_message_maker_tests.cpp \

@@ -21,19 +21,20 @@ namespace bsv
     // Therefore, and additional offset is also stored.
     class instruction
     {
-        opcodetype opcode_;
+        opcodetype opcode_{OP_INVALIDOPCODE};
         int8_t offset_{};
         using operand_type = bsv::span<const uint8_t>;
         operand_type operand_{};
 
     public:
+        constexpr instruction() = default; 
         constexpr instruction(opcodetype opcode) noexcept : opcode_{opcode} {}
 
         constexpr instruction(opcodetype opcode,
                               int8_t offset,
                               const uint8_t* p,
                               size_t n) noexcept
-            : opcode_{opcode}, offset_{offset}, operand_{p, n}
+            : opcode_{opcode}, offset_{offset}, operand_{p, n} 
         {
         }
 

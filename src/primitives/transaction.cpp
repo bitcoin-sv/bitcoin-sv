@@ -36,6 +36,12 @@ std::string CTxOut::ToString() const {
                      HexStr(scriptPubKey).substr(0, 30));
 }
 
+std::ostream& operator<<(std::ostream& os, const COutPoint& op)
+{
+    os << "txid: " << op.txid.ToString() << "\nn: " << op.n;
+    return os;
+}
+
 CMutableTransaction::CMutableTransaction()
     : nVersion(CTransaction::CURRENT_VERSION), nLockTime(0) {}
 CMutableTransaction::CMutableTransaction(const CTransaction &tx)

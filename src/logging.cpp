@@ -89,6 +89,7 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::NETMSGALL, "netmsgall"},
     {BCLog::NET, "net"},
     {BCLog::DOUBLESPEND, "doublespend"},
+    {BCLog::MINERID, "minerid"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };

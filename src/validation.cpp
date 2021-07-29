@@ -8,8 +8,11 @@
 #include "abort_node.h"
 #include "arith_uint256.h"
 #include "async_file_reader.h"
+#include "block_file_access.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
+#include "blockfileinfostore.h"
+#include "blockindex_with_descendants.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -22,6 +25,9 @@
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
+#include "invalid_txn_publisher.h"
+#include "metrics.h"
+#include "miner_id/miner_id.h"
 #include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -31,6 +37,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "processing_block_index.h"
+#include "pubkey.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -48,11 +55,6 @@
 #include "validationinterface.h"
 #include "versionbits.h"
 #include "warnings.h"
-#include "blockfileinfostore.h"
-#include "block_file_access.h"
-#include "invalid_txn_publisher.h"
-#include "blockindex_with_descendants.h"
-#include "metrics.h"
 
 #include <atomic>
 
@@ -550,7 +552,7 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled)
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t height)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
@@ -5411,7 +5413,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled, blockHeight)) {
         auto result = state.Invalid(false, state.GetRejectCode(),
                                     state.GetRejectReason(),
                                     strprintf("Coinbase check failed (txid %s) %s",

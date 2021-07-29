@@ -77,6 +77,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	bswap_tests.cpp
 	checkpoints_tests.cpp
 	checkqueue_tests.cpp
+	coinbase_doc_tests.cpp
 	coins_tests.cpp
 	write_preferring_upgradable_mutex_tests.cpp
 	compress_tests.cpp
@@ -119,6 +120,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp
 	miner_tests.cpp
+	minerid_tests.cpp
 	multisig_tests.cpp
     net_message_maker_tests.cpp
     net_association_tests.cpp
