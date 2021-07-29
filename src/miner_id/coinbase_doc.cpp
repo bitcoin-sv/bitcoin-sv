@@ -34,7 +34,10 @@ bool operator==(const CoinbaseDocument& a, const CoinbaseDocument& b)
            a.mVctx == b.mVctx &&
            ((!a.mDataRefs && !b.mDataRefs) ||
             ((a.mDataRefs && b.mDataRefs) &&
-             (a.mDataRefs.value() == b.mDataRefs.value())));
+             (a.mDataRefs.value() == b.mDataRefs.value()))) &&
+           ((!a.mMinerContact && !b.mMinerContact) ||
+            ((a.mMinerContact && b.mMinerContact) &&
+             (a.mMinerContact->write() == b.mMinerContact->write())));
     // clang-format on
 }
 
@@ -62,6 +65,9 @@ std::ostream& operator<<(std::ostream& os, const CoinbaseDocument& doc)
        << "\nminer_id: " << doc.mMinerId
        << "\noutpoint: " << doc.mVctx;
     // clang-format on
+
+    if(doc.mMinerContact)
+        os << "\nminer_contact: " << doc.mMinerContact->write();
 
     if(!doc.mDataRefs)
         return os;
