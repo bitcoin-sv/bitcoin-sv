@@ -243,13 +243,22 @@ bool MinerId::SetStaticCoinbaseDocument(
         return false;
     }
 
+    // Look for minerContact details
+    std::optional<UniValue> minerContact {};
+    auto& contact = document["minerContact"];
+    if(contact.isObject())
+    {   
+        minerContact = contact;
+    }
+
     CoinbaseDocument coinbaseDocument(
         version.get_str(),
         block_height,
         prevMinerId.get_str(),
         prevMinerIdSig.get_str(),
         minerId.get_str(),
-        COutPoint(uint256S(vctxTxid.get_str()), vctxVout.get_int()));
+        COutPoint(uint256S(vctxTxid.get_str()), vctxVout.get_int()),
+        minerContact);
 
     std::vector<CoinbaseDocument::DataRef> dataRefs;
     if(!parseDataRefs(document, dataRefs))

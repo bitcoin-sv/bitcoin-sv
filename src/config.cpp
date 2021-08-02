@@ -144,6 +144,12 @@ void GlobalConfig::Reset()
     dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
     dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
 
+    // MinerID
+    minerIdCacheSize = MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE;
+    numMinerIdsToKeep = MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP;
+    minerIdReputationM = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
+    minerIdReputationN = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N;
+
     mDisableBIP30Checks = std::nullopt;
 
 #if ENABLE_ZMQ
@@ -1485,6 +1491,99 @@ bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
     }
     mDisableBIP30Checks = disable;
     return true;
+}
+
+// MinerID
+bool GlobalConfig::SetMinerIdCacheSize(int64_t size, std::string* err)
+{
+    if(size < 0 || static_cast<uint64_t>(size) > MinerIdDatabaseDefaults::MAX_CACHE_SIZE)
+    {
+        if(err)
+        {
+            *err = "Miner ID database cache size must be >= 0 and <= " + std::to_string(MinerIdDatabaseDefaults::MAX_CACHE_SIZE);
+        }
+        return false;
+    }
+
+    minerIdCacheSize = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetMinerIdCacheSize() const
+{
+    return minerIdCacheSize;
+}
+
+bool GlobalConfig::SetMinerIdsNumToKeep(int64_t num, std::string* err)
+{
+    if(num < 2)
+    {
+        if(err)
+        {
+            *err = "Number of miner IDs to keep must be >= 2.";
+        }
+        return false;
+    }
+
+    numMinerIdsToKeep = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetMinerIdsNumToKeep() const
+{
+    return numMinerIdsToKeep;
+}
+
+bool GlobalConfig::SetMinerIdReputationM(int64_t num, std::string* err)
+{
+    if(num < 1 || static_cast<uint32_t>(num) > MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_M)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M must be > 0 and <= " + std::to_string(MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_M) + ".";
+        }
+        return false;
+    }
+    else if(static_cast<uint32_t>(num) > GetMinerIdReputationN())
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M must be <= the value of miner ID reputation N.";
+        }
+        return false;
+    }
+
+    minerIdReputationM = static_cast<uint32_t>(num);
+    return true;
+}
+uint32_t GlobalConfig::GetMinerIdReputationM() const
+{
+    return minerIdReputationM;
+}
+
+bool GlobalConfig::SetMinerIdReputationN(int64_t num, std::string* err)
+{
+    if(num < 1 || static_cast<uint32_t>(num) > MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation N must be > 0 and <= " + std::to_string(MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N) + ".";
+        }
+        return false;
+    }
+    else if(static_cast<uint32_t>(num) < GetMinerIdReputationM())
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation N must be >= the value of miner ID reputation M.";
+        }
+        return false;
+    }
+
+    minerIdReputationN = static_cast<uint32_t>(num);
+    return true;
+}
+uint32_t GlobalConfig::GetMinerIdReputationN() const
+{
+    return minerIdReputationN;
 }
 
 bool GlobalConfig::GetDisableBIP30Checks() const

@@ -17,6 +17,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
+#include "miner_id/miner_id_db.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/http_protocol.h"
@@ -3449,6 +3450,44 @@ UniValue waitforptvcompletion(const Config &config, const JSONRPCRequest &reques
     return NullUniValue;
 }
 
+UniValue mineriddump(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw std::runtime_error(
+            "mineriddump\n"
+
+            "\nReturns details for all currently known miner IDs"
+            "\nResult\n"
+            "[\n"
+            "  {\n"
+            "    \"uuid\": xxxxxx,           (string) UUID for this miner\n"
+            "    \"reputation\": xxxx,       (integer) Accumulated reputation score for this miner\n"
+            "    \"firstblock\": xxxx,       (string) Hash of first block seen for this miner\n"
+            "    \"latestblock\": xxxx,      (string) Hash of most recent block seen for this miner\n"
+            "    \"minerids\": [\n"
+            "       \"minerid\": xxxx,       (string) This miner id\n"
+            "       \"current\": xx,         (boolean) Whether this miner id is considered to be the current one\n"
+            "       \"rotationblock\": xxxx, (string) Hash of block in which this miner id was rotated to a new one\n"
+            "    ]\n"
+            "  }\n"
+            "[\n"
+            "\nExamples:\n" +
+            HelpExampleCli("mineriddump", "") +
+            HelpExampleRpc("mineriddump", ""));
+    }
+
+    // Check we have a miner ID databse to dump
+    if(g_minerIDs)
+    {
+        return g_minerIDs->DumpJSON();
+    }
+    else
+    {
+        throw std::runtime_error("Miner ID database unavailable");
+    }
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -3493,7 +3532,8 @@ static const CRPCCommand commands[] = {
     { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
     { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
     { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
-    { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} }
+    { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} },
+    { "hidden",             "mineriddump",            mineriddump,            true,  {} },
 };
 // clang-format on
 

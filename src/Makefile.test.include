@@ -94,6 +94,7 @@ BITCOIN_TESTS =\
   test/mempooltxdb_tests.cpp \
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
+  test/miner_id_db_tests.cpp \
   test/miner_tests.cpp \
   test/minerid_tests.cpp \
   test/multisig_tests.cpp \

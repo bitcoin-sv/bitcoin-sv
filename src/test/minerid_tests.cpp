@@ -76,6 +76,7 @@ static UniValue create_coinbase_doc(const CKey& prevMinerIdKey,
                                     const string& minerIdPubKey,
                                     const string& vctxid,
                                     const UniValue& dataRefs,
+                                    const UniValue& minerContact,
                                     const string& version)
 {
     UniValue document(UniValue::VOBJ);
@@ -101,6 +102,11 @@ static UniValue create_coinbase_doc(const CKey& prevMinerIdKey,
     if(!dataRefs.isNull())
     {
         document.push_back(Pair("dataRefs", dataRefs));
+    }
+
+    if(!minerContact.isNull())
+    {
+        document.push_back(Pair("minerContact", minerContact));
     }
 
     return document;
@@ -223,6 +229,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                                 HexStr(minerIdPubKey),
                                                 vctxid,
                                                 dataRefs,
+                                                NullUniValue,
                                                 "0.1");
     vector<uint8_t> signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1);
@@ -257,6 +264,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        HexStr(minerIdPubKey),
                                        vctxid,
                                        dataRefs,
+                                       NullUniValue,
                                        "0.1");
     minerId = FindMinerId(CTransaction(tx), block_height);
     BOOST_CHECK(minerId == nullopt);
@@ -268,6 +276,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        HexStr(minerIdPubKey),
                                        vctxid,
                                        dataRefs,
+                                       NullUniValue,
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1);
@@ -280,6 +289,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        HexStr(prevMinerIdPubKey),
                                        HexStr(minerIdPubKey),
                                        vctxid,
+                                       NullUniValue,
                                        NullUniValue,
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
@@ -297,6 +307,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        HexStr(minerIdPubKey),
                                        vctxid,
                                        dataRefs,
+                                       NullUniValue,
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1, true);
@@ -319,6 +330,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        HexStr(minerIdPubKey),
                                        vctxid,
                                        dataRefs,
+                                       NullUniValue,
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 2);
@@ -336,6 +348,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        HexStr(minerIdPubKey),
                                        vctxid,
                                        dataRefs,
+                                       NullUniValue,
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 3, true);
@@ -370,6 +383,9 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
     const string txid2 =
         "c6e68a930db53b804b6cbc51d4582856079ce075cc305975f7d8f95755068267";
 
+    UniValue minerContact { UniValue::VOBJ };
+    minerContact.push_back(Pair("name", "SomeName"));
+
     const UniValue dataRefs = createDataRefs(txid1, txid2);
     constexpr auto block_height{624455};
     UniValue baseDocument = create_coinbase_doc(prevMinerIdKey,
@@ -378,6 +394,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
                                                 HexStr(minerIdPubKey),
                                                 vctxid,
                                                 dataRefs,
+                                                minerContact,
                                                 "0.2");
     vector<uint8_t> signature = sign(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
@@ -391,7 +408,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
                                  HexStr(prevMinerIdPubKey),
                                  baseDocument["prevMinerIdSig"].get_str(),
                                  HexStr(minerIdPubKey),
-                                 COutPoint(uint256S(vctxid), 7)};
+                                 COutPoint(uint256S(vctxid), 7),
+                                 minerContact};
     vector<CoinbaseDocument::DataRef> comparingDataRefs = {
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1), 0},
         CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0}};
@@ -438,6 +456,7 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                                   HexStr(minerIdPubKey),
                                                   vctxid,
                                                   dataRefs,
+                                                  NullUniValue,
                                                   "0.1");
     vector<uint8_t> staticSignatureBytes = sign(minerIdKey, staticDocument);
     // Prepare data for dynamic signature
@@ -480,6 +499,7 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                          HexStr(prevMinerIdPubKey),
                                          HexStr(minerIdPubKey),
                                          vctxid,
+                                         NullUniValue,
                                          NullUniValue,
                                          "0.1");
     staticSignatureBytes = sign(minerIdKey, staticDocument);
