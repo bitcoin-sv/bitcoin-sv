@@ -206,13 +206,14 @@ class MiningTest(BitcoinTestFramework):
 
     def test_mine_from_old_mining_candidate(self, blockNode, get_coinbase):
 
+        sync_blocks(self.nodes)
         candidate = blockNode.getminingcandidate(get_coinbase)
 
         # Here we will check multiple block submitions because probability of accepting
         # a block with the random nonce is very high
         for i in range(1, 100):
-            # one more minute to future
-            blockNode.setmocktime(candidate["time"] + 60)
+            # half minute to future. Setting this too high will result in 'time-too-new' errors
+            blockNode.setmocktime(candidate["time"] + 30)
 
             #we are getting new mining candidate to change nTime in the headder of the pblocktemplate
             candidate_new = blockNode.getminingcandidate(get_coinbase)
@@ -224,6 +225,7 @@ class MiningTest(BitcoinTestFramework):
                 assert False, "Submited blocks is rejected because invalid pow, the time has changed."
 
             candidate = candidate_new
+            sync_blocks(self.nodes)
 
 
     def test_optional_validation(self):
