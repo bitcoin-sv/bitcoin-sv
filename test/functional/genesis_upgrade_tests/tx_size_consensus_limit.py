@@ -16,7 +16,7 @@ class TxSizeConsensusCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Max consensus tx size"
     _UTXO_KEY = make_key()    
-    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
+    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
 
     def get_transactions_for_test(self, tx_collection, coinbases):
         if tx_collection.label == "PRE-GENESIS":

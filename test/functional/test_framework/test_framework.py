@@ -110,6 +110,8 @@ class BitcoinTestFramework():
                           help="Attach a python debugger if test fails")
         parser.add_option("--waitforpid", dest="waitforpid", default=False, action="store_true",
                           help="Display the bitcoind pid and wait for the user before proceeding. Useful for (eg) attaching a debugger to bitcoind.")
+        parser.add_option("--timeoutfactor", dest="timeoutfactor", default=1, type='float',
+                          help="Multiply timeouts in specific tests with this factor to enable successful tests in slower environments.")
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args()
 
