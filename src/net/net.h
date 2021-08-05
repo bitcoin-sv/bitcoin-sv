@@ -288,7 +288,6 @@ public:
         uint64_t seed0,
         uint64_t seed1,
         std::chrono::milliseconds debugP2PTheadStallsThreshold);
-    ~CConnman();
     bool Start(CScheduler &scheduler, std::string &strNodeError,
                Options options);
     void Stop();

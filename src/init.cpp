@@ -182,8 +182,7 @@ void Shutdown() {
     if (g_connman) {
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
-        // nullptr (which happens before the destructor is called making Stop
-        // call inside CConnman destructor too late)
+        // nullptr
         g_connman->Stop();
         g_connman.reset();
     }

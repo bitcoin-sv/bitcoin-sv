@@ -27,7 +27,6 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-#include "validation.h"
 
 #include "test/testutil.h"
 #include "test/mempool_test_access.h"
@@ -80,18 +79,6 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
-
-    if(g_connman)
-    {
-        g_connman->Interrupt();
-        // call Stop first as CConnman members are using g_connman global
-        // variable and they must be shut down before the variable is reset to
-        // nullptr (which happens before the destructor is called making Stop
-        // call inside CConnman destructor too late)
-        g_connman->Stop();
-        g_connman.reset();
-    }
-
     fs::remove_all(pathTemp);
 }
 
@@ -137,12 +124,26 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
 
 TestingSetup::~TestingSetup() {
     mining::g_miningFactory.reset();
-    UnregisterNodeSignals(GetNodeSignals());
     threadGroup.interrupt_all();
     threadGroup.join_all();
     UnloadBlockIndex();
     pcoinsTip.reset();
+
+    if (g_connman)
+    {
+        g_connman->Interrupt();
+        // call Stop first as CConnman members are using g_connman global
+        // variable and they must be shut down before the variable is reset to
+        // nullptr
+        g_connman->Stop();
+        g_connman.reset();
+        connman = nullptr;
+    }
+
+    ShutdownScriptCheckQueues();
+    UnregisterNodeSignals(GetNodeSignals());
     delete pblocktree;
+    pblocktree = nullptr;
 }
 
 TestChain100Setup::TestChain100Setup()
