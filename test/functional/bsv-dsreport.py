@@ -558,7 +558,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.createConnection()
 
         self.check_ds_enabled(utxo[:6])
-        self.check_ds_mempool_txn(utxo[15])
+        self.check_ds_mempool_txn(utxo[16])
 
         # missing callback message
         self.check_ds_not_enabled(utxo[7], CScript([OP_FALSE, OP_RETURN]))
