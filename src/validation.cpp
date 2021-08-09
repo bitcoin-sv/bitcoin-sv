@@ -2751,7 +2751,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 }
 } // namespace Consensus
 
-static int32_t GetInputScriptBlockHeight(int32_t coinHeight) {
+int32_t GetInputScriptBlockHeight(int32_t coinHeight) {
     if (coinHeight == MEMPOOL_HEIGHT) {
         // When spending an output that was created in mempool, we assume that it will be mined in the next block.
         return chainActive.Height() + 1;

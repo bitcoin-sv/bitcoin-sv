@@ -867,6 +867,11 @@ uint64_t GetTransactionSigOpCount(const Config &config,
                                   bool& sigOpCountError);
 
 /**
+ * Get the block height for an input script.
+ */
+int32_t GetInputScriptBlockHeight(int32_t coinHeight);
+
+/**
  * Check validity of scripts for a single input from a transaction.
  */
 std::optional<bool> CheckInputScripts(
