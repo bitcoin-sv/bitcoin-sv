@@ -1316,7 +1316,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         // Trigger the peer node to send a getblocks request for the
                         // next batch of inventory.
                         if (inv.hash == pfrom->hashContinue) {
-                            // Bypass PushInventory, this must send even if
+                            // Bypass PushBlockInventory, this must send even if
                             // redundant, and we want it right after the last block
                             // so they don't wait for other stuff first.
                             std::vector<CInv> vInv;
@@ -2186,7 +2186,7 @@ static bool ProcessGetBlocks(
                 pindex->GetHeight(), pindex->GetBlockHash().ToString());
             break;
         }
-        pfrom->PushInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
+        pfrom->PushBlockInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
         if(--nLimit <= 0) {
             // When this block is requested, we'll send an inv that'll
             // trigger the peer to getblocks the next batch of inventory.
@@ -4090,7 +4090,7 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
 
             // If the peer's chain has this block, don't inv it back.
             if (!PeerHasHeader(state, pindex)) {
-                pto->PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
+                pto->PushBlockInventory(CInv(MSG_BLOCK, hashToAnnounce));
                 LogPrint(BCLog::NETMSG, "%s: sending block inv peer=%d hash=%s\n",
                          __func__, pto->id, hashToAnnounce.ToString());
             }
@@ -4168,14 +4168,6 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         pto->nNextInvSend = nNow + Fixed_delay_microsecs; 
     }
 
-    // Time to send but the peer has requested we not relay transactions.
-    if (fSendTrickle) {
-        LOCK(pto->cs_filter);
-        if (!pto->fRelayTxes) {
-            pto->setInventoryTxToSend.clear();
-        }
-    }
-
     // Respond to BIP35 mempool requests
     if (fSendTrickle && pto->fSendMempool) {
         auto vtxinfo = mempool.InfoAll();
@@ -4191,7 +4183,6 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         for (const auto &txinfo : vtxinfo) {
             const uint256 &txid = txinfo.GetTxId();
             CInv inv(MSG_TX, txid);
-            pto->setInventoryTxToSend.erase(txid);
             if (filterrate != Amount(0)) {
                 if (txinfo.feeRate.GetFeePerK() < filterrate) {
                     continue;
