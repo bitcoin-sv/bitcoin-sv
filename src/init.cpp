@@ -32,6 +32,7 @@
 #include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "rpc/webhook_client.h"
 #include "rpc/webhook_client_defaults.h"
 #include "scheduler.h"
 #include "script/scriptcache.h"
@@ -176,6 +177,7 @@ void Shutdown() {
     UnregisterValidationInterface(peerLogic.get());
     peerLogic.reset();
 
+    rpc::client::g_pWebhookClient.reset();
     mining::g_miningFactory.reset();
 
     if (g_connman) {
@@ -3375,6 +3377,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     // Launch non-final mempool periodic checks
     mempool.getNonFinalPool().startPeriodicChecks(scheduler);
+
+    // Create webhook client
+    assert(!rpc::client::g_pWebhookClient);
+    rpc::client::g_pWebhookClient = std::make_unique<rpc::client::WebhookClient>(config);
 
     // Step 12: finished
 
