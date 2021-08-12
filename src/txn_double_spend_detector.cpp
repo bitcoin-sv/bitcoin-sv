@@ -66,9 +66,7 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
 {
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr(); 
     return insertTxnInputs(ptx, pool, state, isFinal);
-    //return insertTxnInputs(*pTxInputData, pool, state, isFinal);
 }
-
 
 void CTxnDoubleSpendDetector::removeTxnInputs(const CTransaction &tx)
 {
@@ -89,7 +87,11 @@ void CTxnDoubleSpendDetector::removeTxnInputs(const CTransaction &tx)
     // and that the entries are both not duplicated and are laid out in
     // consecutive order (guaranteed by the way they were inserted).
     mKnownSpendsTx.erase(&tx);
-    const auto& it = std::find(mKnownSpends.begin(), mKnownSpends.end(), tx.vin[0].prevout);
+    const auto it = std::find_if(
+        mKnownSpends.begin(), mKnownSpends.end(), [&tx](const auto& op_tx) {
+            return op_tx.mOut == tx.vin[0].prevout;
+        });
+
     mKnownSpends.erase(it, it + tx.vin.size());
 }
 
@@ -103,24 +105,31 @@ void CTxnDoubleSpendDetector::clear() {
     mKnownSpends.clear();
 }
 
-bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(const CTransaction &tx, CValidationState& state) const {
+bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(
+    const CTransaction& tx,
+    CValidationState& state) const
+{
     std::set<CTransactionRef> isKnown;
 
-    for (const auto& input: tx.vin) {
-        if (auto found = std::find(mKnownSpends.begin(), mKnownSpends.end(), input.prevout);
-            found != mKnownSpends.end())
+    for(const auto& input : tx.vin)
+    {
+        const auto it = std::find_if(mKnownSpends.begin(),
+                                     mKnownSpends.end(),
+                                     [&input](const auto& op_tx) {
+                                         return op_tx.mOut == input.prevout;
+                                     });
+        if(it != mKnownSpends.end())
         {
-            isKnown.insert(found->mTxRef);
+            isKnown.insert(it->mspTx);
         }
     }
 
-    if( !isKnown.empty() )
+    if(!isKnown.empty())
     {
-        state.SetDoubleSpendDetected( std::move(isKnown) );
+        state.SetDoubleSpendDetected(std::move(isKnown));
 
         return true;
     }
 
     return false;
 }
-

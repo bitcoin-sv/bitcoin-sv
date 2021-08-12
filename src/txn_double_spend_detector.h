@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "primitives/transaction.h"
 #include "txn_validation_data.h"
 #include "uint256.h"
 #include <mutex>
@@ -72,7 +73,6 @@ public:
     /** Check if any of txn's inputs is already known */
     bool isAnyOfInputsKnownNL(const CTransaction &tx, CValidationState& state) const;
 
-  private:
     struct OutPointWithTx;
 
     std::vector<OutPointWithTx> mKnownSpends = {};
@@ -83,14 +83,10 @@ public:
 struct CTxnDoubleSpendDetector::OutPointWithTx
 {
     COutPoint mOut;
-    CTransactionRef mTxRef;
+    std::shared_ptr<const CTransaction> mspTx;
 
-    OutPointWithTx(const COutPoint& out, const CTransactionRef& ref)
+    OutPointWithTx(const COutPoint& out, const std::shared_ptr<const CTransaction>& spTx)
         : mOut{ out }
-        , mTxRef{ ref }
+        , mspTx{ spTx }
     {}
-
-    friend bool operator==(const OutPointWithTx &a, const COutPoint &b) {
-        return (a.mOut.GetTxId() == b.GetTxId() && a.mOut.GetN() == b.GetN());
-    }
 };
