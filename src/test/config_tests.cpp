@@ -367,6 +367,94 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK(!config.SetBanScoreThreshold(-1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(safe_mode_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    // Initial webhook address and URL are empty
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 80);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "");
+
+    // Try setting some bad URLs
+    BOOST_CHECK(!config.SetSafeModeWebhookURL("", &err));
+    BOOST_CHECK(!config.SetSafeModeWebhookURL("://path", &err));
+    BOOST_CHECK(!config.SetSafeModeWebhookURL("http://", &err));
+    BOOST_CHECK(!config.SetSafeModeWebhookURL("https://hostname", &err));
+
+    // Try some good URLS
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://127.0.0.1", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 80);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://[::1]", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "::1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 80);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://www.webhook.com", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "www.webhook.com");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 80);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://www.webhook.com/", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "www.webhook.com");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 80);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "/");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://127.0.0.1:8080", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://[::1]:8080", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "::1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://127.0.0.1/path", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 80);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "/path");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://127.0.0.1:8080/path", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "/path");
+
+    BOOST_CHECK(config.SetSafeModeWebhookURL("http://127.0.0.1:8080/path?arg=val", &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetSafeModeWebhookPath(), "/path?arg=val");
+
+    // Other safe mode values
+    BOOST_CHECK_EQUAL(config.GetSafeModeMinBlockDifference(), SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE);
+    BOOST_CHECK(config.SetSafeModeMinBlockDifference(2 * SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE, &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeMinBlockDifference(), 2 * SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE);
+    BOOST_CHECK(!config.SetSafeModeMinBlockDifference(0, &err));
+    BOOST_CHECK(!config.SetSafeModeMinBlockDifference(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetSafeModeMaxForkDistance(), SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE);
+    BOOST_CHECK(config.SetSafeModeMaxForkDistance(2 * SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeMaxForkDistance(), 2 * SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE);
+    BOOST_CHECK(!config.SetSafeModeMaxForkDistance(0, &err));
+    BOOST_CHECK(!config.SetSafeModeMaxForkDistance(-1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(rpc_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetWebhookClientNumThreads(), rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS);
+    BOOST_CHECK(config.SetWebhookClientNumThreads(2 * rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS, &err));
+    BOOST_CHECK_EQUAL(config.GetWebhookClientNumThreads(), 2 * rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS);
+    BOOST_CHECK(!config.SetWebhookClientNumThreads(0, &err));
+    BOOST_CHECK(!config.SetWebhookClientNumThreads(-1, &err));
+}
+
 BOOST_AUTO_TEST_CASE(dsattempt_config)
 {
     GlobalConfig config {};

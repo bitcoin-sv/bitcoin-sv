@@ -195,6 +195,7 @@ BITCOIN_CORE_H = \
   rpc/tojson.h \
   rpc/register.h \
   rpc/text_writer.h \
+  rpc/webhook_client_defaults.h \
   scheduler.h \
   script_config.h \
   script/scriptcache.h \

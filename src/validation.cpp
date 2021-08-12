@@ -2452,8 +2452,8 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
     {
         return SafeModeLevel::VALID;
     }
-    else if (chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_FORK_DISTANCE &&
-             chainActive.Tip()->GetChainWork() + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_POW_DIFFERENCE) <= pindexForkTip->GetChainWork())
+    else if (chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE &&
+             chainActive.Tip()->GetChainWork() + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE) <= pindexForkTip->GetChainWork())
     {
         if (forkTipStatus.isInvalid())
         {

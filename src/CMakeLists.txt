@@ -478,6 +478,7 @@ add_library(server
 	rpc/server.cpp
 	rpc/server.h
 	rpc/tojson.h
+    rpc/webhook_client_defaults.h
 	script/ismine.cpp
 	script/ismine.h
 	script/scriptcache.cpp

@@ -118,6 +118,13 @@ void GlobalConfig::Reset()
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
 
+    // Safe mode activation
+    safeModeWebhookAddress = "";
+    safeModeWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    safeModeWebhookPath = "";
+    safeModeMinBlockDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
+    safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
+
     // Block download
     blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
     blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
@@ -129,6 +136,9 @@ void GlobalConfig::Reset()
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
     streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+
+    // RPC parameters
+    webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
 
     // Double-Spend parameters
     dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
@@ -1101,6 +1111,93 @@ InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
     return invalidTxFileSinkEvictionPolicy;
 }
 
+// Safe mode activation
+bool GlobalConfig::SetSafeModeWebhookURL(const std::string& url, std::string* err)
+{
+    try
+    {
+        int port { rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT };
+        std::string host {};
+        std::string protocol {};
+        std::string endpoint {};
+        SplitURL(url, protocol, host, port, endpoint);
+
+        // Check for any protocol other than http
+        if(protocol != "http")
+        {
+            if(err)
+            {
+                *err = "Unsupported protocol in safe mode webhook notification URL";
+            }
+            return false;
+        }
+
+        safeModeWebhookAddress = host;
+        safeModeWebhookPort = port;
+        safeModeWebhookPath = endpoint;
+    }
+    catch(const std::exception&)
+    {
+        if(err)
+        {
+            *err = "Badly formatted safe mode webhook URL";
+        }
+        return false;
+    }
+
+    return true;
+}
+std::string GlobalConfig::GetSafeModeWebhookAddress() const
+{
+    return safeModeWebhookAddress;
+}
+int16_t GlobalConfig::GetSafeModeWebhookPort() const
+{
+    return safeModeWebhookPort;
+}
+std::string GlobalConfig::GetSafeModeWebhookPath() const
+{
+    return safeModeWebhookPath;
+}
+
+bool GlobalConfig::SetSafeModeMinBlockDifference(int32_t min, std::string* err)
+{
+    if(min <= 0)
+    {
+        if(err)
+        {
+            *err = "Safe mode minimum block difference must be greater than 0";
+        }
+        return false;
+    }
+
+    safeModeMinBlockDifference = min;
+    return true;
+}
+int32_t GlobalConfig::GetSafeModeMinBlockDifference() const
+{
+    return safeModeMinBlockDifference;
+}
+
+bool GlobalConfig::SetSafeModeMaxForkDistance(int32_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Safe mode maximum fork distance must be greater than 0";
+        }
+        return false;
+    }
+
+    safeModeMaxForkDistance = max;
+    return true;
+}
+int32_t GlobalConfig::GetSafeModeMaxForkDistance() const
+{
+    return safeModeMaxForkDistance;
+}
+
 // Block download
 bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
 {
@@ -1241,6 +1338,27 @@ bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
 unsigned int GlobalConfig::GetBanScoreThreshold() const
 {
     return banScoreThreshold;
+}
+
+// RPC parameters
+bool GlobalConfig::SetWebhookClientNumThreads(int64_t num, std::string* err)
+{
+    if(num <= 0 || num > static_cast<int64_t>(rpc::client::WebhookClientDefaults::MAX_NUM_THREADS))
+    {
+        if(err)
+        {
+            *err = "Webhook client number of threads must be between 1 and " +
+                std::to_string(rpc::client::WebhookClientDefaults::MAX_NUM_THREADS);
+        }
+        return false;
+    }
+
+    webhookClientNumThreads = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetWebhookClientNumThreads() const
+{
+    return webhookClientNumThreads;
 }
 
 // Double-Spend Parameters
