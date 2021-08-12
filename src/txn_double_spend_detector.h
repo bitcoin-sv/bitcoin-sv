@@ -19,11 +19,18 @@ using TxnDoubleSpendDetectorSPtr = std::shared_ptr<CTxnDoubleSpendDetector>;
 /**
  * A basic class used to detect a double spend issue in an early stage of txn validation.
  */
-
-class CTxnDoubleSpendDetector {
-  public:
+class CTxnDoubleSpendDetector
+{
+public:
     CTxnDoubleSpendDetector() = default;
     ~CTxnDoubleSpendDetector() = default;
+
+    CTxnDoubleSpendDetector(const CTxnDoubleSpendDetector&) = delete;
+    CTxnDoubleSpendDetector& operator=(CTxnDoubleSpendDetector&) = delete;
+
+    CTxnDoubleSpendDetector(CTxnDoubleSpendDetector&&) = delete;
+    CTxnDoubleSpendDetector& operator=(CTxnDoubleSpendDetector&&) = delete;
+
     /**
      * Insert txn's inputs into known spends only if non of it's inputs is already known.
      * @param pTxInputData Transaction's input data
