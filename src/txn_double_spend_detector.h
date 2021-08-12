@@ -39,10 +39,11 @@ public:
      * @return true if inserted, false otherwise.
      */
     bool insertTxnInputs(
-	    const TxInputDataSPtr& pTxInputData,
+        const std::shared_ptr<const CTransaction>&,
 	    const CTxMemPool& pool,
 	    CValidationState& state,
         bool isFinal);
+
     /**
      * Remove txn's inputs for known spends.
      * In case one of the transactions was not added this is a no-op.
@@ -59,6 +60,13 @@ public:
      * Clear known spends.
      */
     void clear();
+    
+    // deprecated
+    bool insertTxnInputs(
+	    const std::shared_ptr<CTxInputData>& pTxInputData, 
+	    const CTxMemPool& pool,
+	    CValidationState& state,
+        bool isFinal);
 
   private:
     /** Check if any of txn's inputs is already known */

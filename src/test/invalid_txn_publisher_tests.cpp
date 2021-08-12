@@ -78,7 +78,7 @@ namespace
             CValidationState state;
             bool accepted =
                 mDetector.insertTxnInputs(
-                    MakeDoubleSpendDetectorData(txn),
+                    MakeDoubleSpendDetectorData(txn)->GetTxnPtr(),
                     mempool,
                     state,
                     true);

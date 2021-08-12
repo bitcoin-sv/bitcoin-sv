@@ -6,15 +6,15 @@
 
 #include "consensus/validation.h"
 #include "txmempool.h"
+#include <memory>
 
 bool CTxnDoubleSpendDetector::insertTxnInputs(
-    const TxInputDataSPtr& pTxInputData,
+    const std::shared_ptr<const CTransaction>& ptx,
     const CTxMemPool& pool,
     CValidationState& state,
-    bool isFinal) {
-
-    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
-    const CTransaction &tx = *ptx;
+    bool isFinal)
+{
+    const CTransaction& tx{*ptx};
 
     if (tx.vin.empty()) {
         // only a coinbase can have empty inputs and those should never get here
@@ -56,6 +56,19 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
     }
     return true;
 }
+
+// deprecated
+bool CTxnDoubleSpendDetector::insertTxnInputs(
+    const std::shared_ptr<CTxInputData>& pTxInputData,
+    const CTxMemPool& pool,
+    CValidationState& state,
+    bool isFinal) 
+{
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr(); 
+    return insertTxnInputs(ptx, pool, state, isFinal);
+    //return insertTxnInputs(*pTxInputData, pool, state, isFinal);
+}
+
 
 void CTxnDoubleSpendDetector::removeTxnInputs(const CTransaction &tx)
 {
