@@ -10,20 +10,22 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+#include <memory>
+
+using namespace std;
 
 namespace
 {
     // Create an orphan txn
-    TxInputDataSPtr CreateTxnWithNInputs(
-        TxSource source,
-        size_t nNumInputs) {
-
+    auto CreateTxnWithNInputs(size_t nNumInputs)
+    {
         CKey key;
         key.MakeNewKey(true);
 
         CMutableTransaction tx;
         tx.vin.resize(nNumInputs);
-        for (size_t i=0; i<nNumInputs; i++) {
+        for(size_t i = 0; i < nNumInputs; i++)
+        {
             tx.vin[i].prevout = COutPoint(InsecureRand256(), 0);
             tx.vin[i].scriptSig << OP_1;
         }
@@ -31,12 +33,8 @@ namespace
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-        // Return a shared object with txn's input data
-        return std::make_shared<CTxInputData>(
-                   g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
-                   MakeTransactionRef(tx),  // a pointer to the tx
-                   source,                   // tx source
-                   TxValidationPriority::normal);          // tx validation priority
+
+        return MakeTransactionRef(tx);
     }
 }
 
@@ -45,40 +43,38 @@ BOOST_FIXTURE_TEST_SUITE(test_double_spend_detector, TestingSetup)
 BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs)
 {
     CTxnDoubleSpendDetector dsDetector;
-
-    auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
-    auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx2 = *txnInputData2->GetTxnPtr();
-    auto txnInputData3 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx3 = *txnInputData3->GetTxnPtr();
-
     CValidationState state;
+    
     // tx1 checks
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData1, mempool, state, true));
-    BOOST_REQUIRE(!dsDetector.insertTxnInputs(txnInputData1, mempool, state, true));
+    const auto ptx1 = CreateTxnWithNInputs(10);
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
+    BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx1, mempool, state, true));
+    
     // tx2 checks
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData2, mempool, state, true));
-    BOOST_REQUIRE(!dsDetector.insertTxnInputs(txnInputData2, mempool, state, true));
+    const auto ptx2 = CreateTxnWithNInputs(10);
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx2, mempool, state, true));
+    BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx2, mempool, state, true));
+    
     // tx3 checks
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData3, mempool, state, true));
-    BOOST_REQUIRE(!dsDetector.insertTxnInputs(txnInputData3, mempool, state, true));
+    const auto ptx3 = CreateTxnWithNInputs(10);
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx3, mempool, state, true));
+    BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx3, mempool, state, true));
  
-    auto nTxnsVinSize = tx1.vin.size() + tx2.vin.size() + tx3.vin.size();
+    const auto nTxnsVinSize = ptx1->vin.size() + ptx2->vin.size() + ptx3->vin.size();
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == nTxnsVinSize);
 }
 
 BOOST_AUTO_TEST_CASE(test_detector_conflicts)
 {
     CTxnDoubleSpendDetector dsDetector;
-
-    auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
-    auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx2 = *txnInputData2->GetTxnPtr();
-
     CValidationState state;
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData1, mempool, state, true));
+
+    const auto ptx1 = CreateTxnWithNInputs(10);
+    const CTransaction& tx1{*ptx1};
+    const auto ptx2 = CreateTxnWithNInputs(10);
+    const CTransaction& tx2{*ptx2};
+
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
     // Assign tx1's input as the first input of tx2 
     const_cast<COutPoint&>(tx2.vin[0].prevout) = const_cast<COutPoint&>(tx1.vin[0].prevout);
 
@@ -89,7 +85,7 @@ BOOST_AUTO_TEST_CASE(test_detector_conflicts)
 
     // Try to add conflicted transaction
     // Should not change anything
-    BOOST_REQUIRE(!dsDetector.insertTxnInputs(txnInputData2, mempool, state, true));
+    BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx2, mempool, state, true));
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == tx1.vin.size());
 
     // Try to remove inputs from a copy of tx1 that was never added after a try
@@ -100,28 +96,31 @@ BOOST_AUTO_TEST_CASE(test_detector_conflicts)
 
     // Check if we are able to add tx2 after conflicting inputs were removed
     dsDetector.removeTxnInputs(tx1);
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData2, mempool, state, true));
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx2, mempool, state, true));
 }
 
 BOOST_AUTO_TEST_CASE(test_detector_remove_txn_inputs)
 {
     CTxnDoubleSpendDetector dsDetector;
-
-    auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10000);
-    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
-    auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx2 = *txnInputData2->GetTxnPtr();
-
     CValidationState state;
+
+    const auto ptx1 = CreateTxnWithNInputs(10'000);
+    const auto ptx2 = CreateTxnWithNInputs(10);
+    
     // Insert tx1
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData1, mempool, state, true));
+    const CTransaction& tx1{*ptx1};
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == tx1.vin.size());
+    
     // Try to remove inputs from a non existing txn
+    const CTransaction& tx2{*ptx2};
     dsDetector.removeTxnInputs(tx2);
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == tx1.vin.size());
+
     // Add inputs from tx2
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData2, mempool, state, true));
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx2, mempool, state, true));
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == tx1.vin.size() + tx2.vin.size());
+
     // Remove inputs from tx2
     dsDetector.removeTxnInputs(tx2);
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == tx1.vin.size());
@@ -131,13 +130,12 @@ BOOST_AUTO_TEST_CASE(test_detector_clear_txn_inputs)
 {
     CTxnDoubleSpendDetector dsDetector;
 
-    auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10000);
-    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
+    const auto ptx = CreateTxnWithNInputs(10'000);
 
     CValidationState state;
-    // Insert tx1
-    BOOST_REQUIRE(dsDetector.insertTxnInputs(txnInputData1, mempool, state, true));
-    BOOST_CHECK(dsDetector.getKnownSpendsSize() == tx1.vin.size());
+    BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx, mempool, state, true));
+    
+    BOOST_CHECK(dsDetector.getKnownSpendsSize() == ptx->vin.size());
     dsDetector.clear();
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == 0);
 }
