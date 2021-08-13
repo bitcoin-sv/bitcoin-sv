@@ -17,15 +17,15 @@ using namespace std;
 namespace
 {
     // Create an orphan txn
-    unique_ptr<CTxInputData> CreateTxnWithNInputs(TxSource source,
-                                                  size_t nNumInputs)
+    auto CreateTxnWithNInputs(size_t nNumInputs)
     {
         CKey key;
         key.MakeNewKey(true);
 
         CMutableTransaction tx;
         tx.vin.resize(nNumInputs);
-        for (size_t i=0; i<nNumInputs; i++) {
+        for(size_t i = 0; i < nNumInputs; i++)
+        {
             tx.vin[i].prevout = COutPoint(InsecureRand256(), 0);
             tx.vin[i].scriptSig << OP_1;
         }
@@ -33,11 +33,8 @@ namespace
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-        return std::make_unique<CTxInputData>(
-                   g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
-                   MakeTransactionRef(tx),  // a pointer to the tx
-                   source,                   // tx source
-                   TxValidationPriority::normal);          // tx validation priority
+
+        return MakeTransactionRef(tx);
     }
 }
 
@@ -49,20 +46,17 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs)
     CValidationState state;
     
     // tx1 checks
-    const auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const auto ptx1{txnInputData1->GetTxnPtr()};
+    const auto ptx1 = CreateTxnWithNInputs(10);
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
     BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx1, mempool, state, true));
     
     // tx2 checks
-    const auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const auto ptx2{txnInputData2->GetTxnPtr()};
+    const auto ptx2 = CreateTxnWithNInputs(10);
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx2, mempool, state, true));
     BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx2, mempool, state, true));
     
     // tx3 checks
-    const auto txnInputData3 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const auto ptx3{txnInputData3->GetTxnPtr()};
+    const auto ptx3 = CreateTxnWithNInputs(10);
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx3, mempool, state, true));
     BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx3, mempool, state, true));
  
@@ -75,11 +69,9 @@ BOOST_AUTO_TEST_CASE(test_detector_conflicts)
     CTxnDoubleSpendDetector dsDetector;
     CValidationState state;
 
-    const auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const auto ptx1{txnInputData1->GetTxnPtr()};
+    const auto ptx1 = CreateTxnWithNInputs(10);
     const CTransaction& tx1{*ptx1};
-    const auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const auto ptx2{txnInputData2->GetTxnPtr()};
+    const auto ptx2 = CreateTxnWithNInputs(10);
     const CTransaction& tx2{*ptx2};
 
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
@@ -112,10 +104,8 @@ BOOST_AUTO_TEST_CASE(test_detector_remove_txn_inputs)
     CTxnDoubleSpendDetector dsDetector;
     CValidationState state;
 
-    const auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10000);
-    const auto ptx1{txnInputData1->GetTxnPtr()};
-    const auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const auto ptx2{txnInputData2->GetTxnPtr()};
+    const auto ptx1 = CreateTxnWithNInputs(10'000);
+    const auto ptx2 = CreateTxnWithNInputs(10);
     
     // Insert tx1
     const CTransaction& tx1{*ptx1};
@@ -140,8 +130,7 @@ BOOST_AUTO_TEST_CASE(test_detector_clear_txn_inputs)
 {
     CTxnDoubleSpendDetector dsDetector;
 
-    const auto txnInputData = CreateTxnWithNInputs(TxSource::p2p, 10000);
-    const auto ptx{txnInputData->GetTxnPtr()};
+    const auto ptx = CreateTxnWithNInputs(10'000);
 
     CValidationState state;
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx, mempool, state, true));
