@@ -780,6 +780,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt("-safemodemaxforkdistance=<n>",
             strprintf("Maximum distance of forks last common block from current active tip to enter safe mode "
                 "(default: %d)", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE));
+        strUsage += HelpMessageOpt("-safemodeminvalidforklength=<n>",
+            strprintf("Minimum length of valid fork to enter safe mode "
+                "(default: %d)", SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH));
+        strUsage += HelpMessageOpt("-safemodemaxvalidforkdistance=<n>",
+            strprintf("Maximum distance of valid forks last common block from current active tip to enter safe mode "
+                "(default: %d)", SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE));
         strUsage +=
             HelpMessageOpt("-dropmessagestest=<n>",
                            "Randomly drop 1 of every <n> network messages");
@@ -2177,6 +2183,12 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetSafeModeMaxForkDistance(gArgs.GetArg("-safemodemaxforkdistance", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMinValidForkLength(gArgs.GetArg("-safemodeminvalidforklength", SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMaxValidForkDistance(gArgs.GetArg("-safemodemaxvalidforkdistance", SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE), &err)) {
         return InitError(err);
     }
 

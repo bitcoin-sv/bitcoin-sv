@@ -124,6 +124,8 @@ void GlobalConfig::Reset()
     safeModeWebhookPath = "";
     safeModeMinBlockDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
     safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
+    safeModeMinValidForkLength = SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH;
+    safeModeMaxValidForkDistance = SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE;
 
     // Block download
     blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
@@ -1196,6 +1198,44 @@ bool GlobalConfig::SetSafeModeMaxForkDistance(int32_t max, std::string* err)
 int32_t GlobalConfig::GetSafeModeMaxForkDistance() const
 {
     return safeModeMaxForkDistance;
+}
+
+bool GlobalConfig::SetSafeModeMinValidForkLength(int32_t min, std::string* err)
+{
+    if(min <= 0)
+    {
+        if(err)
+        {
+            *err = "Safe mode minimum valid fork length must be greater than 0";
+        }
+        return false;
+    }
+
+    safeModeMinValidForkLength = min;
+    return true;
+}
+int32_t GlobalConfig::GetSafeModeMinValidForkLength() const
+{
+    return safeModeMinValidForkLength;
+}
+
+bool GlobalConfig::SetSafeModeMaxValidForkDistance(int32_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Safe mode maximum valid fork distance must be greater than 0";
+        }
+        return false;
+    }
+
+    safeModeMaxValidForkDistance = max;
+    return true;
+}
+int32_t GlobalConfig::GetSafeModeMaxValidForkDistance() const
+{
+    return safeModeMaxValidForkDistance;
 }
 
 // Block download

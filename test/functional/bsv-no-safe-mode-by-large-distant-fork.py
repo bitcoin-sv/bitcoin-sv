@@ -19,7 +19,7 @@ from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlo
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal
-from test_framework.cdefs import SAFE_MODE_MAX_FORK_DISTANCE, SAFE_MODE_MIN_POW_DIFFERENCE
+from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 
 class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
@@ -40,13 +40,13 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
             branch_1_root, last_block_time = make_block(conn1, last_block_time = last_block_time)
             branch_1_blocks = [branch_1_root]
-            for _ in range(SAFE_MODE_MAX_FORK_DISTANCE):
+            for _ in range(SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE):
                 new_block, last_block_time = make_block(conn1, branch_1_blocks[-1], last_block_time = last_block_time)
                 branch_1_blocks.append(new_block)
 
             branch_2_root, last_block_time = make_block(conn2, makeValid=False, last_block_time = last_block_time)
             branch_2_blocks = [branch_2_root]
-            for _ in range(SAFE_MODE_MAX_FORK_DISTANCE + SAFE_MODE_MIN_POW_DIFFERENCE + 1):
+            for _ in range(SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE + SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE + 1):
                 new_block, last_block_time = make_block(conn2, branch_2_blocks[-1], last_block_time = last_block_time)
                 branch_2_blocks.append(new_block)
 

@@ -99,6 +99,8 @@ public:
     virtual std::string GetSafeModeWebhookPath() const = 0;
     virtual int32_t GetSafeModeMinBlockDifference() const = 0;
     virtual int32_t GetSafeModeMaxForkDistance() const = 0;
+    virtual int32_t GetSafeModeMinValidForkLength() const = 0;
+    virtual int32_t GetSafeModeMaxValidForkDistance() const = 0;
 
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
@@ -213,6 +215,8 @@ public:
     virtual bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
     virtual bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) = 0;
     virtual bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) = 0;
 
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
@@ -456,6 +460,10 @@ public:
     int32_t GetSafeModeMinBlockDifference() const override;
     bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) override;
     int32_t GetSafeModeMaxForkDistance() const override;
+    bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) override;
+    int32_t GetSafeModeMinValidForkLength() const override;
+    bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) override;
+    int32_t GetSafeModeMaxValidForkDistance() const override;
 
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
@@ -629,6 +637,8 @@ private:
     std::string safeModeWebhookPath;
     int32_t safeModeMinBlockDifference;
     int32_t safeModeMaxForkDistance;
+    int32_t safeModeMinValidForkLength;
+    int32_t safeModeMaxValidForkDistance;
 
     // Block download
     uint64_t blockStallingMinDownloadSpeed;
@@ -1055,6 +1065,10 @@ public:
     int32_t GetSafeModeMinBlockDifference() const override { return SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE; }
     bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) override { return true; }
     int32_t GetSafeModeMaxForkDistance() const override { return SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE; }
+    bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) override { return true; }
+    int32_t GetSafeModeMinValidForkLength() const override { return SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH; }
+    bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) override { return true; }
+    int32_t GetSafeModeMaxValidForkDistance() const override { return SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE; }
 
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }

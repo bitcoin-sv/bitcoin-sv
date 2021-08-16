@@ -292,12 +292,12 @@ int GetProcessingBlocksCount();
 /**
  * Minimum length of valid fork that trigger safe mode.
  */
-static const int SAFE_MODE_MIN_VALID_FORK_LENGTH = 7;
+static const int SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH = 7;
 
 /**
  * Maximum distance of valid fork tip from active tip.
  */
-static const int SAFE_MODE_MAX_VALID_FORK_DISTANCE = 72;
+static const int SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE = 72;
 
 /**
  * Maximum distance of forks last common block from current active tip

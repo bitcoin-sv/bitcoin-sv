@@ -440,7 +440,19 @@ BOOST_AUTO_TEST_CASE(safe_mode_config)
     BOOST_CHECK(config.SetSafeModeMaxForkDistance(2 * SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, &err));
     BOOST_CHECK_EQUAL(config.GetSafeModeMaxForkDistance(), 2 * SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE);
     BOOST_CHECK(!config.SetSafeModeMaxForkDistance(0, &err));
-    BOOST_CHECK(!config.SetSafeModeMaxForkDistance(-1, &err));
+ 
+    BOOST_CHECK_EQUAL(config.GetSafeModeMinValidForkLength(), SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH);
+    BOOST_CHECK(config.SetSafeModeMinValidForkLength(2 * SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH, &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeMinValidForkLength(), 2 * SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH);
+    BOOST_CHECK(!config.SetSafeModeMinValidForkLength(0, &err));
+    BOOST_CHECK(!config.SetSafeModeMinValidForkLength(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetSafeModeMaxValidForkDistance(), SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE);
+    BOOST_CHECK(config.SetSafeModeMaxValidForkDistance(2 * SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE, &err));
+    BOOST_CHECK_EQUAL(config.GetSafeModeMaxValidForkDistance(), 2 * SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE);
+    BOOST_CHECK(!config.SetSafeModeMaxValidForkDistance(0, &err));
+    BOOST_CHECK(!config.SetSafeModeMaxValidForkDistance(-1, &err));
+    BOOST_CHECK(!config.SetSafeModeMaxValidForkDistance(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(rpc_config)
