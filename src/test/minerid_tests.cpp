@@ -3,14 +3,13 @@
 // LICENSE.
 
 #include <algorithm>
-#include <bits/stdint-uintn.h>
-#include <boost/test/tools/old/interface.hpp>
 #include <cassert>
+#include <cctype>
+#include <iterator>
 
 #include <boost/algorithm/hex.hpp>
 #include <boost/test/unit_test.hpp>
-#include <cctype>
-#include <iterator>
+#include <boost/test/tools/old/interface.hpp>
 
 #include "chainparams.h"
 #include "consensus/validation.h"
@@ -18,9 +17,10 @@
 #include "keystore.h"
 #include "miner_id/miner_id.h"
 #include "script/script.h"
-#include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+
+#include "test/test_bitcoin.h"
 
 namespace ba = boost::algorithm;
 

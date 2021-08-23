@@ -1,17 +1,17 @@
 // Copyright (c) 2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <string_view>
+
+#include <boost/test/tools/old/interface.hpp>
+#include <boost/test/unit_test.hpp>
+
 #include "miner_id/coinbase_doc.h"
 #include "miner_id/miner_id.h"
 #include "primitives/transaction.h"
-#include "test/test_bitcoin.h"
 #include "univalue.h"
 
-#include <bits/stdint-intn.h>
-#include <bits/stdint-uintn.h>
-#include <boost/test/tools/old/interface.hpp>
-#include <boost/test/unit_test.hpp>
-#include <string_view>
+#include "test/test_bitcoin.h"
 
 using namespace std;
 
