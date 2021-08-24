@@ -5,7 +5,7 @@
 #include "miner_id.h"
 
 #include <array>
-#include <bits/stdint-uintn.h>
+#include <cstdint>
 #include <iterator>
 #include <string_view>
 
