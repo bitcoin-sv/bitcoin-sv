@@ -253,6 +253,7 @@ add_library(common
 	keystore.h
 	limitedmap.h
 	memusage.h
+	merkleproof.h
 	merkletree.h
 	mining/assembler.h
 	mining/candidates.h
@@ -423,6 +424,7 @@ add_library(server
 	mempooltxdb.h
 	merkleblock.cpp
 	merkleblock.h
+	merkleproof.cpp
 	merkletree.cpp
 	merkletreedb.cpp
 	merkletreedb.h
