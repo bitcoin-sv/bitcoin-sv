@@ -89,6 +89,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
     dsattempt_tests.cpp
+    dsdetected_tests.cpp
 	dstencode_tests.cpp
     dstxn_serialiser_tests.cpp
 	enum_cast_tests.cpp
