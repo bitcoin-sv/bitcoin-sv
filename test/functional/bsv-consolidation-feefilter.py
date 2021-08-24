@@ -63,7 +63,7 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            #"-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
             "-txindex=1"
             ],[
             "-whitelist=127.0.0.1",
@@ -72,7 +72,7 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            #"-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
             "-txindex=1"
         ]]
 
