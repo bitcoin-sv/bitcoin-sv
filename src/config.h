@@ -20,6 +20,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "validation.h"
 #include "script_config.h"
 #include "invalid_txn_publisher.h"
+#include "txn_validator.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -49,10 +50,12 @@ public:
     virtual uint64_t GetMinConfConsolidationInput() const = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
+    virtual CFeeRate GetDustRelayFee() const = 0;
     virtual int64_t GetDustLimitFactor() const = 0;
     virtual CFeeRate GetBlockMinFeePerKB() const = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
+    virtual bool GetDataCarrier() const = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
     virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
@@ -69,6 +72,7 @@ public:
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
+    virtual std::chrono::milliseconds GetMaxTxnValidatorAsyncTasksRunDuration() const = 0;
     virtual bool GetValidationClockCPU() const = 0;
     virtual std::chrono::milliseconds GetMaxTxnChainValidationBudget() const = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
@@ -167,10 +171,12 @@ public:
     virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
     virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
+    virtual bool SetDustRelayFee(Amount amt, std::string* err = nullptr) = 0;
     virtual bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) = 0;
     virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
+    virtual void SetDataCarrier(bool dataCarrier) = 0;
     virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
@@ -190,6 +196,7 @@ public:
     virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) = 0;
     virtual void SetValidationClockCPU(bool enable) = 0;
     virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
@@ -251,6 +258,25 @@ public:
     // state
     virtual void Reset() = 0;
 
+    // Check maxtxnvalidatorasynctasksrunduration, maxstdtxvalidationduration  and maxnonstdtxvalidationduration values
+    bool CheckTxValidationDurations(std::string& err)
+    {
+        if (!(this->GetMaxStdTxnValidationDuration().count() < this->GetMaxNonStdTxnValidationDuration().count()))
+        {
+            err = "maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration";
+            return false;
+        }
+
+        if(this->GetMaxTxnValidatorAsyncTasksRunDuration().count() <= this->GetMaxNonStdTxnValidationDuration().count())
+        {
+            err = "maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration";
+            return false;
+        }
+
+        return true;
+    }
+
+
     // Double-Spend processing parameters
     virtual bool SetDoubleSpendNotificationLevel(int level, std::string* err) = 0;
     virtual bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) = 0;
@@ -279,7 +305,7 @@ protected:
     ~ConfigInit() = default;
 };
 
-class GlobalConfig final : public ConfigInit {
+class GlobalConfig : public ConfigInit {
 public:
     GlobalConfig();
 
@@ -317,6 +343,9 @@ public:
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
 
+    bool SetDustRelayFee(Amount amt, std::string* err = nullptr) override;
+    CFeeRate GetDustRelayFee() const override;
+
     bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override;
     int64_t GetDustLimitFactor() const override;
 
@@ -328,6 +357,9 @@ public:
 
     void SetDataCarrierSize(uint64_t dataCarrierSize) override;
     uint64_t GetDataCarrierSize() const override;
+
+    void SetDataCarrier(bool dataCarrier) override;
+    bool GetDataCarrier() const override;
 
     bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) override;
     uint64_t GetLimitAncestorCount() const override;
@@ -380,6 +412,9 @@ public:
     bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override;
 
+    bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxTxnValidatorAsyncTasksRunDuration() const override;
+
     bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxTxnChainValidationBudget() const override;
 
@@ -403,13 +438,13 @@ public:
     bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
-    uint64_t GetMaxCoinsViewCacheSize() const override {return mMaxCoinsViewCacheSize;}
+    uint64_t GetMaxCoinsViewCacheSize() const override {return data->mMaxCoinsViewCacheSize;}
 
     bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) override;
-    uint64_t GetMaxCoinsProviderCacheSize() const override {return mMaxCoinsProviderCacheSize;}
+    uint64_t GetMaxCoinsProviderCacheSize() const override {return data->mMaxCoinsProviderCacheSize;}
 
     bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) override;
-    uint64_t GetMaxCoinsDbOpenFiles() const override {return mMaxCoinsDbOpenFiles; }
+    uint64_t GetMaxCoinsDbOpenFiles() const override {return data->mMaxCoinsDbOpenFiles; }
 
     void SetInvalidBlocks(const std::set<uint256>& hashes) override; 
     const std::set<uint256>& GetInvalidBlocks() const override;
@@ -482,7 +517,7 @@ public:
 
     // P2P parameters
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
-    int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
+    int64_t GetP2PHandshakeTimeout() const override { return data->p2pHandshakeTimeout; }
     bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override;
     int64_t GetStreamSendRateLimit() const override;
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override;
@@ -564,152 +599,165 @@ public:
     static ConfigInit& GetModifiableGlobalConfig();
 
 private:
-    // All fileds are initialized in Reset()    
-    CFeeRate feePerKB;
-    int64_t dustLimitFactor;
-    CFeeRate blockMinFeePerKB;
-    uint64_t preferredBlockFileSize;
-    uint64_t factorMaxSendQueuesBytes;
-
-    // Block size limits 
-    // SetDefaultBlockSizeParams must be called before reading any of those
-    bool  setDefaultBlockSizeParamsCalled;
     void  CheckSetDefaultCalled() const;
 
-    // Defines when either maxGeneratedBlockSizeBefore or maxGeneratedBlockSizeAfter is used
-    int64_t blockSizeActivationTime;
-    uint64_t maxBlockSize;
-    // Used when SetMaxBlockSize is called with value 0
-    uint64_t defaultBlockSize;
-    uint64_t maxGeneratedBlockSizeBefore;
-    uint64_t maxGeneratedBlockSizeAfter;
-    bool maxGeneratedBlockSizeOverridden;
+    struct GlobalConfigData {
+    private: friend class GlobalConfig;
+        // All fileds are initialized in Reset()    
+        CFeeRate feePerKB;
+        CFeeRate dustRelayFee{DUST_RELAY_TX_FEE};
+        int64_t dustLimitFactor;
+        CFeeRate blockMinFeePerKB;
+        uint64_t preferredBlockFileSize;
+        uint64_t factorMaxSendQueuesBytes;
 
-    uint64_t maxTxSizePolicy;
-    uint64_t minConsolidationFactor;
-    uint64_t maxConsolidationInputScriptSize;
-    uint64_t minConfConsolidationInput;
-    bool acceptNonStdConsolidationInput;
-    uint64_t dataCarrierSize;
-    uint64_t limitAncestorCount;
-    uint64_t limitSecondaryMempoolAncestorCount;
+        // Block size limits 
+        // SetDefaultBlockSizeParams must be called before reading any of those
+        bool  setDefaultBlockSizeParamsCalled;
 
-    bool testBlockCandidateValidity;
-    mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
+        // Defines when either maxGeneratedBlockSizeBefore or maxGeneratedBlockSizeAfter is used
+        int64_t blockSizeActivationTime;
+        uint64_t maxBlockSize;
+        // Used when SetMaxBlockSize is called with value 0
+        uint64_t defaultBlockSize;
+        uint64_t maxGeneratedBlockSizeBefore;
+        uint64_t maxGeneratedBlockSizeAfter;
+        bool maxGeneratedBlockSizeOverridden;
 
-    int32_t genesisActivationHeight;
+        uint64_t maxTxSizePolicy;
+        uint64_t minConsolidationFactor;
+        uint64_t maxConsolidationInputScriptSize;
+        uint64_t minConfConsolidationInput;
+        bool acceptNonStdConsolidationInput;
+        uint64_t dataCarrierSize;
+        bool dataCarrier {DEFAULT_ACCEPT_DATACARRIER};
+        uint64_t limitAncestorCount;
+        uint64_t limitSecondaryMempoolAncestorCount;
 
-    int mMaxConcurrentAsyncTasksPerNode;
+        bool testBlockCandidateValidity;
+        mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
 
-    int mMaxParallelBlocks;
-    int mPerBlockScriptValidatorThreadsCount;
-    int mPerBlockScriptValidationMaxBatchSize;
+        int32_t genesisActivationHeight;
 
-    uint64_t maxOpsPerScriptPolicy;
+        int mMaxConcurrentAsyncTasksPerNode;
 
-    uint64_t maxTxSigOpsCountPolicy;
-    uint64_t maxPubKeysPerMultiSig;
-    uint64_t genesisGracefulPeriod;
+        int mMaxParallelBlocks;
+        int mPerBlockScriptValidatorThreadsCount;
+        int mPerBlockScriptValidationMaxBatchSize;
 
-    std::chrono::milliseconds mMaxStdTxnValidationDuration;
-    std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
-    std::chrono::milliseconds mMaxTxnChainValidationBudget;
+        uint64_t maxOpsPerScriptPolicy;
 
-    bool mValidationClockCPU;
+        uint64_t maxTxSigOpsCountPolicy;
+        uint64_t maxPubKeysPerMultiSig;
+        uint64_t genesisGracefulPeriod;
 
-    uint64_t maxStackMemoryUsagePolicy;
-    uint64_t maxStackMemoryUsageConsensus;
+        std::chrono::milliseconds mMaxStdTxnValidationDuration;
+        std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
+        std::chrono::milliseconds mMaxTxnValidatorAsyncTasksRunDuration;
+        std::chrono::milliseconds mMaxTxnChainValidationBudget;
 
-    uint64_t maxScriptSizePolicy;
+        bool mValidationClockCPU;
 
-    uint64_t maxScriptNumLengthPolicy;
+        uint64_t maxStackMemoryUsagePolicy;
+        uint64_t maxStackMemoryUsageConsensus;
 
-    bool mAcceptNonStandardOutput;
+        uint64_t maxScriptSizePolicy;
 
-    uint64_t mMaxCoinsViewCacheSize;
-    uint64_t mMaxCoinsProviderCacheSize;
+        uint64_t maxScriptNumLengthPolicy;
 
-    uint64_t mMaxCoinsDbOpenFiles;
+        bool mAcceptNonStandardOutput;
 
-    uint64_t mMaxMempool;
-    uint64_t mMaxMempoolSizeDisk;
-    uint64_t mMempoolMaxPercentCPFP;
-    uint64_t mMemPoolExpiry;
-    uint64_t mMaxOrphanTxSize;
-    uint64_t mMaxPercentageOfOrphansInMaxBatchSize;
-    uint64_t mMaxInputsForSecondLayerOrphan;
-    int32_t mStopAtHeight;
-    uint64_t mPromiscuousMempoolFlags;
-    bool mIsSetPromiscuousMempoolFlags;
+        uint64_t mMaxCoinsViewCacheSize;
+        uint64_t mMaxCoinsProviderCacheSize;
 
-    std::set<uint256> mInvalidBlocks;
+        uint64_t mMaxCoinsDbOpenFiles;
 
-    std::set<std::string> mBannedUAClients;
-    uint64_t maxMerkleTreeDiskSpace;
-    uint64_t preferredMerkleTreeFileSize;
-    uint64_t maxMerkleTreeMemoryCacheSize;
+        uint64_t mMaxMempool;
+        uint64_t mMaxMempoolSizeDisk;
+        uint64_t mMempoolMaxPercentCPFP;
+        uint64_t mMemPoolExpiry;
+        uint64_t mMaxOrphanTxSize;
+        uint64_t mMaxPercentageOfOrphansInMaxBatchSize;
+        uint64_t mMaxInputsForSecondLayerOrphan;
+        int32_t mStopAtHeight;
+        uint64_t mPromiscuousMempoolFlags;
+        bool mIsSetPromiscuousMempoolFlags;
 
-    std::set<std::string> invalidTxSinks;
-    int64_t invalidTxFileSinkSize;
-    InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
+        std::set<uint256> mInvalidBlocks;
 
-    // Block download
-    uint64_t blockStallingMinDownloadSpeed;
-    int64_t blockStallingTimeout;
-    int64_t blockDownloadWindow;
-    int64_t blockDownloadSlowFetchTimeout;
-    uint64_t blockDownloadMaxParallelFetch;
-    int64_t blockDownloadTimeoutBase;
-    int64_t blockDownloadTimeoutBaseIBD;
-    int64_t blockDownloadTimeoutPerPeer;
+        std::set<std::string> mBannedUAClients;
+        uint64_t maxMerkleTreeDiskSpace;
+        uint64_t preferredMerkleTreeFileSize;
+        uint64_t maxMerkleTreeMemoryCacheSize;
 
-    // P2P parameters
-    int64_t p2pHandshakeTimeout;
-    int64_t streamSendRateLimit;
-    unsigned int maxProtocolRecvPayloadLength;
-    unsigned int maxProtocolSendPayloadLength;
-    unsigned int recvInvQueueFactor;
-    unsigned int banScoreThreshold;
+        std::set<std::string> invalidTxSinks;
+        int64_t invalidTxFileSinkSize;
+        InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
-    // RPC parameters
-    uint64_t webhookClientNumThreads;
+        // Block download
+        uint64_t blockStallingMinDownloadSpeed;
+        int64_t blockStallingTimeout;
+        int64_t blockDownloadWindow;
+        int64_t blockDownloadSlowFetchTimeout;
+        uint64_t blockDownloadMaxParallelFetch;
+        int64_t blockDownloadTimeoutBase;
+        int64_t blockDownloadTimeoutBaseIBD;
+        int64_t blockDownloadTimeoutPerPeer;
 
-    // Double-Spend parameters
-    DSAttemptHandler::NotificationLevel dsNotificationLevel;
-    int dsEndpointFastTimeout;
-    int dsEndpointSlowTimeout;
-    uint64_t dsEndpointSlowRatePerHour;
-    int dsEndpointPort;
-    uint64_t dsEndpointBlacklistSize;
-    std::set<std::string> dsEndpointSkipList;
-    uint64_t dsEndpointMaxCount;
-    uint64_t dsAttemptTxnRemember;
-    uint64_t dsAttemptNumFastThreads;
-    uint64_t dsAttemptNumSlowThreads;
-    uint64_t dsAttemptQueueMaxMemory;
-    std::string dsDetectedWebhookAddress;
-    int16_t dsDetectedWebhookPort;
-    std::string dsDetectedWebhookPath;
-    uint64_t dsDetectedWebhookMaxTxnSize;
+        // P2P parameters
+        int64_t p2pHandshakeTimeout;
+        int64_t streamSendRateLimit;
+        unsigned int maxProtocolRecvPayloadLength;
+        unsigned int maxProtocolSendPayloadLength;
+        unsigned int recvInvQueueFactor;
+        unsigned int banScoreThreshold;
 
-    std::string safeModeWebhookAddress;
-    int16_t safeModeWebhookPort;
-    std::string safeModeWebhookPath;
-    int64_t safeModeMaxForkDistance;
-    int64_t safeModeMinForkLength;
-    int64_t safeModeMinHeightDifference;
+        // RPC parameters
+        uint64_t webhookClientNumThreads;
 
-    std::optional<bool> mDisableBIP30Checks;
+        // Double-Spend parameters
+        DSAttemptHandler::NotificationLevel dsNotificationLevel;
+        int dsEndpointFastTimeout;
+        int dsEndpointSlowTimeout;
+        uint64_t dsEndpointSlowRatePerHour;
+        int dsEndpointPort;
+        uint64_t dsEndpointBlacklistSize;
+        std::set<std::string> dsEndpointSkipList;
+        uint64_t dsEndpointMaxCount;
+        uint64_t dsAttemptTxnRemember;
+        uint64_t dsAttemptNumFastThreads;
+        uint64_t dsAttemptNumSlowThreads;
+        uint64_t dsAttemptQueueMaxMemory;
+        std::string dsDetectedWebhookAddress;
+        int16_t dsDetectedWebhookPort;
+        std::string dsDetectedWebhookPath;
+        uint64_t dsDetectedWebhookMaxTxnSize;
 
-#if ENABLE_ZMQ
-    int64_t invalidTxZMQMaxMessageSize;
-#endif
+        std::string safeModeWebhookAddress;
+        int16_t safeModeWebhookPort;
+        std::string safeModeWebhookPath;
+        int64_t safeModeMaxForkDistance;
+        int64_t safeModeMinForkLength;
+        int64_t safeModeMinHeightDifference;
 
-    std::int32_t mSoftConsensusFreezeDuration;
+        std::optional<bool> mDisableBIP30Checks;
 
-    // Only for values that can change in runtime
-    mutable std::shared_mutex configMtx{};
+    #if ENABLE_ZMQ
+        int64_t invalidTxZMQMaxMessageSize;
+    #endif
 
+        std::int32_t mSoftConsensusFreezeDuration;
+
+        // Only for values that can change in runtime
+        mutable std::shared_mutex configMtx{};
+    };
+    std::shared_ptr<GlobalConfigData> data = std::make_shared<GlobalConfigData>();
+
+protected:
+    GlobalConfig(std::shared_ptr<GlobalConfigData> data);
+
+public:
+    std::shared_ptr<GlobalConfigData> getGlobalConfigData() const;
 };
 
 // Dummy for subclassing in unittests
@@ -786,6 +834,9 @@ public:
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
 
+    bool SetDustRelayFee(Amount amt, std::string* err = nullptr) override { return true; };
+    CFeeRate GetDustRelayFee() const override { return CFeeRate(Amount(DUST_RELAY_TX_FEE)); };
+
     bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override{return true;};
     int64_t GetDustLimitFactor() const override { return 0; }
 
@@ -797,6 +848,9 @@ public:
 
     uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override { dataCarrierSize = dataCarrierSizeIn; }
+
+    bool GetDataCarrier() const override { return dataCarrier; }
+    void SetDataCarrier(bool dataCarrierIn) override { dataCarrier = dataCarrierIn; }
 
     bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) override {return true;}
     uint64_t GetLimitAncestorCount() const override { return 0; }
@@ -899,6 +953,18 @@ public:
     std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override
     {
         return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
+    }
+
+    bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+
+        return false;
+    }
+
+    std::chrono::milliseconds GetMaxTxnValidatorAsyncTasksRunDuration() const override
+    {
+        return CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION;
     }
 
     bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override
@@ -1098,7 +1164,7 @@ public:
     int64_t GetBlockDownloadTimeoutBase() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE; }
     bool SetBlockDownloadTimeoutBaseIBD(int64_t max, std::string* err = nullptr) override { return true; }
     int64_t GetBlockDownloadTimeoutBaseIBD() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD; }
-    bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) override { return true; }
+    bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) { return true; }
     int64_t GetBlockDownloadTimeoutPerPeer() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER; }
 
     // P2P parameters
@@ -1217,6 +1283,7 @@ public:
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
+    bool dataCarrier {DEFAULT_ACCEPT_DATACARRIER};
     int32_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
