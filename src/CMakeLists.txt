@@ -316,6 +316,8 @@ add_library(common
 	threadpoolT.h
 	time_locked_mempool.h
 	timedata.h
+	transaction_specific_config.cpp
+	transaction_specific_config.h
 	tx_mempool_info.h
 	txhasher.cpp
 	txhasher.h
