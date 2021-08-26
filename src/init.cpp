@@ -1348,6 +1348,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
 
+    strUsage += HelpMessageOpt(
+        "-softconsensusfreezeduration",
+        strprintf("Set for how many blocks a block that contains transaction spending "
+                  "consensus frozen TXO will remain frozen before it auto unfreezes "
+                  "due to the amount of child blocks that were mined after it "
+                  "(default: %u; note: 0 - soft consensus freeze duration is "
+                  "disabled and block is frozen indefinitely).",
+                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
     return strUsage;
 }
 
@@ -2581,6 +2590,16 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     const uint64_t recvInvQueueFactorArg = gArgs.GetArg("-recvinvqueuefactor", DEFAULT_RECV_INV_QUEUE_FACTOR);
     if (std::string err; !config.SetRecvInvQueueFactor(recvInvQueueFactorArg, &err))
+    {
+        return InitError(err);
+    }
+
+    if (std::string err;
+        !config.SetSoftConsensusFreezeDuration(
+            gArgs.GetArg(
+                "-softconsensusfreezeduration",
+                DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION),
+            &err))
     {
         return InitError(err);
     }

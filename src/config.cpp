@@ -154,6 +154,7 @@ void GlobalConfig::Reset()
     preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
     maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
 
+    mSoftConsensusFreezeDuration = DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -1883,4 +1884,22 @@ uint64_t GlobalConfig::GetPromiscuousMempoolFlags() const {
 }
 bool GlobalConfig::IsSetPromiscuousMempoolFlags() const {
     return mIsSetPromiscuousMempoolFlags;
+}
+
+bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err )
+{
+    if (LessThanZero(duration, err, "Soft consensus freeze cannot be configured with a negative value."))
+    {
+        return false;
+    }
+
+    mSoftConsensusFreezeDuration =
+        duration ? duration : std::numeric_limits<std::int32_t>::max();
+
+    return true;
+}
+
+std::int32_t GlobalConfig::GetSoftConsensusFreezeDuration() const
+{
+    return mSoftConsensusFreezeDuration;
 }

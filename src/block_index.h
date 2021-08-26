@@ -349,6 +349,36 @@ private:
     //! (memory only) Source from which we received the first instance of a block.
     CBlockSource mBlockSource{CBlockSource::MakeUnknown()};
 
+    /**
+     * If >=0, this block is considered soft consensus frozen. Value specifies number of descendants
+     * in chain after this block that should also be considered consensus frozen.
+     *
+     * If <0, this block is not considered soft rejected (i.e. it is a normal block).
+     *
+     * NOTE: Value is memory only as persistence on disk is not needed since we
+     *       can always recalculate the value during execution.
+     */
+    std::int32_t mSoftConsensusFreezeForNBlocks{ -1 };
+
+    /**
+     * Indicator whether current block is soft consensus frozen either due to
+     * explicit freeze or implicit due to parent being frozen.
+     *
+     * It is calculated as:
+     * std::max( mSoftConsensusFreezeForNBlocks, parent.mSoftConsensusFreezeForNBlocks - 1)
+     *
+     * For the next block in chain, value of this member is always equal to the value in parent minus one,
+     * value of current block or is -1 if value in parent is already -1. This way soft rejection status is propagated
+     * down the chain and a descendant block that is high enough will not be soft rejected anymore.
+     *
+     * This value is used in best chain selection algorithm. Chains whose tip is soft consensus frozen,
+     * are not considered when selecting best chain.
+     *
+     * NOTE: Value is memory only as persistence on disk is not needed since we
+     *       can always recalculate the value during execution.
+     */
+    std::int32_t mSoftConsensusFreezeForNBlocksCumulative{ -1 };
+
 public:
     /**
      * Used after indexes are loaded from the database to update their chain
@@ -464,6 +494,41 @@ public:
         }
 
         mBlockSource = source;
+    }
+
+    void SoftConsensusFreeze( std::int32_t freezeForNBlocks )
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        assert( freezeForNBlocks >= 0 );
+        assert( mSoftConsensusFreezeForNBlocks == -1 );
+
+        mSoftConsensusFreezeForNBlocks = freezeForNBlocks;
+        mSoftConsensusFreezeForNBlocksCumulative =
+            std::max(
+                mSoftConsensusFreezeForNBlocksCumulative,
+                mSoftConsensusFreezeForNBlocks );
+    }
+
+    void UpdateSoftConsensusFreezeFromParent()
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        UpdateSoftConsensusFreezeFromParentNL();
+    }
+
+    bool IsInExplicitSoftConsensusFreeze() const
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        return mSoftConsensusFreezeForNBlocks != -1;
+    }
+
+    bool IsInSoftConsensusFreeze() const
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        return mSoftConsensusFreezeForNBlocksCumulative != -1;
     }
 
     /**
@@ -843,6 +908,8 @@ private:
             // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
             // constructor are OK.
             SetSoftRejectedFromParentBaseNL();
+
+            UpdateSoftConsensusFreezeFromParentNL();
         }
         nTimeReceived = GetTime();
         nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
@@ -981,6 +1048,24 @@ private:
     }
 
     std::mutex& GetMutex() const;
+
+    void UpdateSoftConsensusFreezeFromParentNL()
+    {
+        assert( pprev ); // !IsGenesis
+
+        if ( pprev->mSoftConsensusFreezeForNBlocksCumulative != -1 )
+        {
+            mSoftConsensusFreezeForNBlocksCumulative =
+                std::max(
+                    mSoftConsensusFreezeForNBlocks,
+                    pprev->mSoftConsensusFreezeForNBlocksCumulative - 1);
+        }
+        else
+        {
+            mSoftConsensusFreezeForNBlocksCumulative =
+                mSoftConsensusFreezeForNBlocks;
+        }
+    }
 };
 
 /**

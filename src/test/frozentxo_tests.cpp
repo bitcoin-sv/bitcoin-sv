@@ -3,8 +3,11 @@
 
 #include "validation.h"
 
+#include "block_index_store.h"
+#include "config.h"
 #include "frozentxo.h"
 #include "frozentxo_db.h"
+#include "pow.h"
 #include "test/test_bitcoin.h"
 #include <boost/test/unit_test.hpp>
 #include <vector>
@@ -34,6 +37,23 @@ void validateInputs(
     BOOST_CHECK_EQUAL( state.GetRejectReason(), errorReason );
 }
 
+void populateBlocks( BlockIndexStore& blockIndexStore, CChain& blocks, std::size_t count )
+{
+    CBlockIndex* prev{};
+    uint256 prevHash;
+    for(std::size_t i = 0; i < count; ++i)
+    {
+        CBlockHeader header;
+        header.nTime = i;
+        header.hashPrevBlock = prevHash;
+        header.nBits = GetNextWorkRequired( prev, &header, GlobalConfig::GetConfig() );
+
+        prev = blockIndexStore.Insert( header );
+        blocks.SetTip( prev );
+        prevHash = prev->GetBlockHash();
+    }
+}
+
 } // anonymous namespace
 
 BOOST_AUTO_TEST_CASE(negative_Consensus_CheckTxInputs)
@@ -56,28 +76,28 @@ BOOST_AUTO_TEST_CASE(negative_Consensus_CheckTxInputs)
         0);
 
     // dummy block hashes
-    auto parentHash = InsecureRand256();
-    auto childHash = InsecureRand256();
     std::int64_t childReceiveTime{999};
+
+    CChain blocks;
+    BlockIndexStore blockIndexStore;
+    populateBlocks( blockIndexStore, blocks, 3 );
 
     std::vector<CFrozenTXOCheck> frozenTXOCheckTransaction; // NOTE: element index is block height at which check is performed
     std::vector<CFrozenTXOCheck> frozenTXOCheckBlock;
+    uint256 prevHash;
+
     for(std::int32_t h=0; h<3; ++h)
     {
         frozenTXOCheckTransaction.emplace_back(
             h,
             "test transaction",
-            parentHash
+            prevHash
         );
         
-        frozenTXOCheckBlock.emplace_back(
-            h,
-            "test block",
-            parentHash,
-            childReceiveTime,
-            childHash
-        );
-    }   
+        frozenTXOCheckBlock.emplace_back( *blocks[h] );
+
+        prevHash = blocks[h]->GetBlockHash();
+    }
 
     // enforce policy level freeze
     CFrozenTXODB::Instance().FreezeTXOPolicyOnly(txTemplate.vin[0].prevout);

@@ -3,10 +3,16 @@
 
 #include "frozentxo.h"
 
+#include "block_index.h"
 #include "frozentxo_db.h"
 #include "frozentxo_logging.h"
 #include "primitives/transaction.h"
 #include "uint256.h"
+
+namespace
+{
+    uint256 zeroHash = {};
+}
 
 CFrozenTXOCheck::CFrozenTXOCheck(
     std::int32_t nHeight,
@@ -19,19 +25,23 @@ CFrozenTXOCheck::CFrozenTXOCheck(
     , mReceivedTime{receivedTime}
 {}
 
-CFrozenTXOCheck::CFrozenTXOCheck(
-    std::int32_t nHeight,
-    const std::string& source,
-    const uint256& previousActiveBlockHash,
-    std::int64_t receivedTime,
-    const uint256& blockHash)
-    : CFrozenTXOCheck{nHeight, source, previousActiveBlockHash, receivedTime}
+CFrozenTXOCheck::CFrozenTXOCheck( const CBlockIndex& blockIndex )
+    : CFrozenTXOCheck{
+        blockIndex.GetHeight(),
+        blockIndex.GetBlockSource().ToString(),
+        (blockIndex.GetPrev() ? blockIndex.GetPrev()->GetBlockHash() : zeroHash),
+        blockIndex.GetHeaderReceivedTime() }
 {
-    mBlockHash = &blockHash;
+    mBlockIndex = &blockIndex;
 }
 
 bool CFrozenTXOCheck::Check(const COutPoint& outpoint, TxGetter& txGetter)
 {
+    if(IsCheckOnBlock() && mBlockIndex->IsInExplicitSoftConsensusFreeze())
+    {
+        return true;
+    }
+
     auto ftd=CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
     if(!CFrozenTXODB::Instance().GetFrozenTXOData(outpoint, ftd))
     {
@@ -40,8 +50,7 @@ bool CFrozenTXOCheck::Check(const COutPoint& outpoint, TxGetter& txGetter)
     }
 
     CFrozenTXODB::FrozenTXOData::Blacklist effective_blacklist;
-    bool validatingBlock = (mBlockHash != nullptr);
-    if(validatingBlock)
+    if(IsCheckOnBlock())
     {
         // When validating block, we only consider TXOs frozen on consensus blacklist
         if(!ftd.IsFrozenOnConsensus(this->nHeight)) // NOTE: Assuming specified height is equal to height of the block that is currently being validated
@@ -78,9 +87,9 @@ bool CFrozenTXOCheck::Check(const COutPoint& outpoint, TxGetter& txGetter)
         mPreviousActiveBlockHash
     };
 
-    if(validatingBlock)
+    if(IsCheckOnBlock())
     {
-        CFrozenTXOLogger::Instance().LogRejectedBlock(entry, *mBlockHash);
+        CFrozenTXOLogger::Instance().LogRejectedBlock(entry, mBlockIndex->GetBlockHash());
     }
     else
     {
