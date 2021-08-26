@@ -71,7 +71,7 @@ public:
         return mpTx;
     }
     // GetNodePtr
-    const std::weak_ptr<CNode>& GetNodePtr() {
+    const std::weak_ptr<CNode>& GetNodePtr() const {
         return mpNode;
     }
     // GetAbsurdFee

@@ -19,6 +19,9 @@
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "disk_tx_pos.h"
+#include "frozentxo.h"
+#include "frozentxo_db.h"
+#include "frozentxo_logging.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
@@ -701,6 +704,12 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
         }
     }
 
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        "mempool and cache",
+        chainActive.Tip()->GetBlockHash(),
+        0}; // Data not known
+
     // For Consenus parameter false is used because we already use policy rules in first CheckInputs call
     // from TxnValidation function that is called before this one, and if that call succeeds then we 
     // can use policy rules again but with different flags now
@@ -715,7 +724,8 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
                 flags,
                 cacheSigStore,  /* sigCacheStore */
                 true,           /* scriptCacheStore */
-                txdata);
+                txdata,
+                frozenTXOCheck);
 }
 
 static bool CheckTxOutputs(
@@ -969,6 +979,31 @@ static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
         return true;
     }
     return false;
+}
+
+static CBlockSource TxInputDataToSource(const CTxInputData& data)
+{
+    switch(data.GetTxSource())
+    {
+    case TxSource::file:
+        return CBlockSource::MakeLocal("file");
+    case TxSource::reorg:
+        return CBlockSource::MakeLocal("reorg");
+    case TxSource::wallet:
+        return CBlockSource::MakeLocal("wallet");
+    case TxSource::rpc:
+        return CBlockSource::MakeRPC();
+    case TxSource::p2p:
+        if(const CNodePtr& pNode = data.GetNodePtr().lock())
+        {
+            return CBlockSource::MakeP2P(pNode->GetAssociation().GetPeerAddr().ToString());
+        }
+
+        // for unit tests only - test_txvalidator.cpp
+        return CBlockSource::MakeP2P("disconnected");
+    default:
+        return CBlockSource::MakeUnknown();
+    }
 }
 
 static std::shared_ptr<task::CCancellationSource> MakeValidationCancellationSource(
@@ -1292,6 +1327,12 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData, vCoinsToUncache};
     }
 
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        TxInputDataToSource(*pTxInputData).ToString(),
+        chainActive.Tip()->GetBlockHash(),
+        nAcceptTime};
+
     // We are getting flags as they would be if the utxos are before genesis. 
     // "CheckInputs" is adding specific flags for each input based on its height in the main chain
     uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
@@ -1310,7 +1351,8 @@ CTxnValResult TxnValidation(
             scriptVerifyFlags,
             true,      /* sigCacheStore */
             false,     /* scriptCacheStore */
-            txdata);
+            txdata,
+            frozenTXOCheck);
 
     if (!res.has_value())
     {
@@ -1385,7 +1427,8 @@ CTxnValResult TxnValidation(
                 MANDATORY_SCRIPT_VERIFY_FLAGS,
                 true,      /* sigCacheStore */
                 false,     /* scriptCacheStore */
-                txdata);
+                txdata,
+                frozenTXOCheck);
         if (!res.has_value())
         {
             state.SetValidationTimeoutExceeded();
@@ -2689,7 +2732,8 @@ std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
 
 namespace Consensus {
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight) {
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
+                   CFrozenTXOCheck& frozenTXOCheck) {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it
     // easier for an attacker to attempt to split the network.
     if (!inputs.HaveInputs(tx)) {
@@ -2700,6 +2744,17 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
+
+        if(!frozenTXOCheck.Check(prevout, tx))
+        {
+            return
+                state.Invalid(
+                    false,
+                    REJECT_INVALID,
+                    "bad-txns-inputs-frozen",
+                    "tried to spend blacklisted input");
+        }
+
         auto coin = inputs.GetCoin(prevout);
         assert(coin.has_value() && !coin->IsSpent());
 
@@ -2875,13 +2930,14 @@ std::optional<bool> CheckInputs(
     bool sigCacheStore,
     bool scriptCacheStore,
     const PrecomputedTransactionData& txdata,
+    CFrozenTXOCheck& frozenTXOCheck,
     std::vector<CScriptCheck>* pvChecks)
 {
     assert(!tx.IsCoinBase());
 
     const auto [ spendHeight, mtp ] = GetSpendHeightAndMTP(inputs);
     (void)mtp;  // Silence unused variable warning
-    if (!Consensus::CheckTxInputs(tx, state, inputs, spendHeight)) 
+    if (!Consensus::CheckTxInputs(tx, state, inputs, spendHeight, frozenTXOCheck))
     {
         return false;
     }
@@ -3390,6 +3446,13 @@ private:
         CDiskTxPos pos(pindex->GetBlockPos(),
                        GetSizeOfCompactSize(block.vtx.size()));
 
+        CFrozenTXOCheck frozenTXOCheck{
+            pindex->GetHeight(),
+            pindex->GetBlockSource().ToString(),
+            pindex->GetPrev()->GetBlockHash(),
+            pindex->GetHeaderReceivedTime(),
+            pindex->GetBlockHash()};
+
         for (size_t i = 0; i < block.vtx.size(); i++) {
             auto& txRef = block.vtx[i];
             const CTransaction &tx = *txRef;
@@ -3464,6 +3527,7 @@ private:
                         fCacheResults,
                         fCacheResults,
                         PrecomputedTransactionData(tx),
+                        frozenTXOCheck,
                         &vChecks);
                 if (!res.has_value())
                 {
@@ -5261,7 +5325,8 @@ static bool ReceivedBlockTransactions(
     CValidationState &state,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos,
-    const CDiskBlockMetaData& metaData)
+    const CDiskBlockMetaData& metaData,
+    const CBlockSource& source)
 {
     // Validate TTOR order for blocks that are MIN_TTOR_VALIDATION_DISTANCE blocks or more from active tip
     if (chainActive.Tip() && chainActive.Tip()->GetHeight() - pindexNew->GetHeight() >= MIN_TTOR_VALIDATION_DISTANCE)
@@ -5278,7 +5343,7 @@ static bool ReceivedBlockTransactions(
         }
     }
 
-    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData, mapBlockIndex);
+    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData, source, mapBlockIndex);
 
     if (pindexNew->IsGenesis() || pindexNew->GetPrev()->GetChainTx())
     {
@@ -5826,7 +5891,8 @@ static bool AcceptBlock(const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     CValidationState& state, CBlockIndex** ppindex,
     bool fRequested, const CDiskBlockPos* dbp,
-    bool* fNewBlock) {
+    bool *fNewBlock,
+    const CBlockSource& source) {
     AssertLockHeld(cs_main);
 
     const CBlock& block = *pblock;
@@ -5954,7 +6020,7 @@ static bool AcceptBlock(const Config& config,
                 AbortNode(state, "Failed to write block");
             }
         }
-        if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData)) {
+        if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData, source)) {
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
         }
     }
@@ -6004,6 +6070,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
     bool* fNewBlock,
+    const CBlockSource& source,
     const BlockValidationOptions& validationOptions)
 {
     auto guard = CBlockProcessing::GetCountGuard();
@@ -6034,7 +6101,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
         if (ret) {
             // Store to disk
             ret = AcceptBlock(config, pblock, state, &pindex, fForceProcessing,
-                              nullptr, fNewBlock);
+                              nullptr, fNewBlock, source);
         }
         CheckBlockIndex(chainparams.GetConsensus());
         if (!ret) {
@@ -6075,12 +6142,13 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock,
+                     const CBlockSource& blockSource,
                      const BlockValidationOptions& validationOptions)
 {
     auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock, validationOptions);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock, blockSource, validationOptions);
 
     if(!bestChainActivation)
     {
@@ -6755,7 +6823,9 @@ bool InitBlockIndex(const Config &config) {
                     "LoadBlockIndex(): writing genesis block to disk failed");
             }
             CBlockIndex *pindex = AddToBlockIndex(block);
-            if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData)) {
+            if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData,
+                CBlockSource::MakeLocal("genesis")))
+            {
                 return error("LoadBlockIndex(): genesis block not accepted");
             }
         } catch (const std::runtime_error &e) {
@@ -6885,7 +6955,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                     LOCK(cs_main);
                     CValidationState state;
                     if (AcceptBlock(config, pblock, state, nullptr, true, dbp,
-                                    nullptr)) {
+                                    nullptr, CBlockSource::MakeLocal("external block file"))) {
                         nLoaded++;
                     }
                     if (state.IsError()) {
@@ -6944,7 +7014,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                             CValidationState dummy;
                             if (AcceptBlock(config, pblockrecursive, dummy,
                                             nullptr, true, &it->second,
-                                            nullptr)) {
+                                            nullptr, CBlockSource::MakeLocal("external block file"))) {
                                 nLoaded++;
                                 queue.push_back(pblockrecursive->GetHash());
                             }
@@ -7270,3 +7340,15 @@ double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pin
     return pindex->GetChainTx() / fTxTotal;
 }
 
+
+void InitFrozenTXO(std::size_t cache_size)
+{
+    CFrozenTXOLogger::Init();
+    CFrozenTXODB::Init(cache_size);
+}
+
+void ShutdownFrozenTXO()
+{
+    CFrozenTXODB::Shutdown();
+    CFrozenTXOLogger::Shutdown();
+}

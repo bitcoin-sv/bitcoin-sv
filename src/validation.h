@@ -45,6 +45,7 @@ class CBlockTreeDB;
 class CBloomFilter;
 class CChainParams;
 class CConnman;
+class CFrozenTXOCheck;
 class CInv;
 class Config;
 class CScriptCheck;
@@ -441,6 +442,7 @@ bool VerifyNewBlock(const Config &config,
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock, 
+                     const CBlockSource& source,
                      const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
@@ -457,6 +459,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
     bool* fNewBlock,
+    const CBlockSource& source,
     const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
@@ -917,6 +920,7 @@ std::optional<bool> CheckInputs(
     bool sigCacheStore,
     bool scriptCacheStore,
     const PrecomputedTransactionData& txdata,
+    CFrozenTXOCheck& frozenTXOCheck,
     std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -938,7 +942,8 @@ namespace Consensus {
  * sigs. Preconditions: tx.IsCoinBase() is false.
  */
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight);
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
+                   CFrozenTXOCheck& frozenTXOCheck);
 
 } // namespace Consensus
 
@@ -1160,5 +1165,27 @@ static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);
+
+
+/** Default value for parameter -frozentxodbcache: cache size for database holding a list of frozen transaction outputs (in bytes) */
+constexpr std::size_t DEFAULT_FROZEN_TXO_DB_CACHE = 128 * ONE_KILOBYTE;
+
+/**
+ * Initialize FrozenTXODB database by calling CFrozenTXODB::Init() with given parameters.
+ *
+ * FrozenTXOLogger is also initialized by calling CFrozenTXOLogger::Init().
+ *
+ * This should typically only be called during application initialization.
+ *
+ * @param cache_size @see CFrozenTXODB::Init()
+ */
+void InitFrozenTXO(std::size_t cache_size);
+
+/**
+ * Shutdown FrozenTXODB database and FrozenTXOLogger by calling CFrozenTXODB::Shutdown() and CFrozenTXOLogger::Shutdown(), respectively.
+ *
+ * This should typically only be called before application quits.
+ */
+void ShutdownFrozenTXO();
 
 #endif // BITCOIN_VALIDATION_H

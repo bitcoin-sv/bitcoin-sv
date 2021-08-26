@@ -2747,7 +2747,7 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
         // new tip (missing previous block, chain not long enough, etc)
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock);
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
         if(!bestChainActivation)
         {
             // something went wrong before we need to activate best chain
@@ -3015,7 +3015,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
             pfrom->GetId());
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock);
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
@@ -3078,7 +3078,7 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
             pfrom->GetId());
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, forceProcessing, &fNewBlock);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, forceProcessing, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
     if(!bestChainActivation)
     {
         // something went wrong before we need to activate best chain
