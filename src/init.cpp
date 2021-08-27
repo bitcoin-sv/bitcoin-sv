@@ -2547,10 +2547,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-dustrelayfee")) {
         Amount n(0);
         auto parsed = ParseMoney(gArgs.GetArg("-dustrelayfee", ""), n);
-        if (!parsed || Amount(0) == n)
+        if (!parsed || !config.SetDustRelayFee(n))
             return InitError(AmountErrMsg("dustrelayfee",
                                           gArgs.GetArg("-dustrelayfee", "")));
-        dustRelayFee = CFeeRate(n);
+    }
+    else
+    {
+        config.SetDustRelayFee(DUST_RELAY_TX_FEE);
     }
 
     fRequireStandard =

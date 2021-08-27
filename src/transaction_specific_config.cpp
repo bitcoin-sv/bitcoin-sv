@@ -310,3 +310,13 @@ int64_t TransactionSpecificConfig::GetDustLimitFactor() const
     return mDustLimitFactor.has_value() ? *mDustLimitFactor : GlobalConfig::GetDustLimitFactor();
 };
 
+void TransactionSpecificConfig::SetTransactionSpecificDustRelayFee(CFeeRate amt)
+{
+    mDustRelayFee = amt;
+};
+
+CFeeRate TransactionSpecificConfig::GetDustRelayFee() const
+{
+    return mDustRelayFee.has_value() ? *mDustRelayFee : GlobalConfig::GetDustRelayFee();
+};
+

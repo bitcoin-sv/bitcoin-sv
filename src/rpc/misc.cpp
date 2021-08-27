@@ -1236,7 +1236,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
     obj.push_back(Pair("datacarrier", fAcceptDatacarrier));
     obj.push_back(Pair("minrelaytxfee", ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
-    obj.push_back(Pair("dustrelayfee", ValueFromAmount(dustRelayFee.GetFeePerK())));
+    obj.push_back(Pair("dustrelayfee", ValueFromAmount(config.GetDustRelayFee().GetFeePerK())));
     obj.push_back(Pair("dustlimitfactor", config.GetDustLimitFactor()));
     obj.push_back(Pair("blockmintxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));

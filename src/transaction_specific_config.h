@@ -62,6 +62,9 @@ public:
     bool SetTransactionSpecificDustLimitFactor(int64_t factor, std::string* err = nullptr);
     int64_t GetDustLimitFactor() const override;
 
+    void SetTransactionSpecificDustRelayFee(CFeeRate amt);
+    CFeeRate GetDustRelayFee() const override;
+
 private:
     std::optional<uint64_t> mMaxTxSize;
     std::optional<uint64_t> mDataCarrierSize;
@@ -79,4 +82,5 @@ private:
     std::optional<uint64_t> mMinConsolidationInput;
     std::optional<bool> mAcceptNonStdConsoldationInput;
     std::optional<uint64_t> mDustLimitFactor;
+    std::optional<CFeeRate> mDustRelayFee;
 };
