@@ -1577,7 +1577,7 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
             result =
                 TxnValidation(
                     elem,
-                    config,
+                    elem.get()->GetConfig(config),
                     pool,
                     handlers.mpTxnDoubleSpendDetector,
                     fUseLimits,
