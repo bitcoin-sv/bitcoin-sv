@@ -4427,7 +4427,7 @@ static bool ActivateBestChainStep(
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
-    
+
     try {
 
         class RAIIUpdateMempool
@@ -4448,15 +4448,36 @@ static bool ActivateBestChainStep(
                 ,changeSet{cs}
                 ,state{ st }
             {
-                // we are diconnecting until we reach the fork point
-                while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-                    if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
-                        // This is likely a fatal error.
-                        fDisconnectFailed = true;
-                        return;
+                auto needTipDisconnect = [&]{ return chainActive.Tip() && chainActive.Tip() != pindexFork; };
+
+                if (needTipDisconnect())
+                {
+                    LogPrintf(
+                        "Performing best chain tip %s rollback to older fork point %s.\n",
+                        chainActive.Tip()->GetBlockHash().ToString(),
+                        pindexFork->GetBlockHash().ToString() );
+
+                    try
+                    {
+                        // we are diconnecting until we reach the fork point
+                        do
+                        {
+                            if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+                                // This is likely a fatal error.
+                                fDisconnectFailed = true;
+                                return;
+                            }
+                            fBlocksDisconnected = true;
+                        } while (needTipDisconnect());
                     }
-                    fBlocksDisconnected = true;
-                } 
+                    catch( ... )
+                    {
+                        // handle exceptions in constructor as incompletely
+                        // constructed instance will not call the destructor
+                        UpdateIfNeeded();
+                        throw;
+                    }
+                }
             }
 
             ~RAIIUpdateMempool()

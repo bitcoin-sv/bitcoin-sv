@@ -3044,3 +3044,12 @@ void CTxMemPool::DumpMempool(uint64_t version) {
     getNonFinalPool().dumpMempool();
 }
 
+DisconnectedBlockTransactions::~DisconnectedBlockTransactions()
+{
+    if (!queuedTx.empty())
+    {
+        LogPrintf(
+            "ERROR in ~DisconnectedBlockTransactions: queuedTx not empty!"
+            " Some transactions will be dropped from mempool.\n");
+    }
+}
