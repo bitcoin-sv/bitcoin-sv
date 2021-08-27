@@ -65,6 +65,9 @@ public:
     void SetTransactionSpecificDustRelayFee(CFeeRate amt);
     CFeeRate GetDustRelayFee() const override;
 
+    void SetTransactionSpecificDataCarrier(bool dataCarrier);
+    bool GetDataCarrier() const override;
+
 private:
     std::optional<uint64_t> mMaxTxSize;
     std::optional<uint64_t> mDataCarrierSize;
@@ -83,4 +86,5 @@ private:
     std::optional<bool> mAcceptNonStdConsoldationInput;
     std::optional<uint64_t> mDustLimitFactor;
     std::optional<CFeeRate> mDustRelayFee;
+    std::optional<bool> mDataCarrier;
 };

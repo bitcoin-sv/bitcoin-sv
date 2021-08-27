@@ -320,3 +320,11 @@ CFeeRate TransactionSpecificConfig::GetDustRelayFee() const
     return mDustRelayFee.has_value() ? *mDustRelayFee : GlobalConfig::GetDustRelayFee();
 };
 
+void TransactionSpecificConfig::SetTransactionSpecificDataCarrier(bool dataCarrier)
+{
+    mDataCarrier = dataCarrier;
+};
+bool TransactionSpecificConfig::GetDataCarrier() const
+{
+    return mDataCarrier.has_value() ? *mDataCarrier : GlobalConfig::GetDataCarrier();
+};

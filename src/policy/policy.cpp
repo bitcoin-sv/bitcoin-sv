@@ -40,7 +40,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
         if (n < 1 || n > 3) return false;
         if (m < 1 || m > n) return false;
     } else if (whichType == TX_NULL_DATA) {
-        if (!fAcceptDatacarrier) {
+        if (!config.GetDataCarrier()) {
             return false;
         }
     }
