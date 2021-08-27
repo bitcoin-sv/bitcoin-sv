@@ -1369,6 +1369,17 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
 
     strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookurl=<url>",
+        "URL of a webhook to notify on receipt of a double-spend detected P2P message from another node. For example: "
+        "http://127.0.0.1/dsdetected/webhook");
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookmaxtxnsize=<n>",
+        strprintf(_("Maximum size of transaction to forward to the double-spend detected webhook. For double-spent transactions "
+                    "above this size only the transaction ID will be reported to the webhook (default: %uMB). "
+                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
+
+    strUsage += HelpMessageOpt(
         "-softconsensusfreezeduration",
         strprintf("Set for how many blocks a block that contains transaction spending "
                   "consensus frozen TXO will remain frozen before it auto unfreezes "
@@ -2429,6 +2440,18 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
     if(std::string err; !config.SetDoubleSpendQueueMaxMemory(
         gArgs.GetArgAsBytes("-dsattemptqueuemaxmemory", DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY, ONE_MEBIBYTE), &err))
+    {
+        return InitError(err);
+    }
+    if(gArgs.IsArgSet("-dsdetectedwebhookurl"))
+    {
+        if(std::string err; !config.SetDoubleSpendDetectedWebhookURL(gArgs.GetArg("-dsdetectedwebhookurl", ""), &err))
+        {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetDoubleSpendDetectedWebhookMaxTxnSize(
+        gArgs.GetArgAsBytes("-dsdetectedwebhookmaxtxnsize", DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE, ONE_MEBIBYTE), &err))
     {
         return InitError(err);
     }

@@ -398,6 +398,7 @@ add_library(server
 	double_spend/dsattempt_handler.h
 	double_spend/dscallback_msg.cpp
 	double_spend/dscallback_msg.h
+	double_spend/dsdetected_defaults.h
 	double_spend/dsdetected_message.cpp
 	double_spend/dsdetected_message.h
 	double_spend/dstxn_serialiser.cpp

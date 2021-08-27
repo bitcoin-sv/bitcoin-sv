@@ -118,6 +118,7 @@ BITCOIN_CORE_H = \
   disk_tx_pos.h \
   double_spend/dsattempt_handler.h \
   double_spend/dscallback_msg.h \
+  double_spend/dsdetected_defaults.h \
   double_spend/dsdetected_message.h \
   double_spend/dstxn_serialiser.h \
   double_spend/time_limited_blacklist.h \

@@ -155,6 +155,10 @@ void GlobalConfig::Reset()
     dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
     dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
     dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
+    dsDetectedWebhookAddress = "";
+    dsDetectedWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    dsDetectedWebhookPath = "";
+    dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
 
     mDisableBIP30Checks = std::nullopt;
 
@@ -1630,6 +1634,73 @@ bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
 uint64_t GlobalConfig::GetDoubleSpendQueueMaxMemory() const
 {
     return dsAttemptQueueMaxMemory;
+}
+
+bool GlobalConfig::SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err)
+{
+    try
+    {
+        int port { rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT };
+        std::string host {};
+        std::string protocol {};
+        std::string endpoint {};
+        SplitURL(url, protocol, host, port, endpoint);
+
+        // Check for any protocol other than http
+        if(protocol != "http")
+        {
+            if(err)
+            {
+                *err = "Unsupported protocol in double-spend detected webhook notification URL";
+            }
+            return false;
+        }
+
+        dsDetectedWebhookAddress = host;
+        dsDetectedWebhookPort = port;
+        dsDetectedWebhookPath = endpoint;
+    }
+    catch(const std::exception&)
+    {
+        if(err)
+        {
+            *err = "Badly formatted double-spend detected webhook URL";
+        }
+        return false;
+    }
+
+    return true;
+}
+std::string GlobalConfig::GetDoubleSpendDetectedWebhookAddress() const
+{
+    return dsDetectedWebhookAddress;
+}
+int16_t GlobalConfig::GetDoubleSpendDetectedWebhookPort() const
+{
+    return dsDetectedWebhookPort;
+}
+std::string GlobalConfig::GetDoubleSpendDetectedWebhookPath() const
+{
+    return dsDetectedWebhookPath;
+}
+
+bool GlobalConfig::SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-spend detected webhook maximum transaction size must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsDetectedWebhookMaxTxnSize = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendDetectedWebhookMaxTxnSize() const
+{
+    return dsDetectedWebhookMaxTxnSize;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)

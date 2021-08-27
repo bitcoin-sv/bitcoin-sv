@@ -545,6 +545,17 @@ BOOST_AUTO_TEST_CASE(dsattempt_config)
     BOOST_CHECK_EQUAL(config.GetDoubleSpendQueueMaxMemory(), 2 * DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY);
     BOOST_CHECK(!config.SetDoubleSpendQueueMaxMemory(0, &err));
     BOOST_CHECK(!config.SetDoubleSpendQueueMaxMemory(-1, &err));
+
+    BOOST_CHECK(config.SetDoubleSpendDetectedWebhookURL("http://127.0.0.1:8080/path", &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendDetectedWebhookAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendDetectedWebhookPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendDetectedWebhookPath(), "/path");
+
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendDetectedWebhookMaxTxnSize(), DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE);
+    BOOST_CHECK(config.SetDoubleSpendDetectedWebhookMaxTxnSize(2 * DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE, &err));
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendDetectedWebhookMaxTxnSize(), 2 * DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE);
+    BOOST_CHECK(!config.SetDoubleSpendDetectedWebhookMaxTxnSize(0, &err));
+    BOOST_CHECK(!config.SetDoubleSpendDetectedWebhookMaxTxnSize(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(disable_BIP30)
