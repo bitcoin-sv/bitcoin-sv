@@ -328,3 +328,22 @@ bool TransactionSpecificConfig::GetDataCarrier() const
 {
     return mDataCarrier.has_value() ? *mDataCarrier : GlobalConfig::GetDataCarrier();
 };
+
+bool TransactionSpecificConfig::SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err)
+{
+    // see comment in SetTransactionSpecificMaxTxSize
+    GlobalConfig tmp;
+    if(!tmp.SetMaxTxnValidatorAsyncTasksRunDuration(ms, err))
+    {
+        return false;
+    }
+
+    mMaxTxnValidatorAsyncTasksRunDuration = tmp.GetMaxTxnValidatorAsyncTasksRunDuration();
+    return true;
+}
+
+std::chrono::milliseconds TransactionSpecificConfig::GetMaxTxnValidatorAsyncTasksRunDuration() const
+{
+    return mMaxTxnValidatorAsyncTasksRunDuration.has_value() ? *mMaxTxnValidatorAsyncTasksRunDuration : GlobalConfig::GetMaxTxnValidatorAsyncTasksRunDuration();
+}
+

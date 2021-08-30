@@ -2369,6 +2369,15 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxTxnValidatorAsyncTasksRunDuration(
+        gArgs.GetArg(
+            "-maxtxnvalidatorasynctasksrunduration",
+            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
     if(std::string err; !config.SetMaxTxnChainValidationBudget(
         gArgs.GetArg(
             "-maxtxchainvalidationbudget",
@@ -2391,8 +2400,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             strprintf("maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration"));
     }
 
-    if (!(gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration",
-            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()) >
+    if (!(gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration", CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()) >
         config.GetMaxNonStdTxnValidationDuration().count())) {
         return InitError(
             strprintf("maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration"));

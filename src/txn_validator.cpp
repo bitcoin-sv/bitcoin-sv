@@ -337,11 +337,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                     gArgs.GetArg("-maxnonstdtxnsperthreadratio", DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO))
         };
         // Get an expected duration for async tasks.
-        std::chrono::milliseconds nMaxTxnValidatorAsyncTasksRunDuration {
-            static_cast<std::chrono::milliseconds>(
-                gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration",
-                    DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()))
-        };
+        std::chrono::milliseconds nMaxTxnValidatorAsyncTasksRunDuration = mConfig.GetMaxTxnValidatorAsyncTasksRunDuration();
         // Ensure, that the last - long running task - won't exceed the limit.
         nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
 

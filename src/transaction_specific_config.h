@@ -68,6 +68,9 @@ public:
     void SetTransactionSpecificDataCarrier(bool dataCarrier);
     bool GetDataCarrier() const override;
 
+    bool SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err);
+    std::chrono::milliseconds GetMaxTxnValidatorAsyncTasksRunDuration() const override;
+
 private:
     std::optional<uint64_t> mMaxTxSize;
     std::optional<uint64_t> mDataCarrierSize;
@@ -80,6 +83,7 @@ private:
     std::optional<bool> mAcceptNonStdOutputs;
     std::optional<std::chrono::milliseconds> mMaxStdTxnValidationDuration;
     std::optional<std::chrono::milliseconds> mMaxNonStdTxnValidationDuration;
+    std::optional<std::chrono::milliseconds> mMaxTxnValidatorAsyncTasksRunDuration;
     std::optional<uint64_t> mMinColsolidationFactor;
     std::optional<uint64_t> mMaxConsolidationInputScriptSize;
     std::optional<uint64_t> mMinConsolidationInput;
