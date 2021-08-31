@@ -13,6 +13,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "net/net.h"
 #include "policy/policy.h"
 #include "rpc/client_config.h"
+#include "rpc/webhook_client_defaults.h"
 #include "script/standard.h"
 #include "txn_validation_config.h"
 #include "validation.h"
@@ -92,6 +93,15 @@ public:
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
 
+    // Safe mode activation
+    virtual std::string GetSafeModeWebhookAddress() const = 0;
+    virtual int16_t GetSafeModeWebhookPort() const = 0;
+    virtual std::string GetSafeModeWebhookPath() const = 0;
+    virtual int32_t GetSafeModeMinBlockDifference() const = 0;
+    virtual int32_t GetSafeModeMaxForkDistance() const = 0;
+    virtual int32_t GetSafeModeMinValidForkLength() const = 0;
+    virtual int32_t GetSafeModeMaxValidForkDistance() const = 0;
+
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
     virtual int64_t GetBlockStallingTimeout() const = 0;
@@ -103,6 +113,9 @@ public:
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
     virtual int64_t GetStreamSendRateLimit() const = 0;
     virtual unsigned int GetBanScoreThreshold() const = 0;
+
+    // RPC parameters
+    virtual uint64_t GetWebhookClientNumThreads() const = 0;
 
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -198,6 +211,13 @@ public:
     virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
 
+    // Safe mode activation
+    virtual bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) = 0;
+
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
     virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
@@ -209,6 +229,9 @@ public:
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
     virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
+
+    // RPC parameters
+    virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
 
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
@@ -428,6 +451,20 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    // Safe mode activation
+    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override;
+    std::string GetSafeModeWebhookAddress() const override;
+    int16_t GetSafeModeWebhookPort() const override;
+    std::string GetSafeModeWebhookPath() const override;
+    bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) override;
+    int32_t GetSafeModeMinBlockDifference() const override;
+    bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) override;
+    int32_t GetSafeModeMaxForkDistance() const override;
+    bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) override;
+    int32_t GetSafeModeMinValidForkLength() const override;
+    bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) override;
+    int32_t GetSafeModeMaxValidForkDistance() const override;
+
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
     uint64_t GetBlockStallingMinDownloadSpeed() const override;
@@ -447,6 +484,10 @@ public:
     int64_t GetStreamSendRateLimit() const override;
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override;
     unsigned int GetBanScoreThreshold() const override;
+
+    // RPC parameters
+    bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
+    uint64_t GetWebhookClientNumThreads() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -590,6 +631,15 @@ private:
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
+    // Safe mode activation
+    std::string safeModeWebhookAddress;
+    int16_t safeModeWebhookPort;
+    std::string safeModeWebhookPath;
+    int32_t safeModeMinBlockDifference;
+    int32_t safeModeMaxForkDistance;
+    int32_t safeModeMinValidForkLength;
+    int32_t safeModeMaxValidForkDistance;
+
     // Block download
     uint64_t blockStallingMinDownloadSpeed;
     int64_t blockStallingTimeout;
@@ -604,6 +654,9 @@ private:
     unsigned int maxProtocolSendPayloadLength;
     unsigned int recvInvQueueFactor;
     unsigned int banScoreThreshold;
+
+    // RPC parameters
+    uint64_t webhookClientNumThreads;
 
     // Double-Spend parameters
     DSAttemptHandler::NotificationLevel dsNotificationLevel;
@@ -1003,6 +1056,20 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
 
+    // Safe mode activation
+    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override { return true; }
+    std::string GetSafeModeWebhookAddress() const override { return ""; }
+    int16_t GetSafeModeWebhookPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetSafeModeWebhookPath() const override { return ""; }
+    bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) override { return true; }
+    int32_t GetSafeModeMinBlockDifference() const override { return SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE; }
+    bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) override { return true; }
+    int32_t GetSafeModeMaxForkDistance() const override { return SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE; }
+    bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) override { return true; }
+    int32_t GetSafeModeMinValidForkLength() const override { return SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH; }
+    bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) override { return true; }
+    int32_t GetSafeModeMaxValidForkDistance() const override { return SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE; }
+
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
     uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
@@ -1022,6 +1089,10 @@ public:
     int64_t GetStreamSendRateLimit() const override { return Stream::DEFAULT_SEND_RATE_LIMIT; }
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override { return true; }
     unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
+
+    // RPC parameters
+    bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }
+    uint64_t GetWebhookClientNumThreads() const override { return rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS; }
 
     // Double-Spend processing parameters
     bool SetDoubleSpendNotificationLevel(int level, std::string* err) override { return true; }

@@ -195,6 +195,8 @@ BITCOIN_CORE_H = \
   rpc/tojson.h \
   rpc/register.h \
   rpc/text_writer.h \
+  rpc/webhook_client.h \
+  rpc/webhook_client_defaults.h \
   scheduler.h \
   script_config.h \
   script/scriptcache.h \
@@ -335,6 +337,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
   rpc/server.cpp \
+  rpc/webhook_client.cpp \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \

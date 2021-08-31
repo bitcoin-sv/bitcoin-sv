@@ -12,7 +12,7 @@ Scenario:
 5. Send alternative branch blocks 21 - 30 but only headers. This should not change anything regarding safe mode.
 6. Send alternative branch first block data. This should mark branch as invalid and change safe mode level to INVALID
 7. Extend main branch by 15 blocks. This should cause that node exits safe mode because alternative branch is 
-   no longer SAFE_MODE_MIN_POW_DIFFERENCE(6) blocks ahead
+   no longer SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE(6) blocks ahead
 """
 from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status
@@ -20,7 +20,7 @@ from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlo
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal
-from test_framework.cdefs import SAFE_MODE_MAX_FORK_DISTANCE, SAFE_MODE_MIN_POW_DIFFERENCE
+from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 
 class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
 
@@ -100,10 +100,10 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
             except JSONRPCException as e:
                 assert e.error["message"] == "Safe mode: Warning: We do not appear to fully agree with our peers! You may need to upgrade, or other nodes may need to upgrade. A large invalid fork has been detected."
 
-            # add more blocks to active chain so fork will no longer have more than SAFE_MODE_MIN_POW_DIFFERENCE blocks
+            # add more blocks to active chain so fork will no longer have more than SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE blocks
             new_block, last_block_time = make_block(conn1, branch_1_blocks[-1], last_block_time=last_block_time)
             branch_1_aditional_blocks = [new_block]
-            for _ in range(20 - SAFE_MODE_MIN_POW_DIFFERENCE):
+            for _ in range(20 - SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE):
                 new_block, last_block_time = make_block(conn1, branch_1_aditional_blocks[-1], last_block_time=last_block_time)
                 branch_1_aditional_blocks.append(new_block)
 

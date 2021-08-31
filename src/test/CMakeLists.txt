@@ -175,6 +175,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	univalue_tests.cpp
 	util_tests.cpp
 	validation_tests.cpp
+    webhook_client_tests.cpp
 
 	# Tests generated from JSON
 	${JSON_HEADERS}

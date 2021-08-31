@@ -2447,13 +2447,13 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
         return SafeModeLevel::NONE;
     }
     else if (forkTipStatus.isValid() && pindexForkTip->GetChainTx() > 0 &&
-             pindexForkTip->GetChainWork() - pindexForkBase->GetChainWork() > (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_VALID_FORK_LENGTH) &&
-             chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_VALID_FORK_DISTANCE)
+             pindexForkTip->GetChainWork() - pindexForkBase->GetChainWork() > (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH) &&
+             chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE)
     {
         return SafeModeLevel::VALID;
     }
-    else if (chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_FORK_DISTANCE &&
-             chainActive.Tip()->GetChainWork() + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_POW_DIFFERENCE) <= pindexForkTip->GetChainWork())
+    else if (chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE &&
+             chainActive.Tip()->GetChainWork() + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE) <= pindexForkTip->GetChainWork())
     {
         if (forkTipStatus.isInvalid())
         {

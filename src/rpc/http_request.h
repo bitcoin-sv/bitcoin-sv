@@ -61,13 +61,16 @@ class HTTPRequest
     void AddHeader(const HeaderField& header) { mHeaders.push_back(header); }
 
 
-    // Factory method to make JSON RPC request
+    // Factory method to make a JSON RPC request
     static HTTPRequest CreateJSONRPCRequest(const RPCClientConfig& config, const std::string& method, const UniValue& params);
+
+    // Factory method to make a generic JSON POST request
+    static HTTPRequest CreateJSONPostRequest(const RPCClientConfig& config, const UniValue& json);
 
     // Factory method to make a query request to a double-spend endpoint
     static HTTPRequest CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid);
 
-    // Factory method to make submit request to a double-spend endpoint
+    // Factory method to make a submit request to a double-spend endpoint
     template<typename... Params>
     static HTTPRequest CreateDSEndpointSubmitRequest(
         const RPCClientConfig& config,

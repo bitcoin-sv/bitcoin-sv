@@ -75,5 +75,22 @@ RPCClientConfig RPCClientConfig::CreateForDoubleSpendEndpoint(
     return clientConfig;
 }
 
+RPCClientConfig RPCClientConfig::CreateForSafeModeWebhook(const Config& config)
+{
+    RPCClientConfig clientConfig {};
+
+    // Set IP/port
+    clientConfig.mServerIP = config.GetSafeModeWebhookAddress();
+    clientConfig.mServerPort = config.GetSafeModeWebhookPort();
+
+    // Set endpoint
+    clientConfig.mEndpoint = config.GetSafeModeWebhookPath();
+
+    // Server sends empty responses
+    clientConfig.mValidEmptyResponse = true;
+
+    return clientConfig;
+}
+
 } // namespace rpc::client
 

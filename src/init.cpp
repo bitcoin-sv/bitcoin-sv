@@ -32,6 +32,8 @@
 #include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "rpc/webhook_client.h"
+#include "rpc/webhook_client_defaults.h"
 #include "scheduler.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
@@ -175,6 +177,7 @@ void Shutdown() {
     UnregisterValidationInterface(peerLogic.get());
     peerLogic.reset();
 
+    rpc::client::g_pWebhookClient.reset();
     mining::g_miningFactory.reset();
 
     if (g_connman) {
@@ -771,6 +774,20 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt(
             "-testsafemode",
             strprintf("Force safe mode (default: %d)", DEFAULT_TESTSAFEMODE));
+        strUsage += HelpMessageOpt("-safemodewebhookurl=<url>",
+            "URL of a webhook to notify if the node enters safe mode. For example: http://127.0.0.1/mywebhook");
+        strUsage += HelpMessageOpt("-safemodeminblockdifference=<n>",
+            strprintf("Minimum number of blocks that fork should be ahead of active tip to enter safe mode "
+                "(default: %d)", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE));
+        strUsage += HelpMessageOpt("-safemodemaxforkdistance=<n>",
+            strprintf("Maximum distance of forks last common block from current active tip to enter safe mode "
+                "(default: %d)", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE));
+        strUsage += HelpMessageOpt("-safemodeminvalidforklength=<n>",
+            strprintf("Minimum length of valid fork to enter safe mode "
+                "(default: %d)", SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH));
+        strUsage += HelpMessageOpt("-safemodemaxvalidforkdistance=<n>",
+            strprintf("Maximum distance of valid forks last common block from current active tip to enter safe mode "
+                "(default: %d)", SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE));
         strUsage +=
             HelpMessageOpt("-dropmessagestest=<n>",
                            "Randomly drop 1 of every <n> network messages");
@@ -1099,7 +1116,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         );
     }
 
-    strUsage += HelpMessageGroup(_("RPC server options:"));
+    strUsage += HelpMessageGroup(_("RPC client/server options:"));
     strUsage += HelpMessageOpt("-server",
                                _("Accept command line and JSON-RPC commands"));
     strUsage += HelpMessageOpt(
@@ -1149,6 +1166,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-rpccorsdomain=value",
         "Domain from which to accept cross origin requests (browser enforced)");
+    strUsage += HelpMessageOpt("-rpcwebhookclientnumthreads=<n>",
+        strprintf(_("Number of threads available for submitting HTTP requests to webhook endpoints. (default: %u, maximum: %u)"),
+            rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS, rpc::client::WebhookClientDefaults::MAX_NUM_THREADS));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-rpcworkqueue=<n>", strprintf("Set the depth of the work queue to "
@@ -2155,6 +2175,25 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
+    // Safe mode activation
+    if(gArgs.IsArgSet("-safemodewebhookurl")) {
+        if(std::string err; !config.SetSafeModeWebhookURL(gArgs.GetArg("-safemodewebhookurl", ""), &err)) {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetSafeModeMinBlockDifference(gArgs.GetArg("-safemodeminblockdifference", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMaxForkDistance(gArgs.GetArg("-safemodemaxforkdistance", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMinValidForkLength(gArgs.GetArg("-safemodeminvalidforklength", SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMaxValidForkDistance(gArgs.GetArg("-safemodemaxvalidforkdistance", SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE), &err)) {
+        return InitError(err);
+    }
+
     // Block download
     if(std::string err; !config.SetBlockStallingMinDownloadSpeed(gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE), &err)) {
         return InitError(err);
@@ -2180,6 +2219,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBanScoreThreshold(gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), &err)) {
+        return InitError(err);
+    }
+
+    // RPC parameters
+    if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {
         return InitError(err);
     }
 
@@ -3333,6 +3377,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     // Launch non-final mempool periodic checks
     mempool.getNonFinalPool().startPeriodicChecks(scheduler);
+
+    // Create webhook client
+    assert(!rpc::client::g_pWebhookClient);
+    rpc::client::g_pWebhookClient = std::make_unique<rpc::client::WebhookClient>(config);
 
     // Step 12: finished
 
