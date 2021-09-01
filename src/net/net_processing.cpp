@@ -14,6 +14,7 @@
 #include "clientversion.h"
 #include "config.h"
 #include "consensus/validation.h"
+#include "double_spend/dsdetected_message.h"
 #include "hash.h"
 #include "init.h"
 #include "locked_ref.h"
@@ -26,7 +27,9 @@
 #include "policy/fees.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "protocol.h"
 #include "random.h"
+#include "rpc/webhook_client.h"
 #include "taskcancellation.h"
 #include "tinyformat.h"
 #include "txdb.h"
@@ -36,7 +39,6 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-#include "protocol.h"
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
 #include <algorithm>
@@ -3406,7 +3408,50 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
 
     return true;
 }
- 
+
+/**
+* PRocess double-spend detected message.
+*/
+static void ProcessDoubleSpendMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv,
+                                      CConnman& connman, const CNetMsgMaker& msgMaker)
+{
+    try
+    {
+        // Deserialise message
+        DSDetected msg {};
+        vRecv >> msg;
+
+        // TODO: Validate double-spend report
+
+        // Relay to our peers
+        connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
+            {
+                // No point echoing back to the sender
+                if(pfrom != to)
+                {
+                    connman.PushMessage(to, msgMaker.Make(NetMsgType::DSDETECTED, msg));
+                }
+            }
+        );
+
+        // Send webhook notification if configured to do so
+        using namespace rpc::client;
+        if(!config.GetDoubleSpendDetectedWebhookAddress().empty() && g_pWebhookClient)
+        {
+            RPCClientConfig rpcConfig { RPCClientConfig::CreateForDoubleSpendDetectedWebhook(config) };
+            using HTTPRequest = rpc::client::HTTPRequest;
+            auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateJSONPostRequest(rpcConfig, msg.ToJSON(config))) };
+            auto response { std::make_shared<StringHTTPResponse>() };
+            g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+        }
+    }
+    catch(const std::exception& e)
+    {
+        LogPrint(BCLog::NETMSG, "Error processing double-spend detected message from peer=%d: %s\n",
+            pfrom->id, e.what());
+    }
+} 
+
 /**
 * Process next message.
 */
@@ -3525,6 +3570,11 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) {
         ProcessBlockMessage(config, pfrom, vRecv, connman);
+    }
+
+    // Ignore double-spend detected notifications while importing
+    else if (strCommand == NetMsgType::DSDETECTED && !fImporting && !fReindex) {
+        ProcessDoubleSpendMessage(config, pfrom, vRecv, connman, msgMaker);
     }
 
     else if (strCommand == NetMsgType::GETADDR) {
