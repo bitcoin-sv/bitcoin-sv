@@ -217,6 +217,10 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
     }
 }
 
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(merkle_proof_tests)
+
 BOOST_AUTO_TEST_CASE(merkle_proof)
 {
     // Build a block
