@@ -11,6 +11,7 @@
 #include "univalue.h"
 
 #include <limits>
+#include <ostream>
 
 /**
  * Class to model a merkle proof conforming to the TSC standard:
@@ -72,6 +73,13 @@ public:
     MerkleProof(const CMerkleTree::MerkleProof& treeProof,
                 const TxId& txnid,
                 const uint256& target);
+    
+    constexpr uint8_t Flags() const noexcept { return mFlags; }
+    constexpr size_t Index() const noexcept { return mIndex; }
+    uint256 Target() const noexcept { return mTarget; }
+
+    [[nodiscard]] bool empty() const noexcept { return mNodes.empty(); }
+    [[nodiscard]] size_t size() const noexcept { return mNodes.size(); }
 
     // Recompute our target and check if it matches the expected value
     bool RecomputeAndCheckTarget() const;
@@ -121,6 +129,7 @@ public:
     ToJSON(uint64_t maxTxnSize = std::numeric_limits<uint64_t>::max()) const;
 
     friend bool operator==(const MerkleProof&, const MerkleProof&);
+    friend std::ostream& operator<<(std::ostream&, const MerkleProof&);
 
 private:
     // Flags to indicate the format of the rest of the proof
@@ -141,29 +150,5 @@ private:
     
 };
 
-inline bool operator==(const MerkleProof::Node& a, const MerkleProof::Node& b)
-{
-    return a.mType == b.mType &&
-           a.mValue == b.mValue;
-}
-
-inline bool operator!=(const MerkleProof::Node& a, const MerkleProof::Node& b)
-{
-    return !(a == b);
-}
-
-inline bool operator==(const MerkleProof& a, const MerkleProof& b)
-{
-    return a.mFlags == b.mFlags &&
-           a.mIndex == b.mIndex &&
-           *a.mTxn == *b.mTxn && // cjg? both null?
-           a.mTxnId == b.mTxnId && 
-           a.mTarget == b.mTarget &&
-           a.mNodes == b.mNodes;
-}
-
-inline bool operator!=(const MerkleProof& a, const MerkleProof& b)
-{
-    return !(a == b);
-}
+bool operator!=(const MerkleProof&, const MerkleProof&);
 

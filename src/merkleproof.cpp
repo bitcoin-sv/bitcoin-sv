@@ -5,6 +5,9 @@
 #include "merkleproof.h"
 #include "consensus/merkle.h"
 #include "core_io.h"
+#include "primitives/transaction.h"
+#include "uint256.h"
+#include <iterator>
 
 MerkleProof::MerkleProof(const CMerkleTree::MerkleProof& treeProof,
                          const TxId& txnid,
@@ -61,5 +64,80 @@ UniValue MerkleProof::ToJSON(uint64_t maxTxnSize) const
     document.push_back(Pair("nodes", nodes));
 
     return document;
+}
+
+static bool operator==(const MerkleProof::Node& a, const MerkleProof::Node& b)
+{
+    return a.mType == b.mType &&
+           a.mValue == b.mValue;
+}
+
+bool operator==(const MerkleProof& a, const MerkleProof& b)
+{
+    if(a.mTxn && !b.mTxn)
+        return false;
+
+    if(b.mTxn && !a.mTxn)
+        return false;
+
+    return a.mFlags == b.mFlags &&
+           a.mIndex == b.mIndex &&
+           a.mTxn && b.mTxn ? *a.mTxn == *b.mTxn : true && // cjg true if both null?
+           a.mTxnId == b.mTxnId && 
+           a.mTarget == b.mTarget &&
+           a.mNodes == b.mNodes;
+}
+
+bool operator!=(const MerkleProof& a, const MerkleProof& b)
+{
+    return !(a == b);
+}
+
+static bool contains_tx(const MerkleProof& mp)
+{
+    return mp.Flags() & 0x1;
+}
+
+static bool contains_txid(const MerkleProof& mp)
+{
+    return !contains_tx(mp);
+}
+
+std::ostream& operator<<(std::ostream& os, const TxId& txid)
+{
+    for(const auto x : txid)
+        os << (int)x;
+
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const MerkleProof::Node& node)
+{
+    os << "Type: " << static_cast<int>(node.mType)
+       << "\n\tValue: ";
+
+    for(const auto x : node.mValue) 
+        os << static_cast<int>(x);
+ 
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const MerkleProof& mp)
+{
+    os << "Flags: " << static_cast<int>(mp.Flags())
+       << "\nIndex: " << static_cast<int>(mp.Index());
+
+    if(contains_txid(mp))
+    {
+       os << "\nTxId: " << mp.mTxnId ;
+    }
+    
+    os << "\nTarget: " << mp.mTarget.ToString();
+    os << "\nNode Count: " << mp.mNodes.size();
+
+    for(const auto& node : mp.mNodes)
+        os << "\n\t" << node;
+    
+    return os;
 }
 
