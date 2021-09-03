@@ -58,10 +58,10 @@ namespace
 }
 
 // Comparison operator for CBlockHeader
-bool operator==(const CBlockHeader& bh1, const CBlockHeader& bh2)
-{
-    return bh1.GetHash() == bh2.GetHash();
-}
+//bool operator==(const CBlockHeader& bh1, const CBlockHeader& bh2)
+//{
+//    return bh1.GetHash() == bh2.GetHash();
+//}
 
 // Comparison operator for DSDetected::BlockDetails
 bool operator==(const DSDetected::BlockDetails& bd1,
