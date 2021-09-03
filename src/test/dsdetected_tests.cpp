@@ -68,8 +68,9 @@ bool operator==(const DSDetected::BlockDetails& a,
                 const DSDetected::BlockDetails& b)
 {
     return a.mBlockHeaders == b.mBlockHeaders &&
-           HashMerkleProof(a.mMerkleProof) ==
-               HashMerkleProof(b.mMerkleProof);
+           a.mMerkleProof == b.mMerkleProof;
+//           HashMerkleProof(a.mMerkleProof) ==
+//               HashMerkleProof(b.mMerkleProof);
 }
 
 // Comparison operator for DSDetected
