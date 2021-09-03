@@ -46,10 +46,18 @@ class MerkleProof
     MerkleProof() = default;
 
     // Construct for a full transaction
-    MerkleProof(const CTransactionRef& txn, size_t index, const uint256& target,
-        const std::vector<Node>& nodes)
-    : mFlags{0x01}, mIndex{index}, mTxn{txn}, mTxnId{txn->GetId()}, mTarget{target}, mNodes{nodes}
-    {}
+    MerkleProof(const std::shared_ptr<const CTransaction>& txn,
+                size_t index,
+                const uint256& target,
+                const std::vector<Node>& nodes)
+        : mFlags{0x01},
+          mIndex{index},
+          mTxn{txn},
+          mTxnId{txn->GetId()},
+          mTarget{target},
+          mNodes{nodes}
+    {
+    }
 
     // Construct for a transaction ID
     MerkleProof(const TxId& txnid, size_t index, const uint256& target,
@@ -116,7 +124,7 @@ class MerkleProof
     size_t mIndex {0};
 
     // Transaction and/or transaction ID
-    CTransactionRef mTxn { nullptr };
+    std::shared_ptr<const CTransaction> mTxn { nullptr };
     TxId mTxnId {};
 
     // Target of proof (a merkle root)
