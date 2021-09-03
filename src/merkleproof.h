@@ -120,6 +120,8 @@ public:
     [[nodiscard]] UniValue
     ToJSON(uint64_t maxTxnSize = std::numeric_limits<uint64_t>::max()) const;
 
+    friend bool operator==(const MerkleProof&, const MerkleProof&);
+
 private:
     // Flags to indicate the format of the rest of the proof
     uint8_t mFlags{0x0};
@@ -136,4 +138,32 @@ private:
 
     // List of nodes making up the proof
     std::vector<Node> mNodes{};
+    
 };
+
+inline bool operator==(const MerkleProof::Node& a, const MerkleProof::Node& b)
+{
+    return a.mType == b.mType &&
+           a.mValue == b.mValue;
+}
+
+inline bool operator!=(const MerkleProof::Node& a, const MerkleProof::Node& b)
+{
+    return !(a == b);
+}
+
+inline bool operator==(const MerkleProof& a, const MerkleProof& b)
+{
+    return a.mFlags == b.mFlags &&
+           a.mIndex == b.mIndex &&
+           *a.mTxn == *b.mTxn && // cjg? both null?
+           a.mTxnId == b.mTxnId && 
+           a.mTarget == b.mTarget &&
+           a.mNodes == b.mNodes;
+}
+
+inline bool operator!=(const MerkleProof& a, const MerkleProof& b)
+{
+    return !(a == b);
+}
+
