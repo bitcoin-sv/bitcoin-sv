@@ -64,19 +64,19 @@ namespace
 //}
 
 // Comparison operator for DSDetected::BlockDetails
-bool operator==(const DSDetected::BlockDetails& bd1,
-                const DSDetected::BlockDetails& bd2)
+bool operator==(const DSDetected::BlockDetails& a,
+                const DSDetected::BlockDetails& b)
 {
-    return bd1.mBlockHeaders == bd2.mBlockHeaders &&
-           HashMerkleProof(bd1.mMerkleProof) ==
-               HashMerkleProof(bd2.mMerkleProof);
+    return a.mBlockHeaders == b.mBlockHeaders &&
+           HashMerkleProof(a.mMerkleProof) ==
+               HashMerkleProof(b.mMerkleProof);
 }
 
 // Comparison operator for DSDetected
-bool operator==(const DSDetected& ds1, const DSDetected& ds2)
+bool operator==(const DSDetected& a, const DSDetected& b)
 {
-    return ds1.GetVersion() == ds2.GetVersion() &&
-           ds2.GetBlockList() == ds2.GetBlockList();
+    return a.GetVersion() == b.GetVersion() &&
+           a.GetBlockList() == b.GetBlockList();
 }
 
 // Print DSDetected
