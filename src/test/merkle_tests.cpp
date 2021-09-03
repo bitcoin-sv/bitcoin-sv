@@ -223,6 +223,8 @@ BOOST_AUTO_TEST_SUITE(merkle_proof_tests)
 
 BOOST_AUTO_TEST_CASE(merkle_proof)
 {
+    using namespace std;
+
     // Build a block
     constexpr unsigned NumTx{100};
     CBlock block{};
@@ -231,45 +233,45 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
     {
         CMutableTransaction mtx{};
         mtx.nLockTime = j;
-        block.vtx[j] = MakeTransactionRef(std::move(mtx));
+        block.vtx[j] = make_shared<const CTransaction>(move(mtx));
     }
 
     // lambda to create CMerkleTree version of proof and return a nodes list
     // suitable for the TSC version, the merkle root from the proof and the
     // entire proof
-    auto CMerkleTreeLambda = [&block](const CTransactionRef& txn) {
+    auto CMerkleTreeLambda = [&block](const CTransaction& txn) {
         // Create and check CMerkleTree version
         CMerkleTree merkleTree{block.vtx, uint256(), 0};
         CMerkleTree::MerkleProof treeProof{
-            merkleTree.GetMerkleProof(txn->GetId(), false)};
+            merkleTree.GetMerkleProof(txn.GetId(), false)};
         uint256 checkRoot{
-            ComputeMerkleRootFromBranch(txn->GetId(),
+            ComputeMerkleRootFromBranch(txn.GetId(),
                                         treeProof.merkleTreeHashes,
                                         treeProof.transactionIndex)};
         BOOST_CHECK_EQUAL(merkleTree.GetMerkleRoot().ToString(),
                           checkRoot.ToString());
 
         // Return nodes list
-        std::vector<MerkleProof::Node> nodes{};
+        vector<MerkleProof::Node> nodes{};
         for(const auto& node : treeProof.merkleTreeHashes)
         {
             nodes.push_back({node});
         }
 
-        return std::make_tuple(nodes, checkRoot, treeProof);
+        return make_tuple(nodes, checkRoot, treeProof);
     };
 
     // Create CMerkleTree and TSC versions of the proof and validate them
     for(size_t txnIndex = 0; txnIndex < NumTx; ++txnIndex)
     {
-        const CTransactionRef& txn{block.vtx[txnIndex]};
+        const shared_ptr<const CTransaction>& txn{block.vtx[txnIndex]};
 
         // Check CMerkleTree version and get what we need to create the TSC
         // versions
-        const auto& [nodes, checkRoot, treeProof]{CMerkleTreeLambda(txn)};
+        const auto& [nodes, checkRoot, treeProof]{CMerkleTreeLambda(*txn)};
 
         // Create some TSC proofs in different ways
-        std::vector<MerkleProof> merkleProofs{
+        vector<MerkleProof> merkleProofs{
             {txn->GetId(), txnIndex, checkRoot, nodes},
             {txn, txnIndex, checkRoot, nodes},
             {treeProof, txn->GetId(), checkRoot}};
@@ -293,8 +295,8 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
     }
 
     // Check JSON formatting of TSC proof
-    const CTransactionRef& txn{block.vtx[0]};
-    const auto& [nodes, checkRoot, treeProof]{CMerkleTreeLambda(txn)};
+    const shared_ptr<const CTransaction>& txn{block.vtx[0]};
+    const auto& [nodes, checkRoot, treeProof]{CMerkleTreeLambda(*txn)};
     MerkleProof merkleProof{treeProof, txn->GetId(), checkRoot};
     UniValue json{merkleProof.ToJSON()};
     BOOST_CHECK_EQUAL(json["index"].get_int(), 0);
