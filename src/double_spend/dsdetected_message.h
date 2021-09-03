@@ -44,6 +44,8 @@ public:
         // block in the above header list,
         MerkleProof mMerkleProof{};
     };
+    using blocks_type = std::vector<BlockDetails>;
+    using const_iterator = blocks_type::const_iterator;
 
     // Accessors
     [[nodiscard]] uint16_t GetVersion() const { return mVersion; }
@@ -51,6 +53,11 @@ public:
     {
         return mBlockList;
     }
+
+    [[nodiscard]] constexpr bool empty() const noexcept { return mBlockList.empty(); }
+
+    constexpr const_iterator cbegin() const noexcept { return mBlockList.cbegin(); }
+    constexpr const_iterator cend() const noexcept { return mBlockList.cend(); }
 
     // Serialisation/deserialisation
     ADD_SERIALIZE_METHODS
@@ -83,6 +90,6 @@ private:
     uint16_t mVersion{MSG_VERSION};
 
     // List of details for blocks double-spends are detected in
-    std::vector<BlockDetails> mBlockList{};
+    blocks_type mBlockList{};
 };
 
