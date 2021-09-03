@@ -1,5 +1,6 @@
 // Copyright (c) 2021 Bitcoin Association
-// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
 
 #pragma once
 
@@ -19,13 +20,12 @@
  */
 class MerkleProof
 {
-  public:
-
+public:
     // A node within the proof
     struct Node
     {
         Node() = default;
-        Node(const uint256 &value) : mValue{value} {}
+        Node(const uint256& value) : mValue{value} {}
 
         // Serialisation/deserialisation
         ADD_SERIALIZE_METHODS
@@ -37,12 +37,12 @@ class MerkleProof
         }
 
         // Only type=0 currently used
-        uint8_t mType {0};
+        uint8_t mType{0};
 
         // Since we only support type=0 just make this a uint256 in all cases
-        uint256 mValue {};
+        uint256 mValue{};
     };
-    
+
     MerkleProof() = default;
 
     // Construct for a full transaction
@@ -60,14 +60,18 @@ class MerkleProof
     }
 
     // Construct for a transaction ID
-    MerkleProof(const TxId& txnid, size_t index, const uint256& target,
-        const std::vector<Node>& nodes)
-    : mIndex{index}, mTxnId{txnid}, mTarget{target}, mNodes{nodes}
-    {}
+    MerkleProof(const TxId& txnid,
+                size_t index,
+                const uint256& target,
+                const std::vector<Node>& nodes)
+        : mIndex{index}, mTxnId{txnid}, mTarget{target}, mNodes{nodes}
+    {
+    }
 
     // Construct from a CMerkleTree::MerkleProof
-    MerkleProof(const CMerkleTree::MerkleProof& treeProof, const TxId& txnid,
-        const uint256& target);
+    MerkleProof(const CMerkleTree::MerkleProof& treeProof,
+                const TxId& txnid,
+                const uint256& target);
 
     // Recompute our target and check if it matches the expected value
     bool RecomputeAndCheckTarget() const;
@@ -85,7 +89,7 @@ class MerkleProof
             // Expecting a full transaction or just an ID?
             if(mFlags & 0x01)
             {
-                CMutableTransaction mtx {};
+                CMutableTransaction mtx{};
                 READWRITE(mtx);
                 mTxn = MakeTransactionRef(std::move(mtx));
                 mTxnId = mTxn->GetId();
@@ -113,24 +117,23 @@ class MerkleProof
     }
 
     // Convert to JSON
-    [[nodiscard]] UniValue ToJSON(uint64_t maxTxnSize = std::numeric_limits<uint64_t>::max()) const;
+    [[nodiscard]] UniValue
+    ToJSON(uint64_t maxTxnSize = std::numeric_limits<uint64_t>::max()) const;
 
-  private:
-
+private:
     // Flags to indicate the format of the rest of the proof
-    uint8_t mFlags { 0x0 };
+    uint8_t mFlags{0x0};
 
     // Index of transaction this proof is for
-    size_t mIndex {0};
+    size_t mIndex{0};
 
     // Transaction and/or transaction ID
-    std::shared_ptr<const CTransaction> mTxn { nullptr };
-    TxId mTxnId {};
+    std::shared_ptr<const CTransaction> mTxn{nullptr};
+    TxId mTxnId{};
 
     // Target of proof (a merkle root)
-    uint256 mTarget {};
+    uint256 mTarget{};
 
     // List of nodes making up the proof
-    std::vector<Node> mNodes {};
+    std::vector<Node> mNodes{};
 };
-
