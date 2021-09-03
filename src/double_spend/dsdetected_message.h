@@ -32,13 +32,13 @@ public:
         template <typename Stream, typename Operation>
         void SerializationOp(Stream& s, Operation ser_action)
         {
-            READWRITE(mHeaderList);
+            READWRITE(mBlockHeaders);
             READWRITE(mMerkleProof);
         }
 
         // List of block headers from the block containing the conflicting
         // transaction back to the last common ancestor of all detailed blocks.
-        std::vector<CBlockHeader> mHeaderList{};
+        std::vector<CBlockHeader> mBlockHeaders{};
 
         // Merkle-proof containing transaction and proof it is in the first
         // block in the above header list,

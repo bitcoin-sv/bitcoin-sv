@@ -67,7 +67,7 @@ bool operator==(const CBlockHeader& bh1, const CBlockHeader& bh2)
 bool operator==(const DSDetected::BlockDetails& bd1,
                 const DSDetected::BlockDetails& bd2)
 {
-    return bd1.mHeaderList == bd2.mHeaderList &&
+    return bd1.mBlockHeaders == bd2.mBlockHeaders &&
            HashMerkleProof(bd1.mMerkleProof) ==
                HashMerkleProof(bd2.mMerkleProof);
 }
@@ -87,7 +87,7 @@ std::ostream& operator<<(std::ostream& str, const DSDetected& msg)
     for(const auto& block : msg.GetBlockList())
     {
         str << "HeaderList: [";
-        for(const auto& header : block.mHeaderList)
+        for(const auto& header : block.mBlockHeaders)
         {
             str << header.GetHash().ToString() << ",";
         }

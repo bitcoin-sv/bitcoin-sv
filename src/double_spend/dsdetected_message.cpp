@@ -18,7 +18,7 @@ UniValue DSDetected::ToJSON(const Config& config) const
         UniValue blockJson{UniValue::VOBJ};
 
         UniValue headers{UniValue::VARR};
-        for(const auto& header : block.mHeaderList)
+        for(const auto& header : block.mBlockHeaders)
         {
             UniValue headerJson{UniValue::VOBJ};
             headerJson.push_back(Pair("version", header.nVersion));
