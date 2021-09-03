@@ -9,7 +9,7 @@ MerkleProof::MerkleProof(
     const CMerkleTree::MerkleProof& treeProof,
     const TxId& txnid,
     const uint256& target)
-: mFlags{0x00}, mIndex{treeProof.transactionIndex}, mTxnId{txnid}, mTarget{target}
+: mIndex{treeProof.transactionIndex}, mTxnId{txnid}, mTarget{target}
 {
     // Build nodes
     for(const auto& hash : treeProof.merkleTreeHashes)

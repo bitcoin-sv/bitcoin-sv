@@ -54,13 +54,12 @@ class MerkleProof
     // Construct for a transaction ID
     MerkleProof(const TxId& txnid, size_t index, const uint256& target,
         const std::vector<Node>& nodes)
-    :mFlags{0x00}, mIndex{index}, mTxnId{txnid}, mTarget{target}, mNodes{nodes}
+    : mIndex{index}, mTxnId{txnid}, mTarget{target}, mNodes{nodes}
     {}
 
     // Construct from a CMerkleTree::MerkleProof
     MerkleProof(const CMerkleTree::MerkleProof& treeProof, const TxId& txnid,
         const uint256& target);
-
 
     // Recompute our target and check if it matches the expected value
     bool RecomputeAndCheckTarget() const;
@@ -111,7 +110,7 @@ class MerkleProof
   private:
 
     // Flags to indicate the format of the rest of the proof
-    uint8_t mFlags { 0x00 };
+    uint8_t mFlags { 0x0 };
 
     // Index of transaction this proof is for
     size_t mIndex {0};
