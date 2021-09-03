@@ -117,12 +117,17 @@ using UnitTestAccess = DSDetected::UnitTestAccess<dsdetected_tests_uid>;
 
 BOOST_AUTO_TEST_SUITE(dsdetected)
 
+BOOST_AUTO_TEST_CASE(default_construction)
+{
+    DSDetected msg;
+    BOOST_CHECK_EQUAL(msg.GetVersion(), DSDetected::MSG_VERSION);
+    BOOST_CHECK(msg.empty());
+}
+
 BOOST_AUTO_TEST_CASE(CreationSerialisation)
 {
     // Test good DSDetected message creation and serialisation/deserialisation
-    DSDetected msg{};
-    BOOST_CHECK_EQUAL(msg.GetVersion(), DSDetected::MSG_VERSION);
-    BOOST_CHECK(msg.GetBlockList().empty());
+    DSDetected msg;
 
     {
         CDataStream ss{SER_NETWORK, 0};
