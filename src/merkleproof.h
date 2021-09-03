@@ -24,13 +24,8 @@ class MerkleProof
     // A node within the proof
     struct Node
     {
-        Node(const uint256& value) : mValue{value} {}
         Node() = default;
-        ~Node() = default;
-        Node(const Node&) = default;
-        Node(Node&&) = default;
-        Node& operator=(const Node&) = default;
-        Node& operator=(Node&&) = default;
+        Node(const uint256 &value) : mValue{value} {}
 
         // Serialisation/deserialisation
         ADD_SERIALIZE_METHODS
@@ -47,6 +42,8 @@ class MerkleProof
         // Since we only support type=0 just make this a uint256 in all cases
         uint256 mValue {};
     };
+    
+    MerkleProof() = default;
 
     // Construct for a full transaction
     MerkleProof(const CTransactionRef& txn, size_t index, const uint256& target,
@@ -64,12 +61,6 @@ class MerkleProof
     MerkleProof(const CMerkleTree::MerkleProof& treeProof, const TxId& txnid,
         const uint256& target);
 
-    MerkleProof() = default;
-    ~MerkleProof() = default;
-    MerkleProof(const MerkleProof&) = default;
-    MerkleProof(MerkleProof&&) = default;
-    MerkleProof& operator=(const MerkleProof&) = default;
-    MerkleProof& operator=(MerkleProof&&) = default;
 
     // Recompute our target and check if it matches the expected value
     bool RecomputeAndCheckTarget() const;
