@@ -1509,42 +1509,6 @@ CValidationState HandleTxnProcessingException(
     return state;
 }
 
-static CTxnValResult PropagateParentError(const CTxnValResult& parentResult, const TxInputDataSPtr& elem)
-{
-    const auto& parentState = parentResult.mState;
-    CValidationState newState;
-    assert(!parentState.IsValid());
-    // The performance part of this is important:
-    if (parentState.IsValidationTimeoutExceeded()) {
-        // when the parent fails due to exceeding the validation time limit it
-        // will get re-scheduled as a low-priority task.
-        // The child has to enter the orphan pool.
-        newState.SetMissingInputs();
-        newState.Invalid();
-    } else if (parentState.IsMissingInputs()) {
-        newState = parentState;
-        if (parentResult.mTxInputData->IsDeleted()) {
-            // see below
-            elem->SetDeleted(true);
-        }
-    } else {
-        // The parent was invalid. The child transaction can never become valid
-        // as it references an invalid parent. so failing the child, too is correct.
-        // Before this change, the second and further transactions in the chain,
-        // after the failing transaction would enter the orphan pool with
-        // no possibility of leaving it except by eviction...
-        newState.SetMissingInputs();
-        newState.Invalid();
-        // Mark subsequent transactions as orphans with an extra flag to drop them on entry to the orphan pool.
-        elem->SetDeleted(true);
-    }
-    if (elem->IsDeleted()) {
-        LogPrint(BCLog::TXNVAL, "Transaction %s gets dropped becasue %s failed\n",
-                             elem->GetTxnPtr()->GetId().ToString(),
-                             parentResult.mTxInputData->GetTxnPtr()->GetId().ToString());
-    }
-    return {newState, elem};
-}
 
 std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask(
     const TxInputDataSPtrRefVec& vTxInputData,
@@ -1598,32 +1562,25 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
         }
         CTxnValResult result {};
         try {
-            if (results.empty() || results.back().first.mState.IsValid()) {
 #ifdef COLLECT_METRICS
-                auto timeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_t };
-                auto cpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
-                if (!elem.get()->IsOrphanTxn()) {
-                    // we are first time through validation === time in network queues
-                    auto e2e = elem.get()->GetLifetime();
-                    durations_queue_t_ms.count(std::chrono::duration_cast<std::chrono::milliseconds>(e2e).count());
-                    durations_queue_t_s.count(std::chrono::duration_cast<std::chrono::seconds>(e2e).count());
-                }
-#endif
-                // Execute validation for the given txn
-                result =
-                    TxnValidation(
-                        elem,
-                        config,
-                        pool,
-                        handlers.mpTxnDoubleSpendDetector,
-                        fUseLimits,
-                        cancellationBudget);
-            } else {
-                // a parent in the chain failed validation, make sure the
-                // rest of the (dependant) chain meets the same fate. We do not
-                // need to actually run the validation to reach that conclusion.
-                result = PropagateParentError(results.back().first, elem);
+            auto timeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_t };
+            auto cpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
+            if (!elem.get()->IsOrphanTxn()) {
+                // we are first time through validation === time in network queues
+                auto e2e = elem.get()->GetLifetime();
+                durations_queue_t_ms.count(std::chrono::duration_cast<std::chrono::milliseconds>(e2e).count());
+                durations_queue_t_s.count(std::chrono::duration_cast<std::chrono::seconds>(e2e).count());
             }
+#endif
+            // Execute validation for the given txn
+            result =
+                TxnValidation(
+                    elem,
+                    config,
+                    pool,
+                    handlers.mpTxnDoubleSpendDetector,
+                    fUseLimits,
+                    cancellationBudget);
             // Process validated results
             ProcessValidatedTxn(pool, result, handlers, false, config);
 #ifdef COLLECT_METRICS
