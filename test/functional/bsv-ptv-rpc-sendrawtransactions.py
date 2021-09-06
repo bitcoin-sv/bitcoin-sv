@@ -558,7 +558,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS9: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
+        with self.run_node_with_connections('TS10: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario5(conn, num_of_chains, chain_length, out, reverseOrder=True, timeout=30)
