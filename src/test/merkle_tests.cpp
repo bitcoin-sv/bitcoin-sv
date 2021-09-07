@@ -266,32 +266,6 @@ BOOST_AUTO_TEST_CASE(tx_construction)
     BOOST_CHECK_EQUAL(1, mp.size());
 }
 
-BOOST_AUTO_TEST_CASE(default_serialisation)
-{
-    // Test serialising/deserialising
-    CDataStream ss{SER_NETWORK, 0};
-    MerkleProof mp;
-    ss << mp;
-    MerkleProof deserialised{};
-    ss >> deserialised;
-    BOOST_CHECK_EQUAL(mp, deserialised); 
-}
-            
-BOOST_AUTO_TEST_CASE(txid_serialisation)
-{
-    const TxId txid{uint256S("1")};
-    size_t index{2};
-    const uint256 target{uint256S("3")};
-    const std::vector<MerkleProof::Node> nodes{{}};
-    MerkleProof mp{txid, index, target, nodes};
-    
-    CDataStream ss{SER_NETWORK, 0};
-    ss << mp;
-    MerkleProof deserialised{};
-    ss >> deserialised;
-    BOOST_CHECK_EQUAL(mp, deserialised); 
-}
-
 BOOST_AUTO_TEST_CASE(deserialize_txid)
 {
     // clang-format off
@@ -387,6 +361,48 @@ BOOST_AUTO_TEST_CASE(deserialize_tx)
 
     const MerkleProof expected{sp, index, target, nodes};
     BOOST_CHECK_EQUAL(expected, actual);
+}
+
+BOOST_AUTO_TEST_CASE(default_serialisation)
+{
+    // Test serialising/deserialising
+    CDataStream ss{SER_NETWORK, 0};
+    MerkleProof mp;
+    ss << mp;
+    MerkleProof deserialised{};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(mp, deserialised); 
+}
+            
+BOOST_AUTO_TEST_CASE(txid_serialisation)
+{
+    const TxId txid{uint256S("1")};
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    MerkleProof mp{txid, index, target, nodes};
+    
+    CDataStream ss{SER_NETWORK, 0};
+    ss << mp;
+    MerkleProof deserialised{};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(mp, deserialised); 
+}
+
+BOOST_AUTO_TEST_CASE(tx_serialization)
+{
+    CMutableTransaction mtx;
+    const auto sp = std::make_shared<const CTransaction>(std::move(mtx));
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    const MerkleProof mp{sp, index, target, nodes};
+    
+    CDataStream ss{SER_NETWORK, 0};
+    ss << mp;
+    MerkleProof deserialised{};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(mp, deserialised); 
 }
 
 BOOST_AUTO_TEST_CASE(merkle_proof)
