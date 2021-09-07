@@ -3,6 +3,7 @@
 // LICENSE.
 
 #include "merkleproof.h"
+
 #include "consensus/merkle.h"
 #include "core_io.h"
 #include "primitives/transaction.h"
@@ -22,7 +23,7 @@ MerkleProof::MerkleProof(const CMerkleTree::MerkleProof& treeProof,
 }
 
 // Recompute our target and check if it matches the expected value
-bool MerkleProof::RecomputeAndCheckTarget() const
+bool MerkleProof::Verify() const
 {
     // Convert our nodes into a list of hashes
     std::vector<uint256> hashes{};
@@ -116,18 +117,12 @@ std::ostream& operator<<(std::ostream& os, const MerkleProof::Node& node)
 std::ostream& operator<<(std::ostream& os, const MerkleProof& mp)
 {
     os << "Flags: " << static_cast<int>(mp.Flags())
-       << "\nIndex: " << static_cast<int>(mp.Index());
-
-    //if(contains_txid(mp))
-    //{
-       os << "\nTxId: " << mp.mTxnId ;
-    //}
-    
-    os << "\nTx Length: " << mp.mTxLen;
-    os << "\nTx*: " << mp.mTxn;
-    
-    os << "\nTarget: " << mp.mTarget.ToString();
-    os << "\nNode Count: " << mp.mNodes.size();
+       << "\nIndex: " << static_cast<int>(mp.Index())
+       << "\nTxId: " << mp.mTxnId
+       << "\nTx Length: " << mp.mTxLen
+       << "\nTx*: " << mp.mTxn
+       << "\nTarget: " << mp.mTarget.ToString()
+       << "\nNode Count: " << mp.mNodes.size();
 
     for(const auto& node : mp.mNodes)
         os << "\n\t" << node;

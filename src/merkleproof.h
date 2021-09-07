@@ -75,15 +75,15 @@ public:
                 const TxId& txnid,
                 const uint256& target);
     
-    constexpr uint8_t Flags() const noexcept { return mFlags; }
-    constexpr size_t Index() const noexcept { return mIndex; }
-    const uint256& Target() const noexcept { return mTarget; }
+    [[nodiscard]] constexpr uint8_t Flags() const noexcept { return mFlags; }
+    [[nodiscard]] constexpr size_t Index() const noexcept { return mIndex; }
+    [[nodiscard]] const uint256& Target() const noexcept { return mTarget; }
 
     [[nodiscard]] bool empty() const noexcept { return mNodes.empty(); }
     [[nodiscard]] size_t size() const noexcept { return mNodes.size(); }
 
-    // Recompute our target and check if it matches the expected value
-    bool RecomputeAndCheckTarget() const;
+    // Recompute root and check if it matches the target value
+    [[nodiscard]] bool Verify() const;
 
     // Serialisation/deserialisation
     ADD_SERIALIZE_METHODS

@@ -290,7 +290,6 @@ BOOST_AUTO_TEST_CASE(txid_serialisation)
     MerkleProof deserialised{};
     ss >> deserialised;
     BOOST_CHECK_EQUAL(mp, deserialised); 
-    //BOOST_CHECK(deserialised.RecomputeAndCheckTarget()); // cjg
 }
 
 BOOST_AUTO_TEST_CASE(deserialize_txid)
@@ -448,19 +447,19 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
         for(const auto& merkleProof : merkleProofs)
         {
             // Check good proof validates
-            BOOST_CHECK(merkleProof.RecomputeAndCheckTarget());
+            BOOST_CHECK(merkleProof.Verify());
 
             // Test serialising/deserialising
             CDataStream ss{SER_NETWORK, 0};
             ss << merkleProof;
             MerkleProof deserialised{};
             ss >> deserialised;
-            BOOST_CHECK(deserialised.RecomputeAndCheckTarget());
+            BOOST_CHECK(deserialised.Verify());
         }
 
         // Check invalid proof
         MerkleProof badProof{TxId{GetRandHash()}, txnIndex, checkRoot, nodes};
-        BOOST_CHECK(!badProof.RecomputeAndCheckTarget());
+        BOOST_CHECK(!badProof.Verify());
     }
 
     // Check JSON formatting of TSC proof
