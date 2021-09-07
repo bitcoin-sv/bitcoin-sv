@@ -231,11 +231,41 @@ BOOST_AUTO_TEST_CASE(default_construction)
     MerkleProof mp;
     BOOST_CHECK_EQUAL(0, mp.Flags());
     BOOST_CHECK_EQUAL(0, mp.Index());
-    //BOOST_CHECK_EQUAL(0, mp.Target()); //cjg
     BOOST_CHECK(mp.empty());
     BOOST_CHECK_EQUAL(0, mp.size());
+    const uint256 target{uint256S("0")};
+    BOOST_CHECK(target == mp.Target());
 }
             
+BOOST_AUTO_TEST_CASE(txid_construction)
+{
+    const TxId txid{uint256S("1")};
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    MerkleProof mp{txid, index, target, nodes};
+    BOOST_CHECK(contains_txid(mp));
+    BOOST_CHECK_EQUAL(index, mp.Index());
+    BOOST_CHECK(target == mp.Target());
+    BOOST_CHECK(!mp.empty());
+    BOOST_CHECK_EQUAL(1, mp.size());
+}
+
+BOOST_AUTO_TEST_CASE(tx_construction)
+{
+    CMutableTransaction mtx;
+    const auto sp = std::make_shared<const CTransaction>(std::move(mtx));
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    const MerkleProof mp{sp, index, target, nodes};
+    BOOST_CHECK(contains_tx(mp));
+    BOOST_CHECK_EQUAL(index, mp.Index());
+    BOOST_CHECK(target == mp.Target());
+    BOOST_CHECK(!mp.empty());
+    BOOST_CHECK_EQUAL(1, mp.size());
+}
+
 BOOST_AUTO_TEST_CASE(default_serialisation)
 {
     // Test serialising/deserialising
@@ -245,21 +275,6 @@ BOOST_AUTO_TEST_CASE(default_serialisation)
     MerkleProof deserialised{};
     ss >> deserialised;
     BOOST_CHECK_EQUAL(mp, deserialised); 
-    BOOST_CHECK(deserialised.RecomputeAndCheckTarget()); // cjg?
-}
-
-BOOST_AUTO_TEST_CASE(txid_construction)
-{
-    const TxId txid{uint256S("1")};
-    size_t index{2};
-    const uint256 target{uint256S("3")};
-    const std::vector<MerkleProof::Node> nodes{{}};
-    MerkleProof mp{txid, index, target, nodes};
-    BOOST_CHECK_EQUAL(0, mp.Flags()); // cjg always 0?
-    BOOST_CHECK_EQUAL(index, mp.Index());
-    BOOST_CHECK(target == mp.Target()); // cjg CHECK_EQUAL requires op<<
-    BOOST_CHECK(!mp.empty());
-    BOOST_CHECK_EQUAL(1, mp.size());
 }
             
 BOOST_AUTO_TEST_CASE(txid_serialisation)
@@ -278,7 +293,7 @@ BOOST_AUTO_TEST_CASE(txid_serialisation)
     //BOOST_CHECK(deserialised.RecomputeAndCheckTarget()); // cjg
 }
 
-BOOST_AUTO_TEST_CASE(cjg)
+BOOST_AUTO_TEST_CASE(deserialize_txid)
 {
     // clang-format off
     const CSerializeData data{0x0, /* flags */
@@ -324,6 +339,56 @@ BOOST_AUTO_TEST_CASE(cjg)
     BOOST_CHECK_EQUAL(expected, actual);
 }
 
+BOOST_AUTO_TEST_CASE(deserialize_tx)
+{
+    // clang-format off
+    const CSerializeData data{0x1, /* flags */
+                              0x0, /* index */
+                              0xa, /* tx len */
+                              /* tx */
+                              0x02, 0x0, 0x0, 0x0, /* version */
+                              0x0, /* ip count */
+                              0x0, /* op count */
+                              0x0, 0x0, 0x0, 0x0, /* Lock time */ 
+                              /* target */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              0x1, /* node count */
+                              0x0, /* type */
+                              /* hash */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              };
+    // clang-format on
+
+    CDataStream ds{data.begin(), data.end(), SER_NETWORK, 0};
+    MerkleProof actual{};
+    ds >> actual;
+
+    // clang-format off
+    const std::vector<uint8_t> data32{
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
+    // clang-format on
+
+    const uint256 tmp{data32};
+    const TxId txid{tmp};
+    const size_t index{0};
+    const uint256 target{tmp};
+    const std::vector<MerkleProof::Node> nodes{{tmp}};
+    
+    CMutableTransaction mtx;
+    auto sp = std::make_shared<const CTransaction>(std::move(mtx));
+
+    const MerkleProof expected{sp, index, target, nodes};
+    BOOST_CHECK_EQUAL(expected, actual);
+}
 
 BOOST_AUTO_TEST_CASE(merkle_proof)
 {

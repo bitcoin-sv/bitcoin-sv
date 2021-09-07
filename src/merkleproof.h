@@ -53,6 +53,7 @@ public:
                 const std::vector<Node>& nodes)
         : mFlags{0x01},
           mIndex{index},
+          mTxLen{txn->GetTotalSize()},
           mTxn{txn},
           mTxnId{txn->GetId()},
           mTarget{target},
@@ -76,7 +77,7 @@ public:
     
     constexpr uint8_t Flags() const noexcept { return mFlags; }
     constexpr size_t Index() const noexcept { return mIndex; }
-    uint256 Target() const noexcept { return mTarget; }
+    const uint256& Target() const noexcept { return mTarget; }
 
     [[nodiscard]] bool empty() const noexcept { return mNodes.empty(); }
     [[nodiscard]] size_t size() const noexcept { return mNodes.size(); }
@@ -97,6 +98,7 @@ public:
             // Expecting a full transaction or just an ID?
             if(mFlags & 0x01)
             {
+                READWRITE(VARINT(mTxLen));
                 CMutableTransaction mtx{};
                 READWRITE(mtx);
                 mTxn = MakeTransactionRef(std::move(mtx));
@@ -112,6 +114,7 @@ public:
             // Full transaction or just ID?
             if(mTxn)
             {
+                READWRITE(VARINT(mTxLen));
                 mTxn->Serialize(s);
             }
             else
@@ -139,6 +142,7 @@ private:
     size_t mIndex{0};
 
     // Transaction and/or transaction ID
+    size_t mTxLen{0};
     std::shared_ptr<const CTransaction> mTxn{nullptr};
     TxId mTxnId{};
 
@@ -151,4 +155,15 @@ private:
 };
 
 bool operator!=(const MerkleProof&, const MerkleProof&);
+
+inline bool contains_tx(const MerkleProof& mp)
+{
+    return mp.Flags() & 0x1;
+}
+
+inline bool contains_txid(const MerkleProof& mp)
+{
+    return !contains_tx(mp);
+}
+
 

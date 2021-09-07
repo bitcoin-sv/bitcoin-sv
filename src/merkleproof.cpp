@@ -82,8 +82,9 @@ bool operator==(const MerkleProof& a, const MerkleProof& b)
 
     return a.mFlags == b.mFlags &&
            a.mIndex == b.mIndex &&
-           a.mTxn && b.mTxn ? *a.mTxn == *b.mTxn : true && // cjg true if both null?
            a.mTxnId == b.mTxnId && 
+           a.mTxLen == b.mTxLen &&
+           (a.mTxn && b.mTxn ? *a.mTxn == *b.mTxn : true) &&
            a.mTarget == b.mTarget &&
            a.mNodes == b.mNodes;
 }
@@ -91,16 +92,6 @@ bool operator==(const MerkleProof& a, const MerkleProof& b)
 bool operator!=(const MerkleProof& a, const MerkleProof& b)
 {
     return !(a == b);
-}
-
-static bool contains_tx(const MerkleProof& mp)
-{
-    return mp.Flags() & 0x1;
-}
-
-static bool contains_txid(const MerkleProof& mp)
-{
-    return !contains_tx(mp);
 }
 
 std::ostream& operator<<(std::ostream& os, const TxId& txid)
@@ -127,10 +118,13 @@ std::ostream& operator<<(std::ostream& os, const MerkleProof& mp)
     os << "Flags: " << static_cast<int>(mp.Flags())
        << "\nIndex: " << static_cast<int>(mp.Index());
 
-    if(contains_txid(mp))
-    {
+    //if(contains_txid(mp))
+    //{
        os << "\nTxId: " << mp.mTxnId ;
-    }
+    //}
+    
+    os << "\nTx Length: " << mp.mTxLen;
+    os << "\nTx*: " << mp.mTxn;
     
     os << "\nTarget: " << mp.mTarget.ToString();
     os << "\nNode Count: " << mp.mNodes.size();
