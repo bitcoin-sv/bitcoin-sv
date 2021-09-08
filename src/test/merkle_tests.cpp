@@ -1,6 +1,16 @@
 // Copyright (c) 2015-2016 The Bitcoin Core developers
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <iostream>
+
+#include "boost/algorithm/hex.hpp"
+#include <bits/stdint-uintn.h>
+#include <boost/test/tools/old/interface.hpp>
+#include <boost/test/unit_test.hpp>
 
 #include "consensus/merkle.h"
 #include "serialize.h"
@@ -11,11 +21,7 @@
 #include "merkletree.h"
 #include "uint256.h"
 
-#include <bits/stdint-uintn.h>
-#include <boost/test/tools/old/interface.hpp>
-#include <boost/test/unit_test.hpp>
-
-#include <tuple>
+namespace ba = boost::algorithm;
 
 BOOST_FIXTURE_TEST_SUITE(merkle_tests, TestingSetup)
 
@@ -233,7 +239,7 @@ BOOST_AUTO_TEST_CASE(default_construction)
     BOOST_CHECK_EQUAL(0, mp.Index());
     BOOST_CHECK(mp.empty());
     BOOST_CHECK_EQUAL(0, mp.size());
-    const uint256 target{uint256S("0")};
+    const uint256 target;
     BOOST_CHECK(target == mp.Target());
 }
             
@@ -250,6 +256,23 @@ BOOST_AUTO_TEST_CASE(txid_construction)
     BOOST_CHECK(!mp.empty());
     BOOST_CHECK_EQUAL(1, mp.size());
 }
+
+//BOOST_AUTO_TEST_CASE(txid_construction_cjg)
+//{
+//    const TxId txid{uint256S("1")};
+//    size_t index{2};
+//    const uint256 target{uint256S("3")};
+//    const std::vector<MerkleProof::Node> nodes{{}};
+//
+//    try
+//    {
+//        MerkleProof mp{txid, index, target, nodes};
+//        BOOST_FAIL();
+//    }
+//    catch(const std::runtime_error& e)
+//    {   
+//    }
+//}
 
 BOOST_AUTO_TEST_CASE(tx_construction)
 {
@@ -361,6 +384,45 @@ BOOST_AUTO_TEST_CASE(deserialize_tx)
 
     const MerkleProof expected{sp, index, target, nodes};
     BOOST_CHECK_EQUAL(expected, actual);
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_std_example)
+{
+    // Taken from: github.com/bitcoin-sv-specs/merkle-proof-standard-example
+    using namespace std;
+
+    // clang-format off
+    vector<uint8_t> v;
+    ba::unhex("00" // flags
+              "0c" // index
+              "ef65a4611570303539143dabd6aa64dbd0f41ed89074406dc0e7cd251cf1efff" // txid
+              "69f17b44cfe9c2a23285168fe05084e1254daa5305311ed8cd95b19ea6b0ed75" // target
+              "05" // node count
+              "00" // node type
+              "8e66d81026ddb2dae0bd88082632790fc6921b299ca798088bef5325a607efb9" // hash
+              "00"
+              "4d104f378654a25e35dbd6a539505a1e3ddbba7f92420414387bb5b12fc1c10f"
+              "00"
+              "472581a20a043cee55edee1c65dd6677e09903f22992062d8fd4b8d55de7b060"
+              "00"
+              "6fcc978b3f999a3dbb85a6ae55edc06dd9a30855a030b450206c3646dadbd8c0"
+              "00"
+              "423ab0273c2572880cdc0030034c72ec300ec9dd7bbc7d3f948a9d41b3621e39",
+              back_inserter(v));
+    // clang-format on
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    MerkleProof actual{};
+    ss >> actual;
+   
+    BOOST_CHECK_EQUAL(0, actual.Flags());
+    BOOST_CHECK_EQUAL(12, actual.Index());
+    BOOST_CHECK_EQUAL(5, actual.size());
+    
+    //const MerkleProof expected{};
+    //BOOST_CHECK_EQUAL(expected, actual);
+    //BOOST_CHECK(actual.Verify());
 }
 
 BOOST_AUTO_TEST_CASE(default_serialisation)

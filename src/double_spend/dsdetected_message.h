@@ -54,10 +54,10 @@ public:
         return mBlockList;
     }
 
-    [[nodiscard]] constexpr bool empty() const noexcept { return mBlockList.empty(); }
+    [[nodiscard]] bool empty() const noexcept { return mBlockList.empty(); }
 
-    constexpr const_iterator cbegin() const noexcept { return mBlockList.cbegin(); }
-    constexpr const_iterator cend() const noexcept { return mBlockList.cend(); }
+    const_iterator cbegin() const noexcept { return mBlockList.cbegin(); }
+    const_iterator cend() const noexcept { return mBlockList.cend(); }
 
     // Serialisation/deserialisation
     ADD_SERIALIZE_METHODS
