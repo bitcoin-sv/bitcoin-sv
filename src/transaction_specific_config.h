@@ -71,6 +71,9 @@ public:
     bool SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err);
     std::chrono::milliseconds GetMaxTxnValidatorAsyncTasksRunDuration() const override;
 
+    bool SetTransactionSpecificSkipScriptFlags(int skipScriptFlags, std::string* err = nullptr);
+    uint32_t GetSkipScriptFlags() const;
+
 private:
     std::optional<uint64_t> mMaxTxSize;
     std::optional<uint64_t> mDataCarrierSize;
@@ -91,4 +94,5 @@ private:
     std::optional<uint64_t> mDustLimitFactor;
     std::optional<CFeeRate> mDustRelayFee;
     std::optional<bool> mDataCarrier;
+    uint32_t mSkipScriptFlags;
 };

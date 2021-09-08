@@ -122,6 +122,9 @@ public:
         return mfTxIdStored;
     }
 
+    // GetSkipScriptFlags
+    uint32_t GetSkipScriptFlags() const;
+
     using clock = std::chrono::steady_clock;
 
     clock::duration GetLifetime() const {

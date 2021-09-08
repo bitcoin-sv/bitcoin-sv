@@ -1338,6 +1338,8 @@ CTxnValResult TxnValidation(
     // We are getting flags as they would be if the utxos are before genesis. 
     // "CheckInputs" is adding specific flags for each input based on its height in the main chain
     uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
+    // Turn off flags that may be on in scriptVerifyFlags, but we explicitly want them to be skipped
+    scriptVerifyFlags &= ~pTxInputData->GetSkipScriptFlags();
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);

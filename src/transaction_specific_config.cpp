@@ -347,3 +347,22 @@ std::chrono::milliseconds TransactionSpecificConfig::GetMaxTxnValidatorAsyncTask
     return mMaxTxnValidatorAsyncTasksRunDuration.has_value() ? *mMaxTxnValidatorAsyncTasksRunDuration : GlobalConfig::GetMaxTxnValidatorAsyncTasksRunDuration();
 }
 
+bool TransactionSpecificConfig::SetTransactionSpecificSkipScriptFlags(int skipScriptFlags, std::string* err)
+{
+    if(skipScriptFlags >= 0)
+    {
+        mSkipScriptFlags = skipScriptFlags;
+        return true;
+    }
+
+    if(err)
+    {
+        *err = "skipscriptflags must be a positive integer";
+    }
+    return false;
+}
+
+uint32_t TransactionSpecificConfig::GetSkipScriptFlags() const
+{
+    return mSkipScriptFlags;
+}
