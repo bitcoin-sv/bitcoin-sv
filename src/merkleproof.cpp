@@ -8,7 +8,12 @@
 #include "core_io.h"
 #include "primitives/transaction.h"
 #include "uint256.h"
+
+#include <bits/c++config.h>
+#include <boost/array.hpp>
 #include <iterator>
+
+#include "boost/container_hash/hash.hpp"
 
 MerkleProof::MerkleProof(const CMerkleTree::MerkleProof& treeProof,
                          const TxId& txnid,
@@ -128,5 +133,28 @@ std::ostream& operator<<(std::ostream& os, const MerkleProof& mp)
         os << "\n\t" << node;
     
     return os;
+}
+
+std::size_t hash_value(const MerkleProof::Node& node)
+{
+    std::size_t seed{0};
+    boost::hash_combine(seed, node.mType);
+    boost::hash_combine(seed, node.mValue);
+    return seed;
+}
+
+std::size_t hash_value(const MerkleProof& mp)
+{
+    size_t seed{0};
+    boost::hash_combine(seed, mp.mFlags);
+    boost::hash_combine(seed, mp.mIndex);
+    boost::hash_combine(seed, mp.mTarget);
+    boost::hash_combine(seed, mp.mTxLen);
+    //boost::hash_combine(seed, mp.mTxn);
+    boost::hash_combine(seed, mp.mTxnId);
+
+    boost::hash_range(seed, mp.mNodes.begin(), mp.mNodes.end());
+    
+    return seed;
 }
 

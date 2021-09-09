@@ -85,6 +85,8 @@ public:
     template <typename T>
     struct UnitTestAccess;
 
+    friend std::hash<DSDetected>;
+
 private:
     // Protocol version for this message
     uint16_t mVersion{MSG_VERSION};
@@ -92,4 +94,24 @@ private:
     // List of details for blocks double-spends are detected in
     blocks_type mBlockList{};
 };
+
+bool operator==(const DSDetected&, const DSDetected&);
+inline bool operator!=(const DSDetected& a, const DSDetected& b) { return !(a == b); }
+
+bool operator==(const DSDetected::BlockDetails&,
+                const DSDetected::BlockDetails&);
+inline bool operator!=(const DSDetected::BlockDetails& a,
+                const DSDetected::BlockDetails& b)
+{
+    return !(a == b);
+}
+
+namespace std
+{
+    template<>
+    struct hash<DSDetected>
+    {
+        std::size_t operator()(const DSDetected&) const;
+    };
+}
 

@@ -134,6 +134,8 @@ public:
     friend bool operator==(const MerkleProof&, const MerkleProof&);
     friend std::ostream& operator<<(std::ostream&, const MerkleProof&);
 
+    friend std::size_t hash_value(const MerkleProof&);
+
 private:
     // Flags to indicate the format of the rest of the proof
     uint8_t mFlags{0x0};

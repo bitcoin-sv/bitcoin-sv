@@ -10,6 +10,7 @@
 #include "merkletree.h"
 #include "streams.h"
 
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 
 namespace
@@ -63,23 +64,6 @@ namespace
 //    return bh1.GetHash() == bh2.GetHash();
 //}
 
-// Comparison operator for DSDetected::BlockDetails
-bool operator==(const DSDetected::BlockDetails& a,
-                const DSDetected::BlockDetails& b)
-{
-    return a.mBlockHeaders == b.mBlockHeaders &&
-           a.mMerkleProof == b.mMerkleProof;
-//           HashMerkleProof(a.mMerkleProof) ==
-//               HashMerkleProof(b.mMerkleProof);
-}
-
-// Comparison operator for DSDetected
-bool operator==(const DSDetected& a, const DSDetected& b)
-{
-    return a.GetVersion() == b.GetVersion() &&
-           a.GetBlockList() == b.GetBlockList();
-}
-
 // Print DSDetected
 std::ostream& operator<<(std::ostream& str, const DSDetected& msg)
 {
@@ -123,6 +107,24 @@ BOOST_AUTO_TEST_CASE(default_construction)
     DSDetected msg;
     BOOST_CHECK_EQUAL(msg.GetVersion(), DSDetected::MSG_VERSION);
     BOOST_CHECK(msg.empty());
+}
+
+BOOST_AUTO_TEST_CASE(default_hash)
+{
+    const std::hash<DSDetected> hasher;
+    const DSDetected msg1;
+    const auto h11 = hasher(msg1); 
+    const auto h12 = hasher(msg1); 
+    BOOST_CHECK_EQUAL(h11, h12);
+    
+    DSDetected msg2;
+    std::vector<CBlockHeader> headers{CBlockHeader{}};
+    std::vector<DSDetected::BlockDetails> blocks{};
+    blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
+    blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
+    UnitTestAccess::SetBlockList(msg2, blocks);
+    const auto h21 = hasher(msg2); 
+    BOOST_CHECK_NE(h11, h21);
 }
 
 BOOST_AUTO_TEST_CASE(CreationSerialisation)
