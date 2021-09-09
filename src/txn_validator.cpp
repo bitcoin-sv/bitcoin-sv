@@ -629,7 +629,7 @@ void CTxnValidator::postValidationStepsNL(
         } else {
             imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
         }
-    } else if (!state.IsMissingInputs() || txStatus.mTxInputData->IsDeleted()) {
+    } else if (!state.IsMissingInputs()) {
         imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
     }
 }
