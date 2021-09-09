@@ -3422,6 +3422,16 @@ static void ProcessDoubleSpendMessage(const Config& config, const CNodePtr& pfro
         vRecv >> msg;
 
         // TODO: Validate double-spend report
+        static std::hash<DSDetected> hasher;
+        static std::vector<size_t> msg_cache;
+       
+        const auto hash = hasher(msg);
+
+        const auto it = find(msg_cache.begin(), msg_cache.end(), hash);
+        if(it != msg_cache.end())
+            return // ignore messages we've already seen
+
+        msg_cache.push_back(hash); 
 
         // Relay to our peers
         connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
