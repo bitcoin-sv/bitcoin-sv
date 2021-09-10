@@ -119,4 +119,5 @@ namespace std
 bool IsValid(const DSDetected&);
 bool IsValid(const DSDetected::BlockDetails&);
 
+bool FormsChain(const std::vector<CBlockHeader>&);
 bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>&);

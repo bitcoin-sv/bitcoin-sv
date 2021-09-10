@@ -113,7 +113,8 @@ UniValue DSDetected::ToJSON(const Config& config) const
 
 bool IsValid(const DSDetected::BlockDetails& fork)
 {
-    return !ContainsDuplicateHeaders(fork.mBlockHeaders);
+    return FormsChain(fork.mBlockHeaders) &&
+           !ContainsDuplicateHeaders(fork.mBlockHeaders);
 }
 
 bool IsValid(const DSDetected& msg)
@@ -124,6 +125,32 @@ bool IsValid(const DSDetected& msg)
         });
 
     return b;
+}
+
+namespace
+{
+    bool linked(const CBlockHeader& a, const CBlockHeader& b)
+    {
+        std::cout << a.hashPrevBlock.ToString() << ' ' << b.GetHash().ToString()
+                  << '\n';
+        return a.hashPrevBlock == b.GetHash();
+    }
+}
+
+bool FormsChain(const std::vector<CBlockHeader>& headers)
+{
+    if(headers.empty())
+        return false;
+
+    if(headers.size() == 1)
+        return true;
+
+    const auto it{mismatch(headers.begin(),
+                           headers.end() - 1,
+                           headers.begin() + 1,
+                           headers.end(),
+                           linked)};
+    return it.second == headers.end();
 }
 
 bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>& headers)

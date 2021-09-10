@@ -237,6 +237,31 @@ BOOST_AUTO_TEST_CASE(MsgMalformed)
     BOOST_CHECK_THROW(ss >> msg;, std::runtime_error);
 }
 
+BOOST_AUTO_TEST_CASE(headers_form_chain)
+{
+    vector<CBlockHeader> headers;
+    BOOST_CHECK(!FormsChain(headers));
+
+    const CBlockHeader h1;
+    headers.push_back(h1);
+    BOOST_CHECK(FormsChain(headers));
+
+    CBlockHeader h2;
+    h2.hashPrevBlock = h1.GetHash();
+    headers.insert(headers.begin(), h2);
+    // BOOST_CHECK(FormsChain(headers));
+
+    CBlockHeader h3;
+    h3.hashPrevBlock = h2.GetHash();
+    headers.insert(headers.begin(), h3);
+    BOOST_CHECK(FormsChain(headers));
+
+    CBlockHeader h4;
+    h4.hashPrevBlock = h1.GetHash();
+    headers.insert(headers.begin(), h4);
+    BOOST_CHECK(!FormsChain(headers));
+}
+
 BOOST_AUTO_TEST_CASE(contains_duplicate_headers)
 {
     vector<CBlockHeader> headers;
