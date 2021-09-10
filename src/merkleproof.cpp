@@ -13,7 +13,7 @@
 #include <boost/array.hpp>
 #include <iterator>
 
-#include "boost/container_hash/hash.hpp"
+#include "boost/functional/hash.hpp"
 
 MerkleProof::MerkleProof(const CMerkleTree::MerkleProof& treeProof,
                          const TxId& txnid,

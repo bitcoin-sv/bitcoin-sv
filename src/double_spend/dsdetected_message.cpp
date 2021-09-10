@@ -8,8 +8,7 @@
 #include "primitives/block.h"
 #include "uint256.h"
 #include <bits/c++config.h>
-#include <boost/container_hash/extensions.hpp>
-#include <boost/container_hash/hash.hpp>
+#include <boost/functional/hash.hpp>
 
 // Comparison operator for DSDetected
 bool operator==(const DSDetected& a, const DSDetected& b)
