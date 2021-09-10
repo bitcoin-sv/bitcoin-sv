@@ -8,10 +8,13 @@
 #include "hash.h"
 #include "merkleproof.h"
 #include "merkletree.h"
+#include "primitives/block.h"
 #include "streams.h"
 
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
+
+using namespace std;
 
 namespace
 {
@@ -232,6 +235,24 @@ BOOST_AUTO_TEST_CASE(MsgMalformed)
     ss << msg;
     DSDetected deserialised{};
     BOOST_CHECK_THROW(ss >> msg;, std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(contains_duplicate_headers)
+{
+    vector<CBlockHeader> headers;
+    BOOST_CHECK(!ContainsDuplicateHeaders(headers));
+
+    const CBlockHeader h1;
+    headers.push_back(h1);
+    BOOST_CHECK(!ContainsDuplicateHeaders(headers));
+
+    CBlockHeader h2;
+    h2.nVersion = 42;
+    headers.push_back(h2);
+    BOOST_CHECK(!ContainsDuplicateHeaders(headers));
+
+    headers.push_back(h2);
+    BOOST_CHECK(ContainsDuplicateHeaders(headers));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

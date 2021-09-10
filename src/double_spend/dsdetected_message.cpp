@@ -3,12 +3,17 @@
 // LICENSE.
 
 #include "double_spend/dsdetected_message.h"
+
 #include "config.h"
 #include "merkleproof.h"
 #include "primitives/block.h"
 #include "uint256.h"
+#include <algorithm>
 #include <bits/c++config.h>
 #include <boost/functional/hash.hpp>
+#include <iterator>
+
+using namespace std;
 
 // Comparison operator for DSDetected
 bool operator==(const DSDetected& a, const DSDetected& b)
@@ -24,7 +29,7 @@ bool operator==(const DSDetected::BlockDetails& a,
     return a.mBlockHeaders == b.mBlockHeaders &&
            a.mMerkleProof == b.mMerkleProof;
 //           HashMerkleProof(a.mMerkleProof) ==
-//               HashMerkleProof(b.mMerkleProof); // cjg
+//               HashMerkleProof(b.mMerkleProof);
 }
 
 std::size_t hash_value(const uint256& i)
@@ -104,4 +109,33 @@ UniValue DSDetected::ToJSON(const Config& config) const
     document.push_back(Pair("blocks", blocks));
 
     return document;
+}
+
+bool IsValid(const DSDetected::BlockDetails& fork)
+{
+    return !ContainsDuplicateHeaders(fork.mBlockHeaders);
+}
+
+bool IsValid(const DSDetected& msg)
+{
+    const bool b = std::all_of(
+        msg.cbegin(), msg.cend(), [](const DSDetected::BlockDetails& fork) {
+            return IsValid(fork);
+        });
+
+    return b;
+}
+
+bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>& headers)
+{
+    vector<size_t> hashes;
+    hashes.reserve(headers.size());
+    transform(headers.begin(),
+              headers.end(),
+              back_inserter(hashes),
+              [](const auto& h) { return hash_value(h); });
+
+    sort(hashes.begin(), hashes.end());
+
+    return adjacent_find(hashes.begin(), hashes.end()) != hashes.end();
 }

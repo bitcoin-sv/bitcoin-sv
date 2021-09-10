@@ -6,9 +6,9 @@
 #include "net/net_processing.h"
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "block_file_access.h"
 #include "block_index_store.h"
 #include "blockencodings.h"
-#include "block_file_access.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "clientversion.h"
@@ -17,6 +17,7 @@
 #include "double_spend/dsdetected_message.h"
 #include "hash.h"
 #include "init.h"
+#include "invalid_txn_publisher.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
 #include "net/block_download_tracker.h"
@@ -40,13 +41,13 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "validationinterface.h"
-#include "invalid_txn_publisher.h"
 #include <algorithm>
-#include <chrono>
-#include <optional>
-#include <shared_mutex>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
+#include <chrono>
+#include <memory>
+#include <optional>
+#include <shared_mutex>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -3409,11 +3410,19 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
     return true;
 }
 
+static void IncreaseBanScore(const CNode& pfrom)
+{
+    // TODO
+} 
+
 /**
 * PRocess double-spend detected message.
 */
-static void ProcessDoubleSpendMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv,
-                                      CConnman& connman, const CNetMsgMaker& msgMaker)
+static void ProcessDoubleSpendMessage(const Config& config,
+                                      const std::shared_ptr<CNode>& pfrom,
+                                      CDataStream& vRecv,
+                                      CConnman& connman,
+                                      const CNetMsgMaker& msgMaker)
 {
     try
     {
@@ -3421,9 +3430,9 @@ static void ProcessDoubleSpendMessage(const Config& config, const CNodePtr& pfro
         DSDetected msg {};
         vRecv >> msg;
 
-        // TODO: Validate double-spend report
+        // Check if we've already handled this message
         static std::hash<DSDetected> hasher;
-        static std::vector<size_t> msg_cache;
+        static std::vector<size_t> msg_cache; // TODO: Only remember last N messages
        
         const auto hash = hasher(msg);
 
@@ -3432,6 +3441,13 @@ static void ProcessDoubleSpendMessage(const Config& config, const CNodePtr& pfro
             return // ignore messages we've already seen
 
         msg_cache.push_back(hash); 
+        
+        // TODO: Validate double-spend report
+        if(!IsValid(msg))
+        {
+            IncreaseBanScore(*pfrom);
+            return;
+        }
 
         // Relay to our peers
         connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)

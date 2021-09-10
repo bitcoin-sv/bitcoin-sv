@@ -115,3 +115,8 @@ namespace std
     };
 }
 
+
+bool IsValid(const DSDetected&);
+bool IsValid(const DSDetected::BlockDetails&);
+
+bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>&);

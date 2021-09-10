@@ -13,12 +13,13 @@
 #include <boost/test/unit_test.hpp>
 
 #include "consensus/merkle.h"
-#include "serialize.h"
-#include "support/allocators/zeroafterfree.h"
-#include "test/test_bitcoin.h"
-#include "task_helpers.h"
+#include "double_spend/dsdetected_message.h"
 #include "merkleproof.h"
 #include "merkletree.h"
+#include "serialize.h"
+#include "support/allocators/zeroafterfree.h"
+#include "task_helpers.h"
+#include "test/test_bitcoin.h"
 #include "uint256.h"
 
 namespace ba = boost::algorithm;
@@ -257,7 +258,7 @@ BOOST_AUTO_TEST_CASE(txid_construction)
     BOOST_CHECK_EQUAL(1, mp.size());
 }
 
-//BOOST_AUTO_TEST_CASE(txid_construction_cjg)
+//BOOST_AUTO_TEST_CASE(txid_construction)
 //{
 //    const TxId txid{uint256S("1")};
 //    size_t index{2};
