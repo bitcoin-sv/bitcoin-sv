@@ -10,6 +10,7 @@
 #include "merkletree.h"
 #include "primitives/block.h"
 #include "streams.h"
+#include "uint256.h"
 
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
@@ -278,6 +279,35 @@ BOOST_AUTO_TEST_CASE(contains_duplicate_headers)
 
     headers.push_back(h2);
     BOOST_CHECK(ContainsDuplicateHeaders(headers));
+}
+
+BOOST_AUTO_TEST_CASE(common_ancestor)
+{
+    DSDetected msg;
+
+    // Add some block details
+    std::vector<DSDetected::BlockDetails> blocks{};
+
+    std::vector<CBlockHeader> headers_1{CBlockHeader{}};
+    blocks.push_back(DSDetected::BlockDetails{headers_1, CreateMerkleProof()});
+
+    std::vector<CBlockHeader> headers_2{CBlockHeader{}};
+    blocks.push_back(DSDetected::BlockDetails{headers_2, CreateMerkleProof()});
+
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK_EQUAL(msg.size(), 2);
+
+    BOOST_CHECK(IsValid(msg));
+
+    CBlockHeader h;
+    const uint256 i = uint256S("42");
+    h.hashPrevBlock = i;
+    std::vector<CBlockHeader> headers_3{h};
+    blocks.push_back(DSDetected::BlockDetails{headers_3, CreateMerkleProof()});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK_EQUAL(msg.size(), 2);
+
+    BOOST_CHECK(!IsValid(msg));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

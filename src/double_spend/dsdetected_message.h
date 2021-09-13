@@ -55,6 +55,7 @@ public:
     }
 
     [[nodiscard]] bool empty() const noexcept { return mBlockList.empty(); }
+    [[nodiscard]] auto size() const noexcept { return mBlockList.size(); }
 
     const_iterator cbegin() const noexcept { return mBlockList.cbegin(); }
     const_iterator cend() const noexcept { return mBlockList.cend(); }

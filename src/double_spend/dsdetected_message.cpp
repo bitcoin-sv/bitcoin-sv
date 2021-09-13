@@ -119,20 +119,31 @@ bool IsValid(const DSDetected::BlockDetails& fork)
 
 bool IsValid(const DSDetected& msg)
 {
-    const bool b = std::all_of(
+    const bool all_forks_valid = std::all_of(
         msg.cbegin(), msg.cend(), [](const DSDetected::BlockDetails& fork) {
             return IsValid(fork);
         });
+    if(!all_forks_valid)
+        return false;
 
-    return b;
+    // Check all forks have the same common ancestor
+    const auto it = adjacent_find(
+        msg.cbegin(), msg.cend(), [](const auto& fork1, const auto& fork2) {
+            assert(!fork1.mBlockHeaders.empty());
+            assert(!fork2.mBlockHeaders.empty());
+            return fork1.mBlockHeaders.back().hashPrevBlock !=
+                   fork2.mBlockHeaders.back().hashPrevBlock;
+        });
+    if(it != msg.cend())
+        return false;
+
+    return true;
 }
 
 namespace
 {
     bool linked(const CBlockHeader& a, const CBlockHeader& b)
     {
-        std::cout << a.hashPrevBlock.ToString() << ' ' << b.GetHash().ToString()
-                  << '\n';
         return a.hashPrevBlock == b.GetHash();
     }
 }
