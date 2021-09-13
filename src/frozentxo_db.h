@@ -203,6 +203,8 @@ public:
 
         /**
          * Specifies interval of block heights.
+         *
+         * Interval is assumed to be half-open [start, stop).
          */
         struct HeightInterval
         {
