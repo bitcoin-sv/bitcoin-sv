@@ -19,7 +19,7 @@ using namespace std;
 bool operator==(const DSDetected& a, const DSDetected& b)
 {
     return a.GetVersion() == b.GetVersion() &&
-           a.GetBlockList() == b.GetBlockList();
+           a.mBlockList == b.mBlockList;
 }
 
 // Comparison operator for DSDetected::BlockDetails
@@ -120,7 +120,7 @@ bool IsValid(const DSDetected::BlockDetails& fork)
 bool IsValid(const DSDetected& msg)
 {
     const bool all_forks_valid = std::all_of(
-        msg.cbegin(), msg.cend(), [](const DSDetected::BlockDetails& fork) {
+        msg.begin(), msg.end(), [](const DSDetected::BlockDetails& fork) {
             return IsValid(fork);
         });
     if(!all_forks_valid)
@@ -128,13 +128,13 @@ bool IsValid(const DSDetected& msg)
 
     // Check all forks have the same common ancestor
     const auto it = adjacent_find(
-        msg.cbegin(), msg.cend(), [](const auto& fork1, const auto& fork2) {
+        msg.begin(), msg.end(), [](const auto& fork1, const auto& fork2) {
             assert(!fork1.mBlockHeaders.empty());
             assert(!fork2.mBlockHeaders.empty());
             return fork1.mBlockHeaders.back().hashPrevBlock !=
                    fork2.mBlockHeaders.back().hashPrevBlock;
         });
-    if(it != msg.cend())
+    if(it != msg.end())
         return false;
 
     return true;

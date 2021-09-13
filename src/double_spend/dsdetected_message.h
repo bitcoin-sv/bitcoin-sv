@@ -49,16 +49,12 @@ public:
 
     // Accessors
     [[nodiscard]] uint16_t GetVersion() const { return mVersion; }
-    [[nodiscard]] const std::vector<BlockDetails>& GetBlockList() const
-    {
-        return mBlockList;
-    }
 
     [[nodiscard]] bool empty() const noexcept { return mBlockList.empty(); }
     [[nodiscard]] auto size() const noexcept { return mBlockList.size(); }
 
-    const_iterator cbegin() const noexcept { return mBlockList.cbegin(); }
-    const_iterator cend() const noexcept { return mBlockList.cend(); }
+    const_iterator begin() const noexcept { return mBlockList.cbegin(); }
+    const_iterator end() const noexcept { return mBlockList.cend(); }
 
     // Serialisation/deserialisation
     ADD_SERIALIZE_METHODS
@@ -86,6 +82,7 @@ public:
     template <typename T>
     struct UnitTestAccess;
 
+    friend bool operator==(const DSDetected&, const DSDetected&);
     friend std::hash<DSDetected>;
 
 private:
@@ -96,7 +93,6 @@ private:
     blocks_type mBlockList{};
 };
 
-bool operator==(const DSDetected&, const DSDetected&);
 inline bool operator!=(const DSDetected& a, const DSDetected& b) { return !(a == b); }
 
 bool operator==(const DSDetected::BlockDetails&,

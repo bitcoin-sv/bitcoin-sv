@@ -73,16 +73,16 @@ std::ostream& operator<<(std::ostream& str, const DSDetected& msg)
 {
     str << "Version: " << msg.GetVersion() << ", ";
     str << "BlockList: [ ";
-    for(const auto& block : msg.GetBlockList())
+    for(const auto& fork : msg)
     {
         str << "HeaderList: [";
-        for(const auto& header : block.mBlockHeaders)
+        for(const auto& header : fork.mBlockHeaders)
         {
             str << header.GetHash().ToString() << ",";
         }
         str << "], ";
         str << "MerkleProof: "
-            << HashMerkleProof(block.mMerkleProof).ToString();
+            << HashMerkleProof(fork.mMerkleProof).ToString();
     }
     str << "]";
     return str;
@@ -149,7 +149,7 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
     std::vector<DSDetected::BlockDetails> blocks{};
     blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.GetBlockList().size(), 1);
+    BOOST_CHECK_EQUAL(msg.size(), 1);
     {
         CDataStream ss{SER_NETWORK, 0};
         ss << msg;
@@ -305,7 +305,7 @@ BOOST_AUTO_TEST_CASE(common_ancestor)
     std::vector<CBlockHeader> headers_3{h};
     blocks.push_back(DSDetected::BlockDetails{headers_3, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 2);
+    BOOST_CHECK_EQUAL(msg.size(), 3);
 
     BOOST_CHECK(!IsValid(msg));
 }
