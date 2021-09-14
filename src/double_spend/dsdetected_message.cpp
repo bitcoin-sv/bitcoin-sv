@@ -27,13 +27,6 @@ bool operator==(const DSDetected::BlockDetails& a,
 {
     return a.mBlockHeaders == b.mBlockHeaders &&
            a.mMerkleProof == b.mMerkleProof;
-//           HashMerkleProof(a.mMerkleProof) ==
-//               HashMerkleProof(b.mMerkleProof);
-}
-
-std::size_t hash_value(const uint256& i)
-{
-    return boost::hash_range(i.begin(), i.end());
 }
 
 std::size_t hash_value(const CBlockHeader& header)

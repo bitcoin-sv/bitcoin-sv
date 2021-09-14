@@ -8,7 +8,6 @@
 #include <iostream>
 
 #include "boost/algorithm/hex.hpp"
-#include <bits/stdint-uintn.h>
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 
@@ -331,7 +330,7 @@ BOOST_AUTO_TEST_CASE(deserialize_txid)
     const TxId txid{tmp};
     const size_t index{0};
     const uint256 target{tmp};
-    const std::vector<MerkleProof::Node> nodes{{tmp}};
+    const std::vector<MerkleProof::Node> nodes{MerkleProof::Node{tmp}};
     const MerkleProof expected{txid, index, target, nodes};
     BOOST_CHECK_EQUAL(expected, actual);
 }
@@ -378,8 +377,8 @@ BOOST_AUTO_TEST_CASE(deserialize_tx)
     const TxId txid{tmp};
     const size_t index{0};
     const uint256 target{tmp};
-    const std::vector<MerkleProof::Node> nodes{{tmp}};
-    
+    const std::vector<MerkleProof::Node> nodes{MerkleProof::Node{tmp}};
+
     CMutableTransaction mtx;
     auto sp = std::make_shared<const CTransaction>(std::move(mtx));
 
@@ -502,7 +501,7 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
         vector<MerkleProof::Node> nodes{};
         for(const auto& node : treeProof.merkleTreeHashes)
         {
-            nodes.push_back({node});
+            nodes.push_back(MerkleProof::Node{node});
         }
 
         return make_tuple(nodes, checkRoot, treeProof);

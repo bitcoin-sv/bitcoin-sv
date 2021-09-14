@@ -55,7 +55,7 @@ namespace
         std::vector<MerkleProof::Node> nodes{};
         for(const auto& node : treeProof.merkleTreeHashes)
         {
-            nodes.push_back({node});
+            nodes.push_back(MerkleProof::Node{node});
         }
 
         return {txn, 0, checkRoot, nodes};

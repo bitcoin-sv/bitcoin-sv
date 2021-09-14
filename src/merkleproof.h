@@ -26,7 +26,7 @@ public:
     struct Node
     {
         Node() = default;
-        Node(const uint256& value) : mValue{value} {}
+        explicit Node(const uint256& value) : mValue{value} {}
 
         // Serialisation/deserialisation
         ADD_SERIALIZE_METHODS
