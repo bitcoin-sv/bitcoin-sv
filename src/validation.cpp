@@ -3955,8 +3955,8 @@ static bool ConnectTip(
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
     std::vector<CTransactionRef> txNew;
-    auto asyncRemoveForBlock = std::async(std::launch::async, 
-        [&blockConnecting, &pindexNew, &changeSet, &txNew]()
+    auto asyncRemoveForBlock = std::async(std::launch::async,
+        [&blockConnecting, &changeSet, &txNew]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
