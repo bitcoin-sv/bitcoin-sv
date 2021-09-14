@@ -62,12 +62,6 @@ namespace
     }
 }
 
-// Comparison operator for CBlockHeader
-//bool operator==(const CBlockHeader& bh1, const CBlockHeader& bh2)
-//{
-//    return bh1.GetHash() == bh2.GetHash();
-//}
-
 // Print DSDetected
 std::ostream& operator<<(std::ostream& str, const DSDetected& msg)
 {

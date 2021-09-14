@@ -114,7 +114,10 @@ UniValue DSDetected::ToJSON(const Config& config) const
 bool IsValid(const DSDetected::BlockDetails& fork)
 {
     return FormsChain(fork.mBlockHeaders) &&
-           !ContainsDuplicateHeaders(fork.mBlockHeaders);
+           !ContainsDuplicateHeaders(fork.mBlockHeaders) &&
+           fork.mMerkleProof.Verify();
+    
+    // TODO: Check POW for each fork
 }
 
 bool IsValid(const DSDetected& msg)
@@ -177,3 +180,4 @@ bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>& headers)
 
     return adjacent_find(hashes.begin(), hashes.end()) != hashes.end();
 }
+
