@@ -3410,11 +3410,6 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
     return true;
 }
 
-static void IncreaseBanScore(const CNode& pfrom)
-{
-    // TODO
-} 
-
 /**
 * PRocess double-spend detected message.
 */
@@ -3442,10 +3437,10 @@ static void ProcessDoubleSpendMessage(const Config& config,
 
         msg_cache.push_back(hash); 
         
-        // TODO: Validate double-spend report
         if(!IsValid(msg))
         {
-            IncreaseBanScore(*pfrom);
+            Misbehaving(pfrom, 10,
+                        "Invalid Double-Spend Detected message received");
             return;
         }
 
