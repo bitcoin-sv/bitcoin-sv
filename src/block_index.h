@@ -251,6 +251,12 @@ public:
  * But it also means that all mutable public methods must be independent of each other and
  * object state between calling any two must be valid because it can be observed by another thread.
  * This is why there are also setters that atomically modify several members and methods that atomically do several independent things.
+ *
+ * NOTE: CBlockIndex can be soft consensus frozen during validation in which case
+ *       the block can't be added to best chain as long as it doesn't receive enough
+ *       descendant blocks to pass the freeze threshold.
+ *       This is not reflected in CBlockIndex state and can only be queried by
+ *       calling IsInExplicitSoftConsensusFreeze() or IsInSoftConsensusFreeze()
  */
 class CBlockIndex {
 public:
@@ -496,14 +502,14 @@ public:
         mBlockSource = source;
     }
 
-    void SoftConsensusFreeze( std::int32_t freezeForNBlocks )
+    void SetSoftConsensusFreezeFor( std::int32_t numberOfBlocks )
     {
         std::lock_guard lock{ GetMutex() };
 
-        assert( freezeForNBlocks >= 0 );
+        assert( numberOfBlocks >= 0 );
         assert( mSoftConsensusFreezeForNBlocks == -1 );
 
-        mSoftConsensusFreezeForNBlocks = freezeForNBlocks;
+        mSoftConsensusFreezeForNBlocks = numberOfBlocks;
         mSoftConsensusFreezeForNBlocksCumulative =
             std::max(
                 mSoftConsensusFreezeForNBlocksCumulative,
