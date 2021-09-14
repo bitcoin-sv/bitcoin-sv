@@ -9,7 +9,6 @@
 #include "primitives/transaction.h"
 #include "uint256.h"
 
-#include <bits/c++config.h>
 #include <boost/array.hpp>
 #include <iterator>
 

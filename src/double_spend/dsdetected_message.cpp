@@ -9,7 +9,6 @@
 #include "primitives/block.h"
 #include "uint256.h"
 #include <algorithm>
-#include <bits/c++config.h>
 #include <boost/functional/hash.hpp>
 #include <iterator>
 
