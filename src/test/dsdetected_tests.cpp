@@ -232,6 +232,26 @@ BOOST_AUTO_TEST_CASE(MsgMalformed)
     BOOST_CHECK_THROW(ss >> msg;, std::runtime_error);
 }
 
+BOOST_AUTO_TEST_CASE(validate_block_detail_count)
+{
+    DSDetected msg;
+    BOOST_CHECK(!IsValid(msg));
+
+    std::vector<DSDetected::BlockDetails> blocks{};
+
+    std::vector<CBlockHeader> headers_1{CBlockHeader{}};
+    blocks.push_back(DSDetected::BlockDetails{headers_1, CreateMerkleProof()});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK_EQUAL(msg.size(), 1);
+    BOOST_CHECK(!IsValid(msg));
+
+    std::vector<CBlockHeader> headers_2{CBlockHeader{}};
+    blocks.push_back(DSDetected::BlockDetails{headers_2, CreateMerkleProof()});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK_EQUAL(msg.size(), 2);
+    BOOST_CHECK(IsValid(msg));
+}
+
 BOOST_AUTO_TEST_CASE(headers_form_chain)
 {
     vector<CBlockHeader> headers;
@@ -244,7 +264,7 @@ BOOST_AUTO_TEST_CASE(headers_form_chain)
     CBlockHeader h2;
     h2.hashPrevBlock = h1.GetHash();
     headers.insert(headers.begin(), h2);
-    // BOOST_CHECK(FormsChain(headers));
+    BOOST_CHECK(FormsChain(headers));
 
     CBlockHeader h3;
     h3.hashPrevBlock = h2.GetHash();

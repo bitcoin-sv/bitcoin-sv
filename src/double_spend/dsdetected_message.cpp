@@ -116,11 +116,14 @@ bool IsValid(const DSDetected::BlockDetails& fork)
 
 bool IsValid(const DSDetected& msg)
 {
-    const bool all_forks_valid = std::all_of(
-        msg.begin(), msg.end(), [](const DSDetected::BlockDetails& fork) {
-            return IsValid(fork);
-        });
-    if(!all_forks_valid)
+    if(msg.size() < 2)
+        return false;
+
+    if(!std::all_of(msg.begin(),
+                    msg.end(),
+                    [](const DSDetected::BlockDetails& fork) {
+                        return IsValid(fork);
+                    }))
         return false;
 
     // Check all forks have the same common ancestor
