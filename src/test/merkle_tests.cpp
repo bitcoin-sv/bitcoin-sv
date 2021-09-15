@@ -338,7 +338,7 @@ BOOST_AUTO_TEST_CASE(deserialize_txid)
 BOOST_AUTO_TEST_CASE(deserialize_tx)
 {
     // clang-format off
-    const CSerializeData data{0x1, /* flags */
+    const CSerializeData data{0x5, /* flags */
                               0x0, /* index */
                               0xa, /* tx len */
                               /* tx */

@@ -46,12 +46,12 @@ public:
 
     MerkleProof() = default;
 
-    // Construct for a full transaction
+    // Construct for a full transaction and merkle root target
     MerkleProof(const std::shared_ptr<const CTransaction>& txn,
                 size_t index,
                 const uint256& target,
                 const std::vector<Node>& nodes)
-        : mFlags{0x01},
+        : mFlags{0x05},
           mIndex{index},
           mTxLen{txn->GetTotalSize()},
           mTxn{txn},
@@ -168,4 +168,7 @@ inline bool contains_txid(const MerkleProof& mp)
     return !contains_tx(mp);
 }
 
-
+inline bool contains_merkle_root(const MerkleProof& mp)
+{
+    return (mp.Flags() & 0x6) == 0x4;
+}

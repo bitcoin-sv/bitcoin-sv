@@ -105,10 +105,12 @@ UniValue DSDetected::ToJSON(const Config& config) const
 
 bool IsValid(const DSDetected::BlockDetails& fork)
 {
-    return FormsChain(fork.mBlockHeaders) &&
+    return contains_tx(fork.mMerkleProof) &&
+           contains_merkle_root(fork.mMerkleProof) &&
+           FormsChain(fork.mBlockHeaders) &&
            !ContainsDuplicateHeaders(fork.mBlockHeaders) &&
            fork.mMerkleProof.Verify();
-    
+
     // TODO: Check POW for each fork
 }
 
