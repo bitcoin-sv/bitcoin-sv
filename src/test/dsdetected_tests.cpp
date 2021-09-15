@@ -9,6 +9,7 @@
 #include "merkleproof.h"
 #include "merkletree.h"
 #include "primitives/block.h"
+#include "primitives/transaction.h"
 #include "streams.h"
 #include "uint256.h"
 
@@ -29,7 +30,7 @@ namespace
     }
 
     // Create a reproducable MerkleProof
-    MerkleProof CreateMerkleProof()
+    MerkleProof CreateMerkleProof(const vector<pair<string, uint32_t>>& inputs)
     {
         // Create a block
         constexpr unsigned NumTx{10};
@@ -39,7 +40,14 @@ namespace
         {
             CMutableTransaction mtx{};
             mtx.nLockTime = j;
-            block.vtx[j] = MakeTransactionRef(std::move(mtx));
+            for(const auto& input : inputs)
+            {
+                CTxIn ip;
+                const uint256 txid{uint256S(input.first)};
+                ip.prevout = COutPoint{txid, input.second};
+                mtx.vin.push_back(ip);
+            }
+            block.vtx[j] = make_shared<const CTransaction>(std::move(mtx));
         }
 
         // Create proof for coinbase txn from block
@@ -59,6 +67,11 @@ namespace
         }
 
         return {txn, 0, checkRoot, nodes};
+    }
+
+    MerkleProof CreateMerkleProof()
+    {
+        return CreateMerkleProof(vector<pair<string, uint32_t>>{});
     }
 }
 
@@ -232,10 +245,10 @@ BOOST_AUTO_TEST_CASE(MsgMalformed)
     BOOST_CHECK_THROW(ss >> msg;, std::runtime_error);
 }
 
-BOOST_AUTO_TEST_CASE(validate_block_detail_count)
+BOOST_AUTO_TEST_CASE(validate_fork_count)
 {
     DSDetected msg;
-    BOOST_CHECK(!IsValid(msg));
+    BOOST_CHECK(!ValidateForkCount(msg));
 
     std::vector<DSDetected::BlockDetails> blocks{};
 
@@ -243,13 +256,13 @@ BOOST_AUTO_TEST_CASE(validate_block_detail_count)
     blocks.push_back(DSDetected::BlockDetails{headers_1, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK_EQUAL(msg.size(), 1);
-    BOOST_CHECK(!IsValid(msg));
+    BOOST_CHECK(!ValidateForkCount(msg));
 
     std::vector<CBlockHeader> headers_2{CBlockHeader{}};
     blocks.push_back(DSDetected::BlockDetails{headers_2, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK_EQUAL(msg.size(), 2);
-    BOOST_CHECK(IsValid(msg));
+    BOOST_CHECK(ValidateForkCount(msg));
 }
 
 BOOST_AUTO_TEST_CASE(headers_form_chain)
@@ -311,7 +324,7 @@ BOOST_AUTO_TEST_CASE(common_ancestor)
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK_EQUAL(msg.size(), 2);
 
-    BOOST_CHECK(IsValid(msg));
+    BOOST_CHECK(ValidateCommonAncestor(msg));
 
     CBlockHeader h;
     const uint256 i = uint256S("42");
@@ -321,7 +334,42 @@ BOOST_AUTO_TEST_CASE(common_ancestor)
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK_EQUAL(msg.size(), 3);
 
-    BOOST_CHECK(!IsValid(msg));
+    BOOST_CHECK(!ValidateCommonAncestor(msg));
+}
+
+BOOST_AUTO_TEST_CASE(ds_outpoints)
+{
+    DSDetected msg;
+
+    std::vector<DSDetected::BlockDetails> blocks{};
+
+    using OutPoints = vector<pair<string, uint32_t>>;
+    std::vector<CBlockHeader> headers_0{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_0,
+                                 CreateMerkleProof(OutPoints{{"42", 0}})});
+
+    std::vector<CBlockHeader> headers_1{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_1,
+                                 CreateMerkleProof(OutPoints{{"42", 1}})});
+
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK(!ValidateDoubleSpends(msg));
+
+    std::vector<CBlockHeader> headers_2{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_2,
+                                 CreateMerkleProof(OutPoints{{"42", 0}})});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK(!ValidateDoubleSpends(msg));
+
+    std::vector<CBlockHeader> headers_3{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_3,
+                                 CreateMerkleProof(OutPoints{{"42", 1}})});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK(ValidateDoubleSpends(msg));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

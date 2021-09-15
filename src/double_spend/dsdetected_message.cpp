@@ -7,6 +7,7 @@
 #include "config.h"
 #include "merkleproof.h"
 #include "primitives/block.h"
+#include "primitives/transaction.h"
 #include "uint256.h"
 #include <algorithm>
 #include <boost/functional/hash.hpp>
@@ -114,9 +115,83 @@ bool IsValid(const DSDetected::BlockDetails& fork)
     // TODO: Check POW for each fork
 }
 
+bool ValidateForkCount(const DSDetected& msg)
+{
+    return msg.size() >= 2;
+}
+
+bool ValidateCommonAncestor(const DSDetected& msg)
+{
+    // Check all forks have the same common ancestor
+    return adjacent_find(msg.begin(),
+                         msg.end(),
+                         [](const auto& fork1, const auto& fork2) {
+                             assert(!fork1.mBlockHeaders.empty());
+                             assert(!fork2.mBlockHeaders.empty());
+                             return fork1.mBlockHeaders.back().hashPrevBlock !=
+                                    fork2.mBlockHeaders.back().hashPrevBlock;
+                         }) == msg.end();
+}
+
+
+bool ValidateDoubleSpends(const DSDetected& msg)
+{
+    // Gather all the spent Outpoints and their fork index in the msg
+    int index{0};
+    using index_outpoint = std::pair<int, COutPoint>;
+    vector<index_outpoint> indexed_ops;
+    for(const auto& fork : msg)
+    {
+        const CTransaction& tx{fork.mMerkleProof.Tx()};
+        for(const auto& ip : tx.vin)
+            indexed_ops.push_back({index, ip.prevout});
+        ++index;
+    }
+
+    // sort by the outpoints, ignoring the index
+    const auto outpoint_less = [](const auto& a, const auto& b) {
+        return a.second < b.second;
+    };
+    sort(indexed_ops.begin(), indexed_ops.end(), outpoint_less);
+
+    // Find all the duplicates - these are double-spends
+    vector<index_outpoint> duplicates;
+    for(auto it{indexed_ops.begin()}; it != indexed_ops.end();)
+    {
+        auto r = equal_range(it, indexed_ops.end(), *it, outpoint_less);
+        if(r.first != indexed_ops.end())
+        {
+            if(distance(r.first, r.second) > 1)
+            {
+                for(; r.first != r.second; ++r.first)
+                    duplicates.push_back(*r.first);
+            }
+        }
+        it = r.second;
+    }
+
+    // There must be a double spend for each for in the msg
+    if(duplicates.size() < msg.size())
+        return false;
+
+    // Check that each index is contained in the duplicates collection
+    std::vector<uint32_t> indices;
+    indices.reserve(duplicates.size());
+    std::transform(duplicates.begin(),
+                   duplicates.end(),
+                   back_inserter(indices),
+                   [](const auto& index_op) { return index_op.first; });
+    sort(indices.begin(), indices.end());
+    unique(indices.begin(), indices.end());
+
+    vector<uint32_t> expected(msg.size());
+    iota(expected.begin(), expected.end(), 0);
+    return std::equal(expected.begin(), expected.end(), indices.begin());
+}
+
 bool IsValid(const DSDetected& msg)
 {
-    if(msg.size() < 2)
+    if(!ValidateForkCount(msg))
         return false;
 
     if(!std::all_of(msg.begin(),
@@ -126,15 +201,12 @@ bool IsValid(const DSDetected& msg)
                     }))
         return false;
 
-    // Check all forks have the same common ancestor
-    const auto it = adjacent_find(
-        msg.begin(), msg.end(), [](const auto& fork1, const auto& fork2) {
-            assert(!fork1.mBlockHeaders.empty());
-            assert(!fork2.mBlockHeaders.empty());
-            return fork1.mBlockHeaders.back().hashPrevBlock !=
-                   fork2.mBlockHeaders.back().hashPrevBlock;
-        });
-    if(it != msg.end())
+    if(!ValidateCommonAncestor(msg))
+        return false;
+
+    // Verify all forks have a tx that double-spends a COutPoint with at least
+    // one other fork in the message.
+    if(!ValidateDoubleSpends(msg))
         return false;
 
     return true;

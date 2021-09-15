@@ -114,6 +114,10 @@ namespace std
 
 
 bool IsValid(const DSDetected&);
+bool ValidateForkCount(const DSDetected&);
+bool ValidateCommonAncestor(const DSDetected&);
+bool ValidateDoubleSpends(const DSDetected&);
+
 bool IsValid(const DSDetected::BlockDetails&);
 
 bool FormsChain(const std::vector<CBlockHeader>&);

@@ -77,6 +77,7 @@ public:
     
     [[nodiscard]] constexpr uint8_t Flags() const noexcept { return mFlags; }
     [[nodiscard]] constexpr size_t Index() const noexcept { return mIndex; }
+    [[nodiscard]] const CTransaction& Tx() const noexcept { return *mTxn; }
     [[nodiscard]] const uint256& Target() const noexcept { return mTarget; }
 
     [[nodiscard]] bool empty() const noexcept { return mNodes.empty(); }
