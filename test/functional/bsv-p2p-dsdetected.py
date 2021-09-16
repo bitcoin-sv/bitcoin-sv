@@ -69,7 +69,7 @@ class DSDetectedTests(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 1
         # Set webhook url with IP, port and endpoint
-        self.extra_args = [["-dsdetectedwebhookurl=http://127.0.0.1:8888/dsdetected/webhook"]]
+        self.extra_args = [["-dsdetectedwebhookurl=http://127.0.0.1:8888/dsdetected/webhook", "-banscore=100000"]]
 
     def start_webhook_server(self):
         self.server = HTTPServer(('localhost', 8888), partial(WebHookService))
