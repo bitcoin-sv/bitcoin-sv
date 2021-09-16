@@ -18,6 +18,7 @@
 #include "hash.h"
 #include "init.h"
 #include "invalid_txn_publisher.h"
+#include "limited_cache.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
 #include "net/block_download_tracker.h"
@@ -3427,15 +3428,15 @@ static void ProcessDoubleSpendMessage(const Config& config,
 
         // Check if we've already handled this message
         static std::hash<DSDetected> hasher;
-        static std::vector<size_t> msg_cache; // TODO: Only remember last N messages
+        constexpr size_t cache_size{1000};
+        static limited_cache msg_cache{cache_size}; 
        
         const auto hash = hasher(msg);
 
-        const auto it = find(msg_cache.begin(), msg_cache.end(), hash);
-        if(it != msg_cache.end())
-            return // ignore messages we've already seen
+        if(msg_cache.contains(hash))
+            return;     // ignore messages we've already seen
 
-        msg_cache.push_back(hash); 
+        msg_cache.insert(hash); 
         
         if(!IsValid(msg))
         {

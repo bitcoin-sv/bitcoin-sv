@@ -6,6 +6,7 @@
 #include "consensus/merkle.h"
 #include "double_spend/dsdetected_message.h"
 #include "hash.h"
+#include "limited_cache.h"
 #include "merkleproof.h"
 #include "merkletree.h"
 #include "primitives/block.h"
@@ -370,6 +371,34 @@ BOOST_AUTO_TEST_CASE(ds_outpoints)
                                  CreateMerkleProof(OutPoints{{"42", 1}})});
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK(ValidateDoubleSpends(msg));
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(limited_cache_tests)
+
+BOOST_AUTO_TEST_CASE(default_construction)
+{
+    limited_cache lc{2};
+    BOOST_CHECK(!lc.contains(1));
+    lc.insert(1);
+    BOOST_CHECK(lc.contains(1));
+    BOOST_CHECK(!lc.contains(2));
+    lc.insert(2);
+    BOOST_CHECK(lc.contains(1));
+    BOOST_CHECK(lc.contains(2));
+    lc.insert(3);
+    BOOST_CHECK(!lc.contains(1));
+    BOOST_CHECK(lc.contains(2));
+    BOOST_CHECK(lc.contains(3));
+    lc.insert(4);
+    BOOST_CHECK(!lc.contains(2));
+    BOOST_CHECK(lc.contains(3));
+    BOOST_CHECK(lc.contains(4));
+    lc.insert(5);
+    BOOST_CHECK(!lc.contains(3));
+    BOOST_CHECK(lc.contains(4));
+    BOOST_CHECK(lc.contains(5));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

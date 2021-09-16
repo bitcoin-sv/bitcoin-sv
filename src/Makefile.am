@@ -140,6 +140,7 @@ BITCOIN_CORE_H = \
   dbwrapper.h \
   leaky_bucket.h \
   limitedmap.h \
+  limited_cache.h \
   locked_ref.h \
   logging.h \
   memusage.h \
