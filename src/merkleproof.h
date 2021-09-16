@@ -169,7 +169,13 @@ inline bool contains_txid(const MerkleProof& mp)
     return !contains_tx(mp);
 }
 
+inline bool contains_coinbase_tx(const MerkleProof& mp)
+{
+    return mp.Index() == 0;
+}
+
 inline bool contains_merkle_root(const MerkleProof& mp)
 {
     return (mp.Flags() & 0x6) == 0x4;
 }
+

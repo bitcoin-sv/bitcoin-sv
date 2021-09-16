@@ -107,6 +107,7 @@ UniValue DSDetected::ToJSON(const Config& config) const
 bool IsValid(const DSDetected::BlockDetails& fork)
 {
     return contains_tx(fork.mMerkleProof) &&
+           !contains_coinbase_tx(fork.mMerkleProof) &&
            contains_merkle_root(fork.mMerkleProof) &&
            FormsChain(fork.mBlockHeaders) &&
            !ContainsDuplicateHeaders(fork.mBlockHeaders) &&

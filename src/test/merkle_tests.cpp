@@ -241,6 +241,10 @@ BOOST_AUTO_TEST_CASE(default_construction)
     BOOST_CHECK_EQUAL(0, mp.size());
     const uint256 target;
     BOOST_CHECK(target == mp.Target());
+
+    BOOST_CHECK(!contains_tx(mp));
+    BOOST_CHECK(contains_txid(mp));
+    BOOST_CHECK(contains_coinbase_tx(mp));
 }
             
 BOOST_AUTO_TEST_CASE(txid_construction)
@@ -255,6 +259,10 @@ BOOST_AUTO_TEST_CASE(txid_construction)
     BOOST_CHECK(target == mp.Target());
     BOOST_CHECK(!mp.empty());
     BOOST_CHECK_EQUAL(1, mp.size());
+    
+    BOOST_CHECK(!contains_tx(mp));
+    BOOST_CHECK(contains_txid(mp));
+    BOOST_CHECK(!contains_coinbase_tx(mp));
 }
 
 //BOOST_AUTO_TEST_CASE(txid_construction)
