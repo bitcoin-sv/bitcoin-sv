@@ -365,6 +365,9 @@ private:
     //! (memory only) Maximum nTime in the chain upto and including this block.
     unsigned int nTimeMax{ 0 };
 
+    //! (memory only) Ignore this block and all of it descendants when checking criteria for the safe-mode.
+    bool ignoreForSafeMode{ false };
+
     //! (memory only) Source from which we received the first instance of a block.
     CBlockSource mBlockSource{CBlockSource::MakeUnknown()};
 
@@ -726,6 +729,18 @@ public:
     const arith_uint256& GetChainWork() const
     {
         return this->nChainWork;
+    }
+
+    bool GetIgnoredForSafeMode() const
+    {
+        std::lock_guard lock { GetMutex() };
+        return this->ignoreForSafeMode;
+    }
+
+    void SetIgnoredForSafeMode(bool doIgnore)
+    {
+        std::lock_guard lock { GetMutex() };
+        this->ignoreForSafeMode = doIgnore;
     }
 
     BlockStatus getStatus() const {
