@@ -3653,7 +3653,7 @@ private:
             index.GetBlockHash().ToString(),
             duration );
 
-        index.SoftConsensusFreeze( duration );
+        index.SetSoftConsensusFreezeFor( duration );
 
         BlockIndexWithDescendants blocks{
             &index,
@@ -4280,8 +4280,6 @@ static CBlockIndex *FindMostWorkChain() {
                 if ((*it)->IsSoftRejected() ||
                     (*it)->IsInSoftConsensusFreeze())
                 {
-                    // This block is marked as soft rejected and should not be considered.
-                    // Try the next one.
                     ++it;
                     continue;
                 }
