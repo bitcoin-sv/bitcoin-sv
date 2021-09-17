@@ -5924,8 +5924,11 @@ static const CBlockIndex* FindPreviousBlockIndex(const CBlockHeader &block, CVal
  *
  * Returns true if the block is succesfully added to the block index.
  */
-static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
-                              CValidationState &state, CBlockIndex **ppindex) {
+bool AcceptBlockHeader(const Config& config,
+                       const CBlockHeader& block,
+                       CValidationState& state,
+                       CBlockIndex** ppindex)
+{
     AssertLockHeld(cs_main);
     const CChainParams &chainparams = config.GetChainParams();
 

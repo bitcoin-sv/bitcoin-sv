@@ -7,6 +7,7 @@
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "block_file_access.h"
+#include "block_index.h"
 #include "block_index_store.h"
 #include "blockencodings.h"
 #include "blockstreams.h"
@@ -3411,8 +3412,26 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
     return true;
 }
 
+static bool IsValid(const DSDetected& msg, const Config& config)
+{
+    if(!IsValid(msg))
+        return false;
+
+    LOCK(cs_main);
+    return all_of(msg.begin(), msg.end(), [&config](const auto& fork) {
+        return all_of(fork.mBlockHeaders.crbegin(),
+                      fork.mBlockHeaders.crend(),
+                      [&config](const CBlockHeader& bh) {
+                          CValidationState state;
+                          CBlockIndex* pbIndex{};
+                          bool accepted = AcceptBlockHeader(config, bh, state, &pbIndex);
+                          return accepted && state.IsValid();
+                      });
+    });
+}
+
 /**
-* PRocess double-spend detected message.
+* Process double-spend detected message.
 */
 static void ProcessDoubleSpendMessage(const Config& config,
                                       const std::shared_ptr<CNode>& pfrom,
@@ -3438,7 +3457,7 @@ static void ProcessDoubleSpendMessage(const Config& config,
 
         msg_cache.insert(hash); 
         
-        if(!IsValid(msg))
+        if(!IsValid(msg, config))
         {
             Misbehaving(pfrom, 10,
                         "Invalid Double-Spend Detected message received");
