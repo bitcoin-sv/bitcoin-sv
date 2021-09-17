@@ -312,6 +312,17 @@ static const int SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = 288;
 static const int SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE = 6;
 
 /**
+ * Forks shorter than SAFE_MODE_MIN_FORK_LENGTH will not trigger safe mode
+ */
+static const uint64_t SAFE_MODE_MIN_FORK_LENGTH = 3;
+
+/**
+ * Forks whose height difference to the current tip  (<fork tip height> - <active chain height>) 
+ * is smaller than active chain tip will not trigger the safe mode
+ */
+static const int64_t SAFE_MODE_MIN_HEIGHT_DIFFERENCE = 72;
+
+/**
  * Method checks if block that is being added to block index causes
  * node to enter safe mode. 
  * Node enters "Safe mode" in two cases:
