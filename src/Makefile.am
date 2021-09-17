@@ -342,6 +342,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
+  rpc/safe_mode.cpp \
   rpc/server.cpp \
   rpc/webhook_client.cpp \
   script/scriptcache.cpp \

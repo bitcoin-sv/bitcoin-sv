@@ -480,6 +480,7 @@ add_library(server
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
 	rpc/register.h
+	rpc/safe_mode.cpp
 	rpc/server.cpp
 	rpc/server.h
 	rpc/tojson.h
