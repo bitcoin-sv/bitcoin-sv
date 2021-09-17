@@ -323,6 +323,9 @@ UniValue addToConsensusBlacklist(const Config& config, const JSONRPCRequest& req
 
 Adds or updates transaction outputs on consensus blacklist.
 
+Block heights at which the transaction output is considered consensus frozen are specified by half-open intervals [start, stop) in array 'enforceAtHeight'.
+Option 'policyExpiresWithConsensus' specifies whether the transaction output is still considered policy frozen at heights after the highest interval in 'enforceAtHeight' (true = no longer considered policy frozen, false = still considered policy frozen).
+
 Arguments: )" + GenerateHelpStringForFunds("funds", R"(,
       "enforceAtHeight": [{
         "start": <integer>,
