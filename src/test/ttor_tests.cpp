@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE(invalidate_chain)
 
     // invalidate block 6 and its chain
     blocks[6].get().ModifyStatusWithFailed(mapBlockIndex);
-    InvalidateChain( &blocks[6].get() );
+    InvalidateChain(testConfig, &blocks[6].get() );
 
     // block 6 should remain invalid but not with failed parent
     BOOST_CHECK(blocks[6].get().getStatus().hasFailed() == true);

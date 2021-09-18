@@ -43,7 +43,7 @@ UniValue ignoresafemodeforblock(const Config &config, const JSONRPCRequest &requ
         }
         
         pblockindex->SetIgnoredForSafeMode(true);
-        CheckSafeModeParameters(nullptr);
+        CheckSafeModeParameters(config, nullptr);
     }
 
 
@@ -88,7 +88,7 @@ UniValue reconsidersafemodeforblock(const Config &config, const JSONRPCRequest &
             pblockindex = pblockindex->GetPrev();
         }
 
-        CheckSafeModeParameters(nullptr);
+        CheckSafeModeParameters(config, nullptr);
     }
 
     return NullUniValue;

@@ -334,13 +334,13 @@ static const int64_t SAFE_MODE_MIN_HEIGHT_DIFFERENCE = 72;
  *      SAFE_MODE_MIN_VALID_FORK_LENGTH block long and whose tip is within 
  *      SAFE_MODE_MAX_VALID_FORK_DISTANCE blocks from the current best chain tip
  */
-void CheckSafeModeParameters(const CBlockIndex* pindexNew);
+void CheckSafeModeParameters(const Config& conf, const CBlockIndex* pindexNew);
 
 /**
  * Method finds all chain tips (except active) and checks if any of them 
  * should trigger node to enter safe mode.
  */
-void CheckSafeModeParametersForAllForksOnStartup();
+void CheckSafeModeParametersForAllForksOnStartup(const Config& config);
 
 /**
  * Invalidate all chains containing given block that should be already invalid. 

@@ -3290,7 +3290,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     // After block chain is loaded check fork tip statuses and
     // restore global safe mode state.
-    CheckSafeModeParametersForAllForksOnStartup();
+    CheckSafeModeParametersForAllForksOnStartup(config);
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 

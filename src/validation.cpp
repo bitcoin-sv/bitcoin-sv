@@ -2389,7 +2389,7 @@ void CheckForkForInvalidBlocks(CBlockIndex* pindexForkTip)
  *                   because we could be using old version of node
  *         VALID   - fork that triggers safe mode is valid
  */
-SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase)
+SafeModeLevel ShouldForkTriggerSafeMode(const Config& config, const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase)
 {
     AssertLockHeld(cs_main);
 
@@ -2472,7 +2472,7 @@ void NotifySafeModeLevelChange(SafeModeLevel safeModeLevel, const CBlockIndex* p
     }
 }
 
-void CheckSafeModeParameters(const CBlockIndex* pindexNew)
+void CheckSafeModeParameters(const Config& config, const CBlockIndex* pindexNew)
 {
     AssertLockHeld(cs_main);
 
@@ -2515,7 +2515,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
             pindexForkBase = FindForkBase(pindexNew);
         }
         // Check if fork is in bounds to cause safe mode
-        SafeModeLevel safeModeLevelFork = ShouldForkTriggerSafeMode(pindexNew, pindexForkBase);
+        SafeModeLevel safeModeLevelFork = ShouldForkTriggerSafeMode(config, pindexNew, pindexForkBase);
         if (safeModeLevelFork != SafeModeLevel::NONE)
         {
             // Add fork to collection of forks that cause safe mode
@@ -2540,7 +2540,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
     {
         for (auto it = safeModeForks.cbegin(); it != safeModeForks.cend();)
         {
-            SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(it->first, it->second);
+            SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(config, it->first, it->second);
             if (safeModeLevelForks == SafeModeLevel::NONE)
             {
                 it = safeModeForks.erase(it);
@@ -2571,7 +2571,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
  *  1. Restore global safe mode state
  *  2. Validate that all header only fork tips have correct tip status
  */
-void CheckSafeModeParametersForAllForksOnStartup()
+void CheckSafeModeParametersForAllForksOnStartup(const Config& config)
 {
     LOCK(cs_main);
 
@@ -2605,14 +2605,14 @@ void CheckSafeModeParametersForAllForksOnStartup()
             CheckForkForInvalidBlocks(tip);
         }
         // Restore global safe mode state,
-        CheckSafeModeParameters(tip);
+        CheckSafeModeParameters(config, tip);
     }
     LogPrintf("%s: global safe mode state restored to level %d in %dms\n", 
               __func__, static_cast<int>(GetSafeModeLevel()),
               GetTimeMillis() - nStart);
 }
 
-static void InvalidChainFound(const CBlockIndex *pindexNew)
+static void InvalidChainFound(const Config& config, const CBlockIndex *pindexNew)
 {
     auto chainWork = pindexNew->GetChainWork();
     if (!pindexBestInvalid ||
@@ -2632,17 +2632,17 @@ static void InvalidChainFound(const CBlockIndex *pindexNew)
               __func__, tip->GetBlockHash().ToString(), chainActive.Height(),
               log(tip->GetChainWork().getdouble()) / log(2.0),
               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", tip->GetBlockTime()));
-    CheckSafeModeParameters(pindexNew);
+    CheckSafeModeParameters(config, pindexNew);
 }
 
-static void InvalidBlockFound(CBlockIndex *pindex,
+static void InvalidBlockFound(const Config& config, CBlockIndex *pindex,
                               const CValidationState &state) {
     if (state.GetRejectCode() != REJECT_SOFT_CONSENSUS_FREEZE &&
         !state.CorruptionPossible())
     {
         pindex->ModifyStatusWithFailed(mapBlockIndex);
         setBlockIndexCandidates.erase(pindex);
-        InvalidChainFound(pindex);
+        InvalidChainFound(config, pindex);
     }
 }
 
@@ -4145,7 +4145,7 @@ static bool ConnectTip(
         GetMainSignals().BlockChecked(blockConnecting, state);
         if (!rv) {
             if (state.IsInvalid()) {
-                InvalidBlockFound(pindexNew, state);
+                InvalidBlockFound(config, pindexNew, state);
             }
             return error("ConnectTip(): ConnectBlock %s failed (%s)",
                          pindexNew->GetBlockHash().ToString(),
@@ -4544,7 +4544,7 @@ static bool ActivateBestChainStep(
                     if (state.IsInvalid()) {
                         // The block violates a consensus rule.
                         if (!state.CorruptionPossible()) {
-                            InvalidChainFound(vpindexToConnect.back());
+                            InvalidChainFound(config, vpindexToConnect.back());
                         }
                         state = CValidationState();
                         fInvalidFound = true;
@@ -4821,12 +4821,12 @@ bool ActivateBestChain(
                 if (pindexNewTip)
                 {
                     // check if new tip affects safe mode
-                    CheckSafeModeParameters(pindexNewTip);
+                    CheckSafeModeParameters(config, pindexNewTip);
                 }
                 if (pindexOldTip)
                 {
                     // check if old tip affects safe mode
-                    CheckSafeModeParameters(pindexOldTip);
+                    CheckSafeModeParameters(config, pindexOldTip);
                 }
             }
             // When we reach this point, we switched to a new tip (stored in
@@ -5063,7 +5063,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
             }
         });
 
-    InvalidChainFound(pindex);
+    InvalidChainFound(config, pindex);
     if(tip_disconnected)
     {
         uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->GetPrev());
@@ -5315,7 +5315,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     return true;
 }
 
-static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
+static CBlockIndex *AddToBlockIndex(const Config& config, const CBlockHeader &block) {
     if (auto index = mapBlockIndex.Get( block.GetHash() ); index) {
         return index;
     }
@@ -5324,12 +5324,12 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
     auto pindexNew = mapBlockIndex.Insert( block );
 
     // Check if adding new block index triggers safe mode
-    CheckSafeModeParameters(pindexNew);
+    CheckSafeModeParameters(config, pindexNew);
 
     return pindexNew;
 }
 
-void InvalidateChain(const CBlockIndex* pindexNew)
+void InvalidateChain(const Config& config, const CBlockIndex* pindexNew)
 {
     std::set<CBlockIndex*> setTipCandidates;
     std::set<CBlockIndex*> setPrevs;
@@ -5380,7 +5380,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
                 pindexWalk = pindexWalk->GetPrev();
             }
             // Check if we have to enter safe mode if chain has been invalidated
-            CheckSafeModeParameters(*it);
+            CheckSafeModeParameters(config, *it);
         }
     }
 }
@@ -5414,6 +5414,7 @@ bool CheckBlockTTOROrder(const CBlock& block)
  * BLOCK_VALID_TRANSACTIONS).
  */
 static bool ReceivedBlockTransactions(
+    const Config& config,
     const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindexNew,
@@ -5430,8 +5431,8 @@ static bool ReceivedBlockTransactions(
             // Mark the block itself as invalid.
             pindexNew->ModifyStatusWithFailed(mapBlockIndex);
             setBlockIndexCandidates.erase(pindexNew);
-            InvalidateChain(pindexNew);
-            InvalidChainFound(pindexNew);
+            InvalidateChain(config, pindexNew);
+            InvalidChainFound(config, pindexNew);
             return state.Invalid(false, 0, "bad-blk-ttor");
         }
     }
@@ -5938,7 +5939,7 @@ bool AcceptBlockHeader(const Config& config,
         }
     }
 
-    if (CBlockIndex* newIdx = AddToBlockIndex(block); ppindex)
+    if (CBlockIndex* newIdx = AddToBlockIndex(config, block); ppindex)
     {
         *ppindex = newIdx;
     }
@@ -6116,7 +6117,7 @@ static bool AcceptBlock(const Config& config,
                 AbortNode(state, "Failed to write block");
             }
         }
-        if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData, source)) {
+        if (!ReceivedBlockTransactions(config, block, state, pindex, blockPos, metaData, source)) {
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
         }
     }
@@ -6132,7 +6133,7 @@ static bool AcceptBlock(const Config& config,
     if (!chainActive.Contains(pindex))
     {
         // if we are accepting block from fork check if it changes safe mode level
-        CheckSafeModeParameters(pindex);
+        CheckSafeModeParameters(config, pindex);
     }
 
     return true;
@@ -6918,8 +6919,8 @@ bool InitBlockIndex(const Config &config) {
                 return error(
                     "LoadBlockIndex(): writing genesis block to disk failed");
             }
-            CBlockIndex *pindex = AddToBlockIndex(block);
-            if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData,
+            CBlockIndex *pindex = AddToBlockIndex(config, block);
+            if (!ReceivedBlockTransactions(config, block, state, pindex, blockPos, metaData,
                 CBlockSource::MakeLocal("genesis")))
             {
                 return error("LoadBlockIndex(): genesis block not accepted");
