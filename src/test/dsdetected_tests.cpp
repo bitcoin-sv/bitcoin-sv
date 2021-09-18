@@ -373,6 +373,34 @@ BOOST_AUTO_TEST_CASE(ds_outpoints)
     BOOST_CHECK(ValidateDoubleSpends(msg));
 }
 
+BOOST_AUTO_TEST_CASE(tx_uniqueness)
+{
+    DSDetected msg;
+
+    std::vector<DSDetected::BlockDetails> blocks{};
+
+    using OutPoints = vector<pair<string, uint32_t>>;
+    std::vector<CBlockHeader> headers_0{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_0,
+                                 CreateMerkleProof(OutPoints{{"42", 0}})});
+
+    std::vector<CBlockHeader> headers_1{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_1,
+                                 CreateMerkleProof(OutPoints{{"42", 1}})});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK(AreTxsUnique(msg));
+    
+    std::vector<CBlockHeader> headers_2{CBlockHeader{}};
+    blocks.push_back(
+        DSDetected::BlockDetails{headers_2,
+                                 CreateMerkleProof(OutPoints{{"42", 0}})});
+    UnitTestAccess::SetBlockList(msg, blocks);
+    BOOST_CHECK(!AreTxsUnique(msg));
+
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(limited_cache_tests)

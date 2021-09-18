@@ -189,6 +189,20 @@ bool ValidateDoubleSpends(const DSDetected& msg)
     iota(expected.begin(), expected.end(), 0);
     return std::equal(expected.begin(), expected.end(), indices.begin());
 }
+    
+// Ensure there are no duplicate transactions
+bool AreTxsUnique(const DSDetected& msg)
+{
+    vector<uint256> txids(msg.size());
+    transform(msg.begin(),
+              msg.end(),
+              txids.begin(),
+              [](const DSDetected::BlockDetails& fork) {
+                  return fork.mMerkleProof.Tx().GetId();
+              });
+    sort(txids.begin(), txids.end());
+    return adjacent_find(txids.cbegin(), txids.cend()) == txids.cend();
+}
 
 bool IsValid(const DSDetected& msg)
 {
@@ -203,6 +217,9 @@ bool IsValid(const DSDetected& msg)
         return false;
 
     if(!ValidateCommonAncestor(msg))
+        return false;
+
+    if(!AreTxsUnique(msg))
         return false;
 
     // Verify all forks have a tx that double-spends a COutPoint with at least

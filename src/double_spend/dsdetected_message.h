@@ -117,6 +117,7 @@ bool IsValid(const DSDetected&);
 bool ValidateForkCount(const DSDetected&);
 bool ValidateCommonAncestor(const DSDetected&);
 bool ValidateDoubleSpends(const DSDetected&);
+bool AreTxsUnique(const DSDetected&);
 
 bool IsValid(const DSDetected::BlockDetails&);
 
