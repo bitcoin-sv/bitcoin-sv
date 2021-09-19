@@ -5,7 +5,7 @@
 #include "block_index_store.h"
 #include "validation.h"
 #include "rpc/server.h"
-#include "../safe_mode.h"
+#include "safe_mode.h"
 #include "jsonwriter.h"
 #include "logging.h"
 
@@ -171,7 +171,7 @@ void  getsafemodeinfo(const Config& config,
         jWriter.writeBeginObject();
         jWriter.pushKNoComma("result");
         LOCK(cs_main);
-        //SafeModeGetStatus(jWriter); TODO: Implement me
+        SafeModeGetStatus(jWriter);
         jWriter.pushKV("error", nullptr);
         jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();

@@ -487,6 +487,8 @@ add_library(server
     rpc/webhook_client.cpp
     rpc/webhook_client.h
     rpc/webhook_client_defaults.h
+	safe_mode.cpp
+	safe_mode.h
 	script/ismine.cpp
 	script/ismine.h
 	script/scriptcache.cpp
