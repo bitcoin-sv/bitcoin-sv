@@ -104,6 +104,8 @@ private:
 
     // The block index contains data for soft rejection
     static const uint32_t HAS_SOFT_REJ_FLAG = 0x100;
+    
+    static const uint32_t HAS_DOUBLE_SPEND_FLAG = 0x200;
 
     // Mask used to check if the block failed.
     static const uint32_t INVALID_MASK = FAILED_FLAG | FAILED_PARENT_FLAG;
@@ -156,7 +158,7 @@ public:
         return BlockStatus((status & ~FAILED_PARENT_FLAG) |
                            (hasFailedParent ? FAILED_PARENT_FLAG : 0));
     }
-
+    
     bool hasDataForSoftRejection() const
     {
         return status & HAS_SOFT_REJ_FLAG;
@@ -165,6 +167,17 @@ public:
     {
         return BlockStatus((status & ~HAS_SOFT_REJ_FLAG) |
                            (hasData ? HAS_SOFT_REJ_FLAG : 0));
+    }
+    
+    [[nodiscard]] bool hasDoubleSpend() const
+    {
+        return status & HAS_DOUBLE_SPEND_FLAG;
+    }
+
+    BlockStatus withDoubleSpend(bool hasDoubleSpend = true) const 
+    {
+        return BlockStatus((status & ~HAS_DOUBLE_SPEND_FLAG) |
+                           (hasDoubleSpend ? HAS_DOUBLE_SPEND_FLAG : 0));
     }
 
     /**
@@ -602,6 +615,12 @@ public:
         std::lock_guard lock { GetMutex() };
         SetSoftRejectedFromParentNL(notifyDirty);
     }
+    
+    bool HasDoubleSpend() const
+    {
+        std::lock_guard lock { GetMutex() };
+        return nStatus.hasDoubleSpend();
+    }
 
     void SetChainWork()
     {
@@ -726,6 +745,13 @@ public:
         std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withFailedParent();
 
+        notifyDirty.Insert( *this );
+    }
+    
+    void ModifyStatusWithDoubleSpend(DirtyBlockIndexStore& notifyDirty)
+    {
+        std::lock_guard lock { GetMutex() };
+        nStatus = nStatus.withDoubleSpend();
         notifyDirty.Insert( *this );
     }
 

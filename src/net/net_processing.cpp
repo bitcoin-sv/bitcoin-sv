@@ -3411,12 +3411,9 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
 
     return true;
 }
-
-static bool IsValid(const DSDetected& msg, const Config& config)
+    
+static bool AcceptBlockHeaders(const DSDetected& msg, const Config& config)
 {
-    if(!IsValid(msg))
-        return false;
-
     LOCK(cs_main);
     return all_of(msg.begin(), msg.end(), [&config](const auto& fork) {
         return all_of(fork.mBlockHeaders.crbegin(),
@@ -3428,6 +3425,24 @@ static bool IsValid(const DSDetected& msg, const Config& config)
                           return accepted && state.IsValid();
                       });
     });
+}
+
+static bool UpdateBlockStatus(const DSDetected& msg)
+{
+    // Update CBlockIndex::BlockStatus to show the double-spend
+    for(const auto& fork : msg)
+    {
+        assert(!fork.mBlockHeaders.empty());
+        const auto& header{fork.mBlockHeaders.back()};
+        const auto hash{header.GetHash()};
+
+        CBlockIndex* pIndex{mapBlockIndex.Get(hash)};
+        if(pIndex)
+            pIndex->ModifyStatusWithDoubleSpend(mapBlockIndex); 
+        else    
+            return false;
+    }
+    return true; 
 }
 
 /**
@@ -3463,7 +3478,7 @@ static void ProcessDoubleSpendMessage(const Config& config,
 
         msg_cache.insert(hash); 
         
-        if(!IsValid(msg, config))
+        if(!IsValid(msg))
         {
             Misbehaving(pfrom, 10,
                         "Invalid Double-Spend Detected message received");
@@ -3472,6 +3487,24 @@ static void ProcessDoubleSpendMessage(const Config& config,
         LogPrint(BCLog::NETMSG,
                  "Valid double-spend detected message from peer=%d\n",
                  pfrom->id);
+
+        if(!AcceptBlockHeaders(msg, config))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Failed to accept block headers from double-spend detected "
+                     "message from peer=%d\n",
+                     pfrom->id);
+            return;
+        }
+
+        if(!UpdateBlockStatus(msg))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Failed to update block statuses from double-spend detected "
+                     "message from peer=%d\n",
+                     pfrom->id);
+            return;
+        }
 
         // Relay to our peers
         connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)

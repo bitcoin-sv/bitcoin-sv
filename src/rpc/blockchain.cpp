@@ -119,6 +119,9 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
     if (nextBlockHash.has_value()) {
         result.push_back(Pair("nextblockhash", nextBlockHash.value().GetHex()));
     }
+    
+    result.push_back(Pair("Double spend: ", blockindex->HasDoubleSpend())); 
+
     return result;
 }
 
