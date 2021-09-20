@@ -106,14 +106,54 @@ UniValue DSDetected::ToJSON(const Config& config) const
 
 bool IsValid(const DSDetected::BlockDetails& fork)
 {
-    return contains_tx(fork.mMerkleProof) &&
-           !contains_coinbase_tx(fork.mMerkleProof) &&
-           contains_merkle_root(fork.mMerkleProof) &&
-           FormsChain(fork.mBlockHeaders) &&
-           !ContainsDuplicateHeaders(fork.mBlockHeaders) &&
-           fork.mMerkleProof.Verify();
+    if(!contains_tx(fork.mMerkleProof))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: doesn't contain "
+                 "Transaction\n");
+        return false;
+    }
 
-    // TODO: Check POW for each fork
+    if(contains_coinbase_tx(fork.mMerkleProof))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: contains coinbase"
+                 " transaction\n");
+        return false;
+    }
+
+    if(!contains_merkle_root(fork.mMerkleProof))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: doesn't contain "
+                 "merkle root\n");
+        return false;
+    }
+    
+    if(!FormsChain(fork.mBlockHeaders))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: block_headers do not "
+                 "form a chain\n");
+        return false;
+    }
+
+    if(ContainsDuplicateHeaders(fork.mBlockHeaders))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: contains duplicate headers\n");
+        return false;
+
+    }
+
+    if(!fork.mMerkleProof.Verify())
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: merkle proof is invalid\n");
+        return false;
+    }
+    
+    return true; 
 }
 
 bool ValidateForkCount(const DSDetected& msg)
@@ -207,7 +247,12 @@ bool AreTxsUnique(const DSDetected& msg)
 bool IsValid(const DSDetected& msg)
 {
     if(!ValidateForkCount(msg))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message - invalid fork "
+                 "count\n");
         return false;
+    }
 
     if(!std::all_of(msg.begin(),
                     msg.end(),
@@ -217,15 +262,30 @@ bool IsValid(const DSDetected& msg)
         return false;
 
     if(!ValidateCommonAncestor(msg))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message - invalid common "
+                 "ancestor\n");
         return false;
+    }
 
     if(!AreTxsUnique(msg))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message - duplicate txids in "
+                 "merkle proofs\n");
         return false;
+    }
 
     // Verify all forks have a tx that double-spends a COutPoint with at least
     // one other fork in the message.
     if(!ValidateDoubleSpends(msg))
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message - no double spend "
+                 "detected\n");
         return false;
+    }
 
     return true;
 }

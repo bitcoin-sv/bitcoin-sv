@@ -3453,7 +3453,13 @@ static void ProcessDoubleSpendMessage(const Config& config,
         const auto hash = hasher(msg);
 
         if(msg_cache.contains(hash))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Ignoring duplicate double-spend detected message from "
+                     "peer=%d\n",
+                     pfrom->id);
             return;     // ignore messages we've already seen
+        }
 
         msg_cache.insert(hash); 
         
@@ -3463,6 +3469,9 @@ static void ProcessDoubleSpendMessage(const Config& config,
                         "Invalid Double-Spend Detected message received");
             return;
         }
+        LogPrint(BCLog::NETMSG,
+                 "Valid double-spend detected message from peer=%d\n",
+                 pfrom->id);
 
         // Relay to our peers
         connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
