@@ -347,7 +347,10 @@ BOOST_AUTO_TEST_CASE(deserialize_tx)
 {
     // clang-format off
     const CSerializeData data{0x5, /* flags */
-                              0x0, /* index */
+                              /* index use CompactSize format */
+                              static_cast<char>(0xfd), 
+                              static_cast<char>(0xfd),
+                              static_cast<char>(0x0),
                               0xa, /* tx len */
                               /* tx */
                               0x02, 0x0, 0x0, 0x0, /* version */
@@ -383,7 +386,7 @@ BOOST_AUTO_TEST_CASE(deserialize_tx)
 
     const uint256 tmp{data32};
     const TxId txid{tmp};
-    const size_t index{0};
+    const size_t index{253};
     const uint256 target{tmp};
     const std::vector<MerkleProof::Node> nodes{MerkleProof::Node{tmp}};
 

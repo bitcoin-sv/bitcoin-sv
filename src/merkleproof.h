@@ -92,14 +92,14 @@ public:
     void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(mFlags);
-        READWRITE(VARINT(mIndex));
+        READWRITECOMPACTSIZE(mIndex);         
 
         if(ser_action.ForRead())
         {
             // Expecting a full transaction or just an ID?
             if(mFlags & 0x01)
             {
-                READWRITE(VARINT(mTxLen));
+                READWRITECOMPACTSIZE(mTxLen);
                 CMutableTransaction mtx{};
                 READWRITE(mtx);
                 mTxn = MakeTransactionRef(std::move(mtx));
@@ -115,7 +115,7 @@ public:
             // Full transaction or just ID?
             if(mTxn)
             {
-                READWRITE(VARINT(mTxLen));
+                READWRITECOMPACTSIZE(mTxLen);
                 mTxn->Serialize(s);
             }
             else
