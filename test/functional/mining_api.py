@@ -226,7 +226,7 @@ class MiningTest(BitcoinTestFramework):
         # Start 2 nodes, 1 with validation enabled the other disabled
         self.log.info("Restarting nodes for optional validation")
         self.stop_nodes()
-        self.start_nodes([['-blockcandidatevaliditytest=1','-checkmempool=0'], ['-blockcandidatevaliditytest=0','-checkmempool=0']])
+        self.start_nodes([['-blockcandidatevaliditytest=1','-checkmempool=0', "-disablesafemode=1"], ['-blockcandidatevaliditytest=0','-checkmempool=0', "-disablesafemode=1"]])
         self.sync_all()
         connect_nodes_bi(self.nodes, 0, 1)
 

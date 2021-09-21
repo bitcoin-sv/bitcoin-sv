@@ -12,15 +12,15 @@ Scenario:
 5. Send alternative branch blocks 21 - 30 but only headers. This should not change anything regarding safe mode.
 6. Send alternative branch first block data. This should mark branch as invalid and change safe mode level to INVALID
 7. Extend main branch by 15 blocks. This should cause that node exits safe mode because alternative branch is 
-   no longer SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE(6) blocks ahead
+   no longer SAFE_MODE_MIN_POW_DIFFERENCE(6) blocks ahead
 """
+from time import sleep
+
 from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status
-from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlockHeader
-from test_framework.script import CScript, OP_TRUE
+from test_framework.mininode import msg_block
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, assert_equal
-from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
+from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 
 class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
 
@@ -69,7 +69,9 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 conn1.rpc.getbalance()
                 assert False, "Should not come to here, should raise exception in line above."
             except JSONRPCException as e:
+                self.log.info(e.error["message"])
                 assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+
 
             # send headers only for the rest of the second branch
             send_by_headers(conn2, branch_2_blocks[20:], do_send_blocks=False)
@@ -79,7 +81,17 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 conn1.rpc.getbalance()
                 assert False, "Should not come to here, should raise exception in line above."
             except JSONRPCException as e:
+                self.log.info(e.error["message"])
                 assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+
+            safe_mode_status = conn1.rpc.getsafemodeinfo()
+            assert safe_mode_status["safemodeenabled"]
+            conn1.rpc.ignoresafemodeforblock(safe_mode_status["forks"][0]["forkfirstblock"]["hash"])
+            safe_mode_status_2 = conn1.rpc.getsafemodeinfo()
+            assert not safe_mode_status_2["safemodeenabled"]
+            conn1.rpc.reconsidersafemodeforblock(safe_mode_status["forks"][0]["tips"][0]["hash"])
+            safe_mode_status_3 = conn1.rpc.getsafemodeinfo()
+            assert safe_mode_status_3["safemodeenabled"]
 
             # send contents of first block of second branch
             # this block is invalid and should invalidate whole second branch
@@ -98,6 +110,7 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 conn1.rpc.getbalance()
                 assert False, "Should not come to here, should raise exception in line above."
             except JSONRPCException as e:
+                self.log.info(e.error["message"])
                 assert e.error["message"] == "Safe mode: Warning: We do not appear to fully agree with our peers! You may need to upgrade, or other nodes may need to upgrade. A large invalid fork has been detected."
 
             # add more blocks to active chain so fork will no longer have more than SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE blocks

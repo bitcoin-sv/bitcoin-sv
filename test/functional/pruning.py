@@ -38,15 +38,15 @@ class PruneTest(BitcoinTestFramework):
         # Create nodes 0 and 1 to mine.
         # Create node 2 to test pruning.
         self.full_node_default_args = ["-maxreceivebuffer=20000", "-blockmaxsize=999000", "-checkblocks=5", "-checkmempool=1",
-                                       "-limitancestorcount=100"]
+                                       "-limitancestorcount=100", "-disablesafemode=1"]
         # Create nodes 3 and 4 to test manual pruning (they will be re-started with manual pruning later)
         # Create nodes 5 to test wallet in prune mode, but do not connect
         self.extra_args = [self.full_node_default_args,
                            self.full_node_default_args,
-                           ["-maxreceivebuffer=20000", "-prune=550"],
-                           ["-maxreceivebuffer=20000", "-blockmaxsize=999000"],
-                           ["-maxreceivebuffer=20000", "-blockmaxsize=999000"],
-                           ["-prune=550"]]
+                           ["-maxreceivebuffer=20000", "-disablesafemode=1", "-prune=550"],
+                           ["-maxreceivebuffer=20000", "-disablesafemode=1", "-blockmaxsize=999000"],
+                           ["-maxreceivebuffer=20000", "-disablesafemode=1",  "-blockmaxsize=999000"],
+                           ["-disablesafemode=1", "-prune=550"]]
 
     def setup_network(self):
         self.setup_nodes()
@@ -145,7 +145,7 @@ class PruneTest(BitcoinTestFramework):
         # block max size so we don't keep mining all our big mempool
         # transactions (from disconnected blocks)
         self.stop_node(1)
-        self.start_node(1, extra_args=["-maxreceivebuffer=20000", "-blockmaxsize=5000", "-checkblocks=5",
+        self.start_node(1, extra_args=["-maxreceivebuffer=20000", "-disablesafemode=1", "-blockmaxsize=5000", "-checkblocks=5",
                                        "-disablesafemode", "-checkmempool=0"])
 
         height = self.nodes[1].getblockcount()
@@ -171,7 +171,7 @@ class PruneTest(BitcoinTestFramework):
 
         # Reboot node1 to clear those giant tx's from mempool
         self.stop_node(1)
-        self.start_node(1, extra_args=["-maxreceivebuffer=20000", "-blockmaxsize=5000", "-checkblocks=5",
+        self.start_node(1, extra_args=["-maxreceivebuffer=20000", "-disablesafemode=1", "-blockmaxsize=5000", "-checkblocks=5",
                                        "-disablesafemode", "-checkmempool=0"])
 
         self.log.info("Generating new longer chain of 300 more blocks")
@@ -268,7 +268,7 @@ class PruneTest(BitcoinTestFramework):
 
         # now re-start in manual pruning mode
         self.stop_node(node_number)
-        self.start_node(node_number, extra_args=["-prune=1"])
+        self.start_node(node_number, extra_args=["-disablesafemode=1", "-prune=1"])
         node = self.nodes[node_number]
         assert_equal(node.getblockcount(), 995)
 
@@ -356,7 +356,7 @@ class PruneTest(BitcoinTestFramework):
         # stop node, start back up with auto-prune at 550MB, make sure still
         # runs
         self.stop_node(node_number)
-        self.start_node(node_number, extra_args=["-prune=550"])
+        self.start_node(node_number, extra_args=["-disablesafemode=1", "-prune=550"])
 
         self.log.info("Success")
 
@@ -364,7 +364,7 @@ class PruneTest(BitcoinTestFramework):
         # check that the pruning node's wallet is still in good shape
         self.log.info("Stop and start pruning node to trigger wallet rescan")
         self.stop_node(2)
-        self.start_node(2, extra_args=["-prune=550"])
+        self.start_node(2, extra_args=["-disablesafemode=1", "-prune=550"])
         self.log.info("Success")
 
         # check that wallet loads loads successfully when restarting a pruned node after IBD.
@@ -374,7 +374,7 @@ class PruneTest(BitcoinTestFramework):
         nds = [self.nodes[0], self.nodes[5]]
         sync_blocks(nds, wait=5, timeout=300)
         self.stop_node(5)  # stop and start to trigger rescan
-        self.start_node(5, extra_args=["-prune=550"])
+        self.start_node(5, extra_args=["-disablesafemode=1", "-prune=550"])
         self.log.info("Success")
 
     def run_test(self):

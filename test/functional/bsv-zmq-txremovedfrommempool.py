@@ -73,7 +73,9 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         address = f"tcp://127.0.0.1:{zmq_port(0)}"
         self.zmqSubSocket.connect(address)
         self.extra_args = [["-zmqpubdiscardedfrommempool=%s" % address,
-                            "-zmqpubremovedfrommempoolblock=%s" % address], []]
+                            "-zmqpubremovedfrommempoolblock=%s" % address,
+                            "-disablesafemode=1"],
+                           ["-disablesafemode=1"]]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
 
