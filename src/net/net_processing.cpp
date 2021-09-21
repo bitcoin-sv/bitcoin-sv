@@ -3445,6 +3445,19 @@ static bool UpdateBlockStatus(const DSDetected& msg)
     return true; 
 }
 
+static bool IsSamePeer(const CNode& peer1, const CNode& peer2)
+{
+    const auto& assocID1{peer1.GetAssociation().GetAssociationID()};
+    const auto& assocID2{peer2.GetAssociation().GetAssociationID()};
+    // If either peer doesn't have an association ID, best we can do is compare
+    // node ptrs
+    if(!assocID1 || !assocID2)
+    {
+        return &peer1 == &peer2;
+    }
+    return *assocID1 == *assocID2;
+}
+
 /**
 * Process double-spend detected message.
 */
@@ -3510,7 +3523,7 @@ static void ProcessDoubleSpendMessage(const Config& config,
         connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
             {
                 // No point echoing back to the sender
-                if(pfrom != to)
+                if(!IsSamePeer(*pfrom, *to))
                 {
                     connman.PushMessage(to, msgMaker.Make(NetMsgType::DSDETECTED, msg));
                 }
