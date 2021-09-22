@@ -30,7 +30,7 @@ bool operator==(const DSDetected::BlockDetails& a,
            a.mMerkleProof == b.mMerkleProof;
 }
 
-std::size_t hash_value(const CBlockHeader& header)
+size_t hash_value(const CBlockHeader& header)
 {
     size_t seed{0};
     boost::hash_combine(seed, header.nVersion);
@@ -42,7 +42,7 @@ std::size_t hash_value(const CBlockHeader& header)
     return seed;
 }
 
-std::size_t hash_value(const DSDetected::BlockDetails& blocks)
+size_t hash_value(const DSDetected::BlockDetails& blocks)
 {
     size_t seed{0};
     boost::hash_range(seed, blocks.mBlockHeaders.begin(), blocks.mBlockHeaders.end());
@@ -52,9 +52,9 @@ std::size_t hash_value(const DSDetected::BlockDetails& blocks)
 
 namespace std
 {
-    std::size_t hash<DSDetected>::operator()(const DSDetected& ds) const
+    size_t hash<DSDetected>::operator()(const DSDetected& ds) const
     {
-        std::size_t seed{0};
+        size_t seed{0};
         boost::hash_combine(seed, ds.mVersion);
         boost::hash_range(seed, ds.mBlockList.begin(), ds.mBlockList.end());
         return seed;
@@ -179,7 +179,7 @@ bool ValidateDoubleSpends(const DSDetected& msg)
 {
     // Gather all the spent Outpoints and their fork index in the msg
     int index{0};
-    using index_outpoint = std::pair<int, COutPoint>;
+    using index_outpoint = pair<int, COutPoint>;
     vector<index_outpoint> indexed_ops;
     for(const auto& fork : msg)
     {
@@ -216,9 +216,9 @@ bool ValidateDoubleSpends(const DSDetected& msg)
         return false;
 
     // Check that each index is contained in the duplicates collection
-    std::vector<uint32_t> indices;
+    vector<uint32_t> indices;
     indices.reserve(duplicates.size());
-    std::transform(duplicates.begin(),
+    transform(duplicates.begin(),
                    duplicates.end(),
                    back_inserter(indices),
                    [](const auto& index_op) { return index_op.first; });
@@ -227,7 +227,7 @@ bool ValidateDoubleSpends(const DSDetected& msg)
 
     vector<uint32_t> expected(msg.size());
     iota(expected.begin(), expected.end(), 0);
-    return std::equal(expected.begin(), expected.end(), indices.begin());
+    return equal(expected.begin(), expected.end(), indices.begin());
 }
     
 // Ensure there are no duplicate transactions
@@ -254,11 +254,11 @@ bool IsValid(const DSDetected& msg)
         return false;
     }
 
-    if(!std::all_of(msg.begin(),
-                    msg.end(),
-                    [](const DSDetected::BlockDetails& fork) {
-                        return IsValid(fork);
-                    }))
+    if(!all_of(msg.begin(),
+               msg.end(),
+               [](const DSDetected::BlockDetails& fork) {
+                   return IsValid(fork);
+               }))
         return false;
 
     if(!ValidateCommonAncestor(msg))
@@ -298,7 +298,7 @@ namespace
     }
 }
 
-bool FormsChain(const std::vector<CBlockHeader>& headers)
+bool FormsChain(const vector<CBlockHeader>& headers)
 {
     if(headers.empty())
         return false;
@@ -314,7 +314,7 @@ bool FormsChain(const std::vector<CBlockHeader>& headers)
     return it.second == headers.end();
 }
 
-bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>& headers)
+bool ContainsDuplicateHeaders(const vector<CBlockHeader>& headers)
 {
     vector<size_t> hashes;
     hashes.reserve(headers.size());

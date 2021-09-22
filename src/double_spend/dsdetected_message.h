@@ -53,8 +53,8 @@ public:
     [[nodiscard]] bool empty() const noexcept { return mBlockList.empty(); }
     [[nodiscard]] auto size() const noexcept { return mBlockList.size(); }
 
-    const_iterator begin() const noexcept { return mBlockList.cbegin(); }
-    const_iterator end() const noexcept { return mBlockList.cend(); }
+    [[nodiscard]] const_iterator begin() const noexcept { return mBlockList.cbegin(); }
+    [[nodiscard]] const_iterator end() const noexcept { return mBlockList.cend(); }
 
     // Serialisation/deserialisation
     ADD_SERIALIZE_METHODS
