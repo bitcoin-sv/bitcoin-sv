@@ -73,6 +73,13 @@ UniValue DSDetected::ToJSON(const Config& config) const
     {
         UniValue blockJson{UniValue::VOBJ};
 
+        if(!block.mBlockHeaders.empty())
+        {
+            blockJson.push_back(
+                Pair("divergentBlockHash",
+                     block.mBlockHeaders.back().GetHash().ToString()));
+        }
+        
         UniValue headers{UniValue::VARR};
         for(const auto& header : block.mBlockHeaders)
         {

@@ -174,6 +174,7 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
   "version": 1,
   "blocks": [
     {
+      "divergentBlockHash": "14508459b221041eab257d2baaa7459775ba748246c8403609eb708f0e57e74b",
       "headers": [
         {
           "version": 0,
@@ -208,6 +209,7 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
   "version": 1,
   "blocks": [
     {
+      "divergentBlockHash": "14508459b221041eab257d2baaa7459775ba748246c8403609eb708f0e57e74b",
       "headers": [
         {
           "version": 0,
