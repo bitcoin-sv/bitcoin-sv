@@ -14,8 +14,14 @@
 #include "streams.h"
 #include "uint256.h"
 
+#include <boost/algorithm/hex.hpp>
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
+
+#include <stdexcept>
+#include <string_view>
+
+namespace ba = boost::algorithm;
 
 using namespace std;
 
@@ -67,7 +73,7 @@ namespace
             nodes.push_back(MerkleProof::Node{node});
         }
 
-        return {txn, 0, checkRoot, nodes};
+        return {txn, 1, checkRoot, nodes};
     }
 
     MerkleProof CreateMerkleProof()
@@ -89,8 +95,7 @@ std::ostream& operator<<(std::ostream& str, const DSDetected& msg)
             str << header.GetHash().ToString() << ",";
         }
         str << "], ";
-        str << "MerkleProof: "
-            << HashMerkleProof(fork.mMerkleProof).ToString();
+        str << "MerkleProof: " << HashMerkleProof(fork.mMerkleProof).ToString();
     }
     str << "]";
     return str;
@@ -125,17 +130,17 @@ BOOST_AUTO_TEST_CASE(default_hash)
 {
     const std::hash<DSDetected> hasher;
     const DSDetected msg1;
-    const auto h11 = hasher(msg1); 
-    const auto h12 = hasher(msg1); 
+    const auto h11 = hasher(msg1);
+    const auto h12 = hasher(msg1);
     BOOST_CHECK_EQUAL(h11, h12);
-    
+
     DSDetected msg2;
     std::vector<CBlockHeader> headers{CBlockHeader{}};
     std::vector<DSDetected::BlockDetails> blocks{};
     blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
     blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg2, blocks);
-    const auto h21 = hasher(msg2); 
+    const auto h21 = hasher(msg2);
     BOOST_CHECK_NE(h11, h21);
 }
 
@@ -144,20 +149,13 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
     // Test good DSDetected message creation and serialisation/deserialisation
     DSDetected msg;
 
-    {
-        CDataStream ss{SER_NETWORK, 0};
-        ss << msg;
-        DSDetected deserialised{};
-        ss >> deserialised;
-        BOOST_CHECK_EQUAL(msg, deserialised);
-    }
-
     // Add some block details
     std::vector<CBlockHeader> headers{CBlockHeader{}};
     std::vector<DSDetected::BlockDetails> blocks{};
     blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
+    blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 1);
+    BOOST_CHECK_EQUAL(msg.size(), 2);
     {
         CDataStream ss{SER_NETWORK, 0};
         ss << msg;
@@ -186,7 +184,32 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
         }
       ],
       "merkleProof": {
-        "index": 0,
+        "index": 1,
+        "txOrId": "02000000000000000000",
+        "targetType": "merkleRoot",
+        "target": "b9d4ad1b47f176c83ca56ca0c4cff7af1f976119f4cc3e036c7a835f1da3bf29",
+        "nodes": [
+          "d877b150e2f2cb183f38643fca5169da842be9c8fb841570d6fdf496bd56e829",
+          "7c9d845b0df91f64cdba247a30fe0457951e89bf5d59129c1e22160e9a4d1ec3",
+          "fb95795a028885a9e63fee9d55dd5690adb382c4573c18385662c085f083aff6",
+          "e05430a9d32cce4d0f352a0ac6ecea74e8f9b96f5d91c944ed1299fd25bafdf3"
+        ]
+      }
+    },
+    {
+      "divergentBlockHash": "14508459b221041eab257d2baaa7459775ba748246c8403609eb708f0e57e74b",
+      "headers": [
+        {
+          "version": 0,
+          "hashPrevBlock": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hashMerkleRoot": "0000000000000000000000000000000000000000000000000000000000000000",
+          "time": 0,
+          "bits": 0,
+          "nonce": 0
+        }
+      ],
+      "merkleProof": {
+        "index": 1,
         "txOrId": "02000000000000000000",
         "targetType": "merkleRoot",
         "target": "b9d4ad1b47f176c83ca56ca0c4cff7af1f976119f4cc3e036c7a835f1da3bf29",
@@ -221,7 +244,32 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
         }
       ],
       "merkleProof": {
-        "index": 0,
+        "index": 1,
+        "txOrId": "4ebd325a4b394cff8c57e8317ccf5a8d0e2bdf1b8526f8aad6c8e43d8240621a",
+        "targetType": "merkleRoot",
+        "target": "b9d4ad1b47f176c83ca56ca0c4cff7af1f976119f4cc3e036c7a835f1da3bf29",
+        "nodes": [
+          "d877b150e2f2cb183f38643fca5169da842be9c8fb841570d6fdf496bd56e829",
+          "7c9d845b0df91f64cdba247a30fe0457951e89bf5d59129c1e22160e9a4d1ec3",
+          "fb95795a028885a9e63fee9d55dd5690adb382c4573c18385662c085f083aff6",
+          "e05430a9d32cce4d0f352a0ac6ecea74e8f9b96f5d91c944ed1299fd25bafdf3"
+        ]
+      }
+    },
+    {
+      "divergentBlockHash": "14508459b221041eab257d2baaa7459775ba748246c8403609eb708f0e57e74b",
+      "headers": [
+        {
+          "version": 0,
+          "hashPrevBlock": "0000000000000000000000000000000000000000000000000000000000000000",
+          "hashMerkleRoot": "0000000000000000000000000000000000000000000000000000000000000000",
+          "time": 0,
+          "bits": 0,
+          "nonce": 0
+        }
+      ],
+      "merkleProof": {
+        "index": 1,
         "txOrId": "4ebd325a4b394cff8c57e8317ccf5a8d0e2bdf1b8526f8aad6c8e43d8240621a",
         "targetType": "merkleRoot",
         "target": "b9d4ad1b47f176c83ca56ca0c4cff7af1f976119f4cc3e036c7a835f1da3bf29",
@@ -244,8 +292,329 @@ BOOST_AUTO_TEST_CASE(MsgMalformed)
     UnitTestAccess::SetVersion(msg, 0x02);
     CDataStream ss{SER_NETWORK, 0};
     ss << msg;
-    DSDetected deserialised{};
-    BOOST_CHECK_THROW(ss >> msg;, std::runtime_error);
+    BOOST_CHECK_THROW(ss >> msg, std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_happy_case)
+{
+    vector<uint8_t> v;
+    ba::unhex(
+        "0100" // version
+        "02"   // block count
+        // block 0
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "01" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00" // node count
+        // block 1
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "01" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "01" // node count
+        // node 0
+        "00" // node type
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", // hash
+        back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected actual;
+    ss >> actual;
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_invalid_dsdetected_version)
+{
+    vector<uint8_t> v;
+    ba::unhex("0200", // <- invalid version
+              back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected msg;
+    try
+    {
+        ss >> msg;
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const runtime_error& e)
+    {
+        const string_view expected{"Unsupported DSDetected message version"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_too_few_block_details)
+{
+    vector<uint8_t> v;
+    ba::unhex(
+        "0100"
+        "01" // invalid block count
+        // block 0
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "01" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00", // node count
+        back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected msg;
+    try
+    {
+        ss >> msg;
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const runtime_error& e)
+    {
+        const string_view expected{"DSDetected invalid block count"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_invalid_invalid_merkle_proof_flags)
+{
+    vector<uint8_t> v;
+    ba::unhex(
+        "0100" // version
+        "02"   // fork count
+        // fork 0
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "01" // <- invalid flags
+        "01" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00" // node count
+        // fork 1
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "00" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00", // node count
+        back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected msg;
+    try
+    {
+        ss >> msg;
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const runtime_error& e)
+    {
+        const string_view expected{"Unsupported DSDetected merkle proof flags"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_invalid_invalid_merkle_proof_index)
+{
+    vector<uint8_t> v;
+    ba::unhex(
+        "0100" // version
+        "02"   // fork count
+        // fork 0
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "00" // <- invalid index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00" // node count
+        // fork 1
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "00" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00", // node count
+        back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected msg;
+    try
+    {
+        ss >> msg;
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const runtime_error& e)
+    {
+        const string_view expected{"Unsupported DSDetected merkle proof index"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_invalid_invalid_merkle_proof_node_type)
+{
+    vector<uint8_t> v;
+    ba::unhex(
+        "0100" // version
+        "02"   // fork count
+        // fork 0
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "01" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "00" // node count
+        // fork 1
+        "01" // header count
+        // header 0
+        "02000000" // version
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(root)
+        "00000000" // time
+        "00000000" // bits
+        "00000000" // nonce
+        // Merkle proof
+        "05" // flags
+        "01" // index
+        "0a" // tx length
+        // tx
+        "02000000" // version
+        "00"       // ip count
+        "00"       // op count
+        "00000000" // Lock time
+        // Merkle root
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" // h(prev)
+        "01" // node count
+        // node 0
+        "01" // <- invalid node type
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", // hash
+        back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected msg;
+    try
+    {
+        ss >> msg;
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const runtime_error& e)
+    {
+        const string_view expected{"Unsupported DSDetected merkle proof type"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
 }
 
 BOOST_AUTO_TEST_CASE(validate_fork_count)
@@ -393,14 +762,13 @@ BOOST_AUTO_TEST_CASE(tx_uniqueness)
                                  CreateMerkleProof(OutPoints{{"42", 1}})});
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK(AreTxsUnique(msg));
-    
+
     std::vector<CBlockHeader> headers_2{CBlockHeader{}};
     blocks.push_back(
         DSDetected::BlockDetails{headers_2,
                                  CreateMerkleProof(OutPoints{{"42", 0}})});
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK(!AreTxsUnique(msg));
-
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -9,6 +9,7 @@
 #include "serialize.h"
 #include "univalue.h"
 
+#include <stdexcept>
 #include <vector>
 
 class Config;
@@ -34,7 +35,10 @@ public:
         {
             READWRITE(mBlockHeaders);
             READWRITE(mMerkleProof);
+            Validate(mMerkleProof);
         }
+
+        static void Validate(const MerkleProof&);
 
         // List of block headers from the block containing the conflicting
         // transaction back to the last common ancestor of all detailed blocks.
@@ -53,8 +57,14 @@ public:
     [[nodiscard]] bool empty() const noexcept { return mBlockList.empty(); }
     [[nodiscard]] auto size() const noexcept { return mBlockList.size(); }
 
-    [[nodiscard]] const_iterator begin() const noexcept { return mBlockList.cbegin(); }
-    [[nodiscard]] const_iterator end() const noexcept { return mBlockList.cend(); }
+    [[nodiscard]] const_iterator begin() const noexcept
+    {
+        return mBlockList.cbegin();
+    }
+    [[nodiscard]] const_iterator end() const noexcept
+    {
+        return mBlockList.cend();
+    }
 
     // Serialisation/deserialisation
     ADD_SERIALIZE_METHODS
@@ -62,8 +72,6 @@ public:
     void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(mVersion);
-        READWRITE(mBlockList);
-
         if(ser_action.ForRead())
         {
             // Check message version
@@ -71,6 +79,16 @@ public:
             {
                 throw std::runtime_error(
                     "Unsupported DSDetected message version");
+            }
+        }
+
+        READWRITE(mBlockList);
+        if(ser_action.ForRead())
+        {
+            // Check message version
+            if(mBlockList.size() < 2)
+            {
+                throw std::runtime_error("DSDetected invalid block count");
             }
         }
     }
@@ -93,12 +111,15 @@ private:
     blocks_type mBlockList{};
 };
 
-inline bool operator!=(const DSDetected& a, const DSDetected& b) { return !(a == b); }
+inline bool operator!=(const DSDetected& a, const DSDetected& b)
+{
+    return !(a == b);
+}
 
 bool operator==(const DSDetected::BlockDetails&,
                 const DSDetected::BlockDetails&);
 inline bool operator!=(const DSDetected::BlockDetails& a,
-                const DSDetected::BlockDetails& b)
+                       const DSDetected::BlockDetails& b)
 {
     return !(a == b);
 }

@@ -43,6 +43,8 @@ public:
         // Since we only support type=0 just make this a uint256 in all cases
         uint256 mValue{};
     };
+    using nodes_type = std::vector<Node>;
+    using const_iterator = nodes_type::const_iterator;
 
     MerkleProof() = default;
 
@@ -77,11 +79,13 @@ public:
     
     [[nodiscard]] constexpr uint8_t Flags() const noexcept { return mFlags; }
     [[nodiscard]] constexpr size_t Index() const noexcept { return mIndex; }
-    [[nodiscard]] const CTransaction& Tx() const noexcept { return *mTxn; }
+    [[nodiscard]] const CTransaction* Tx() const noexcept { return mTxn.get(); }
     [[nodiscard]] const uint256& Target() const noexcept { return mTarget; }
 
     [[nodiscard]] bool empty() const noexcept { return mNodes.empty(); }
     [[nodiscard]] size_t size() const noexcept { return mNodes.size(); }
+    [[nodiscard]] const_iterator begin() const noexcept { return mNodes.begin(); } 
+    [[nodiscard]] const_iterator end() const noexcept { return mNodes.end(); } 
 
     // Recompute root and check if it matches the target value
     [[nodiscard]] bool Verify() const;
@@ -153,8 +157,7 @@ private:
     uint256 mTarget{};
 
     // List of nodes making up the proof
-    std::vector<Node> mNodes{};
-    
+    nodes_type mNodes{};
 };
 
 bool operator!=(const MerkleProof&, const MerkleProof&);

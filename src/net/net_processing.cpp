@@ -47,6 +47,7 @@
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
 #include <chrono>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <shared_mutex>
@@ -3467,12 +3468,28 @@ static void ProcessDoubleSpendMessage(const Config& config,
                                       CConnman& connman,
                                       const CNetMsgMaker& msgMaker)
 {
+    // Deserialise message
+    constexpr int misbehaviour_penalty{10};
+    DSDetected msg{};
     try
     {
-        // Deserialise message
-        DSDetected msg {};
         vRecv >> msg;
+    }
+    catch(const exception& e)
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Error processing double-spend detected message from "
+                 "peer=%d: %s\n",
+                 pfrom->id,
+                 e.what());
+        Misbehaving(pfrom,
+                    misbehaviour_penalty,
+                    "Invalid double-spend Detected message received");
+        return;
+    }
 
+    try
+    {
         // Check if we've already handled this message
         static std::hash<DSDetected> hasher;
         constexpr size_t cache_size{1000};
@@ -3493,8 +3510,8 @@ static void ProcessDoubleSpendMessage(const Config& config,
         
         if(!IsValid(msg))
         {
-            Misbehaving(pfrom, 10,
-                        "Invalid Double-Spend Detected message received");
+            Misbehaving(pfrom, misbehaviour_penalty,
+                        "Invalid double-spend Detected message received");
             return;
         }
         LogPrint(BCLog::NETMSG,

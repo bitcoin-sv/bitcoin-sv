@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <boost/functional/hash.hpp>
 #include <iterator>
+#include <stdexcept>
 
 using namespace std;
 
@@ -59,6 +60,20 @@ namespace std
         boost::hash_range(seed, ds.mBlockList.begin(), ds.mBlockList.end());
         return seed;
     };
+}
+
+void DSDetected::BlockDetails::Validate(const MerkleProof& mp)
+{
+    if(mp.Flags() != 5)
+        throw runtime_error("Unsupported DSDetected merkle proof flags");
+   
+    if(mp.Index() == 0)
+        throw runtime_error("Unsupported DSDetected merkle proof index");
+
+    if(any_of(mp.begin(), mp.end(), [](const auto& node) {
+           return node.mType != 0;
+       }))
+        throw runtime_error("Unsupported DSDetected merkle proof type");
 }
 
 // Convert to JSON suitable for sending to a remote webhoo
@@ -190,8 +205,8 @@ bool ValidateDoubleSpends(const DSDetected& msg)
     vector<index_outpoint> indexed_ops;
     for(const auto& fork : msg)
     {
-        const CTransaction& tx{fork.mMerkleProof.Tx()};
-        for(const auto& ip : tx.vin)
+        const CTransaction* tx{fork.mMerkleProof.Tx()};
+        for(const auto& ip : tx->vin)
             indexed_ops.push_back({index, ip.prevout});
         ++index;
     }
@@ -245,7 +260,7 @@ bool AreTxsUnique(const DSDetected& msg)
               msg.end(),
               txids.begin(),
               [](const DSDetected::BlockDetails& fork) {
-                  return fork.mMerkleProof.Tx().GetId();
+                  return fork.mMerkleProof.Tx()->GetId();
               });
     sort(txids.begin(), txids.end());
     return adjacent_find(txids.cbegin(), txids.cend()) == txids.cend();
