@@ -238,7 +238,7 @@ class DSDetectedTests(BitcoinTestFramework):
         txB.rehash()
         blockA.vtx.append(txA)
         blockB.vtx.append(txB)
-        blockB.vtx.append(txA)
+        #blockB.vtx.append(txA)
         blockA.hashMerkleRoot = blockA.calc_merkle_root()
         blockB.hashMerkleRoot = blockB.calc_merkle_root()
         blockA.calc_sha256()
@@ -332,6 +332,18 @@ class DSDetectedTests(BitcoinTestFramework):
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockC)], DSMerkleProof(1, txC, blockC.hashMerkleRoot, [MerkleProofNode(blockC.vtx[0].sha256)]))])
+        peer.send_and_ping(dsdMessage)
+        assert_equal(self.get_JSON_notification(), None)
+
+        # Webhook should not receive the notification if the two double spending transactions are actually the same transaction (having same txid)
+        # Create a block similar as before, but with a transaction spending a different utxo
+        blockD, _ = make_block(connection, parent_block=utxoBlock)
+        blockD.vtx.append(txA)
+        blockD.hashMerkleRoot = blockD.calc_merkle_root()
+        blockD.solve()
+        dsdMessage = msg_dsdetected(blocksDetails=[
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockD)], DSMerkleProof(1, txA, blockD.hashMerkleRoot, [MerkleProofNode(blockD.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
