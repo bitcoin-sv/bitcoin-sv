@@ -265,23 +265,6 @@ BOOST_AUTO_TEST_CASE(txid_construction)
     BOOST_CHECK(!contains_coinbase_tx(mp));
 }
 
-//BOOST_AUTO_TEST_CASE(txid_construction)
-//{
-//    const TxId txid{uint256S("1")};
-//    size_t index{2};
-//    const uint256 target{uint256S("3")};
-//    const std::vector<MerkleProof::Node> nodes{{}};
-//
-//    try
-//    {
-//        MerkleProof mp{txid, index, target, nodes};
-//        BOOST_FAIL();
-//    }
-//    catch(const std::runtime_error& e)
-//    {   
-//    }
-//}
-
 BOOST_AUTO_TEST_CASE(tx_construction)
 {
     CMutableTransaction mtx;

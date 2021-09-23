@@ -99,14 +99,6 @@ bool operator!=(const MerkleProof& a, const MerkleProof& b)
     return !(a == b);
 }
 
-std::ostream& operator<<(std::ostream& os, const TxId& txid)
-{
-    for(const auto x : txid)
-        os << (int)x;
-
-    return os;
-}
-
 std::ostream& operator<<(std::ostream& os, const MerkleProof::Node& node)
 {
     os << "Type: " << static_cast<int>(node.mType)
@@ -122,7 +114,7 @@ std::ostream& operator<<(std::ostream& os, const MerkleProof& mp)
 {
     os << "Flags: " << static_cast<int>(mp.Flags())
        << "\nIndex: " << static_cast<int>(mp.Index())
-       << "\nTxId: " << mp.mTxnId
+       << "\nTxId: " << mp.mTxnId.ToString()
        << "\nTx Length: " << mp.mTxLen
        << "\nTx*: " << mp.mTxn
        << "\nTarget: " << mp.mTarget.ToString()
@@ -149,7 +141,7 @@ std::size_t hash_value(const MerkleProof& mp)
     boost::hash_combine(seed, mp.mIndex);
     boost::hash_combine(seed, mp.mTarget);
     boost::hash_combine(seed, mp.mTxLen);
-    //boost::hash_combine(seed, mp.mTxn);
+    boost::hash_combine(seed, mp.mTxn->GetId());
     boost::hash_combine(seed, mp.mTxnId);
 
     boost::hash_range(seed, mp.mNodes.begin(), mp.mNodes.end());
