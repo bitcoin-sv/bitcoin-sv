@@ -376,8 +376,12 @@ class DSDetectedTests(BitcoinTestFramework):
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
-        assert(self.get_JSON_notification() != None)
-        #assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=self.get_JSON_notification())))
+        json_notification = self.get_JSON_notification()
+        # remove diverentBlockHash so we can compare with the ds-message
+        assert(json_notification != None)
+        for e in json_notification['blocks']:
+            del e['divergentBlockHash']
+        assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))
 
         # TODO: think about banning mechanism..if we do negative tests will peer be banned? Should we first try normal cases first so that peer is trusted?
         
@@ -389,8 +393,12 @@ class DSDetectedTests(BitcoinTestFramework):
             dsdMessage = self.createDsDetectedMessageFromBlockTree(blockTree)
             peer.send_and_ping(dsdMessage)
             # Notification should be received as generated dsdetected message is valid
-            assert(self.get_JSON_notification() != None)
-            #assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=self.get_JSON_notification())))
+            json_notification = self.get_JSON_notification()
+            # remove diverentBlockHash so we can compare with the ds-message
+            assert (json_notification != None)
+            for e in json_notification['blocks']:
+                del e['divergentBlockHash']
+            assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))
 
         self.stop_webhook_server()
 
