@@ -253,6 +253,7 @@ add_library(common
 	keystore.h
 	limitedmap.h
 	memusage.h
+	merkleproof.h
 	merkletree.h
 	mining/assembler.h
 	mining/candidates.h
@@ -397,6 +398,9 @@ add_library(server
 	double_spend/dsattempt_handler.h
 	double_spend/dscallback_msg.cpp
 	double_spend/dscallback_msg.h
+	double_spend/dsdetected_defaults.h
+	double_spend/dsdetected_message.cpp
+	double_spend/dsdetected_message.h
 	double_spend/dstxn_serialiser.cpp
 	double_spend/dstxn_serialiser.h
 	double_spend/time_limited_blacklist.h
@@ -423,6 +427,7 @@ add_library(server
 	mempooltxdb.h
 	merkleblock.cpp
 	merkleblock.h
+	merkleproof.cpp
 	merkletree.cpp
 	merkletreedb.cpp
 	merkletreedb.h

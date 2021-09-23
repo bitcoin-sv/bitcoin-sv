@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "boost/functional/hash.hpp"
+
 /** Template base class for fixed-sized opaque blobs. */
 template <unsigned int BITS> class base_blob {
 protected:
@@ -201,6 +203,11 @@ inline uint160 uint160S(const std::string &str) {
     uint160 rv;
     rv.SetHex(str);
     return rv;
+}
+
+inline std::size_t hash_value(const uint256& i)
+{
+    return boost::hash_range(i.begin(), i.end());
 }
 
 #endif // BITCOIN_UINT256_H

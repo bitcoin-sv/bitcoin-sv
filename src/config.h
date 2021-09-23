@@ -9,6 +9,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 
 #include "amount.h"
 #include "consensus/consensus.h"
+#include "double_spend/dsdetected_defaults.h"
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
@@ -142,6 +143,10 @@ public:
     virtual uint64_t GetDoubleSpendNumFastThreads() const = 0;
     virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
     virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
+    virtual std::string GetDoubleSpendDetectedWebhookAddress() const = 0;
+    virtual int16_t GetDoubleSpendDetectedWebhookPort() const = 0;
+    virtual std::string GetDoubleSpendDetectedWebhookPath() const = 0;
+    virtual uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const = 0;
 
     virtual std::int32_t GetSoftConsensusFreezeDuration() const = 0;
 
@@ -261,6 +266,8 @@ public:
     virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
+    virtual bool SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
+    virtual bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err = nullptr) = 0;
 
     virtual bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) = 0;
 
@@ -528,6 +535,12 @@ public:
     uint64_t GetDoubleSpendNumSlowThreads() const override;
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override;
     uint64_t GetDoubleSpendQueueMaxMemory() const override;
+    bool SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err) override;
+    std::string GetDoubleSpendDetectedWebhookAddress() const override;
+    int16_t GetDoubleSpendDetectedWebhookPort() const override;
+    std::string GetDoubleSpendDetectedWebhookPath() const override;
+    bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err) override;
+    uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override;
 
     bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) override;
     std::int32_t GetSoftConsensusFreezeDuration() const override;
@@ -671,6 +684,10 @@ private:
     uint64_t dsAttemptNumFastThreads;
     uint64_t dsAttemptNumSlowThreads;
     uint64_t dsAttemptQueueMaxMemory;
+    std::string dsDetectedWebhookAddress;
+    int16_t dsDetectedWebhookPort;
+    std::string dsDetectedWebhookPath;
+    uint64_t dsDetectedWebhookMaxTxnSize;
 
     std::optional<bool> mDisableBIP30Checks;
 
@@ -1119,6 +1136,12 @@ public:
     uint64_t GetDoubleSpendNumSlowThreads() const override { return DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS; }
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override { return true; }
     uint64_t GetDoubleSpendQueueMaxMemory() const override { return DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY * ONE_MEGABYTE; }
+    bool SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err) override { return true; }
+    std::string GetDoubleSpendDetectedWebhookAddress() const override { return ""; }
+    int16_t GetDoubleSpendDetectedWebhookPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetDoubleSpendDetectedWebhookPath() const override { return ""; }
+    bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override { return DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

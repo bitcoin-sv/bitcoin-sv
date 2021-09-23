@@ -118,6 +118,8 @@ BITCOIN_CORE_H = \
   disk_tx_pos.h \
   double_spend/dsattempt_handler.h \
   double_spend/dscallback_msg.h \
+  double_spend/dsdetected_defaults.h \
+  double_spend/dsdetected_message.h \
   double_spend/dstxn_serialiser.h \
   double_spend/time_limited_blacklist.h \
   dstencode.h \
@@ -138,11 +140,13 @@ BITCOIN_CORE_H = \
   dbwrapper.h \
   leaky_bucket.h \
   limitedmap.h \
+  limited_cache.h \
   locked_ref.h \
   logging.h \
   memusage.h \
   mempooltxdb.h \
   merkleblock.h \
+  merkleproof.h \
   merkletree.h \
   merkletreedb.h \
   merkletreestore.h \
@@ -297,9 +301,11 @@ libbitcoin_server_a_SOURCES = \
   dbwrapper.cpp \
   double_spend/dsattempt_handler.cpp \
   double_spend/dscallback_msg.cpp \
+  double_spend/dsdetected_message.cpp \
   double_spend/dstxn_serialiser.cpp \
   mempooltxdb.cpp \
   merkleblock.cpp \
+  merkleproof.cpp \
   merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \

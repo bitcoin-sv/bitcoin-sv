@@ -61,6 +61,21 @@ public:
     int64_t GetBlockTime() const { return (int64_t)nTime; }
 };
 
+inline bool operator==(const CBlockHeader& a, const CBlockHeader& b)
+{
+    return a.nVersion == b.nVersion &&
+     a.hashPrevBlock == b.hashPrevBlock &&
+     a.hashMerkleRoot == b.hashMerkleRoot &&
+     a.nTime == b.nTime &&
+     a.nBits == b.nBits && 
+     a.nNonce == b.nNonce;
+}
+
+inline bool operator!=(const CBlockHeader& a, const CBlockHeader& b)
+{
+    return !(a == b);
+}
+
 class CBlock : public CBlockHeader {
 public:
     // network and disk

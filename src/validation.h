@@ -1113,6 +1113,11 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex);
 
+bool AcceptBlockHeader(const Config&, 
+                       const CBlockHeader&,
+                       CValidationState&,
+                       CBlockIndex**);
+
 /**
  * Mark a block and its descendants (up to numBlocks of them) as soft rejected.
  */

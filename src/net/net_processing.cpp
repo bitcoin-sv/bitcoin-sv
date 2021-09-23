@@ -6,16 +6,20 @@
 #include "net/net_processing.h"
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "block_file_access.h"
+#include "block_index.h"
 #include "block_index_store.h"
 #include "blockencodings.h"
-#include "block_file_access.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
 #include "consensus/validation.h"
+#include "double_spend/dsdetected_message.h"
 #include "hash.h"
 #include "init.h"
+#include "invalid_txn_publisher.h"
+#include "limited_cache.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
 #include "net/block_download_tracker.h"
@@ -26,7 +30,9 @@
 #include "policy/fees.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "protocol.h"
 #include "random.h"
+#include "rpc/webhook_client.h"
 #include "taskcancellation.h"
 #include "tinyformat.h"
 #include "txdb.h"
@@ -36,15 +42,15 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-#include "protocol.h"
 #include "validationinterface.h"
-#include "invalid_txn_publisher.h"
 #include <algorithm>
-#include <chrono>
-#include <optional>
-#include <shared_mutex>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
+#include <chrono>
+#include <exception>
+#include <memory>
+#include <optional>
+#include <shared_mutex>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -3406,7 +3412,159 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
 
     return true;
 }
- 
+    
+static bool AcceptBlockHeaders(const DSDetected& msg, const Config& config)
+{
+    LOCK(cs_main);
+    return all_of(msg.begin(), msg.end(), [&config](const auto& fork) {
+        return all_of(fork.mBlockHeaders.crbegin(),
+                      fork.mBlockHeaders.crend(),
+                      [&config](const CBlockHeader& bh) {
+                          CValidationState state;
+                          CBlockIndex* pbIndex{};
+                          bool accepted = AcceptBlockHeader(config, bh, state, &pbIndex);
+                          return accepted && state.IsValid();
+                      });
+    });
+}
+
+static bool UpdateBlockStatus(const DSDetected& msg)
+{
+    // Update CBlockIndex::BlockStatus to show the double-spend
+    for(const auto& fork : msg)
+    {
+        assert(!fork.mBlockHeaders.empty());
+        const auto& header{fork.mBlockHeaders.back()};
+        const auto hash{header.GetHash()};
+
+        CBlockIndex* pIndex{mapBlockIndex.Get(hash)};
+        if(pIndex)
+            pIndex->ModifyStatusWithDoubleSpend(mapBlockIndex); 
+        else    
+            return false;
+    }
+    return true; 
+}
+
+static bool IsSamePeer(const CNode& peer1, const CNode& peer2)
+{
+    const auto& assocID1{peer1.GetAssociation().GetAssociationID()};
+    const auto& assocID2{peer2.GetAssociation().GetAssociationID()};
+    // If either peer doesn't have an association ID, best we can do is compare
+    // node ptrs
+    if(!assocID1 || !assocID2)
+    {
+        return &peer1 == &peer2;
+    }
+    return *assocID1 == *assocID2;
+}
+
+/**
+* Process double-spend detected message.
+*/
+static void ProcessDoubleSpendMessage(const Config& config,
+                                      const std::shared_ptr<CNode>& pfrom,
+                                      CDataStream& vRecv,
+                                      CConnman& connman,
+                                      const CNetMsgMaker& msgMaker)
+{
+    // Deserialise message
+    constexpr int misbehaviour_penalty{10};
+    DSDetected msg{};
+    try
+    {
+        vRecv >> msg;
+    }
+    catch(const exception& e)
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Error processing double-spend detected message from "
+                 "peer=%d: %s\n",
+                 pfrom->id,
+                 e.what());
+        Misbehaving(pfrom,
+                    misbehaviour_penalty,
+                    "Invalid double-spend Detected message received");
+        return;
+    }
+
+    try
+    {
+        // Check if we've already handled this message
+        static std::hash<DSDetected> hasher;
+        constexpr size_t cache_size{1000};
+        static limited_cache msg_cache{cache_size}; 
+       
+        const auto hash = hasher(msg);
+
+        if(msg_cache.contains(hash))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Ignoring duplicate double-spend detected message from "
+                     "peer=%d\n",
+                     pfrom->id);
+            return;     // ignore messages we've already seen
+        }
+
+        msg_cache.insert(hash); 
+        
+        if(!IsValid(msg))
+        {
+            Misbehaving(pfrom, misbehaviour_penalty,
+                        "Invalid double-spend Detected message received");
+            return;
+        }
+        LogPrint(BCLog::NETMSG,
+                 "Valid double-spend detected message from peer=%d\n",
+                 pfrom->id);
+
+        if(!AcceptBlockHeaders(msg, config))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Failed to accept block headers from double-spend detected "
+                     "message from peer=%d\n",
+                     pfrom->id);
+            return;
+        }
+
+        if(!UpdateBlockStatus(msg))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Failed to update block statuses from double-spend detected "
+                     "message from peer=%d\n",
+                     pfrom->id);
+            return;
+        }
+
+        // Relay to our peers
+        connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
+            {
+                // No point echoing back to the sender
+                if(!IsSamePeer(*pfrom, *to))
+                {
+                    connman.PushMessage(to, msgMaker.Make(NetMsgType::DSDETECTED, msg));
+                }
+            }
+        );
+
+        // Send webhook notification if configured to do so
+        using namespace rpc::client;
+        if(!config.GetDoubleSpendDetectedWebhookAddress().empty() && g_pWebhookClient)
+        {
+            RPCClientConfig rpcConfig { RPCClientConfig::CreateForDoubleSpendDetectedWebhook(config) };
+            using HTTPRequest = rpc::client::HTTPRequest;
+            auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateJSONPostRequest(rpcConfig, msg.ToJSON(config))) };
+            auto response { std::make_shared<StringHTTPResponse>() };
+            g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+        }
+    }
+    catch(const std::exception& e)
+    {
+        LogPrint(BCLog::NETMSG, "Error processing double-spend detected message from peer=%d: %s\n",
+            pfrom->id, e.what());
+    }
+} 
+
 /**
 * Process next message.
 */
@@ -3525,6 +3683,11 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) {
         ProcessBlockMessage(config, pfrom, vRecv, connman);
+    }
+
+    // Ignore double-spend detected notifications while importing
+    else if (strCommand == NetMsgType::DSDETECTED && !fImporting && !fReindex) {
+        ProcessDoubleSpendMessage(config, pfrom, vRecv, connman, msgMaker);
     }
 
     else if (strCommand == NetMsgType::GETADDR) {
