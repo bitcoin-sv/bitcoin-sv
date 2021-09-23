@@ -8,6 +8,7 @@
 #include "sync.h"
 #include "block_index.h"
 #include "warnings.h"
+#include "rpc/webhook_client.h"
 
 class CJSONWriter;
 
@@ -63,7 +64,7 @@ class SafeMode
         const CBlockIndex* base;
         static bool CompareBlockIndex(const CBlockIndex* lhs, const CBlockIndex* rhs) 
         {
-            if (lhs->GetHeight() == lhs->GetHeight())
+            if (lhs->GetHeight() == rhs->GetHeight())
             {
                 return lhs->GetBlockHash() < rhs->GetBlockHash();
             }
@@ -103,6 +104,11 @@ class SafeMode
     */
     SafeModeResult GetSafeModeResult(const Config& config);
 
+    /**
+    * Sends result in json form using webhooks.
+    */
+    void NotifyUsingWebhooks(const Config& config, const SafeModeResult& result);
+
 private: // data members
     // collection of current forks that can potentially trigger the safe mode (key: fork tip, value: fork first block)
     std::map<const CBlockIndex*, const CBlockIndex*> safeModeForks;
@@ -111,8 +117,12 @@ private: // data members
     SafeModeResult currentResult;
     // a block which was the active tip last time we have updated fork data
     const CBlockIndex* oldTip {nullptr};
-
+    
     CCriticalSection cs_safeModeLevelForks;
+
+    // webhook objects, initialized on first access
+    std::unique_ptr<rpc::client::WebhookClient> webhooks;
+    std::unique_ptr<rpc::client::RPCClientConfig> webhookConfig;
 
 public:
     /**

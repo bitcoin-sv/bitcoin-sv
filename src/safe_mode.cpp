@@ -4,6 +4,9 @@
 #include "safe_mode.h"
 #include "validation.h"
 #include "config.h"
+#include "rpc/http_request.h"
+#include "rpc/http_response.h"
+#include "rpc/webhook_client.h"
 
 SafeMode safeMode;
 
@@ -46,7 +49,7 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     assert(pindexForkTip->GetHeight() >= pindexForkBase->GetHeight());
     int64_t forkLength = pindexForkTip->GetHeight() - pindexForkBase->GetHeight() + 1;
 
-    if (forkLength <= config.GetSafeModeMinForkLength())
+    if (forkLength < config.GetSafeModeMinForkLength())
     {
         return SafeModeLevel::NONE; // not long enough
     }
@@ -66,7 +69,7 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
         ? chainActive.Tip()->GetChainWork() + absPowDifference
         : chainActive.Tip()->GetChainWork() - std::min(chainActive.Tip()->GetChainWork()*1, absPowDifference);
 
-    if (pindexForkTip->GetChainWork() <= forkMinPow)
+    if (pindexForkTip->GetChainWork() < forkMinPow)
     {
         return SafeModeLevel::NONE; // not enough POW (height)
     }
@@ -252,6 +255,26 @@ SafeMode::SafeModeResult SafeMode::GetSafeModeResult(const Config& config)
     return res;
 }
 
+void SafeMode::NotifyUsingWebhooks(const Config& config, const SafeMode::SafeModeResult& result)
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_safeModeLevelForks);
+
+    if(!webhooks)
+    {
+        webhooks = std::make_unique<rpc::client::WebhookClient>(config);
+        webhookConfig = std::make_unique<rpc::client::RPCClientConfig>(rpc::client::RPCClientConfig::CreateForSafeModeWebhook(config));
+    }
+
+    auto request = 
+        std::make_shared<rpc::client::HTTPRequest>(
+            rpc::client::HTTPRequest::CreateJSONPostRequest(*webhookConfig, result.ToJson(false) + "\r\n")
+        );
+    auto response = std::make_shared<rpc::client::StringHTTPResponse>();
+    webhooks->SubmitRequest(*webhookConfig, std::move(request), std::move(response));
+}
+
+
 void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* pindexNew)
 {
     AssertLockHeld(cs_main);
@@ -285,7 +308,7 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
 
     if(!(newResults == currentResult) && config.GetSafeModeWebhookAddress() != "")
     {
-        // TODO: Notify by webhook
+        NotifyUsingWebhooks(config, newResults);
         LogPrintf("WARNING: Safe mode: " + newResults.ToJson(false) + "\n");
     }
 
@@ -409,7 +432,7 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
             sortedForks.emplace_back(f.second);
         }
         std::sort(sortedForks.begin(), sortedForks.end(), 
-            [](auto lhs, auto rhs) 
+            [](std::reference_wrapper<const SafeModeFork> lhs, std::reference_wrapper<const SafeModeFork> rhs) 
             { 
                 return SafeModeFork::CompareBlockIndex(lhs.get().base, rhs.get().base);
             }
