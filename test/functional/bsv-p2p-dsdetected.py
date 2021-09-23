@@ -246,6 +246,8 @@ class DSDetectedTests(BitcoinTestFramework):
         blockA.solve()
         blockB.solve()
 
+        start_banscore = node.getpeerinfo()[0]['banscore']
+
         # Webhook should not receive the notification if we send dsdetected message with only one block detail.
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)]))])
@@ -365,6 +367,9 @@ class DSDetectedTests(BitcoinTestFramework):
                 break
             nonce_dummy += 1
             assert (nonce_dummy < 100)
+
+        end_banscore = node.getpeerinfo()[0]['banscore']
+        assert ((end_banscore - start_banscore) / 10 == 13)  # because we have 13 negative tests so far
 
         # Finally, webhook should receive the notification if we send a proper dsdetected message
         dsdMessage = msg_dsdetected(blocksDetails=[
