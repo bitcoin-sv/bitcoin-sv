@@ -350,23 +350,24 @@ class DSDetectedTests(BitcoinTestFramework):
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if header cannot pow
-        # note hat pow is so easy to achieve in regtest that we have to iterator over the nonce
-        # to achieve a failed pow test
-        nonce_dummy = 0
+        # note hat pow is so easy in regtest that nonce can often be hence we have to select the nonce carefully
+        blockE, _ = make_block(connection, parent_block=utxoBlock)
+        blockE.vtx.append(txB)
+        blockE.hashMerkleRoot = blockE.calc_merkle_root()
+        nonce = blockE.nNonce
         while True:
-            blockE, _ = make_block(connection, parent_block=utxoBlock)
-            blockE.vtx.append(txB)
-            blockE.hashMerkleRoot = blockE.calc_merkle_root()
-            blockE.nNonce = nonce_dummy
-            #blockE.solve()
-            dsdMessage = msg_dsdetected(blocksDetails=[
-                BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
-                BlockDetails([CBlockHeader(blockE)], DSMerkleProof(1, txB, blockE.hashMerkleRoot, [MerkleProofNode(blockE.vtx[0].sha256)]))])
-            peer.send_and_ping(dsdMessage)
-            if not self.get_JSON_notification():
+            blockE.solve()
+            if blockE.nNonce > nonce:
+                blockE.nNonce = nonce
                 break
-            nonce_dummy += 1
-            assert (nonce_dummy < 100)
+            nonce += 1
+            blockE.nNonce = nonce
+
+        dsdMessage = msg_dsdetected(blocksDetails=[
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockE)], DSMerkleProof(1, txB, blockE.hashMerkleRoot, [MerkleProofNode(blockE.vtx[0].sha256)]))])
+        peer.send_and_ping(dsdMessage)
+        assert_equal(self.get_JSON_notification(), None)
 
         end_banscore = node.getpeerinfo()[0]['banscore']
         assert ((end_banscore - start_banscore) / 10 == 13)  # because we have 13 negative tests so far
