@@ -233,23 +233,20 @@ bool ValidateDoubleSpends(const DSDetected& msg)
         it = r.second;
     }
 
-    // There must be a double spend for each for in the msg
+    // There must be a double spend for each fork in the msg
     if(duplicates.size() < msg.size())
         return false;
 
     // Check that each index is contained in the duplicates collection
-    vector<uint32_t> indices;
-    indices.reserve(duplicates.size());
+    vector<uint32_t> indices(duplicates.size());
     transform(duplicates.begin(),
-                   duplicates.end(),
-                   back_inserter(indices),
-                   [](const auto& index_op) { return index_op.first; });
+              duplicates.end(),
+              indices.begin(),
+              [](const auto& index_op) { return index_op.first; });
     sort(indices.begin(), indices.end());
-    unique(indices.begin(), indices.end());
-
-    vector<uint32_t> expected(msg.size());
-    iota(expected.begin(), expected.end(), 0);
-    return equal(expected.begin(), expected.end(), indices.begin());
+    const auto end = unique(indices.begin(), indices.end());
+    const size_t dist = distance(indices.begin(), end);
+    return dist == msg.size();
 }
     
 // Ensure there are no duplicate transactions
