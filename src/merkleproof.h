@@ -96,7 +96,7 @@ public:
     void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(mFlags);
-        READWRITECOMPACTSIZE(mIndex);         
+        READWRITECOMPACTSIZE(mIndex);
 
         if(ser_action.ForRead())
         {
@@ -146,10 +146,10 @@ private:
     uint8_t mFlags{0x0};
 
     // Index of transaction this proof is for
-    size_t mIndex{0};
+    uint64_t mIndex{0};
 
     // Transaction and/or transaction ID
-    size_t mTxLen{0};
+    uint64_t mTxLen{0};
     std::shared_ptr<const CTransaction> mTxn{nullptr};
     TxId mTxnId{};
 
