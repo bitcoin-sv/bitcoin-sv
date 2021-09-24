@@ -232,19 +232,25 @@ class DSDetectedTests(BitcoinTestFramework):
         # Create two blocks with transactions spending the same utxo
         blockA, _ = make_block(connection, parent_block=utxoBlock)
         blockB, _ = make_block(connection, parent_block=utxoBlock)
+        blockF, _ = make_block(connection, parent_block=utxoBlock)
         txA = create_tx(utxoBlock.vtx[1], 0, int(0.8*COIN))
         txB = create_tx(utxoBlock.vtx[1], 0, int(0.9*COIN))
+        txF = create_tx(utxoBlock.vtx[1], 0, int(0.7*COIN))
         txA.rehash()
         txB.rehash()
+        txF.rehash()
         blockA.vtx.append(txA)
         blockB.vtx.append(txB)
-        #blockB.vtx.append(txA)
+        blockF.vtx.append(txF)
         blockA.hashMerkleRoot = blockA.calc_merkle_root()
         blockB.hashMerkleRoot = blockB.calc_merkle_root()
+        blockF.hashMerkleRoot = blockF.calc_merkle_root()
         blockA.calc_sha256()
         blockB.calc_sha256()
+        blockF.calc_sha256()
         blockA.solve()
         blockB.solve()
+        blockF.solve()
 
         start_banscore = node.getpeerinfo()[0]['banscore']
 
@@ -384,8 +390,23 @@ class DSDetectedTests(BitcoinTestFramework):
             del e['divergentBlockHash']
         assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))
 
-        # TODO: think about banning mechanism..if we do negative tests will peer be banned? Should we first try normal cases first so that peer is trusted?
-        
+        # Repeat previous test but change the order of the BlockDetails, the node should identify this as a duplicate
+        dsdMessage = msg_dsdetected(blocksDetails=[
+            BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)]))])
+        peer.send_and_ping(dsdMessage)
+        assert_equal(self.get_JSON_notification(), None)
+
+        # repeat previous test but generate many blocks in the node to age the notificatoin message.
+        # very old notification messages shall be ignored. We use the same thresholds as safe mode.
+        # We will hardcode this threshold for now until branch we depend on is merged
+        node.generate (289)
+        dsdMessage = msg_dsdetected(blocksDetails=[
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockF)], DSMerkleProof(1, txF, blockF.hashMerkleRoot, [MerkleProofNode(blockF.vtx[0].sha256)]))])
+        peer.send_and_ping(dsdMessage)
+        assert_equal(self.get_JSON_notification(), None)
+
         # Create number of random valid block trees and send dsdetected P2P message for each
         maxNumberOfBranches = 10
         maxNumberOfBlocksPerBranch = 30

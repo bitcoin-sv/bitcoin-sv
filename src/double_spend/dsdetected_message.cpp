@@ -56,10 +56,27 @@ namespace std
     size_t hash<DSDetected>::operator()(const DSDetected& ds) const
     {
         size_t seed{0};
-        boost::hash_combine(seed, ds.mVersion);
-        boost::hash_range(seed, ds.mBlockList.begin(), ds.mBlockList.end());
+        boost::hash_combine(seed, ds.GetVersion());
+        boost::hash_range(seed, ds.begin(), ds.end());
         return seed;
     };
+}
+
+std::size_t sort_hasher(const DSDetected& ds)
+{
+    size_t seed{0};
+    boost::hash_combine(seed, ds.GetVersion());
+
+    vector<size_t> hashes(ds.size());
+    std::transform(ds.begin(),
+                   ds.end(),
+                   hashes.begin(),
+                   [](const auto& fork) { return hash_value(fork); });
+
+    sort(hashes.begin(), hashes.end());
+    boost::hash_range(seed, hashes.begin(), hashes.end());
+
+    return seed;
 }
 
 void DSDetected::BlockDetails::Validate(const MerkleProof& mp)

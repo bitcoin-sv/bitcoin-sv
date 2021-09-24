@@ -3461,9 +3461,6 @@ static bool IsSamePeer(const CNode& peer1, const CNode& peer2)
 
 static bool ValidateForkHeight(const DSDetected& msg)
 {
-    bool cjg{true};
-    while(cjg);
-
     const auto& fork{MaxForkLength(msg)};
     if(fork->mBlockHeaders.empty())
         return false;
@@ -3479,13 +3476,10 @@ static bool ValidateForkHeight(const DSDetected& msg)
     const auto ca_height{pIndex->GetHeight()};
 
     const CBlockIndex& bestIndex{mapBlockIndex.GetBestHeader()};
-    const auto best_height{bestIndex.GetHeight()};
+    const size_t best_height = bestIndex.GetHeight();
 
-    constexpr auto ancient_dist{1'000}; 
-    //const auto x  = best_height - (ca_height + fork_len);
-    const auto x  = ca_height + fork_len + ancient_dist;
-    return x > best_height;
-    //return (best_height - (ca_height + fork_len)) > ancient_dist;
+    constexpr auto two_days_avg_blocks{2 * 24 * 6}; 
+    return (ca_height + fork_len + two_days_avg_blocks) > best_height;
 }
 
 /**
@@ -3520,11 +3514,10 @@ static void ProcessDoubleSpendMessage(const Config& config,
     try
     {
         // Check if we've already handled this message
-        static std::hash<DSDetected> hasher;
         constexpr size_t cache_size{1000};
         static limited_cache msg_cache{cache_size}; 
        
-        const auto hash = hasher(msg);
+        const auto hash = sort_hasher(msg);
 
         if(msg_cache.contains(hash))
         {
