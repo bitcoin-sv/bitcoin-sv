@@ -144,3 +144,12 @@ bool IsValid(const DSDetected::BlockDetails&);
 
 bool FormsChain(const std::vector<CBlockHeader>&);
 bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>&);
+
+inline auto MaxForkLength(const DSDetected& msg)
+{
+    return max_element(msg.begin(), msg.end(), [](const auto& fork1, const auto& fork2)
+    {   
+        return fork1.mBlockHeaders.size() < fork2.mBlockHeaders.size(); 
+    }); 
+}
+
