@@ -261,9 +261,7 @@ bool ValidateDoubleSpends(const DSDetected& msg)
               indices.begin(),
               [](const auto& index_op) { return index_op.first; });
     sort(indices.begin(), indices.end());
-    const auto end = unique(indices.begin(), indices.end());
-    const size_t dist = distance(indices.begin(), end);
-    return dist == msg.size();
+    return indices.end() == adjacent_find(indices.begin(), indices.end());
 }
     
 // Ensure there are no duplicate transactions
@@ -362,5 +360,14 @@ bool ContainsDuplicateHeaders(const vector<CBlockHeader>& headers)
     sort(hashes.begin(), hashes.end());
 
     return adjacent_find(hashes.begin(), hashes.end()) != hashes.end();
+}
+
+const DSDetected::BlockDetails& MaxForkLength(const DSDetected& msg)
+{
+    assert(!msg.empty());
+    return *max_element(msg.begin(), msg.end(), [](const auto& fork1, const auto& fork2)
+    {   
+        return fork1.mBlockHeaders.size() < fork2.mBlockHeaders.size(); 
+    }); 
 }
 

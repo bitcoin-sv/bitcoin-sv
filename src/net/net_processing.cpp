@@ -3462,11 +3462,11 @@ static bool IsSamePeer(const CNode& peer1, const CNode& peer2)
 static bool ValidateForkHeight(const DSDetected& msg)
 {
     const auto& fork{MaxForkLength(msg)};
-    if(fork->mBlockHeaders.empty())
+    if(fork.mBlockHeaders.empty())
         return false;
 
-    const auto fork_len{fork->mBlockHeaders.size()};
-    const auto& common_ancestor_hash{fork->mBlockHeaders[fork_len-1].hashPrevBlock};
+    const auto fork_len{fork.mBlockHeaders.size()};
+    const auto& common_ancestor_hash{fork.mBlockHeaders[fork_len-1].hashPrevBlock};
     
     LOCK(cs_main);
     const auto* pIndex{mapBlockIndex.Get(common_ancestor_hash)};
