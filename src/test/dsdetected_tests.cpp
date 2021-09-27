@@ -144,6 +144,38 @@ BOOST_AUTO_TEST_CASE(default_hash)
     BOOST_CHECK_NE(h11, h21);
 }
 
+BOOST_AUTO_TEST_CASE(sorted_hasher)
+{
+    using OutPoints = vector<pair<string, uint32_t>>;
+    
+    std::vector<CBlockHeader> headers{CBlockHeader{}};
+
+    DSDetected msg1;
+    std::vector<DSDetected::BlockDetails> blocks1{};
+    blocks1.push_back(
+        DSDetected::BlockDetails{headers,
+                                 CreateMerkleProof(OutPoints{{"42", 0}})});
+    blocks1.push_back(
+        DSDetected::BlockDetails{headers,
+                                 CreateMerkleProof(OutPoints{{"42", 1}})});
+    UnitTestAccess::SetBlockList(msg1, blocks1);
+    const auto h1 = sort_hasher(msg1);
+
+    DSDetected msg2;
+    std::vector<DSDetected::BlockDetails> blocks2{};
+    blocks2.push_back(
+        DSDetected::BlockDetails{headers,
+                                 CreateMerkleProof(OutPoints{{"42", 1}})});
+    blocks2.push_back(
+        DSDetected::BlockDetails{headers,
+                                 CreateMerkleProof(OutPoints{{"42", 0}})});
+    UnitTestAccess::SetBlockList(msg2, blocks2);
+
+    const auto h2 = sort_hasher(msg2);
+    BOOST_CHECK_EQUAL(h1, h2);
+                                 
+}
+
 BOOST_AUTO_TEST_CASE(CreationSerialisation)
 {
     // Test good DSDetected message creation and serialisation/deserialisation

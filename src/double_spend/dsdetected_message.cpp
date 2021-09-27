@@ -56,10 +56,27 @@ namespace std
     size_t hash<DSDetected>::operator()(const DSDetected& ds) const
     {
         size_t seed{0};
-        boost::hash_combine(seed, ds.mVersion);
-        boost::hash_range(seed, ds.mBlockList.begin(), ds.mBlockList.end());
+        boost::hash_combine(seed, ds.GetVersion());
+        boost::hash_range(seed, ds.begin(), ds.end());
         return seed;
     };
+}
+
+std::size_t sort_hasher(const DSDetected& ds)
+{
+    size_t seed{0};
+    boost::hash_combine(seed, ds.GetVersion());
+
+    vector<size_t> hashes(ds.size());
+    std::transform(ds.begin(),
+                   ds.end(),
+                   hashes.begin(),
+                   [](const auto& fork) { return hash_value(fork); });
+
+    sort(hashes.begin(), hashes.end());
+    boost::hash_range(seed, hashes.begin(), hashes.end());
+
+    return seed;
 }
 
 void DSDetected::BlockDetails::Validate(const MerkleProof& mp)
@@ -233,23 +250,18 @@ bool ValidateDoubleSpends(const DSDetected& msg)
         it = r.second;
     }
 
-    // There must be a double spend for each for in the msg
+    // There must be a double spend for each fork in the msg
     if(duplicates.size() < msg.size())
         return false;
 
     // Check that each index is contained in the duplicates collection
-    vector<uint32_t> indices;
-    indices.reserve(duplicates.size());
+    vector<uint32_t> indices(duplicates.size());
     transform(duplicates.begin(),
-                   duplicates.end(),
-                   back_inserter(indices),
-                   [](const auto& index_op) { return index_op.first; });
+              duplicates.end(),
+              indices.begin(),
+              [](const auto& index_op) { return index_op.first; });
     sort(indices.begin(), indices.end());
-    unique(indices.begin(), indices.end());
-
-    vector<uint32_t> expected(msg.size());
-    iota(expected.begin(), expected.end(), 0);
-    return equal(expected.begin(), expected.end(), indices.begin());
+    return indices.end() == adjacent_find(indices.begin(), indices.end());
 }
     
 // Ensure there are no duplicate transactions
@@ -348,5 +360,14 @@ bool ContainsDuplicateHeaders(const vector<CBlockHeader>& headers)
     sort(hashes.begin(), hashes.end());
 
     return adjacent_find(hashes.begin(), hashes.end()) != hashes.end();
+}
+
+const DSDetected::BlockDetails& MaxForkLength(const DSDetected& msg)
+{
+    assert(!msg.empty());
+    return *max_element(msg.begin(), msg.end(), [](const auto& fork1, const auto& fork2)
+    {   
+        return fork1.mBlockHeaders.size() < fork2.mBlockHeaders.size(); 
+    }); 
 }
 

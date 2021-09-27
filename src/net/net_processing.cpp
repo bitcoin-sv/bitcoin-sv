@@ -3459,6 +3459,29 @@ static bool IsSamePeer(const CNode& peer1, const CNode& peer2)
     return *assocID1 == *assocID2;
 }
 
+static bool ValidateForkHeight(const DSDetected& msg)
+{
+    const auto& fork{MaxForkLength(msg)};
+    if(fork.mBlockHeaders.empty())
+        return false;
+
+    const auto fork_len{fork.mBlockHeaders.size()};
+    const auto& common_ancestor_hash{fork.mBlockHeaders[fork_len-1].hashPrevBlock};
+    
+    LOCK(cs_main);
+    const auto* pIndex{mapBlockIndex.Get(common_ancestor_hash)};
+    if(!pIndex)
+        return false;
+
+    const auto ca_height{pIndex->GetHeight()};
+
+    const CBlockIndex& bestIndex{mapBlockIndex.GetBestHeader()};
+    const size_t best_height = bestIndex.GetHeight();
+
+    constexpr auto two_days_avg_blocks{2 * 24 * 6}; 
+    return (ca_height + fork_len + two_days_avg_blocks) > best_height;
+}
+
 /**
 * Process double-spend detected message.
 */
@@ -3491,11 +3514,10 @@ static void ProcessDoubleSpendMessage(const Config& config,
     try
     {
         // Check if we've already handled this message
-        static std::hash<DSDetected> hasher;
         constexpr size_t cache_size{1000};
         static limited_cache msg_cache{cache_size}; 
        
-        const auto hash = hasher(msg);
+        const auto hash = sort_hasher(msg);
 
         if(msg_cache.contains(hash))
         {
@@ -3517,6 +3539,15 @@ static void ProcessDoubleSpendMessage(const Config& config,
         LogPrint(BCLog::NETMSG,
                  "Valid double-spend detected message from peer=%d\n",
                  pfrom->id);
+
+        if(!ValidateForkHeight(msg))
+        {
+            LogPrint(BCLog::NETMSG,
+                     "Block height too low in double-spend "
+                     "detected message from peer=%d\n",
+                     pfrom->id);
+            return;
+        }
 
         if(!AcceptBlockHeaders(msg, config))
         {

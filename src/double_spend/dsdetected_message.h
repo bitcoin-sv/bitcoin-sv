@@ -101,7 +101,6 @@ public:
     struct UnitTestAccess;
 
     friend bool operator==(const DSDetected&, const DSDetected&);
-    friend std::hash<DSDetected>;
 
 private:
     // Protocol version for this message
@@ -133,6 +132,7 @@ namespace std
     };
 }
 
+std::size_t sort_hasher(const DSDetected&);
 
 bool IsValid(const DSDetected&);
 bool ValidateForkCount(const DSDetected&);
@@ -144,3 +144,6 @@ bool IsValid(const DSDetected::BlockDetails&);
 
 bool FormsChain(const std::vector<CBlockHeader>&);
 bool ContainsDuplicateHeaders(const std::vector<CBlockHeader>&);
+
+const DSDetected::BlockDetails& MaxForkLength(const DSDetected&);
+
