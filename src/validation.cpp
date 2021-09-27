@@ -3761,6 +3761,13 @@ bool FlushStateToDisk(
                 }
                 // First make sure all block and undo data is flushed to disk.
                 pBlockFileInfoStore->FlushBlockFile();
+
+                // Finally remove any pruned files
+                //
+                // NOTE: This must happen before dirty block info write to disk
+                // below (pblocktree->WriteBatchSync)
+                if (fFlushForPrune) UnlinkPrunedFiles(setFilesToPrune);
+
                 // Then update all block file information (which may refer to
                 // block and undo files).
                 {
@@ -3773,8 +3780,6 @@ bool FlushStateToDisk(
                             state, "Failed to write to block index database");
                     }
                 }
-                // Finally remove any pruned files
-                if (fFlushForPrune) UnlinkPrunedFiles(setFilesToPrune);
                 nLastWrite = nNow;
             }
             // Flush best chain related state. This can only be done if the
