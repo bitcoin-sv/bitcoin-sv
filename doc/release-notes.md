@@ -1,10 +1,30 @@
 # Bitcoin SV version 1.0.9 Release Notes
 
 ## Headline changes since 1.0.8
+* Interface node with 'DS Detector' to receive DS notifications; the node passes these onto other nodes via P2P.
+* Update safe-mode trigger methodology.
+* Make safe-mode activation parameters configurable.
+* New RPC functions to enable/disable/report on safe mode.
+* bitcoind - add support for soft consensus freeze.
 
 ## Other technical changes
+* Soft consensus freeze requires block index freeze info persistency.
+* Add description for generating core dumps from systemd service.
+* New Open BSV licence.
+* Fix: Double spend detection for in-mempool txns can fail.
+* Fix: Unit test merkletreefile_readwrite_tests.write_read_test fails.
+* Fix: sendrawtransactions RPC doesn't always report all invalid transactions.
+* Fix: bitcoind crashes in pruned mode after restart or improper shutdown due lack of blkXXXXX.dat file.
+* Fix: Transaction in chain gets rejected if parent is already in block.
+* Fix: Force safe mode (-testsafemode=1) is stuck after restart.
+* Fix: bitcoind should not start with invalid safemodemaxvalidforkdistance.
+* Fix: Safe mode message during IBD is misleading.
+* Fix: Bitcoind starts fine with invalid values of safe mode parameters.
+* Fix: Missing information on getsafemodeinfo help script.
+* Fix: STN - core was generated when ActivateBestChainStep.
 
 ## Functional tests
+* Fix: Double-spend functional test tries to use same UTXO twice.
 
 ## Security
 
