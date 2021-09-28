@@ -5,7 +5,7 @@
 Test soft consensus freeze - unlimited freeze
 
 Make sure that not setting softconsensusfreezeduration attribute freezes block
-for expected duration.
+for expected duration and check rpc method preciousblock has no impact on soft freeze duration.
 """
 from soft_consensus_freeze_base import Send_node, SoftConsensusFreezeBase
 
@@ -34,7 +34,15 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         # both blocks are still frozen
         self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
         self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
+        last_frozen_block = self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
+
+        bestblockhash = node.rpc.getbestblockhash()
+
+        # check that precious block does not have impact on soft freeze duration
+        node.rpc.preciousblock(last_frozen_block.hash)
+
+        # assert preciousblock did not change the tip
+        assert (bestblockhash == node.rpc.getbestblockhash())
 
         # all blocks are unfrozen
         self._mine_and_send_block(None, node)
