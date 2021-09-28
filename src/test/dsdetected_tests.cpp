@@ -771,7 +771,7 @@ BOOST_AUTO_TEST_CASE(ds_outpoints)
     std::vector<CBlockHeader> headers_3{CBlockHeader{}};
     blocks.push_back(
         DSDetected::BlockDetails{headers_3,
-                                 CreateMerkleProof(OutPoints{{"42", 1}})});
+                                 CreateMerkleProof(OutPoints{{"42", 0},{"42", 1}})});
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK(ValidateDoubleSpends(msg));
 }
