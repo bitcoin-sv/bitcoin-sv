@@ -88,7 +88,8 @@ int ComputeNextBlockAndDepthNL(const CBlockIndex* tip, const CBlockIndex* blocki
 
 UniValue blockheaderToJSON(const CBlockIndex *blockindex, 
                            const int confirmations, 
-                           const std::optional<uint256>& nextBlockHash) {
+                           const std::optional<uint256>& nextBlockHash) 
+{
     UniValue result(UniValue::VOBJ);
 
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
@@ -120,9 +121,28 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
         result.push_back(Pair("nextblockhash", nextBlockHash.value().GetHex()));
     }
     
-    result.push_back(Pair("Double spend: ", blockindex->HasDoubleSpend())); 
+    const auto status{blockStatusToJSON(blockindex->getStatus())}; 
+    result.push_back(Pair("status", status));
 
     return result;
+}
+
+UniValue blockStatusToJSON(const BlockStatus& block_status) 
+{
+    UniValue uv(UniValue::VOBJ);
+
+    const auto v = block_status.getValidity();
+    uv.push_back(Pair("validity", to_string(v)));
+
+
+    uv.push_back(Pair("data", block_status.hasData())); 
+    uv.push_back(Pair("undo", block_status.hasUndo()));
+    uv.push_back(Pair("failed", block_status.hasFailed())); 
+    uv.push_back(Pair("parent failed", block_status.hasFailedParent())); 
+    uv.push_back(Pair("disk meta", block_status.hasDiskBlockMetaData())); 
+    uv.push_back(Pair("soft reject", block_status.hasDataForSoftRejection())); 
+    uv.push_back(Pair("double spend", block_status.hasDoubleSpend())); 
+    return uv;
 }
 
 UniValue getblockcount(const Config &config, const JSONRPCRequest &request) {
@@ -780,6 +800,16 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
             "previous block\n"
             "  \"nextblockhash\" : \"hash\",      (string) The hash of the "
             "next block\n"
+            "status: {\n"
+            "  \"validity\" : (string) Validation state of the block\n"
+            "  \"data\" : (boolean) Data flag\n"
+            "  \"undo\" : (boolean) Undo flag\n"
+            "  \"failed\" : (boolean) Failed flag\n"
+            "  \"parent failed\" : (boolean) Parent failed flag\n"
+            "  \"disk meta\" : (boolean) Disk meta flag\n"
+            "  \"soft reject\" : (boolean) Soft reject flag\n"
+            "  \"double spend\" : (boolean) May contain a double spend tx\n"
+            "  }\n"
             "}\n"
             "\nResult (for verbose=false):\n"
             "\"data\"             (string) A string that is serialized, "

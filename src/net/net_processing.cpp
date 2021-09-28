@@ -3431,6 +3431,7 @@ static bool AcceptBlockHeaders(const DSDetected& msg, const Config& config)
 static bool UpdateBlockStatus(const DSDetected& msg)
 {
     // Update CBlockIndex::BlockStatus to show the double-spend
+    LOCK(cs_main);
     for(const auto& fork : msg)
     {
         assert(!fork.mBlockHeaders.empty());

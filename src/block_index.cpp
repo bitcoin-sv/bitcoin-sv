@@ -414,3 +414,25 @@ std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk() c
             CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
             CStreamVersionAndType{SER_NETWORK, PROTOCOL_VERSION});
 }
+
+
+std::string to_string(const enum BlockValidity& bv)
+{
+    switch(bv)
+    {
+    case BlockValidity::UNKNOWN:
+        return "unknown";
+    case BlockValidity::HEADER:
+        return "header";
+    case BlockValidity::TREE:
+        return "tree";
+    case BlockValidity::TRANSACTIONS:
+        return "transactions";
+    case BlockValidity::CHAIN:
+        return "chain";
+    case BlockValidity::SCRIPTS:
+        return "scripts";
+    default:
+        return "";
+    } 
+}

@@ -78,6 +78,8 @@ enum class BlockValidity : uint32_t {
     SCRIPTS = 5,
 };
 
+std::string to_string(const enum BlockValidity&);
+
 struct BlockStatus {
 private:
     friend class CBlockIndex;
@@ -120,10 +122,6 @@ private:
                            (hasUndo ? HAS_UNDO_FLAG : 0));
     }
 
-    [[nodiscard]] bool hasDiskBlockMetaData() const
-    {
-        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
-    }
     [[nodiscard]] BlockStatus withDiskBlockMetaData(bool hasData = true) const
     {
         return BlockStatus((status & ~HAS_DISK_BLOCK_META_DATA_FLAG) |
@@ -157,6 +155,11 @@ public:
     BlockStatus withFailedParent(bool hasFailedParent = true) const {
         return BlockStatus((status & ~FAILED_PARENT_FLAG) |
                            (hasFailedParent ? FAILED_PARENT_FLAG : 0));
+    }
+    
+    [[nodiscard]] bool hasDiskBlockMetaData() const
+    {
+        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
     }
     
     bool hasDataForSoftRejection() const
