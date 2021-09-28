@@ -261,7 +261,10 @@ bool ValidateDoubleSpends(const DSDetected& msg)
               indices.begin(),
               [](const auto& index_op) { return index_op.first; });
     sort(indices.begin(), indices.end());
-    return indices.end() == adjacent_find(indices.begin(), indices.end());
+
+    const auto end = unique(indices.begin(), indices.end());
+    const size_t dist = distance(indices.begin(), end);
+    return dist == msg.size();
 }
     
 // Ensure there are no duplicate transactions
