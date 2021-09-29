@@ -3460,7 +3460,7 @@ static bool IsSamePeer(const CNode& peer1, const CNode& peer2)
     return *assocID1 == *assocID2;
 }
 
-static bool ValidateForkHeight(const DSDetected& msg)
+static bool ValidateForkHeight(const DSDetected& msg, const int64_t max_fork_distance)
 {
     const auto& fork{MaxForkLength(msg)};
     if(fork.mBlockHeaders.empty())
@@ -3478,9 +3478,7 @@ static bool ValidateForkHeight(const DSDetected& msg)
 
     const CBlockIndex& bestIndex{mapBlockIndex.GetBestHeader()};
     const size_t best_height = bestIndex.GetHeight();
-
-    constexpr auto two_days_avg_blocks{2 * 24 * 6}; 
-    return (ca_height + fork_len + two_days_avg_blocks) > best_height;
+    return (ca_height + fork_len + max_fork_distance) > best_height;
 }
 
 /**
@@ -3541,7 +3539,7 @@ static void ProcessDoubleSpendMessage(const Config& config,
                  "Valid double-spend detected message from peer=%d\n",
                  pfrom->id);
 
-        if(!ValidateForkHeight(msg))
+        if(!ValidateForkHeight(msg, config.GetSafeModeMaxForkDistance()))
         {
             Misbehaving(pfrom, misbehaviour_penalty,
                 "Block height too low in double-spend detected message");
