@@ -767,27 +767,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "-checkpoints", strprintf("Only accept block chain matching "
                                       "built-in checkpoints (default: %d)",
                                       DEFAULT_CHECKPOINTS_ENABLED));
-        strUsage += HelpMessageOpt(
-            "-disablesafemode", strprintf("Disable safemode, override a real "
-                                          "safe mode event (default: %d)",
-                                          DEFAULT_DISABLE_SAFEMODE));
-        strUsage += HelpMessageOpt(
-            "-testsafemode",
-            strprintf("Force safe mode (default: %d)", DEFAULT_TESTSAFEMODE));
-        strUsage += HelpMessageOpt("-safemodewebhookurl=<url>",
-            "URL of a webhook to notify if the node enters safe mode. For example: http://127.0.0.1/mywebhook");
-        strUsage += HelpMessageOpt("-safemodeminblockdifference=<n>",
-            strprintf("Minimum number of blocks that fork should be ahead of active tip to enter safe mode "
-                "(default: %d)", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE));
-        strUsage += HelpMessageOpt("-safemodemaxforkdistance=<n>",
-            strprintf("Maximum distance of forks last common block from current active tip to enter safe mode "
-                "(default: %d)", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE));
-        strUsage += HelpMessageOpt("-safemodeminvalidforklength=<n>",
-            strprintf("Minimum length of valid fork to enter safe mode "
-                "(default: %d)", SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH));
-        strUsage += HelpMessageOpt("-safemodemaxvalidforkdistance=<n>",
-            strprintf("Maximum distance of valid forks last common block from current active tip to enter safe mode "
-                "(default: %d)", SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE));
+
         strUsage +=
             HelpMessageOpt("-dropmessagestest=<n>",
                            "Randomly drop 1 of every <n> network messages");
@@ -1387,6 +1367,32 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                   "(default: %u; note: 0 - soft consensus freeze duration is "
                   "disabled and block is frozen indefinitely).",
                   DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
+
+    /** Double-Spend detection/reporting */
+    strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
+
+    strUsage += HelpMessageOpt(
+        "-disablesafemode", strprintf("Disable safemode, override a real "
+                                        "safe mode event (default: %d)",
+                                        DEFAULT_DISABLE_SAFEMODE));
+    if (showDebug) {
+        strUsage += HelpMessageOpt(
+            "-testsafemode",
+            strprintf("Force safe mode (default: %d)", DEFAULT_TESTSAFEMODE));
+    }
+    strUsage += HelpMessageOpt("-safemodewebhookurl=<url>",
+        "URL of a webhook to notify if the node enters safe mode. For example: http://127.0.0.1/mywebhook");
+    strUsage += HelpMessageOpt("-safemodeminblockdifference=<n>",
+        strprintf("Minimum number of blocks that fork should be ahead (if positive) or behind (if negative) of active tip to enter safe mode "
+            "(default: %d)", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE));
+    strUsage += HelpMessageOpt("-safemodemaxforkdistance=<n>",
+        strprintf("Maximum distance of forks last common block from current active tip to enter safe mode "
+            "(default: %d)", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE));
+    strUsage += HelpMessageOpt("-safemodeminvalidforklength=<n>",
+        strprintf("Minimum length of valid fork to enter safe mode "
+            "(default: %d)", SAFE_MODE_DEFAULT_MIN_FORK_LENGTH));
+
 
     return strUsage;
 }
@@ -2192,16 +2198,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             return InitError(err);
         }
     }
-    if(std::string err; !config.SetSafeModeMinBlockDifference(gArgs.GetArg("-safemodeminblockdifference", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE), &err)) {
+    if(std::string err; !config.SetSafeModeMinForkHeightDifference(gArgs.GetArg("-safemodeminblockdifference", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE), &err)) {
         return InitError(err);
     }
     if(std::string err; !config.SetSafeModeMaxForkDistance(gArgs.GetArg("-safemodemaxforkdistance", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE), &err)) {
         return InitError(err);
     }
-    if(std::string err; !config.SetSafeModeMinValidForkLength(gArgs.GetArg("-safemodeminvalidforklength", SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH), &err)) {
-        return InitError(err);
-    }
-    if(std::string err; !config.SetSafeModeMaxValidForkDistance(gArgs.GetArg("-safemodemaxvalidforkdistance", SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE), &err)) {
+    if(std::string err; !config.SetSafeModeMinForkLength(gArgs.GetArg("-safemodeminforklength", SAFE_MODE_DEFAULT_MIN_FORK_LENGTH), &err)) {
         return InitError(err);
     }
 
@@ -3287,7 +3290,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     // After block chain is loaded check fork tip statuses and
     // restore global safe mode state.
-    CheckSafeModeParametersForAllForksOnStartup();
+    CheckSafeModeParametersForAllForksOnStartup(config);
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 

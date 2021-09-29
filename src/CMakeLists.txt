@@ -480,12 +480,15 @@ add_library(server
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
 	rpc/register.h
+	rpc/safe_mode.cpp
 	rpc/server.cpp
 	rpc/server.h
 	rpc/tojson.h
     rpc/webhook_client.cpp
     rpc/webhook_client.h
     rpc/webhook_client_defaults.h
+	safe_mode.cpp
+	safe_mode.h
 	script/ismine.cpp
 	script/ismine.h
 	script/scriptcache.cpp

@@ -118,15 +118,6 @@ void GlobalConfig::Reset()
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
 
-    // Safe mode activation
-    safeModeWebhookAddress = "";
-    safeModeWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
-    safeModeWebhookPath = "";
-    safeModeMinBlockDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
-    safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
-    safeModeMinValidForkLength = SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH;
-    safeModeMaxValidForkDistance = SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE;
-
     // Block download
     blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
     blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
@@ -171,6 +162,14 @@ void GlobalConfig::Reset()
     maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
 
     mSoftConsensusFreezeDuration = DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION;
+    // Safe mode activation
+    safeModeWebhookAddress = "";
+    safeModeWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    safeModeWebhookPath = "";
+    safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
+    safeModeMinForkLength = SAFE_MODE_DEFAULT_MIN_FORK_LENGTH;
+    safeModeMinHeightDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
+
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -1166,82 +1165,6 @@ std::string GlobalConfig::GetSafeModeWebhookPath() const
     return safeModeWebhookPath;
 }
 
-bool GlobalConfig::SetSafeModeMinBlockDifference(int32_t min, std::string* err)
-{
-    if(min <= 0)
-    {
-        if(err)
-        {
-            *err = "Safe mode minimum block difference must be greater than 0";
-        }
-        return false;
-    }
-
-    safeModeMinBlockDifference = min;
-    return true;
-}
-int32_t GlobalConfig::GetSafeModeMinBlockDifference() const
-{
-    return safeModeMinBlockDifference;
-}
-
-bool GlobalConfig::SetSafeModeMaxForkDistance(int32_t max, std::string* err)
-{
-    if(max <= 0)
-    {
-        if(err)
-        {
-            *err = "Safe mode maximum fork distance must be greater than 0";
-        }
-        return false;
-    }
-
-    safeModeMaxForkDistance = max;
-    return true;
-}
-int32_t GlobalConfig::GetSafeModeMaxForkDistance() const
-{
-    return safeModeMaxForkDistance;
-}
-
-bool GlobalConfig::SetSafeModeMinValidForkLength(int32_t min, std::string* err)
-{
-    if(min <= 0)
-    {
-        if(err)
-        {
-            *err = "Safe mode minimum valid fork length must be greater than 0";
-        }
-        return false;
-    }
-
-    safeModeMinValidForkLength = min;
-    return true;
-}
-int32_t GlobalConfig::GetSafeModeMinValidForkLength() const
-{
-    return safeModeMinValidForkLength;
-}
-
-bool GlobalConfig::SetSafeModeMaxValidForkDistance(int32_t max, std::string* err)
-{
-    if(max <= 0)
-    {
-        if(err)
-        {
-            *err = "Safe mode maximum valid fork distance must be greater than 0";
-        }
-        return false;
-    }
-
-    safeModeMaxValidForkDistance = max;
-    return true;
-}
-int32_t GlobalConfig::GetSafeModeMaxValidForkDistance() const
-{
-    return safeModeMaxValidForkDistance;
-}
-
 // Block download
 bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
 {
@@ -1634,6 +1557,57 @@ bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
 uint64_t GlobalConfig::GetDoubleSpendQueueMaxMemory() const
 {
     return dsAttemptQueueMaxMemory;
+}
+
+int64_t GlobalConfig::GetSafeModeMaxForkDistance() const
+{
+    return safeModeMaxForkDistance;
+}
+
+bool GlobalConfig::SetSafeModeMaxForkDistance(int64_t distance, std::string* err)
+{
+    if(distance < 1)
+    {
+       if(err)
+        {
+            *err = "Safe mode maximum fork distance must be greater than 0.";
+        }
+        return false;
+    }
+
+    safeModeMaxForkDistance = distance;
+    return true;
+}
+
+int64_t GlobalConfig::GetSafeModeMinForkLength() const
+{
+    return safeModeMinForkLength;
+}
+
+bool GlobalConfig::SetSafeModeMinForkLength(int64_t length, std::string* err)
+{
+    if(length < 1)
+    {
+       if(err)
+        {
+            *err = "Safe mode minimal fork length must be greater than 0.";
+        }
+        return false;
+    }
+
+    safeModeMinForkLength = length;
+    return true;
+}
+
+int64_t GlobalConfig::GetSafeModeMinForkHeightDifference() const
+{
+    return safeModeMinHeightDifference;
+}
+
+bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err)
+{
+    safeModeMinHeightDifference = heightDifference;
+    return true;
 }
 
 bool GlobalConfig::SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err)

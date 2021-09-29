@@ -149,7 +149,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, primary_mempool_chain[1:] + secondary_mempool_chain[1:])
 
             # invalidate the block, this will force mined transactions back to mempool
-            # as we do not check chain lenght after reorg we will end up with long chains in the mempool
+            # as we do not check chain length after reorg we will end up with long chains in the mempool
             conn.rpc.invalidateblock(block.hash)
             check_mempool_equals(conn.rpc, primary_mempool_chain + secondary_mempool_chain)
 
@@ -239,7 +239,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, [tx2, tx3, tx4, tx5, tx6])
 
             # invalidate the block, this will force mined transactions back to mempool
-            # as we do not check chain lenght after reorg we will end up with long chains in the mempool
+            # as we do not check chain length after reorg we will end up with long chains in the mempool
             conn.rpc.invalidateblock(block.hash)
             check_mempool_equals(conn.rpc, [tx1, tx2, tx3, tx4, tx5, tx6])
 

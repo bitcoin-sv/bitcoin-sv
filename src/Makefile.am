@@ -201,6 +201,7 @@ BITCOIN_CORE_H = \
   rpc/text_writer.h \
   rpc/webhook_client.h \
   rpc/webhook_client_defaults.h \
+  safe_mode.h \
   scheduler.h \
   script_config.h \
   script/scriptcache.h \
@@ -342,8 +343,10 @@ libbitcoin_server_a_SOURCES = \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
+  rpc/safe_mode.cpp \
   rpc/server.cpp \
   rpc/webhook_client.cpp \
+  safe_mode.cpp \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \

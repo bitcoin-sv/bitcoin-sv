@@ -30,7 +30,12 @@ HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, co
 {
     // Format contents
     std::string contents { json.write() + "\r\n" };
+    return CreateJSONPostRequest(config, std::move(contents));
+}
 
+// Create a generic JSON POST request
+HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, const std::string contents)
+{
     // Create request
     HTTPRequest request { config.GetEndpoint(), contents, RequestCmdType::POST };
     request.AddHeader({"Content-Type", "application/json"});

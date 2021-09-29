@@ -50,8 +50,8 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 2
         self.chain = ChainManager()
-        self.extra_args = [["-minrelaytxfee=0", "-limitfreerelay=999999", "-blockmintxfee=0", "-blockassembler=legacy"],
-                           ["-minrelaytxfee=0", "-limitfreerelay=999999", "-blockmintxfee=0", "-blockassembler=journaling"]]
+        self.extra_args = [["-disablesafemode=1", "-minrelaytxfee=0", "-limitfreerelay=999999", "-blockmintxfee=0", "-blockassembler=legacy"],
+                           ["-disablesafemode=1", "-minrelaytxfee=0", "-limitfreerelay=999999", "-blockmintxfee=0", "-blockassembler=journaling"]]
         self.block_count = 0
 
     def init_(self, nodes_count):

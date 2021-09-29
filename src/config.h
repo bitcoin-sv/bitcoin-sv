@@ -94,15 +94,6 @@ public:
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
 
-    // Safe mode activation
-    virtual std::string GetSafeModeWebhookAddress() const = 0;
-    virtual int16_t GetSafeModeWebhookPort() const = 0;
-    virtual std::string GetSafeModeWebhookPath() const = 0;
-    virtual int32_t GetSafeModeMinBlockDifference() const = 0;
-    virtual int32_t GetSafeModeMaxForkDistance() const = 0;
-    virtual int32_t GetSafeModeMinValidForkLength() const = 0;
-    virtual int32_t GetSafeModeMaxValidForkDistance() const = 0;
-
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
     virtual int64_t GetBlockStallingTimeout() const = 0;
@@ -149,6 +140,14 @@ public:
     virtual uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const = 0;
 
     virtual std::int32_t GetSoftConsensusFreezeDuration() const = 0;
+
+    // Safe mode params
+    virtual std::string GetSafeModeWebhookAddress() const = 0;
+    virtual int16_t GetSafeModeWebhookPort() const = 0;
+    virtual std::string GetSafeModeWebhookPath() const = 0;
+    virtual int64_t GetSafeModeMaxForkDistance() const = 0;
+    virtual int64_t GetSafeModeMinForkLength() const = 0;
+    virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
 protected:
     ~Config() = default;
@@ -216,13 +215,6 @@ public:
     virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
 
-    // Safe mode activation
-    virtual bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
-    virtual bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) = 0;
-    virtual bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) = 0;
-    virtual bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) = 0;
-    virtual bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) = 0;
-
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
     virtual bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) = 0;
@@ -270,6 +262,12 @@ public:
     virtual bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err = nullptr) = 0;
 
     virtual bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) = 0;
+    // Safe mode params
+    virtual bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err) = 0;
+    virtual bool SetSafeModeMinForkLength(int64_t length, std::string* err) = 0;
+    virtual bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) = 0;
+
 
 protected:
     ~ConfigInit() = default;
@@ -458,20 +456,6 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
-    // Safe mode activation
-    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override;
-    std::string GetSafeModeWebhookAddress() const override;
-    int16_t GetSafeModeWebhookPort() const override;
-    std::string GetSafeModeWebhookPath() const override;
-    bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) override;
-    int32_t GetSafeModeMinBlockDifference() const override;
-    bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) override;
-    int32_t GetSafeModeMaxForkDistance() const override;
-    bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) override;
-    int32_t GetSafeModeMinValidForkLength() const override;
-    bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) override;
-    int32_t GetSafeModeMaxValidForkDistance() const override;
-
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
     uint64_t GetBlockStallingMinDownloadSpeed() const override;
@@ -544,6 +528,19 @@ public:
 
     bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) override;
     std::int32_t GetSoftConsensusFreezeDuration() const override;
+
+    // Safe mode params
+    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override;
+    std::string GetSafeModeWebhookAddress() const override;
+    int16_t GetSafeModeWebhookPort() const override;
+    std::string GetSafeModeWebhookPath() const override;
+    int64_t GetSafeModeMaxForkDistance() const override;
+    bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err)  override;
+    int64_t GetSafeModeMinForkLength() const  override;
+    bool SetSafeModeMinForkLength(int64_t length, std::string* err) override;
+    int64_t GetSafeModeMinForkHeightDifference() const  override;
+    bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override;
+
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -644,15 +641,6 @@ private:
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
-    // Safe mode activation
-    std::string safeModeWebhookAddress;
-    int16_t safeModeWebhookPort;
-    std::string safeModeWebhookPath;
-    int32_t safeModeMinBlockDifference;
-    int32_t safeModeMaxForkDistance;
-    int32_t safeModeMinValidForkLength;
-    int32_t safeModeMaxValidForkDistance;
-
     // Block download
     uint64_t blockStallingMinDownloadSpeed;
     int64_t blockStallingTimeout;
@@ -688,6 +676,13 @@ private:
     int16_t dsDetectedWebhookPort;
     std::string dsDetectedWebhookPath;
     uint64_t dsDetectedWebhookMaxTxnSize;
+
+    std::string safeModeWebhookAddress;
+    int16_t safeModeWebhookPort;
+    std::string safeModeWebhookPath;
+    int64_t safeModeMaxForkDistance;
+    int64_t safeModeMinForkLength;
+    int64_t safeModeMinHeightDifference;
 
     std::optional<bool> mDisableBIP30Checks;
 
@@ -1073,20 +1068,6 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
 
-    // Safe mode activation
-    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override { return true; }
-    std::string GetSafeModeWebhookAddress() const override { return ""; }
-    int16_t GetSafeModeWebhookPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
-    std::string GetSafeModeWebhookPath() const override { return ""; }
-    bool SetSafeModeMinBlockDifference(int32_t min, std::string* err = nullptr) override { return true; }
-    int32_t GetSafeModeMinBlockDifference() const override { return SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE; }
-    bool SetSafeModeMaxForkDistance(int32_t max, std::string* err = nullptr) override { return true; }
-    int32_t GetSafeModeMaxForkDistance() const override { return SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE; }
-    bool SetSafeModeMinValidForkLength(int32_t min, std::string* err = nullptr) override { return true; }
-    int32_t GetSafeModeMinValidForkLength() const override { return SAFE_MODE_DEFAULT_MIN_VALID_FORK_LENGTH; }
-    bool SetSafeModeMaxValidForkDistance(int32_t max, std::string* err = nullptr) override { return true; }
-    int32_t GetSafeModeMaxValidForkDistance() const override { return SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE; }
-
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
     uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
@@ -1197,6 +1178,18 @@ public:
     {
         return std::numeric_limits<std::int32_t>::max();
     }
+
+    // Safe mode params
+    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override { return true; }
+    std::string GetSafeModeWebhookAddress() const override { return ""; }
+    int16_t GetSafeModeWebhookPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetSafeModeWebhookPath() const override { return ""; }
+    int64_t GetSafeModeMaxForkDistance() const override { return 100;};
+    bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err)  override {return true;};
+    int64_t GetSafeModeMinForkLength() const  override { return 3;};
+    bool SetSafeModeMinForkLength(int64_t length, std::string* err) override {return true;};
+    int64_t GetSafeModeMinForkHeightDifference() const  override { return 5;};
+    bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override {return true;};
 
     void Reset() override;
 
