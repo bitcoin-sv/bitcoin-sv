@@ -2487,7 +2487,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Dust limit is expressed as a multiple in percent of the dust relay fee applied to
     // an output.
     if (gArgs.IsArgSet("-dustlimitfactor")) {
-        Amount n(0);
         auto factor = gArgs.GetArg("-dustlimitfactor", DEFAULT_DUST_LIMIT_FACTOR);
 
         if (std::string err; !config.SetDustLimitFactor(factor, &err))
