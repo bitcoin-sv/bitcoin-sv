@@ -3534,7 +3534,7 @@ static void ProcessDoubleSpendMessage(const Config& config,
         if(!IsValid(msg))
         {
             Misbehaving(pfrom, misbehaviour_penalty,
-                        "Invalid double-spend Detected message received");
+                        "Invalid double-spend detected message received");
             return;
         }
         LogPrint(BCLog::NETMSG,
@@ -3543,6 +3543,8 @@ static void ProcessDoubleSpendMessage(const Config& config,
 
         if(!ValidateForkHeight(msg))
         {
+            Misbehaving(pfrom, misbehaviour_penalty,
+                "Block height too low in double-spend detected message");
             LogPrint(BCLog::NETMSG,
                      "Block height too low in double-spend "
                      "detected message from peer=%d\n",

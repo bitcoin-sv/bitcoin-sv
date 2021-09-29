@@ -234,8 +234,8 @@ bool ValidateDoubleSpends(const DSDetected& msg)
     };
     sort(indexed_ops.begin(), indexed_ops.end(), outpoint_less);
 
-    // Find all the duplicates - these are double-spends
-    vector<index_outpoint> duplicates;
+    // Find the indices of all the duplicates - these are double-spends
+    vector<uint32_t> indices;
     for(auto it{indexed_ops.begin()}; it != indexed_ops.end();)
     {
         auto r = equal_range(it, indexed_ops.end(), *it, outpoint_less);
@@ -244,29 +244,23 @@ bool ValidateDoubleSpends(const DSDetected& msg)
             if(distance(r.first, r.second) > 1)
             {
                 for(; r.first != r.second; ++r.first)
-                    duplicates.push_back(*r.first);
+                    indices.push_back((*r.first).first);
             }
         }
         it = r.second;
     }
 
     // There must be a double spend for each fork in the msg
-    if(duplicates.size() < msg.size())
+    if(indices.size() < msg.size())
         return false;
 
     // Check that each index is contained in the duplicates collection
-    vector<uint32_t> indices(duplicates.size());
-    transform(duplicates.begin(),
-              duplicates.end(),
-              indices.begin(),
-              [](const auto& index_op) { return index_op.first; });
     sort(indices.begin(), indices.end());
-
     const auto end = unique(indices.begin(), indices.end());
     const size_t dist = distance(indices.begin(), end);
     return dist == msg.size();
 }
-    
+   
 // Ensure there are no duplicate transactions
 bool AreTxsUnique(const DSDetected& msg)
 {
