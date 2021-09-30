@@ -61,8 +61,8 @@ UniValue reconsidersafemodeforblock(const Config &config, const JSONRPCRequest &
             "the block for which we want \n"
             "\nResult:\n"
             "\nExamples:\n" +
-            HelpExampleCli("ignoresafemodeforblock", "\"blockhash\"") +
-            HelpExampleRpc("ignoresafemodeforblock", "\"blockhash\""));
+            HelpExampleCli("reconsidersafemodeforblock", "\"blockhash\"") +
+            HelpExampleRpc("reconsidersafemodeforblock", "\"blockhash\""));
     }
 
     std::string strHash = request.params[0].get_str();
