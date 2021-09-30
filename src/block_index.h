@@ -109,6 +109,8 @@ private:
     
     static const uint32_t HAS_DOUBLE_SPEND_FLAG = 0x200;
 
+    static const uint32_t HAS_SOFT_CONSENSUS_FROZEN_FLAG = 0x400;
+
     // Mask used to check if the block failed.
     static const uint32_t INVALID_MASK = FAILED_FLAG | FAILED_PARENT_FLAG;
 
@@ -171,7 +173,17 @@ public:
         return BlockStatus((status & ~HAS_SOFT_REJ_FLAG) |
                            (hasData ? HAS_SOFT_REJ_FLAG : 0));
     }
-    
+
+    bool hasDataForSoftConsensusFreeze() const
+    {
+        return status & HAS_SOFT_CONSENSUS_FROZEN_FLAG;
+    }
+    [[nodiscard]] BlockStatus withDataForSoftConsensusFreeze(bool hasData = true) const
+    {
+        return BlockStatus((status & ~HAS_SOFT_CONSENSUS_FROZEN_FLAG) |
+                           (hasData ? HAS_SOFT_CONSENSUS_FROZEN_FLAG : 0));
+    }
+
     [[nodiscard]] bool hasDoubleSpend() const
     {
         return status & HAS_DOUBLE_SPEND_FLAG;
@@ -390,7 +402,7 @@ private:
      * explicit freeze or implicit due to parent being frozen.
      *
      * It is calculated as:
-     * std::max( mSoftConsensusFreezeForNBlocks, parent.mSoftConsensusFreezeForNBlocks - 1)
+     * std::max( mSoftConsensusFreezeForNBlocks, parent.mSoftConsensusFreezeForNBlocksCumulative - 1)
      *
      * For the next block in chain, value of this member is always equal to the value in parent minus one,
      * value of current block or is -1 if value in parent is already -1. This way soft rejection status is propagated
@@ -420,6 +432,12 @@ public:
 
         BuildSkipNL();
         SetChainWorkNL();
+
+        if (pprev)
+        {
+            UpdateSoftConsensusFreezeFromParentNL();
+        }
+
         nTimeMax = (pprev ? std::max(pprev->nTimeMax, nTime) : nTime);
 
         // We can link the chain of blocks for which we've received transactions
@@ -521,7 +539,9 @@ public:
         mBlockSource = source;
     }
 
-    void SetSoftConsensusFreezeFor( std::int32_t numberOfBlocks )
+    void SetSoftConsensusFreezeFor(
+        std::int32_t numberOfBlocks,
+        DirtyBlockIndexStore& notifyDirty )
     {
         std::lock_guard lock{ GetMutex() };
 
@@ -533,6 +553,10 @@ public:
             std::max(
                 mSoftConsensusFreezeForNBlocksCumulative,
                 mSoftConsensusFreezeForNBlocks );
+
+        nStatus = nStatus.withDataForSoftConsensusFreeze();
+
+        notifyDirty.Insert( *this );
     }
 
     void UpdateSoftConsensusFreezeFromParent()

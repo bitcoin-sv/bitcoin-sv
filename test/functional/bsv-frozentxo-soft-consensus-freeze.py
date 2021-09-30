@@ -158,6 +158,11 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         # all blocks are unfrozen
         block = self._mine_and_send_block(None, node)
 
+        # check that verifychain works after node restart
+        assert node.rpc.verifychain(4, 0)
+        self.restart_node(0)
+        assert node.rpc.verifychain(4, 0)
+
         node.rpc.invalidateblock(block.hash)
 
         assert( block_before_frozen_blocks_hash == node.rpc.getbestblockhash() )
