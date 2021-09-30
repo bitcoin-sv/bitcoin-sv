@@ -83,17 +83,12 @@ class SafeMode
     struct SafeModeResult
     {
         const CBlockIndex* activeChainTip;
+        const CBlockIndex* reorgedFrom;
+        int numberOfDisconnectedBlocks;
         std::map<const CBlockIndex*, SafeModeFork> forks;
         SafeModeLevel maxLevel;
 
-        
-        bool operator == (const SafeModeResult& other) const
-        {
-            return  forks == other.forks
-                && maxLevel == other.maxLevel;
-        }
-        
-
+        bool ShouldNotify(const SafeModeResult& oldResult) const;
         void AddFork(const CBlockIndex* forkTip, const CBlockIndex* forkBase, SafeModeLevel level);
         void ToJson(CJSONWriter& writer) const;
         std::string ToJson(bool pretty = false) const;
@@ -102,7 +97,7 @@ class SafeMode
     /**
     * Recalculates safe mode criteria for all forks.
     */
-    SafeModeResult GetSafeModeResult(const Config& config);
+    SafeModeResult GetSafeModeResult(const Config& config, const CBlockIndex* prevTip);
 
     /**
     * Sends result in json form using webhooks.

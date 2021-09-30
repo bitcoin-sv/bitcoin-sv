@@ -230,13 +230,28 @@ const CBlockIndex* SafeMode::ExcludeIgnoredBlocks(const CBlockIndex* pindexForkT
     return lastIgnored->GetPrev();
 }
 
-SafeMode::SafeModeResult SafeMode::GetSafeModeResult(const Config& config)
+SafeMode::SafeModeResult SafeMode::GetSafeModeResult(const Config& config, const CBlockIndex* prevTip)
 {
     AssertLockHeld(cs_main);
     AssertLockHeld(cs_safeModeLevelForks);
 
+    bool reorgHappened = prevTip && !chainActive.Contains(prevTip);
+    int numberOfDisconnectedBlocks = 0;
+    if (reorgHappened)
+    {
+        const CBlockIndex* pindexWalk = prevTip;
+        while (pindexWalk && !chainActive.Contains(pindexWalk))
+        {
+            pindexWalk = pindexWalk->GetPrev();
+            numberOfDisconnectedBlocks++;
+        }
+    }
 
-    SafeModeResult res{ chainActive.Tip(),{}, SafeModeLevel::NONE };
+    SafeModeResult res{ chainActive.Tip(), 
+                        reorgHappened ? prevTip : nullptr, 
+                        numberOfDisconnectedBlocks,
+                        {}, 
+                        SafeModeLevel::NONE };
 
     for (auto [forkTip, forkBase] : safeModeForks)
     {
@@ -304,9 +319,9 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
 
     UpdateCurentForkData();
     PruneStaleForkData(config);
-    auto newResults = GetSafeModeResult(config);
+    auto newResults = GetSafeModeResult(config, oldTip);
 
-    if(!(newResults == currentResult) && config.GetSafeModeWebhookAddress() != "")
+    if(newResults.ShouldNotify(currentResult) && config.GetSafeModeWebhookAddress() != "")
     {
         NotifyUsingWebhooks(config, newResults);
         LogPrintf("WARNING: Safe mode: " + newResults.ToJson(false) + "\n");
@@ -357,6 +372,12 @@ std::string SafeMode::GetStatus()
     LOCK(cs_safeModeLevelForks);
     return currentResult.ToJson();
 }
+
+bool SafeMode::SafeModeResult::ShouldNotify(const SafeModeResult& oldResult) const
+{
+    return forks != oldResult.forks
+        || maxLevel != oldResult.maxLevel;
+};
 
 void SafeMode::SafeModeResult::AddFork(const CBlockIndex* forkTip, const CBlockIndex* forkBase, SafeModeLevel level)
 {
@@ -425,6 +446,21 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         writer.pushKV("safemodeenabled", maxLevel != SafeModeLevel::NONE);
         WriteBlock(writer, "activetip", chainActive.Tip());
         writer.pushKV("timeutc", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", std::time(nullptr)));
+
+        writer.writeBeginObject("reorg");
+            if (reorgedFrom)
+            {
+                writer.pushKV("happened", true);
+                writer.pushKV("numberofdisconnectedblocks", numberOfDisconnectedBlocks);
+                WriteBlock(writer, "oldtip", reorgedFrom);
+            }
+            else
+            {
+                writer.pushKV("happened", false);
+                writer.pushKV("numberofdisconnectedblocks", 0);
+                writer.pushKV("oldtip", nullptr);
+            }
+        writer.writeEndObject();
 
         std::vector<std::reference_wrapper<const SafeModeFork>> sortedForks;
         for(const auto& f: forks)
