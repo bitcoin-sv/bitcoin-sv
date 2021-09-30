@@ -76,8 +76,6 @@ BOOST_AUTO_TEST_CASE(negative_Consensus_CheckTxInputs)
         0);
 
     // dummy block hashes
-    std::int64_t childReceiveTime{999};
-
     CChain blocks;
     BlockIndexStore blockIndexStore;
     populateBlocks( blockIndexStore, blocks, 3 );

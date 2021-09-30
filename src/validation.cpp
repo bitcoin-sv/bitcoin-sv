@@ -3951,7 +3951,7 @@ static bool ConnectTip(
     }
 
     auto asyncRemoveForBlock = std::async(std::launch::async, 
-        [&blockConnecting, &pindexNew, &changeSet]()
+        [&blockConnecting, &changeSet]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
