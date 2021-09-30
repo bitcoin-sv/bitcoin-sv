@@ -12,7 +12,7 @@ Scenario:
 5. Send alternative branch blocks 21 - 30 but only headers. This should not change anything regarding safe mode.
 6. Send alternative branch first block data. This should mark branch as invalid and change safe mode level to INVALID
 7. Extend main branch by 15 blocks. This should cause that node exits safe mode because alternative branch is 
-   no longer SAFE_MODE_MIN_POW_DIFFERENCE(6) blocks ahead
+   no longer SAFE_MODE_MIN_POW_DIFFERENCE blocks ahead
 """
 from time import sleep
 

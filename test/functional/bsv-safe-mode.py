@@ -2,7 +2,15 @@
 # Copyright (c) 2021 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
+Testing entering and exiting the safe-mode. Testing command line params and RPC methods for ignoring
+and reconsidering blocks for the safe mode activation. Testing webhook callbacks for the safe mode.
 
+For different set of parameters (safemodemaxforkdistance, safemodeminforklength, safemodeminblockdifference) we doing these steps
+and testing safe mode status with rpc and webhook:
+1. Creating three different forks, every fork is at the limit with one parameter for the safe mode activation.
+2. Restarting the node with command line params off by one, should not be in safe mode
+3. Modifying chainstate (extending tips) to make some of forks not trigger the safe mode. Making the same using ignoresafemodeforblock
+   and reconsidersafemodeforblock.
 """
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -87,7 +95,7 @@ class SafeMode(BitcoinTestFramework):
         def is_safe_mode_data_ok():
             try:
                 self.check_safe_mode_data(rpc, forks, check_webhook_messages)
-            except AssertionError as ex:
+            except AssertionError:
                 return False
             return True
 
