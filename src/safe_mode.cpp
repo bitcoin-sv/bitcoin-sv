@@ -12,7 +12,7 @@ SafeMode safeMode;
 
 bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) const
 {
-    //AssertLockHeld(cs_safeModeLevelForks);
+    AssertLockHeld(cs_safeModeLevelForks);
 
     // if we received only header then block is not yet part of the fork 
     // so check only for blocks with data
@@ -42,7 +42,6 @@ bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) c
 SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const
 {
     AssertLockHeld(cs_main);
-    //AssertLockHeld(cs_safeModeLevelForks);
 
     if (!pindexForkTip || !pindexForkBase)
     {
@@ -53,7 +52,6 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     {
         return SafeModeLevel::NONE;
     }
-
 
     // check if the fork is long enough
     assert(pindexForkTip->GetHeight() >= pindexForkBase->GetHeight());
@@ -75,9 +73,10 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     
     // check if the fork has enough proof-of-work
     auto absPowDifference = GetBlockProof(*chainActive.Tip()) * abs(config.GetSafeModeMinForkHeightDifference());
+    auto tipTotalWork = chainActive.Tip()->GetChainWork();
     auto forkMinPow = config.GetSafeModeMinForkHeightDifference() > 0
-        ? chainActive.Tip()->GetChainWork() + absPowDifference
-        : chainActive.Tip()->GetChainWork() - std::min(chainActive.Tip()->GetChainWork()*1, absPowDifference);
+        ? tipTotalWork + absPowDifference
+        : tipTotalWork - std::min(static_cast<base_uint<256>>(tipTotalWork), absPowDifference);
 
     if (pindexForkTip->GetChainWork() < forkMinPow)
     {
@@ -195,6 +194,7 @@ void SafeMode::UpdateCurentForkData()
 
 void SafeMode::PruneStaleForkData(const Config& config)
 {
+    AssertLockHeld(cs_main);
     AssertLockHeld(cs_safeModeLevelForks);
 
     auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
@@ -212,7 +212,7 @@ void SafeMode::PruneStaleForkData(const Config& config)
     }
 }
 
-std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::ExcludeIgnoredBlocks(const CBlockIndex* pindexForkTip) const
+std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const
 {
     AssertLockHeld(cs_main);
 
@@ -221,8 +221,15 @@ std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::Exclud
     std::vector<const CBlockIndex*> ignoringForSafeMode;
     std::vector<const CBlockIndex*> visited;
 
+    auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
+
     while (!chainActive.Contains(pindexWalk))
     {
+        if(pindexWalk->GetHeight() < minimumRelevantBlockHeight)
+        {
+            return {nullptr, {}};
+        }
+
         visited.push_back(pindexWalk);
         if (pindexWalk->GetIgnoredForSafeMode())
         {
@@ -324,7 +331,7 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
         ignoredBlocks.clear();
         for (const CBlockIndex* tip: GetForkTips())
         {
-            auto [newTip, blocksToIgnore] = ExcludeIgnoredBlocks(tip);
+            auto [newTip, blocksToIgnore] = ExcludeIgnoredBlocks(config, tip);
             ignoredBlocks.insert(blocksToIgnore.begin(), blocksToIgnore.end());
             if(newTip)
             {

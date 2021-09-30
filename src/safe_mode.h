@@ -54,7 +54,7 @@ class SafeMode
      * and set of all blocks that should be ignored.
      * If the whole fork is marked for ignoring nullptr is returned.
      */
-    std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> ExcludeIgnoredBlocks(const CBlockIndex* pindexForkTip) const;
+    std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const;
 
     /**
     * Represents single forking of the main chain
@@ -114,10 +114,12 @@ private: // data members
     
     // last safe mode status
     SafeModeResult currentResult;
+    
     // a block which was the active tip last time we have updated fork data
     const CBlockIndex* oldTip {nullptr};
     
-    CCriticalSection cs_safeModeLevelForks;
+    // protect this class members
+    mutable CCriticalSection cs_safeModeLevelForks;
 
     // webhook objects, initialized on first access
     std::unique_ptr<rpc::client::WebhookClient> webhooks;
