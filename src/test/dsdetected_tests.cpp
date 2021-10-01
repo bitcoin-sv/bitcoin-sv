@@ -451,6 +451,31 @@ BOOST_AUTO_TEST_CASE(deserialize_too_few_block_details)
     }
 }
 
+BOOST_AUTO_TEST_CASE(deserialize_no_block_headers)
+{
+    vector<uint8_t> v;
+    ba::unhex(
+        "0100" // version
+        "02"   // fork count
+        // fork 0
+        "00", // <- invalid header count
+        back_inserter(v));
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    DSDetected msg;
+    try
+    {
+        ss >> msg;
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const runtime_error& e)
+    {
+        const string_view expected{"Invalid DSDetected message - no block headers"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
+}
+
 BOOST_AUTO_TEST_CASE(deserialize_invalid_invalid_merkle_proof_flags)
 {
     vector<uint8_t> v;
@@ -667,6 +692,12 @@ BOOST_AUTO_TEST_CASE(validate_fork_count)
     UnitTestAccess::SetBlockList(msg, blocks);
     BOOST_CHECK_EQUAL(msg.size(), 2);
     BOOST_CHECK(ValidateForkCount(msg));
+}
+
+BOOST_AUTO_TEST_CASE(IsValid_no_headers)
+{
+    const DSDetected::BlockDetails v;
+    BOOST_CHECK(!IsValid(v));
 }
 
 BOOST_AUTO_TEST_CASE(headers_form_chain)

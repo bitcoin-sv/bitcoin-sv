@@ -34,6 +34,10 @@ public:
         void SerializationOp(Stream& s, Operation ser_action)
         {
             READWRITE(mBlockHeaders);
+            if(mBlockHeaders.empty())
+                throw std::runtime_error(
+                    "Invalid DSDetected message - no block headers");
+
             READWRITE(mMerkleProof);
             Validate(mMerkleProof);
         }
