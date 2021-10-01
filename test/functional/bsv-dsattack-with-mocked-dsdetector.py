@@ -5,7 +5,6 @@
 import time
 import json
 import threading
-import time
 from io import BytesIO
 
 
@@ -75,9 +74,6 @@ class MockDsdetector():
                             sha256_A = blockA.vtx[0].sha256
                             sha256_B = blockB.vtx[0].sha256
 
-                            sizea = len(txA.vin[0].scriptSig)
-                            sizeb = len(txB.vin[0].scriptSig)
-
                             dsdMessage = msg_dsdetected(blocksDetails=[
                                 BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(sha256_A)])),
                                 BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(sha256_B)]))])
@@ -109,6 +105,7 @@ class Exchange():
             hash = b['divergentBlockHash']
             if hash == bad_block_hint:
                 node.invalidateblock(bad_block_hint)
+                node.ignoresafemodeforblock(bad_block_hint)
                 return True
         return False
 
@@ -294,13 +291,13 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         self.log.info("spends attackers funds in node0")
         for i in range(self.nbDoubleSpends):
-            ds = attacker.spend_to_pkh(node0, funding_tx, i, funding_tx.vout[i].nValue, friend0_of_attacker.pubkey)
+            attacker.spend_to_pkh(node0, funding_tx, i, funding_tx.vout[i].nValue, friend0_of_attacker.pubkey)
         node0.generate(1)
         assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + 1)
 
         self.log.info("double spend attacker funds in node1")
         for i in range(self.nbDoubleSpends):
-            ds = attacker.spend_to_pkh(node1, funding_tx, i, funding_tx.vout[i].nValue, friend1_of_attacker.pubkey)
+            attacker.spend_to_pkh(node1, funding_tx, i, funding_tx.vout[i].nValue, friend1_of_attacker.pubkey)
 
         node1.generate(1)
         first_bad_block = node1.getbestblockhash()
