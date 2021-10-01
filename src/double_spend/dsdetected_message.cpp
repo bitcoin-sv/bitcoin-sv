@@ -145,6 +145,13 @@ UniValue DSDetected::ToJSON(const Config& config) const
 
 bool IsValid(const DSDetected::BlockDetails& fork)
 {
+    if(fork.mBlockHeaders.empty())
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: no block headers\n");
+        return false;
+    }
+
     if(!contains_tx(fork.mMerkleProof))
     {
         LogPrint(BCLog::NETMSG,
