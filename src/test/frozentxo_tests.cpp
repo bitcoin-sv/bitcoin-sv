@@ -75,7 +75,6 @@ BOOST_AUTO_TEST_CASE(negative_Consensus_CheckTxInputs)
         false,
         0);
 
-    // dummy block hashes
     CChain blocks;
     BlockIndexStore blockIndexStore;
     populateBlocks( blockIndexStore, blocks, 3 );

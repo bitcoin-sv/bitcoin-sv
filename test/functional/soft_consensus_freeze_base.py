@@ -33,10 +33,25 @@ class Send_node():
         self.node_no = node_no
         self.tmpdir = tmpdir
         self.log = log
+        self._register_on_reject()
 
+    def _register_on_reject(self):
         def on_reject(conn, msg):
             self.rejected_blocks.append(msg)
         self.p2p.connection.cb.on_reject = on_reject
+
+    def restart_node(self, extra_args=None):
+        self.log.info("Restarting node ...")
+        self.rpc.stop_node()
+        self.rpc.wait_until_stopped()
+        self.rpc.start(True, extra_args)
+        self.rpc.wait_for_rpc_connection()
+        self.p2p = NodeConnCB()
+        connection = NodeConn('127.0.0.1', p2p_port(0), self.rpc, self.p2p)
+        NetworkThread().start()
+        self.p2p.add_connection(connection)
+        self.p2p.wait_for_verack()
+        self._register_on_reject()
 
     def send_block(self, block, expect_tip, expect_reject = False):
         self.p2p.send_and_ping(msg_block(block))
@@ -114,7 +129,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
         return tx
 
-    def _mine_and_send_block(self, tx, node, expect_reject = False, expect_tip = None):
+    def _mine_block(self, tx):
         block = self.chain.next_block(self.block_count)
 
         txs = []
@@ -128,10 +143,16 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
         self.log.info(f"attempting mining block: {block.hash}")
 
+        self.block_count += 1
+
+        return block
+
+    def _mine_and_send_block(self, tx, node, expect_reject = False, expect_tip = None):
+        block = self._mine_block(tx)
+
         expect_tip = expect_tip if expect_tip != None else block.hash
 
         node.send_block(block, expect_tip, expect_reject)
-        self.block_count += 1
 
         return block
 
@@ -178,3 +199,17 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         assert_equal(result["notProcessed"], [])
 
         return freeze_tx
+
+    def submit_block_and_check_tip(self, node, block, expect_tip):
+        node.rpc.submitblock(block.serialize().hex())
+        if expect_tip == None:
+            expect_tip = block.hash
+        assert_equal( expect_tip, node.rpc.getbestblockhash() )
+
+    def get_chain_tip(self):
+        block_number = self.block_count - 1
+        assert self.chain.blocks[block_number] == self.chain.tip
+        return block_number
+
+    def set_chain_tip(self, block_number):
+        self.chain.set_tip(block_number)

@@ -3391,7 +3391,7 @@ private:
             index.GetBlockHash().ToString(),
             duration );
 
-        index.SetSoftConsensusFreezeFor( duration );
+        index.SetSoftConsensusFreezeFor( duration, mapBlockIndex );
 
         BlockIndexWithDescendants blocks{
             &index,

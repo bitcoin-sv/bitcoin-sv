@@ -135,13 +135,15 @@ UniValue blockStatusToJSON(const BlockStatus& block_status)
     uv.push_back(Pair("validity", to_string(v)));
 
 
-    uv.push_back(Pair("data", block_status.hasData())); 
+    uv.push_back(Pair("data", block_status.hasData()));
     uv.push_back(Pair("undo", block_status.hasUndo()));
-    uv.push_back(Pair("failed", block_status.hasFailed())); 
-    uv.push_back(Pair("parent failed", block_status.hasFailedParent())); 
-    uv.push_back(Pair("disk meta", block_status.hasDiskBlockMetaData())); 
-    uv.push_back(Pair("soft reject", block_status.hasDataForSoftRejection())); 
-    uv.push_back(Pair("double spend", block_status.hasDoubleSpend())); 
+    uv.push_back(Pair("failed", block_status.hasFailed()));
+    uv.push_back(Pair("parent failed", block_status.hasFailedParent()));
+    uv.push_back(Pair("disk meta", block_status.hasDiskBlockMetaData()));
+    uv.push_back(Pair("soft reject", block_status.hasDataForSoftRejection()));
+    uv.push_back(Pair("double spend", block_status.hasDoubleSpend()));
+    uv.push_back(Pair("soft consensus frozen", block_status.hasDataForSoftConsensusFreeze()));
+
     return uv;
 }
 
@@ -809,6 +811,7 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
             "  \"disk meta\" : (boolean) Disk meta flag\n"
             "  \"soft reject\" : (boolean) Soft reject flag\n"
             "  \"double spend\" : (boolean) May contain a double spend tx\n"
+            "  \"soft consensus frozen\" : (boolean) Soft consensus frozen flag\n"
             "  }\n"
             "}\n"
             "\nResult (for verbose=false):\n"
