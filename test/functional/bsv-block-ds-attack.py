@@ -3,7 +3,6 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 import json
-import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, connect_nodes, sync_blocks, disconnect_nodes_bi
@@ -144,13 +143,13 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         self.log.info("spends attackers funds in node0")
         for i in range(self.nbDoubleSpends):
-            ds = attacker.spend_to_pkh(node0, funding_tx, i, funding_tx.vout[i].nValue, friend0_of_attacker.pubkey)
+            attacker.spend_to_pkh(node0, funding_tx, i, funding_tx.vout[i].nValue, friend0_of_attacker.pubkey)
         node0.generate(1)
         assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + 1)
 
         self.log.info("double spend attacker funds in node1")
         for i in range(self.nbDoubleSpends):
-            ds = attacker.spend_to_pkh(node1, funding_tx, i, funding_tx.vout[i].nValue, friend1_of_attacker.pubkey)
+            attacker.spend_to_pkh(node1, funding_tx, i, funding_tx.vout[i].nValue, friend1_of_attacker.pubkey)
 
         node1.generate(1)
         first_bad_block = node1.getbestblockhash()
@@ -203,6 +202,7 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         # Test 4: Assert that safemode is exited if the offending chain is invalidated
         node0.invalidateblock(first_bad_block)
+        node0.ignoresafemodeforblock(first_bad_block)
         balance = node0.rpc.getbalance()
         assert (balance != None)
 
