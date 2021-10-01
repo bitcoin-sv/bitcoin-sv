@@ -172,7 +172,7 @@ class Stream
     const uint64_t mMaxRecvBuffSize {0};
 
     // Process some newly read bytes from our underlying socket
-    enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
+    enum RECV_STATUS {RECV_OK, RECV_BAD_HEADER, RECV_FAIL};
     RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes, bool& complete);
 
     // Write the next batch of data to the wire

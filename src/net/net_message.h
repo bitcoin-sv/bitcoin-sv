@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2017 The Bitcoin developers
-// Copyright (c) 2020 Bitcoin Association
+// Copyright (c) 2020-2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #pragma once
@@ -10,55 +10,55 @@
 #include <protocol.h>
 #include <streams.h>
 
+#include <stdexcept>
+
 class CNetMessage {
 private:
-    mutable CHash256 hasher;
-    mutable uint256 data_hash;
+    mutable CHash256 hasher {};
+    mutable uint256 data_hash {};
 
-public:
-    // Parsing header (false) or data (true)
-    bool in_data;
+    // Incoming data stream
+    CDataStream dataBuff;
 
-    // Partially received header.
-    CDataStream hdrbuf;
-    // Complete header.
+    // Message header
     CMessageHeader hdr;
-    uint32_t nHdrPos;
-
-    // Received message data.
-    CDataStream vRecv;
-    uint32_t nDataPos;
 
     // Time (in microseconds) of message receipt.
-    int64_t nTime;
+    int64_t nTime {0};
 
-    CNetMessage(const CMessageHeader::MessageMagic &pchMessageStartIn,
-                int nTypeIn, int nVersionIn)
-        : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn),
-          vRecv(nTypeIn, nVersionIn) {
-        hdrbuf.resize(24);
-        in_data = false;
-        nHdrPos = 0;
-        nDataPos = 0;
-        nTime = 0;
+public:
+    CNetMessage(const CMessageHeader::MessageMagic& pchMessageStartIn, int nTypeIn, int nVersionIn)
+    : dataBuff { nTypeIn, nVersionIn },
+      hdr { pchMessageStartIn }
+    {
     }
 
-    bool complete() const {
-        if (!in_data) {
+    bool Complete() const {
+        if (!hdr.Complete()) {
             return false;
         }
 
-        return (hdr.nPayloadLength == nDataPos);
+        return (hdr.GetPayloadLength() == dataBuff.size());
     }
 
-    const uint256 &GetMessageHash() const;
+    const uint256& GetMessageHash() const;
+    const CMessageHeader& GetHeader() const { return hdr; }
+    int64_t GetTime() const { return nTime; }
+    void SetTime(int64_t time) { nTime = time; }
+    CDataStream& GetData() { return dataBuff; }
+    uint64_t GetTotalLength() const;
 
     void SetVersion(int nVersionIn) {
-        hdrbuf.SetVersion(nVersionIn);
-        vRecv.SetVersion(nVersionIn);
+        dataBuff.SetVersion(nVersionIn);
     }
 
-    int readHeader(const Config &config, const char *pch, uint32_t nBytes, uint64_t maxBlockSize);
-    int readData(const char *pch, uint32_t nBytes);
+    uint64_t Read(const Config& config, const char* pch, uint64_t nBytes);
+
+    // Exception class thrown when reading message header
+    class HeaderError : public std::runtime_error
+    {
+      public:
+        explicit HeaderError(const std::string& msg) : std::runtime_error{msg} {}
+    };
 };
 

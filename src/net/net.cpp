@@ -3022,7 +3022,8 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
     return pnode && pnode->fSuccessfullyConnected && !pnode->fDisconnect;
 }
 
-void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream) {
+void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg&& msg, StreamType stream)
+{
     uint64_t nPayloadLength = msg.Size();
     if (nPayloadLength > std::numeric_limits<uint32_t>::max())
     {
@@ -3033,13 +3034,10 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, Strea
     LogPrint(BCLog::NETMSGVERB, "sending %s (%d bytes) peer=%d\n",
              SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
-    std::vector<uint8_t> serializedHeader;
-    serializedHeader.reserve(CMessageHeader::HEADER_SIZE);
-    CMessageHeader hdr(config->GetChainParams().NetMagic(),
-                       msg.Command().c_str(), nPayloadLength);
-    memcpy(hdr.pchChecksum, msg.Hash().begin(), CMessageHeader::CHECKSUM_SIZE);
-
-    CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
+    CMessageHeader hdr { *config, msg };
+    std::vector<uint8_t> serializedHeader {};
+    serializedHeader.reserve(hdr.GetLength());
+    CVectorWriter { SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr };
 
     uint64_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg), stream) };
     if (nBytesSent > 0)

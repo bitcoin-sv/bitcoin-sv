@@ -1002,7 +1002,7 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
 
 static bool rejectIfMaxDownloadExceeded(uint64_t maxSendQueuesBytes, CSerializedNetMsg &msg, bool isMostRecentBlock, const CNodePtr& pfrom, CConnman &connman) {
 
-    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::HEADER_SIZE;
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
     if (totalSize > maxSendQueuesBytes) {
 
         if (!isMostRecentBlock) {
@@ -1417,7 +1417,7 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
             std::string strMsg;
             uint8_t ccode;
             std::string strReason;
-            vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >>
+            vRecv >> LIMITED_STRING(strMsg, CMessageFields::COMMAND_SIZE) >>
                 ccode >>
                 LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
 
@@ -3867,19 +3867,20 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     CNetMessage& msg { *nextMsg };
     msg.SetVersion(pfrom->GetRecvVersion());
 
+    const CMessageHeader& hdr = msg.GetHeader();
     std::optional<CLogP2PStallDuration> durationLog;
     using namespace std::literals::chrono_literals;
     if(debugP2PTheadStallsThreshold > 0ms)
     {
-        durationLog = { msg.hdr.GetCommand(), debugP2PTheadStallsThreshold };
+        durationLog = { hdr.GetCommand(), debugP2PTheadStallsThreshold };
     }
 
     // Scan for message start
-    if (memcmp(msg.hdr.pchMessageStart.data(),
+    if (memcmp(hdr.GetMsgStart().data(),
                chainparams.NetMagic().data(),
-               CMessageHeader::MESSAGE_START_SIZE) != 0) {
+               CMessageFields::MESSAGE_START_SIZE) != 0) {
         LogPrint(BCLog::NETMSG, "PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n",
-                  SanitizeString(msg.hdr.GetCommand()), pfrom->id);
+                  SanitizeString(hdr.GetCommand()), pfrom->id);
 
         // Make sure we ban where that come from for some time.
         connman.Ban(pfrom->GetAssociation().GetPeerAddr(), BanReasonNodeMisbehaving);
@@ -3889,7 +3890,6 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Read header
-    CMessageHeader &hdr = msg.hdr;
     if (!hdr.IsValid(config)) {
         LogPrint(BCLog::NETMSG, "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n",
                   SanitizeString(hdr.GetCommand()), pfrom->id);
@@ -3898,18 +3898,17 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     std::string strCommand = hdr.GetCommand();
 
     // Message size
-    unsigned int nPayloadLength = hdr.nPayloadLength;
+    uint64_t nPayloadLength = hdr.GetPayloadLength();
 
     // Checksum
-    CDataStream &vRecv = msg.vRecv;
+    CDataStream& vRecv = msg.GetData();
     const uint256 &hash = msg.GetMessageHash();
-    if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=0) {
+    if (memcmp(hash.begin(), hdr.GetChecksum().data(), CMessageFields::CHECKSUM_SIZE) !=0) {
         LogPrint(BCLog::NETMSG,
-            "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
+            "%s(%s, %lu bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
             SanitizeString(strCommand), nPayloadLength,
-            HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
-            HexStr(hdr.pchChecksum,
-                   hdr.pchChecksum + CMessageHeader::CHECKSUM_SIZE));
+            HexStr(hash.begin(), hash.begin() + CMessageFields::CHECKSUM_SIZE),
+            HexStr(hdr.GetChecksum()));
         {
             // Try to obtain an access to the node's state data.
             const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
@@ -3942,7 +3941,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     // Process message
     bool fRet = false;
     try {
-        fRet = ProcessMessage(config, pfrom, strCommand, vRecv, msg.nTime,
+        fRet = ProcessMessage(config, pfrom, strCommand, vRecv, msg.GetTime(),
                               chainparams, connman, interruptMsgProc);
         if (interruptMsgProc) {
             return false;
@@ -3959,17 +3958,17 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         if (strstr(e.what(), "end of data")) {
             // Allow exceptions from under-length message on vRecv
             LogPrint(BCLog::NETMSG,
-                     "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
+                     "%s(%s, %lu bytes): Exception '%s' caught, normally caused by a "
                      "message being shorter than its stated length\n",
                      __func__, SanitizeString(strCommand), nPayloadLength, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
-            LogPrint(BCLog::NETMSG, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
+            LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
-            LogPrint(BCLog::NETMSG, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
+            LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
@@ -3981,7 +3980,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     if (!fRet) {
-        LogPrint(BCLog::NETMSG, "%s(%s, %u bytes) FAILED peer=%d\n", __func__,
+        LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes) FAILED peer=%d\n", __func__,
                   SanitizeString(strCommand), nPayloadLength, pfrom->id);
     }
 

@@ -24,17 +24,6 @@ const enumTableT<StreamType>& enumTable(StreamType)
 
 namespace
 {
-    bool IsOversizedMessage(const Config& config, const CNetMessage& msg, uint64_t maxBlockSize)
-    {   
-        if(!msg.in_data)
-        {   
-            // Header only, cannot be oversized.
-            return false;
-        }
-
-        return msg.hdr.IsOversized(config, maxBlockSize);
-    }
-
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 }
 
@@ -168,9 +157,9 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                 if (status != RECV_OK)
                 {   
                     mNode->CloseSocketDisconnect();
-                    if (status == RECV_BAD_LENGTH)
+                    if (status == RECV_BAD_HEADER)
                     {   
-                        // Ban the peer if try to send messages with bad length
+                        // Ban the peer if try to send messages with bad length or other header errors
                         throw BanStream{};
                     }
                 }
@@ -278,7 +267,7 @@ std::pair<Stream::QueuedNetMessage, bool> Stream::GetNextMessage()
         mRecvCompleteMsgQueue.pop_front();
 
         // Update total queued msgs size
-        mRecvMsgQueueSize -= msg->vRecv.size() + CMessageHeader::HEADER_SIZE;
+        mRecvMsgQueueSize -= msg->GetTotalLength();
         mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
     }
 
@@ -380,50 +369,40 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     mLastRecvTime = nTimeMicros / MICROS_PER_SECOND;
     mTotalBytesRecv += nBytes;
     mBytesRecvThisSpot += nBytes;
-    uint64_t maxBlockSize = config.GetMaxBlockSize();
 
     while (nBytes > 0)
     {   
         // Get current incomplete message, or create a new one.
-        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back()->complete())
+        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back()->Complete())
         {
             mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
         }
 
         CNetMessage& msg { *(mRecvMsgQueue.back()) };
 
-        // Absorb network data.
-        int handled;
-        if (!msg.in_data)
-        {   
-            handled = msg.readHeader(config, pch, nBytes, maxBlockSize);
-            if (handled < 0)
-            {   
-                return RECV_BAD_LENGTH;//Notify bad message as soon as seen in the header
-            }
+        // Absorb network data
+        uint64_t handled {0};
+        try
+        {
+            handled = msg.Read(config, pch, nBytes);
         }
-        else
-        {   
-            handled = msg.readData(pch, nBytes);
+        catch(const CNetMessage::HeaderError& e)
+        {
+            LogPrint(BCLog::NETMSG, "Stream error reading message header: %s, peer=%d\n", e.what(), mNode->GetId());
+            return RECV_BAD_HEADER;//Notify bad message as soon as seen in the header
         }
-
-        if (handled < 0)
-        {   
+        catch(const std::exception& e)
+        {
+            LogPrint(BCLog::NETMSG, "Stream error reading message: %s, peer=%d\n", e.what(), mNode->GetId());
             return RECV_FAIL;
-        }
-
-        if (IsOversizedMessage(config, msg, maxBlockSize))
-        {   
-            LogPrint(BCLog::NETCONN, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
-            return RECV_BAD_LENGTH;
         }
 
         pch += handled;
         nBytes -= handled;
 
-        if (msg.complete())
+        if (msg.Complete())
         {      
-            msg.nTime = nTimeMicros;
+            msg.SetTime(nTimeMicros);
             complete = true;
         }
     }   
@@ -473,15 +452,15 @@ void Stream::GetNewMsgs()
     auto it { mRecvMsgQueue.begin() };
     for(; it != mRecvMsgQueue.end(); ++it)
     {   
-        if(!(*it)->complete())
+        if(!(*it)->Complete())
         {   
             break;
         }
-        uint64_t msgSize { (*it)->vRecv.size() + CMessageHeader::HEADER_SIZE };
+        uint64_t msgSize { (*it)->GetTotalLength() };
         nSizeAdded += msgSize;
 
         // Update recieved msg counts
-        mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find((*it)->hdr.pchCommand) };
+        mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find((*it)->GetHeader().GetCommand()) };
         if(i == mRecvBytesPerMsgCmd.end())
         {   
             i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);

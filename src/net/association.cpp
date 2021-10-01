@@ -415,7 +415,7 @@ uint64_t Association::GetTotalSendQueueSize() const
 uint64_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType)
 {
     uint64_t nPayloadLength { msg.Size() };
-    uint64_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
+    uint64_t nTotalSize { nPayloadLength + serialisedHeader.size() };
     uint64_t nBytesSent {0};
 
     try
