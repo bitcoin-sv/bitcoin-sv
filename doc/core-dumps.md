@@ -83,3 +83,7 @@ docker cp <container_name>:<path_to_core_dump> <location_on_host_machine>
 > Note: The container should not be started with --rm flag (--rm flag causes deleting container's filesystem after container exits and this prevents us from copying core dump file).
 
 > Note: docker cp command does not support wildcards. We recommend copying whole directory with core dumps.
+
+## Running BSV node as a systemd service
+
+When running BitcoinSV Node as a systemd service add `LimitCORE=infinity ` to the service file in order to disable limit on core dump size. [More details about systemd process properties.](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Process%20Properties)
