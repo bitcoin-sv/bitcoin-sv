@@ -4582,6 +4582,7 @@ bool ActivateBestChain(
                         connectTrace,
                         changeSet))
                 {
+                    CheckSafeModeParameters(config, nullptr);
                     return false;
                 }
 
@@ -4602,17 +4603,6 @@ bool ActivateBestChain(
                     assert(trace.pblock && trace.pindex);
                     GetMainSignals().BlockConnected(trace.pblock, trace.pindex,
                                                     *trace.conflictedTxs);
-                }
-                
-                if (pindexNewTip)
-                {
-                    // check if new tip affects safe mode
-                    CheckSafeModeParameters(config, pindexNewTip);
-                }
-                if (pindexOldTip)
-                {
-                    // check if old tip affects safe mode
-                    CheckSafeModeParameters(config, pindexOldTip);
                 }
             }
             // When we reach this point, we switched to a new tip (stored in
@@ -4661,6 +4651,7 @@ bool ActivateBestChain(
 
     // Write changes periodically to disk, after relay.
     if (!FlushStateToDisk(params, state, FLUSH_STATE_PERIODIC)) {
+        CheckSafeModeParameters(config, nullptr);
         return false;
     }
 
@@ -4670,6 +4661,7 @@ bool ActivateBestChain(
         StartShutdown();
     }
 
+    CheckSafeModeParameters(config, pindexNewTip);
     return true;
 }
 
@@ -5165,10 +5157,10 @@ void InvalidateChain(const Config& config, const CBlockIndex* pindexNew)
                 setBlockIndexCandidates.erase(pindexWalk);
                 pindexWalk = pindexWalk->GetPrev();
             }
-            // Check if we have to enter safe mode if chain has been invalidated
-            CheckSafeModeParameters(config, *it);
         }
     }
+    // Check if we have to enter safe mode if chain has been invalidated
+    CheckSafeModeParameters(config, nullptr);
 }
 
 bool CheckBlockTTOROrder(const CBlock& block)
