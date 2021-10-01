@@ -49,6 +49,7 @@ std::future<std::shared_ptr<HTTPResponse>> WebhookClient::SubmitRequest(
                 int status { response->GetStatus() };
                 if(status >= 200 && status < 300)
                 {
+                    LogPrint(BCLog::HTTP, "Submitted HTTP webhook request to %s, status %d\n", config.GetServerIP(), status);
                     success = true;
                 }
                 else
