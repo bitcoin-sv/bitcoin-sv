@@ -1389,7 +1389,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-safemodemaxforkdistance=<n>",
         strprintf("Maximum distance of forks last common block from current active tip to enter safe mode "
             "(default: %d)", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE));
-    strUsage += HelpMessageOpt("-safemodeminvalidforklength=<n>",
+    strUsage += HelpMessageOpt("-safemodeminforklength=<n>",
         strprintf("Minimum length of valid fork to enter safe mode "
             "(default: %d)", SAFE_MODE_DEFAULT_MIN_FORK_LENGTH));
 
