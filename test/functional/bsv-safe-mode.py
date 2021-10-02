@@ -204,10 +204,10 @@ class SafeMode(BitcoinTestFramework):
                                                      expected_short_fork_data,
                                                      ])
 
-            # We will add two more extensions to the chain
+            # We will add three more extensions to the chain
             #=====================================================
-            #  ... - mc[N-1] -  mc[N] - mc_extension
-            #                 \
+            #  ... - mc[N-1] -  mc[N] - mc_extension            sf_extension_2
+            #                 \                               /
             #                   sf[0] - sf[1] - ... - sf[N-1] - sf[N]
             #                                                 \
             #                                                   sf_extension
@@ -242,6 +242,17 @@ class SafeMode(BitcoinTestFramework):
             self.wait_for_safe_mode_data(conn1.rpc, [expected_distant_fork_data,
                                                      expected_low_height_difference_fork_data,
                                                      ])
+
+            # extend ignored short fork with one more tip, we should ignore this block also because its ancestor is ignored
+            short_fork_extension_2 = self.make_chain(conn1, short_fork[-2], 1)
+            send_by_headers(conn1, short_fork_extension_2, do_send_blocks=True)
+            wait_for_tip_status(conn1, short_fork_extension_2[-1].hash, "headers-only")
+            self.wait_for_safe_mode_data(conn1.rpc, [expected_distant_fork_data,
+                                                     expected_low_height_difference_fork_data,
+                                                     ])
+
+            # but when it will be reconsidered the new tip should be visible
+            expected_short_fork_data["tips"].add(short_fork_extension_2[-1].hash)
 
             # reconsidering one of the tips of the short fork will revert ignoring of the root block
             conn1.rpc.reconsidersafemodeforblock(short_fork[-1].hash)

@@ -50,10 +50,11 @@ class SafeMode
     void PruneStaleForkData(const Config& config);
 
     /**
-     * Returns a new fork tip which is result of ignoring specific blocks for the safe mode.
+     * Returns a new fork tip which is result of ignoring specific blocks for the safe mode,
+     * and set of all blocks that should be ignored.
      * If the whole fork is marked for ignoring nullptr is returned.
      */
-    const CBlockIndex* ExcludeIgnoredBlocks(const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const;
+    std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> ExcludeIgnoredBlocks(const CBlockIndex* pindexForkTip) const;
 
     /**
     * Represents single forking of the main chain
@@ -107,6 +108,9 @@ class SafeMode
 private: // data members
     // collection of current forks that can potentially trigger the safe mode (key: fork tip, value: fork first block)
     std::map<const CBlockIndex*, const CBlockIndex*> safeModeForks;
+
+    // all blocks and its descendants which are marked for ignoring the safe mode
+    std::set<const CBlockIndex*> ignoredBlocks;
     
     // last safe mode status
     SafeModeResult currentResult;
