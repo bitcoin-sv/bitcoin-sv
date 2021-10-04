@@ -86,7 +86,9 @@ SOLO_TESTS = {
     "bsv-pbv-withsigops.py",
     "bsv-broadcast_delay.py",
     "bsv-dsreport.py",
-    "bsv-callback-service.py"
+    "bsv-callback-service.py",
+    "bsv-safe-mode.py",
+    "bsv-safe-mode-reorg-notification.py",
 }
 
 # This tests can be only run by explicitly specifying them on command line. 

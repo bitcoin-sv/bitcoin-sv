@@ -12,12 +12,22 @@ SafeMode safeMode;
 
 bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) const
 {
-    //AssertLockHeld(cs_safeModeLevelForks);
+    AssertLockHeld(cs_safeModeLevelForks);
 
     // if we received only header then block is not yet part of the fork 
     // so check only for blocks with data
     for (auto const& fork : safeModeForks)
     {
+        if(pindexNew == fork.first || pindexNew == fork.second)
+        {
+            return true;
+        }
+        // if it is higher than tip or lower than base it is not member
+        if(pindexNew->GetHeight() >= fork.first->GetHeight() || pindexNew->GetHeight() <= fork.second->GetHeight())
+        {
+            return false;
+        }
+
         auto pindexWalk = fork.first;
         while (pindexWalk && pindexWalk != fork.second)
         {
@@ -32,7 +42,6 @@ bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) c
 SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const
 {
     AssertLockHeld(cs_main);
-    //AssertLockHeld(cs_safeModeLevelForks);
 
     if (!pindexForkTip || !pindexForkBase)
     {
@@ -43,7 +52,6 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     {
         return SafeModeLevel::NONE;
     }
-
 
     // check if the fork is long enough
     assert(pindexForkTip->GetHeight() >= pindexForkBase->GetHeight());
@@ -65,9 +73,10 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     
     // check if the fork has enough proof-of-work
     auto absPowDifference = GetBlockProof(*chainActive.Tip()) * abs(config.GetSafeModeMinForkHeightDifference());
+    auto tipTotalWork = chainActive.Tip()->GetChainWork();
     auto forkMinPow = config.GetSafeModeMinForkHeightDifference() > 0
-        ? chainActive.Tip()->GetChainWork() + absPowDifference
-        : chainActive.Tip()->GetChainWork() - std::min(chainActive.Tip()->GetChainWork()*1, absPowDifference);
+        ? tipTotalWork + absPowDifference
+        : tipTotalWork - std::min(static_cast<base_uint<256>>(tipTotalWork), absPowDifference);
 
     if (pindexForkTip->GetChainWork() < forkMinPow)
     {
@@ -185,6 +194,7 @@ void SafeMode::UpdateCurentForkData()
 
 void SafeMode::PruneStaleForkData(const Config& config)
 {
+    AssertLockHeld(cs_main);
     AssertLockHeld(cs_safeModeLevelForks);
 
     auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
@@ -202,32 +212,46 @@ void SafeMode::PruneStaleForkData(const Config& config)
     }
 }
 
-const CBlockIndex* SafeMode::ExcludeIgnoredBlocks(const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const
+std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const
 {
-    //AssertLockHeld(cs_safeModeLevelForks);
+    AssertLockHeld(cs_main);
 
     const CBlockIndex* pindexWalk = pindexForkTip;
     const CBlockIndex* lastIgnored = nullptr;
-    while (pindexWalk != pindexForkBase->GetPrev())
+    std::vector<const CBlockIndex*> ignoringForSafeMode;
+    std::vector<const CBlockIndex*> visited;
+
+    auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
+
+    while (!chainActive.Contains(pindexWalk))
     {
+        if(pindexWalk->GetHeight() < minimumRelevantBlockHeight)
+        {
+            return {nullptr, {}};
+        }
+
+        visited.push_back(pindexWalk);
         if (pindexWalk->GetIgnoredForSafeMode())
         {
             lastIgnored = pindexWalk;
+            ignoringForSafeMode = visited;
         }
         pindexWalk = pindexWalk->GetPrev();
     }
     
+    // no blocks should be ignored
     if(lastIgnored == nullptr)
     {
-        return pindexForkTip;
+        return {pindexForkTip, ignoringForSafeMode};
     }
 
-    if(lastIgnored == pindexForkBase)
+    // whole fork should be ignored
+    if(chainActive.Contains(lastIgnored->GetPrev()))
     {
-        return nullptr;
+        return {nullptr, ignoringForSafeMode};
     }
 
-    return lastIgnored->GetPrev();
+    return {lastIgnored->GetPrev(), ignoringForSafeMode};
 }
 
 SafeMode::SafeModeResult SafeMode::GetSafeModeResult(const Config& config, const CBlockIndex* prevTip)
@@ -255,13 +279,7 @@ SafeMode::SafeModeResult SafeMode::GetSafeModeResult(const Config& config, const
 
     for (auto [forkTip, forkBase] : safeModeForks)
     {
-        const CBlockIndex* newForkTip = ExcludeIgnoredBlocks(forkTip, forkBase);
-        if (newForkTip == nullptr)
-        {
-            continue;
-        }
-
-        auto level = ShouldForkTriggerSafeMode(config, newForkTip, forkBase);
+        auto level = ShouldForkTriggerSafeMode(config, forkTip, forkBase);
         if (level != SafeModeLevel::NONE)
         {
             res.AddFork(forkTip, forkBase, level);
@@ -295,7 +313,10 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
     AssertLockHeld(cs_main);
 
     if (pindexNew && pindexNew->IsGenesis())
+    {
         return;
+    }
+
 
     LOCK(cs_safeModeLevelForks);
 
@@ -307,13 +328,25 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
         // A reorg happened or we have unspecified change;
         // lets recalculate fork data for all forks.
         safeModeForks.clear();
+        ignoredBlocks.clear();
         for (const CBlockIndex* tip: GetForkTips())
         {
-            CreateForkData(config, tip);
+            auto [newTip, blocksToIgnore] = ExcludeIgnoredBlocks(config, tip);
+            ignoredBlocks.insert(blocksToIgnore.begin(), blocksToIgnore.end());
+            if(newTip)
+            {
+                CreateForkData(config, newTip);
+            }
         }
     }
     else
     {
+        // this block or his parent should be ignored for the safe mode
+        if (pindexNew->GetIgnoredForSafeMode() || (ignoredBlocks.find(pindexNew->GetPrev()) != ignoredBlocks.end()))
+        {
+            ignoredBlocks.insert(pindexNew);
+            return;
+        }
         CreateForkData(config, pindexNew);
     }
 

@@ -75,7 +75,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
             conn1.rpc.invalidateblock(branch_1_blocks[-1].hash)
             wait_for_tip(conn1, branch_1_blocks[-2].hash)
-            # here we have shortened distance ftom the active tip to the fork root so the safe mode should be activated
+            # here we have shortened distance from the active tip to the fork root so the safe mode should be activated
             assert conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 
             conn1.rpc.reconsiderblock(branch_1_blocks[-1].hash)

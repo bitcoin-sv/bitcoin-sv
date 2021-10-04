@@ -2,7 +2,15 @@
 # Copyright (c) 2021 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
+Testing entering and exiting the safe-mode. Testing command line params and RPC methods for ignoring
+and reconsidering blocks for the safe mode activation. Testing webhook callbacks for the safe mode.
 
+For different set of parameters (safemodemaxforkdistance, safemodeminforklength, safemodeminblockdifference) we doing these steps
+and testing safe mode status with rpc and webhook:
+1. Creating three different forks, every fork is at the limit with one parameter for the safe mode activation.
+2. Restarting the node with command line params off by one, should not be in safe mode
+3. Modifying chainstate (extending tips) to make some of forks not trigger the safe mode. Making the same using ignoresafemodeforblock
+   and reconsidersafemodeforblock.
 """
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -87,7 +95,7 @@ class SafeMode(BitcoinTestFramework):
         def is_safe_mode_data_ok():
             try:
                 self.check_safe_mode_data(rpc, forks, check_webhook_messages)
-            except AssertionError as ex:
+            except AssertionError:
                 return False
             return True
 
@@ -204,10 +212,10 @@ class SafeMode(BitcoinTestFramework):
                                                      expected_short_fork_data,
                                                      ])
 
-            # We will add two more extensions to the chain
+            # We will add three more extensions to the chain
             #=====================================================
-            #  ... - mc[N-1] -  mc[N] - mc_extension
-            #                 \
+            #  ... - mc[N-1] -  mc[N] - mc_extension            sf_extension_2
+            #                 \                               /
             #                   sf[0] - sf[1] - ... - sf[N-1] - sf[N]
             #                                                 \
             #                                                   sf_extension
@@ -242,6 +250,17 @@ class SafeMode(BitcoinTestFramework):
             self.wait_for_safe_mode_data(conn1.rpc, [expected_distant_fork_data,
                                                      expected_low_height_difference_fork_data,
                                                      ])
+
+            # extend ignored short fork with one more tip, we should ignore this block also because its ancestor is ignored
+            short_fork_extension_2 = self.make_chain(conn1, short_fork[-2], 1)
+            send_by_headers(conn1, short_fork_extension_2, do_send_blocks=True)
+            wait_for_tip_status(conn1, short_fork_extension_2[-1].hash, "headers-only")
+            self.wait_for_safe_mode_data(conn1.rpc, [expected_distant_fork_data,
+                                                     expected_low_height_difference_fork_data,
+                                                     ])
+
+            # but when it will be reconsidered the new tip should be visible
+            expected_short_fork_data["tips"].add(short_fork_extension_2[-1].hash)
 
             # reconsidering one of the tips of the short fork will revert ignoring of the root block
             conn1.rpc.reconsidersafemodeforblock(short_fork[-1].hash)

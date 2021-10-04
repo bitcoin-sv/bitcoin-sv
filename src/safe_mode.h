@@ -50,10 +50,11 @@ class SafeMode
     void PruneStaleForkData(const Config& config);
 
     /**
-     * Returns a new fork tip which is result of ignoring specific blocks for the safe mode.
+     * Returns a new fork tip which is result of ignoring specific blocks for the safe mode,
+     * and set of all blocks that should be ignored.
      * If the whole fork is marked for ignoring nullptr is returned.
      */
-    const CBlockIndex* ExcludeIgnoredBlocks(const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const;
+    std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const;
 
     /**
     * Represents single forking of the main chain
@@ -107,13 +108,18 @@ class SafeMode
 private: // data members
     // collection of current forks that can potentially trigger the safe mode (key: fork tip, value: fork first block)
     std::map<const CBlockIndex*, const CBlockIndex*> safeModeForks;
+
+    // all blocks and its descendants which are marked for ignoring the safe mode
+    std::set<const CBlockIndex*> ignoredBlocks;
     
     // last safe mode status
     SafeModeResult currentResult;
+    
     // a block which was the active tip last time we have updated fork data
     const CBlockIndex* oldTip {nullptr};
     
-    CCriticalSection cs_safeModeLevelForks;
+    // protect this class members
+    mutable CCriticalSection cs_safeModeLevelForks;
 
     // webhook objects, initialized on first access
     std::unique_ptr<rpc::client::WebhookClient> webhooks;
