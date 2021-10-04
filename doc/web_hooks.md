@@ -46,52 +46,63 @@ message template is shown below.
 
 ```
 {
-    "safemodeenabled" : <true / false>,
-                        "activetip" : {
-                            "hash" : "<block_hash>",
-                            "height" : <height>,
-                            "blocktime" : "<time UTC>",
-                            "firstseentime" : "<time UTC>",
-                            "status" : "active"
-                        },
-                                      "timeutc" : "<time_of_the_message>",
-                                                  "forks"
-        : [
-            {
-                "forkfirstblock" : {
-                    "hash" : "<block_hash>",
-                    "height" : <height>,
-                    "blocktime" : "<time UTC>",
-                    "firstseentime" : "<time UTC>",
-                    "status" : "<block_header_status>"
-                },
-                "tips" : [
-                    {
-                        "hash" : "<block_hash>",
-                        "height" : <height>,
-                        "blocktime" : "<time UTC>",
-                        "firstseentime" : "<time UTC>",
-                        "status" : "<block_header_status>"
-                    },
-                    ...
-                ],
-                "lastcommonblock" : {
-                    "hash" : "<block_hash>",
-                    "height" : <height>,
-                    "blocktime" : "<time UTC>",
-                    "firstseentime" : "<time UTC>",
-                    "status" : "active"
-                },
-                "activechainfirstblock" : {
-                    "hash" : "<block_hash>",
-                    "height" : <height>,
-                    "blocktime" : "<time UTC>",
-                    "firstseentime" : "<time UTC>",
-                    "status" : "active"
-                },
+    "safemodeenabled": <true/false>,
+    "activetip": {
+        "hash": "<block_hash>",
+        "height": <height>,
+        "blocktime": "<time UTC>",
+        "firstseentime": "<time UTC>",
+        "status": "active"
+    },
+    "timeutc": "<time_of_the_message>",
+    "reorg": {
+        "happened": <true/false>,
+        "numberofdisconnectedblocks": <number>,
+        "oldtip": {
+            "hash": "<block_hash>",
+            "height": <height>,
+            "blocktime": "<time UTC>",
+            "firstseentime": "<time UTC>",
+            "status": "<block_header_status>"
+        }
+    },
+    "forks": [
+        {
+            "forkfirstblock": {
+                "hash": "<block_hash>",
+                "height": <height>,
+                "blocktime": "<time UTC>",
+                "firstseentime": "<time UTC>",
+                "status": "<block_header_status>"
             },
-            ...
-        ]
+            "tips": [
+                {
+                    "hash": "<block_hash>",
+                    "height": <height>,
+                    "blocktime": "<time UTC>",
+                    "firstseentime": "<time UTC>",
+                    "status": "<block_header_status>"
+                },
+                ...
+            ],
+            "lastcommonblock": {
+                "hash": "<block_hash>",
+                "height": <height>,
+                "blocktime": "<time UTC>",
+                "firstseentime": "<time UTC>",
+                "status": "active"
+            },
+            "activechainfirstblock": {
+                "hash": "<block_hash>",
+                "height": <height>,
+                "blocktime": "<time UTC>",
+                "firstseentime": "<time UTC>",
+                "status": "active"
+            },
+        },
+    ...
+    ]
 }
+
 
 ```
