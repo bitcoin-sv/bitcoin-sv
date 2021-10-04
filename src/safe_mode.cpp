@@ -356,6 +356,7 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
 void SafeMode::Clear() 
 {
     LOCK(cs_safeModeLevelForks);
+    oldTip = nullptr;
     safeModeForks.clear();
 }
 
