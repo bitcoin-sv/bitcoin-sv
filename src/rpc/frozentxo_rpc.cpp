@@ -539,7 +539,7 @@ const CRPCCommand commands[] = {
   //  category      name                            actor (function)                okSafeMode
   //  ------------- -----------------------         ---------------------           ----------
     { "frozentxo", "addToPolicyBlacklist",         addToPolicyBlacklist,           false,  {"funds"} },
-    { "frozentxo", "addToConsensusBlacklist",      addToConsensusBlacklist,        false,  {"funds"} },
+    { "hidden",    "addToConsensusBlacklist",      addToConsensusBlacklist,        false,  {"funds"} },
     { "frozentxo", "removeFromPolicyBlacklist",    removeFromPolicyBlacklist,      false,  {"funds"} },
     { "frozentxo", "queryBlacklist",               queryBlacklist,                 false,  {}        },
     { "frozentxo", "clearBlacklists",              clearBlacklists,                false,  {"removeAllEntries"} }
