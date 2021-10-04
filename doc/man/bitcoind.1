@@ -800,12 +800,12 @@ TxnValidator options:
 \fB\-numstdtxvalidationthreads=\fR<n>
 .IP
 Set the number of 'High' priority threads used to validate standard txns
-(dynamically calculated default: 5)
+(dynamically calculated default: 6)
 .HP
 \fB\-numnonstdtxvalidationthreads=\fR<n>
 .IP
 Set the number of 'Low' priority threads used to validate non\-standard
-txns (dynamically calculated default: 1)
+txns (dynamically calculated default: 2)
 .HP
 \fB\-maxstdtxnsperthreadratio=\fR<n>
 .IP
@@ -1014,7 +1014,7 @@ behind (if negative) of active tip to enter safe mode (default:
 Maximum distance of forks last common block from current active tip to
 enter safe mode (default: 288)
 .HP
-\fB\-safemodeminvalidforklength=\fR<n>
+\fB\-safemodeminforklength=\fR<n>
 .IP
 Minimum length of valid fork to enter safe mode (default: 3)
 .SH COPYRIGHT
