@@ -294,7 +294,7 @@ int GetProcessingBlocksCount();
  * Maximum distance of forks last common block from current active tip
  * to still enter safe mode.
  */
-static const int64_t SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = 288;
+static const int64_t SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = 1000;
 
 /**
  * Forks shorter than SAFE_MODE_MIN_FORK_LENGTH will not trigger safe mode
