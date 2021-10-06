@@ -114,7 +114,10 @@ private: // data members
     
     // last safe mode status
     SafeModeResult currentResult;
-    
+
+    // last result notified by webhook
+    SafeModeResult currentResultWebhook;
+
     // a block which was the active tip last time we have updated fork data
     const CBlockIndex* oldTip {nullptr};
     
