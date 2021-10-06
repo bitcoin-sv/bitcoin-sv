@@ -304,6 +304,10 @@ extern const char *STREAMACK;
  * been observed which contains an attempt to double-spend some UTXOs.
  */
 extern const char *DSDETECTED;
+/**
+ * Contains an extended message (one which may exceed 4GB in size).
+ */
+extern const char *EXTMSG;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
