@@ -354,10 +354,14 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
     PruneStaleForkData(config);
     auto newResults = GetSafeModeResult(config, oldTip);
 
-    if(newResults.ShouldNotify(currentResult) && config.GetSafeModeWebhookAddress() != "")
+    if(config.GetSafeModeWebhookAddress() != "" && !IsInitialBlockDownload())
     {
-        NotifyUsingWebhooks(config, newResults);
-        LogPrintf("WARNING: Safe mode: " + newResults.ToJson(false) + "\n");
+        if(newResults.ShouldNotify(currentResultWebhook))
+        {
+            NotifyUsingWebhooks(config, newResults);
+            LogPrintf("WARNING: Safe mode: " + newResults.ToJson(false) + "\n");
+        }
+        currentResultWebhook = newResults;
     }
 
     currentResult = newResults;

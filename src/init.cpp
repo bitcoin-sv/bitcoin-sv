@@ -51,6 +51,7 @@
 #include "validationinterface.h"
 #include "vmtouch.h"
 #include "merkletreestore.h"
+#include "safe_mode.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
@@ -1567,6 +1568,12 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
             StartShutdown();
         }
     } // End scope of CImportingNow
+
+    {
+        LOCK(cs_main);
+        CheckSafeModeParameters(config, nullptr);
+    }
+
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         mempool.LoadMempool(config, shutdownToken);
         mempool.ResumeSanityCheck();

@@ -70,7 +70,8 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 assert False, "Should not come to here, should raise exception in line above."
             except JSONRPCException as e:
                 self.log.info(e.error["message"])
-                assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+                assert e.error["message"] == "Safe mode: Warning: The network does not appear to agree with the local blockchain! Still waiting for block data for more details."
+
 
 
             # send headers only for the rest of the second branch
@@ -82,7 +83,7 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 assert False, "Should not come to here, should raise exception in line above."
             except JSONRPCException as e:
                 self.log.info(e.error["message"])
-                assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+                assert e.error["message"] == "Safe mode: Warning: The network does not appear to agree with the local blockchain! Still waiting for block data for more details."
 
             safe_mode_status = conn1.rpc.getsafemodeinfo()
             assert safe_mode_status["safemodeenabled"]

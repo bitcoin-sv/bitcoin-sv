@@ -64,7 +64,7 @@ class ExitSafeModeForDistantFork(BitcoinTestFramework):
                 conn1.rpc.getbalance()
                 assert False, "Should not come to here, should raise exception in line above."
             except JSONRPCException as e:
-                assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+                assert e.error["message"] == "Safe mode: Warning: The network does not appear to agree with the local blockchain! Still waiting for block data for more details."
 
             # add one more block to active chain 
             send_by_headers(conn1, branch_1_blocks[SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE:], do_send_blocks=True)
