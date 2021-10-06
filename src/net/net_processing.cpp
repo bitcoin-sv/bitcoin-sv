@@ -3005,12 +3005,14 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
     }
 
     if(fBlockReconstructed) {
-        // If we got here, we were able to optimistically reconstruct a
-        // block that is in flight from some other peer.
-        const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
-        const CNodeStatePtr& nodestate { nodestateRef.get() };
-        assert(nodestate);
-        blockDownloadTracker.MarkBlockAsReceived(blockSource, false, nodestate);
+        {
+            // If we got here, we were able to optimistically reconstruct a
+            // block that is in flight from some other peer.
+            const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
+            const CNodeStatePtr& nodestate { nodestateRef.get() };
+            assert(nodestate);
+            blockDownloadTracker.MarkBlockAsReceived(blockSource, false, nodestate);
+        }
 
         bool fNewBlock = false;
         auto source = task::CCancellationSource::Make();
