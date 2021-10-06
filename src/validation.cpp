@@ -4649,19 +4649,23 @@ bool ActivateBestChain(
     const CChainParams &params = config.GetChainParams();
     CheckBlockIndex(params.GetConsensus());
 
-    // Write changes periodically to disk, after relay.
-    if (!FlushStateToDisk(params, state, FLUSH_STATE_PERIODIC)) {
-        CheckSafeModeParameters(config, nullptr);
-        return false;
+    {
+        LOCK( cs_main ); // needed by safe_mode CheckSafeModeParameters (chainActive)
+        // Write changes periodically to disk, after relay.
+        if (!FlushStateToDisk(params, state, FLUSH_STATE_PERIODIC)) {
+            CheckSafeModeParameters(config, nullptr);
+            return false;
+        }
+
+        int32_t nStopAtHeight = config.GetStopAtHeight();
+        if (nStopAtHeight && pindexNewTip &&
+            pindexNewTip->GetHeight() >= nStopAtHeight) {
+            StartShutdown();
+        }
+
+        CheckSafeModeParameters(config, pindexNewTip);
     }
 
-    int32_t nStopAtHeight = config.GetStopAtHeight();
-    if (nStopAtHeight && pindexNewTip &&
-        pindexNewTip->GetHeight() >= nStopAtHeight) {
-        StartShutdown();
-    }
-
-    CheckSafeModeParameters(config, pindexNewTip);
     return true;
 }
 
