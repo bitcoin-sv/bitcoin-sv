@@ -372,7 +372,9 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
                 : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
         if (!IsSelectableSocket(hSocket)) {
-            LogPrint(BCLog::NETCONN, "Cannot create connection: non-selectable socket created (fd >= FD_SETSIZE ?)\n");
+            LogPrint(BCLog::NETCONN, "Cannot create connection: "
+                     "non-selectable socket created (fd [%d] >= FD_SETSIZE ?)\n",
+                     hSocket);
             CloseSocket(hSocket);
             return nullptr;
         }
