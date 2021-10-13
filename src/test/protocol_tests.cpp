@@ -87,6 +87,12 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     GlobalConfig config;
     config.SetDefaultBlockSizeParams(DefaultBlockSizeParams{0, 10000, 10000, 10000});
 
+    // Test static header sizing methods
+    BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(0xFFFFFFFFL), CMessageFields::BASIC_HEADER_SIZE);
+    BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(0xFFFFFFFFL + 1), CMessageFields::EXTENDED_HEADER_SIZE);
+    BOOST_CHECK_EQUAL(CMessageHeader::GetMaxPayloadLength(EXTENDED_PAYLOAD_VERSION - 1), std::numeric_limits<uint32_t>::max());
+    BOOST_CHECK_EQUAL(CMessageHeader::GetMaxPayloadLength(EXTENDED_PAYLOAD_VERSION), std::numeric_limits<uint64_t>::max());
+
     // confirm that an incomplete message is not valid
     CMessageHeader hdr { config.GetChainParams().NetMagic() };
     BOOST_CHECK_EQUAL(hdr.IsValid(config), false);

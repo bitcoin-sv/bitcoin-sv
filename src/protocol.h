@@ -149,6 +149,7 @@ public:
     bool IsOversized(const Config& config) const;
 
     static uint64_t GetHeaderSizeForPayload(uint64_t payloadSize);
+    static uint64_t GetMaxPayloadLength(int version);
 
     ADD_SERIALIZE_METHODS
     template <typename Stream, typename Operation>

@@ -1620,7 +1620,12 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
 
     try {
         vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
+
+        // Set protocol version
         nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
+        pfrom->SetSendVersion(nSendVersion);
+        pfrom->nVersion = nVersion;
+
         nServices = ServiceFlags(nServiceInt);
         if(!pfrom->fInbound) {
             connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
@@ -1757,10 +1762,6 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
         // Set to true after we get the first filter* message
         pfrom->fRelayTxes = fRelay;
     }
-
-    // Change version
-    pfrom->SetSendVersion(nSendVersion);
-    pfrom->nVersion = nVersion;
 
     // Potentially mark this peer as a preferred download peer.
     UpdatePreferredDownload(pfrom);

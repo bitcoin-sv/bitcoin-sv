@@ -1065,6 +1065,7 @@ public:
     int GetRecvVersion() { return nRecvVersion; }
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
+    bool SendVersionIsSet() const { return nSendVersion != 0; }
 
     uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
 

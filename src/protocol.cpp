@@ -290,6 +290,16 @@ uint64_t CMessageHeader::GetHeaderSizeForPayload(uint64_t payloadSize)
     return CMessageFields::BASIC_HEADER_SIZE;
 }
 
+uint64_t CMessageHeader::GetMaxPayloadLength(int version)
+{
+    if(version >= EXTENDED_PAYLOAD_VERSION)
+    {
+        return std::numeric_limits<uint64_t>::max();
+    }
+
+    return std::numeric_limits<uint32_t>::max();
+}
+
 bool CMessageHeader::CheckHeaderMagicAndCommand(const MessageMagic& magic) const
 {
     // Check start string
