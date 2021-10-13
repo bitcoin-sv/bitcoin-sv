@@ -44,7 +44,7 @@ from test_framework.util import hex_str_to_bytes, bytes_to_hex_str, wait_until
 from test_framework.streams import StreamType
 
 BIP0031_VERSION = 60000
-MY_VERSION = 70015 # INVALID_CB_NO_BAN_VERSION
+MY_VERSION = 70016 # Large payload (>4GB) version
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 # from version 70001 onwards, fRelay should be appended to version messages (BIP37)
 MY_RELAY = 1
@@ -1033,8 +1033,8 @@ class BlockTransactions():
 class msg_version():
     command = b"version"
 
-    def __init__(self):
-        self.nVersion = MY_VERSION
+    def __init__(self, versionNum=MY_VERSION):
+        self.nVersion = versionNum
         self.nServices = 1
         self.nTime = int(time.time())
         self.addrTo = CAddressInVersion()
@@ -2027,7 +2027,7 @@ class NodeConn(asyncore.dispatcher):
     }
 
     def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True,
-                 strSubVer=None, assocID=None, nullAssocID=False):
+                 versionNum=MY_VERSION, strSubVer=None, assocID=None, nullAssocID=False):
         # Lock must be acquired when new object is added to prevent NetworkThread from trying
         # to access partially constructed object or trying to call callbacks before the connection
         # is established.
@@ -2040,6 +2040,7 @@ class NodeConn(asyncore.dispatcher):
             self.recvbuf = b""
             self.ver_send = 209
             self.ver_recv = 209
+            self.protoVersion = versionNum
             self.last_sent = 0
             self.state = "connecting"
             self.network = net
@@ -2055,7 +2056,7 @@ class NodeConn(asyncore.dispatcher):
 
             if send_version:
                 # stuff version msg into sendbuf
-                vt = msg_version()
+                vt = msg_version(self.protoVersion)
                 vt.nServices = services
                 vt.addrTo.ip = self.dstaddr
                 vt.addrTo.port = self.dstport
