@@ -338,12 +338,15 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxM
     {
         txiter entry = *toVisit.begin();
         toVisit.erase(toVisit.begin());
-        ancestors.insert(entry);
-        for(txiter parent: GetMemPoolParentsNL(entry))
+        bool isInserted =  ancestors.insert(entry).second;
+        if (isInserted)
         {
-            if (!parent->IsInPrimaryMempool())
+            for(txiter parent: GetMemPoolParentsNL(entry))
             {
-                toVisit.insert(parent);
+                if (!parent->IsInPrimaryMempool())
+                {
+                    toVisit.insert(parent);
+                }
             }
         }
     }
@@ -454,7 +457,9 @@ CTxMemPool::ResultOfUpdateEntryGroupingDataNL CTxMemPool::UpdateEntryGroupingDat
     }
 }
 
-void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet)
+void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, 
+                                             mining::CJournalChangeSet& changeSet, 
+                                             bool limitTheLoop)
 {
     // we want to limit the number of txs that could be updated at once to mitigate potential attack where
     // creating of one group results in accepting arbitrary number of txs to the mempool.
@@ -466,7 +471,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
     //  if the payFor0 is submitted last, it will trigger acceptance of all transaction
     int countOfVisitedTxs = 0;
 
-    while(!toUpdate.empty() && countOfVisitedTxs < MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO)
+    while(!toUpdate.empty() && !(limitTheLoop && countOfVisitedTxs > MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO))
     {
         // take first item from the topo-sorted set, this transactions does not
         // depend on any other tx in the set
@@ -566,7 +571,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
             // accept it to primary mempool as group paying tx
             setEntriesTopoSorted toUpdate;
             toUpdate.insert(entry);
-            TryAcceptToPrimaryMempoolNL(std::move(toUpdate), changeSet);
+            TryAcceptToPrimaryMempoolNL(std::move(toUpdate), changeSet, true);
         }
     }
     else
@@ -1126,7 +1131,8 @@ void CTxMemPool::RemoveForBlock(
                    childrenOfToRemoveSecondaryMempool.begin(), childrenOfToRemoveSecondaryMempool.end(),
                    std::inserter(toRecheck, toRecheck.begin()), InsrtionOrderComparator());
 
-    TryAcceptToPrimaryMempoolNL(std::move(toRecheck), nonNullChangeSet.Get());
+    // we want to try re-accept all transactions that were removed from primary mempool
+    TryAcceptToPrimaryMempoolNL(std::move(toRecheck), nonNullChangeSet.Get(), false);
 
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
@@ -1787,8 +1793,8 @@ void CTxMemPool::prioritiseTransactionNL(
         {
             entries = RemoveFromPrimaryMempoolNL(entries, *changeSet, false);
         }
-
-        TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet);
+        
+        TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet, false);
     }
 }
 
@@ -1992,7 +1998,7 @@ void CTxMemPool::removeStagedNL(
     removeUncheckedNL(stage, changeSet, conflictedWith, reason);
 
     // check if removed transactions can be re-accepted to the primary mempool
-    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), changeSet);
+    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), changeSet, false);
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
