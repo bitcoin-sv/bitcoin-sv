@@ -62,12 +62,14 @@ NON_SCRIPTS = [
 
 LARGE_BLOCK_TESTS = [
     # Tests for block files larger than 4GB. 
-    # This tests take really long time to execute so they are excluded by default. 
+    # This tests take really long time to execute or require a great deal of memory so they
+    # are excluded by default.
     # Use --large-block-tests command line parameter to run them.
     "bsv-genesis-large-blockfile-io.py",
     "bsv-genesis-large-blockfile-reindex.py",
     "bsv-genesis-large-blockfile-max-32-bit.py",
-    "bsv-large-blocks-txindex-data.py"
+    "bsv-large-blocks-txindex-data.py",
+    "bsv-4gb-plus-block.py"
 ]
 
 # This is a list of tests that should not run in parallel.
@@ -104,6 +106,7 @@ ENVIRONMENT_TYPE = {
 # test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
 # factor for release build is always 1; it is still present in this map for consistency
 TIMEOUT_FACTOR_FOR_TESTS = {
+    "bsv-4gb-plus-block.py" : [1,2,2,3]
 }
 
 # This tests can be only run by explicitly specifying them on command line. 
