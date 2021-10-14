@@ -21,6 +21,8 @@ template<>
 struct CTxMemPool::UnitTestAccess<UnitTestAccessTag>
 {
 public:
+    using Indexed_transaction_set = indexed_transaction_set;
+
     CTxMemPool& mempool;
 
     UnitTestAccess(CTxMemPool& _mempool)

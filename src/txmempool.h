@@ -437,8 +437,8 @@ private:
     // The group definition needs access to the mempool index iterator type.
     friend class CPFPGroup;
 
-public:
-    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
+private:
+    // FIXME: DEPRECATED - ultimately this will be changed or removed
     typedef boost::multi_index_container<
         CTxMemPoolEntry, boost::multi_index::indexed_by<
                              // sorted by txid
@@ -455,12 +455,11 @@ public:
                                  boost::multi_index::tag<insertion_order>>>>
         indexed_transaction_set;
 
-    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - ultimately this will be changed or removed
     mutable std::shared_mutex smtx;
-    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - ultimately this will be changed or removed
     indexed_transaction_set mapTx;
 
-private:
     static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
 
     using txiter = indexed_transaction_set::index<transaction_id>::type::const_iterator;
