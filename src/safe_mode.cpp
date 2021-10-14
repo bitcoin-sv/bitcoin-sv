@@ -18,22 +18,22 @@ bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) c
     // so check only for blocks with data
     for (auto const& fork : safeModeForks)
     {
-        if(pindexNew == fork.first || pindexNew == fork.second)
+        if(pindexNew == fork.first || pindexNew == fork.second->back())
         {
             return true;
         }
         // if it is higher than tip or lower than base it is not member
-        if(pindexNew->GetHeight() >= fork.first->GetHeight() || pindexNew->GetHeight() <= fork.second->GetHeight())
+        if(pindexNew->GetHeight() >= fork.first->GetHeight() || pindexNew->GetHeight() <= fork.second->back()->GetHeight())
         {
             return false;
         }
 
-        auto pindexWalk = fork.first;
-        while (pindexWalk && pindexWalk != fork.second)
+        for(const CBlockIndex* pindex: *fork.second)
         {
-            if (pindexWalk == pindexNew)
+            if(pindex == pindexNew)
+            {
                 return true;
-            pindexWalk = pindexWalk->GetPrev();
+            }
         }
     }
     return false;
@@ -131,9 +131,10 @@ void SafeMode::CreateForkData(const Config& config, const CBlockIndex* pindexNew
     if (existingFork != safeModeForks.end())
     {
         // replace fork data 
-        const CBlockIndex* forkBase = existingFork->second;
+        auto forkElements = existingFork->second;
+        forkElements->push_front(pindexNew);
         safeModeForks.erase(existingFork);
-        safeModeForks.insert(std::pair<const CBlockIndex*, const CBlockIndex*>(pindexNew, forkBase));
+        safeModeForks.emplace(pindexNew, forkElements);
         return;
     }
 
@@ -141,6 +142,7 @@ void SafeMode::CreateForkData(const Config& config, const CBlockIndex* pindexNew
     // we are walking back until current block parent is on the active chain and insert a new fork data
     const CBlockIndex* pindexWalk = pindexNew;
     auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
+    auto newForkElements = std::make_shared<std::deque<const CBlockIndex*>>();
     while (pindexWalk && pindexWalk->GetHeight() >= minimumRelevantBlockHeight)
     {
         if (!pindexWalk->GetPrev())
@@ -148,9 +150,11 @@ void SafeMode::CreateForkData(const Config& config, const CBlockIndex* pindexNew
             break;
         }
 
+        newForkElements->push_back(pindexWalk);
+
         if (chainActive.Contains(pindexWalk->GetPrev()))
         {
-            safeModeForks.insert(std::pair<const CBlockIndex*, const CBlockIndex*>(pindexNew, pindexWalk));
+            safeModeForks.emplace(pindexNew, newForkElements);
             break;
         }
         pindexWalk = pindexWalk->GetPrev();
@@ -173,19 +177,10 @@ void SafeMode::UpdateCurentForkData()
         }
         else
         {
-            // check if the fork base is part of the main chain
-            if(chainActive.Contains(it->second))
+            // remove all transactions that are on the main chain
+            while(chainActive.Contains(it->second->back()))
             {
-                // now try to find first block which is not on the main chain
-                // by reversely iterating through the fork
-                const CBlockIndex* pindexWalk = it->first;
-
-                while ( !chainActive.Contains(pindexWalk->GetPrev()) )
-                {
-                    pindexWalk = pindexWalk->GetPrev();
-                }
-
-                it->second = pindexWalk;
+                it->second->pop_back();
             }
             it++;
         }
@@ -201,7 +196,7 @@ void SafeMode::PruneStaleForkData(const Config& config)
 
     for (auto it = safeModeForks.begin(); it != safeModeForks.end();)
     {
-        if (it->second->GetPrev()->GetHeight() < minimumRelevantBlockHeight)
+        if (it->second->back()->GetPrev()->GetHeight() < minimumRelevantBlockHeight)
         {
             it = safeModeForks.erase(it);
         }
@@ -277,12 +272,12 @@ SafeMode::SafeModeResult SafeMode::GetSafeModeResult(const Config& config, const
                         {}, 
                         SafeModeLevel::NONE };
 
-    for (auto [forkTip, forkBase] : safeModeForks)
+    for (const auto& [forkTip, forkElements] : safeModeForks)
     {
-        auto level = ShouldForkTriggerSafeMode(config, forkTip, forkBase);
+        auto level = ShouldForkTriggerSafeMode(config, forkTip, forkElements->back());
         if (level != SafeModeLevel::NONE)
         {
-            res.AddFork(forkTip, forkBase, level);
+            res.AddFork(forkTip, forkElements->back(), level);
         }
     }
     return res;
@@ -309,7 +304,7 @@ void SafeMode::NotifyUsingWebhooks(const Config& config, const SafeMode::SafeMod
 
 
 void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* pindexNew)
-{
+{   
     AssertLockHeld(cs_main);
 
     if (pindexNew && pindexNew->IsGenesis())
@@ -350,6 +345,7 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
         CreateForkData(config, pindexNew);
     }
 
+
     UpdateCurentForkData();
     PruneStaleForkData(config);
     auto newResults = GetSafeModeResult(config, oldTip);
@@ -364,7 +360,7 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
         currentResultWebhook = newResults;
     }
 
-    currentResult = newResults;
+    currentResult = std::move(newResults);
     oldTip = chainActive.Tip();
 
     // If we have any forks trigger safe mode
