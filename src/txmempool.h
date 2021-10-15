@@ -675,7 +675,7 @@ private:
 
     // tries to accept transactions to primary mempool. it recalculates grouping data, forms groups or accepts transactions as standalone
     // this may result that some other transaction, which are not in the toUpdate, to be updated and accepted to primary mempool
-    void TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet);
+    void TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet, bool limitTheLoop);
 
     // tries to accept entry to the primary mempool, may result in accepting other transactions (i.e. if the entry is groups paying tx)
     void TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet);
