@@ -106,8 +106,8 @@ class SafeMode
     void NotifyUsingWebhooks(const Config& config, const SafeModeResult& result);
 
 private: // data members
-    // collection of current forks that can potentially trigger the safe mode (key: fork tip, value: fork first block)
-    std::map<const CBlockIndex*, const CBlockIndex*> safeModeForks;
+    // collection of current forks that can potentially trigger the safe mode (key: fork tip, value: blocks in order from highest to lowest)
+    std::map<const CBlockIndex*, std::shared_ptr<std::deque<const CBlockIndex*>>> safeModeForks;
 
     // all blocks and its descendants which are marked for ignoring the safe mode
     std::set<const CBlockIndex*> ignoredBlocks;
