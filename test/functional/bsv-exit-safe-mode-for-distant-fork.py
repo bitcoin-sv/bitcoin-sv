@@ -72,8 +72,16 @@ class ExitSafeModeForDistantFork(BitcoinTestFramework):
             # active tip is last block from branch 1
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
 
-            # alternative chain is now more than 288 blocks away so we should exit safe mode
-            conn1.rpc.getbalance()
+            # alternative chain is now enough blocks away so we should exit safe mode
+            # NOTE: Safe mode level is updated after the new block has already become a tip.
+            #       So we must wait because here node may still be in safe mode for a short while.
+            def is_not_safemode():
+                try:
+                    conn1.rpc.getbalance()
+                    return True
+                except JSONRPCException as e:
+                    return False
+            wait_until(is_not_safemode, timeout=10, check_interval=0.2) # Only a small timeout is needed since safe mode level is changed shortly after the block has become tip.
 
 if __name__ == '__main__':
     ExitSafeModeForDistantFork().main()
