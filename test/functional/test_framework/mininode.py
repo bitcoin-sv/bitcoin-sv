@@ -63,7 +63,7 @@ NODE_XTHIN = (1 << 4)
 NODE_BITCOIN_CASH = (1 << 5)
 
 # Howmuch data will be read from the network at once
-READ_BUFFER_SIZE = 8192
+READ_BUFFER_SIZE = 1024 * 256
 
 logger = logging.getLogger("TestFramework.mininode")
 
@@ -2026,6 +2026,10 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
+    # Extended message command
+    EXTMSG_COMMAND = b'extmsg\x00\x00\x00\x00\x00\x00'
+    assert(len(EXTMSG_COMMAND) == 12)
+
     def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True,
                  versionNum=MY_VERSION, strSubVer=None, assocID=None, nullAssocID=False):
         # Lock must be acquired when new object is added to prevent NetworkThread from trying
@@ -2037,7 +2041,7 @@ class NodeConn(asyncore.dispatcher):
             self.dstport = dstport
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sendbuf = bytearray()
-            self.recvbuf = b""
+            self.recvbuf = bytearray()
             self.ver_send = 209
             self.ver_recv = 209
             self.protoVersion = versionNum
@@ -2089,7 +2093,7 @@ class NodeConn(asyncore.dispatcher):
         logger.debug("Closing connection to: %s:%d" %
                      (self.dstaddr, self.dstport))
         self.state = "closed"
-        self.recvbuf = b""
+        self.recvbuf = bytearray()
         self.sendbuf = bytearray()
         try:
             self.close()
@@ -2154,20 +2158,35 @@ class NodeConn(asyncore.dispatcher):
                     msg = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + payloadlen]
                     self.recvbuf = self.recvbuf[4 + 12 + 4 + payloadlen:]
                 else:
-                    if len(self.recvbuf) < 4 + 12 + 4 + 4:
+                    hdrsize = 4 + 12 + 4 + 4
+                    if len(self.recvbuf) < hdrsize:
                         return None
-                    command = self.recvbuf[4:4 + 12].split(b"\x00", 1)[0]
-                    payloadlen = struct.unpack(
-                        "<i", self.recvbuf[4 + 12:4 + 12 + 4])[0]
-                    checksum = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + 4]
-                    if len(self.recvbuf) < 4 + 12 + 4 + 4 + payloadlen:
+                    extended = self.recvbuf[4:4 + 12] == self.EXTMSG_COMMAND
+
+                    command = ''
+                    payloadlen = 0
+                    if extended:
+                        hdrsize_ext = hdrsize + 12 + 8
+                        if len(self.recvbuf) < hdrsize_ext:
+                            return None
+                        command = self.recvbuf[hdrsize:hdrsize + 12].split(b"\x00", 1)[0]
+                        payloadlen = struct.unpack("<Q", self.recvbuf[hdrsize + 12:hdrsize + 12 + 8])[0]
+                        hdrsize = hdrsize_ext
+                    else:
+                        command = self.recvbuf[4:4 + 12].split(b"\x00", 1)[0]
+                        payloadlen = struct.unpack("<L", self.recvbuf[4 + 12:4 + 12 + 4])[0]
+
+                    if len(self.recvbuf) < hdrsize + payloadlen:
                         return None
-                    msg = self.recvbuf[4 + 12 + 4 + 4:4 + 12 + 4 + 4 + payloadlen]
+
+                    msg = self.recvbuf[hdrsize:hdrsize + payloadlen]
                     h = sha256(sha256(msg))
+                    checksum = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + 4]
                     if checksum != h[:4]:
                         raise ValueError(
                             "got bad checksum " + repr(self.recvbuf))
-                    self.recvbuf = self.recvbuf[4 + 12 + 4 + 4 + payloadlen:]
+                    self.recvbuf = self.recvbuf[hdrsize + payloadlen:]
+                command = bytes(command)
                 if command not in self.messagemap:
                     logger.warning("Received unknown command from %s:%d: '%s' %s" % (
                         self.dstaddr, self.dstport, command, repr(msg)))
