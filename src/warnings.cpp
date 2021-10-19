@@ -72,13 +72,19 @@ std::string GetWarnings(const std::string &strFor) {
         break;
     }
 
-    if (IsInitialBlockDownload())
+    if (IsInitialBlockDownload() && (currentSafeModeLevel != SafeModeLevel::NONE))
     {
-        const std::string ibdWarning = " We are in the startup process (e.g. Initial "
+        const std::string ibdWarning = " We are in the startup process (e.g. Initial"
                                        " block download or reindex), this might be"
                                        " reason for disagreement.";
-        strStatusBar += ibdWarning;
-        strRPC += strRPC;
+        if(strStatusBar != "")
+        {
+            strStatusBar += ibdWarning;
+        }
+        if(strRPC != "")
+        {
+            strRPC += ibdWarning;
+        }
     }
 
     if (strFor == "statusbar")
