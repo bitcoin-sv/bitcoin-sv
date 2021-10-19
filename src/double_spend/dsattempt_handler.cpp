@@ -262,7 +262,8 @@ std::pair<bool, DSAttemptHandler::NotificationDetails> DSAttemptHandler::GetNoti
                     }
                     catch(std::exception& e)
                     {
-                        LogPrint(BCLog::DOUBLESPEND, "Error fetching script details for txn %s input %d: %s\n", doubleSpendTxn, doubleSpendTxnInput, e.what());
+                        LogPrint(BCLog::DOUBLESPEND, "Error fetching script details for txn %s input %d: %s\n",
+                            doubleSpendTxn->GetId().ToString(), doubleSpendTxnInput, e.what());
                     }
                 }
             }
@@ -295,7 +296,7 @@ DSAttemptHandler::ScriptDetails DSAttemptHandler::GetScriptDetails(
         {
             scriptPubKey = coin->GetTxOut().scriptPubKey;
             amount = coin->GetTxOut().nValue;
-            coinHeight = coin->GetHeight();
+            coinHeight = GetInputScriptBlockHeight(coin->GetHeight());
             spendHeight = GetSpendHeightAndMTP(view).first;
         }
         else

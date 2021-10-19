@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "primitives/transaction.h"
 #include "txn_validation_data.h"
 #include "uint256.h"
 #include <mutex>
@@ -19,11 +20,18 @@ using TxnDoubleSpendDetectorSPtr = std::shared_ptr<CTxnDoubleSpendDetector>;
 /**
  * A basic class used to detect a double spend issue in an early stage of txn validation.
  */
-
-class CTxnDoubleSpendDetector {
-  public:
+class CTxnDoubleSpendDetector
+{
+public:
     CTxnDoubleSpendDetector() = default;
     ~CTxnDoubleSpendDetector() = default;
+
+    CTxnDoubleSpendDetector(const CTxnDoubleSpendDetector&) = delete;
+    CTxnDoubleSpendDetector& operator=(CTxnDoubleSpendDetector&) = delete;
+
+    CTxnDoubleSpendDetector(CTxnDoubleSpendDetector&&) = delete;
+    CTxnDoubleSpendDetector& operator=(CTxnDoubleSpendDetector&&) = delete;
+
     /**
      * Insert txn's inputs into known spends only if non of it's inputs is already known.
      * @param pTxInputData Transaction's input data
@@ -32,10 +40,11 @@ class CTxnDoubleSpendDetector {
      * @return true if inserted, false otherwise.
      */
     bool insertTxnInputs(
-	    const TxInputDataSPtr& pTxInputData,
+        const std::shared_ptr<const CTransaction>&,
 	    const CTxMemPool& pool,
 	    CValidationState& state,
         bool isFinal);
+
     /**
      * Remove txn's inputs for known spends.
      * In case one of the transactions was not added this is a no-op.
@@ -52,12 +61,18 @@ class CTxnDoubleSpendDetector {
      * Clear known spends.
      */
     void clear();
+    
+    // deprecated
+    bool insertTxnInputs(
+	    const std::shared_ptr<CTxInputData>& pTxInputData, 
+	    const CTxMemPool& pool,
+	    CValidationState& state,
+        bool isFinal);
 
   private:
     /** Check if any of txn's inputs is already known */
     bool isAnyOfInputsKnownNL(const CTransaction &tx, CValidationState& state) const;
 
-  private:
     struct OutPointWithTx;
 
     std::vector<OutPointWithTx> mKnownSpends = {};
@@ -68,14 +83,10 @@ class CTxnDoubleSpendDetector {
 struct CTxnDoubleSpendDetector::OutPointWithTx
 {
     COutPoint mOut;
-    CTransactionRef mTxRef;
+    std::shared_ptr<const CTransaction> mspTx;
 
-    OutPointWithTx(const COutPoint& out, const CTransactionRef& ref)
+    OutPointWithTx(const COutPoint& out, const std::shared_ptr<const CTransaction>& spTx)
         : mOut{ out }
-        , mTxRef{ ref }
+        , mspTx{ spTx }
     {}
-
-    friend bool operator==(const OutPointWithTx &a, const COutPoint &b) {
-        return (a.mOut.GetTxId() == b.GetTxId() && a.mOut.GetN() == b.GetN());
-    }
 };

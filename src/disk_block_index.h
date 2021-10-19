@@ -58,7 +58,7 @@ public:
         {
             try {
                 READWRITE(blockIndex.mDiskBlockMetaData);
-            } catch (std::ios_base::failure &) {
+            } catch (const std::ios_base::failure &) {
                 blockIndex.nStatus = blockIndex.nStatus.withDiskBlockMetaData(false);
                 LogPrintf("Can not read metadata from block %s. Probably upgrading from downgraded version. \n", GetBlockHash().ToString());
             }
@@ -70,7 +70,7 @@ public:
             {
                 READWRITE(VARINT(blockIndex.nSoftRejected));
             }
-            catch (std::ios_base::failure&)
+            catch (const std::ios_base::failure&)
             {
                 // Detect and handle the case when someone has marked a block as soft rejected,
                 // then downgraded the executable to version before soft rejected blocks were implemented,
@@ -95,6 +95,24 @@ public:
             // By default the block is not soft rejected so that actual value
             // does not need to be stored for most of the blocks.
             blockIndex.nSoftRejected = -1;
+        }
+
+        if(blockIndex.nStatus.hasDataForSoftConsensusFreeze())
+        {
+            try
+            {
+                READWRITE(VARINT(blockIndex.mSoftConsensusFreezeForNBlocks));
+            }
+            catch (std::ios_base::failure&)
+            {
+                blockIndex.nStatus = blockIndex.nStatus.withDataForSoftConsensusFreeze(false);
+                blockIndex.mSoftConsensusFreezeForNBlocks = -1;
+                LogPrintf("Can not read soft consensus freeze status for block %s from database. Probably upgrading from downgraded version.\n", GetBlockHash().ToString());
+            }
+        }
+        else if(ser_action.ForRead())
+        {
+            blockIndex.mSoftConsensusFreezeForNBlocks = -1;
         }
     }
 

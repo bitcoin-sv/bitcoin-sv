@@ -81,7 +81,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             tx.rehash()
             final_size = len(tx.serialize())
 
-            # signing transaction can change its lenght by +- n inputs
+            # signing transaction can change its length by +- n inputs
             # if tx size is not desired we will try again
             if final_size == total_bytes:
                 return tx

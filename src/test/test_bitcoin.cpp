@@ -103,6 +103,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
     mempool.SetSanityCheck(1.0);
+    InitFrozenTXO(DEFAULT_FROZEN_TXO_DB_CACHE);
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsTip =
         std::make_unique<CoinsDB>(
@@ -143,6 +144,7 @@ TestingSetup::~TestingSetup() {
     UnloadBlockIndex();
     pcoinsTip.reset();
     delete pblocktree;
+    ShutdownFrozenTXO();
 }
 
 TestChain100Setup::TestChain100Setup()
@@ -186,7 +188,8 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
 
     std::shared_ptr<const CBlock> shared_pblock =
         std::make_shared<const CBlock>(block);
-    ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr);
+    ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr,
+        CBlockSource::MakeLocal("test"));
 
     CBlock result = block;
     return result;

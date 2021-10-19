@@ -18,7 +18,7 @@ from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlo
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal
-from test_framework.cdefs import SAFE_MODE_MIN_VALID_FORK_LENGTH, SAFE_MODE_MAX_VALID_FORK_DISTANCE
+from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_FORK_LENGTH, SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE
 
 class TriggerSafeModeAfterReorg(BitcoinTestFramework):
 
@@ -39,13 +39,13 @@ class TriggerSafeModeAfterReorg(BitcoinTestFramework):
 
             branch_1_root, last_block_time = make_block(conn1, last_block_time = last_block_time)
             branch_1_blocks = [branch_1_root]
-            for _ in range(SAFE_MODE_MIN_VALID_FORK_LENGTH + 1):
+            for _ in range(SAFE_MODE_DEFAULT_MIN_FORK_LENGTH + 1):
                 new_block, last_block_time = make_block(conn1, branch_1_blocks[-1], last_block_time = last_block_time)
                 branch_1_blocks.append(new_block)
 
             branch_2_root, last_block_time = make_block(conn2, last_block_time = last_block_time)
             branch_2_blocks = [branch_2_root]
-            for _ in range(SAFE_MODE_MAX_VALID_FORK_DISTANCE):
+            for _ in range(SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE):
                 new_block, last_block_time = make_block(conn2, branch_2_blocks[-1], last_block_time = last_block_time)
                 branch_2_blocks.append(new_block)
 
@@ -56,28 +56,24 @@ class TriggerSafeModeAfterReorg(BitcoinTestFramework):
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
 
             # send second branch with more POW
-            send_by_headers(conn2, branch_2_blocks[:SAFE_MODE_MIN_VALID_FORK_LENGTH + 3], do_send_blocks=True)
+            send_by_headers(conn2, branch_2_blocks[:SAFE_MODE_DEFAULT_MIN_FORK_LENGTH + 3], do_send_blocks=True)
 
             # active tip is from branch 2 and branch 1 has status valid-fork
-            wait_for_tip(conn1, branch_2_blocks[SAFE_MODE_MIN_VALID_FORK_LENGTH + 2].hash)
+            wait_for_tip(conn1, branch_2_blocks[SAFE_MODE_DEFAULT_MIN_FORK_LENGTH + 2].hash)
             wait_for_tip_status(conn1, branch_1_blocks[-1].hash, "valid-fork")
 
-            # we should entered the safe mode with VALID because there is a valid fork with SAFE_MODE_MIN_VALID_FORK_POW pow
-            # and last common block is less than SAFE_MODE_MAX_VALID_FORK_DISTANCE from active tip
-            try:
-                conn1.rpc.getbalance()
-                assert False, "Should not come to here, should raise exception in line above."
-            except JSONRPCException as e:
-                assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! Some miners appear to be experiencing issues. A large valid fork has been detected."
+            # we should entered the safe mode with VALID because there is a valid fork with SAFE_MODE_DEFAULT_MIN_VALID_FORK_POW pow
+            # and last common block is less than SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE from active tip
+            assert conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 
             # send more blockst of second branch
-            send_by_headers(conn1, branch_2_blocks[SAFE_MODE_MIN_VALID_FORK_LENGTH + 3:], do_send_blocks=True)
+            send_by_headers(conn1, branch_2_blocks[SAFE_MODE_DEFAULT_MIN_FORK_LENGTH + 3:], do_send_blocks=True)
 
             # active tip is last block from branch 2
             wait_for_tip(conn1,branch_2_blocks[-1].hash)
 
             # we should exit safe mode because fork base is too far from active tip
-            conn1.rpc.getbalance()
+            assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 
 if __name__ == '__main__':
     TriggerSafeModeAfterReorg().main()

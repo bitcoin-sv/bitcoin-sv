@@ -57,6 +57,11 @@ enum LogFlags : uint32_t {
 
 class Logger {
 private:
+    /**
+     * Name of the log file
+     */
+    const char* const fileName;
+
     FILE *fileout = nullptr;
     std::mutex mutexDebugLog;
     std::list<std::string> vMsgsBeforeOpenLog;
@@ -84,6 +89,7 @@ public:
 
     std::atomic<bool> fReopenDebugLog{false};
 
+    explicit Logger(const char* fileName);
     ~Logger();
 
     /** Send a string to the log output */

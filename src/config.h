@@ -9,10 +9,12 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 
 #include "amount.h"
 #include "consensus/consensus.h"
+#include "double_spend/dsdetected_defaults.h"
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "rpc/client_config.h"
+#include "rpc/webhook_client_defaults.h"
 #include "script/standard.h"
 #include "txn_validation_config.h"
 #include "validation.h"
@@ -104,6 +106,9 @@ public:
     virtual int64_t GetStreamSendRateLimit() const = 0;
     virtual unsigned int GetBanScoreThreshold() const = 0;
 
+    // RPC parameters
+    virtual uint64_t GetWebhookClientNumThreads() const = 0;
+
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
 #endif
@@ -129,6 +134,20 @@ public:
     virtual uint64_t GetDoubleSpendNumFastThreads() const = 0;
     virtual uint64_t GetDoubleSpendNumSlowThreads() const = 0;
     virtual uint64_t GetDoubleSpendQueueMaxMemory() const = 0;
+    virtual std::string GetDoubleSpendDetectedWebhookAddress() const = 0;
+    virtual int16_t GetDoubleSpendDetectedWebhookPort() const = 0;
+    virtual std::string GetDoubleSpendDetectedWebhookPath() const = 0;
+    virtual uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const = 0;
+
+    virtual std::int32_t GetSoftConsensusFreezeDuration() const = 0;
+
+    // Safe mode params
+    virtual std::string GetSafeModeWebhookAddress() const = 0;
+    virtual int16_t GetSafeModeWebhookPort() const = 0;
+    virtual std::string GetSafeModeWebhookPath() const = 0;
+    virtual int64_t GetSafeModeMaxForkDistance() const = 0;
+    virtual int64_t GetSafeModeMinForkLength() const = 0;
+    virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
 protected:
     ~Config() = default;
@@ -208,6 +227,9 @@ public:
     virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
     virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
 
+    // RPC parameters
+    virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
+
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
 #if ENABLE_ZMQ
@@ -236,6 +258,16 @@ public:
     virtual bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) = 0;
     virtual bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) = 0;
+    virtual bool SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
+    virtual bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err = nullptr) = 0;
+
+    virtual bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) = 0;
+    // Safe mode params
+    virtual bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) = 0;
+    virtual bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err) = 0;
+    virtual bool SetSafeModeMinForkLength(int64_t length, std::string* err) = 0;
+    virtual bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) = 0;
+
 
 protected:
     ~ConfigInit() = default;
@@ -444,6 +476,10 @@ public:
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override;
     unsigned int GetBanScoreThreshold() const override;
 
+    // RPC parameters
+    bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
+    uint64_t GetWebhookClientNumThreads() const override;
+
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
 
@@ -483,6 +519,28 @@ public:
     uint64_t GetDoubleSpendNumSlowThreads() const override;
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override;
     uint64_t GetDoubleSpendQueueMaxMemory() const override;
+    bool SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err) override;
+    std::string GetDoubleSpendDetectedWebhookAddress() const override;
+    int16_t GetDoubleSpendDetectedWebhookPort() const override;
+    std::string GetDoubleSpendDetectedWebhookPath() const override;
+    bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err) override;
+    uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override;
+
+    bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) override;
+    std::int32_t GetSoftConsensusFreezeDuration() const override;
+
+    // Safe mode params
+    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override;
+    std::string GetSafeModeWebhookAddress() const override;
+    int16_t GetSafeModeWebhookPort() const override;
+    std::string GetSafeModeWebhookPath() const override;
+    int64_t GetSafeModeMaxForkDistance() const override;
+    bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err)  override;
+    int64_t GetSafeModeMinForkLength() const  override;
+    bool SetSafeModeMinForkLength(int64_t length, std::string* err) override;
+    int64_t GetSafeModeMinForkHeightDifference() const  override;
+    bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override;
+
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -598,6 +656,9 @@ private:
     unsigned int recvInvQueueFactor;
     unsigned int banScoreThreshold;
 
+    // RPC parameters
+    uint64_t webhookClientNumThreads;
+
     // Double-Spend parameters
     DSAttemptHandler::NotificationLevel dsNotificationLevel;
     int dsEndpointFastTimeout;
@@ -611,12 +672,25 @@ private:
     uint64_t dsAttemptNumFastThreads;
     uint64_t dsAttemptNumSlowThreads;
     uint64_t dsAttemptQueueMaxMemory;
+    std::string dsDetectedWebhookAddress;
+    int16_t dsDetectedWebhookPort;
+    std::string dsDetectedWebhookPath;
+    uint64_t dsDetectedWebhookMaxTxnSize;
+
+    std::string safeModeWebhookAddress;
+    int16_t safeModeWebhookPort;
+    std::string safeModeWebhookPath;
+    int64_t safeModeMaxForkDistance;
+    int64_t safeModeMinForkLength;
+    int64_t safeModeMinHeightDifference;
 
     std::optional<bool> mDisableBIP30Checks;
 
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
+
+    std::int32_t mSoftConsensusFreezeDuration;
 
     // Only for values that can change in runtime
     mutable std::shared_mutex configMtx{};
@@ -1014,6 +1088,10 @@ public:
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override { return true; }
     unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
 
+    // RPC parameters
+    bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }
+    uint64_t GetWebhookClientNumThreads() const override { return rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS; }
+
     // Double-Spend processing parameters
     bool SetDoubleSpendNotificationLevel(int level, std::string* err) override { return true; }
     DSAttemptHandler::NotificationLevel GetDoubleSpendNotificationLevel() const override { return DSAttemptHandler::DEFAULT_NOTIFY_LEVEL; }
@@ -1039,6 +1117,12 @@ public:
     uint64_t GetDoubleSpendNumSlowThreads() const override { return DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS; }
     bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override { return true; }
     uint64_t GetDoubleSpendQueueMaxMemory() const override { return DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY * ONE_MEGABYTE; }
+    bool SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err) override { return true; }
+    std::string GetDoubleSpendDetectedWebhookAddress() const override { return ""; }
+    int16_t GetDoubleSpendDetectedWebhookPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetDoubleSpendDetectedWebhookPath() const override { return ""; }
+    bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err) override { return true; }
+    uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override { return DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
@@ -1084,6 +1168,28 @@ public:
     {
         return true;
     }
+
+    bool SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err ) override
+    {
+        return true;
+    }
+
+    std::int32_t GetSoftConsensusFreezeDuration() const override
+    {
+        return std::numeric_limits<std::int32_t>::max();
+    }
+
+    // Safe mode params
+    bool SetSafeModeWebhookURL(const std::string& url, std::string* err = nullptr) override { return true; }
+    std::string GetSafeModeWebhookAddress() const override { return ""; }
+    int16_t GetSafeModeWebhookPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetSafeModeWebhookPath() const override { return ""; }
+    int64_t GetSafeModeMaxForkDistance() const override { return 100;};
+    bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err)  override {return true;};
+    int64_t GetSafeModeMinForkLength() const  override { return 3;};
+    bool SetSafeModeMinForkLength(int64_t length, std::string* err) override {return true;};
+    int64_t GetSafeModeMinForkHeightDifference() const  override { return 5;};
+    bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override {return true;};
 
     void Reset() override;
 

@@ -1,168 +1,259 @@
-# Bitcoin SV version 1.0.8 Release Notes
+# 1.0.9 Release Notes
 
-## Headline changes since 1.0.7
-* Support for creating double-spend enabled transactions; if a double-spend of an input is seen,
-a HTTP notification will be sent to a specified endpoint. (Please refer to
-[here](https://github.com/bitcoin-sv-specs/protocol/double-spend-notifications.md) for further details)
-* New getorphaninfo RPC.
-* New verifyScript RPC.
-* New getmerkleproof2 RPC consistent with latest TSC.
-* maxstackmemoryusageconsensus parameter added to output of getsettings RPC.
-* sendrawtransaction and sendrawtransactions RPC can be used with dontCheckFees even when a transaction is already known.
-* sendrawtransaction and sendrawtransactions RPC modified to optionally return list of unconfirmed parents.
-* New configuration parameter -dustlimitfactor available to define dust.
-* Free consolidation transaction can be used to avoid dusting attack. 
-* Adjusted default maximum validation duration for async tasks to better handle chains and long graphs.
-* Change algorithm for using ancestor height rather than ancestor count.
-* Improve release rate from Oprhan pool.
-* Better performance as a result of improvements to cs_main processing.
-* Improved validation of chains.
-* Transactions will not be accepted if the result is an in-mempool ancestor chain of height 10,000 or more. Previously this figure was 1000 transactions.
-* The default value for the maxorphantxsize configuration parameter has been changed to 1GB
-* The maxcollectedoutpoints configuration parameter is no longer used and has been removed.
-* The STN is being reset.
+# Bitcoin SV Node software – Upgrade to v1.0.9 Release
+Version 1.0.9 release is a recommended upgrade from version 1.0.8; This new version brings improved safe mode processing, webhook notifications, block double spend P2P notification messages and the possibility to freeze transaction outputs that are the target of double spends.
 
-## Changes since 1.0.8.beta
-* Fixed the dust return script condition in IsDustReturnScript. The previous version incorrectly contained an OP_4.
-* Fixed a bug that caused double spend notifications to be skipped for previously detected but unreported double-spends.
-* Fixed an issue that could cause mempool and journal inconsistencies during a reorg.
+Content details listed below:  
 
-## Other technical changes
-* Remove all support for Tor.
-* Configure docker images so that core dump is preserved.
-* Include header files in CMAKE build.
-* Make CBlockIndex thread safe to remove cs_main dependency.
-* Encapsulate mapBlockIndex and remove cs_main dependency.
-* Create leaky bucket for tracking peer suspension score.
-* Remove non-ctor init function in networkprocessing.
-* Soft block orphaning support (not used).
-* Refactor NET logging category.
-* Move lNodesAnnouncingHeaderAndIDs into BlockDownloadTracker.
-* Replace rand with the facilities in <random>.
-* Allow parallel downloads of the same block from several peers.
-* Error message can be of 'txid' instead of 'hash' at the beginning for incorrect txid value while executing getmerkleproof RPC as like verifymerkleproof RPC.
-* GlobalConfig class is not thread safe.
-* dev branch clang warning -Wdefaulted-function-deleted.
-* Initialize class members where clang requires.
-* Fix: P2P Messages In Multiple TCP Segments.
-* Improve detection of longer chains.
-* Improved orphan transaction processing.
-* Reduce Logging Cost.
-* Fix runtime errors in unit test (Windows os).
-* Global thread-local interferes with address sanitizer.
-* Remove libatomic dependency.
-* Undefined behaviour sanitiser reporting vector out of bounds access in CBlockFileInfoStore::FlushBlockFile.
-* Fix: St16invalid_argument displays many times on startup.
-* Falsely logged error opening rev<xxxx>.dat in logs.
-* Fix: coredump at shutdown within logging.
-* Fix: failure in CTxMemPool::GetMemPoolChildrenNL.
-* Fix: a possible false negative result during querying the PTV processing queue.
-* Remove maxcollectedoutpoints configuration parameter.
-* Improved stability when accepting transactions during the reorg.
+1. New block double spend P2P notification message.
+2. Improved safe mode processing including new RPCs to manually control safe mode.
+3. Webhook notification of competing chains and double spends.
+4. Possibility to freeze transaction outputs.
+5. Performance improvements to transaction chain processing.
+6. STN Reset
 
-## Functional tests
-* Fix: import-rescan.py - possible race condition during tip update signaling.
-* Fix: bsv-factorMaxSendQueueBytes functional test fails on Windows.
-* Remove test/test_bitcoin_fuzzy.cpp.
-* Fix: failing functional test bsv-getdata.py.
-* Add a new FT to test long chains of CPFP txs.
-* Fix: bsv-magicbytes.py functional test failed.
-* Fix: internittent failure in bsv-block-propagation-priority.py.
-* Fix: Random failures of bsv_pbv_firstvalidactive.py functional test.
-* Fix: Failing util tests on Windows.
-* Fix for issue detected by bsv-dsreport.py and bsv-ds-bad-callback-service.py on Windows.
-* Wait_for_getdata method is misused in functional tests.
+## Response to Block Withholding Attacks
 
-## Security
-* Remove warnings from source code.
-* Update out-of-date dependencies with known security issues.
-* Lock consistency violations in WPUSMutex.
-* CReeRate calculation of CPFP groups allows invalid amounts.
-* Incorect usage of cs_main.
+**Background**
 
-## Scaling Test Network (STN) Reset
-The Scaling Test Network has been reset at block height 5. This block has hash 
-`00000000e9222ebe623bf53f6ec774619703c113242327bdc24ac830787873d6`.
+In the past few months, there have been several attempted attacks on the BSV network.  The attacks involve mining a hidden alternate chain (in at least one case > 80 blocks in length) and then posting it to the blockchain at once so it became the new main chain. The new chain replaces some of the transactions in the original chain with double spends. Exchanges typically require a certain number of block confirmations (say 50 blocks have been built on the attempted transactions) before coin deposits or withdrawals into their exchange are valid, *for example*, to prevent an attacker from depositing double-spent BSV coins and immediately trade or cash out his position in the selfish chain after previously doing the same thing on the main chain.
 
-## Additional notes
+The BSV blockchain and other PoW blockchains are vulnerable to these types of attacks because of the large amounts of roaming hash-power available that can be used on competing networks.
 
-### New command line option -dustlimitfactor available to define dust.
+Our response to these attacks has included steps to:
 
-Until now, the minimum ratio between a transaction output amount and its corresponding fee is 3/1.
-If this condition was not met, the transaction was considered “dust” and was rejected during validation.
+1. Put global 24 hour/7 day a week monitoring in position and:
+    - notify miners of long, competing chains when they appear.
+    - notify exchanges and application providers of double spends in the new chain.
+2. Enable honest miners to invalidate the block at the base of the selfish chain using **invalidateblock**, and then mine on the original honest chain until it is restored as the main chain.
 
-This factor can now be configured via the new “*-dustlimitfactor*” option in percent, which still defaults
-to 300% but can be set to any value between 300% and 0%.
+**Notification of change of safe mode (competing chains)
+**
 
-If the *-dustlimitfactor* is set to zero, then no transaction output is regarded as dust.
+Exchanges and miners will be notified if a suspicious event (most likely an attack) occurs. The trigger is the existence of recent, long, competing chains.
 
-The formula for calculating the dust threshold is as follows (integer arithmetic):
+Notification about a block reorganisation is part of the safe mode notification.
 
-    s = serialized size of transaction output
-    d = dustlimitfactor, percent value between 300 and 0, default: 300
-    r = dustrelayfee, default: default-minrelaytxfee, 250 as of v1.0.8
-    m = 148, minimum bytes of spendable input
-    
-    d * (r * (s + m)/1000)) / 100
+The Bitcoin SV Node software currently contains “safe-mode” logic to detect competing chains and de-activate wallet RPC calls (put into safe-mode). The safe-mode logic has been updated so that chain detection is configurable (allowing for users to customise their sensitivity to suspicious events) and triggers notifications via webhooks to exchanges/miners/application providers.
 
-Note that the division by 100 as the dustlimitfactor specifies a percentage value.
 
-A transaction exactly at the threshold passes. If one output is below the threshold, the transaction is rejected.
+**Notification of double spends**
 
-Example: For a typical transaction with an output of 34 bytes in size, the formula yields a threshold of 135 Satoshis.
+Exchanges and miners will be notified of recent double spends in competing chains of the BSV network.
 
-    s = 34
-    d = 300
-    r = 250
-    m = 148
-    
-    Threshold = (300 * (250 * (34 + 148)/1000)) / 100 = 135
+Blockchain monitoring applications may send a DSD P2P notifications message to a BSV node (meaning a mining node), which will then relay the message to other nodes. The message contains a double spend proof (Merkle proof of the inclusion of transactions in a block).  Notifications are via webhooks.
 
-Note the same formula would give a threshold of 136.5 Satoshis if floating point arithmetic is used.
 
-A typical transaction output, with the default parameter settings in 1.0.8, needs to be worth 135
-Satoshis not to be considered dust. Note that due to rounding, the calculated dust threshold for the
-example transaction becomes 0 if the *dustlimitfactor* and the *dustrelayfee* are very low.
+**Freezing of double spends.**
+A BSV node (meaning a mining node) can now "freeze" specific TXOs (e.g. used by double spends).
 
-### Free consolidation transaction can be used to avoid dusting attack.
+If a policy freeze is applied to the TXO, the node will not accept transactions that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
 
-Transaction validation has now been relaxed to allow a new kind of transaction, the dust return transaction.
-This new transaction type allows donating dust to miners via fees as a new way to counter wallet dusting attacks.
-This is more economical for the network because it allows clearing the wallets and UTXO databases from otherwise
-practically unspendable outputs, whilst completely removing the incentive to conduct dust attacks at all.
+## Specific Changes
 
-A transaction is considered a dust return transaction if the following conditions are met:
+### Interface with DS Detector
 
-- The transaction has a single output of zero value (zero amount).
-- The scriptPubKey is as follows:
+The node will receive DSD P2P notification message that a double spend has been detected. On receipt of a DSD message, (a) the DSD message is verified/validated (to ensure that is not a malicious fake), (b) the DSD message is relayed to other nodes, and (c) webhooks are used to notify users.
 
-        OP_FALSE OP_RETURN OP_PUSHDATA ‘dust’.
+Note that there is no need to inform peers about every double-spend contained in every block, it is sufficient for a notification to just contain the details of a single transaction from each block containing a conflict. 
 
-All inputs must be standard inputs or the following node configuration parameter must be set:
+#### DSD P2P message
 
-    -acceptnonstdconsolidationinput=1
+The format of the new DSD P2P message is 
 
-The node must also be configured to accept non standard transactions. I.e. following configuration option must be set:
+| **Field size** | **Description** | **Data Type**   | **Comments**                                                 |
+| -------------- | --------------- | --------------- | ------------------------------------------------------------ |
+| 2              | version         | uint16_t        | Versioning information for this message. Currently can only contain the value 0x0001. |
+| 1+             | block count     | varint          | The number of blocks containing a double spend transaction this message is reporting. Must be >= 2. |
+| variable       | block list      | block_details[] | An array of details for blocks containing double spend transactions |
 
-    -acceptnonstdtx=1
+block_details:
 
-Note that dust return transactions share two configuration parameters with consolidation transactions:
+| **Field size** | **Description** | **Data Type**  | **Comments**                                                 |
+| -------------- | --------------- | -------------- | ------------------------------------------------------------ |
+| 1+             | header count    | varint         | The number of following block headers (may not be 0).        |
+| variable       | header list     | block_header[] | An array of unique block headers containing details for all the blocks from the one containing the conflicting transaction back to the last common ancestor of all blocks reported in this message. Note that we don't actually need the last common ancestor in this list, it is sufficient for the last header in this list to be for the block where this fork begins, i.e.; the **hashPrevBlock** field from the last block header will be the same for all the blocks reported in this message. |
+| variable       | merkle proof    | merkle_proof   | The transaction contents and a proof that the transaction exists in this block. Follows TSC standard. |
 
-- *-acceptnonstdconsolidationinput* (default: 0)
-- *-minconsolidationfactor* (default: 20. Setting consolidation factor to 0 disables consolidation transactions and dust return transactions as well)
+block_header:
 
-# Previous Releases
-* [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
-* [Version 0.1.1](release-notes-v0.1.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.1) - 2019-02-11
-* [Version 0.2.0](release-notes-v0.2.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.0) - 2019-06-05
-* [Version 0.2.1](release-notes-v0.2.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.1) - 2019-07-12
-* [Version 0.2.2.beta](release-notes-v0.2.2-beta.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.2.beta/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.2.beta) - 2019-10-30
-* [Version 1.0.0](release-notes-v1.0.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.0) - 2020-01-15
-* [Version 1.0.1](release-notes-v1.0.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.1) - 2020-01-28
-* [Version 1.0.2](release-notes-v1.0.2.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.2/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.2) - 2020-02-17
-* [Version 1.0.3](release-notes-v1.0.3.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.3/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.3) - 2020-04-28
-* [Version 1.0.4](release-notes-v1.0.4.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.4/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.4) - 2020-07-01
-* [Version 1.0.5](release-notes-v1.0.5.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.5/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.5) - 2020-09-08
-* [Version 1.0.6](release-notes-v1.0.6.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.6/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.6) - 2020-11-17
-* [Version 1.0.7](release-notes-v1.0.7.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.7/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.7) - 2021-02-10
-* [Version 1.0.7.1](release-notes-v1.0.7.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/1.0.7.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v1.0.7.1) - 2021-04-22
+| **Field size** | **Description**     | **Data Type** | **Comments**                               |
+| -------------- | ------------------- | ------------- | ------------------------------------------ |
+| 4              | version             | int32_t       | Block version information.                 |
+| 32             | hash previous block | char[32]      | Hash of the previous block in the fork.    |
+| 32             | hash merkle root    | char[32]      | The merkle root for this block.            |safemodemaxforkdistance
+| 4              | time                | uint32_t      | Timestamp for when this block was created. |
+| 4              | bits                | uint32_t      | Difficulty target for this block.          |
+| 4              | nonce               | uint32_t      | Nonce used when hashing this block.        |
+
+
+
+The DSD P2P message specification can be found at https://github.com/bitcoin-sv-specs/protocol/blob/master/p2p/DSD_P2P.md
+
+#### Webhook DSD notification message.
+
+The node will use webhooks to notify listeners that new double spends has been detected on alternate chains on the blockchain. The recipient of the webhook message can be configured using the new command line parameter, ***dsdetectedwebhookurl\***.
+
+The DSD notification message template is shown below
+
+```
+{
+    "version": number,
+    "blocks : [
+        { 
+            "divergentBlockHash" : string,
+            "headers" : [
+                {
+                    "version" : number,
+                    "hashPrevBlock" : string,
+                    "hashMerkleRoot" : string,
+                    "time" : number,
+                    "bits" : number,
+                    "nonce" : number
+                }
+            ],
+            "merkleProof" : {
+                "index" : number,
+                "txOrId" : string,   // Full transaction, serialised, hex-encoded
+                "targetType": "merkleRoot",        
+                "target" : string,   // Merkle-root
+                "nodes" : [ "hash", ... ]
+            }
+        },
+        ...
+    ]
+}
+```
+
+This notification message is documented in docs/web_hooks.md in the distribution.
+
+The **getblockheader** RPC has been updated to report on the valid/invalidated status of the block.
+
+### Update of Safe-Mode Trigger Methodology
+
+Safe-mode disables node wallet functionality so that users cannot spend coins. Safe-mode is triggered when a long competing (parallel) block chain is detected. i.e. an attack chain is found. Webhooks are used to notify users when safe-mode status has been changed.
+This update also modifies the logic that triggers safe-mode.
+
+This release introduces 3 new command line parameters
+
+1. **safemodemaxforkdistance**, Default = 1000 (7 days of mining)
+2. **safemodeminforklength**, Default = 3
+3. **safemodeminblockdifference**, Default = -72 (12 hours of mining below current tip)
+
+Safe mode is automatically triggered if all of these criteria are satisfied:
+
+- The distance between the current tip and the last common block header of the fork is smaller than the **safemodemaxforkdistance**.
+- The length of the fork is greater than **safemodeminforklength**.
+- The total proof of work of the fork tip is greater than the minimum fork proof of work (POW). The minimum fork POW is calculated relative to the active chain tip using this formula: <total-proof-of-work-active-chain> + **safemodeminblockdifference** * <proof-of-work-of-the-active-tip>. Safe mode is activated if the fork height is bigger than <height-active-chain-tip> + **safemodeminblockdifference**. Note that the negative value of **safemodeminblockdifference** means that we will activate the safe mode for forks with tips below active chain tip.
+The first condition from the current implementation is retained, but triggering occurs before the competing fork surpasses the active chain. Safe mode is activated whenever the competing chain tip approaches the main chain tip closer than **safemodeminforklength** or it is ahead of the main chain tip.
+
+#### Webhook Safe Mode notification message
+
+The node will use webhooks to notify listeners if the node enters or leaves safe-mode or one of the following events occur while in safe mode.
+
+- the non-main chain is extended
+- a block is fetched for the tip of non-main chain.
+- a change in the validity of a chain (e.g. triggered by calls to **invalidateblock**)
+- a blockchain reorg
+
+Notifications will not occur during initial block download or reindex even if safe mode conditions exist.
+
+A users who is only interested in the current safe mode state can check the **safemodeenabled** field in the notification message (see below).
+
+The recipient of the webhook message can be configured using the new command line parameter ***safemodewebhookurl\***.
+
+The safe mode notification message template is shown below.
+
+```
+{
+    "safemodeenabled": boolean,           // Is the node in the safe mode.
+    "activetip": {                        // Tip of the main chain.
+        "hash": string,                   // Block hash.
+        "height": number,                 // Block height.
+        "blocktime": string,              // Human readable, UTC, block time.
+        "firstseentime": string,          // Human readable, UTC, time when the node first received header.
+        "status": "active"                // Status of the block. Possible values: active, invalid
+                                          //     headers-only, valid-fork, and valid-headers.
+    },
+    "timeutc": string,                    // Human readable, UTC, time of creation of this message.
+    "reorg": {                            // Information about possible reorg.
+        "happened": bool,                 // Indicates if an reorg happened.
+        "numberofdisconnectedblocks": number, // Number of blocks disconnected in reorg.
+        "oldtip": {                       // Information about old active tip, "null" if an reorg did not happened.
+            "hash": string,               
+            "height": number,
+            "blocktime": string,
+            "firstseentime": string,
+            "status": string
+        }
+    },
+    "forks": [                             // List of forks that are triggering the safe mode.
+        {
+            "forkfirstblock": {            // Root of the fork, this block's parent is on the main chain.
+                "hash": string,
+                "height": number,
+                "blocktime": string,
+                "firstseentime": string,
+                "status": string
+            },
+            "tips": [                      // List of tips of this fork.
+                {
+                    "hash": string,
+                    "height": number,
+                    "blocktime": string,
+                    "firstseentime": string,
+                    "status": string
+                },
+                ...
+            ],
+            "lastcommonblock": {            // Block on the main chain which is parent of the "forkfirstblock"
+                "hash": string,
+                "height": number,
+                "blocktime": string,
+                "firstseentime": string,
+                "status": string
+            },
+            "activechainfirstblock": {      // Block on the main chain which is child of the "lastcommonblock"
+                "hash": string,
+                "height": number,
+                "blocktime": string,
+                "firstseentime": string,
+                "status": string
+            },
+        },
+    ...
+    ]
+}
+```
+
+
+This notification message is also documented in docs/web_hooks.md in the distribution.
+
+### New RPC functions to enable/disable Safe-Mode
+
+The RPC function allows a user to manually override safe-mode without restarting the node. 
+
+This release introduces 3 new RPCs.
+
+1. **ignoresafemodeforblock <block_hash>** - The specified block and all its descendants will be ignored when calculating criteria for entering the safe mode.
+2. **reconsidersafemodeforblock <block_hash>** - The specified block and all its descendants will be considered when calculating criteria for entering the safe mode.
+3. **getsafemodeinfo** - Detailed information on the safe mode status.
+
+The effect of the RPCs is not preserved across node restarts.
+
+### Support for Transaction Output Freezes
+
+A node can now "freeze" specific transaction outputs (TXOs). A freeze can be applied to both spent and unspent TXOs, and can be used to ensure that a node does not process a known double spend.
+
+If a policy freeze is applied to the TXO, the node will not accept transactions that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
+
+This release introduces new RPCs.
+
+1. **addToPolicyBlacklist \<funds : object\> ** - add TXO to policy blacklist (i.e. do not accept transactions that accesses this TXO, blocks containing transaction may be accepted if not in the consensus blacklist)
+2. **removeFromPolicyBlacklist \<funds : object\>** - remove TXO from policy blacklist
+3. **queryBlacklist** - Returns all frozen TXOs from the DB.
+4. **clearBlacklists \<removeAllEntries : boolean, default=true\> ** - Removes entries from the blacklist.
+
+### Performance Improvements ###
+The release contains optimisation to the processing of long, complex chains of transactions under extreme loads.
+

@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include "consensus/validation.h"
+#include "frozentxo.h"
 #include "key.h"
 #include "keystore.h"
 #include "mining/assembler.h"
@@ -19,6 +20,7 @@
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "utiltime.h"
+#include "validation.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -79,6 +81,7 @@ namespace {
                                         std::function<bool(uint32_t)> expectedResultBasedOnFlags,
                                         bool add_to_cache,
                                         bool upgraded_nop,
+                                        CFrozenTXOCheck& frozenTXOCheckTransaction,
                                         const CCoinsViewCache& tipView)
     {
         //DummyConfig config(CBaseChainParams::MAIN);
@@ -122,6 +125,7 @@ namespace {
                     true,
                     add_to_cache,
                     txdata,
+                    frozenTXOCheckTransaction,
                     nullptr).value();
 
             // find out if we should pass or fail based on flags.
@@ -153,6 +157,7 @@ namespace {
                         true,
                         add_to_cache,
                         txdata,
+                        frozenTXOCheckTransaction,
                         &scriptchecks).value());
                 BOOST_CHECK(scriptchecks.empty());
             } else {
@@ -172,6 +177,7 @@ namespace {
                         true,
                         add_to_cache,
                         txdata,
+                        frozenTXOCheckTransaction,
                         &scriptchecks).value());
                 BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
             }
@@ -244,6 +250,12 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
     // Test that passing CheckInputs with one set of script flags doesn't imply
     // that we would pass again with a different set of flags.
     InitScriptExecutionCache();
+
+    auto parentHash = InsecureRand256();
+    CFrozenTXOCheck frozenTXOCheckTransaction{
+        0, // NOTE: Since no TXO is frozen in this test, dummy block height can be used for checking.
+        "test transaction",
+        parentHash};
 
     CScript p2pk_scriptPubKey =
         CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
@@ -323,6 +335,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                     true,
                     true,
                     ptd_spend_tx,
+                    frozenTXOCheckTransaction,
                     nullptr).value());
 
             // If we call again asking for scriptchecks (as happens in
@@ -343,6 +356,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                     true,
                     true,
                     ptd_spend_tx,
+                    frozenTXOCheckTransaction,
                     &scriptchecks).value());
 
             BOOST_CHECK_EQUAL(scriptchecks.size(), 1);
@@ -353,7 +367,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             // successes.
             ValidateCheckInputsForAllFlags(spend_tx,
                                            [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CLEANSTACK); },
-                                           false, false, cache);
+                                           false, false, frozenTXOCheckTransaction, cache);
         }
         
         // And if we produce a block with this tx, it should be valid (LOW_S not
@@ -383,7 +397,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         ValidateCheckInputsForAllFlags(invalid_under_p2sh_tx,
                                        [](uint32_t flags) -> bool { return (flags & SCRIPT_UTXO_AFTER_GENESIS); },
-                                       true, false, CCoinsViewCache{ view });
+                                       true, false, frozenTXOCheckTransaction, CCoinsViewCache{ view });
     }
 
     // Test CHECKLOCKTIMEVERIFY
@@ -413,7 +427,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         ValidateCheckInputsForAllFlags(invalid_with_cltv_tx,
                                        [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
                                                                             || (flags & SCRIPT_UTXO_AFTER_GENESIS); },
-                                       true, true, cache);
+                                       true, true, frozenTXOCheckTransaction, cache);
         
         // Make it valid, and check again
         invalid_with_cltv_tx.vin[0].scriptSig = CScript() << vchSig << 100;
@@ -436,6 +450,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 true,
                 txdata,
+                frozenTXOCheckTransaction,
                 nullptr).value());
     }
 
@@ -465,7 +480,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         ValidateCheckInputsForAllFlags(invalid_with_csv_tx,
                                        [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)
                                                                             || (flags & SCRIPT_UTXO_AFTER_GENESIS); },
-                                       true, true, cache);
+                                       true, true, frozenTXOCheckTransaction, cache);
         // Make it valid, and check again
         invalid_with_csv_tx.vin[0].scriptSig = CScript() << vchSig << 100;
         CValidationState state;
@@ -487,6 +502,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 true,
                 txdata,
+                frozenTXOCheckTransaction,
                 nullptr).value());
     }
 
@@ -527,7 +543,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         CoinsDBSpan cache{*pcoinsTip};
 
         // This spends p2sh so after genesis it should fail if cleans stack rule is enforced
-        ValidateCheckInputsForAllFlags(tx, shouldPass,  true, false, cache);
+        ValidateCheckInputsForAllFlags(tx, shouldPass,  true, false, frozenTXOCheckTransaction, cache);
 
         // Check that if the second input is invalid, but the first input is
         // valid, the transaction is not cached.
@@ -553,6 +569,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 true,
                 txdata,
+                frozenTXOCheckTransaction,
                 nullptr).value());
 
         // Make sure this transaction was not cached (ie becausethe first input
@@ -571,6 +588,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 true,
                 txdata,
+                frozenTXOCheckTransaction,
                 &scriptchecks).value());
         // Should get 2 script checks back -- caching is on a whole-transaction
         // basis.

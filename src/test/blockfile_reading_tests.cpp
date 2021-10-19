@@ -83,7 +83,7 @@ namespace
 
         BOOST_REQUIRE( res );
 
-        index.SetDiskBlockData(block.vtx.size(), blockPos, metaData, notifyDirty);
+        index.SetDiskBlockData(block.vtx.size(), blockPos, metaData, CBlockSource::MakeUnknown(), notifyDirty);
     }
 
     struct CScopeSetupTeardown

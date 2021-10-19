@@ -299,6 +299,11 @@ extern const char *CREATESTREAM;
  * attempt to setup a new stream has been successful.
  */
 extern const char *STREAMACK;
+/**
+ * The dsdetected message is a notification that a block (or blocks) have
+ * been observed which contains an attempt to double-spend some UTXOs.
+ */
+extern const char *DSDETECTED;
 
 /**
  * Indicate if the message is used to transmit the content of a block.

@@ -299,7 +299,9 @@ enum class MemPoolRemovalReason {
     //! Removed for conflict with in-block transaction
     CONFLICT,
     //! Removed for replacement
-    REPLACED
+    REPLACED,
+    //! Removed because input was frozen
+    FROZEN_INPUT
 };
 
 struct DisconnectedBlockTransactions;
@@ -409,6 +411,7 @@ private:
     std::atomic_bool suspendSanityCheck {false};
 
     std::atomic_uint nTransactionsUpdated {0};
+    std::atomic_uint mFrozenTxnUpdatedAt {0};
 
     // fee that a transaction or a group needs to pay to enter the primary mempool
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
@@ -672,7 +675,7 @@ private:
 
     // tries to accept transactions to primary mempool. it recalculates grouping data, forms groups or accepts transactions as standalone
     // this may result that some other transaction, which are not in the toUpdate, to be updated and accepted to primary mempool
-    void TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet);
+    void TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet, bool limitTheLoop);
 
     // tries to accept entry to the primary mempool, may result in accepting other transactions (i.e. if the entry is groups paying tx)
     void TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet);
@@ -702,6 +705,8 @@ public:
             const mining::CJournalChangeSetPtr& changeSet,
             const uint256& blockhash);
 
+    void RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet);
+
     void Clear();
 
     void QueryHashes(std::vector<uint256> &vtxid);
@@ -709,6 +714,7 @@ public:
     CTransactionWrapperRef IsSpentBy(const COutPoint &outpoint) const;
 
     unsigned int GetTransactionsUpdated() const;
+    unsigned int GetFrozenTxnUpdatedAt() const {return mFrozenTxnUpdatedAt;}
     void AddTransactionsUpdated(unsigned int n);
 
     /**
@@ -1372,12 +1378,10 @@ struct DisconnectedBlockTransactions {
     // It's almost certainly a logic bug if we don't clear out queuedTx before
     // destruction, as we add to it while disconnecting blocks, and then we
     // need to re-process remaining transactions to ensure mempool consistency.
-    // For now, assert() that we've emptied out this object on destruction.
-    // This assert() can always be removed if the reorg-processing code were
-    // to be refactored such that this assumption is no longer true (for
-    // instance if there was some other way we cleaned up the mempool after a
-    // reorg, besides draining this object).
-    ~DisconnectedBlockTransactions() { assert(queuedTx.empty()); }
+    // For now just log it as an ERROR since we don't want to loose stack trace
+    // in case of an exception and loosing some transactions from mempool is not
+    // a critical error.
+    ~DisconnectedBlockTransactions();
 
 private:
     indexed_disconnected_transactions queuedTx;

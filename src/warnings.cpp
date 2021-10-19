@@ -7,6 +7,7 @@
 #include "clientversion.h"
 #include "sync.h"
 #include "util.h"
+#include "validation.h"
 
 CCriticalSection cs_warnings;
 std::string strMiscWarning;
@@ -63,12 +64,27 @@ std::string GetWarnings(const std::string &strFor) {
                                 "has been detected.";
         break;
     case SafeModeLevel::UNKNOWN:
-        strStatusBar = strRPC = "Warning: The network does not appear to fully "
-                                "agree! We received headers of a large fork. " 
-                                "Still waiting for block data for more details.";
+        strStatusBar = strRPC = "Warning: The network does not appear to agree "
+                                "with the local blockchain! Still waiting for "
+                                "block data for more details.";
         break;
     case SafeModeLevel::NONE:
         break;
+    }
+
+    if (IsInitialBlockDownload() && (currentSafeModeLevel != SafeModeLevel::NONE))
+    {
+        const std::string ibdWarning = " We are in the startup process (e.g. Initial"
+                                       " block download or reindex), this might be"
+                                       " reason for disagreement.";
+        if(strStatusBar != "")
+        {
+            strStatusBar += ibdWarning;
+        }
+        if(strRPC != "")
+        {
+            strRPC += ibdWarning;
+        }
     }
 
     if (strFor == "statusbar")

@@ -32,6 +32,8 @@
 #include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "rpc/webhook_client.h"
+#include "rpc/webhook_client_defaults.h"
 #include "scheduler.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
@@ -49,6 +51,7 @@
 #include "validationinterface.h"
 #include "vmtouch.h"
 #include "merkletreestore.h"
+#include "safe_mode.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
@@ -175,6 +178,7 @@ void Shutdown() {
     UnregisterValidationInterface(peerLogic.get());
     peerLogic.reset();
 
+    rpc::client::g_pWebhookClient.reset();
     mining::g_miningFactory.reset();
 
     if (g_connman) {
@@ -238,7 +242,7 @@ void Shutdown() {
     }
     vpwallets.clear();
 #endif
-
+    ShutdownFrozenTXO();
     BlockIndexStoreLoader(mapBlockIndex).ForceClear();
 
     LogPrintf("%s: done\n", __func__);
@@ -346,6 +350,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(
             _("Set database cache size in megabytes (%d to %d, default: %d). The value may be given in megabytes or with unit (B, KiB, MiB, GiB)."),
             nMinDbCache, nMaxDbCache, nDefaultDbCache));
+
+    strUsage += HelpMessageOpt(
+        "-frozentxodbcache=<n>",
+        strprintf(
+            _("Set cache size for database holding a list of frozen transaction outputs in bytes (default: %u)"),
+            DEFAULT_FROZEN_TXO_DB_CACHE));
+
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-feefilter", strprintf("Tell other nodes to filter invs to us by "
@@ -757,13 +768,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "-checkpoints", strprintf("Only accept block chain matching "
                                       "built-in checkpoints (default: %d)",
                                       DEFAULT_CHECKPOINTS_ENABLED));
-        strUsage += HelpMessageOpt(
-            "-disablesafemode", strprintf("Disable safemode, override a real "
-                                          "safe mode event (default: %d)",
-                                          DEFAULT_DISABLE_SAFEMODE));
-        strUsage += HelpMessageOpt(
-            "-testsafemode",
-            strprintf("Force safe mode (default: %d)", DEFAULT_TESTSAFEMODE));
+
         strUsage +=
             HelpMessageOpt("-dropmessagestest=<n>",
                            "Randomly drop 1 of every <n> network messages");
@@ -1092,7 +1097,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         );
     }
 
-    strUsage += HelpMessageGroup(_("RPC server options:"));
+    strUsage += HelpMessageGroup(_("RPC client/server options:"));
     strUsage += HelpMessageOpt("-server",
                                _("Accept command line and JSON-RPC commands"));
     strUsage += HelpMessageOpt(
@@ -1142,6 +1147,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-rpccorsdomain=value",
         "Domain from which to accept cross origin requests (browser enforced)");
+    strUsage += HelpMessageOpt("-rpcwebhookclientnumthreads=<n>",
+        strprintf(_("Number of threads available for submitting HTTP requests to webhook endpoints. (default: %u, maximum: %u)"),
+            rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS, rpc::client::WebhookClientDefaults::MAX_NUM_THREADS));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-rpcworkqueue=<n>", strprintf("Set the depth of the work queue to "
@@ -1341,6 +1349,52 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
 
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookurl=<url>",
+        "URL of a webhook to notify on receipt of a double-spend detected P2P message from another node. For example: "
+        "http://127.0.0.1/dsdetected/webhook");
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookmaxtxnsize=<n>",
+        strprintf(_("Maximum size of transaction to forward to the double-spend detected webhook. For double-spent transactions "
+                    "above this size only the transaction ID will be reported to the webhook (default: %uMB). "
+                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
+
+    strUsage += HelpMessageOpt(
+        "-softconsensusfreezeduration",
+        strprintf("Set for how many blocks a block that contains transaction spending "
+                  "consensus frozen TXO will remain frozen before it auto unfreezes "
+                  "due to the amount of child blocks that were mined after it "
+                  "(default: %u; note: 0 - soft consensus freeze duration is "
+                  "disabled and block is frozen indefinitely).",
+                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
+
+    /** Double-Spend detection/reporting */
+    strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
+
+    strUsage += HelpMessageOpt(
+        "-disablesafemode", strprintf("Disable safemode, override a real "
+                                        "safe mode event (default: %d)",
+                                        DEFAULT_DISABLE_SAFEMODE));
+    if (showDebug) {
+        strUsage += HelpMessageOpt(
+            "-testsafemode",
+            strprintf("Force safe mode (default: %d)", DEFAULT_TESTSAFEMODE));
+    }
+    strUsage += HelpMessageOpt("-safemodewebhookurl=<url>",
+        "URL of a webhook to notify if the node enters safe mode. For example: http://127.0.0.1/mywebhook");
+    strUsage += HelpMessageOpt("-safemodeminblockdifference=<n>",
+        strprintf("Minimum number of blocks that fork should be ahead (if positive) or behind (if negative) of active tip to enter safe mode "
+            "(default: %d)", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE));
+    strUsage += HelpMessageOpt("-safemodemaxforkdistance=<n>",
+        strprintf("Maximum distance of forks last common block from current active tip to enter safe mode "
+            "(default: %d)", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE));
+    strUsage += HelpMessageOpt("-safemodeminforklength=<n>",
+        strprintf("Minimum length of valid fork to enter safe mode "
+            "(default: %d)", SAFE_MODE_DEFAULT_MIN_FORK_LENGTH));
+
+
     return strUsage;
 }
 
@@ -1514,6 +1568,12 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
             StartShutdown();
         }
     } // End scope of CImportingNow
+
+    {
+        LOCK(cs_main);
+        CheckSafeModeParameters(config, nullptr);
+    }
+
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         mempool.LoadMempool(config, shutdownToken);
         mempool.ResumeSanityCheck();
@@ -2139,6 +2199,22 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
+    // Safe mode activation
+    if(gArgs.IsArgSet("-safemodewebhookurl")) {
+        if(std::string err; !config.SetSafeModeWebhookURL(gArgs.GetArg("-safemodewebhookurl", ""), &err)) {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetSafeModeMinForkHeightDifference(gArgs.GetArg("-safemodeminblockdifference", SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMaxForkDistance(gArgs.GetArg("-safemodemaxforkdistance", SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetSafeModeMinForkLength(gArgs.GetArg("-safemodeminforklength", SAFE_MODE_DEFAULT_MIN_FORK_LENGTH), &err)) {
+        return InitError(err);
+    }
+
     // Block download
     if(std::string err; !config.SetBlockStallingMinDownloadSpeed(gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE), &err)) {
         return InitError(err);
@@ -2164,6 +2240,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBanScoreThreshold(gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), &err)) {
+        return InitError(err);
+    }
+
+    // RPC parameters
+    if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {
         return InitError(err);
     }
 
@@ -2372,6 +2453,18 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
+    if(gArgs.IsArgSet("-dsdetectedwebhookurl"))
+    {
+        if(std::string err; !config.SetDoubleSpendDetectedWebhookURL(gArgs.GetArg("-dsdetectedwebhookurl", ""), &err))
+        {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetDoubleSpendDetectedWebhookMaxTxnSize(
+        gArgs.GetArgAsBytes("-dsdetectedwebhookmaxtxnsize", DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE, ONE_MEBIBYTE), &err))
+    {
+        return InitError(err);
+    }
 
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
@@ -2401,7 +2494,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Dust limit is expressed as a multiple in percent of the dust relay fee applied to
     // an output.
     if (gArgs.IsArgSet("-dustlimitfactor")) {
-        Amount n(0);
         auto factor = gArgs.GetArg("-dustlimitfactor", DEFAULT_DUST_LIMIT_FACTOR);
 
         if (std::string err; !config.SetDustLimitFactor(factor, &err))
@@ -2574,6 +2666,16 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     const uint64_t recvInvQueueFactorArg = gArgs.GetArg("-recvinvqueuefactor", DEFAULT_RECV_INV_QUEUE_FACTOR);
     if (std::string err; !config.SetRecvInvQueueFactor(recvInvQueueFactorArg, &err))
+    {
+        return InitError(err);
+    }
+
+    if (std::string err;
+        !config.SetSoftConsensusFreezeDuration(
+            gArgs.GetArg(
+                "-softconsensusfreezeduration",
+                DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION),
+            &err))
     {
         return InitError(err);
     }
@@ -3003,6 +3105,13 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
               limits.Memory() * (1.0 / 1024 / 1024),
               limits.Disk() * (1.0 / 1024 / 1024));
 
+    std::int64_t frozen_txo_db_cache_size = gArgs.GetArg("-frozentxodbcache", static_cast<std::int64_t>(DEFAULT_FROZEN_TXO_DB_CACHE));
+    if(frozen_txo_db_cache_size<0)
+    {
+        return InitError(_("Negative value specified for -frozentxodbcache!"));
+    }
+    InitFrozenTXO(static_cast<std::size_t>(frozen_txo_db_cache_size));
+
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {
         bool fReset = fReindex;
@@ -3187,7 +3296,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     // After block chain is loaded check fork tip statuses and
     // restore global safe mode state.
-    CheckSafeModeParametersForAllForksOnStartup();
+    CheckSafeModeParametersForAllForksOnStartup(config);
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
@@ -3300,6 +3409,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     // Launch non-final mempool periodic checks
     mempool.getNonFinalPool().startPeriodicChecks(scheduler);
+
+    // Create webhook client
+    assert(!rpc::client::g_pWebhookClient);
+    rpc::client::g_pWebhookClient = std::make_unique<rpc::client::WebhookClient>(config);
 
     // Step 12: finished
 

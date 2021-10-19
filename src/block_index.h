@@ -78,6 +78,8 @@ enum class BlockValidity : uint32_t {
     SCRIPTS = 5,
 };
 
+std::string to_string(const enum BlockValidity&);
+
 struct BlockStatus {
 private:
     friend class CBlockIndex;
@@ -104,6 +106,10 @@ private:
 
     // The block index contains data for soft rejection
     static const uint32_t HAS_SOFT_REJ_FLAG = 0x100;
+    
+    static const uint32_t HAS_DOUBLE_SPEND_FLAG = 0x200;
+
+    static const uint32_t HAS_SOFT_CONSENSUS_FROZEN_FLAG = 0x400;
 
     // Mask used to check if the block failed.
     static const uint32_t INVALID_MASK = FAILED_FLAG | FAILED_PARENT_FLAG;
@@ -118,10 +124,6 @@ private:
                            (hasUndo ? HAS_UNDO_FLAG : 0));
     }
 
-    [[nodiscard]] bool hasDiskBlockMetaData() const
-    {
-        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
-    }
     [[nodiscard]] BlockStatus withDiskBlockMetaData(bool hasData = true) const
     {
         return BlockStatus((status & ~HAS_DISK_BLOCK_META_DATA_FLAG) |
@@ -156,7 +158,12 @@ public:
         return BlockStatus((status & ~FAILED_PARENT_FLAG) |
                            (hasFailedParent ? FAILED_PARENT_FLAG : 0));
     }
-
+    
+    [[nodiscard]] bool hasDiskBlockMetaData() const
+    {
+        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
+    }
+    
     bool hasDataForSoftRejection() const
     {
         return status & HAS_SOFT_REJ_FLAG;
@@ -165,6 +172,27 @@ public:
     {
         return BlockStatus((status & ~HAS_SOFT_REJ_FLAG) |
                            (hasData ? HAS_SOFT_REJ_FLAG : 0));
+    }
+
+    bool hasDataForSoftConsensusFreeze() const
+    {
+        return status & HAS_SOFT_CONSENSUS_FROZEN_FLAG;
+    }
+    [[nodiscard]] BlockStatus withDataForSoftConsensusFreeze(bool hasData = true) const
+    {
+        return BlockStatus((status & ~HAS_SOFT_CONSENSUS_FROZEN_FLAG) |
+                           (hasData ? HAS_SOFT_CONSENSUS_FROZEN_FLAG : 0));
+    }
+
+    [[nodiscard]] bool hasDoubleSpend() const
+    {
+        return status & HAS_DOUBLE_SPEND_FLAG;
+    }
+
+    BlockStatus withDoubleSpend(bool hasDoubleSpend = true) const 
+    {
+        return BlockStatus((status & ~HAS_DOUBLE_SPEND_FLAG) |
+                           (hasDoubleSpend ? HAS_DOUBLE_SPEND_FLAG : 0));
     }
 
     /**
@@ -212,6 +240,23 @@ struct CDiskBlockMetaData
 
 arith_uint256 GetBlockProof(const CBlockIndex &block);
 
+//! Identifier of source from which we received the first instance of a block.
+class CBlockSource
+{
+private:
+    std::string mSource;
+
+    CBlockSource(std::string&& source) : mSource( std::move(source) ) {}
+
+public:
+    static CBlockSource MakeUnknown() { return {"unknown"}; }
+    static CBlockSource MakeLocal(const std::string& extra) { return {"local: " + extra}; }
+    static CBlockSource MakeP2P(const std::string& address) { return {"p2p address: " + address}; }
+    static CBlockSource MakeRPC() { return {"rpc"}; }
+
+    const std::string& ToString() const { return mSource; }
+};
+
 /**
  * CBlockIndex holds information about block header as well as its context in the blockchain.
  * For holding information about the containing chain, pprev must always be set.
@@ -234,6 +279,12 @@ arith_uint256 GetBlockProof(const CBlockIndex &block);
  * But it also means that all mutable public methods must be independent of each other and
  * object state between calling any two must be valid because it can be observed by another thread.
  * This is why there are also setters that atomically modify several members and methods that atomically do several independent things.
+ *
+ * NOTE: CBlockIndex can be soft consensus frozen during validation in which case
+ *       the block can't be added to best chain as long as it doesn't receive enough
+ *       descendant blocks to pass the freeze threshold.
+ *       This is not reflected in CBlockIndex state and can only be queried by
+ *       calling IsInExplicitSoftConsensusFreeze() or IsInSoftConsensusFreeze()
  */
 class CBlockIndex {
 public:
@@ -329,6 +380,42 @@ private:
     //! (memory only) Maximum nTime in the chain upto and including this block.
     unsigned int nTimeMax{ 0 };
 
+    //! (memory only) Ignore this block and all of it descendants when checking criteria for the safe-mode.
+    bool ignoreForSafeMode{ false };
+
+    //! (memory only) Source from which we received the first instance of a block.
+    CBlockSource mBlockSource{CBlockSource::MakeUnknown()};
+
+    /**
+     * If >=0, this block is considered soft consensus frozen. Value specifies number of descendants
+     * in chain after this block that should also be considered consensus frozen.
+     *
+     * If <0, this block is not considered soft rejected (i.e. it is a normal block).
+     *
+     * NOTE: Value is memory only as persistence on disk is not needed since we
+     *       can always recalculate the value during execution.
+     */
+    std::int32_t mSoftConsensusFreezeForNBlocks{ -1 };
+
+    /**
+     * Indicator whether current block is soft consensus frozen either due to
+     * explicit freeze or implicit due to parent being frozen.
+     *
+     * It is calculated as:
+     * std::max( mSoftConsensusFreezeForNBlocks, parent.mSoftConsensusFreezeForNBlocksCumulative - 1)
+     *
+     * For the next block in chain, value of this member is always equal to the value in parent minus one,
+     * value of current block or is -1 if value in parent is already -1. This way soft rejection status is propagated
+     * down the chain and a descendant block that is high enough will not be soft rejected anymore.
+     *
+     * This value is used in best chain selection algorithm. Chains whose tip is soft consensus frozen,
+     * are not considered when selecting best chain.
+     *
+     * NOTE: Value is memory only as persistence on disk is not needed since we
+     *       can always recalculate the value during execution.
+     */
+    std::int32_t mSoftConsensusFreezeForNBlocksCumulative{ -1 };
+
 public:
     /**
      * Used after indexes are loaded from the database to update their chain
@@ -345,6 +432,12 @@ public:
 
         BuildSkipNL();
         SetChainWorkNL();
+
+        if (pprev)
+        {
+            UpdateSoftConsensusFreezeFromParentNL();
+        }
+
         nTimeMax = (pprev ? std::max(pprev->nTimeMax, nTime) : nTime);
 
         // We can link the chain of blocks for which we've received transactions
@@ -424,6 +517,7 @@ public:
         size_t transactionsCount,
         const CDiskBlockPos& pos,
         CDiskBlockMetaData metaData,
+        const CBlockSource& source,
         DirtyBlockIndexStore& notifyDirty)
     {
         std::lock_guard lock { GetMutex() };
@@ -441,6 +535,49 @@ public:
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
         }
+
+        mBlockSource = source;
+    }
+
+    void SetSoftConsensusFreezeFor(
+        std::int32_t numberOfBlocks,
+        DirtyBlockIndexStore& notifyDirty )
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        assert( numberOfBlocks >= 0 );
+        assert( mSoftConsensusFreezeForNBlocks == -1 );
+
+        mSoftConsensusFreezeForNBlocks = numberOfBlocks;
+        mSoftConsensusFreezeForNBlocksCumulative =
+            std::max(
+                mSoftConsensusFreezeForNBlocksCumulative,
+                mSoftConsensusFreezeForNBlocks );
+
+        nStatus = nStatus.withDataForSoftConsensusFreeze();
+
+        notifyDirty.Insert( *this );
+    }
+
+    void UpdateSoftConsensusFreezeFromParent()
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        UpdateSoftConsensusFreezeFromParentNL();
+    }
+
+    bool IsInExplicitSoftConsensusFreeze() const
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        return mSoftConsensusFreezeForNBlocks != -1;
+    }
+
+    bool IsInSoftConsensusFreeze() const
+    {
+        std::lock_guard lock{ GetMutex() };
+
+        return mSoftConsensusFreezeForNBlocksCumulative != -1;
     }
 
     /**
@@ -513,6 +650,12 @@ public:
     {
         std::lock_guard lock { GetMutex() };
         SetSoftRejectedFromParentNL(notifyDirty);
+    }
+    
+    bool HasDoubleSpend() const
+    {
+        std::lock_guard lock { GetMutex() };
+        return nStatus.hasDoubleSpend();
     }
 
     void SetChainWork()
@@ -615,6 +758,18 @@ public:
         return this->nChainWork;
     }
 
+    bool GetIgnoredForSafeMode() const
+    {
+        std::lock_guard lock { GetMutex() };
+        return this->ignoreForSafeMode;
+    }
+
+    void SetIgnoredForSafeMode(bool doIgnore)
+    {
+        std::lock_guard lock { GetMutex() };
+        this->ignoreForSafeMode = doIgnore;
+    }
+
     BlockStatus getStatus() const {
         std::lock_guard lock { GetMutex() };
         return nStatus;
@@ -638,6 +793,13 @@ public:
         std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withFailedParent();
 
+        notifyDirty.Insert( *this );
+    }
+    
+    void ModifyStatusWithDoubleSpend(DirtyBlockIndexStore& notifyDirty)
+    {
+        std::lock_guard lock { GetMutex() };
+        nStatus = nStatus.withDoubleSpend();
         notifyDirty.Insert( *this );
     }
 
@@ -691,6 +853,8 @@ public:
     //! Efficiently find an ancestor of this block.
     CBlockIndex *GetAncestor(int32_t height);
     const CBlockIndex *GetAncestor(int32_t height) const;
+
+    const CBlockSource& GetBlockSource() const { return mBlockSource; }
 
     std::optional<CBlockUndo> GetBlockUndo() const;
 
@@ -818,6 +982,8 @@ private:
             // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
             // constructor are OK.
             SetSoftRejectedFromParentBaseNL();
+
+            UpdateSoftConsensusFreezeFromParentNL();
         }
         nTimeReceived = GetTime();
         nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
@@ -956,6 +1122,24 @@ private:
     }
 
     std::mutex& GetMutex() const;
+
+    void UpdateSoftConsensusFreezeFromParentNL()
+    {
+        assert( pprev ); // !IsGenesis
+
+        if ( pprev->mSoftConsensusFreezeForNBlocksCumulative != -1 )
+        {
+            mSoftConsensusFreezeForNBlocksCumulative =
+                std::max(
+                    mSoftConsensusFreezeForNBlocks,
+                    pprev->mSoftConsensusFreezeForNBlocksCumulative - 1);
+        }
+        else
+        {
+            mSoftConsensusFreezeForNBlocksCumulative =
+                mSoftConsensusFreezeForNBlocks;
+        }
+    }
 };
 
 /**
