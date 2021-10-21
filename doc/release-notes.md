@@ -1,4 +1,4 @@
-# 1.0.9 Release Notes
+# Public
 
 # Bitcoin SV Node software – Upgrade to v1.0.9 Release
 Version 1.0.9 release is a recommended upgrade from version 1.0.8; This new version brings improved safe mode processing, webhook notifications, block double spend P2P notification messages and the possibility to freeze transaction outputs that are the target of double spends.
@@ -16,7 +16,7 @@ Content details listed below:
 
 **Background**
 
-In the past few months, there have been several attempted attacks on the BSV network.  The attacks involve mining a hidden alternate chain (in at least one case > 80 blocks in length) and then posting it to the blockchain at once so it became the new main chain. The new chain replaces some of the transactions in the original chain with double spends. Exchanges typically require a certain number of block confirmations (say 50 blocks have been built on the attempted transactions) before coin deposits or withdrawals into their exchange are valid, *for example*, to prevent an attacker from depositing double-spent BSV coins and immediately trade or cash out his position in the selfish chain after previously doing the same thing on the main chain.
+In the past few months, there have been several attempted attacks on the BSV network.  The attacks involve mining a hidden alternate chain (in at least one case > 80 blocks in length) and then posting it to the blockchain at once so it became the new main chain. The new chain replaces some of the transactions in the original chain with double spends. Exchanges typically require a certain number of block confirmations (say 50 blocks have been built on the attempted transactions) before coin deposits or withdrawals into their exchange are valid, *for example*, to prevent an attacker from depositing double-spent BSV coins and immediately trade or cash out his position in the hidden chain after previously doing the same thing on the main chain.
 
 The BSV blockchain and other PoW blockchains are vulnerable to these types of attacks because of the large amounts of roaming hash-power available that can be used on competing networks.
 
@@ -25,10 +25,9 @@ Our response to these attacks has included steps to:
 1. Put global 24 hour/7 day a week monitoring in position and:
     - notify miners of long, competing chains when they appear.
     - notify exchanges and application providers of double spends in the new chain.
-2. Enable honest miners to invalidate the block at the base of the selfish chain using **invalidateblock**, and then mine on the original honest chain until it is restored as the main chain.
+2. Enable honest miners to invalidate the block at the base of the hidden chain using **invalidateblock**, and then mine on the original honest chain until it is restored as the main chain.
 
-**Notification of change of safe mode (competing chains)
-**
+**Notification of change of safe mode (competing chains)**
 
 Exchanges and miners will be notified if a suspicious event (most likely an attack) occurs. The trigger is the existence of recent, long, competing chains.
 
@@ -47,7 +46,7 @@ Blockchain monitoring applications may send a DSD P2P notifications message to a
 **Freezing of double spends.**
 A BSV node (meaning a mining node) can now "freeze" specific TXOs (e.g. used by double spends).
 
-If a policy freeze is applied to the TXO, the node will not accept transactions that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
+If a policy freeze is applied to the TXO, the node will not accept transactions into their block templates that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
 
 ## Specific Changes
 
@@ -144,7 +143,7 @@ Safe mode is automatically triggered if all of these criteria are satisfied:
 
 - The distance between the current tip and the last common block header of the fork is smaller than the **safemodemaxforkdistance**.
 - The length of the fork is greater than **safemodeminforklength**.
-- The total proof of work of the fork tip is greater than the minimum fork proof of work (POW). The minimum fork POW is calculated relative to the active chain tip using this formula: <total-proof-of-work-active-chain> + **safemodeminblockdifference** * <proof-of-work-of-the-active-tip>. Safe mode is activated if the fork height is bigger than <height-active-chain-tip> + **safemodeminblockdifference**. Note that the negative value of **safemodeminblockdifference** means that we will activate the safe mode for forks with tips below active chain tip.
+- The total proof of work of the fork tip is greater than the minimum fork proof of work (POW). The minimum fork POW is calculated relative to the active chain tip using this formula: <total-proof-of-work-active-chain> + **safemodeminblockdifference** * <proof-of-work-of-the-active-tip>. Safe mode is activated if the fork height is bigger than <height-active-chain-tip> + **safemodeminblockdifference**. Note that the negative value of **safemodeminblockdifference** means that it will activate the safe mode for forks with tips below active chain tip.
 The first condition from the current implementation is retained, but triggering occurs before the competing fork surpasses the active chain. Safe mode is activated whenever the competing chain tip approaches the main chain tip closer than **safemodeminforklength** or it is ahead of the main chain tip.
 
 #### Webhook Safe Mode notification message
@@ -245,7 +244,7 @@ The effect of the RPCs is not preserved across node restarts.
 
 A node can now "freeze" specific transaction outputs (TXOs). A freeze can be applied to both spent and unspent TXOs, and can be used to ensure that a node does not process a known double spend.
 
-If a policy freeze is applied to the TXO, the node will not accept transactions that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
+If a policy freeze is applied to the TXO, the node will not accept transactions into its block templates that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
 
 This release introduces new RPCs.
 
@@ -257,3 +256,11 @@ This release introduces new RPCs.
 ### Performance Improvements ###
 The release contains optimisation to the processing of long, complex chains of transactions under extreme loads.
 
+**Binaries and source code can be downloaded here:**
+**<https://download.bitcoinsv.io/bitcoinsv/>** 
+
+Should you have any support questions, please direct them via **<support@bitcoinsv.io>** or via telegram at **<https://t.me/bitcoinsvsupport>**
+
+Thank you for your continued support of Bitcoin SV.
+
+**Sent on behalf of Steve Shadders and the Bitcoin SV Infrastructure team.**
