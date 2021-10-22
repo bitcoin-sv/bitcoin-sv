@@ -2182,7 +2182,10 @@ class NodeConn(asyncore.dispatcher):
                     msg = self.recvbuf[hdrsize:hdrsize + payloadlen]
                     h = sha256(sha256(msg))
                     checksum = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + 4]
-                    if checksum != h[:4]:
+                    if extended:
+                        if checksum != b'\x00\x00\x00\x00':
+                            raise ValueError("extended format msg checksum should be 0: {}".format(checksum))
+                    elif checksum != h[:4]:
                         raise ValueError(
                             "got bad checksum " + repr(self.recvbuf))
                     self.recvbuf = self.recvbuf[hdrsize + payloadlen:]

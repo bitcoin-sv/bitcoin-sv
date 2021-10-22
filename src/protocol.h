@@ -150,6 +150,7 @@ public:
 
     static uint64_t GetHeaderSizeForPayload(uint64_t payloadSize);
     static uint64_t GetMaxPayloadLength(int version);
+    static bool IsExtended(uint64_t payloadSize);
 
     ADD_SERIALIZE_METHODS
     template <typename Stream, typename Operation>

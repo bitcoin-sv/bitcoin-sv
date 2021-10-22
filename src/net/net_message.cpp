@@ -36,7 +36,12 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
     uint64_t nRemaining { hdr.GetPayloadLength() - dataBuff.size() };
     uint64_t nCopy { std::min(nRemaining, nBytes) };
     dataBuff.write(pch, nCopy);
-    hasher.Write(reinterpret_cast<const uint8_t*>(pch), nCopy);
+
+    // No need to calculate message hash for extended format msgs
+    if(! hdr.IsExtended())
+    {
+        hasher.Write(reinterpret_cast<const uint8_t*>(pch), nCopy);
+    }
 
     return nCopy;
 }

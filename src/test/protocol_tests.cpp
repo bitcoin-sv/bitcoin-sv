@@ -90,6 +90,8 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     // Test static header sizing methods
     BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(0xFFFFFFFFL), CMessageFields::BASIC_HEADER_SIZE);
     BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(0xFFFFFFFFL + 1), CMessageFields::EXTENDED_HEADER_SIZE);
+    BOOST_CHECK(! CMessageHeader::IsExtended(0xFFFFFFFFL));
+    BOOST_CHECK(CMessageHeader::IsExtended(0xFFFFFFFFL + 1));
     BOOST_CHECK_EQUAL(CMessageHeader::GetMaxPayloadLength(EXTENDED_PAYLOAD_VERSION - 1), std::numeric_limits<uint32_t>::max());
     BOOST_CHECK_EQUAL(CMessageHeader::GetMaxPayloadLength(EXTENDED_PAYLOAD_VERSION), std::numeric_limits<uint64_t>::max());
 

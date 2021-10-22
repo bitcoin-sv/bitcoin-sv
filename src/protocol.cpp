@@ -210,6 +210,7 @@ CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn,
         // length of pszCommand is always smaller than COMMAND_SIZE
         strncpy(pchCommand.data(), NetMsgType::EXTMSG, CMessageFields::COMMAND_SIZE);
         nPayloadLength = std::numeric_limits<uint32_t>::max();
+        memset(pchChecksum.data(), 0, pchChecksum.size());
         extendedFields = CExtendedMessageHeader { pszCommand, nPayloadLengthIn };
     }
     else
@@ -217,11 +218,12 @@ CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn,
         // length of pszCommand is always smaller than COMMAND_SIZE
         strncpy(pchCommand.data(), pszCommand, CMessageFields::COMMAND_SIZE);
         nPayloadLength = static_cast<uint32_t>(nPayloadLengthIn);
+
+        // Only set the checksum on non-extended messages
+        memcpy(pchChecksum.data(), payloadHash.begin(), pchChecksum.size());
     }
 
     GCC_WARNINGS_POP;
-
-    memcpy(pchChecksum.data(), payloadHash.begin(), pchChecksum.size());
 }
 
 // Read data and deserialise ourselves as we go
@@ -298,6 +300,11 @@ uint64_t CMessageHeader::GetMaxPayloadLength(int version)
     }
 
     return std::numeric_limits<uint32_t>::max();
+}
+
+bool CMessageHeader::IsExtended(uint64_t payloadSize)
+{
+    return GetHeaderSizeForPayload(payloadSize) == CMessageFields::EXTENDED_HEADER_SIZE;
 }
 
 bool CMessageHeader::CheckHeaderMagicAndCommand(const MessageMagic& magic) const

@@ -3901,48 +3901,49 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     // Message size
     uint64_t nPayloadLength = hdr.GetPayloadLength();
 
-    // Checksum
-    CDataStream& vRecv = msg.GetData();
-    const uint256 &hash = msg.GetMessageHash();
-    if (memcmp(hash.begin(), hdr.GetChecksum().data(), CMessageFields::CHECKSUM_SIZE) !=0) {
-        LogPrint(BCLog::NETMSG,
-            "%s(%s, %lu bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
-            SanitizeString(strCommand), nPayloadLength,
-            HexStr(hash.begin(), hash.begin() + CMessageFields::CHECKSUM_SIZE),
-            HexStr(hdr.GetChecksum()));
-        {
-            // Try to obtain an access to the node's state data.
-            const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
-            const CNodeStatePtr& state { stateRef.get() };
-            if (state){
-                auto curTime = std::chrono::system_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
-                unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
-                std::chrono::milliseconds checksumInterval(interval); 
-                if (duration < std::chrono::milliseconds(checksumInterval).count()){
-                    ++ state->dInvalidChecksumFrequency;
+    // Checksum (skipped for extended messages)
+    if(! hdr.IsExtended()) {
+        const uint256 &hash = msg.GetMessageHash();
+        if (memcmp(hash.begin(), hdr.GetChecksum().data(), CMessageFields::CHECKSUM_SIZE) !=0) {
+            LogPrint(BCLog::NETMSG,
+                "%s(%s, %lu bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
+                SanitizeString(strCommand), nPayloadLength,
+                HexStr(hash.begin(), hash.begin() + CMessageFields::CHECKSUM_SIZE),
+                HexStr(hdr.GetChecksum()));
+            {
+                // Try to obtain an access to the node's state data.
+                const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+                const CNodeStatePtr& state { stateRef.get() };
+                if (state){
+                    auto curTime = std::chrono::system_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
+                    unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+                    std::chrono::milliseconds checksumInterval(interval); 
+                    if (duration < std::chrono::milliseconds(checksumInterval).count()){
+                        ++ state->dInvalidChecksumFrequency;
+                    }
+                    else { 
+                        // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
+                        state->dInvalidChecksumFrequency = 0;
+                    }
+                    unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+                    if (state->dInvalidChecksumFrequency > checkSumFreq){
+                        // MisbehavingNode if the count goes above some chosen value 
+                        // 100 conseqitive invalid checksums received with less than 500ms between them
+                        Misbehaving(pfrom, 1, "Invalid Checksum activity");
+                        LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
+                    }
+                    state->nTimeOfLastInvalidChecksumHeader = curTime;
                 }
-                else { 
-                    // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
-                    state->dInvalidChecksumFrequency = 0;
-                }
-                unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-                if (state->dInvalidChecksumFrequency > checkSumFreq){
-                    // MisbehavingNode if the count goes above some chosen value 
-                    // 100 conseqitive invalid checksums received with less than 500ms between them
-                    Misbehaving(pfrom, 1, "Invalid Checksum activity");
-                    LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
-                }
-                state->nTimeOfLastInvalidChecksumHeader = curTime;
             }
+            return fMoreWork;
         }
-        return fMoreWork;
     }
 
     // Process message
     bool fRet = false;
     try {
-        fRet = ProcessMessage(config, pfrom, strCommand, vRecv, msg.GetTime(),
+        fRet = ProcessMessage(config, pfrom, strCommand, msg.GetData(), msg.GetTime(),
                               chainparams, connman, interruptMsgProc);
         if (interruptMsgProc) {
             return false;
@@ -3950,7 +3951,8 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         if (!pfrom->vRecvGetData.empty()) {
             fMoreWork = true;
         }
-    } catch (const std::ios_base::failure &e) {
+    }
+    catch (const std::ios_base::failure &e) {
         connman.PushMessage(pfrom,
                             CNetMsgMaker(INIT_PROTO_VERSION)
                             .Make(NetMsgType::REJECT, strCommand,
@@ -3974,9 +3976,11 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e) {
         PrintExceptionContinue(&e, "ProcessMessages()");
-    } catch (...) {
+    }
+    catch (...) {
         PrintExceptionContinue(nullptr, "ProcessMessages()");
     }
 
