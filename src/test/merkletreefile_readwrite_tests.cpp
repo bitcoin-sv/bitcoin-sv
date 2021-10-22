@@ -60,7 +60,7 @@ namespace
         dataToStore.blockHash = block.GetHash();
         dataToStore.writtenMerkleRoot = merkleRoot;
         BOOST_CHECK(dataToStore.writtenMerkleRoot == BlockMerkleRoot(block));
-        uint64_t indexOfRandomTx = InsecureRandRange(block.vtx.size() - 1);
+        uint64_t indexOfRandomTx = InsecureRandRange(block.vtx.size());
         dataToStore.writtenRandomTxIndex = indexOfRandomTx;
         dataToStore.writtenRandomTxHash = block.vtx[indexOfRandomTx]->GetId();
         writtenData.push_back(dataToStore);

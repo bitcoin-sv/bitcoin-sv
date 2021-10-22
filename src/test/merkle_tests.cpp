@@ -1,13 +1,27 @@
 // Copyright (c) 2015-2016 The Bitcoin Core developers
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <iostream>
+
+#include "boost/algorithm/hex.hpp"
+#include <boost/test/tools/old/interface.hpp>
+#include <boost/test/unit_test.hpp>
 
 #include "consensus/merkle.h"
-#include "test/test_bitcoin.h"
-#include "task_helpers.h"
+#include "double_spend/dsdetected_message.h"
+#include "merkleproof.h"
 #include "merkletree.h"
+#include "serialize.h"
+#include "support/allocators/zeroafterfree.h"
+#include "task_helpers.h"
+#include "test/test_bitcoin.h"
+#include "uint256.h"
 
-#include <boost/test/unit_test.hpp>
+namespace ba = boost::algorithm;
 
 BOOST_FIXTURE_TEST_SUITE(merkle_tests, TestingSetup)
 
@@ -212,6 +226,328 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
         // root from CMerkleTree instance must be same as legacy merkle root
         BOOST_CHECK(originalMerkleRoot == newMerkleRoot);
     }
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(merkle_proof_tests)
+
+BOOST_AUTO_TEST_CASE(default_construction)
+{
+    MerkleProof mp;
+    BOOST_CHECK_EQUAL(0, mp.Flags());
+    BOOST_CHECK_EQUAL(0, mp.Index());
+    BOOST_CHECK(mp.empty());
+    BOOST_CHECK_EQUAL(0, mp.size());
+    const uint256 target;
+    BOOST_CHECK(target == mp.Target());
+
+    BOOST_CHECK(!contains_tx(mp));
+    BOOST_CHECK(contains_txid(mp));
+    BOOST_CHECK(contains_coinbase_tx(mp));
+}
+            
+BOOST_AUTO_TEST_CASE(txid_construction)
+{
+    const TxId txid{uint256S("1")};
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    MerkleProof mp{txid, index, target, nodes};
+    BOOST_CHECK(contains_txid(mp));
+    BOOST_CHECK_EQUAL(index, mp.Index());
+    BOOST_CHECK(target == mp.Target());
+    BOOST_CHECK(!mp.empty());
+    BOOST_CHECK_EQUAL(1, mp.size());
+    
+    BOOST_CHECK(!contains_tx(mp));
+    BOOST_CHECK(contains_txid(mp));
+    BOOST_CHECK(!contains_coinbase_tx(mp));
+}
+
+BOOST_AUTO_TEST_CASE(tx_construction)
+{
+    CMutableTransaction mtx;
+    const auto sp = std::make_shared<const CTransaction>(std::move(mtx));
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    const MerkleProof mp{sp, index, target, nodes};
+    BOOST_CHECK(contains_tx(mp));
+    BOOST_CHECK_EQUAL(index, mp.Index());
+    BOOST_CHECK(target == mp.Target());
+    BOOST_CHECK(!mp.empty());
+    BOOST_CHECK_EQUAL(1, mp.size());
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_txid)
+{
+    // clang-format off
+    const CSerializeData data{0x0, /* flags */
+                              0x0, /* index */
+                              /* txid */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              /* target */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              0x1, /* node count */
+                              0x0, /* type */
+                              /* hash */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              };
+    // clang-format on
+
+    CDataStream ds{data.begin(), data.end(), SER_NETWORK, 0};
+    MerkleProof actual{};
+    ds >> actual;
+
+    // clang-format off
+    const std::vector<uint8_t> data32{
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
+    // clang-format on
+
+    const uint256 tmp{data32};
+    const TxId txid{tmp};
+    const size_t index{0};
+    const uint256 target{tmp};
+    const std::vector<MerkleProof::Node> nodes{MerkleProof::Node{tmp}};
+    const MerkleProof expected{txid, index, target, nodes};
+    BOOST_CHECK_EQUAL(expected, actual);
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_tx)
+{
+    // clang-format off
+    const CSerializeData data{0x5, /* flags */
+                              /* index use CompactSize format */
+                              static_cast<char>(0xfd), 
+                              static_cast<char>(0xfd),
+                              static_cast<char>(0x0),
+                              0xa, /* tx len */
+                              /* tx */
+                              0x02, 0x0, 0x0, 0x0, /* version */
+                              0x0, /* ip count */
+                              0x0, /* op count */
+                              0x0, 0x0, 0x0, 0x0, /* Lock time */ 
+                              /* target */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              0x1, /* node count */
+                              0x0, /* type */
+                              /* hash */
+                              0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                              0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                              0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+                              };
+    // clang-format on
+
+    CDataStream ds{data.begin(), data.end(), SER_NETWORK, 0};
+    MerkleProof actual{};
+    ds >> actual;
+
+    // clang-format off
+    const std::vector<uint8_t> data32{
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
+    // clang-format on
+
+    const uint256 tmp{data32};
+    const TxId txid{tmp};
+    const size_t index{253};
+    const uint256 target{tmp};
+    const std::vector<MerkleProof::Node> nodes{MerkleProof::Node{tmp}};
+
+    CMutableTransaction mtx;
+    auto sp = std::make_shared<const CTransaction>(std::move(mtx));
+
+    const MerkleProof expected{sp, index, target, nodes};
+    BOOST_CHECK_EQUAL(expected, actual);
+}
+
+BOOST_AUTO_TEST_CASE(deserialize_std_example)
+{
+    // Taken from: github.com/bitcoin-sv-specs/merkle-proof-standard-example
+    using namespace std;
+
+    // clang-format off
+    vector<uint8_t> v;
+    ba::unhex("00" // flags
+              "0c" // index
+              "ef65a4611570303539143dabd6aa64dbd0f41ed89074406dc0e7cd251cf1efff" // txid
+              "69f17b44cfe9c2a23285168fe05084e1254daa5305311ed8cd95b19ea6b0ed75" // target
+              "05" // node count
+              "00" // node type
+              "8e66d81026ddb2dae0bd88082632790fc6921b299ca798088bef5325a607efb9" // hash
+              "00"
+              "4d104f378654a25e35dbd6a539505a1e3ddbba7f92420414387bb5b12fc1c10f"
+              "00"
+              "472581a20a043cee55edee1c65dd6677e09903f22992062d8fd4b8d55de7b060"
+              "00"
+              "6fcc978b3f999a3dbb85a6ae55edc06dd9a30855a030b450206c3646dadbd8c0"
+              "00"
+              "423ab0273c2572880cdc0030034c72ec300ec9dd7bbc7d3f948a9d41b3621e39",
+              back_inserter(v));
+    // clang-format on
+
+    const CSerializeData data{v.begin(), v.end()};
+    CDataStream ss{data.begin(), data.end(), SER_NETWORK, 0};
+    MerkleProof actual{};
+    ss >> actual;
+   
+    BOOST_CHECK_EQUAL(0, actual.Flags());
+    BOOST_CHECK_EQUAL(12, actual.Index());
+    BOOST_CHECK_EQUAL(5, actual.size());
+    
+    //const MerkleProof expected{};
+    //BOOST_CHECK_EQUAL(expected, actual);
+    //BOOST_CHECK(actual.Verify());
+}
+
+BOOST_AUTO_TEST_CASE(default_serialisation)
+{
+    // Test serialising/deserialising
+    CDataStream ss{SER_NETWORK, 0};
+    MerkleProof mp;
+    ss << mp;
+    MerkleProof deserialised{};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(mp, deserialised); 
+}
+            
+BOOST_AUTO_TEST_CASE(txid_serialisation)
+{
+    const TxId txid{uint256S("1")};
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    MerkleProof mp{txid, index, target, nodes};
+    
+    CDataStream ss{SER_NETWORK, 0};
+    ss << mp;
+    MerkleProof deserialised{};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(mp, deserialised); 
+}
+
+BOOST_AUTO_TEST_CASE(tx_serialization)
+{
+    CMutableTransaction mtx;
+    const auto sp = std::make_shared<const CTransaction>(std::move(mtx));
+    size_t index{2};
+    const uint256 target{uint256S("3")};
+    const std::vector<MerkleProof::Node> nodes{{}};
+    const MerkleProof mp{sp, index, target, nodes};
+    
+    CDataStream ss{SER_NETWORK, 0};
+    ss << mp;
+    MerkleProof deserialised{};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(mp, deserialised); 
+}
+
+BOOST_AUTO_TEST_CASE(merkle_proof)
+{
+    using namespace std;
+
+    // Build a block
+    constexpr unsigned NumTx{100};
+    CBlock block{};
+    block.vtx.resize(NumTx);
+    for(size_t j = 0; j < NumTx; j++)
+    {
+        CMutableTransaction mtx{};
+        mtx.nLockTime = j;
+        block.vtx[j] = make_shared<const CTransaction>(move(mtx));
+    }
+
+    // lambda to create CMerkleTree version of proof and return a nodes list
+    // suitable for the TSC version, the merkle root from the proof and the
+    // entire proof
+    auto CMerkleTreeLambda = [&block](const CTransaction& txn) {
+        // Create and check CMerkleTree version
+        CMerkleTree merkleTree{block.vtx, uint256(), 0};
+        CMerkleTree::MerkleProof treeProof{
+            merkleTree.GetMerkleProof(txn.GetId(), false)};
+        uint256 checkRoot{
+            ComputeMerkleRootFromBranch(txn.GetId(),
+                                        treeProof.merkleTreeHashes,
+                                        treeProof.transactionIndex)};
+        BOOST_CHECK_EQUAL(merkleTree.GetMerkleRoot().ToString(),
+                          checkRoot.ToString());
+
+        // Return nodes list
+        vector<MerkleProof::Node> nodes{};
+        for(const auto& node : treeProof.merkleTreeHashes)
+        {
+            nodes.push_back(MerkleProof::Node{node});
+        }
+
+        return make_tuple(nodes, checkRoot, treeProof);
+    };
+
+    // Create CMerkleTree and TSC versions of the proof and validate them
+    for(size_t txnIndex = 0; txnIndex < NumTx; ++txnIndex)
+    {
+        const shared_ptr<const CTransaction>& txn{block.vtx[txnIndex]};
+
+        // Check CMerkleTree version and get what we need to create the TSC
+        // versions
+        const auto& [nodes, checkRoot, treeProof]{CMerkleTreeLambda(*txn)};
+
+        // Create some TSC proofs in different ways
+        vector<MerkleProof> merkleProofs{
+            {txn->GetId(), txnIndex, checkRoot, nodes},
+            {txn, txnIndex, checkRoot, nodes},
+            {treeProof, txn->GetId(), checkRoot}};
+
+        for(const auto& merkleProof : merkleProofs)
+        {
+            // Check good proof validates
+            BOOST_CHECK(merkleProof.Verify());
+
+            // Test serialising/deserialising
+            CDataStream ss{SER_NETWORK, 0};
+            ss << merkleProof;
+            MerkleProof deserialised{};
+            ss >> deserialised;
+            BOOST_CHECK(deserialised.Verify());
+        }
+
+        // Check invalid proof
+        MerkleProof badProof{TxId{GetRandHash()}, txnIndex, checkRoot, nodes};
+        BOOST_CHECK(!badProof.Verify());
+    }
+
+    // Check JSON formatting of TSC proof
+    const shared_ptr<const CTransaction>& txn{block.vtx[0]};
+    const auto& [nodes, checkRoot, treeProof]{CMerkleTreeLambda(*txn)};
+    MerkleProof merkleProof{treeProof, txn->GetId(), checkRoot};
+    UniValue json{merkleProof.ToJSON()};
+    BOOST_CHECK_EQUAL(json["index"].get_int(), 0);
+    BOOST_CHECK_EQUAL(
+        json["txOrId"].get_str(),
+        "4ebd325a4b394cff8c57e8317ccf5a8d0e2bdf1b8526f8aad6c8e43d8240621a");
+    BOOST_CHECK_EQUAL(json["targetType"].get_str(), "merkleRoot");
+    BOOST_CHECK_EQUAL(
+        json["target"].get_str(),
+        "ebea82c40a534011e25c6114a87475847e0451fcd68e6d2e98bda5db96b81219");
+    BOOST_CHECK_EQUAL(json["nodes"].get_array().size(), 7);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

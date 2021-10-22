@@ -35,9 +35,10 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
 from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
+from test_framework.blocktools import create_coinbase, create_block
 from test_framework.util import assert_equal, assert_raises_rpc_error, wait_until
 from test_framework.comptool import TestInstance
-from test_framework.mininode import msg_tx, ToHex
+from test_framework.mininode import msg_tx, msg_block, ToHex
 import random
 import itertools
 
@@ -55,6 +56,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
         self.default_args = ['-debug', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight]
         self.extra_args = [self.default_args] * self.num_nodes
+        self.private_key = CECKey()
+        self.private_key.set_secretbytes(b"fatstacks")
+        self.public_key = self.private_key.get_pubkey()
 
     def run_test(self):
         self.test.run()
@@ -314,6 +318,60 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Valid transactions should be in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(ok))
 
+    def make_block(self, txs, parent_hash, parent_height, parent_time):
+        """ creates a block with given transactions"""
+        block = create_block(int(parent_hash, 16),
+                             coinbase=create_coinbase(pubkey=self.public_key, height=parent_height + 1),
+                             nTime=parent_time + 1)
+        block.vtx.extend(txs)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.calc_sha256()
+        block.solve()
+
+        return block
+
+
+    # Test an attempt to submit transactions (via rpc interface) which are already mined
+    def run_scenario6(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
+        # Create and send tx chains.
+        txchains, bad, orphan = self.get_txchains_n(num_of_chains, chain_length, spend, num_of_bad_chains=0)
+        to_mine = []
+        # Prepare inputs for sendrawtransactions
+        rpc_txs_bulk_input = []
+        for tx in range(len(txchains)):
+            # Collect txn input data for bulk submit through rpc interface.
+            rpc_txs_bulk_input.append({'hex': ToHex(txchains[tx]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
+            if tx < len(txchains) // 2:
+                # First half of txns will be mined in a block submitted through p2p interface.
+                to_mine.append(txchains[tx])
+
+        root_block_info = conn.rpc.getblock(conn.rpc.getbestblockhash())
+        root_hash = root_block_info["hash"]
+        root_height = root_block_info["height"]
+        root_time = root_block_info["time"]
+
+        # create the block
+        block = self.make_block(to_mine, root_hash, root_height, root_time)
+        conn.send_message(msg_block(block))
+        wait_until(lambda: conn.rpc.getbestblockhash() == block.hash, check_interval=0.3)
+
+        # Check if there is an expected number of transactions in the mempool
+        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+
+        # Submit a batch of txns through rpc interface.
+        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+
+        # There should be to_mine rejected transactions.
+        assert_equal(len(rejected_txns['invalid']), len(to_mine))
+        # bitcoind knows about the outputs of the last already mined transaction
+        assert_equal(len([tx for tx in rejected_txns['invalid']
+                          if tx['reject_reason'] == 'txn-already-known']), 1)
+        # bitcoind knows nothing about the previous already mined transactions so it considers them orphans
+        assert_equal(len([tx for tx in rejected_txns['invalid']
+                          if tx['reject_reason'] == 'missing-inputs']), len(to_mine) - 1)
+        # No transactions that were already mined should be in the mempool. The rest should be
+        assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchains) - len(to_mine))
+
 
 
     def get_tests(self):
@@ -345,6 +403,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             out.append(self.chain.get_spendable_output())
 
         self.stop_node(0)
+
 
         #====================================================================
         # Valid test cases.
@@ -558,11 +617,26 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS9: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
+        with self.run_node_with_connections('TS10: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario5(conn, num_of_chains, chain_length, out, reverseOrder=True, timeout=30)
 
+        # Scenario 11 (TS11).
+        # This test case checks a bulk submit of txs, through rpc sendrawtransactions interface, where some submitted transactions are already mined.
+        #
+        # Test case config
+        num_of_chains = 1
+        chain_length = 10
+        # Node's config
+        args = ['-txnvalidationasynchrunfreq=100',
+                '-limitancestorcount=100',
+                '-checkmempool=0',
+                '-persistmempool=0']
+        with self.run_node_with_connections('TS11: {} chains of length {}. Pre-mined txs. Default params for rpc call.'.format(num_of_chains, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario6(conn, num_of_chains, chain_length, out, timeout=20)
 
 if __name__ == '__main__':
     RPCSendRawTransactions().main()

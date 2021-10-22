@@ -15,6 +15,7 @@ static const uint8_t REJECT_MALFORMED = 0x01;
 static const uint8_t REJECT_INVALID = 0x10;
 static const uint8_t REJECT_OBSOLETE = 0x11;
 static const uint8_t REJECT_DUPLICATE = 0x12;
+static const uint8_t REJECT_SOFT_CONSENSUS_FREEZE = 0x13;
 static const uint8_t REJECT_NONSTANDARD = 0x40;
 static const uint8_t REJECT_DUST = 0x41;
 static const uint8_t REJECT_INSUFFICIENTFEE = 0x42;

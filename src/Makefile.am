@@ -119,10 +119,15 @@ BITCOIN_CORE_H = \
   disk_tx_pos.h \
   double_spend/dsattempt_handler.h \
   double_spend/dscallback_msg.h \
+  double_spend/dsdetected_defaults.h \
+  double_spend/dsdetected_message.h \
   double_spend/dstxn_serialiser.h \
   double_spend/time_limited_blacklist.h \
   dstencode.h \
   enum_cast.h \
+  frozentxo.h \
+  frozentxo_db.h \
+  frozentxo_logging.h \
   fs.h \
   httprpc.h \
   httpserver.h \
@@ -136,11 +141,13 @@ BITCOIN_CORE_H = \
   dbwrapper.h \
   leaky_bucket.h \
   limitedmap.h \
+  limited_cache.h \
   locked_ref.h \
   logging.h \
   memusage.h \
   mempooltxdb.h \
   merkleblock.h \
+  merkleproof.h \
   merkletree.h \
   merkletreedb.h \
   merkletreestore.h \
@@ -196,6 +203,9 @@ BITCOIN_CORE_H = \
   rpc/tojson.h \
   rpc/register.h \
   rpc/text_writer.h \
+  rpc/webhook_client.h \
+  rpc/webhook_client_defaults.h \
+  safe_mode.h \
   scheduler.h \
   script_config.h \
   script/scriptcache.h \
@@ -285,6 +295,9 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   miner_id/coinbase_doc.cpp \
+  frozentxo.cpp \
+  frozentxo_db.cpp \
+  frozentxo_logging.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -294,9 +307,11 @@ libbitcoin_server_a_SOURCES = \
   dbwrapper.cpp \
   double_spend/dsattempt_handler.cpp \
   double_spend/dscallback_msg.cpp \
+  double_spend/dsdetected_message.cpp \
   double_spend/dstxn_serialiser.cpp \
   mempooltxdb.cpp \
   merkleblock.cpp \
+  merkleproof.cpp \
   merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
@@ -329,12 +344,16 @@ libbitcoin_server_a_SOURCES = \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
+  rpc/frozentxo_rpc.cpp \
   rpc/mining.cpp \
   rpc/mining-fbb.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
+  rpc/safe_mode.cpp \
   rpc/server.cpp \
+  rpc/webhook_client.cpp \
+  safe_mode.cpp \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \

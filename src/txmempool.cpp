@@ -8,6 +8,7 @@
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "frozentxo.h"
 #include "mempooltxdb.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
@@ -337,12 +338,15 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxM
     {
         txiter entry = *toVisit.begin();
         toVisit.erase(toVisit.begin());
-        ancestors.insert(entry);
-        for(txiter parent: GetMemPoolParentsNL(entry))
+        bool isInserted =  ancestors.insert(entry).second;
+        if (isInserted)
         {
-            if (!parent->IsInPrimaryMempool())
+            for(txiter parent: GetMemPoolParentsNL(entry))
             {
-                toVisit.insert(parent);
+                if (!parent->IsInPrimaryMempool())
+                {
+                    toVisit.insert(parent);
+                }
             }
         }
     }
@@ -453,7 +457,9 @@ CTxMemPool::ResultOfUpdateEntryGroupingDataNL CTxMemPool::UpdateEntryGroupingDat
     }
 }
 
-void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet)
+void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, 
+                                             mining::CJournalChangeSet& changeSet, 
+                                             bool limitTheLoop)
 {
     // we want to limit the number of txs that could be updated at once to mitigate potential attack where
     // creating of one group results in accepting arbitrary number of txs to the mempool.
@@ -465,7 +471,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
     //  if the payFor0 is submitted last, it will trigger acceptance of all transaction
     int countOfVisitedTxs = 0;
 
-    while(!toUpdate.empty() && countOfVisitedTxs < MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO)
+    while(!toUpdate.empty() && !(limitTheLoop && countOfVisitedTxs > MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO))
     {
         // take first item from the topo-sorted set, this transactions does not
         // depend on any other tx in the set
@@ -565,7 +571,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
             // accept it to primary mempool as group paying tx
             setEntriesTopoSorted toUpdate;
             toUpdate.insert(entry);
-            TryAcceptToPrimaryMempoolNL(std::move(toUpdate), changeSet);
+            TryAcceptToPrimaryMempoolNL(std::move(toUpdate), changeSet, true);
         }
     }
     else
@@ -1125,10 +1131,56 @@ void CTxMemPool::RemoveForBlock(
                    childrenOfToRemoveSecondaryMempool.begin(), childrenOfToRemoveSecondaryMempool.end(),
                    std::inserter(toRecheck, toRecheck.begin()), InsrtionOrderComparator());
 
-    TryAcceptToPrimaryMempoolNL(std::move(toRecheck), nonNullChangeSet.Get());
+    // we want to try re-accept all transactions that were removed from primary mempool
+    TryAcceptToPrimaryMempoolNL(std::move(toRecheck), nonNullChangeSet.Get(), false);
 
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
+}
+
+void CTxMemPool::RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        "mempool",
+        chainActive.Tip()->GetBlockHash()};
+
+    // Find transactions in mempool that spend frozen outputs
+    setEntries spendingFrozenTXOs;
+    for(const auto& spentTXO: mapNextTx.get<by_prevout>())
+    {
+        struct TxGetterMP : CFrozenTXOCheck::TxGetter
+        {
+            TxGetterMP(const CTxMemPoolEntry& mpe)
+            : mpe(mpe)
+            {}
+
+            TxData GetTxData() override
+            {
+                txRef = mpe.GetSharedTx();
+                return TxData(*txRef, mpe.GetTime());
+            }
+
+            const CTxMemPoolEntry& mpe;
+            CTransactionRef txRef;
+        } txGetter(*spentTXO.spentBy);
+
+        if(!frozenTXOCheck.Check(spentTXO.outpoint, txGetter))
+        {
+            // Store iterator to this tx and all its descendants
+            GetDescendantsNL(spentTXO.spentBy, spendingFrozenTXOs);
+        }
+    }
+
+    if(!spendingFrozenTXOs.empty())
+    {
+        removeStagedNL(spendingFrozenTXOs, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::FROZEN_INPUT);
+
+        mFrozenTxnUpdatedAt = nTransactionsUpdated.load();
+    }
 }
 
 void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
@@ -1323,10 +1375,17 @@ void CTxMemPool::CheckMempoolImplNL(
         if (fDependsWait) {
             waitingOnDependants.push_back(&(*it));
         } else {
+            CFrozenTXOCheck frozenTXOCheck{
+                chainActive.Tip()->GetHeight() + 1,
+                "mempool",
+                chainActive.Tip()->GetBlockHash(),
+                it->GetTime()};
+
             CValidationState state;
             bool fCheckResult = tx->IsCoinBase() ||
                                 Consensus::CheckTxInputs(
-                                    *tx, state, mempoolDuplicate, nSpendHeight);
+                                    *tx, state, mempoolDuplicate, nSpendHeight,
+                                    frozenTXOCheck);
             assert(fCheckResult);
             UpdateCoins(*tx, mempoolDuplicate, 1000000);
         }
@@ -1349,10 +1408,17 @@ void CTxMemPool::CheckMempoolImplNL(
             stepsSinceLastRemove++;
             assert(stepsSinceLastRemove < waitingOnDependants.size());
         } else {
+            CFrozenTXOCheck frozenTXOCheck{
+                chainActive.Tip()->GetHeight() + 1,
+                "mempool",
+                chainActive.Tip()->GetBlockHash(),
+                entry->GetTime()};
+
             bool fCheckResult =
                 entryTx->IsCoinBase() ||
                 Consensus::CheckTxInputs(*entryTx, state,
-                                         mempoolDuplicate, nSpendHeight);
+                                         mempoolDuplicate, nSpendHeight,
+                                         frozenTXOCheck);
             assert(fCheckResult);
             UpdateCoins(*entryTx, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
@@ -1727,8 +1793,8 @@ void CTxMemPool::prioritiseTransactionNL(
         {
             entries = RemoveFromPrimaryMempoolNL(entries, *changeSet, false);
         }
-
-        TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet);
+        
+        TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet, false);
     }
 }
 
@@ -1932,7 +1998,7 @@ void CTxMemPool::removeStagedNL(
     removeUncheckedNL(stage, changeSet, conflictedWith, reason);
 
     // check if removed transactions can be re-accepted to the primary mempool
-    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), changeSet);
+    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), changeSet, false);
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
@@ -2140,6 +2206,20 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             changeSet,
             tip,
             StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+
+    if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
+    {
+        // Remove any transactions from mempool that spend TXOs, which were previously not considered policy frozen, but now are.
+        // Note that this can only happen if all of the following is true:
+        //   - TXO is consensus frozen up to (and not including) height H with policyExpiresWithConsensus=true.
+        //   - Transaction spending this TXO was added to mempool when mempool height was H or above.
+        //   - Active chain was reorged back so that mempool height is now below H.
+        // NOTE: To avoid re-checking whole mempool every time, we only do this if it is theoretically possible that mempool could
+        //       contain such as transaction. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
+        //       is below or at current mempool height, there is simply no such TXO and we can safely skip the expensive re-check.
+        LogPrint(BCLog::MEMPOOL, "Removing any transactions that spend TXOs, which were previously not considered policy frozen, but now are because the mempool height has become lower.\n");
+        RemoveFrozen(changeSet);
+    }
 
     // Check mempool & journal
     CheckMempool(*pcoinsTip, changeSet);
@@ -2970,3 +3050,12 @@ void CTxMemPool::DumpMempool(uint64_t version) {
     getNonFinalPool().dumpMempool();
 }
 
+DisconnectedBlockTransactions::~DisconnectedBlockTransactions()
+{
+    if (!queuedTx.empty())
+    {
+        LogPrintf(
+            "ERROR in ~DisconnectedBlockTransactions: queuedTx not empty!"
+            " Some transactions will be dropped from mempool.\n");
+    }
+}

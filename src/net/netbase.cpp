@@ -405,6 +405,14 @@ static bool ConnectSocketDirectly(const CService &addrConnect,
     SOCKET hSocket = socket(((struct sockaddr *)&sockaddr)->sa_family,
                             SOCK_STREAM, IPPROTO_TCP);
     if (hSocket == INVALID_SOCKET) return false;
+    if (!IsSelectableSocket(hSocket)) {
+        LogPrint(BCLog::NETCONN,
+                 "ConnectSocketDirectly: Cannot create connection: "
+                 "non-selectable socket created (fd [%d] >= FD_SETSIZE ?)\n",
+                 hSocket);
+        CloseSocket(hSocket);
+        return false;
+    }
 
     int set = 1;
 #ifdef SO_NOSIGPIPE

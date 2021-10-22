@@ -20,6 +20,8 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
                            const int confirmations, 
                            const std::optional<uint256>& nextBlockHash);
 
+UniValue blockStatusToJSON(const BlockStatus&);
+
 // Following functions are implemented in rawtransaction.cpp
 void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,

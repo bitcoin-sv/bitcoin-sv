@@ -202,7 +202,7 @@ UniValue generateBlocks(const Config &config,
         // even though it was accepted when block was created.
         const BlockValidationOptions validationOptions = BlockValidationOptions()
             .withCheckMaxBlockSize(!config.GetTestBlockCandidateValidity());
-        if (!ProcessNewBlock(config, shared_pblock, true, nullptr, validationOptions)) {
+        if (!ProcessNewBlock(config, shared_pblock, true, nullptr, CBlockSource::MakeRPC(), validationOptions)) {
             throw JSONRPCError(RPC_INTERNAL_ERROR,
                                "ProcessNewBlock, block not accepted");
         }
@@ -650,7 +650,7 @@ void getblocktemplate(const Config& config,
 
         if (pindexPrev != tip ||
             (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast &&
-             GetTime() - nStart > 5)) {
+             ((GetTime() - nStart > 5) || nTransactionsUpdatedLast < mempool.GetFrozenTxnUpdatedAt()))) {
             // Clear pindexPrev so future calls make a new block, despite any
             // failures from here on
             pindexPrev = nullptr;
@@ -926,7 +926,7 @@ static UniValue submitblock(const Config &config,
     auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
     {
         CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitblock");
-        return ProcessNewBlock(config, blockptr, true, nullptr);
+        return ProcessNewBlock(config, blockptr, true, nullptr, CBlockSource::MakeRPC());
     };
     return processBlock(config, blockptr, submitBlock);
 }

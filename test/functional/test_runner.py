@@ -80,7 +80,11 @@ SOLO_TESTS = {
     "bsv-pbv-withsigops.py",
     "bsv-broadcast_delay.py",
     "bsv-dsreport.py",
-    "bsv-callback-service.py"
+    "bsv-callback-service.py",
+    "bsv-dsattack-with-mocked-dsdetector.py",
+    "bsv-p2p-dsdetected.py",
+    "bsv-safe-mode.py",
+    "bsv-safe-mode-reorg-notification.py"
 }
 
 ENVIRONMENT_TYPE = {
