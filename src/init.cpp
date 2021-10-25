@@ -562,6 +562,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("Maximum number of parallel requests to different peers we will issue for "
                         "a block that has exceeded the slow fetch detection timeout (default: %u)"),
                         DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
+        strUsage += HelpMessageOpt("-blockdownloadtimeoutbasepercent=<n>",
+            strprintf(_("Block download timeout, expressed as percentage of the block interval which is %d minutes."
+                        " (default: %u%%)"),
+                        config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
+                        DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE));
+        strUsage += HelpMessageOpt("-blockdownloadtimeoutperpeerpercent=<n>",
+            strprintf(_("Additional block download time per parallel downloading peer, expressed as percentage of the block interval which is %d minutes."
+                        " (default: %u%%)"),
+                        config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
+                        DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER));
     }
 
     strUsage += HelpMessageOpt(
@@ -2229,6 +2239,12 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBlockDownloadMaxParallelFetch(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadTimeoutBase(gArgs.GetArg("-blockdownloadtimeoutbasepercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadTimeoutPerPeer(gArgs.GetArg("-blockdownloadtimeoutperpeerpercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER), &err)) {
         return InitError(err);
     }
 

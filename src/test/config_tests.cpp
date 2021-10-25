@@ -340,6 +340,18 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadMaxParallelFetch(), 2 * DEFAULT_MAX_BLOCK_PARALLEL_FETCH);
     BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBase(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE);
+    BOOST_CHECK(config.SetBlockDownloadTimeoutBase(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBase(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE);
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBase(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBase(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutPerPeer(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER);
+    BOOST_CHECK(config.SetBlockDownloadTimeoutPerPeer(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutPerPeer(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER);
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutPerPeer(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutPerPeer(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(p2p_config)
