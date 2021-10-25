@@ -25,6 +25,23 @@ HTTPRequest HTTPRequest::CreateJSONRPCRequest(const RPCClientConfig& config, con
     return { endPoint, contents, RequestCmdType::POST };
 }
 
+// Create a generic JSON POST request
+HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, const UniValue& json)
+{
+    // Format contents
+    std::string contents { json.write() + "\r\n" };
+    return CreateJSONPostRequest(config, std::move(contents));
+}
+
+// Create a generic JSON POST request
+HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, const std::string contents)
+{
+    // Create request
+    HTTPRequest request { config.GetEndpoint(), contents, RequestCmdType::POST };
+    request.AddHeader({"Content-Type", "application/json"});
+    return request;
+}
+
 // Create a properly formatted query request to a double-spend endpoint
 HTTPRequest HTTPRequest::CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid)
 {

@@ -13,13 +13,15 @@ Scenario:
 7. Validate that second branch tip is now invalid and active tip is from first branch.
 8. Validate that node is not in safe mode.
 """
+from time import sleep
+
 from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status
 from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlockHeader
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 from test_framework.util import wait_until, assert_equal
-from test_framework.cdefs import SAFE_MODE_MAX_FORK_DISTANCE, SAFE_MODE_MIN_POW_DIFFERENCE
 
 class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
@@ -34,37 +36,52 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
         self.add_nodes(self.num_nodes)
 
     def run_test(self):
-        with self.run_node_with_connections("Preparation", 0, None, 2) as (conn1, conn2):
+
+        MAX_FORK_DISTANCE = 10
+        MIN_FORK_LENGTH = 3
+        MIN_FORK_DIFFERENCE = 1
+
+        args= [f"-safemodemaxforkdistance={MAX_FORK_DISTANCE}",
+               f"-safemodeminforklength={MIN_FORK_LENGTH}",
+               f"-safemodeminblockdifference={MIN_FORK_DIFFERENCE}",]
+
+        with self.run_node_with_connections("Preparation", 0, args, 2) as (conn1, conn2):
             last_block_time = 0
             conn1.rpc.generate(1)
 
             branch_1_root, last_block_time = make_block(conn1, last_block_time = last_block_time)
             branch_1_blocks = [branch_1_root]
-            for _ in range(SAFE_MODE_MAX_FORK_DISTANCE):
+            for _ in range(MAX_FORK_DISTANCE):
                 new_block, last_block_time = make_block(conn1, branch_1_blocks[-1], last_block_time = last_block_time)
                 branch_1_blocks.append(new_block)
 
             branch_2_root, last_block_time = make_block(conn2, makeValid=False, last_block_time = last_block_time)
             branch_2_blocks = [branch_2_root]
-            for _ in range(SAFE_MODE_MAX_FORK_DISTANCE + SAFE_MODE_MIN_POW_DIFFERENCE + 1):
+            for _ in range(MAX_FORK_DISTANCE + MIN_FORK_DIFFERENCE + 1):
                 new_block, last_block_time = make_block(conn2, branch_2_blocks[-1], last_block_time = last_block_time)
                 branch_2_blocks.append(new_block)
 
             # send first branch that should be active tip
             send_by_headers(conn1, branch_1_blocks, do_send_blocks=True)
-
-            # wait for active tip
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
 
             # send second branch with more POW
             send_by_headers(conn2, branch_2_blocks, do_send_blocks=False)
-
-            # active tip should be from first branch and second branch should have headers-only status
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
             wait_for_tip_status(conn1, branch_2_blocks[-1].hash, "headers-only")
     
-            # we should not be in safe mode
-            conn1.rpc.getbalance()
+            # we should not be in safe mode (distance to the fork is too large)
+            assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
+
+            conn1.rpc.invalidateblock(branch_1_blocks[-1].hash)
+            wait_for_tip(conn1, branch_1_blocks[-2].hash)
+            # here we have shortened distance from the active tip to the fork root so the safe mode should be activated
+            assert conn1.rpc.getsafemodeinfo()["safemodeenabled"]
+
+            conn1.rpc.reconsiderblock(branch_1_blocks[-1].hash)
+            wait_for_tip(conn1, branch_1_blocks[-1].hash)
+            # returning to the old state (distance to the fork is too large)
+            assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 
             # From time to time this test can run faster than expected and
             # the older blocks for batch 2 headers are not yet requested.
@@ -88,12 +105,15 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
             for block in branch_2_blocks:
                 conn2.send_message(msg_block(block))
 
+            tips = conn2.rpc.getchaintips()
+
             # second branch should now be invalid
             wait_for_tip_status(conn1, branch_2_blocks[-1].hash, "invalid")
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
             
             # we should not be in safe mode
-            conn1.rpc.getbalance()
+            assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
+
 
 if __name__ == '__main__':
     NoSafeModeByLargeDistantFork().main()

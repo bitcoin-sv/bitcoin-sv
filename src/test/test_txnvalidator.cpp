@@ -350,7 +350,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
     for(const auto& data : txnsData)
     {
         CValidationState state;
-        BOOST_CHECK(detector.insertTxnInputs(data, pool, state, true) == true);
+        BOOST_CHECK(detector.insertTxnInputs(data->GetTxnPtr(), pool, state, true) == true);
 
         BOOST_CHECK(state.IsDoubleSpendDetected() == false);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);

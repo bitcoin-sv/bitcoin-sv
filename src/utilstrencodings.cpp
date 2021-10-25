@@ -122,6 +122,61 @@ void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
     }
 }
 
+// Basic URL parsing for webhooks.
+// Doesn't try to be 100% standards compliant, just good enough to extract what we need.
+void SplitURL(const std::string& url, std::string& protocol, std::string& host, int& port,
+    std::string& endpoint)
+{
+    auto urlLastPos { url.size() - 1 };
+
+    // Host and port either at the start or follow '://'
+    auto addrStart { url.find("://") };
+    if(addrStart == std::string::npos)
+    {
+        addrStart = 0;
+    }
+    else
+    {
+        // Extract protocol
+        protocol = url.substr(0, addrStart);
+        addrStart += 3;
+    }
+
+    if(urlLastPos > addrStart)
+    {
+        // End of the address is either the rest of the URL or until a '/' separator
+        auto addrEnd { url.find('/', addrStart) };
+        std::string::size_type addrLen {};
+        if(addrEnd == std::string::npos)
+        {
+            addrLen = url.size() - addrStart;
+        }
+        else
+        {
+            addrLen = addrEnd - addrStart;
+        }
+
+        if(addrLen > 0)
+        {
+            // Get address and split into host & port
+            std::string addr { url.substr(addrStart, addrLen) };
+            SplitHostPort(addr, port, host);
+
+            // Endpoint optionally follows address
+            auto endPointStart { addrStart + addrLen };
+            if(endPointStart < url.size())
+            {
+                endpoint = url.substr(endPointStart);
+            }
+
+            // Got everything
+            return;
+        }
+    }
+
+    throw std::runtime_error("Badly formatted URL");
+}
+
 std::string EncodeBase64(const uint8_t *pch, size_t len) {
     static const char *pbase64 =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

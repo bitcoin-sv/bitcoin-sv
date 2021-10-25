@@ -45,6 +45,7 @@ class CBlockTreeDB;
 class CBloomFilter;
 class CChainParams;
 class CConnman;
+class CFrozenTXOCheck;
 class CInv;
 class Config;
 class CScriptCheck;
@@ -207,6 +208,8 @@ constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
 /** Default maximum size of script batches processed by a single checker thread */
 constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
 
+constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
+
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
@@ -287,52 +290,39 @@ static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 int GetProcessingBlocksCount();
 
 /**
- * Minimum length of valid fork that trigger safe mode.
- */
-static const int SAFE_MODE_MIN_VALID_FORK_LENGTH = 7;
 
-/**
- * Maximum distance of valid fork tip from active tip.
- */
-static const int SAFE_MODE_MAX_VALID_FORK_DISTANCE = 72;
-
-/**
  * Maximum distance of forks last common block from current active tip
  * to still enter safe mode.
  */
-static const int SAFE_MODE_MAX_FORK_DISTANCE = 288;
+static const int64_t SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = 1000;
 
 /**
- * Minimum number of blocks that fork should be ahead of active tip to
- * enter safe mode.
+ * Forks shorter than SAFE_MODE_MIN_FORK_LENGTH will not trigger safe mode
  */
-static const int SAFE_MODE_MIN_POW_DIFFERENCE = 6;
+static const int64_t SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = 3;
 
 /**
- * Method checks if block that is being added to block index causes
- * node to enter safe mode. 
- * Node enters "Safe mode" in two cases:
- *   1. When any fork tip which is demonstrating at least SAFE_MODE_MIN_POW_DIFFERENCE 
- *      blocks more proof of work than the current best chain, is detected regardless 
- *      of the header status (valid / invalid / unknown) but only if last common block
- *      is at most SAFE_MODE_MAX_FORK_DISTANCE blocks away from current best tip. 
- *   2. When a fork with successfully validated blocks is detected, which is at least 
- *      SAFE_MODE_MIN_VALID_FORK_LENGTH block long and whose tip is within 
- *      SAFE_MODE_MAX_VALID_FORK_DISTANCE blocks from the current best chain tip
+ * Forks whose proof-of-work difference to the current tip  (<active chain pow> - <fork tip pow>),
+ * is smaller than active chain tip will not trigger the safe mode
  */
-void CheckSafeModeParameters(const CBlockIndex* pindexNew);
+static const int64_t SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE = -72;
+
+/**
+ * Finds all chain tips except the active tip
+ */
+std::set<CBlockIndex*> GetForkTips();
 
 /**
  * Method finds all chain tips (except active) and checks if any of them 
  * should trigger node to enter safe mode.
  */
-void CheckSafeModeParametersForAllForksOnStartup();
+void CheckSafeModeParametersForAllForksOnStartup(const Config& config);
 
 /**
  * Invalidate all chains containing given block that should be already invalid. 
  * Set status of descendent blocks to "with failed parent".
  */
-void InvalidateChain(const CBlockIndex* pindexNew);
+void InvalidateChain(const Config& config, const CBlockIndex* pindexNew);
 
 /**
  * Minimum distance between recevied block and active tip required 
@@ -441,6 +431,7 @@ bool VerifyNewBlock(const Config &config,
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock, 
+                     const CBlockSource& source,
                      const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
@@ -457,6 +448,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
     bool* fNewBlock,
+    const CBlockSource& source,
     const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
@@ -917,6 +909,7 @@ std::optional<bool> CheckInputs(
     bool sigCacheStore,
     bool scriptCacheStore,
     const PrecomputedTransactionData& txdata,
+    CFrozenTXOCheck& frozenTXOCheck,
     std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -938,7 +931,8 @@ namespace Consensus {
  * sigs. Preconditions: tx.IsCoinBase() is false.
  */
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight);
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
+                   CFrozenTXOCheck& frozenTXOCheck);
 
 } // namespace Consensus
 
@@ -1106,6 +1100,11 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex);
 
+bool AcceptBlockHeader(const Config&, 
+                       const CBlockHeader&,
+                       CValidationState&,
+                       CBlockIndex**);
+
 /**
  * Mark a block and its descendants (up to numBlocks of them) as soft rejected.
  */
@@ -1160,5 +1159,27 @@ static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);
+
+
+/** Default value for parameter -frozentxodbcache: cache size for database holding a list of frozen transaction outputs (in bytes) */
+constexpr std::size_t DEFAULT_FROZEN_TXO_DB_CACHE = 128 * ONE_KILOBYTE;
+
+/**
+ * Initialize FrozenTXODB database by calling CFrozenTXODB::Init() with given parameters.
+ *
+ * FrozenTXOLogger is also initialized by calling CFrozenTXOLogger::Init().
+ *
+ * This should typically only be called during application initialization.
+ *
+ * @param cache_size @see CFrozenTXODB::Init()
+ */
+void InitFrozenTXO(std::size_t cache_size);
+
+/**
+ * Shutdown FrozenTXODB database and FrozenTXOLogger by calling CFrozenTXODB::Shutdown() and CFrozenTXOLogger::Shutdown(), respectively.
+ *
+ * This should typically only be called before application quits.
+ */
+void ShutdownFrozenTXO();
 
 #endif // BITCOIN_VALIDATION_H

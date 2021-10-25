@@ -90,11 +90,15 @@ add_test_to_suite(bitcoin test_bitcoin
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
     dsattempt_tests.cpp
+    dsdetected_tests.cpp
 	dstencode_tests.cpp
     dstxn_serialiser_tests.cpp
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp
+	frozentxo_db_tests.cpp
+	frozentxo_mempool_tests.cpp
+	frozentxo_tests.cpp
 	getarg_tests.cpp
 	hash_tests.cpp
 	inv_tests.cpp
@@ -175,6 +179,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	univalue_tests.cpp
 	util_tests.cpp
 	validation_tests.cpp
+    webhook_client_tests.cpp
 
 	# Tests generated from JSON
 	${JSON_HEADERS}

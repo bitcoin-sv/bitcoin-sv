@@ -186,7 +186,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         pblock->nNonce = blockinfo[i].nonce;
         std::shared_ptr<const CBlock> shared_pblock =
             std::make_shared<const CBlock>(*pblock);
-        BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr));
+        BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr, CBlockSource::MakeLocal("test")));
         pblock->hashPrevBlock = pblock->GetHash();
     }
 
@@ -836,7 +836,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
         pblock->nNonce = blockinfo[i].nonce;
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
-        BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr));
+        BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr, CBlockSource::MakeLocal("test")));
         pblock->hashPrevBlock = pblock->GetHash();
     }
 

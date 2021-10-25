@@ -130,6 +130,9 @@ void GlobalConfig::Reset()
     streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
 
+    // RPC parameters
+    webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
+
     // Double-Spend parameters
     dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
     dsEndpointFastTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
@@ -143,6 +146,10 @@ void GlobalConfig::Reset()
     dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
     dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
     dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
+    dsDetectedWebhookAddress = "";
+    dsDetectedWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    dsDetectedWebhookPath = "";
+    dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
 
     // MinerID
     minerIdCacheSize = MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE;
@@ -159,6 +166,15 @@ void GlobalConfig::Reset()
     maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
     preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
     maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
+
+    mSoftConsensusFreezeDuration = DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION;
+    // Safe mode activation
+    safeModeWebhookAddress = "";
+    safeModeWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    safeModeWebhookPath = "";
+    safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
+    safeModeMinForkLength = SAFE_MODE_DEFAULT_MIN_FORK_LENGTH;
+    safeModeMinHeightDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
 
 }
 
@@ -1106,6 +1122,55 @@ InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
     return invalidTxFileSinkEvictionPolicy;
 }
 
+// Safe mode activation
+bool GlobalConfig::SetSafeModeWebhookURL(const std::string& url, std::string* err)
+{
+    try
+    {
+        int port { rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT };
+        std::string host {};
+        std::string protocol {};
+        std::string endpoint {};
+        SplitURL(url, protocol, host, port, endpoint);
+
+        // Check for any protocol other than http
+        if(protocol != "http")
+        {
+            if(err)
+            {
+                *err = "Unsupported protocol in safe mode webhook notification URL";
+            }
+            return false;
+        }
+
+        safeModeWebhookAddress = host;
+        safeModeWebhookPort = port;
+        safeModeWebhookPath = endpoint;
+    }
+    catch(const std::exception&)
+    {
+        if(err)
+        {
+            *err = "Badly formatted safe mode webhook URL";
+        }
+        return false;
+    }
+
+    return true;
+}
+std::string GlobalConfig::GetSafeModeWebhookAddress() const
+{
+    return safeModeWebhookAddress;
+}
+int16_t GlobalConfig::GetSafeModeWebhookPort() const
+{
+    return safeModeWebhookPort;
+}
+std::string GlobalConfig::GetSafeModeWebhookPath() const
+{
+    return safeModeWebhookPath;
+}
+
 // Block download
 bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
 {
@@ -1246,6 +1311,27 @@ bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
 unsigned int GlobalConfig::GetBanScoreThreshold() const
 {
     return banScoreThreshold;
+}
+
+// RPC parameters
+bool GlobalConfig::SetWebhookClientNumThreads(int64_t num, std::string* err)
+{
+    if(num <= 0 || num > static_cast<int64_t>(rpc::client::WebhookClientDefaults::MAX_NUM_THREADS))
+    {
+        if(err)
+        {
+            *err = "Webhook client number of threads must be between 1 and " +
+                std::to_string(rpc::client::WebhookClientDefaults::MAX_NUM_THREADS);
+        }
+        return false;
+    }
+
+    webhookClientNumThreads = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetWebhookClientNumThreads() const
+{
+    return webhookClientNumThreads;
 }
 
 // Double-Spend Parameters
@@ -1477,6 +1563,124 @@ bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
 uint64_t GlobalConfig::GetDoubleSpendQueueMaxMemory() const
 {
     return dsAttemptQueueMaxMemory;
+}
+
+int64_t GlobalConfig::GetSafeModeMaxForkDistance() const
+{
+    return safeModeMaxForkDistance;
+}
+
+bool GlobalConfig::SetSafeModeMaxForkDistance(int64_t distance, std::string* err)
+{
+    if(distance < 1)
+    {
+       if(err)
+        {
+            *err = "Safe mode maximum fork distance must be greater than 0.";
+        }
+        return false;
+    }
+
+    safeModeMaxForkDistance = distance;
+    return true;
+}
+
+int64_t GlobalConfig::GetSafeModeMinForkLength() const
+{
+    return safeModeMinForkLength;
+}
+
+bool GlobalConfig::SetSafeModeMinForkLength(int64_t length, std::string* err)
+{
+    if(length < 1)
+    {
+       if(err)
+        {
+            *err = "Safe mode minimal fork length must be greater than 0.";
+        }
+        return false;
+    }
+
+    safeModeMinForkLength = length;
+    return true;
+}
+
+int64_t GlobalConfig::GetSafeModeMinForkHeightDifference() const
+{
+    return safeModeMinHeightDifference;
+}
+
+bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err)
+{
+    safeModeMinHeightDifference = heightDifference;
+    return true;
+}
+
+bool GlobalConfig::SetDoubleSpendDetectedWebhookURL(const std::string& url, std::string* err)
+{
+    try
+    {
+        int port { rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT };
+        std::string host {};
+        std::string protocol {};
+        std::string endpoint {};
+        SplitURL(url, protocol, host, port, endpoint);
+
+        // Check for any protocol other than http
+        if(protocol != "http")
+        {
+            if(err)
+            {
+                *err = "Unsupported protocol in double-spend detected webhook notification URL";
+            }
+            return false;
+        }
+
+        dsDetectedWebhookAddress = host;
+        dsDetectedWebhookPort = port;
+        dsDetectedWebhookPath = endpoint;
+    }
+    catch(const std::exception&)
+    {
+        if(err)
+        {
+            *err = "Badly formatted double-spend detected webhook URL";
+        }
+        return false;
+    }
+
+    return true;
+}
+std::string GlobalConfig::GetDoubleSpendDetectedWebhookAddress() const
+{
+    return dsDetectedWebhookAddress;
+}
+int16_t GlobalConfig::GetDoubleSpendDetectedWebhookPort() const
+{
+    return dsDetectedWebhookPort;
+}
+std::string GlobalConfig::GetDoubleSpendDetectedWebhookPath() const
+{
+    return dsDetectedWebhookPath;
+}
+
+bool GlobalConfig::SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-spend detected webhook maximum transaction size must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsDetectedWebhookMaxTxnSize = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendDetectedWebhookMaxTxnSize() const
+{
+    return dsDetectedWebhookMaxTxnSize;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
@@ -1982,4 +2186,22 @@ uint64_t GlobalConfig::GetPromiscuousMempoolFlags() const {
 }
 bool GlobalConfig::IsSetPromiscuousMempoolFlags() const {
     return mIsSetPromiscuousMempoolFlags;
+}
+
+bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err )
+{
+    if (LessThanZero(duration, err, "Soft consensus freeze cannot be configured with a negative value."))
+    {
+        return false;
+    }
+
+    mSoftConsensusFreezeDuration =
+        duration ? duration : std::numeric_limits<std::int32_t>::max();
+
+    return true;
+}
+
+std::int32_t GlobalConfig::GetSoftConsensusFreezeDuration() const
+{
+    return mSoftConsensusFreezeDuration;
 }

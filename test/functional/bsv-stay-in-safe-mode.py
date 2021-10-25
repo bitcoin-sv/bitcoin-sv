@@ -75,16 +75,11 @@ class StayInSafeMode(BitcoinTestFramework):
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
             wait_for_tip_status(conn2, branch_2_blocks[-1].hash, "headers-only")
 
-            # we should have entered the safe mode
-            try:
-                conn1.rpc.getbalance()
-                assert False, "Should not come to here, should raise exception in line above."
-            except JSONRPCException as e:
-                assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+            assert conn1.rpc.getsafemodeinfo()["safemodeenabled"], "We should be in the safe mode"
 
             def wait_for_log():
                 safeModeChanges = 0
-                line_text = "NotifySafeModeLevelChange: Warning: Found chain at least ~6 blocks longer than our best chain."
+                line_text = "WARNING: Safe mode level changed"
                 for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
                     if line_text in line:
                         self.log.info("Found line: %s", line)
@@ -102,11 +97,7 @@ class StayInSafeMode(BitcoinTestFramework):
             conn3.cb.sync_with_ping()
 
             # we should still be in safe mode
-            try:
-                conn1.rpc.getbalance()
-                assert False, "Should not come to here, should raise exception in line above."
-            except JSONRPCException as e:
-                assert e.error["message"] == "Safe mode: Warning: The network does not appear to fully agree! We received headers of a large fork. Still waiting for block data for more details."
+            assert conn1.rpc.getsafemodeinfo()["safemodeenabled"], "We should be in the safe mode"
 
     def run_test(self):
         self.run_test_case("Send active chain first and then headers from second branch. Do not wait between sending.", order=1, wait=False)

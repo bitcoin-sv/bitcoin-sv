@@ -22,6 +22,9 @@
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "disk_tx_pos.h"
+#include "frozentxo.h"
+#include "frozentxo_db.h"
+#include "frozentxo_logging.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
@@ -55,6 +58,12 @@
 #include "validationinterface.h"
 #include "versionbits.h"
 #include "warnings.h"
+#include "blockfileinfostore.h"
+#include "block_file_access.h"
+#include "invalid_txn_publisher.h"
+#include "blockindex_with_descendants.h"
+#include "metrics.h"
+#include "safe_mode.h"
 
 #include <atomic>
 
@@ -703,6 +712,12 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
         }
     }
 
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        "mempool and cache",
+        chainActive.Tip()->GetBlockHash(),
+        0}; // Data not known
+
     // For Consenus parameter false is used because we already use policy rules in first CheckInputs call
     // from TxnValidation function that is called before this one, and if that call succeeds then we 
     // can use policy rules again but with different flags now
@@ -717,7 +732,8 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
                 flags,
                 cacheSigStore,  /* sigCacheStore */
                 true,           /* scriptCacheStore */
-                txdata);
+                txdata,
+                frozenTXOCheck);
 }
 
 static bool CheckTxOutputs(
@@ -971,6 +987,31 @@ static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
         return true;
     }
     return false;
+}
+
+static CBlockSource TxInputDataToSource(const CTxInputData& data)
+{
+    switch(data.GetTxSource())
+    {
+    case TxSource::file:
+        return CBlockSource::MakeLocal("file");
+    case TxSource::reorg:
+        return CBlockSource::MakeLocal("reorg");
+    case TxSource::wallet:
+        return CBlockSource::MakeLocal("wallet");
+    case TxSource::rpc:
+        return CBlockSource::MakeRPC();
+    case TxSource::p2p:
+        if(const CNodePtr& pNode = data.GetNodePtr().lock())
+        {
+            return CBlockSource::MakeP2P(pNode->GetAssociation().GetPeerAddr().ToString());
+        }
+
+        // for unit tests only - test_txvalidator.cpp
+        return CBlockSource::MakeP2P("disconnected");
+    default:
+        return CBlockSource::MakeUnknown();
+    }
 }
 
 static std::shared_ptr<task::CCancellationSource> MakeValidationCancellationSource(
@@ -1294,6 +1335,12 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData, vCoinsToUncache};
     }
 
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        TxInputDataToSource(*pTxInputData).ToString(),
+        chainActive.Tip()->GetBlockHash(),
+        nAcceptTime};
+
     // We are getting flags as they would be if the utxos are before genesis. 
     // "CheckInputs" is adding specific flags for each input based on its height in the main chain
     uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
@@ -1312,7 +1359,8 @@ CTxnValResult TxnValidation(
             scriptVerifyFlags,
             true,      /* sigCacheStore */
             false,     /* scriptCacheStore */
-            txdata);
+            txdata,
+            frozenTXOCheck);
 
     if (!res.has_value())
     {
@@ -1387,7 +1435,8 @@ CTxnValResult TxnValidation(
                 MANDATORY_SCRIPT_VERIFY_FLAGS,
                 true,      /* sigCacheStore */
                 false,     /* scriptCacheStore */
-                txdata);
+                txdata,
+                frozenTXOCheck);
         if (!res.has_value())
         {
             state.SetValidationTimeoutExceeded();
@@ -1468,42 +1517,6 @@ CValidationState HandleTxnProcessingException(
     return state;
 }
 
-static CTxnValResult PropagateParentError(const CTxnValResult& parentResult, const TxInputDataSPtr& elem)
-{
-    const auto& parentState = parentResult.mState;
-    CValidationState newState;
-    assert(!parentState.IsValid());
-    // The performance part of this is important:
-    if (parentState.IsValidationTimeoutExceeded()) {
-        // when the parent fails due to exceeding the validation time limit it
-        // will get re-scheduled as a low-priority task.
-        // The child has to enter the orphan pool.
-        newState.SetMissingInputs();
-        newState.Invalid();
-    } else if (parentState.IsMissingInputs()) {
-        newState = parentState;
-        if (parentResult.mTxInputData->IsDeleted()) {
-            // see below
-            elem->SetDeleted(true);
-        }
-    } else {
-        // The parent was invalid. The child transaction can never become valid
-        // as it references an invalid parent. so failing the child, too is correct.
-        // Before this change, the second and further transactions in the chain,
-        // after the failing transaction would enter the orphan pool with
-        // no possibility of leaving it except by eviction...
-        newState.SetMissingInputs();
-        newState.Invalid();
-        // Mark subsequent transactions as orphans with an extra flag to drop them on entry to the orphan pool.
-        elem->SetDeleted(true);
-    }
-    if (elem->IsDeleted()) {
-        LogPrint(BCLog::TXNVAL, "Transaction %s gets dropped becasue %s failed\n",
-                             elem->GetTxnPtr()->GetId().ToString(),
-                             parentResult.mTxInputData->GetTxnPtr()->GetId().ToString());
-    }
-    return {newState, elem};
-}
 
 std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask(
     const TxInputDataSPtrRefVec& vTxInputData,
@@ -1557,32 +1570,25 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
         }
         CTxnValResult result {};
         try {
-            if (results.empty() || results.back().first.mState.IsValid()) {
 #ifdef COLLECT_METRICS
-                auto timeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_t };
-                auto cpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
-                if (!elem.get()->IsOrphanTxn()) {
-                    // we are first time through validation === time in network queues
-                    auto e2e = elem.get()->GetLifetime();
-                    durations_queue_t_ms.count(std::chrono::duration_cast<std::chrono::milliseconds>(e2e).count());
-                    durations_queue_t_s.count(std::chrono::duration_cast<std::chrono::seconds>(e2e).count());
-                }
-#endif
-                // Execute validation for the given txn
-                result =
-                    TxnValidation(
-                        elem,
-                        config,
-                        pool,
-                        handlers.mpTxnDoubleSpendDetector,
-                        fUseLimits,
-                        cancellationBudget);
-            } else {
-                // a parent in the chain failed validation, make sure the
-                // rest of the (dependant) chain meets the same fate. We do not
-                // need to actually run the validation to reach that conclusion.
-                result = PropagateParentError(results.back().first, elem);
+            auto timeTimer = metrics::TimedScope<std::chrono::steady_clock, std::chrono::milliseconds> { durations_t };
+            auto cpuTimer = metrics::TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
+            if (!elem.get()->IsOrphanTxn()) {
+                // we are first time through validation === time in network queues
+                auto e2e = elem.get()->GetLifetime();
+                durations_queue_t_ms.count(std::chrono::duration_cast<std::chrono::milliseconds>(e2e).count());
+                durations_queue_t_s.count(std::chrono::duration_cast<std::chrono::seconds>(e2e).count());
             }
+#endif
+            // Execute validation for the given txn
+            result =
+                TxnValidation(
+                    elem,
+                    config,
+                    pool,
+                    handlers.mpTxnDoubleSpendDetector,
+                    fUseLimits,
+                    cancellationBudget);
             // Process validated results
             ProcessValidatedTxn(pool, result, handlers, false, config);
 #ifdef COLLECT_METRICS
@@ -2290,29 +2296,11 @@ void AlertNotify(const std::string &strMessage) {
     boost::thread t(runCommand, strCmd); // thread runs free
 }
 
-// collection of current forks that trigger safe mode (key: fork tip, value: fork base)
-std::map<const CBlockIndex*, const CBlockIndex*> safeModeForks;
-static CCriticalSection cs_safeModeLevelForks;
+
 
 /**
- * Finds fork base of a given fork tip. 
- * Returns nullptr if pindexForkTip is not connected to main chain
- */
-const CBlockIndex* FindForkBase(const CBlockIndex* pindexForkTip)
-{
-    AssertLockHeld(cs_main);
-
-    const CBlockIndex* pindexWalk = pindexForkTip;
-    while (pindexWalk && !chainActive.Contains(pindexWalk))
-    {
-        pindexWalk = pindexWalk->GetPrev();
-    }
-    return pindexWalk;
-}
-
-/**
- * Finds first invalid block from pindexForkTip. Returns nullptr if none was found.
- */
+    * Finds first invalid block from pindexForkTip. Returns nullptr if none was found.
+    */
 const CBlockIndex* FindInvalidBlockOnFork(const CBlockIndex* pindexForkTip)
 {
     AssertLockHeld(cs_main);
@@ -2327,31 +2315,6 @@ const CBlockIndex* FindInvalidBlockOnFork(const CBlockIndex* pindexForkTip)
         pindexWalk = pindexWalk->GetPrev();
     }
     return nullptr;
-}
-
-/**
- * Checks if block is part of one of the forks that are causing safe mode
- */
-bool IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew)
-{
-    AssertLockHeld(cs_safeModeLevelForks);
-
-    // if we received only header then block is not yet part of the fork 
-    // so check only for blocks with data
-    if (pindexNew->getStatus().hasData())
-    {
-        for (auto const& fork : safeModeForks)
-        {
-            auto pindexWalk = fork.first;
-            while (pindexWalk && pindexWalk != fork.second)
-            {
-                if (pindexWalk == pindexNew)
-                    return true;
-                pindexWalk = pindexWalk->GetPrev();
-            }
-        }
-    }
-    return false;
 }
 
 /**
@@ -2377,210 +2340,15 @@ void CheckForkForInvalidBlocks(CBlockIndex* pindexForkTip)
 }
 
 /**
- * Method checks if fork should cause node to enter safe mode.
- *
- * @param[in]      pindexForkTip  Tip of the fork that we are validating.
- * @param[in]      pindexForkBase Base of the fork (point where this fork split from active chain). 
- *                                It must be (indirect) parent of pindexForkTip or nullptr if
- *                                pindexForkTip is not connected to main chain.
- * @return Returns level of safe mode that this fork triggers:
- *         NONE    - fork is not triggering safe mode or we called this with pindexForkTip 
- *         UNKNOWN - fork trigger safe mode but we don't know yet if this fork is valid or invalid;
- *                   we probably only have block headers
- *         INVALID - fork that triggers safe mode is marked as invalid but we should still warn 
- *                   because we could be using old version of node
- *         VALID   - fork that triggers safe mode is valid
+ * This method finds all chain tips except active tip
  */
-SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase)
+std::set<CBlockIndex*> GetForkTips()
 {
     AssertLockHeld(cs_main);
-
-    BlockStatus forkTipStatus = pindexForkTip->getStatus();
-    if (!pindexForkTip || !pindexForkBase)
-    {
-        return SafeModeLevel::NONE;
-    }
-
-    if (chainActive.Contains(pindexForkTip))
-    {
-        return SafeModeLevel::NONE;
-    }
-    else if (forkTipStatus.isValid() && pindexForkTip->GetChainTx() > 0 &&
-             pindexForkTip->GetChainWork() - pindexForkBase->GetChainWork() > (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_VALID_FORK_LENGTH) &&
-             chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_VALID_FORK_DISTANCE)
-    {
-        return SafeModeLevel::VALID;
-    }
-    else if (chainActive.Tip()->GetHeight() - pindexForkBase->GetHeight() <= SAFE_MODE_MAX_FORK_DISTANCE &&
-             chainActive.Tip()->GetChainWork() + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_POW_DIFFERENCE) <= pindexForkTip->GetChainWork())
-    {
-        if (forkTipStatus.isInvalid())
-        {
-            return SafeModeLevel::INVALID;
-        }
-        else if (forkTipStatus.isValid() && pindexForkTip->GetChainTx() > 0)
-        {
-            return SafeModeLevel::VALID;
-        }
-        else
-        {
-            return SafeModeLevel::UNKNOWN;
-        }
-    }
-    return SafeModeLevel::NONE;
-}
-
-void NotifySafeModeLevelChange(SafeModeLevel safeModeLevel, const CBlockIndex* pindexForkTip)
-{
-    AssertLockHeld(cs_safeModeLevelForks);
-
-    if (!pindexForkTip)
-        return;
-
-    if (safeModeForks.find(pindexForkTip) == safeModeForks.end())
-        return;
-
-    switch (safeModeLevel)
-    {
-    case SafeModeLevel::NONE:
-        break;
-    case SafeModeLevel::UNKNOWN:
-        LogPrintf("%s: Warning: Found chain at least ~6 blocks "
-                  "longer than our best chain.\nStill waiting for "
-                  "block data.\n",
-                  __func__);
-        break;
-    case SafeModeLevel::INVALID:
-        LogPrintf("%s: Warning: Found invalid chain at least ~6 blocks "
-                  "longer than our best chain.\nChain state database "
-                  "corruption likely.\n",
-                  __func__);
-        break;
-    case SafeModeLevel::VALID:
-        const CBlockIndex* pindexForkBase = safeModeForks[pindexForkTip];
-        std::string warning =
-            std::string("'Warning: Large-work fork detected, forking after "
-                        "block ") +
-                        pindexForkBase->GetBlockHash().ToString() + std::string("'");
-        AlertNotify(warning);
-        LogPrintf("%s: Warning: Large valid fork found\n  forking the "
-                  "chain at height %d (%s)\n  lasting to height %d "
-                  "(%s).\nChain state database corruption likely.\n",
-                  __func__, pindexForkBase->GetHeight(),
-                  pindexForkBase->GetBlockHash().ToString(),
-                  pindexForkTip->GetHeight(),
-                  pindexForkTip->GetBlockHash().ToString());
-        break;
-    }
-}
-
-void CheckSafeModeParameters(const CBlockIndex* pindexNew)
-{
-    AssertLockHeld(cs_main);
-
-    if (!pindexNew || pindexNew->IsGenesis())
-        return;
-
-    LOCK(cs_safeModeLevelForks);
-
-    // safe mode level to be set
-    SafeModeLevel safeModeLevel = SafeModeLevel::NONE;
-    // fork triggering safe mode level change
-    const CBlockIndex* pindexForkTip = nullptr;
-    bool checkExistingForks = false;
-
-    if (chainActive.Tip() == pindexNew->GetPrev() || chainActive.Contains(pindexNew) || IsBlockPartOfExistingSafeModeFork(pindexNew))
-    {
-        // When we are extending active chain or updating any of the forks or main chain 
-        // then only check all existing forks if we should stay in safe mode. If block is part
-        // of existing safe mode fork than check whole fork (and all other forks) not just
-        // from fork base to pindexNew
-        if (GetSafeModeLevel() != SafeModeLevel::NONE)
-        {
-            // Check all forks if they still meet conditions for safe mode
-            checkExistingForks = true;
-        }
-    }
-    else
-    {
-        const CBlockIndex* pindexForkBase = pindexNew;
-        auto itPPrev = safeModeForks.find(pindexNew->GetPrev());
-        if (itPPrev != safeModeForks.end())
-        {
-            // Check if we are extending existing fork that caused safe mode
-            pindexForkBase = itPPrev->second;
-            safeModeForks.erase(itPPrev);
-        }
-        else
-        {
-            // Find base of new fork
-            pindexForkBase = FindForkBase(pindexNew);
-        }
-        // Check if fork is in bounds to cause safe mode
-        SafeModeLevel safeModeLevelFork = ShouldForkTriggerSafeMode(pindexNew, pindexForkBase);
-        if (safeModeLevelFork != SafeModeLevel::NONE)
-        {
-            // Add fork to collection of forks that cause safe mode
-            safeModeForks.insert(std::pair<const CBlockIndex*, const CBlockIndex*>(pindexNew, pindexForkBase));
-            // Check if we increased safe mode level
-            if (safeModeLevelFork > safeModeLevel)
-            {
-                safeModeLevel = safeModeLevelFork;
-                pindexForkTip = pindexNew;
-            }
-        }
-        else
-        {
-            // This fork does not cause safe mode so check if any of 
-            // existing forks still cause safe mode
-            checkExistingForks = true;
-        }
-    }
-
-    // If needed, check existing forks and remove those that no longer cause safe mode
-    if (checkExistingForks)
-    {
-        for (auto it = safeModeForks.cbegin(); it != safeModeForks.cend();)
-        {
-            SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(it->first, it->second);
-            if (safeModeLevelForks == SafeModeLevel::NONE)
-            {
-                it = safeModeForks.erase(it);
-            }
-            else
-            {
-                // check if this fork rises safe mode level
-                if (safeModeLevelForks > safeModeLevel)
-                {
-                    safeModeLevel = safeModeLevelForks;
-                    pindexForkTip = it->first;
-                }
-                ++it;
-            }
-        }
-    }
-
-    // If we have any forks trigger safe mode
-    if (GetSafeModeLevel() != safeModeLevel)
-    {
-        SetSafeModeLevel(safeModeLevel);
-        NotifySafeModeLevelChange(safeModeLevel, pindexForkTip);
-    }
-}
-
-/**
- * This method is called on node startup. It has two tasks:
- *  1. Restore global safe mode state
- *  2. Validate that all header only fork tips have correct tip status
- */
-void CheckSafeModeParametersForAllForksOnStartup()
-{
-    LOCK(cs_main);
-
+    
+    std::set<CBlockIndex*> setTips;
     std::set<CBlockIndex*> setTipCandidates;
     std::set<CBlockIndex*> setPrevs;
-
-    int64_t nStart = GetTimeMillis();
 
     mapBlockIndex.ForEachMutable(
         [&](CBlockIndex& index)
@@ -2592,10 +2360,28 @@ void CheckSafeModeParametersForAllForksOnStartup()
             }
         });
 
-    std::set<CBlockIndex*> setTips;
+    
     std::set_difference(setTipCandidates.begin(), setTipCandidates.end(),
                         setPrevs.begin(), setPrevs.end(),
                         std::inserter(setTips, setTips.begin()));
+    
+    return setTips;
+}
+
+/**
+ * This method is called on node startup. It has two tasks:
+ *  1. Restore global safe mode state
+ *  2. Validate that all header only fork tips have correct tip status
+ */
+void CheckSafeModeParametersForAllForksOnStartup(const Config& config)
+{
+    LOCK(cs_main);
+
+    int64_t nStart = GetTimeMillis();
+
+    std::set<CBlockIndex*> setTips = GetForkTips();
+
+    SafeModeClear();
 
     for (auto& tip :setTips)
     {
@@ -2607,14 +2393,14 @@ void CheckSafeModeParametersForAllForksOnStartup()
             CheckForkForInvalidBlocks(tip);
         }
         // Restore global safe mode state,
-        CheckSafeModeParameters(tip);
+        CheckSafeModeParameters(config, tip);
     }
     LogPrintf("%s: global safe mode state restored to level %d in %dms\n", 
               __func__, static_cast<int>(GetSafeModeLevel()),
               GetTimeMillis() - nStart);
 }
 
-static void InvalidChainFound(const CBlockIndex *pindexNew)
+static void InvalidChainFound(const Config& config, const CBlockIndex *pindexNew)
 {
     auto chainWork = pindexNew->GetChainWork();
     if (!pindexBestInvalid ||
@@ -2634,16 +2420,20 @@ static void InvalidChainFound(const CBlockIndex *pindexNew)
               __func__, tip->GetBlockHash().ToString(), chainActive.Height(),
               log(tip->GetChainWork().getdouble()) / log(2.0),
               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", tip->GetBlockTime()));
-    CheckSafeModeParameters(pindexNew);
+    CheckSafeModeParameters(config, pindexNew);
 }
 
-static void InvalidBlockFound(CBlockIndex* pindex,
-                              const CBlock& block, 
-                              const CValidationState& state) {
-    if (!state.CorruptionPossible()) {
+static void InvalidBlockFound(const Config& config,
+                              CBlockIndex* pindex,
+                              const CBlock& block,
+                              const CValidationState& state)
+{
+    if(state.GetRejectCode() != REJECT_SOFT_CONSENSUS_FREEZE &&
+       !state.CorruptionPossible())
+    {
         pindex->ModifyStatusWithFailed(mapBlockIndex);
         setBlockIndexCandidates.erase(pindex);
-        InvalidChainFound(pindex);
+        InvalidChainFound(config, pindex);
     }
 
     // Update miner ID database if required
@@ -2697,7 +2487,8 @@ std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
 
 namespace Consensus {
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight) {
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
+                   CFrozenTXOCheck& frozenTXOCheck) {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it
     // easier for an attacker to attempt to split the network.
     if (!inputs.HaveInputs(tx)) {
@@ -2708,6 +2499,19 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
+
+        if(!frozenTXOCheck.Check(prevout, tx))
+        {
+            return
+                state.Invalid(
+                    false,
+                    frozenTXOCheck.IsCheckOnBlock() ?
+                        REJECT_SOFT_CONSENSUS_FREEZE :
+                        REJECT_INVALID,
+                    "bad-txns-inputs-frozen",
+                    "tried to spend blacklisted input");
+        }
+
         auto coin = inputs.GetCoin(prevout);
         assert(coin.has_value() && !coin->IsSpent());
 
@@ -2883,13 +2687,14 @@ std::optional<bool> CheckInputs(
     bool sigCacheStore,
     bool scriptCacheStore,
     const PrecomputedTransactionData& txdata,
+    CFrozenTXOCheck& frozenTXOCheck,
     std::vector<CScriptCheck>* pvChecks)
 {
     assert(!tx.IsCoinBase());
 
     const auto [ spendHeight, mtp ] = GetSpendHeightAndMTP(inputs);
     (void)mtp;  // Silence unused variable warning
-    if (!Consensus::CheckTxInputs(tx, state, inputs, spendHeight)) 
+    if (!Consensus::CheckTxInputs(tx, state, inputs, spendHeight, frozenTXOCheck))
     {
         return false;
     }
@@ -3398,6 +3203,8 @@ private:
         CDiskTxPos pos(pindex->GetBlockPos(),
                        GetSizeOfCompactSize(block.vtx.size()));
 
+        CFrozenTXOCheck frozenTXOCheck{ *pindex };
+
         for (size_t i = 0; i < block.vtx.size(); i++) {
             auto& txRef = block.vtx[i];
             const CTransaction &tx = *txRef;
@@ -3472,6 +3279,7 @@ private:
                         fCacheResults,
                         fCacheResults,
                         PrecomputedTransactionData(tx),
+                        frozenTXOCheck,
                         &vChecks);
                 if (!res.has_value())
                 {
@@ -3482,6 +3290,13 @@ private:
                 }
                 else if (!res.value())
                 {
+                    if (state.GetRejectCode() == REJECT_SOFT_CONSENSUS_FREEZE)
+                    {
+                        softConsensusFreeze(
+                            *pindex,
+                            config.GetSoftConsensusFreezeDuration() );
+                    }
+
                     return error("ConnectBlock(): CheckInputs on %s failed with %s",
                                  tx.GetId().ToString(), FormatStateMessage(state));
                 }
@@ -3582,6 +3397,26 @@ private:
         }
 
         return true;
+    }
+
+    void softConsensusFreeze( CBlockIndex& index, std::int32_t duration )
+    {
+        LogPrintf(
+            "Soft consensus freezing block %s for %d blocks.\n",
+            index.GetBlockHash().ToString(),
+            duration );
+
+        index.SetSoftConsensusFreezeFor( duration, mapBlockIndex );
+
+        BlockIndexWithDescendants blocks{
+            &index,
+            mapBlockIndex,
+            index.GetHeight() + duration };
+
+        for(auto* item=blocks.Root()->Next(); item!=nullptr; item=item->Next())
+        {
+            item->BlockIndex()->UpdateSoftConsensusFreezeFromParent();
+        }
     }
 
     const Config& config;
@@ -3722,6 +3557,13 @@ bool FlushStateToDisk(
                 }
                 // First make sure all block and undo data is flushed to disk.
                 pBlockFileInfoStore->FlushBlockFile();
+
+                // Finally remove any pruned files
+                //
+                // NOTE: This must happen before dirty block info write to disk
+                // below (pblocktree->WriteBatchSync)
+                if (fFlushForPrune) UnlinkPrunedFiles(setFilesToPrune);
+
                 // Then update all block file information (which may refer to
                 // block and undo files).
                 {
@@ -3734,8 +3576,6 @@ bool FlushStateToDisk(
                             state, "Failed to write to block index database");
                     }
                 }
-                // Finally remove any pruned files
-                if (fFlushForPrune) UnlinkPrunedFiles(setFilesToPrune);
                 nLastWrite = nNow;
             }
             // Flush best chain related state. This can only be done if the
@@ -4110,9 +3950,11 @@ static bool ConnectTip(
         connectTrace.TracePoolEntryRemovedEvents(true);
 
         GetMainSignals().BlockChecked(blockConnecting, state);
-        if (!rv) {
-            if (state.IsInvalid()) {
-                InvalidBlockFound(pindexNew, blockConnecting, state);
+        if(!rv)
+        {
+            if(state.IsInvalid())
+            {
+                InvalidBlockFound(config, pindexNew, blockConnecting, state);
             }
             return error("ConnectTip(): ConnectBlock %s failed (%s)",
                          pindexNew->GetBlockHash().ToString(),
@@ -4138,7 +3980,7 @@ static bool ConnectTip(
     }
 
     auto asyncRemoveForBlock = std::async(std::launch::async, 
-        [&blockConnecting, &pindexNew, &changeSet]()
+        [&blockConnecting, &changeSet]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
@@ -4194,7 +4036,7 @@ static bool ConnectTip(
  * Return the tip of the chain with the most work in it, that isn't known to be
  * invalid (it's however far from certain to be valid).
  */
-static CBlockIndex *FindMostWorkChain() {
+static CBlockIndex *FindMostWorkChain(const Config &config) {
     do {
         CBlockIndex *pindexNew = nullptr;
 
@@ -4207,10 +4049,9 @@ static CBlockIndex *FindMostWorkChain() {
                     return nullptr;
                 }
 
-                if((*it)->IsSoftRejected())
+                if ((*it)->IsSoftRejected() ||
+                    (*it)->IsInSoftConsensusFreeze())
                 {
-                    // This block is marked as soft rejected and should not be considered.
-                    // Try the next one.
                     ++it;
                     continue;
                 }
@@ -4248,7 +4089,7 @@ static CBlockIndex *FindMostWorkChain() {
                         pindexBestInvalid = pindexNew;
                     }
                     // Invalidate chain
-                    InvalidateChain(pindexTest);
+                    InvalidateChain(config, pindexTest);
                 }
                 else if (fMissingData)
                 {
@@ -4281,6 +4122,14 @@ static CBlockIndex *FindMostWorkChain() {
 /** Delete all entries in setBlockIndexCandidates that are worse than the
  * current tip. */
 static void PruneBlockIndexCandidates() {
+    if (chainActive.Tip()->IsInSoftConsensusFreeze())
+    {
+        // Wait with the cleaning until the tip is back in the "guaranteed
+        // not soft rejected" zone and we no longer expect that reorg will
+        // fall back on a block that should not be at the tip.
+        return;
+    }
+
     // Note that we can't delete the current block itself, as we may need to
     // return to it later in case a reorganization to a better block fails.
     std::set<CBlockIndex *, CBlockIndexWorkComparator>::iterator it =
@@ -4298,6 +4147,36 @@ static void PruneBlockIndexCandidates() {
     // Either the current tip or a successor of it we're working towards is left
     // in setBlockIndexCandidates.
     assert(!setBlockIndexCandidates.empty());
+}
+
+static std::optional<bool> RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+    const Config& config,
+    const CJournalChangeSetPtr& changeSet,
+    CValidationState& state,
+    DisconnectedBlockTransactions& disconnectpool )
+{
+    std::int32_t disconnectCounter = 0;
+    const CBlockIndex* walkIndex = chainActive.Tip();
+    while ( walkIndex->IsInSoftConsensusFreeze() )
+    {
+        if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+            // This is likely a fatal error, but keep the mempool consistent,
+            // just in case. Only remove from the mempool in this case.
+            mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+
+            return {};
+        }
+
+        ++disconnectCounter;
+        walkIndex = chainActive.Tip();
+    }
+
+    LogPrintf(
+        "Disconnected %d consensus frozen blocks back to tip %s.\n",
+        disconnectCounter,
+        chainActive.Tip()->GetBlockHash().ToString() );
+
+    return disconnectCounter;
 }
 
 /**
@@ -4318,7 +4197,7 @@ static bool ActivateBestChainStep(
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
-    
+
     try {
 
         class RAIIUpdateMempool
@@ -4328,23 +4207,62 @@ static bool ActivateBestChainStep(
             bool fBlocksDisconnected = false;
             bool fDisconnectFailed = false;
             DisconnectedBlockTransactions disconnectpool;
+            CValidationState& state;
         public:
-            RAIIUpdateMempool(const Config& c, const CJournalChangeSetPtr& cs, const CBlockIndex* pindexFork, CValidationState& state) 
+            RAIIUpdateMempool(
+                const Config& c,
+                const CJournalChangeSetPtr& cs,
+                const CBlockIndex* pindexFork,
+                CValidationState& st)
                 :config{c}
                 ,changeSet{cs}
+                ,state{ st }
             {
-                // we are diconnecting until we reach the fork point
-                while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-                    if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
-                        // This is likely a fatal error.
-                        fDisconnectFailed = true;
-                        return;
+                auto needTipDisconnect = [&]{ return chainActive.Tip() && chainActive.Tip() != pindexFork; };
+
+                if (needTipDisconnect())
+                {
+                    LogPrintf(
+                        "Performing best chain tip %s rollback to older fork point %s.\n",
+                        chainActive.Tip()->GetBlockHash().ToString(),
+                        pindexFork->GetBlockHash().ToString() );
+
+                    try
+                    {
+                        // we are diconnecting until we reach the fork point
+                        do
+                        {
+                            if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+                                // This is likely a fatal error.
+                                fDisconnectFailed = true;
+                                return;
+                            }
+                            fBlocksDisconnected = true;
+                        } while (needTipDisconnect());
                     }
-                    fBlocksDisconnected = true;
-                } 
+                    catch( ... )
+                    {
+                        // handle exceptions in constructor as incompletely
+                        // constructed instance will not call the destructor
+                        UpdateIfNeeded();
+                        throw;
+                    }
+                }
             }
 
-            ~RAIIUpdateMempool() { UpdateIfNeeded(); }
+            ~RAIIUpdateMempool()
+            {
+                if (std::uncaught_exceptions())
+                {
+                    RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+                        config,
+                        changeSet,
+                        state,
+                        disconnectpool );
+                }
+
+                UpdateIfNeeded();
+            }
         
             void UpdateIfNeeded()
             {
@@ -4354,6 +4272,8 @@ static bool ActivateBestChainStep(
                     fBlocksDisconnected = false;
                 }
             }
+
+            void MarkBlocksDisconnected() { fBlocksDisconnected = true; }
 
             DisconnectedBlockTransactions& GetDisconnectpool() {return disconnectpool;}
         
@@ -4416,12 +4336,30 @@ static bool ActivateBestChainStep(
                         connectTrace,
                         reorgUpdate.GetDisconnectpool(),
                         changeSet,
-                        pindexMostWork->GetChainWork()))
+                        pindexMostWork->GetChainWork() ))
                 {
+                    auto result =
+                        RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+                            config,
+                            changeSet,
+                            state,
+                            reorgUpdate.GetDisconnectpool() );
+                    if (result.has_value())
+                    {
+                        if (result.value() == true)
+                        {
+                            reorgUpdate.MarkBlocksDisconnected();
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+
                     if (state.IsInvalid()) {
                         // The block violates a consensus rule.
                         if (!state.CorruptionPossible()) {
-                            InvalidChainFound(vpindexToConnect.back());
+                            InvalidChainFound(config, vpindexToConnect.back());
                         }
                         state = CValidationState();
                         fInvalidFound = true;
@@ -4513,7 +4451,8 @@ static CBlockIndex* ConsiderBlockForMostWorkChain(
 
     if(mostWork.GetChainWork() > indexOfNewBlock->GetChainWork()
         || !indexOfNewBlock->IsValid(BlockValidity::TRANSACTIONS)
-        || !indexOfNewBlock->GetChainTx())
+        || !indexOfNewBlock->GetChainTx()
+        || indexOfNewBlock->IsInSoftConsensusFreeze())
     {
         return &mostWork;
     }
@@ -4595,7 +4534,7 @@ bool ActivateBestChain(
                 // new tip to aim for.
                 if (pindexMostWork == nullptr || pindexNewTip != chainActive.Tip())
                 {
-                    pindexMostWork = FindMostWorkChain();
+                    pindexMostWork = FindMostWorkChain(config);
 
                     // Whether we have anything to do at all.
                     if (pindexMostWork == nullptr)
@@ -4672,6 +4611,7 @@ bool ActivateBestChain(
                         connectTrace,
                         changeSet))
                 {
+                    CheckSafeModeParameters(config, nullptr);
                     return false;
                 }
 
@@ -4692,17 +4632,6 @@ bool ActivateBestChain(
                     assert(trace.pblock && trace.pindex);
                     GetMainSignals().BlockConnected(trace.pblock, trace.pindex,
                                                     *trace.conflictedTxs);
-                }
-                
-                if (pindexNewTip)
-                {
-                    // check if new tip affects safe mode
-                    CheckSafeModeParameters(pindexNewTip);
-                }
-                if (pindexOldTip)
-                {
-                    // check if old tip affects safe mode
-                    CheckSafeModeParameters(pindexOldTip);
                 }
             }
             // When we reach this point, we switched to a new tip (stored in
@@ -4749,15 +4678,21 @@ bool ActivateBestChain(
     const CChainParams &params = config.GetChainParams();
     CheckBlockIndex(params.GetConsensus());
 
-    // Write changes periodically to disk, after relay.
-    if (!FlushStateToDisk(params, state, FLUSH_STATE_PERIODIC)) {
-        return false;
-    }
+    {
+        LOCK( cs_main ); // needed by safe_mode CheckSafeModeParameters (chainActive)
+        // Write changes periodically to disk, after relay.
+        if (!FlushStateToDisk(params, state, FLUSH_STATE_PERIODIC)) {
+            CheckSafeModeParameters(config, nullptr);
+            return false;
+        }
 
-    int32_t nStopAtHeight = config.GetStopAtHeight();
-    if (nStopAtHeight && pindexNewTip &&
-        pindexNewTip->GetHeight() >= nStopAtHeight) {
-        StartShutdown();
+        int32_t nStopAtHeight = config.GetStopAtHeight();
+        if (nStopAtHeight && pindexNewTip &&
+            pindexNewTip->GetHeight() >= nStopAtHeight) {
+            StartShutdown();
+        }
+
+        CheckSafeModeParameters(config, pindexNewTip);
     }
 
     return true;
@@ -4903,12 +4838,25 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
             mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
             return false;
         }
+
+        auto result =
+            RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
+                config,
+                changeSet,
+                state,
+                disconnectpool );
+        if (!result.has_value())
+        {
+            // Disconnecting tip has failed.
+            mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+            return false;
+        }
     }
     else
     {
         // in case of invalidating block that is not on active chain make sure
         // that we mark all its descendants (whole chain) as invalid 
-        InvalidateChain(pindex);
+        InvalidateChain(config, pindex);
     }
 
     // DisconnectTip will add transactions to disconnectpool; try to add these
@@ -4926,7 +4874,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
             }
         });
 
-    InvalidChainFound(pindex);
+    InvalidChainFound(config, pindex);
     if(tip_disconnected)
     {
         uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->GetPrev());
@@ -5178,7 +5126,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     return true;
 }
 
-static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
+static CBlockIndex *AddToBlockIndex(const Config& config, const CBlockHeader &block) {
     if (auto index = mapBlockIndex.Get( block.GetHash() ); index) {
         return index;
     }
@@ -5187,12 +5135,12 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
     auto pindexNew = mapBlockIndex.Insert( block );
 
     // Check if adding new block index triggers safe mode
-    CheckSafeModeParameters(pindexNew);
+    CheckSafeModeParameters(config, pindexNew);
 
     return pindexNew;
 }
 
-void InvalidateChain(const CBlockIndex* pindexNew)
+void InvalidateChain(const Config& config, const CBlockIndex* pindexNew)
 {
     std::set<CBlockIndex*> setTipCandidates;
     std::set<CBlockIndex*> setPrevs;
@@ -5242,10 +5190,10 @@ void InvalidateChain(const CBlockIndex* pindexNew)
                 setBlockIndexCandidates.erase(pindexWalk);
                 pindexWalk = pindexWalk->GetPrev();
             }
-            // Check if we have to enter safe mode if chain has been invalidated
-            CheckSafeModeParameters(*it);
         }
     }
+    // Check if we have to enter safe mode if chain has been invalidated
+    CheckSafeModeParameters(config, nullptr);
 }
 
 bool CheckBlockTTOROrder(const CBlock& block)
@@ -5277,11 +5225,13 @@ bool CheckBlockTTOROrder(const CBlock& block)
  * BLOCK_VALID_TRANSACTIONS).
  */
 static bool ReceivedBlockTransactions(
+    const Config& config,
     const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos,
-    const CDiskBlockMetaData& metaData)
+    const CDiskBlockMetaData& metaData,
+    const CBlockSource& source)
 {
     // Validate TTOR order for blocks that are MIN_TTOR_VALIDATION_DISTANCE blocks or more from active tip
     if (chainActive.Tip() && chainActive.Tip()->GetHeight() - pindexNew->GetHeight() >= MIN_TTOR_VALIDATION_DISTANCE)
@@ -5292,13 +5242,13 @@ static bool ReceivedBlockTransactions(
             // Mark the block itself as invalid.
             pindexNew->ModifyStatusWithFailed(mapBlockIndex);
             setBlockIndexCandidates.erase(pindexNew);
-            InvalidateChain(pindexNew);
-            InvalidChainFound(pindexNew);
+            InvalidateChain(config, pindexNew);
+            InvalidChainFound(config, pindexNew);
             return state.Invalid(false, 0, "bad-blk-ttor");
         }
     }
 
-    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData, mapBlockIndex);
+    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData, source, mapBlockIndex);
 
     if (pindexNew->IsGenesis() || pindexNew->GetPrev()->GetChainTx())
     {
@@ -5741,8 +5691,11 @@ static const CBlockIndex* FindPreviousBlockIndex(const CBlockHeader &block, CVal
  *
  * Returns true if the block is succesfully added to the block index.
  */
-static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
-                              CValidationState &state, CBlockIndex **ppindex) {
+bool AcceptBlockHeader(const Config& config,
+                       const CBlockHeader& block,
+                       CValidationState& state,
+                       CBlockIndex** ppindex)
+{
     AssertLockHeld(cs_main);
     const CChainParams &chainparams = config.GetChainParams();
 
@@ -5797,7 +5750,7 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
         }
     }
 
-    if (CBlockIndex* newIdx = AddToBlockIndex(block); ppindex)
+    if (CBlockIndex* newIdx = AddToBlockIndex(config, block); ppindex)
     {
         *ppindex = newIdx;
     }
@@ -5846,7 +5799,8 @@ static bool AcceptBlock(const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     CValidationState& state, CBlockIndex** ppindex,
     bool fRequested, const CDiskBlockPos* dbp,
-    bool* fNewBlock) {
+    bool *fNewBlock,
+    const CBlockSource& source) {
     AssertLockHeld(cs_main);
 
     const CBlock& block = *pblock;
@@ -5974,7 +5928,7 @@ static bool AcceptBlock(const Config& config,
                 AbortNode(state, "Failed to write block");
             }
         }
-        if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData)) {
+        if (!ReceivedBlockTransactions(config, block, state, pindex, blockPos, metaData, source)) {
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
         }
     }
@@ -5990,7 +5944,7 @@ static bool AcceptBlock(const Config& config,
     if (!chainActive.Contains(pindex))
     {
         // if we are accepting block from fork check if it changes safe mode level
-        CheckSafeModeParameters(pindex);
+        CheckSafeModeParameters(config, pindex);
     }
 
     return true;
@@ -6024,6 +5978,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
     bool* fNewBlock,
+    const CBlockSource& source,
     const BlockValidationOptions& validationOptions)
 {
     auto guard = CBlockProcessing::GetCountGuard();
@@ -6054,7 +6009,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
         if (ret) {
             // Store to disk
             ret = AcceptBlock(config, pblock, state, &pindex, fForceProcessing,
-                              nullptr, fNewBlock);
+                              nullptr, fNewBlock, source);
         }
         CheckBlockIndex(chainparams.GetConsensus());
         if (!ret) {
@@ -6095,12 +6050,13 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock,
+                     const CBlockSource& blockSource,
                      const BlockValidationOptions& validationOptions)
 {
     auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock, validationOptions);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock, blockSource, validationOptions);
 
     if(!bestChainActivation)
     {
@@ -6707,8 +6663,7 @@ bool RewindBlockIndex(const Config &config) {
 void UnloadBlockIndex() {
     LOCK(cs_main);
 
-    LOCK(cs_safeModeLevelForks);
-    safeModeForks.clear();
+    SafeModeClear();
 
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
@@ -6774,8 +6729,10 @@ bool InitBlockIndex(const Config &config) {
                 return error(
                     "LoadBlockIndex(): writing genesis block to disk failed");
             }
-            CBlockIndex *pindex = AddToBlockIndex(block);
-            if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData)) {
+            CBlockIndex *pindex = AddToBlockIndex(config, block);
+            if (!ReceivedBlockTransactions(config, block, state, pindex, blockPos, metaData,
+                CBlockSource::MakeLocal("genesis")))
+            {
                 return error("LoadBlockIndex(): genesis block not accepted");
             }
         } catch (const std::runtime_error &e) {
@@ -6905,7 +6862,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                     LOCK(cs_main);
                     CValidationState state;
                     if (AcceptBlock(config, pblock, state, nullptr, true, dbp,
-                                    nullptr)) {
+                                    nullptr, CBlockSource::MakeLocal("external block file"))) {
                         nLoaded++;
                     }
                     if (state.IsError()) {
@@ -6964,7 +6921,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                             CValidationState dummy;
                             if (AcceptBlock(config, pblockrecursive, dummy,
                                             nullptr, true, &it->second,
-                                            nullptr)) {
+                                            nullptr, CBlockSource::MakeLocal("external block file"))) {
                                 nLoaded++;
                                 queue.push_back(pblockrecursive->GetHash());
                             }
@@ -7290,3 +7247,15 @@ double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pin
     return pindex->GetChainTx() / fTxTotal;
 }
 
+
+void InitFrozenTXO(std::size_t cache_size)
+{
+    CFrozenTXOLogger::Init();
+    CFrozenTXODB::Init(cache_size);
+}
+
+void ShutdownFrozenTXO()
+{
+    CFrozenTXODB::Shutdown();
+    CFrozenTXOLogger::Shutdown();
+}

@@ -30,6 +30,8 @@ class RPCClientConfig
                                                         const std::string& addr,
                                                         int timeout,
                                                         unsigned protocolVersion);
+    static RPCClientConfig CreateForSafeModeWebhook(const Config& config);
+    static RPCClientConfig CreateForDoubleSpendDetectedWebhook(const Config& config);
 
     // Accessors
     const std::string& GetServerIP() const { return mServerIP; }

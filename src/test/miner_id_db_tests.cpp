@@ -304,7 +304,7 @@ namespace
             }
 
             const auto shared_pblock { std::make_shared<const CBlock>(block) };
-            ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr);
+            ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr, CBlockSource::MakeLocal("test"));
 
             return block;
         }

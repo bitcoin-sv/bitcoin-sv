@@ -185,7 +185,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 # Boost packages
-set(BOOST_PACKAGES_REQUIRED chrono filesystem program_options thread)
+set(BOOST_PACKAGES_REQUIRED chrono date_time filesystem program_options thread)
 
 function(prepend var prefix)
 	set(listVar "")
@@ -253,6 +253,7 @@ add_library(common
 	keystore.h
 	limitedmap.h
 	memusage.h
+	merkleproof.h
 	merkletree.h
 	mining/assembler.h
 	mining/candidates.h
@@ -399,9 +400,18 @@ add_library(server
 	double_spend/dsattempt_handler.h
 	double_spend/dscallback_msg.cpp
 	double_spend/dscallback_msg.h
+	double_spend/dsdetected_defaults.h
+	double_spend/dsdetected_message.cpp
+	double_spend/dsdetected_message.h
 	double_spend/dstxn_serialiser.cpp
 	double_spend/dstxn_serialiser.h
 	double_spend/time_limited_blacklist.h
+	frozentxo.cpp
+	frozentxo.h
+	frozentxo_db.cpp
+	frozentxo_db.h
+	frozentxo_logging.cpp
+	frozentxo_logging.h
 	httprpc.cpp
 	httprpc.h
 	httpserver.cpp
@@ -419,6 +429,7 @@ add_library(server
 	mempooltxdb.h
 	merkleblock.cpp
 	merkleblock.h
+	merkleproof.cpp
 	merkletree.cpp
 	merkletreedb.cpp
 	merkletreedb.h
@@ -466,6 +477,7 @@ add_library(server
 	rpc/abc.cpp
 	rpc/blockchain.cpp
 	rpc/blockchain.h
+	rpc/frozentxo_rpc.cpp
 	rpc/http_protocol.h
 	rpc/mining-fbb.cpp
 	rpc/mining.cpp
@@ -475,9 +487,15 @@ add_library(server
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
 	rpc/register.h
+	rpc/safe_mode.cpp
 	rpc/server.cpp
 	rpc/server.h
 	rpc/tojson.h
+    rpc/webhook_client.cpp
+    rpc/webhook_client.h
+    rpc/webhook_client_defaults.h
+	safe_mode.cpp
+	safe_mode.h
 	script/ismine.cpp
 	script/ismine.h
 	script/scriptcache.cpp
