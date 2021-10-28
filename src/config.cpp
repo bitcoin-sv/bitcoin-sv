@@ -134,6 +134,10 @@ void GlobalConfig::Reset()
     data->streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     data->banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
 
+    // banclientua
+    data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
+    data->mAllowedUAClients = {};
+
     // RPC parameters
     data->webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
 
@@ -1023,18 +1027,29 @@ bool GlobalConfig::IsBlockInvalidated(const uint256& hash) const
 
 void GlobalConfig::SetBanClientUA(const std::set<std::string> uaClients)
 {
-    data->mBannedUAClients = uaClients;
+    data->mBannedUAClients = std::move(uaClients);
+}
+
+void GlobalConfig::SetAllowClientUA(const std::set<std::string> uaClients)
+{
+    data->mAllowedUAClients = std::move(uaClients);
 }
 
 bool GlobalConfig::IsClientUABanned(const std::string uaClient) const
 {
-    for (std::string invUAClient : data->mBannedUAClients)
-    {
-        if (boost::icontains(uaClient, invUAClient))
-        {
+    auto matchClient =  [&uaClient](std::string const & s)
+            {
+                return boost::icontains(uaClient,s);
+            };
+    auto searchForMatch = [&matchClient](auto const & container)
+            {
+                return std::find_if(container.cbegin(), container.cend(), matchClient) != container.cend();
+            };
+
+    if (searchForMatch(data->mBannedUAClients))
+        if (!searchForMatch(data->mAllowedUAClients))
             return true;
-        }
-    }
+
     return false;
 }
 

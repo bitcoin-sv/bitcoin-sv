@@ -52,10 +52,37 @@ class BanClientUA(BitcoinTestFramework):
                                             number_of_connections=1, ip=get_lan_ip(), strSubVer=b"ClientC") as (conn,):
             assert conn.connected
 
-        with self.run_node_with_connections("Testing that we will NOT get banned if banclientua is not specified",
+        with self.run_node_with_connections("Testing that we will NOT get banned if banclientua is not specified and we are not bch",
                                             0, [],
                                             number_of_connections=1, ip=get_lan_ip(), strSubVer=b"ClientA") as (conn,):
             assert conn.connected
+
+        with self.run_node_with_connections("Testing that we will get banned if we are BCH even with default settings",
+                                            0, [],
+                                            number_of_connections=1, ip=get_lan_ip(), strSubVer=b"ThisIsAnABCClient", wait_for_verack=False) as (conn,):
+            wait_until(lambda: len(conn.rpc.listbanned()) == 1, check_interval=1, label="Waiting to be banned")
+            assert get_lan_ip() in conn.rpc.listbanned()[0]["address"]
+            conn.rpc.clearbanned()
+
+        with self.run_node_with_connections("Testing that case does not matter",
+                                            0, [],
+                                            number_of_connections=1, ip=get_lan_ip(), strSubVer=b"ThisIsAnAbcClient", wait_for_verack=False) as (conn,):
+            wait_until(lambda: len(conn.rpc.listbanned()) == 1, check_interval=1, label="Waiting to be banned")
+            assert get_lan_ip() in conn.rpc.listbanned()[0]["address"]
+            conn.rpc.clearbanned()
+
+        with self.run_node_with_connections("Test that we can override ban settings using 'allowclientua' parameter",
+                                            0, ['-banclientua=ClientA', '-banclientua=ClientB', '-allowclientua=Client'],
+                                            number_of_connections=1, ip=get_lan_ip(), strSubVer=b"ClientA") as (conn,):
+            assert conn.connected
+
+        with self.run_node_with_connections("Test that we can override the default ban settings with our own",
+                                            0, ['-banclientua=ClientA'],
+                                            number_of_connections=1, ip=get_lan_ip(), strSubVer=b"ThisIsAnABCClient") as (conn,):
+            assert conn.connected
+
+
+
 
 
 if __name__ == '__main__':

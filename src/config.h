@@ -209,6 +209,7 @@ public:
     virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
     virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
     virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
+    virtual void SetAllowClientUA(const std::set<std::string> uaClients) = 0;
     virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
     virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
     virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
@@ -451,6 +452,7 @@ public:
     bool IsBlockInvalidated(const uint256& hash) const override;
 
     void SetBanClientUA(const std::set<std::string> uaClients) override;
+    void SetAllowClientUA(const std::set<std::string> uaClients) override;
     bool IsClientUABanned(const std::string uaClient) const override;
     bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) override;
     uint64_t GetMaxMerkleTreeDiskSpace() const override;
@@ -685,7 +687,9 @@ private:
 
         std::set<uint256> mInvalidBlocks;
 
-        std::set<std::string> mBannedUAClients;
+        std::set<std::string> mBannedUAClients{DEFAULT_CLIENTUA_BAN_PATTERNS};
+        std::set<std::string> mAllowedUAClients;
+
         uint64_t maxMerkleTreeDiskSpace;
         uint64_t preferredMerkleTreeFileSize;
         uint64_t maxMerkleTreeMemoryCacheSize;
@@ -1125,7 +1129,12 @@ public:
 
     void SetBanClientUA(const std::set<std::string> uaClients) override
     {
-        mBannedUAClients = uaClients;
+        mBannedUAClients = std::move(uaClients);
+    }
+    
+    void SetAllowClientUA(const std::set<std::string> uaClients) override
+    {
+        mAllowedUAClients = std::move(uaClients);
     }
     
     bool IsClientUABanned(const std::string uaClient) const override
@@ -1292,7 +1301,8 @@ private:
     uint64_t acceptNonStdConsolidationInput { DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
-    std::set<std::string> mBannedUAClients;
+    std::set<std::string> mBannedUAClients{DEFAULT_CLIENTUA_BAN_PATTERNS};
+    std::set<std::string> mAllowedUAClients;
 
     void SetErrorMsg(std::string* err)
     {
