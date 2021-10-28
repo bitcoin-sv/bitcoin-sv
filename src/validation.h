@@ -167,6 +167,10 @@ static const unsigned int MAX_FEEFILTER_CHANGE_DELAY = 5 * 60;
 /** Block download timeout base, expressed as percentage of the block interval
  * (i.e. 10 min) */
 static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE = 100;  // percent
+/** Block download timeout base during Initial block download, 
+ * expressed as percentage of the block interval
+ * (i.e. 60 min) */
+static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD = 600;  // percent
 /** Additional block download timeout per parallel downloading peer,
 *   expressed as percentage of the block interval
 *   (i.e. 5 min)*/

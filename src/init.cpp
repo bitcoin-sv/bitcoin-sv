@@ -567,6 +567,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                         " (default: %u%%)"),
                         config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
                         DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE));
+        strUsage += HelpMessageOpt("-blockdownloadtimeoutbaseibdpercent=<n>",
+            strprintf(_("Block download timeout during the initial block download, expressed as percentage of the block interval which is %d minutes."
+                        " (default: %u%%)"),
+                        config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
+                        DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD));
         strUsage += HelpMessageOpt("-blockdownloadtimeoutperpeerpercent=<n>",
             strprintf(_("Additional block download time per parallel downloading peer, expressed as percentage of the block interval which is %d minutes."
                         " (default: %u%%)"),
@@ -2242,6 +2247,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBlockDownloadTimeoutBase(gArgs.GetArg("-blockdownloadtimeoutbasepercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadTimeoutBaseIBD(gArgs.GetArg("-blockdownloadtimeoutbaseibdpercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD), &err)) {
         return InitError(err);
     }
     if(std::string err; !config.SetBlockDownloadTimeoutPerPeer(gArgs.GetArg("-blockdownloadtimeoutperpeerpercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER), &err)) {

@@ -125,6 +125,7 @@ void GlobalConfig::Reset()
     blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
     blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
     blockDownloadTimeoutBase = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE;
+    blockDownloadTimeoutBaseIBD = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD;
     blockDownloadTimeoutPerPeer = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER;
 
     // P2P parameters
@@ -1279,6 +1280,24 @@ bool GlobalConfig::SetBlockDownloadTimeoutBase(int64_t timeout, std::string* err
 int64_t GlobalConfig::GetBlockDownloadTimeoutBase() const
 {
     return blockDownloadTimeoutBase;
+}
+
+bool GlobalConfig::SetBlockDownloadTimeoutBaseIBD(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download timeout base during the initial block download (as percentage of the block interval) must be greater than 0.";
+        }
+        return false;
+    }
+    blockDownloadTimeoutBaseIBD = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadTimeoutBaseIBD() const
+{
+    return blockDownloadTimeoutBaseIBD;
 }
 
 bool GlobalConfig::SetBlockDownloadTimeoutPerPeer(int64_t timeout, std::string* err)

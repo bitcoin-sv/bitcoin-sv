@@ -347,6 +347,12 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK(!config.SetBlockDownloadTimeoutBase(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadTimeoutBase(-1, &err));
 
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBaseIBD(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD);
+    BOOST_CHECK(config.SetBlockDownloadTimeoutBaseIBD(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBaseIBD(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD);
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBaseIBD(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBaseIBD(-1, &err));
+
     BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutPerPeer(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER);
     BOOST_CHECK(config.SetBlockDownloadTimeoutPerPeer(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER, &err));
     BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutPerPeer(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER);

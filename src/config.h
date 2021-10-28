@@ -101,6 +101,7 @@ public:
     virtual int64_t GetBlockDownloadSlowFetchTimeout() const = 0;
     virtual uint64_t GetBlockDownloadMaxParallelFetch() const = 0;
     virtual int64_t GetBlockDownloadTimeoutBase() const = 0;
+    virtual int64_t GetBlockDownloadTimeoutBaseIBD() const = 0;
     virtual int64_t GetBlockDownloadTimeoutPerPeer() const = 0;
 
     // P2P parameters
@@ -224,6 +225,7 @@ public:
     virtual bool SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetBlockDownloadTimeoutBase(int64_t max, std::string* err = nullptr) = 0;
+    virtual bool SetBlockDownloadTimeoutBaseIBD(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) = 0;
 
     // P2P parameters
@@ -473,6 +475,8 @@ public:
     uint64_t GetBlockDownloadMaxParallelFetch() const override;
     bool SetBlockDownloadTimeoutBase(int64_t max, std::string* err = nullptr) override;
     int64_t GetBlockDownloadTimeoutBase() const override;
+    bool SetBlockDownloadTimeoutBaseIBD(int64_t max, std::string* err = nullptr) override;
+    int64_t GetBlockDownloadTimeoutBaseIBD() const override;
     bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) override;
     int64_t GetBlockDownloadTimeoutPerPeer() const override;
 
@@ -656,6 +660,7 @@ private:
     int64_t blockDownloadSlowFetchTimeout;
     uint64_t blockDownloadMaxParallelFetch;
     int64_t blockDownloadTimeoutBase;
+    int64_t blockDownloadTimeoutBaseIBD;
     int64_t blockDownloadTimeoutPerPeer;
 
     // P2P parameters
@@ -1091,6 +1096,8 @@ public:
     uint64_t GetBlockDownloadMaxParallelFetch() const override { return DEFAULT_MAX_BLOCK_PARALLEL_FETCH; }
     bool SetBlockDownloadTimeoutBase(int64_t max, std::string* err = nullptr) override { return true; }
     int64_t GetBlockDownloadTimeoutBase() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE; }
+    bool SetBlockDownloadTimeoutBaseIBD(int64_t max, std::string* err = nullptr) override { return true; }
+    int64_t GetBlockDownloadTimeoutBaseIBD() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD; }
     bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) { return true; }
     int64_t GetBlockDownloadTimeoutPerPeer() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER; }
 
