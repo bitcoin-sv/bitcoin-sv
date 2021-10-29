@@ -47,7 +47,7 @@ std::string le_to_string(const CFrozenTXOLogger::LogEntry_Rejected& le)
 {
     std::string s;
     s += " received_timestamp=";
-    s += boost::posix_time::to_iso_extended_string(boost::posix_time::from_time_t(le.receivedTime))+'Z'; // NOTE: receivedTime must be POSIX time, which implies UTC timezone
+    s += DateTimeFormatISO8601(le.receivedTime);
     s += " enforcement_level=";
     if(le.enforcementLevel==CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly)
     {
