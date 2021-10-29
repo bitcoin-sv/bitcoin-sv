@@ -322,10 +322,10 @@ BOOST_AUTO_TEST_CASE(net_messages)
 
     // Verify a non-extended message with a bad length throws
     auto setBadLength = [&config](CMessageHeader& hdr) { HdrUnitTestAccess::SetPayloadLength(hdr, config.GetMaxProtocolRecvPayloadLength() + 1); };
-    BOOST_CHECK_THROW(lambda(setBadLength, oneK->size() * 2, NetMsgType::PING, FLATDATA(*oneK)), CNetMessage::HeaderError);
+    BOOST_CHECK_THROW(lambda(setBadLength, oneK->size() * 2, NetMsgType::PING, FLATDATA(*oneK)), BanPeer);
 
     // Verify an extended message with a bad length throws
-    BOOST_CHECK_THROW(lambda(setBadLength, extendedPayload->size() * 2, NetMsgType::PING, FLATDATA(*extendedPayload)), CNetMessage::HeaderError);
+    BOOST_CHECK_THROW(lambda(setBadLength, extendedPayload->size() * 2, NetMsgType::PING, FLATDATA(*extendedPayload)), BanPeer);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

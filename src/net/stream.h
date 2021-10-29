@@ -52,17 +52,6 @@ enum class StreamType : uint8_t
 const enumTableT<StreamType>& enumTable(StreamType);
 
 /**
- * Exception type that gets thrown if we should ban a peer due to something
- * they did over a stream.
- */
-class BanStream : public std::exception
-{
-  public:
-    const char* what() const noexcept override { return "StreamBan"; }
-};
-
-
-/**
  * A stream is a single channel of communication carried over an association
  * between 2 peers.
  */
@@ -172,8 +161,7 @@ class Stream
     const uint64_t mMaxRecvBuffSize {0};
 
     // Process some newly read bytes from our underlying socket
-    enum RECV_STATUS {RECV_OK, RECV_BAD_HEADER, RECV_FAIL};
-    RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes, bool& complete);
+    void ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes, bool& complete);
 
     // Write the next batch of data to the wire
     uint64_t SocketSendData();

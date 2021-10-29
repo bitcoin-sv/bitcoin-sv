@@ -53,12 +53,14 @@ public:
     }
 
     uint64_t Read(const Config& config, const char* pch, uint64_t nBytes);
+};
 
-    // Exception class thrown when reading message header
-    class HeaderError : public std::runtime_error
-    {
-      public:
-        explicit HeaderError(const std::string& msg) : std::runtime_error{msg} {}
-    };
+/**
+ * Exception type that gets thrown if we should ban a peer.
+ */
+class BanPeer : public std::runtime_error
+{
+  public:
+    explicit BanPeer(const std::string& msg) : std::runtime_error{msg} {}
 };
 

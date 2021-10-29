@@ -389,9 +389,16 @@ void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setEr
         mStreamPolicy->ServiceSockets(mStreams, setRecv, setSend, setError, config,
             gotNewMsgs, bytesRecv, bytesSent);
     }
-    catch(BanStream& ban)
+    catch(const BanPeer& e)
     {
+        LogPrint(BCLog::NETCONN, "Fatal error servicing streams: %s, banning peer=%d\n", e.what(), mNode->GetId());
+        mNode->CloseSocketDisconnect();
         connman.Ban(GetPeerAddr(), BanReasonNodeMisbehaving);
+    }
+    catch(const std::exception& e)
+    {
+        LogPrint(BCLog::NETCONN, "Error servicing streams: %s, peer=%d\n", e.what(), mNode->GetId());
+        mNode->CloseSocketDisconnect();
     }
 }
 

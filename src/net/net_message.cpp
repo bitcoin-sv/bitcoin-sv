@@ -20,7 +20,7 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
                 // Reject oversized messages
                 if(hdr.IsOversized(config))
                 {
-                    throw HeaderError { "Oversized header detected" };
+                    throw BanPeer { "Oversized header detected" };
                 }
             }
 
@@ -28,7 +28,7 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
         }
         catch(const std::exception& e)
         {
-            throw HeaderError { std::string { "Bad header format: " } + e.what() };
+            throw BanPeer { std::string { "Bad header format: " } + e.what() };
         }
     }
 

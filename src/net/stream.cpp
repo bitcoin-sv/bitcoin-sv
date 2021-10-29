@@ -152,17 +152,9 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
             }
             if (nBytes > 0)
             {
+                // Process received data
                 bytesRecv = static_cast<uint64_t>(nBytes);
-                const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
-                if (status != RECV_OK)
-                {   
-                    mNode->CloseSocketDisconnect();
-                    if (status == RECV_BAD_HEADER)
-                    {   
-                        // Ban the peer if try to send messages with bad length or other header errors
-                        throw BanStream{};
-                    }
-                }
+                ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
             }
             else if (nBytes == 0)
             {   
@@ -357,8 +349,7 @@ void Stream::SetOwningNode(CNode* newNode)
     mNode = newNode;
 }
 
-Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes,
-    bool& complete)
+void Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes, bool& complete)
 {
     AssertLockHeld(cs_mNode);
 
@@ -381,21 +372,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
         CNetMessage& msg { *(mRecvMsgQueue.back()) };
 
         // Absorb network data
-        uint64_t handled {0};
-        try
-        {
-            handled = msg.Read(config, pch, nBytes);
-        }
-        catch(const CNetMessage::HeaderError& e)
-        {
-            LogPrint(BCLog::NETMSG, "Stream error reading message header: %s, peer=%d\n", e.what(), mNode->GetId());
-            return RECV_BAD_HEADER;//Notify bad message as soon as seen in the header
-        }
-        catch(const std::exception& e)
-        {
-            LogPrint(BCLog::NETMSG, "Stream error reading message: %s, peer=%d\n", e.what(), mNode->GetId());
-            return RECV_FAIL;
-        }
+        uint64_t handled { msg.Read(config, pch, nBytes) };
 
         pch += handled;
         nBytes -= handled;
@@ -406,8 +383,6 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
             complete = true;
         }
     }   
-    
-    return RECV_OK;
 }   
 
 uint64_t Stream::SocketSendData()
