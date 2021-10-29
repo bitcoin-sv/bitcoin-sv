@@ -7,7 +7,6 @@ Test RPC function verifyscript
 """
 
 from test_framework.blocktools import create_block, create_coinbase, create_transaction, create_tx
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, CTxIn, COutPoint, CTxOut, ToHex, COIN
 from test_framework.script import CScript, hash160, SignatureHashForkId, OP_CHECKSIG, OP_DROP, OP_DUP, OP_EQUALVERIFY, OP_FALSE, OP_HASH160, OP_MUL, OP_TRUE, SIGHASH_ALL, SIGHASH_FORKID
@@ -286,12 +285,12 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         self.verifyscript_check(node, ["skipped", "skipped"], [{"tx": ToHex(tx1), "n": 0}, {"tx": ToHex(tx1), "n": 0}], True, 0)  # everything must be skipped if timeout is 0
         self.verifyscript_check(node, ["skipped", "skipped"], [{"tx": ToHex(tx1), "n": 0}, {"tx": ToHex(tx1), "n": 0}], False, 0)
 
-        # Restart the node to allow unlimited script size
-        self.restart_node(0, self.extra_args[0] + ["-maxscriptsizepolicy=0"])
+        # Restart the node to allow unlimited script size and large numbers
+        self.restart_node(0, self.extra_args[0] + ["-maxscriptsizepolicy=0", "-maxscriptnumlengthpolicy=250000"])
 
         # Create, send and mine transaction with large anyone-can-spend lock script
         tx6 = create_tx(tx_test, 2, 1*COIN)
-        tx6.vout[0] = CTxOut(int(1*COIN), CScript([bytearray([42] * DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE]))
+        tx6.vout[0] = CTxOut(int(1*COIN), CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE]))
         tx6.rehash()
         node.sendrawtransaction(ToHex(tx6), False, True)
         assert_equal(node.getrawmempool(), [tx6.hash])
@@ -313,7 +312,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
 
         # Restart the node with larger value for maxstdtxvalidationduration so that its
         # default value does not limit maximum execution time of single script.
-        self.restart_node(0, self.extra_args[0] + ["-maxstdtxvalidationduration=2000", "-maxnonstdtxvalidationduration=2001", "-maxscriptsizepolicy=0"])
+        self.restart_node(0, self.extra_args[0] + ["-maxstdtxvalidationduration=2000", "-maxnonstdtxvalidationduration=2001", "-maxscriptsizepolicy=0", "-maxscriptnumlengthpolicy=250000"])
 
         # Verification of all three scripts should now succeed if total timeout is large enough ...
         self.verifyscript_check(node, ["ok", "ok", "ok"], [{"tx": ToHex(tx1), "n": 0}, {"tx": ToHex(tx7), "n": 0}, {"tx": ToHex(tx1), "n": 0}], False, 2000)
