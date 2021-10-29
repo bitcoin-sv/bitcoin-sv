@@ -1098,7 +1098,7 @@ public:
     int64_t GetBlockDownloadTimeoutBase() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE; }
     bool SetBlockDownloadTimeoutBaseIBD(int64_t max, std::string* err = nullptr) override { return true; }
     int64_t GetBlockDownloadTimeoutBaseIBD() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD; }
-    bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) { return true; }
+    bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) override { return true; }
     int64_t GetBlockDownloadTimeoutPerPeer() const override { return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER; }
 
     // P2P parameters
