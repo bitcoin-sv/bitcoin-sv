@@ -4458,11 +4458,16 @@ bool DetectStalling(const Config& config, const CNodePtr& pto, const CNodeStateP
         int nOtherPeersWithValidatedDownloads =
             nPeersWithValidatedDownloads -
             (state->nBlocksInFlightValidHeaders > 0);
-        if (nNow > state->nDownloadingSince +
-                       consensusParams.nPowTargetSpacing *
-                           (BLOCK_DOWNLOAD_TIMEOUT_BASE +
-                            BLOCK_DOWNLOAD_TIMEOUT_PER_PEER *
-                                nOtherPeersWithValidatedDownloads)) {
+
+        auto timeoutBase = IsInitialBlockDownload() 
+                                ? config.GetBlockDownloadTimeoutBaseIBD() 
+                                : config.GetBlockDownloadTimeoutBase();
+        auto timeoutPeers = config.GetBlockDownloadTimeoutPerPeer() * nOtherPeersWithValidatedDownloads;
+        // nPowTargetSpacing is in seconds, timeout is percentage, while maxDownloadTime should be in microseconds
+        // to get seconds we must multiply by 1000000 and divide by 100 which is equivalent to multipy by 10000
+        auto maxDownloadTime = consensusParams.nPowTargetSpacing * (timeoutBase + timeoutPeers) * 10000;
+
+        if (nNow > state->nDownloadingSince + maxDownloadTime) {
             LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n",
                       queuedBlock.hash.ToString(), pto->id);
             pto->fDisconnect = true;
