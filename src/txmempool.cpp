@@ -2215,7 +2215,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         //   - Transaction spending this TXO was added to mempool when mempool height was H or above.
         //   - Active chain was reorged back so that mempool height is now below H.
         // NOTE: To avoid re-checking whole mempool every time, we only do this if it is theoretically possible that mempool could
-        //       contain such as transaction. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
+        //       contain such transactions. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
         //       is below or at current mempool height, there is simply no such TXO and we can safely skip the expensive re-check.
         LogPrint(BCLog::MEMPOOL, "Removing any transactions that spend TXOs, which were previously not considered policy frozen, but now are because the mempool height has become lower.\n");
         RemoveFrozen(changeSet);

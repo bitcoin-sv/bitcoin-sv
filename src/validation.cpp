@@ -3386,6 +3386,8 @@ private:
 
     void softConsensusFreeze( CBlockIndex& index, std::int32_t duration )
     {
+        assert( duration>=0 );
+
         LogPrintf(
             "Soft consensus freezing block %s for %d blocks.\n",
             index.GetBlockHash().ToString(),
@@ -3396,7 +3398,7 @@ private:
         BlockIndexWithDescendants blocks{
             &index,
             mapBlockIndex,
-            index.GetHeight() + duration };
+            (std::numeric_limits<std::int32_t>::max() - duration > index.GetHeight()) ? index.GetHeight() + duration : duration };
 
         for(auto* item=blocks.Root()->Next(); item!=nullptr; item=item->Next())
         {
