@@ -1074,6 +1074,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Ban clients whose User Agent contains specified string (case insensitive). "
                     "This option can be specified multiple times.")));
 
+    strUsage += HelpMessageOpt(
+        "-allowclientua=<ua>",
+        strprintf(_("Allow clients whose User Agent equals specified string (case insensitive). "
+                    "This option can be specified multiple times and has precedence over '-banclientua'.")));
+
     if (showDebug) {
         strUsage +=
             HelpMessageOpt("-blockversion=<n>",
@@ -2649,9 +2654,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         std::set<std::string> invalidUAClients;
         for (auto invalidClient : gArgs.GetArgs("-banclientua"))
         {
-            invalidUAClients.insert(invalidClient);
+            invalidUAClients.insert(std::move(invalidClient));
         }
-        config.SetBanClientUA(invalidUAClients);
+        config.SetBanClientUA(std::move(invalidUAClients));
+    }
+
+    if (gArgs.IsArgSet("-allowclientua"))
+    {
+        std::set<std::string> validUAClients;
+        for (auto validClient : gArgs.GetArgs("-allowclientua"))
+        {
+            validUAClients.insert(std::move(validClient));
+        }
+        config.SetAllowClientUA(std::move(validUAClients));
     }
 
     // Configure maximum disk space that can be taken by Merkle Tree data files.

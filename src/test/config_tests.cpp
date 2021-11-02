@@ -606,6 +606,34 @@ BOOST_AUTO_TEST_CASE(dust_config_test)
     BOOST_CHECK(!config.SetDustLimitFactor(301, &err));
 }
 
+BOOST_AUTO_TEST_CASE(banned_clientua_test)
+{
+    GlobalConfig config {};
+
+    // default patterns are DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"};
+    // but we will set allow patterns to "not-abc-client"
+
+    BOOST_CHECK(config.IsClientUABanned("not-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-abc-client"));
+    BOOST_CHECK(!config.IsClientUABanned("is-bsv-client"));
+
+    config.SetAllowClientUA(std::set<std::string>{"not-abc-client"});
+    BOOST_CHECK(!config.IsClientUABanned("not-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-abc-client"));
+    BOOST_CHECK(!config.IsClientUABanned("is-bsv-client"));
+
+    BOOST_CHECK(!config.IsClientUABanned("not-ABC-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-ABC-client"));
+    BOOST_CHECK(!config.IsClientUABanned("is-BSV-client"));
+
+    config.SetBanClientUA(std::set<std::string>{"abc","cash","bch","BSV"});
+    BOOST_CHECK(!config.IsClientUABanned("not-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-bsv-client"));
+
+    // check that default BitcoinSV client is not banned
+    BOOST_CHECK(!config.IsClientUABanned(userAgent()));
+}
 
 
 BOOST_AUTO_TEST_SUITE_END()
