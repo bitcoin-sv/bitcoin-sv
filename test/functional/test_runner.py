@@ -496,7 +496,7 @@ class TestHandler:
                 log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
                 test_argv = t.split()
                 tmpdir = [os.path.join("--tmpdir=%s", "%s_%s") %
-                          (self.tmpdir, re.sub(".py$", "", t), portseed)]
+                          (self.tmpdir, re.sub(".py.*$", "", t), portseed)]
                 running_jobs.append((t,
                              time.time(),
                                   subprocess.Popen([sys.executable, os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,
