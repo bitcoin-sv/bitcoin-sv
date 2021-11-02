@@ -281,9 +281,9 @@ def main():
     if (args.timeout_factors.isdigit()):
         for timeout_test in TIMEOUT_FACTOR_FOR_TESTS.keys():
             if timeout_test in test_list:
-                test_list.remove(timeout_test)
-                test_list.append(timeout_test + " --timeoutfactor={}"
+                test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}"
                     .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1]))
+
     else:
         try:
             timeout_factors_json = json.loads(args.timeout_factors)
@@ -293,8 +293,7 @@ def main():
                 sys.exit(0)
             for timeout_test in timeout_factors_json.keys():
                 if timeout_test in test_list:
-                    test_list.remove(timeout_test)
-                    test_list.append(timeout_test + " --timeoutfactor={}".format(timeout_factors_json[timeout_test]))
+                    test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}".format(timeout_factors_json[timeout_test]))
         except ValueError as e:
             print ("Error parsing input json: ", e)
 
