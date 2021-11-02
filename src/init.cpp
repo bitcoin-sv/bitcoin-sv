@@ -2369,6 +2369,15 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxTxnValidatorAsyncTasksRunDuration(
+        gArgs.GetArg(
+            "-maxtxnvalidatorasynctasksrunduration",
+            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
     if(std::string err; !config.SetMaxTxnChainValidationBudget(
         gArgs.GetArg(
             "-maxtxchainvalidationbudget",
@@ -2386,16 +2395,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 #endif
 
-    if (!(config.GetMaxStdTxnValidationDuration() < config.GetMaxNonStdTxnValidationDuration())) {
-        return InitError(
-            strprintf("maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration"));
-    }
-
-    if (!(gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration",
-            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()) >
-        config.GetMaxNonStdTxnValidationDuration().count())) {
-        return InitError(
-            strprintf("maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration"));
+    if(std::string err; !config.CheckTxValidationDurations(err))
+    {
+        return InitError(err);
     }
 
     if(std::string err; !config.SetMaxCoinsViewCacheSize(
@@ -2547,10 +2549,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-dustrelayfee")) {
         Amount n(0);
         auto parsed = ParseMoney(gArgs.GetArg("-dustrelayfee", ""), n);
-        if (!parsed || Amount(0) == n)
+        if (!parsed || !config.SetDustRelayFee(n))
             return InitError(AmountErrMsg("dustrelayfee",
                                           gArgs.GetArg("-dustrelayfee", "")));
-        dustRelayFee = CFeeRate(n);
+    }
+    else
+    {
+        config.SetDustRelayFee(DUST_RELAY_TX_FEE);
     }
 
     fRequireStandard =
@@ -2569,8 +2574,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     fIsBareMultisigStd =
         gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
-    fAcceptDatacarrier =
-        gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
+    config.SetDataCarrier(gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER));
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(gArgs.GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op

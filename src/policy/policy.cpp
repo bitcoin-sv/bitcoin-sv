@@ -40,7 +40,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
         if (n < 1 || n > 3) return false;
         if (m < 1 || m > n) return false;
     } else if (whichType == TX_NULL_DATA) {
-        if (!fAcceptDatacarrier) {
+        if (!config.GetDataCarrier()) {
             return false;
         }
     }
@@ -175,7 +175,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
-        } else if (txout.IsDust(dustRelayFee, config.GetDustLimitFactor(), IsGenesisEnabled(config, nHeight))) {
+        } else if (txout.IsDust(config.GetDustRelayFee(), config.GetDustLimitFactor(), IsGenesisEnabled(config, nHeight))) {
             reason = "dust";
             return false;
         }
@@ -262,5 +262,4 @@ std::optional<bool> AreInputsStandard(
     return true;
 }
 
-CFeeRate dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
 static_assert(DUST_RELAY_TX_FEE == DEFAULT_MIN_RELAY_TX_FEE, "lowering only fees increases dust");

@@ -214,6 +214,4 @@ std::optional<bool> AreInputsStandard(
     const CCoinsViewCache &mapInputs,
     const int32_t mempoolHeight);
 
-extern CFeeRate dustRelayFee;
-
 #endif // BITCOIN_POLICY_POLICY_H

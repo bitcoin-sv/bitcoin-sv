@@ -794,9 +794,10 @@ static bool CheckMempoolMinFee(
 
 static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
-                                std::string& errString) {
-    const auto limitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-    const auto limitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
+                                std::string& errString,
+                                const Config& config) {
+    const auto limitAncestors = config.GetLimitAncestorCount();
+    const auto limitSecondaryMempoolAncestors = config.GetLimitSecondaryMempoolAncestorCount();
     return pool.CheckAncestorLimits(entry,
                                     limitAncestors,
                                     limitSecondaryMempoolAncestors,
@@ -1321,7 +1322,7 @@ CTxnValResult TxnValidation(
     }
     // Calculate in-mempool ancestors, up to a limit.
     std::string errString;
-    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString)) {
+    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString, config)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-mempool-chain",
                   errString);
@@ -1337,6 +1338,8 @@ CTxnValResult TxnValidation(
     // We are getting flags as they would be if the utxos are before genesis. 
     // "CheckInputs" is adding specific flags for each input based on its height in the main chain
     uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
+    // Turn off flags that may be on in scriptVerifyFlags, but we explicitly want them to be skipped
+    scriptVerifyFlags &= ~pTxInputData->GetSkipScriptFlags();
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
@@ -1577,7 +1580,7 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
             result =
                 TxnValidation(
                     elem,
-                    config,
+                    elem.get()->GetConfig(config),
                     pool,
                     handlers.mpTxnDoubleSpendDetector,
                     fUseLimits,

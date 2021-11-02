@@ -9,6 +9,7 @@
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
+#include "transaction_specific_config.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
@@ -33,6 +34,7 @@
 #include "validation.h"
 #include "merkletreestore.h"
 #include "rpc/blockchain.h"
+#include "rpc/misc.h"
 #include "consensus/merkle.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
@@ -42,6 +44,7 @@
 #include <cstdint>
 #include <univalue.h>
 #include <sstream>
+#include <rpc/misc.h>
 
 using namespace mining;
 
@@ -1224,6 +1227,262 @@ static UniValue GetUnconfirmedAncestors(const TxId& txid)
     }
     return unconfirmedAncestors;
 }
+namespace
+{
+    bool getNumOrRejectReason(const UniValue& jsonConfig, const std::string& parameter, UniValue& value, std::string& rejectReason)
+    {
+        value = jsonConfig[parameter];
+        // optional int parameter
+        if(value.isNull() || value.isNum())
+        {
+            return true;
+        }
+    
+        rejectReason =  parameter + std::string(" must be a number");
+        return false;
+    }
+
+    bool getBoolOrRejectReason(const UniValue& jsonConfig, const std::string& parameter, UniValue& value, std::string& rejectReason)
+    {
+        value = jsonConfig[parameter];
+        // optional bool parameter
+        if(value.isNull() || value.isBool())
+        {
+            return true;
+        }
+    
+        rejectReason =  parameter + std::string(" must be a boolean");
+        return false;
+    }
+
+
+    // Parse UniValue and set TransactionSpecificConfig
+    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc, const UniValue& jsonConfig, uint32_t skipScriptFlags, std::string& rejectReason)
+    {
+        const std::set<std::string> allPolicySettings = {"maxtxsizepolicy","datacarriersize","maxscriptsizepolicy","maxscriptnumlengthpolicy",
+                                                         "maxstackmemoryusagepolicy","maxscriptnumlengthpolicy","limitancestorcount", "limitcpfpgroupmemberscount",
+                                                         "acceptnonstdoutputs", "datacarrier", "dustrelayfee", "maxstdtxvalidationduration", "maxnonstdtxvalidationduration",
+                                                         "minconsolidationfactor", "maxconsolidationinputscriptsize", "minconfconsolidationinput", "acceptnonstdconsolidationinput",
+                                                         "dustlimitfactor", "maxtxnvalidatorasynctasksrunduration", "skipscriptflags"};
+
+        // Check if we only have flags that are supported
+        for(UniValue jsonConfigValue : jsonConfig.getKeys())
+        {
+            std::string strJsonValue = jsonConfigValue.get_str();
+            if(allPolicySettings.find(strJsonValue) == allPolicySettings.end())
+            {
+                rejectReason =  strJsonValue + " is not a valid policy setting.";
+                return false;
+            }
+        }
+
+        // Check each flag and call setter, set reject_reason if something is not ok
+        if (UniValue maxtxsizepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxtxsizepolicy", maxtxsizepolicy_uv, rejectReason) || 
+            (!maxtxsizepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxTxSize(maxtxsizepolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+
+        if (UniValue datacarriersize_uv; getNumOrRejectReason(jsonConfig, "datacarriersize", datacarriersize_uv, rejectReason))
+        {
+            if(!datacarriersize_uv.isNull())
+            {
+                int64_t datacarriersize = datacarriersize_uv.get_int64();
+                if(datacarriersize < 0)
+                {
+                    rejectReason = " datacarriersize must not be less than 0";
+                    return false;
+                }
+                tsc.SetTransactionSpecificDataCarrierSize(datacarriersize);
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue maxscriptsizepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptsizepolicy", maxscriptsizepolicy_uv, rejectReason) ||
+            (!maxscriptsizepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptSizePolicy(maxscriptsizepolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) ||
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+    
+       if (UniValue maxstackmemoryusagepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxstackmemoryusagepolicy", maxstackmemoryusagepolicy_uv, rejectReason) || 
+           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
+       {
+          return false;
+       }
+
+        if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) || 
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue limitancestorcount_uv; !getNumOrRejectReason(jsonConfig, "limitancestorcount", limitancestorcount_uv, rejectReason) || 
+            (!limitancestorcount_uv.isNull() && !tsc.SetTransactionSpecificLimitAncestorCount(limitancestorcount_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue limitcpfpgroupmemberscount_uv; !getNumOrRejectReason(jsonConfig, "limitcpfpgroupmemberscount", limitcpfpgroupmemberscount_uv, rejectReason) ||
+            (!limitcpfpgroupmemberscount_uv.isNull() && !tsc.SetTransactionSpecificLimitSecondaryMempoolAncestorCount(limitcpfpgroupmemberscount_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue acceptnonstdoutputs_uv; getBoolOrRejectReason(jsonConfig, "acceptnonstdoutputs", acceptnonstdoutputs_uv, rejectReason))
+        {
+            if(!acceptnonstdoutputs_uv.isNull())
+            {
+                 tsc.SetTransactionSpecificAcceptNonStandardOutput(acceptnonstdoutputs_uv.get_bool());
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue datacarrier_uv; getBoolOrRejectReason(jsonConfig, "datacarrier", datacarrier_uv, rejectReason))
+        {
+            if(!datacarrier_uv.isNull())
+            {
+                tsc.SetTransactionSpecificDataCarrier(datacarrier_uv.get_bool());
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue dustrelayfee_uv; getNumOrRejectReason(jsonConfig, "dustrelayfee", dustrelayfee_uv, rejectReason))
+        {
+            if(!dustrelayfee_uv.isNull())
+            {
+                tsc.SetTransactionSpecificDustRelayFee(CFeeRate(Amount(dustrelayfee_uv.get_int64())));
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        if (UniValue maxstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxstdtxvalidationduration", maxstdtxvalidationduration_uv, rejectReason) ||
+            (!maxstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxStdTxnValidationDuration(maxstdtxvalidationduration_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxnonstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxnonstdtxvalidationduration", maxnonstdtxvalidationduration_uv, rejectReason) ||
+            (!maxnonstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxNonStdTxnValidationDuration(maxnonstdtxvalidationduration_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue minconsolidationfactor_uv; !getNumOrRejectReason(jsonConfig, "minconsolidationfactor", minconsolidationfactor_uv, rejectReason) ||
+            (!minconsolidationfactor_uv.isNull() && !tsc.SetTransactionSpecificMinConsolidationFactor(minconsolidationfactor_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxconsolidationinputscriptsize_uv; !getNumOrRejectReason(jsonConfig, "maxconsolidationinputscriptsize", maxconsolidationinputscriptsize_uv, rejectReason) || 
+            (!maxconsolidationinputscriptsize_uv.isNull() && !tsc.SetTransactionSpecificMaxConsolidationInputScriptSize(maxconsolidationinputscriptsize_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue minconfconsolidationinput_uv; !getNumOrRejectReason(jsonConfig, "minconfconsolidationinput", minconfconsolidationinput_uv, rejectReason) ||
+            (!minconfconsolidationinput_uv.isNull() && !tsc.SetTransactionSpecificMinConfConsolidationInput(minconfconsolidationinput_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+   
+        if (UniValue acceptnonstdconsolidationinput_uv; !getBoolOrRejectReason(jsonConfig, "acceptnonstdconsolidationinput", acceptnonstdconsolidationinput_uv, rejectReason) ||
+            (!acceptnonstdconsolidationinput_uv.isNull() && !tsc.SetTransactionSpecificAcceptNonStdConsolidationInput(acceptnonstdconsolidationinput_uv.get_bool(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue dustlimitfactor_uv; !getNumOrRejectReason(jsonConfig, "dustlimitfactor", dustlimitfactor_uv, rejectReason) ||
+            (!dustlimitfactor_uv.isNull() && !tsc.SetTransactionSpecificDustLimitFactor(dustlimitfactor_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if (UniValue maxtxnvalidatorasynctasksrunduration_uv; !getNumOrRejectReason(jsonConfig, "maxtxnvalidatorasynctasksrunduration", maxtxnvalidatorasynctasksrunduration_uv, rejectReason) ||
+            (!maxtxnvalidatorasynctasksrunduration_uv.isNull() && !tsc.SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(maxtxnvalidatorasynctasksrunduration_uv.get_int64(), &rejectReason)))
+        {
+            return false;
+        }
+
+        if(!tsc.SetTransactionSpecificSkipScriptFlags(skipScriptFlags, &rejectReason))
+        {
+            return false;
+        }
+
+         // check durations
+        if(!tsc.CheckTxValidationDurations(rejectReason))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+
+    bool parseSkipScriptFlags(const UniValue& jsonConfig, uint32_t& skipFlagsValue, std::string& err)
+    {
+        UniValue skipscriptflags_uv = jsonConfig["skipscriptflags"];
+        uint32_t allowedToSkip = SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_MINIMALDATA | SCRIPT_VERIFY_NULLDUMMY | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | SCRIPT_VERIFY_CLEANSTACK;
+
+        if (skipscriptflags_uv.isArray())
+        {
+            UniValue skipFlagsArray = skipscriptflags_uv.get_array();
+            for (size_t arrayIndex = 0; arrayIndex < skipFlagsArray.size(); arrayIndex++)
+            {
+                const UniValue &myElement = skipFlagsArray[arrayIndex];
+                if(myElement.isStr())
+                {
+                    auto flagNumber = GetFlagNumber(myElement.get_str(), err);
+                    if(flagNumber.has_value())
+                    {
+                        skipFlagsValue |= *flagNumber;
+
+                        if((allowedToSkip | *flagNumber) != allowedToSkip)
+                        {
+                            err = "Invalid skipscriptflag: " + *flagNumber;
+                            skipFlagsValue = 0;
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    err = "skipscriptflags array elements must be strings";
+                    return false;
+                }
+            }
+        }
+        else if(!skipscriptflags_uv.isNull())
+        {
+            err = "skipscriptflags must be an array";
+            return false;
+        }
+
+        return true;
+    }
+}
 
 static UniValue sendrawtransaction(const Config &config,
                                    const JSONRPCRequest &request) {
@@ -1478,9 +1737,9 @@ void sendrawtransactions(const Config& config,
                          bool processedInBatch)
 {
     if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 1) {
+        request.params.size() > 2) {
         throw std::runtime_error(
-            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false, \"listunconfirmedancestors\": true|false}, ...]\n"
+            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false, \"listunconfirmedancestors\": true|false, \"config: \" <json string> }, ...]\n"
             "\nSubmits raw transactions (serialized, hex-encoded) to local node "
             "and network.\n"
             "\nTo maximise performance, transaction chains should be provided in inheritance order\n"
@@ -1499,10 +1758,34 @@ void sendrawtransactions(const Config& config,
             "Don't check fee\n"
             "         \"listunconfirmedancestors\": true|false  (boolean, optional, default=false) "
             "List transaction ids of unconfirmed ancestors\n"
+             "         \"config\": json string  (json string, optional, default=\"\") "
+            "Key-value pairs of policy settings for this transaction in any combination. Setting invalid policy setting results in transaction being rejected and returned in invalid transactions array. "
+            "Each setting should not be specified more than once. If they are, it is unspecified which value will be used. Following settings are available:\n"
+            "    {\n"
+            "        \"maxtxsizepolicy\": n,                 (integer, optional) Set maximum transaction size in bytes we relay and mine\n"
+            "        \"datacarriersize\": n,                 (integer, optional) Maximum size of data in data carrier transactions we relay and mine\n"
+            "        \"maxscriptsizepolicy\": n,             (integer, optional) Set maximum script size in bytes we're willing to relay/mine per script after Genesis is activated\n"
+            "        \"maxscriptnumlengthpolicy\": n,        (integer, optional) Set maximum allowed number length we're willing to relay/mine in scripts after Genesis is activated\n"
+            "        \"maxstackmemoryusagepolicy\": n,       (integer, optional) Set maximum stack memory usage used for script verification we're willing to relay/mine in a single transaction after Genesis is activated (policy level)\n"
+            "        \"limitancestorcount\": n,              (integer, optional) Do not accept transactions if maximum height of in-mempool ancestor chain is <n> or more\n"
+            "        \"limitcpfpgroupmemberscount\": n,      (integer, optional) Do not accept transactions if number of in-mempool transactions which we are not willing to mine due to a low fee is <n> or more\n"
+            "        \"acceptnonstdoutputs\": n,             (boolean, optional) Relay and mine transactions that create or consume non standard after Genesis is activated\n"
+            "        \"datacarrier\": n,                     (boolean, optional) Relay and mine data carrier transactions\n"
+            "        \"dustrelayfee\": n,                    (integer, optional) Fee rate (in %s/kB) used to define dust. A transaction output paying less than (dustlimitfactor * output_dust_fee / 100) is considered dust.\n"
+            "        \"maxstdtxvalidationduration\": n,      (integer, optional) Set the single standard transaction validation duration threshold in milliseconds after which the standard transaction validation will terminate with error and the transaction is not accepted to mempool\n"
+            "        \"maxnonstdtxvalidationduration\": n,   (integer, optional) Set the single non-standard transaction validation duration threshold in milliseconds after which the standard transaction validation will terminate with error and the transaction is not accepted to mempool\n"
+            "        \"minconsolidationfactor\": n,          (integer, optional)Set minimum ratio between sum of utxo scriptPubKey sizes spent in a consolidation transaction, to the corresponding sum of output scriptPubKey sizes.\n"
+            "        \"maxconsolidationinputscriptsize\": n, (integer, optional) This number is the maximum length for a scriptSig input in a consolidation txn\n"
+            "        \"minconfconsolidationinput\": n,       (integer, optional) Minimum number of confirmations of inputs spent by consolidation transactions \n"
+            "        \"acceptnonstdconsolidationinput\": n,  (boolean, optional) Accept consolidation transactions spending non standard inputs\n"
+            "        \"dustlimitfactor\": n,                 (integer, optional) The dust limit factor (a value in percent) is applied to the dust relay fee to determine if an output is dust.\n"
+            "        \"skipscriptflags\": n                  (array of strings, optional) Specify standard non-mandatory flags that you wish to be skipped. Options are: \"DERSIG\", \"MINIMALDATA\", \"NULLDUMMY\", \"DISCOURAGE_UPGRADABLE_NOPS\", \"CLEANSTACK\"\n"
+            "    }\n"
             "       } \n"
             "       ,...\n"
             "     ]\n"
-
+            "2. \"policy settings\"      (json string, optional) "
+            "Policy settings for all inputs. If policy settings are defined for specific input this global policy is ignored (for that input). Setting invalid policy setting results in JSONRPCError. Options are the same as for per transaction config policies. \n"
             "\nResult:\n"
             "{\n"
             "  \"known\" : [                 (json array) "
@@ -1582,12 +1865,40 @@ void sendrawtransactions(const Config& config,
     if(httpReq == nullptr)
         return;
 
+    const GlobalConfig* const globalConfig = dynamic_cast<const GlobalConfig*>(&config);
+    // Check if config is global config which allows us to create TransactionSpecificConfig
+    if(globalConfig==nullptr)
+    {
+        throw JSONRPCError(RPC_TYPE_ERROR, "Internal error! Unexpected config class.");
+    }
+
     RPCTypeCheck(request.params, {UniValue::VARR});
 
     if (request.params[0].empty()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER,
             std::string("Invalid parameter: An empty json array of objects"));
     }
+
+    // Use shared pointer to TransactionSpecificConfig, because it gets stored in CTxInputData
+    // which may exist longer that this scope.
+    std::shared_ptr<TransactionSpecificConfig> global_tsc;
+    uint32_t skipScriptFlagsGlobal = 0;
+
+    // Check if we have a second parameter that provides config for all inputs
+    if (!request.params[1].empty() && request.params[1].isObject())
+    {
+        if(std::string errorString; !parseSkipScriptFlags(request.params[1], skipScriptFlagsGlobal, errorString))
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, errorString);
+        }
+
+        global_tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
+        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, rejectReason))
+        {
+             throw JSONRPCError(RPC_INVALID_PARAMETER, rejectReason);
+        }
+    }
+
     // Check if inputs are present
     UniValue inputs = request.params[0].get_array();
     // A vector to store input transactions.
@@ -1599,6 +1910,8 @@ void sendrawtransactions(const Config& config,
     std::vector<TxId> vKnownTxns {};
     // A vector to store transactions that need a list of unconfirmed ancestors.
     std::vector<TxId> vTxListUnconfirmedAncestors {};
+    // A vector of transactions that have invalid configs
+    CTxnValidator::InvalidTxnStateUMap invalidConfigTxns {};
 
     /**
      * Parse an input data
@@ -1651,6 +1964,25 @@ void sendrawtransactions(const Config& config,
             }
         }
 
+        //Check for config per input
+        std::shared_ptr<TransactionSpecificConfig> tsc;
+        uint32_t skipFlagsValue = 0;
+        const UniValue& configPolicies = find_value(o, "config");
+        if(!configPolicies.isNull())
+        {
+            tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
+            // set transaction specific config and skipScriptFlags. Put transaction to invalid array with appropriate reject_reason if anything fails.
+            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, rejectReason))
+            {
+                CValidationState state;
+                state.Error(rejectReason);
+                invalidConfigTxns.try_emplace(txid, state);
+                // If configuration settings were wrong we don't want to validate transaction
+                continue;
+            }
+        }
+
+
         if (fTxInMempools) {
             if (fTxToPrioritise) {
                 vTxToPrioritise.emplace_back(txid);
@@ -1675,6 +2007,10 @@ void sendrawtransactions(const Config& config,
                 }
             }
         }
+
+        // Choose which TransactionSpecificConfig to use (if per transaction is set -> use it, else use per function call tsc or null if not provided)
+        std::shared_ptr<TransactionSpecificConfig> transactionConfig = (tsc == nullptr) ? global_tsc : tsc;
+
         // Create an object with transaction's input data.
         TxInputDataSPtr pTxInputData =
             std::make_shared<CTxInputData>(
@@ -1684,7 +2020,11 @@ void sendrawtransactions(const Config& config,
                 TxValidationPriority::normal,   // tx validation priority
                 TxStorage::memory,              // tx storage
                 GetTime(),                      // fLimitFree
-                nMaxRawTxFee);                 // nAbsurdFee
+                nMaxRawTxFee,                   // nAbsurdFee
+                std::weak_ptr<CNode>(),         // pNode
+                false,                          // fOrphan
+                transactionConfig);             // transaction specific config
+
         // Check if transaction is already known
         // - received through p2p interface or present in the mempools
         if (!pTxInputData->IsTxIdStored()) {
@@ -1801,6 +2141,7 @@ void sendrawtransactions(const Config& config,
     // Known txns array.
     KnownTxnsToJSON(vKnownTxns, jWriter);
     // Rejected txns array.
+    rejectedTxns.first.insert(invalidConfigTxns.begin(), invalidConfigTxns.end());
     InvalidTxnsToJSON(rejectedTxns.first, jWriter);
     // Evicted txns array.
     EvictedTxnsToJSON(rejectedTxns.second, jWriter);

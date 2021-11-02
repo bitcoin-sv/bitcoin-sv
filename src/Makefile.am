@@ -227,6 +227,7 @@ BITCOIN_CORE_H = \
   threadinterrupt.h \
   timedata.h \
   time_locked_mempool.h \
+  transaction_specific_config.h \
   txdb.h \
   txhasher.h \
   txmempool.h \
@@ -490,6 +491,7 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  transaction_specific_config.cpp \
   txhasher.cpp \
   warnings.cpp \
   write_preferring_upgradable_mutex.cpp \
