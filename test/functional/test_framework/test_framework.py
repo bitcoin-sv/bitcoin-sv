@@ -327,7 +327,7 @@ class BitcoinTestFramework():
             if len(connArgs) > i:
                 thisConnArgs = connArgs[i]
 
-            connection = NodeConn(ip, p2p_port(0), self.nodes[node_index], connCb, **thisConnArgs)
+            connection = NodeConn(ip, p2p_port(node_index), self.nodes[node_index], connCb, **thisConnArgs)
             connections.append(connection)
             connCb.add_connection(connection)
 
