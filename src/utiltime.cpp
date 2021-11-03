@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
+﻿// Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -8,6 +8,7 @@
 #endif
 
 #include "utiltime.h"
+#include "tinyformat.h"
 
 #include <atomic>
 
@@ -84,4 +85,19 @@ std::string DateTimeStrFormat(const char* pszFormat, int64_t nTime)
     ss.imbue(loc);
     ss << boost::posix_time::from_time_t(nTime);
     return ss.str();
+}
+
+std::string DateTimeFormatISO8601(int64_t nTime) {
+    struct tm ts;
+    time_t time_val = nTime;
+#ifdef WIN32
+    // On windows gmtime_s must be used because gmtime_r is not available
+    if (gmtime_s(&ts, &time_val) != 0) {
+#else
+    // All other platforms are assumed to provide gmtime_r (POSIX)
+    if (gmtime_r(&time_val, &ts) == nullptr) {
+#endif
+        return {};
+    }
+    return tinyformat::format("%04i-%02i-%02iT%02i:%02i:%02iZ", ts.tm_year + 1900, ts.tm_mon + 1, ts.tm_mday, ts.tm_hour, ts.tm_min, ts.tm_sec);
 }

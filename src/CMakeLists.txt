@@ -185,7 +185,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 # Boost packages
-set(BOOST_PACKAGES_REQUIRED chrono date_time filesystem program_options thread)
+set(BOOST_PACKAGES_REQUIRED chrono filesystem program_options thread)
 
 function(prepend var prefix)
 	set(listVar "")
