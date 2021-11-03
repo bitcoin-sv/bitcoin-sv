@@ -287,6 +287,12 @@ std::vector<BlockDownloadTracker::InFlightBlock> BlockDownloadTracker::GetBlockD
     return res;
 }
 
+// Get number of peers from which we are downloading blocks
+int BlockDownloadTracker::GetPeersWithValidatedDownloadsCount() const 
+{
+    std::lock_guard lock{mMtx};
+    return mPeersWithValidatedDownloadsCount;
+}
 
 // Remove a block from our in flight details
 bool BlockDownloadTracker::removeFromBlockMapNL(const BlockSource& block, const CNodeStatePtr& state)
