@@ -26,6 +26,8 @@ namespace metrics {
 *                auto cpuTimer = TimedScope<task::thread_clock, std::chrono::milliseconds> { durations_cpu };
 *                // measured code
 *    }
+* 
+* Use test/functional/test_framework/metrics/histogram.py script to draw graphs from histogram logs.
 */
 
 class Histogram {

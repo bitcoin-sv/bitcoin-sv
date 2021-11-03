@@ -175,6 +175,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	undo_tests.cpp
 	univalue_tests.cpp
 	util_tests.cpp
+    validation_scheduler_tests.cpp
 	validation_tests.cpp
     webhook_client_tests.cpp
 

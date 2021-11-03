@@ -1235,6 +1235,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-txnvalidationasynchrunfreq=<n>",
         strprintf("Set run frequency in asynchronous mode (default: %dms)",
             CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
+    // The message below assumes that default strategy is TOPO_SORT, therefore we assert here.
+    static_assert(DEFAULT_PTV_TASK_SCHEDULE_STRATEGY == PTVTaskScheduleStrategy::TOPO_SORT);
+    strUsage += HelpMessageOpt(
+            "-txnvalidationschedulestrategy=<strategy>",
+            "Set task scheduling strategy to use in parallel transaction validation."
+                      "Available strategies: CHAIN_DETECTOR (legacy), TOPO_SORT (default)");
     strUsage += HelpMessageOpt(
         "-maxtxnvalidatorasynctasksrunduration=<n>",
         strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
@@ -2403,6 +2409,16 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.CheckTxValidationDurations(err))
     {
         return InitError(err);
+    }
+
+    if (gArgs.IsArgSet("-txnvalidationschedulestrategy"))
+    {
+        static_assert(DEFAULT_PTV_TASK_SCHEDULE_STRATEGY == PTVTaskScheduleStrategy::TOPO_SORT);
+        auto strategy = gArgs.GetArg("-txnvalidationschedulestrategy", "TOPO_SORT");
+        if (std::string err; !config.SetPTVTaskScheduleStrategy(strategy, &err))
+        {
+            return InitError(err);
+        }
     }
 
     if(std::string err; !config.SetMaxCoinsViewCacheSize(

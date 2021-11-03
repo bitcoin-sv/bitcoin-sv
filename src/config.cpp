@@ -835,6 +835,31 @@ bool GlobalConfig::GetValidationClockCPU() const {
     return data->mValidationClockCPU;
 }
 
+bool GlobalConfig::SetPTVTaskScheduleStrategy(std::string strategy, std::string *err)
+{
+    if (strategy == "CHAIN_DETECTOR")
+    {
+        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::CHAIN_DETECTOR;
+        return true;
+    }
+    else if (strategy == "TOPO_SORT")
+    {
+        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::TOPO_SORT;
+        return true;
+    }
+
+    if (err)
+    {
+        *err = "Invalid value for task scheduling strategy. Available strategies are CHAIN_DETECTOR and TOPO_SORT. Got " + strategy;
+    }
+
+    return false;
+}
+
+PTVTaskScheduleStrategy GlobalConfig::GetPTVTaskScheduleStrategy() const
+{
+    return data->mPTVTaskScheduleStrategy;
+}
 
 /**
  * Compute the maximum number of sigops operations that can be contained in a block

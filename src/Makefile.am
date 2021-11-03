@@ -174,6 +174,7 @@ BITCOIN_CORE_H = \
   net/stream.h \
   net/stream_policy.h \
   net/stream_policy_factory.h \
+  net/validation_scheduler.h \
   netmessagemaker.h \
   noui.h \
   orphan_txns.h \
@@ -329,6 +330,7 @@ libbitcoin_server_a_SOURCES = \
   net/stream.cpp \
   net/stream_policy.cpp \
   net/stream_policy_factory.cpp \
+  net/validation_scheduler.cpp \
   noui.cpp \
   orphan_txns.cpp \
   policy/fees.cpp \
