@@ -36,6 +36,7 @@ import struct
 import sys
 import time
 from itertools import chain
+from math import ceil
 from threading import RLock, Thread
 import uuid
 
@@ -1985,6 +1986,53 @@ class NodeConnCB():
             setattr(self, cb_name, cb)
 
 
+class RateLimiter:
+    """ A class that can rate limit processing. Currently used to limit speed of reading and writing to socket."""
+
+    MEASURING_PERIOD = 1.0  # seconds
+    MAX_FRACTION_TO_PROCESS_IN_ONE_GO = 0.1
+
+    def __init__(self, rate_limit):
+        self.rate_limit = rate_limit  # in amount per second
+        self.history = []
+        self.processed_in_last_measuring_period = 0
+        self.max_chunk = ceil(self.rate_limit * RateLimiter.MAX_FRACTION_TO_PROCESS_IN_ONE_GO * RateLimiter.MEASURING_PERIOD)
+        self.amount_per_measuring_period = ceil(self.rate_limit * self.MEASURING_PERIOD)
+
+    def calculate_next_chunk(self, time_now):
+
+        # ignore history older than one measuring period
+        prune_to_ndx = None
+        for ndx, (time_processed, amount_processed) in enumerate(self.history):
+            if time_now - time_processed > self.MEASURING_PERIOD:
+                prune_to_ndx = ndx
+                self.processed_in_last_measuring_period -= amount_processed
+            else:
+                break
+        if prune_to_ndx is not None:
+            del self.history[:prune_to_ndx + 1]
+
+
+        if self.processed_in_last_measuring_period == 0:
+            assert len(self.history) == 0, "History not empty when processed data is 0"
+        else:
+            assert len(self.history) != 0, "History empty when processed data is not 0"
+        assert self.processed_in_last_measuring_period <= self.amount_per_measuring_period, "Too much of processed data"
+
+        # max amount of data that can still be processed in this time period
+        can_be_processed = self.amount_per_measuring_period - self.processed_in_last_measuring_period
+
+        return min(can_be_processed, self.max_chunk)
+
+    def update_amount_processed(self, time_processed, amount_processed, sleep_expected_fraction=0):
+        if amount_processed:
+            self.history.append((time_processed, amount_processed))
+            self.processed_in_last_measuring_period += amount_processed
+        if sleep_expected_fraction:
+            expected_time_to_send = amount_processed / self.rate_limit
+            time.sleep(sleep_expected_fraction * expected_time_to_send)
+
+
 # The actual NodeConn class
 # This class provides an interface for a p2p connection to a specified node
 
@@ -2035,6 +2083,10 @@ class NodeConn(asyncore.dispatcher):
         # Lock must be acquired when new object is added to prevent NetworkThread from trying
         # to access partially constructed object or trying to call callbacks before the connection
         # is established.
+
+        self.send_data_rate_limiter = None
+        self.receive_data_rate_limiter = None
+
         with network_thread_loop_intent_lock, network_thread_loop_lock:
             asyncore.dispatcher.__init__(self, map=mininode_socket_map)
             self.dstaddr = dstaddr
@@ -2082,6 +2134,18 @@ class NodeConn(asyncore.dispatcher):
                 self.handle_close()
             self.rpc = rpc
 
+    def rate_limit_sending(self, limit):
+        """The maximal rate of sending data in bytes/second, send rate will never exceed the limit while it will be somewhat slower.
+         If None there will be no limit."""
+        with mininode_lock:
+            self.send_data_rate_limiter = RateLimiter(limit) if limit else None
+
+    def rate_limit_receiving(self, limit):
+        """The maximal rate of receiving in bytes/second, receive rate will never exceed the limit while it will be somewhat slower.
+         If None there will be no limit."""
+        with mininode_lock:
+            self.receive_data_rate_limiter = RateLimiter(limit) if limit else None
+
     def handle_connect(self):
         if self.state != "connected":
             logger.debug("Connected & Listening: %s:%d" %
@@ -2103,7 +2167,14 @@ class NodeConn(asyncore.dispatcher):
 
     def handle_read(self):
         with mininode_lock:
-            t = self.recv(READ_BUFFER_SIZE)
+            if self.receive_data_rate_limiter is None:
+                t = self.recv(READ_BUFFER_SIZE)
+            else:
+                time_now = time.time()
+                read_chunk = self.receive_data_rate_limiter.calculate_next_chunk(time_now)
+                max_read = min(READ_BUFFER_SIZE, read_chunk)
+                t = self.recv(max_read)
+                self.receive_data_rate_limiter.update_amount_processed(time_now, len(t), 0.1)
             if len(t) > 0:
                 self.recvbuf += t
 
@@ -2133,7 +2204,14 @@ class NodeConn(asyncore.dispatcher):
                 return
 
             try:
-                sent = self.send(self.sendbuf)
+                if self.send_data_rate_limiter is None:
+                    sent = self.send(self.sendbuf)
+                else:
+                    time_now = time.time()
+                    next_chunk = self.send_data_rate_limiter.calculate_next_chunk(time_now)
+                    next_chunk = min(next_chunk, len(self.sendbuf))
+                    sent = self.send(self.sendbuf[:next_chunk])
+                    self.send_data_rate_limiter.update_amount_processed(time_now, sent, 0.1)
             except:
                 self.handle_close()
                 return
