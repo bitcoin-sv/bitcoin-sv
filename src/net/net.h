@@ -232,10 +232,15 @@ public:
         std::vector<uint8_t>&& data)
         : mCommand{std::move(command)}
         , mPayloadType{payloadType}
-        , mHash{::Hash(data.data(), data.data() + data.size())}
         , mSize{data.size()}
-        , mData{std::make_unique<CVectorStream>(std::move(data))}
-    {/**/}
+    {
+        // Only calculate message hash for non-extended messages
+        if(! CMessageHeader::IsExtended(mSize))
+        {
+            mHash = ::Hash(data.data(), data.data() + data.size());
+        }
+        mData = std::make_unique<CVectorStream>(std::move(data));
+    }
 
     CSerializedNetMsg(
         std::string&& command,
@@ -1065,6 +1070,7 @@ public:
     int GetRecvVersion() { return nRecvVersion; }
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
+    bool SendVersionIsSet() const { return nSendVersion != 0; }
 
     uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
 
