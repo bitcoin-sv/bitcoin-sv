@@ -64,6 +64,12 @@ Currently, the following notifications are supported:
     -zmqpubdiscardedfrommempool=address
     -zmqpubremovedfrommempoolblock=address
 
+    -zmqpubhashtx2=address
+    -zmqpubhashblock2=address
+    -zmqpubrawblock2=address
+    -zmqpubrawtx2=address
+
+
 The socket type is PUB and the address must be a valid ZeroMQ socket
 address. The same address can be used in more than one notification.
 
@@ -99,6 +105,14 @@ in mempool or one of the blocks we had.
 `-zmqpubremovedfrommempoolblock` notification will contain one of the following reasons:
 - reorg, included-in-block
 
+The behaviour of PUB notifications of form zmqpub<body>2 is similar to
+the one of the respective original ones. The differences are:
+	- duplicate notifications for transaction that was already in 
+	our mempool, when it is included in the receiving block, are removed
+	- on reorg all blocks are notified, not only the tip (see 
+	remarks)
+
+These options can also be provided in bitcoin.conf.
 
 ZeroMQ endpoint specifiers for TCP (and others) are documented in the
 [ZeroMQ API](http://api.zeromq.org/master:_start).

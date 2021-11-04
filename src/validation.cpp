@@ -3954,14 +3954,14 @@ static bool ConnectTip(
         auto flushed = pCoinsTipSpan.TryFlush();
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
-
+    std::vector<CTransactionRef> txNew;
     auto asyncRemoveForBlock = std::async(std::launch::async, 
-        [&blockConnecting, &changeSet]()
+        [&blockConnecting, &pindexNew, &changeSet, &txNew]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash());
+            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash(), txNew);
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
@@ -3983,7 +3983,8 @@ static bool ConnectTip(
     nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-    if(g_connman)
+    
+    if (g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
     }
@@ -4002,6 +4003,7 @@ static bool ConnectTip(
              (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
+    GetMainSignals().BlockConnected2(pindexNew, txNew);
 
     FinalizeGenesisCrossing(config, pindexNew->GetHeight(), changeSet);
 

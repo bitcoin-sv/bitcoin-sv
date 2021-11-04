@@ -1017,8 +1017,8 @@ void CTxMemPool::RemoveForReorg(
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     const CJournalChangeSetPtr& changeSet,
-    const uint256& blockhash)
-{
+    const uint256& blockhash,
+    std::vector<CTransactionRef>& txNew) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
@@ -1092,6 +1092,7 @@ void CTxMemPool::RemoveForBlock(
                     removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), conflict, MemPoolRemovalReason::CONFLICT);
                 }
             }
+            txNew.push_back(tx);
         }
     }
 
