@@ -83,7 +83,14 @@ class BIP65Test(BitcoinTestFramework):
         node0.wait_for_verack()
 
         self.log.info("Mining %d blocks", CLTV_HEIGHT - 2)
-        self.coinbase_blocks = self.nodes[0].generate(CLTV_HEIGHT - 2)
+        # Break the generate 1349 blocks call into smaller chunks to avoid occasional timeout
+        # when node is too busy to send getdata msg
+        rem = (CLTV_HEIGHT - 2) % 10
+        self.coinbase_blocks = []
+        for i in range((CLTV_HEIGHT - 2) // 10):
+            self.coinbase_blocks += self.nodes[0].generate(10)
+        self.coinbase_blocks += self.nodes[0].generate(rem)
+        
         self.nodeaddress = self.nodes[0].getnewaddress()
 
         self.log.info(
