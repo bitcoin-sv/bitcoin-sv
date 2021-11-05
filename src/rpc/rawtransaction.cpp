@@ -1457,7 +1457,7 @@ namespace
 
                         if((allowedToSkip | *flagNumber) != allowedToSkip)
                         {
-                            err = "Invalid skipscriptflag: " + *flagNumber;
+                            err = "Invalid skipscriptflag: " + std::to_string(*flagNumber);
                             skipFlagsValue = 0;
                             return false;
                         }
