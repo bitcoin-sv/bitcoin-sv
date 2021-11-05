@@ -1588,7 +1588,7 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
     {
         CoinsDBView coinsView{ *pcoinsTip };
-        std::shared_lock lock{smtx};
+        std::lock_guard lock{smtx};
 
         auto resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
         // submit backed-up transactions
