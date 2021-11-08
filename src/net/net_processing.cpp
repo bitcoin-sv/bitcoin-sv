@@ -78,9 +78,6 @@ BlockDownloadTracker blockDownloadTracker {};
 /** Number of preferable block download peers. */
 std::atomic<int> nPreferredDownload = 0;
 
-/** Number of peers from which we're downloading blocks. */
-std::atomic<int> nPeersWithValidatedDownloads = 0;
-
 /** Relay map, protected by cs_main. */
 typedef std::map<uint256, CTransactionRef> MapRelay;
 MapRelay mapRelay;
@@ -4460,8 +4457,9 @@ bool DetectStalling(const Config& config, const CNodePtr& pto, const CNodeStateP
     if (state->vBlocksInFlight.size() > 0) {
         QueuedBlock &queuedBlock = state->vBlocksInFlight.front();
         int nOtherPeersWithValidatedDownloads =
-            nPeersWithValidatedDownloads -
-            (state->nBlocksInFlightValidHeaders > 0);
+            blockDownloadTracker.GetPeersWithValidatedDownloadsCount() - 
+            (state->nBlocksInFlightValidHeaders > 0) ? 1 : 0;
+        assert(nOtherPeersWithValidatedDownloads >= 0);
 
         auto timeoutBase = IsInitialBlockDownload() 
                                 ? config.GetBlockDownloadTimeoutBaseIBD() 
