@@ -89,9 +89,9 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
 
     // Test static header sizing methods
     BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(0xFFFFFFFFL), CMessageFields::BASIC_HEADER_SIZE);
-    BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(0xFFFFFFFFL + 1), CMessageFields::EXTENDED_HEADER_SIZE);
+    BOOST_CHECK_EQUAL(CMessageHeader::GetHeaderSizeForPayload(static_cast<uint64_t>(0xFFFFFFFFL) + 1), CMessageFields::EXTENDED_HEADER_SIZE);
     BOOST_CHECK(! CMessageHeader::IsExtended(0xFFFFFFFFL));
-    BOOST_CHECK(CMessageHeader::IsExtended(0xFFFFFFFFL + 1));
+    BOOST_CHECK(CMessageHeader::IsExtended(static_cast<uint64_t>(0xFFFFFFFFL) + 1));
     BOOST_CHECK_EQUAL(CMessageHeader::GetMaxPayloadLength(EXTENDED_PAYLOAD_VERSION - 1), std::numeric_limits<uint32_t>::max());
     BOOST_CHECK_EQUAL(CMessageHeader::GetMaxPayloadLength(EXTENDED_PAYLOAD_VERSION), std::numeric_limits<uint64_t>::max());
 
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(maxplusSizeGetBlockTxnHdr.IsOversized(config), true);
 
     // Increase allowable block sizes beyond range of uint32_t
-    constexpr uint64_t veryLargeBlockSize { 6UL * 1024 * 1024 * 1024 };
+    constexpr uint64_t veryLargeBlockSize { 6UL * ONE_GIBIBYTE };
     config.SetDefaultBlockSizeParams(DefaultBlockSizeParams{0, veryLargeBlockSize, veryLargeBlockSize, veryLargeBlockSize});
 
     // test with non-extended max size BLOCK message
@@ -144,12 +144,12 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(maxNonExtendedBlockHdr.GetPayloadLength(), std::numeric_limits<uint32_t>::max());
 
     // test with extended large size BLOCK message
-    CMessageHeader extendedBlockHdr { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::BLOCK, std::numeric_limits<uint32_t>::max() + 1UL, uint256{}) };
+    CMessageHeader extendedBlockHdr { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::BLOCK, std::numeric_limits<uint32_t>::max() + static_cast<uint64_t>(1UL), uint256{}) };
     BOOST_CHECK_EQUAL(extendedBlockHdr.IsValid(config), true);
     BOOST_CHECK_EQUAL(extendedBlockHdr.IsOversized(config), false);
     BOOST_CHECK_EQUAL(extendedBlockHdr.IsExtended(), true);
     BOOST_CHECK_EQUAL(extendedBlockHdr.GetLength(), CMessageFields::EXTENDED_HEADER_SIZE);
-    BOOST_CHECK_EQUAL(extendedBlockHdr.GetPayloadLength(), std::numeric_limits<uint32_t>::max() + 1UL);
+    BOOST_CHECK_EQUAL(extendedBlockHdr.GetPayloadLength(), std::numeric_limits<uint32_t>::max() + static_cast<uint64_t>(1UL));
 
     // test with max size extended large BLOCK message
     CMessageHeader maxExtendedBlockHdr { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::BLOCK, veryLargeBlockSize, uint256{}) };
@@ -252,7 +252,7 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_command)
 
 
     // Increase allowable block sizes beyond range of uint32_t
-    constexpr uint64_t veryLargeBlockSize { 6UL * 1024 * 1024 * 1024 };
+    constexpr uint64_t veryLargeBlockSize { 6UL * ONE_GIBIBYTE };
     config.SetDefaultBlockSizeParams(DefaultBlockSizeParams{0, veryLargeBlockSize, veryLargeBlockSize, veryLargeBlockSize});
 
     // Check command for extended header
@@ -265,7 +265,7 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_command)
 BOOST_AUTO_TEST_CASE(net_messages)
 {
     GlobalConfig config {};
-    constexpr uint64_t veryLargeBlockSize { 6UL * 1024 * 1024 * 1024 };
+    constexpr uint64_t veryLargeBlockSize { 6UL * ONE_GIBIBYTE };
     config.SetDefaultBlockSizeParams(DefaultBlockSizeParams{0, veryLargeBlockSize, veryLargeBlockSize, veryLargeBlockSize});
     const CNetMsgMaker msgMaker { INIT_PROTO_VERSION };
 
