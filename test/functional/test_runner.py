@@ -161,8 +161,10 @@ def main():
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--coverage', action='store_true',
                         help='generate a basic coverage report for the RPC interface')
-    parser.add_argument(
-        '--exclude', '-x', help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
+    parser.add_argument('--exclude', '-x',
+                        help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
+    parser.add_argument('--run-solo',
+                        help='specify a comma-seperated-list of scripts to execute non-parallel. Do not include the .py extension in the name.')
     parser.add_argument('--extended', action='store_true',
                         help='run the extended test suite in addition to the basic tests')
     parser.add_argument('--list-tests', action='store_true',
@@ -232,6 +234,15 @@ def main():
         print(
             "Rerun `configure` with -enable-wallet, -with-utils and -with-daemon and rerun make")
         sys.exit(0)
+
+    # Parse '--run-solo'. Add specified tests to the SOLO_TESTS list
+    if args.run_solo:
+        for test_name in args.run_solo.split(','):
+            test_name = test_name + ".py"
+            if test_name not in SOLO_TESTS:
+                SOLO_TESTS.add(test_name)
+            else:
+                print("Warning: %s already a part of SOLO_TESTS" % test_name)
 
     # Build list of tests
     all_scripts = get_all_scripts_from_disk(tests_dir, NON_SCRIPTS)
