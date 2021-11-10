@@ -563,19 +563,19 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                         "a block that has exceeded the slow fetch detection timeout (default: %u)"),
                         DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
         strUsage += HelpMessageOpt("-blockdownloadtimeoutbasepercent=<n>",
-            strprintf(_("Block download timeout, expressed as percentage of the block interval which is %d minutes."
+            strprintf(_("Block download timeout, expressed as percentage of the block interval which is %d minutes by default."
                         " (default: %u%%)"),
-                        config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
+                        defaultChainParams->GetConsensus().nPowTargetSpacing / 60,
                         DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE));
         strUsage += HelpMessageOpt("-blockdownloadtimeoutbaseibdpercent=<n>",
-            strprintf(_("Block download timeout during the initial block download, expressed as percentage of the block interval which is %d minutes."
+            strprintf(_("Block download timeout during the initial block download, expressed as percentage of the block interval which is %d minutes by default."
                         " (default: %u%%)"),
-                        config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
+                        defaultChainParams->GetConsensus().nPowTargetSpacing / 60,
                         DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD));
         strUsage += HelpMessageOpt("-blockdownloadtimeoutperpeerpercent=<n>",
-            strprintf(_("Additional block download time per parallel downloading peer, expressed as percentage of the block interval which is %d minutes."
+            strprintf(_("Additional block download time per parallel downloading peer, expressed as percentage of the block interval which is %d minutes by default."
                         " (default: %u%%)"),
-                        config.GetChainParams().GetConsensus().nPowTargetSpacing / 60,
+                        defaultChainParams->GetConsensus().nPowTargetSpacing / 60,
                         DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER));
     }
 
