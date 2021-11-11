@@ -1663,6 +1663,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             
             if (config.IsClientUABanned(cleanSubVer))
             {
+                LogPrint(BCLog::NETCONN, "Client UA is banned (%s) peer=%d\n", cleanSubVer, pfrom->id);
                 Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
                 return false;
             }
