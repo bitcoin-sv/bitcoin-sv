@@ -978,10 +978,8 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     std::array<std::pair<uint64_t, CNodePtr>, 2> best {{{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
-    bool allowUnsolictedAddr { gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
-    auto sortfunc = [&best, &hasher, nRelayNodes, allowUnsolictedAddr](const CNodePtr& pnode) {
-        // FIXME: When we get rid of -allowunsolicitedaddr, change to just: pnode->fInbound && ...
-        if ((allowUnsolictedAddr || pnode->fInbound) && pnode->nVersion >= CADDR_TIME_VERSION) {
+    auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
+        if (pnode->fInbound && pnode->nVersion >= CADDR_TIME_VERSION) {
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
             for (unsigned int i = 0; i < nRelayNodes; i++) {
                 if (hashKey > best[i].first) {
@@ -1911,50 +1909,43 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
 
     const CAddress& peerAddr { pfrom->GetAssociation().GetPeerAddr() };
 
-    // FIXME: For now we make rejecting unsolicited addr messages configurable (on by default).
-    // Once we are happy this doesn't have any adverse effects on address propagation we can
-    // remove the config option and make it the only behaviour.
-    bool rejectUnsolictedAddr { !gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
-    if(rejectUnsolictedAddr)
+    // To avoid malicious flooding of our address table, only allow unsolicited
+    // ADDR messages to insert the connecting IP. We need to allow this IP
+    // to be inserted, or there is no way for that node to tell the network
+    // about itself if its behind a NAT.
+
+    // Digression about how things work behind a NAT:
+    //      Node A periodically ADDRs node B with the address that B reported
+    //      to A as A's own address (in the VERSION message).
+    if (!requestedAddr && pfrom->fInbound)
     {
-        // To avoid malicious flooding of our address table, only allow unsolicited
-        // ADDR messages to insert the connecting IP. We need to allow this IP
-        // to be inserted, or there is no way for that node to tell the network
-        // about itself if its behind a NAT.
-
-        // Digression about how things work behind a NAT:
-        //      Node A periodically ADDRs node B with the address that B reported
-        //      to A as A's own address (in the VERSION message).
-        if (!requestedAddr && pfrom->fInbound)
+        bool reportedOwnAddr {false};
+        CAddress ownAddr {};
+        for (const CAddress& addr : vAddr)
         {
-            bool reportedOwnAddr {false};
-            CAddress ownAddr {};
-            for (const CAddress& addr : vAddr)
+            // Server listen port will be different. We want to compare IPs and then use provided port
+            if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(peerAddr))
             {
-                // Server listen port will be different. We want to compare IPs and then use provided port
-                if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(peerAddr))
-                {
-                    ownAddr = addr;
-                    reportedOwnAddr = true;
-                    break;
-                }
+                ownAddr = addr;
+                reportedOwnAddr = true;
+                break;
             }
-            if (reportedOwnAddr)
-            {
-                // Get rid of every address the remote node tried to inject except itself.
-                vAddr.resize(1);
-                vAddr[0] = ownAddr;
-            }
-            else
-            {
-                // Today unsolicited ADDRs are not illegal, but we should consider
-                // misbehaving on this because a few unsolicited ADDRs are ok from
-                // a DOS perspective but lots are not.
-                LogPrint(BCLog::NETMSG, "Peer %d sent unsolicited ADDR\n", pfrom->id);
+        }
+        if (reportedOwnAddr)
+        {
+            // Get rid of every address the remote node tried to inject except itself.
+            vAddr.resize(1);
+            vAddr[0] = ownAddr;
+        }
+        else
+        {
+            // Today unsolicited ADDRs are not illegal, but we should consider
+            // misbehaving on this because a few unsolicited ADDRs are ok from
+            // a DOS perspective but lots are not.
+            LogPrint(BCLog::NETMSG, "Peer %d sent unsolicited ADDR\n", pfrom->id);
 
-                // We don't want to process any other addresses, but giving them is not an error
-                return true;
-            }
+            // We don't want to process any other addresses, but giving them is not an error
+            return true;
         }
     }
 
@@ -1962,7 +1953,8 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
     std::vector<CAddress> vAddrOk;
     int64_t nNow = GetAdjustedTime();
     int64_t nSince = nNow - 10 * 60;
-    for (CAddress& addr : vAddr) {
+    for (CAddress& addr : vAddr)
+    {
         if (interruptMsgProc) {
             return true;
         }
@@ -1976,8 +1968,7 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
         }
         pfrom->AddAddressKnown(addr);
         bool fReachable = IsReachable(addr);
-        // FIXME: When we remove -allowunsolicitedaddr, remove the whole (rejectUnsolictedAddr || !requestedAddr) check
-        if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable() && (rejectUnsolictedAddr || !requestedAddr)) {
+        if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable()) {
             // Relay to a limited number of other nodes
             RelayAddress(addr, fReachable, connman);
         }
