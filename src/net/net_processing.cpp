@@ -1347,10 +1347,14 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     // a MEMPOOL request.
                     if (!txinfo.IsNull() &&
                         txinfo.nTime <= pfrom->timeLastMempoolReq) {
-                        connman.PushMessage(pfrom,
-                                            msgMaker.Make(NetMsgType::TX,
-                                                          *txinfo.GetTx()));
-                        push = true;
+
+                        if(const auto& pTx{txinfo.GetTx()}; pTx)
+                        {
+                            connman.PushMessage(pfrom,
+                                                msgMaker.Make(NetMsgType::TX,
+                                                              *pTx));
+                            push = true;
+                        }
                     }
                 }
                 if (!push) {
