@@ -4858,6 +4858,13 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->GetPrev());
     }
 
+    // Make sure all on disk data is consistent after rewinding the tip
+    if(! FlushStateToDisk(config.GetChainParams(), state, FLUSH_STATE_ALWAYS))
+    {
+        LogPrintf("Failed to flush to disk in InvalidateBlock\n");
+        return false;
+    }
+
     if (state.IsValid() && g_connman) {
         CScopedBlockOriginRegistry reg(pindex->GetBlockHash(), "invalidateblock");
         auto source = task::CCancellationSource::Make();
