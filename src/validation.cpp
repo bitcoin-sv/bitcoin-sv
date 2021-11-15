@@ -6273,6 +6273,11 @@ void LoadChainTip(const CChainParams &chainparams) {
         return;
     }
 
+    if(setBlockIndexCandidates.count(index) == 0)
+    {
+        throw std::runtime_error("LoadChainTip error: CoinsDB best block not in setBlockIndexCandidates");
+    }
+
     chainActive.SetTip(index);
     PruneBlockIndexCandidates();
 
