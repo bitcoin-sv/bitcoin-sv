@@ -4458,7 +4458,7 @@ bool DetectStalling(const Config& config, const CNodePtr& pto, const CNodeStateP
         QueuedBlock &queuedBlock = state->vBlocksInFlight.front();
         int nOtherPeersWithValidatedDownloads =
             blockDownloadTracker.GetPeersWithValidatedDownloadsCount() - 
-            (state->nBlocksInFlightValidHeaders > 0) ? 1 : 0;
+            ((state->nBlocksInFlightValidHeaders > 0) ? 1 : 0);
         assert(nOtherPeersWithValidatedDownloads >= 0);
 
         auto timeoutBase = IsInitialBlockDownload() 
