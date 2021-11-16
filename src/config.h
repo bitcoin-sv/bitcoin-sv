@@ -158,7 +158,7 @@ public:
     virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
 protected:
-    ~Config() = default;
+    virtual ~Config() = default;
 };
 
 class ConfigInit : public Config {
