@@ -3,34 +3,6 @@
 
 #include "transaction_specific_config.h"
 
-namespace
-{
-    bool LessThan(
-        int64_t argValue,
-        std::string* err,
-        const std::string& errorMessage,
-        int64_t minValue)
-    {
-        if (argValue < minValue)
-        {
-            if (err)
-            {
-                *err = errorMessage;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    bool LessThanZero(
-        int64_t argValue,
-        std::string* err,
-        const std::string& errorMessage)
-    {
-        return LessThan( argValue, err, errorMessage, 0 );
-    }
-}
-
 TransactionSpecificConfig::TransactionSpecificConfig(const GlobalConfig& config)
   : GlobalConfig( config.getGlobalConfigData() )
 {

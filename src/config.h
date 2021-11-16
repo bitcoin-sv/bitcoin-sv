@@ -158,7 +158,7 @@ public:
     virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
 protected:
-    ~Config() = default;
+    virtual ~Config() = default;
 };
 
 class ConfigInit : public Config {
@@ -210,8 +210,8 @@ public:
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
     virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
-    virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
-    virtual void SetAllowClientUA(const std::set<std::string> uaClients) = 0;
+    virtual void SetBanClientUA(std::set<std::string> uaClients) = 0;
+    virtual void SetAllowClientUA(std::set<std::string> uaClients) = 0;
     virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
     virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
     virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
@@ -456,8 +456,8 @@ public:
     const std::set<uint256>& GetInvalidBlocks() const override;
     bool IsBlockInvalidated(const uint256& hash) const override;
 
-    void SetBanClientUA(const std::set<std::string> uaClients) override;
-    void SetAllowClientUA(const std::set<std::string> uaClients) override;
+    void SetBanClientUA(std::set<std::string> uaClients) override;
+    void SetAllowClientUA(std::set<std::string> uaClients) override;
     bool IsClientUABanned(const std::string uaClient) const override;
     bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) override;
     uint64_t GetMaxMerkleTreeDiskSpace() const override;
@@ -1137,12 +1137,12 @@ public:
         return mInvalidBlocks.find(hash) != mInvalidBlocks.end(); 
     };
 
-    void SetBanClientUA(const std::set<std::string> uaClients) override
+    void SetBanClientUA(std::set<std::string> uaClients) override
     {
         mBannedUAClients = std::move(uaClients);
     }
     
-    void SetAllowClientUA(const std::set<std::string> uaClients) override
+    void SetAllowClientUA(std::set<std::string> uaClients) override
     {
         mAllowedUAClients = std::move(uaClients);
     }

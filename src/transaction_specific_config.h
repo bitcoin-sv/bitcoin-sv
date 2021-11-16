@@ -94,5 +94,5 @@ private:
     std::optional<uint64_t> mDustLimitFactor;
     std::optional<CFeeRate> mDustRelayFee;
     std::optional<bool> mDataCarrier;
-    uint32_t mSkipScriptFlags;
+    uint32_t mSkipScriptFlags{0};
 };

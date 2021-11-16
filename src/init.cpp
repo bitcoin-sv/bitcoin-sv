@@ -2676,7 +2676,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-invalidateblock"))
     {
         std::set<uint256> invalidBlocks;
-        for(auto invalidBlockHashStr : gArgs.GetArgs("-invalidateblock"))
+        for(const auto& invalidBlockHashStr : gArgs.GetArgs("-invalidateblock"))
         {
             uint256 hash = uint256S(invalidBlockHashStr);
             invalidBlocks.insert(hash);
@@ -2687,7 +2687,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-banclientua"))
     {
         std::set<std::string> invalidUAClients;
-        for (auto invalidClient : gArgs.GetArgs("-banclientua"))
+        for (auto& invalidClient : gArgs.GetArgs("-banclientua"))
         {
             invalidUAClients.insert(std::move(invalidClient));
         }
@@ -2697,7 +2697,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-allowclientua"))
     {
         std::set<std::string> validUAClients;
-        for (auto validClient : gArgs.GetArgs("-allowclientua"))
+        for (auto& validClient : gArgs.GetArgs("-allowclientua"))
         {
             validUAClients.insert(std::move(validClient));
         }
