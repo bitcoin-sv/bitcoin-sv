@@ -1733,7 +1733,7 @@ void CTxMemPool::PrioritiseTransaction(
         std::unique_lock lock{smtx};
         prioritiseTransactionNL(hash, nFeeDelta);
     }
-    LogPrintf("PrioritiseTransaction: %s fee += %d\n", strHash, FormatMoney(nFeeDelta));
+    LogPrint(BCLog::MEMPOOL, "PrioritiseTransaction: %s fee += %d\n", strHash, FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::PrioritiseTransaction(
@@ -1750,7 +1750,7 @@ void CTxMemPool::PrioritiseTransaction(
         }
     }
     for(const TxId& txid: vTxToPrioritise) {
-        LogPrintf("PrioritiseTransaction: %s fee += %d\n",
+        LogPrint(BCLog::MEMPOOL, "PrioritiseTransaction: %s fee += %d\n",
             txid.ToString(),
             FormatMoney(nFeeDelta));
     }
