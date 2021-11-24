@@ -431,34 +431,58 @@ ZeroMQ notification options:
 .HP
 \fB\-zmqpubhashblock=\fR<address>
 .IP
-Enable publish hash block in <address>
+Enable publish hash block in <address>. For more information see
+doc/zmq.md.
 .HP
 \fB\-zmqpubhashtx=\fR<address>
 .IP
-Enable publish hash transaction in <address>
+Enable publish hash transaction in <address>. For more information see
+doc/zmq.md.
 .HP
 \fB\-zmqpubrawblock=\fR<address>
 .IP
-Enable publish raw block in <address>
+Enable publish raw block in <address>. For more information see
+doc/zmq.md.
 .HP
 \fB\-zmqpubrawtx=\fR<address>
 .IP
-Enable publish raw transaction in <address>
+Enable publish raw transaction in <address>. For more information see
+doc/zmq.md.
 .HP
 \fB\-zmqpubinvalidtx=\fR<address>
 .IP
 Enable publish invalid transaction in <address>. \fB\-invalidtxsink\fR=\fI\,ZMQ\/\fR
-should be specified.
+should be specified. For more information see doc/zmq.md.
 .HP
-\fB\-zmqpubdiscardedfrommempool=\fR<address>
+\fB\-zmqpubremovedfrommempool=\fR<address>
 .IP
 Enable publish removal of transaction (txid and the reason in json
-format) in <address>
+format) in <address>. For more information see doc/zmq.md.
 .HP
 \fB\-zmqpubremovedfrommempoolblock=\fR<address>
 .IP
 Enable publish removal of transaction (txid and the reason in json
-format) in <address>
+format) in <address>. For more information see doc/zmq.md.
+.HP
+\fB\-zmqpubhashtx2=\fR<address>
+.IP
+Enable publish hash transaction in <address>. For more information see
+doc/zmq.md.
+.HP
+\fB\-zmqpubrawtx2=\fR<address>
+.IP
+Enable publish raw transaction in <address>. For more information see
+doc/zmq.md.
+.HP
+\fB\-zmqpubhashblock2=\fR<address>
+.IP
+Enable publish hash block in <address>. For more information see
+doc/zmq.md.
+.HP
+\fB\-zmqpubrawblock2=\fR<address>
+.IP
+Enable publish raw block in <address>. For more information see
+doc/zmq.md.
 .PP
 Debugging/Testing options:
 .HP
@@ -645,13 +669,13 @@ Accept consolidation transactions spending non standard inputs (default:
 \fB\-maxscriptsizepolicy\fR
 .IP
 Set maximum script size in bytes we're willing to relay/mine per script
-after Genesis is activated. (default: 10000, 0 = unlimited). The
+after Genesis is activated. (default: 500000, 0 = unlimited). The
 value may be given in bytes or with unit (B, kB, MB, GB).
 .HP
 \fB\-maxscriptnumlengthpolicy=\fR<n>
 .IP
 Set maximum allowed number length we're willing to relay/mine in scripts
-(default: 250000, 0 = unlimited) after Genesis is activated. The
+(default: 10000, 0 = unlimited) after Genesis is activated. The
 value may be given in bytes or with unit (B, kB, MB, GB).
 .PP
 Block creation options:
