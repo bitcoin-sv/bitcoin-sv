@@ -195,11 +195,11 @@ class Association():
         self.recvd_stream_policy_names = None
 
     # Create streams to node
-    def create_streams(self, node, ip='127.0.0.1', sub_version=None):
+    def create_streams(self, node, ip='127.0.0.1', connArgs={}):
         # Create GENERAL stream connection
         general_cb = StreamCB(self)
         self.stream_callbacks[StreamType.GENERAL] = general_cb
-        conn = NodeConn(ip, p2p_port(0), node, general_cb, strSubVer=sub_version)
+        conn = NodeConn(ip, p2p_port(0), node, general_cb, **connArgs)
         general_stream = Stream(StreamType.GENERAL, conn)
         self.streams[StreamType.GENERAL] = general_stream
         self.conn_to_stream_map[conn] = general_stream
@@ -208,7 +208,7 @@ class Association():
         for additional_stream_type in self.stream_policy.additional_streams:
             stream_cb = StreamCB(self)
             self.stream_callbacks[additional_stream_type] = stream_cb
-            conn = NodeConn(ip, p2p_port(0), node, stream_cb, assocID=general_stream.conn.assocID, strSubVer=sub_version)
+            conn = NodeConn(ip, p2p_port(0), node, stream_cb, assocID=general_stream.conn.assocID, **connArgs)
             stream = Stream(additional_stream_type, conn)
             self.streams[additional_stream_type] = stream
             self.conn_to_stream_map[conn] = stream

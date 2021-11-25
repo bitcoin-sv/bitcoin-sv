@@ -7,6 +7,9 @@
 #include "txn_util.h"
 #include <enum_cast.h>
 
+class Config;
+class TransactionSpecificConfig;
+
 // Enumerate possible txn's source type
 enum class TxSource : int
 {
@@ -56,10 +59,11 @@ public:
         int64_t nAcceptTime=0,
         Amount nAbsurdFee=Amount(0),
         std::weak_ptr<CNode> pNode={},
-        bool fOrphan=false);
+        bool fOrphan=false,
+        const std::shared_ptr<const TransactionSpecificConfig> tsc=nullptr);
     // Defaults
     CTxInputData(CTxInputData&&) = default;
-    CTxInputData(const CTxInputData&) = default;
+    CTxInputData(const CTxInputData&) = delete;
     // Destructor
     ~CTxInputData();
 
@@ -118,11 +122,16 @@ public:
         return mfTxIdStored;
     }
 
+    // GetSkipScriptFlags
+    uint32_t GetSkipScriptFlags() const;
+
     using clock = std::chrono::steady_clock;
 
     clock::duration GetLifetime() const {
         return clock::now() - mCreated;
     }
+
+    const Config& GetConfig( const Config& defaultConfig ) const;
 
     /**
      * Setters
@@ -162,6 +171,7 @@ private:
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     bool mfOrphan {false};
     bool mfTxIdStored {false};
+    const std::shared_ptr<const TransactionSpecificConfig> mConfig;
 };
 
 using TxInputDataSPtr = std::shared_ptr<CTxInputData>;

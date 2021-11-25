@@ -31,9 +31,11 @@ public:
 
     virtual bool Initialize(void *pcontext, std::shared_ptr<CZMQPublisher>) = 0;
     virtual void Shutdown() = 0;
-
+    
     virtual bool NotifyBlock(const CBlockIndex *pindex);
+    virtual bool NotifyBlock2(const CBlockIndex* pindex);
     virtual bool NotifyTransaction(const CTransaction &transaction);
+    virtual bool NotifyTransaction2(const CTransaction& transaction);
     virtual bool NotifyTextMessage(const std::string& topic, std::string_view message);
     virtual bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
                                           const CTransactionConflict& conflictedWith);

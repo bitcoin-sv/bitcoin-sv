@@ -24,6 +24,7 @@ class LargeBlockFileMax32Bit(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
+        self.bitcoind_proc_wait_timeout = 180
         self.setup_clean_chain = True
         self.genesisactivationheight = 104
         self.nocleanup = True

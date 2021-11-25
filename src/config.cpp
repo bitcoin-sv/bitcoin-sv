@@ -46,153 +46,161 @@ GlobalConfig::GlobalConfig() {
 
 void GlobalConfig::Reset()
 {
-    feePerKB = CFeeRate {};
-    dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
-    blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
-    preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
-    factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
+    data->feePerKB = CFeeRate {};
+    data->dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
+    data->blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
+    data->preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
+    data->factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
 
-    setDefaultBlockSizeParamsCalled = false;
+    data->setDefaultBlockSizeParamsCalled = false;
 
-    blockSizeActivationTime = 0;
-    maxBlockSize = 0;
-    defaultBlockSize = 0;
-    maxGeneratedBlockSizeBefore = 0;
-    maxGeneratedBlockSizeAfter = 0;
-    maxGeneratedBlockSizeOverridden =  false;
-    maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
-    minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
-    maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
-    minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
-    acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
+    data->blockSizeActivationTime = 0;
+    data->maxBlockSize = 0;
+    data->defaultBlockSize = 0;
+    data->maxGeneratedBlockSizeBefore = 0;
+    data->maxGeneratedBlockSizeAfter = 0;
+    data->maxGeneratedBlockSizeOverridden =  false;
+    data->maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
+    data->minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
+    data->maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
+    data->minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
+    data->acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
-    dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
-    limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
-    limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
+    data->dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
+    data->limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
+    data->limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
     
-    testBlockCandidateValidity = false;
-    blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
+    data->testBlockCandidateValidity = false;
+    data->blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
 
-    genesisActivationHeight = 0;
+    data->genesisActivationHeight = 0;
 
-    mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
+    data->mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
 
-    mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
-    mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
-    mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
-    maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
-    maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
-    maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
+    data->mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+    data->mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
+    data->mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
+    data->maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
+    data->maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
+    data->maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
-    mMaxStdTxnValidationDuration = DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
-    mMaxNonStdTxnValidationDuration = DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
+    data->mMaxStdTxnValidationDuration = DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
+    data->mMaxNonStdTxnValidationDuration = DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
+    data->mMaxTxnValidatorAsyncTasksRunDuration = CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION;
 
-    maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS;
-    maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
-    maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
+    data->maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS;
+    data->maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
+    data->maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
 
-    maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
-    genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
+    data->maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
+    data->genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
 
-    mAcceptNonStandardOutput = true;
+    data->mAcceptNonStandardOutput = true;
 
-    mMaxCoinsViewCacheSize = 0;
-    mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+    data->mMaxCoinsViewCacheSize = 0;
+    data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
 
-    maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
-    maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
+    data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+    data->maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
 
-    recvInvQueueFactor = DEFAULT_RECV_INV_QUEUE_FACTOR;
+    data->recvInvQueueFactor = DEFAULT_RECV_INV_QUEUE_FACTOR;
 
-    mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
-    mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
-    mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
-    mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
-    mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
-    mMaxPercentageOfOrphansInMaxBatchSize = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
-    mMaxInputsForSecondLayerOrphan = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
-    mStopAtHeight = DEFAULT_STOPATHEIGHT;
-    mPromiscuousMempoolFlags = 0;
-    mIsSetPromiscuousMempoolFlags = false;
+    data->mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
+    data->mMaxMempoolSizeDisk = data->mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
+    data->mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
+    data->mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
+    data->mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
+    data->mMaxPercentageOfOrphansInMaxBatchSize = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
+    data->mMaxInputsForSecondLayerOrphan = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
+    data->mStopAtHeight = DEFAULT_STOPATHEIGHT;
+    data->mPromiscuousMempoolFlags = 0;
+    data->mIsSetPromiscuousMempoolFlags = false;
 
-    invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
-    invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+    data->invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
+    data->invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
 
     // Block download
-    blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
-    blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
-    blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
-    blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
-    blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
+    data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
+    data->blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
+    data->blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    data->blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
+    data->blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
+    data->blockDownloadTimeoutBase = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE;
+    data->blockDownloadTimeoutBaseIBD = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD;
+    data->blockDownloadTimeoutPerPeer = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER;
 
     // P2P parameters
-    p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
-    streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
-    banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+    data->p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+    data->streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
+    data->banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+
+    // banclientua
+    data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
+    data->mAllowedUAClients = {};
 
     // RPC parameters
-    webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
+    data->webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
 
     // Double-Spend parameters
-    dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
-    dsEndpointFastTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
-    dsEndpointSlowTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT;
-    dsEndpointSlowRatePerHour = DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR;
-    dsEndpointPort = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT;
-    dsEndpointBlacklistSize = DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE;
-    dsEndpointSkipList = {};
-    dsEndpointMaxCount = DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT;
-    dsAttemptTxnRemember = DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT;
-    dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
-    dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
-    dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
-    dsDetectedWebhookAddress = "";
-    dsDetectedWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
-    dsDetectedWebhookPath = "";
-    dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
 
-    mDisableBIP30Checks = std::nullopt;
+    data->dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
+    data->dsEndpointFastTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
+    data->dsEndpointSlowTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT;
+    data->dsEndpointSlowRatePerHour = DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR;
+    data->dsEndpointPort = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT;
+    data->dsEndpointBlacklistSize = DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE;
+    data->dsEndpointSkipList = {};
+    data->dsEndpointMaxCount = DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT;
+    data->dsAttemptTxnRemember = DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT;
+    data->dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
+    data->dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
+    data->dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
+    data->dsDetectedWebhookAddress = "";
+    data->dsDetectedWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    data->dsDetectedWebhookPath = "";
+    data->dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
+
+    data->mDisableBIP30Checks = std::nullopt;
 
 #if ENABLE_ZMQ
-    invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
+    data->invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
 #endif
 
-    maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
-    preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
-    maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
+    data->maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
+    data->preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
+    data->maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
 
-    mSoftConsensusFreezeDuration = DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION;
+    data->mSoftConsensusFreezeDuration = DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION;
     // Safe mode activation
-    safeModeWebhookAddress = "";
-    safeModeWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
-    safeModeWebhookPath = "";
-    safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
-    safeModeMinForkLength = SAFE_MODE_DEFAULT_MIN_FORK_LENGTH;
-    safeModeMinHeightDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
-
+    data->safeModeWebhookAddress = "";
+    data->safeModeWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    data->safeModeWebhookPath = "";
+    data->safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
+    data->safeModeMinForkLength = SAFE_MODE_DEFAULT_MIN_FORK_LENGTH;
+    data->safeModeMinHeightDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
-    preferredBlockFileSize = preferredSize;
+    data->preferredBlockFileSize = preferredSize;
 }
 
 uint64_t GlobalConfig::GetPreferredBlockFileSize() const {
-    return preferredBlockFileSize;
+    return data->preferredBlockFileSize;
 }
 
 void GlobalConfig::SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) {
-    blockSizeActivationTime = params.blockSizeActivationTime;
-    maxBlockSize = params.maxBlockSize;
-    defaultBlockSize = maxBlockSize;
-    maxGeneratedBlockSizeBefore = params.maxGeneratedBlockSizeBefore;
-    maxGeneratedBlockSizeAfter = params.maxGeneratedBlockSizeAfter;
-    maxGeneratedBlockSizeOverridden = false;
-    setDefaultBlockSizeParamsCalled = true;
+    data->blockSizeActivationTime = params.blockSizeActivationTime;
+    data->maxBlockSize = params.maxBlockSize;
+    data->defaultBlockSize = data->maxBlockSize;
+    data->maxGeneratedBlockSizeBefore = params.maxGeneratedBlockSizeBefore;
+    data->maxGeneratedBlockSizeAfter = params.maxGeneratedBlockSizeAfter;
+    data->maxGeneratedBlockSizeOverridden = false;
+    data->setDefaultBlockSizeParamsCalled = true;
 }
 
 void GlobalConfig::CheckSetDefaultCalled() const
 {
-    if (!setDefaultBlockSizeParamsCalled)
+    if (!data->setDefaultBlockSizeParamsCalled)
     {
         // If you hit this we created new instance of GlobalConfig without 
         // setting defaults
@@ -202,7 +210,7 @@ void GlobalConfig::CheckSetDefaultCalled() const
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
-    std::scoped_lock<std::shared_mutex> lock{configMtx};
+    std::scoped_lock<std::shared_mutex> lock{data->configMtx};
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
     if (maxSize && maxSize <= LEGACY_MAX_BLOCK_SIZE) {
@@ -212,23 +220,23 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
     }
 
     // Unlimited value depends on each definition of CChainParams
-    maxBlockSize = maxSize ? maxSize : defaultBlockSize;
+    data->maxBlockSize = maxSize ? maxSize : data->defaultBlockSize;
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
-    std::shared_lock<std::shared_mutex> lock{configMtx};
+    std::shared_lock<std::shared_mutex> lock{data->configMtx};
     CheckSetDefaultCalled();
-    return maxBlockSize;
+    return data->maxBlockSize;
 }
 
 void GlobalConfig::SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytesIn) {
-    factorMaxSendQueuesBytes = factorMaxSendQueuesBytesIn;
+    data->factorMaxSendQueuesBytes = factorMaxSendQueuesBytesIn;
 }
 
 uint64_t GlobalConfig::GetFactorMaxSendQueuesBytes() const {
-    return factorMaxSendQueuesBytes;
+    return data->factorMaxSendQueuesBytes;
 }
 
 uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
@@ -236,51 +244,51 @@ uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
     // Use the "after upgrade" excessive block size to determine the maximum size of 
     // block related messages that we are prepared to queue
     uint64_t maxBlockSize = GetMaxBlockSize();
-    if (factorMaxSendQueuesBytes > UINT64_MAX / maxBlockSize)
+    if (data->factorMaxSendQueuesBytes > UINT64_MAX / maxBlockSize)
     {
         return UINT64_MAX;
     }
-    return factorMaxSendQueuesBytes * maxBlockSize;
+    return data->factorMaxSendQueuesBytes * maxBlockSize;
 }
 
 bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
-    std::scoped_lock<std::shared_mutex> lock{configMtx};
-    maxGeneratedBlockSizeAfter = maxSize;
-    maxGeneratedBlockSizeOverridden = true;
+    std::scoped_lock<std::shared_mutex> lock{data->configMtx};
+    data->maxGeneratedBlockSizeAfter = maxSize;
+    data->maxGeneratedBlockSizeOverridden = true;
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
-    std::shared_lock<std::shared_mutex> lock{configMtx};
+    std::shared_lock<std::shared_mutex> lock{data->configMtx};
     CheckSetDefaultCalled();
-    return maxGeneratedBlockSizeAfter;
+    return data->maxGeneratedBlockSizeAfter;
 }
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
-    std::shared_lock<std::shared_mutex> lock{configMtx};
+    std::shared_lock<std::shared_mutex> lock{data->configMtx};
     CheckSetDefaultCalled();
     uint64_t maxSize;
-    if (!maxGeneratedBlockSizeOverridden) {
-        maxSize = nMedianTimePast >= blockSizeActivationTime ? maxGeneratedBlockSizeAfter : maxGeneratedBlockSizeBefore;
+    if (!data->maxGeneratedBlockSizeOverridden) {
+        maxSize = nMedianTimePast >= data->blockSizeActivationTime ? data->maxGeneratedBlockSizeAfter : data->maxGeneratedBlockSizeBefore;
     }
     else {
-        maxSize = maxGeneratedBlockSizeAfter;
+        maxSize = data->maxGeneratedBlockSizeAfter;
     }
     return maxSize;
 }
 bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
-    return maxGeneratedBlockSizeOverridden;
+    return data->maxGeneratedBlockSizeOverridden;
 }
 
 bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* err) {
-    blockSizeActivationTime = activationTime;
+    data->blockSizeActivationTime = activationTime;
     return true;
 }
 
 int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     CheckSetDefaultCalled();
-    return blockSizeActivationTime;
+    return data->blockSizeActivationTime;
 }
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
@@ -291,7 +299,7 @@ bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* er
     }
     if (maxTxSizePolicyIn == 0)
     {
-        maxTxSizePolicy = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
+        data->maxTxSizePolicy = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
         return true;
     }
     uint64_t maxTxSizePolicyInUnsigned = static_cast<uint64_t>(maxTxSizePolicyIn);
@@ -312,7 +320,7 @@ bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* er
         return false;
     }
 
-    maxTxSizePolicy = maxTxSizePolicyInUnsigned;
+    data->maxTxSizePolicy = maxTxSizePolicyInUnsigned;
     return true;
 }
 
@@ -331,7 +339,7 @@ uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) con
     {
         return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
     }
-    return maxTxSizePolicy;
+    return data->maxTxSizePolicy;
 }
 
 bool GlobalConfig::SetMinConsolidationFactor(int64_t minConsolidationFactorIn, std::string* err)
@@ -340,13 +348,13 @@ bool GlobalConfig::SetMinConsolidationFactor(int64_t minConsolidationFactorIn, s
     {
         return false;
     }
-    minConsolidationFactor = static_cast<uint64_t>(minConsolidationFactorIn);
+    data->minConsolidationFactor = static_cast<uint64_t>(minConsolidationFactorIn);
     return true;
 }
 
 uint64_t GlobalConfig::GetMinConsolidationFactor() const
 {
-    return minConsolidationFactor;
+    return data->minConsolidationFactor;
 }
 
 bool GlobalConfig::SetMaxConsolidationInputScriptSize(int64_t maxConsolidationInputScriptSizeIn, std::string* err)
@@ -356,16 +364,16 @@ bool GlobalConfig::SetMaxConsolidationInputScriptSize(int64_t maxConsolidationIn
         return false;
     }
     else if (maxConsolidationInputScriptSizeIn == 0) {
-        maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
+        data->maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     } else {
-        maxConsolidationInputScriptSize = static_cast<uint64_t>(maxConsolidationInputScriptSizeIn);
+        data->maxConsolidationInputScriptSize = static_cast<uint64_t>(maxConsolidationInputScriptSizeIn);
     }
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxConsolidationInputScriptSize() const
 {
-    return maxConsolidationInputScriptSize;
+    return data->maxConsolidationInputScriptSize;
 }
 
 bool GlobalConfig::SetMinConfConsolidationInput(int64_t minconfIn, std::string* err)
@@ -376,38 +384,47 @@ bool GlobalConfig::SetMinConfConsolidationInput(int64_t minconfIn, std::string* 
     }
     if (minconfIn == 0)
     {
-        minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
+        data->minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
     }
     else
     {
-        minConfConsolidationInput = static_cast<uint64_t>(minconfIn);
+        data->minConfConsolidationInput = static_cast<uint64_t>(minconfIn);
     }
     return true;
 }
 
 uint64_t GlobalConfig::GetMinConfConsolidationInput() const
 {
-    return minConfConsolidationInput;
+    return data->minConfConsolidationInput;
 }
 
 bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
 {
-    acceptNonStdConsolidationInput = flagValue;
+    data->acceptNonStdConsolidationInput = flagValue;
     return true;
 }
 
 bool GlobalConfig::GetAcceptNonStdConsolidationInput() const
 {
-    return acceptNonStdConsolidationInput;
+    return data->acceptNonStdConsolidationInput;
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {
-    dataCarrierSize = dataCarrierSizeIn;
+    data->dataCarrierSize = dataCarrierSizeIn;
 }
 
 uint64_t GlobalConfig::GetDataCarrierSize() const {
-    return dataCarrierSize;
+    return data->dataCarrierSize;
 }
+
+void GlobalConfig::SetDataCarrier(bool dataCarrierIn) {
+    data->dataCarrier = dataCarrierIn;
+}
+
+bool GlobalConfig::GetDataCarrier() const {
+    return data->dataCarrier;
+}
+
 
 bool  GlobalConfig::SetLimitAncestorCount(int64_t limitAncestorCountIn, std::string* err) {
     if (limitAncestorCountIn <= 0)
@@ -418,12 +435,12 @@ bool  GlobalConfig::SetLimitAncestorCount(int64_t limitAncestorCountIn, std::str
         }
         return false;
     }
-    limitAncestorCount = static_cast<uint64_t>(limitAncestorCountIn);
+    data->limitAncestorCount = static_cast<uint64_t>(limitAncestorCountIn);
     return true;
 }
 
 uint64_t GlobalConfig::GetLimitAncestorCount() const {
-    return limitAncestorCount;
+    return data->limitAncestorCount;
 }
 
 bool GlobalConfig::SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err) {
@@ -435,12 +452,12 @@ bool GlobalConfig::SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryM
         }
         return false;
     }
-    limitSecondaryMempoolAncestorCount = static_cast<uint64_t>(limitSecondaryMempoolAncestorCountIn);
+    data->limitSecondaryMempoolAncestorCount = static_cast<uint64_t>(limitSecondaryMempoolAncestorCountIn);
     return true;
 }
 
 uint64_t GlobalConfig::GetLimitSecondaryMempoolAncestorCount()const {
-    return limitSecondaryMempoolAncestorCount;
+    return data->limitSecondaryMempoolAncestorCount;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {
@@ -465,11 +482,11 @@ bool GlobalConfig::SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigI
     }
     else if (maxPubKeysPerMultiSigUnsigned == 0)
     {
-        maxPubKeysPerMultiSig = MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS;
+        data->maxPubKeysPerMultiSig = MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS;
     }
     else
     {
-        maxPubKeysPerMultiSig = maxPubKeysPerMultiSigUnsigned;
+        data->maxPubKeysPerMultiSig = maxPubKeysPerMultiSigUnsigned;
     }
 
     return true;
@@ -487,7 +504,7 @@ uint64_t GlobalConfig::GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool cons
         return MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS; // use new limit after genesis
     }
 
-    return maxPubKeysPerMultiSig;
+    return data->maxPubKeysPerMultiSig;
 }
 
 bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err)
@@ -508,7 +525,7 @@ bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std
     }
     else
     {
-        genesisGracefulPeriod = genesisGracefulPeriodUnsigned;
+        data->genesisGracefulPeriod = genesisGracefulPeriodUnsigned;
     }
 
     return true;
@@ -517,7 +534,7 @@ bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std
 
 uint64_t GlobalConfig::GetGenesisGracefulPeriod() const
 {
-    return genesisGracefulPeriod;
+    return data->genesisGracefulPeriod;
 }
 
 Config& GlobalConfig::GetConfig()
@@ -533,19 +550,19 @@ ConfigInit& GlobalConfig::GetModifiableGlobalConfig()
 }
 
 void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
-    testBlockCandidateValidity = test;
+    data->testBlockCandidateValidity = test;
 }
 
 bool GlobalConfig::GetTestBlockCandidateValidity() const {
-    return testBlockCandidateValidity;
+    return data->testBlockCandidateValidity;
 }
 
 void GlobalConfig::SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) {
-    blockAssemblerType = type;
+    data->blockAssemblerType = type;
 }
 
 mining::CMiningFactory::BlockAssemblerType GlobalConfig::GetMiningCandidateBuilder() const {
-    return blockAssemblerType;
+    return data->blockAssemblerType;
 }
 
 bool GlobalConfig::SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err) {
@@ -557,12 +574,12 @@ bool GlobalConfig::SetGenesisActivationHeight(int32_t genesisActivationHeightIn,
         }
         return false;
     }
-    genesisActivationHeight = genesisActivationHeightIn;
+    data->genesisActivationHeight = genesisActivationHeightIn;
     return true;
 }
 
 int32_t GlobalConfig::GetGenesisActivationHeight() const {
-    return genesisActivationHeight;
+    return data->genesisActivationHeight;
 }
 
 bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
@@ -570,7 +587,7 @@ bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
     std::string* error)
 {
     if (maxConcurrentAsyncTasksPerNode < 1
-        || maxConcurrentAsyncTasksPerNode > mMaxParallelBlocks)
+        || maxConcurrentAsyncTasksPerNode > data->mMaxParallelBlocks)
     {
         if(error)
         {
@@ -583,14 +600,14 @@ bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
         return false;
     }
 
-    mMaxConcurrentAsyncTasksPerNode = maxConcurrentAsyncTasksPerNode;
+    data->mMaxConcurrentAsyncTasksPerNode = maxConcurrentAsyncTasksPerNode;
 
     return true;
 }
 
 int GlobalConfig::GetMaxConcurrentAsyncTasksPerNode() const
 {
-    return mMaxConcurrentAsyncTasksPerNode;
+    return data->mMaxConcurrentAsyncTasksPerNode;
 }
 
 bool GlobalConfig::SetBlockScriptValidatorsParams(
@@ -614,11 +631,11 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
             return false;
         }
 
-        mMaxParallelBlocks = maxParallelBlocks;
+        data->mMaxParallelBlocks = maxParallelBlocks;
 
         // limit dependent variable
-        mMaxConcurrentAsyncTasksPerNode =
-            std::min(mMaxConcurrentAsyncTasksPerNode, mMaxParallelBlocks);
+        data->mMaxConcurrentAsyncTasksPerNode =
+            std::min(data->mMaxConcurrentAsyncTasksPerNode, data->mMaxParallelBlocks);
     }
 
     {
@@ -643,7 +660,7 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
             return false;
         }
 
-        mPerBlockScriptValidatorThreadsCount = perValidatorThreadsCount;
+        data->mPerBlockScriptValidatorThreadsCount = perValidatorThreadsCount;
     }
 
     {
@@ -661,7 +678,7 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
 
             return false;
         }
-        mPerBlockScriptValidationMaxBatchSize = perValidatorThreadMaxBatchSize;
+        data->mPerBlockScriptValidationMaxBatchSize = perValidatorThreadMaxBatchSize;
     }
 
     return true;
@@ -669,17 +686,17 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
 
 int GlobalConfig::GetMaxParallelBlocks() const
 {
-    return mMaxParallelBlocks;
+    return data->mMaxParallelBlocks;
 }
 
 int GlobalConfig::GetPerBlockScriptValidatorThreadsCount() const
 {
-    return mPerBlockScriptValidatorThreadsCount;
+    return data->mPerBlockScriptValidatorThreadsCount;
 }
 
 int GlobalConfig::GetPerBlockScriptValidationMaxBatchSize() const
 {
-    return mPerBlockScriptValidationMaxBatchSize;
+    return data->mPerBlockScriptValidationMaxBatchSize;
 }
 
 bool GlobalConfig::SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error)
@@ -700,11 +717,11 @@ bool GlobalConfig::SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std
     }
     else if (maxOpsPerScriptPolicyInUnsigned == 0)
     {
-        maxOpsPerScriptPolicy = MAX_OPS_PER_SCRIPT_AFTER_GENESIS;
+        data->maxOpsPerScriptPolicy = MAX_OPS_PER_SCRIPT_AFTER_GENESIS;
     }
     else
     {
-        maxOpsPerScriptPolicy = maxOpsPerScriptPolicyInUnsigned;
+        data->maxOpsPerScriptPolicy = maxOpsPerScriptPolicyInUnsigned;
     }
 
     return true;
@@ -721,7 +738,7 @@ uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus)
     {
         return MAX_OPS_PER_SCRIPT_AFTER_GENESIS; // use new limit after genesis
     }
-    return maxOpsPerScriptPolicy;
+    return data->maxOpsPerScriptPolicy;
 }
 
 bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
@@ -738,14 +755,35 @@ bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
         return false;
     }
 
-    mMaxStdTxnValidationDuration = std::chrono::milliseconds{ms};
+    data->mMaxStdTxnValidationDuration = std::chrono::milliseconds{ms};
 
     return true;
 }
 
 std::chrono::milliseconds GlobalConfig::GetMaxStdTxnValidationDuration() const
 {
-    return mMaxStdTxnValidationDuration;
+    return data->mMaxStdTxnValidationDuration;
+}
+
+bool GlobalConfig::SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err)
+{
+    if(ms > 0)
+    {
+        data->mMaxTxnValidatorAsyncTasksRunDuration = std::chrono::milliseconds{ms};
+        return true;
+    }
+
+    if(err)
+    {
+        *err = "maxtxnvalidatorasynctasksrunduration must be at least 1ms";
+    }
+
+    return false;
+}
+
+std::chrono::milliseconds GlobalConfig::GetMaxTxnValidatorAsyncTasksRunDuration() const
+{
+    return data->mMaxTxnValidatorAsyncTasksRunDuration;
 }
 
 bool GlobalConfig::SetMaxNonStdTxnValidationDuration(int ms, std::string* err)
@@ -762,14 +800,14 @@ bool GlobalConfig::SetMaxNonStdTxnValidationDuration(int ms, std::string* err)
         return false;
     }
 
-    mMaxNonStdTxnValidationDuration = std::chrono::milliseconds{ms};
+    data->mMaxNonStdTxnValidationDuration = std::chrono::milliseconds{ms};
 
     return true;
 }
 
 std::chrono::milliseconds GlobalConfig::GetMaxNonStdTxnValidationDuration() const
 {
-    return mMaxNonStdTxnValidationDuration;
+    return data->mMaxNonStdTxnValidationDuration;
 }
 
 bool GlobalConfig::SetMaxTxnChainValidationBudget(int ms, std::string* err)
@@ -780,23 +818,48 @@ bool GlobalConfig::SetMaxTxnChainValidationBudget(int ms, std::string* err)
         return false;
     }
 
-    mMaxTxnChainValidationBudget = std::chrono::milliseconds{ms};
+    data->mMaxTxnChainValidationBudget = std::chrono::milliseconds{ms};
 
     return true;
 }
 
 std::chrono::milliseconds GlobalConfig::GetMaxTxnChainValidationBudget() const {
-    return mMaxTxnChainValidationBudget;
+    return data->mMaxTxnChainValidationBudget;
 }
 
 void GlobalConfig::SetValidationClockCPU(bool enable) {
-    mValidationClockCPU = enable;
+    data->mValidationClockCPU = enable;
 }
 
 bool GlobalConfig::GetValidationClockCPU() const {
-    return mValidationClockCPU;
+    return data->mValidationClockCPU;
 }
 
+bool GlobalConfig::SetPTVTaskScheduleStrategy(std::string strategy, std::string *err)
+{
+    if (strategy == "CHAIN_DETECTOR")
+    {
+        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::CHAIN_DETECTOR;
+        return true;
+    }
+    else if (strategy == "TOPO_SORT")
+    {
+        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::TOPO_SORT;
+        return true;
+    }
+
+    if (err)
+    {
+        *err = "Invalid value for task scheduling strategy. Available strategies are CHAIN_DETECTOR and TOPO_SORT. Got " + strategy;
+    }
+
+    return false;
+}
+
+PTVTaskScheduleStrategy GlobalConfig::GetPTVTaskScheduleStrategy() const
+{
+    return data->mPTVTaskScheduleStrategy;
+}
 
 /**
  * Compute the maximum number of sigops operations that can be contained in a block
@@ -824,27 +887,27 @@ bool GlobalConfig::SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn
 
     if (maxStackMemoryUsageConsensusIn == 0)
     {
-        maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
+        data->maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
     }
     else
     {
-        maxStackMemoryUsageConsensus = static_cast<uint64_t>(maxStackMemoryUsageConsensusIn);
+        data->maxStackMemoryUsageConsensus = static_cast<uint64_t>(maxStackMemoryUsageConsensusIn);
     }
 
     if (maxStackMemoryUsagePolicyIn == 0)
     {
-        maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
+        data->maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
     }
     else
     {
-        maxStackMemoryUsagePolicy = static_cast<uint64_t>(maxStackMemoryUsagePolicyIn);
+        data->maxStackMemoryUsagePolicy = static_cast<uint64_t>(maxStackMemoryUsagePolicyIn);
     }
 
-    if (maxStackMemoryUsagePolicy > maxStackMemoryUsageConsensus)
+    if (data->maxStackMemoryUsagePolicy > data->maxStackMemoryUsageConsensus)
     {
         if (err)
         {
-            *err = _("Policy value of max stack memory usage must not exceed consensus limit of ") + std::to_string(maxStackMemoryUsageConsensus);
+            *err = _("Policy value of max stack memory usage must not exceed consensus limit of ") + std::to_string(data->maxStackMemoryUsageConsensus);
         }
         return false;
     }
@@ -863,10 +926,10 @@ uint64_t GlobalConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consen
 
     if (consensus)
     {
-        return maxStackMemoryUsageConsensus;
+        return data->maxStackMemoryUsageConsensus;
     }
 
-    return maxStackMemoryUsagePolicy;
+    return data->maxStackMemoryUsagePolicy;
 }
 
 bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err)
@@ -887,7 +950,7 @@ bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std
     }
     else if (maxScriptNumLengthUnsigned == 0)
     {
-        maxScriptNumLengthPolicy = MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+        data->maxScriptNumLengthPolicy = MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
     }
     else if (maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
     {
@@ -899,7 +962,7 @@ bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std
     }
     else
     {
-        maxScriptNumLengthPolicy = maxScriptNumLengthUnsigned;
+        data->maxScriptNumLengthPolicy = maxScriptNumLengthUnsigned;
     }
 
     return true;
@@ -916,17 +979,17 @@ uint64_t GlobalConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConse
     {
         return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // use new limit after genesis
     }
-    return maxScriptNumLengthPolicy; // use policy
+    return data->maxScriptNumLengthPolicy; // use policy
 }
 
 void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
 {
-    mAcceptNonStandardOutput = accept;
+    data->mAcceptNonStandardOutput = accept;
 }
 
 bool GlobalConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
 {
-    return isGenesisEnabled ? mAcceptNonStandardOutput : !fRequireStandard;
+    return isGenesisEnabled ? data->mAcceptNonStandardOutput : !fRequireStandard;
 }
 
 bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
@@ -936,7 +999,7 @@ bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
         return false;
     }
 
-    mMaxCoinsViewCacheSize = static_cast<uint64_t>(max);
+    data->mMaxCoinsViewCacheSize = static_cast<uint64_t>(max);
 
     return true;
 }
@@ -955,7 +1018,7 @@ bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
         return false;
     }
 
-    mMaxCoinsProviderCacheSize = static_cast<uint64_t>(max);
+    data->mMaxCoinsProviderCacheSize = static_cast<uint64_t>(max);
 
     return true;
 }
@@ -967,40 +1030,51 @@ bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
         return false;
     }
 
-    mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
+    data->mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
 
     return true;
 }
 
 void GlobalConfig::SetInvalidBlocks(const std::set<uint256>& hashes)
 {
-    mInvalidBlocks = hashes;
+    data->mInvalidBlocks = hashes;
 }
 
 const std::set<uint256>& GlobalConfig::GetInvalidBlocks() const
 {
-    return mInvalidBlocks;
+    return data->mInvalidBlocks;
 }
 
 bool GlobalConfig::IsBlockInvalidated(const uint256& hash) const
 {
-    return mInvalidBlocks.find(hash) != mInvalidBlocks.end(); 
+    return data->mInvalidBlocks.find(hash) != data->mInvalidBlocks.end(); 
 }
 
 void GlobalConfig::SetBanClientUA(const std::set<std::string> uaClients)
 {
-    mBannedUAClients = uaClients;
+    data->mBannedUAClients = std::move(uaClients);
+}
+
+void GlobalConfig::SetAllowClientUA(const std::set<std::string> uaClients)
+{
+    data->mAllowedUAClients = std::move(uaClients);
 }
 
 bool GlobalConfig::IsClientUABanned(const std::string uaClient) const
 {
-    for (std::string invUAClient : mBannedUAClients)
-    {
-        if (boost::icontains(uaClient, invUAClient))
-        {
+    auto matchClient =  [&uaClient](std::string const & s)
+            {
+                return boost::icontains(uaClient,s);
+            };
+    auto searchForMatch = [&matchClient](auto const & container)
+            {
+                return std::find_if(container.cbegin(), container.cend(), matchClient) != container.cend();
+            };
+
+    if (searchForMatch(data->mBannedUAClients))
+        if (!searchForMatch(data->mAllowedUAClients))
             return true;
-        }
-    }
+
     return false;
 }
 
@@ -1020,13 +1094,13 @@ bool GlobalConfig::SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* 
         }
         return false;
     }
-    maxMerkleTreeDiskSpace = setMaxDiskSpace;
+    data->maxMerkleTreeDiskSpace = setMaxDiskSpace;
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxMerkleTreeDiskSpace() const
 {
-    return maxMerkleTreeDiskSpace;
+    return data->maxMerkleTreeDiskSpace;
 }
 
 bool GlobalConfig::SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err)
@@ -1035,13 +1109,13 @@ bool GlobalConfig::SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std
     {
         return false;
     }
-    preferredMerkleTreeFileSize = static_cast<uint64_t>(preferredFileSize);
+    data->preferredMerkleTreeFileSize = static_cast<uint64_t>(preferredFileSize);
     return true;
 }
 
 uint64_t GlobalConfig::GetPreferredMerkleTreeFileSize() const
 {
-    return preferredMerkleTreeFileSize;
+    return data->preferredMerkleTreeFileSize;
 }
 
 bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
@@ -1056,13 +1130,13 @@ bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
         }
         return false;
     }
-    invalidTxSinks.insert(sink);
+    data->invalidTxSinks.insert(sink);
     return true;
 }
 
 std::set<std::string> GlobalConfig::GetInvalidTxSinks() const
 {
-    return invalidTxSinks;
+    return data->invalidTxSinks;
 }
 
 std::set<std::string> GlobalConfig::GetAvailableInvalidTxSinks() const
@@ -1081,25 +1155,25 @@ bool GlobalConfig::SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* er
         return false;
     }
 
-    invalidTxFileSinkSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
+    data->invalidTxFileSinkSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
     return true;
 }
 
 int64_t GlobalConfig::GetInvalidTxFileSinkMaxDiskUsage() const
 {
-    return invalidTxFileSinkSize;
+    return data->invalidTxFileSinkSize;
 }
 
 bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err)
 {
     if(policy == "IGNORE_NEW")
     {
-        invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::IGNORE_NEW;
+        data->invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::IGNORE_NEW;
         return true;
     }
     else if (policy == "DELETE_OLD")
     {
-        invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::DELETE_OLD;
+        data->invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::DELETE_OLD;
         return true;
     }
 
@@ -1113,7 +1187,7 @@ bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::s
 
 InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
 {
-    return invalidTxFileSinkEvictionPolicy;
+    return data->invalidTxFileSinkEvictionPolicy;
 }
 
 // Safe mode activation
@@ -1137,9 +1211,9 @@ bool GlobalConfig::SetSafeModeWebhookURL(const std::string& url, std::string* er
             return false;
         }
 
-        safeModeWebhookAddress = host;
-        safeModeWebhookPort = port;
-        safeModeWebhookPath = endpoint;
+        data->safeModeWebhookAddress = host;
+        data->safeModeWebhookPort = port;
+        data->safeModeWebhookPath = endpoint;
     }
     catch(const std::exception&)
     {
@@ -1154,15 +1228,15 @@ bool GlobalConfig::SetSafeModeWebhookURL(const std::string& url, std::string* er
 }
 std::string GlobalConfig::GetSafeModeWebhookAddress() const
 {
-    return safeModeWebhookAddress;
+    return data->safeModeWebhookAddress;
 }
 int16_t GlobalConfig::GetSafeModeWebhookPort() const
 {
-    return safeModeWebhookPort;
+    return data->safeModeWebhookPort;
 }
 std::string GlobalConfig::GetSafeModeWebhookPath() const
 {
-    return safeModeWebhookPath;
+    return data->safeModeWebhookPath;
 }
 
 // Block download
@@ -1177,12 +1251,12 @@ bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* er
         return false;
     }
 
-    blockStallingMinDownloadSpeed = min;
+    data->blockStallingMinDownloadSpeed = min;
     return true;
 }
 uint64_t GlobalConfig::GetBlockStallingMinDownloadSpeed() const
 {
-    return blockStallingMinDownloadSpeed;
+    return data->blockStallingMinDownloadSpeed;
 }
 
 bool GlobalConfig::SetBlockStallingTimeout(int64_t timeout, std::string* err)
@@ -1196,12 +1270,12 @@ bool GlobalConfig::SetBlockStallingTimeout(int64_t timeout, std::string* err)
         return false;
     }
 
-    blockStallingTimeout = timeout;
+    data->blockStallingTimeout = timeout;
     return true;
 }
 int64_t GlobalConfig::GetBlockStallingTimeout() const
 {
-    return blockStallingTimeout;
+    return data->blockStallingTimeout;
 }
 
 bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
@@ -1215,12 +1289,12 @@ bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
         return false;
     }
 
-    blockDownloadWindow = window;
+    data->blockDownloadWindow = window;
     return true;
 }
 int64_t GlobalConfig::GetBlockDownloadWindow() const
 {
-    return blockDownloadWindow;
+    return data->blockDownloadWindow;
 }
 
 bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err)
@@ -1234,12 +1308,12 @@ bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string
         return false;
     }
 
-    blockDownloadSlowFetchTimeout = timeout;
+    data->blockDownloadSlowFetchTimeout = timeout;
     return true;
 }
 int64_t GlobalConfig::GetBlockDownloadSlowFetchTimeout() const
 {
-    return blockDownloadSlowFetchTimeout;
+    return data->blockDownloadSlowFetchTimeout;
 }
 
 bool GlobalConfig::SetBlockDownloadMaxParallelFetch(int64_t max, std::string* err)
@@ -1253,12 +1327,66 @@ bool GlobalConfig::SetBlockDownloadMaxParallelFetch(int64_t max, std::string* er
         return false;
     }
 
-    blockDownloadMaxParallelFetch = max;
+    data->blockDownloadMaxParallelFetch = max;
     return true;
 }
 uint64_t GlobalConfig::GetBlockDownloadMaxParallelFetch() const
 {
-    return blockDownloadMaxParallelFetch;
+    return data->blockDownloadMaxParallelFetch;
+}
+
+bool GlobalConfig::SetBlockDownloadTimeoutBase(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download timeout base (as percentage of the block interval) must be greater than 0.";
+        }
+        return false;
+    }
+    data->blockDownloadTimeoutBase = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadTimeoutBase() const
+{
+    return data->blockDownloadTimeoutBase;
+}
+
+bool GlobalConfig::SetBlockDownloadTimeoutBaseIBD(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download timeout base during the initial block download (as percentage of the block interval) must be greater than 0.";
+        }
+        return false;
+    }
+    data->blockDownloadTimeoutBaseIBD = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadTimeoutBaseIBD() const
+{
+    return data->blockDownloadTimeoutBaseIBD;
+}
+
+bool GlobalConfig::SetBlockDownloadTimeoutPerPeer(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Block download timeout per peer (as percentage of the block interval) must be greater than 0.";
+        }
+        return false;
+    }
+    data->blockDownloadTimeoutPerPeer = timeout;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadTimeoutPerPeer() const
+{
+    return data->blockDownloadTimeoutPerPeer;
 }
 
 // P2P Parameters
@@ -1273,23 +1401,23 @@ bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
         return false;
     }
 
-    p2pHandshakeTimeout = timeout;
+    data->p2pHandshakeTimeout = timeout;
     return true;
 }
 
 bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
 {
-    streamSendRateLimit = limit;
+    data->streamSendRateLimit = limit;
     return true;
 }
 int64_t GlobalConfig::GetStreamSendRateLimit() const
 {
-    return streamSendRateLimit;
+    return data->streamSendRateLimit;
 }
 
 bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
 {
-    auto maxThreshold { std::numeric_limits<decltype(banScoreThreshold)>::max() };
+    auto maxThreshold { std::numeric_limits<decltype(data->banScoreThreshold)>::max() };
     if(threshold <= 0 || threshold > maxThreshold)
     {
         if(err)
@@ -1299,12 +1427,12 @@ bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
         return false;
     }
 
-    banScoreThreshold = static_cast<decltype(banScoreThreshold)>(threshold);
+    data->banScoreThreshold = static_cast<decltype(data->banScoreThreshold)>(threshold);
     return true;
 }
 unsigned int GlobalConfig::GetBanScoreThreshold() const
 {
-    return banScoreThreshold;
+    return data->banScoreThreshold;
 }
 
 // RPC parameters
@@ -1320,12 +1448,12 @@ bool GlobalConfig::SetWebhookClientNumThreads(int64_t num, std::string* err)
         return false;
     }
 
-    webhookClientNumThreads = static_cast<uint64_t>(num);
+    data->webhookClientNumThreads = static_cast<uint64_t>(num);
     return true;
 }
 uint64_t GlobalConfig::GetWebhookClientNumThreads() const
 {
-    return webhookClientNumThreads;
+    return data->webhookClientNumThreads;
 }
 
 // Double-Spend Parameters
@@ -1341,12 +1469,12 @@ bool GlobalConfig::SetDoubleSpendNotificationLevel(int level, std::string* err)
         return false;
     }
 
-    dsNotificationLevel = static_cast<DSAttemptHandler::NotificationLevel>(level);
+    data->dsNotificationLevel = static_cast<DSAttemptHandler::NotificationLevel>(level);
     return true;
 }
 DSAttemptHandler::NotificationLevel GlobalConfig::GetDoubleSpendNotificationLevel() const
 {
-    return dsNotificationLevel;
+    return data->dsNotificationLevel;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err)
@@ -1360,12 +1488,12 @@ bool GlobalConfig::SetDoubleSpendEndpointFastTimeout(int timeout, std::string* e
         return false;
     }
 
-    dsEndpointFastTimeout = timeout;
+    data->dsEndpointFastTimeout = timeout;
     return true;
 }
 int GlobalConfig::GetDoubleSpendEndpointFastTimeout() const
 {
-    return dsEndpointFastTimeout;
+    return data->dsEndpointFastTimeout;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err)
@@ -1379,12 +1507,12 @@ bool GlobalConfig::SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* e
         return false;
     }
 
-    dsEndpointSlowTimeout = timeout;
+    data->dsEndpointSlowTimeout = timeout;
     return true;
 }
 int GlobalConfig::GetDoubleSpendEndpointSlowTimeout() const
 {
-    return dsEndpointSlowTimeout;
+    return data->dsEndpointSlowTimeout;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err)
@@ -1398,12 +1526,12 @@ bool GlobalConfig::SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::stri
         return false;
     }
 
-    dsEndpointSlowRatePerHour = static_cast<uint64_t>(rate);
+    data->dsEndpointSlowRatePerHour = static_cast<uint64_t>(rate);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendEndpointSlowRatePerHour() const
 {
-    return dsEndpointSlowRatePerHour;
+    return data->dsEndpointSlowRatePerHour;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointPort(int port, std::string* err)
@@ -1417,12 +1545,12 @@ bool GlobalConfig::SetDoubleSpendEndpointPort(int port, std::string* err)
         return false;
     }
 
-    dsEndpointPort = port;
+    data->dsEndpointPort = port;
     return true;
 }
 int GlobalConfig::GetDoubleSpendEndpointPort() const
 {
-    return dsEndpointPort;
+    return data->dsEndpointPort;
 }
 
 bool GlobalConfig::SetDoubleSpendTxnRemember(int64_t size, std::string* err)
@@ -1436,12 +1564,12 @@ bool GlobalConfig::SetDoubleSpendTxnRemember(int64_t size, std::string* err)
         return false;
     }
 
-    dsAttemptTxnRemember = static_cast<uint64_t>(size);
+    data->dsAttemptTxnRemember = static_cast<uint64_t>(size);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendTxnRemember() const
 {
-    return dsAttemptTxnRemember;
+    return data->dsAttemptTxnRemember;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err)
@@ -1455,12 +1583,12 @@ bool GlobalConfig::SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string
         return false;
     }
 
-    dsEndpointBlacklistSize = static_cast<uint64_t>(size);
+    data->dsEndpointBlacklistSize = static_cast<uint64_t>(size);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendEndpointBlacklistSize() const
 {
-    return dsEndpointBlacklistSize;
+    return data->dsEndpointBlacklistSize;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err)
@@ -1471,14 +1599,14 @@ bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::
     for(auto& ip : ips)
     {
         boost::algorithm::trim(ip);
-        dsEndpointSkipList.insert(ip);
+        data->dsEndpointSkipList.insert(ip);
     }
 
     return true;
 }
 std::set<std::string> GlobalConfig::GetDoubleSpendEndpointSkipList() const
 {
-    return dsEndpointSkipList;
+    return data->dsEndpointSkipList;
 }
 
 bool GlobalConfig::SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err)
@@ -1492,12 +1620,12 @@ bool GlobalConfig::SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err)
         return false;
     }
 
-    dsEndpointMaxCount = static_cast<uint64_t>(max);
+    data->dsEndpointMaxCount = static_cast<uint64_t>(max);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendEndpointMaxCount() const
 {
-    return dsEndpointMaxCount;
+    return data->dsEndpointMaxCount;
 }
 
 bool GlobalConfig::SetDoubleSpendNumFastThreads(int64_t num, std::string* err)
@@ -1512,12 +1640,12 @@ bool GlobalConfig::SetDoubleSpendNumFastThreads(int64_t num, std::string* err)
         return false;
     }
 
-    dsAttemptNumFastThreads = static_cast<uint64_t>(num);
+    data->dsAttemptNumFastThreads = static_cast<uint64_t>(num);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendNumFastThreads() const
 {
-    return dsAttemptNumFastThreads;
+    return data->dsAttemptNumFastThreads;
 }
 
 bool GlobalConfig::SetDoubleSpendNumSlowThreads(int64_t num, std::string* err)
@@ -1532,12 +1660,12 @@ bool GlobalConfig::SetDoubleSpendNumSlowThreads(int64_t num, std::string* err)
         return false;
     }
 
-    dsAttemptNumSlowThreads = static_cast<uint64_t>(num);
+    data->dsAttemptNumSlowThreads = static_cast<uint64_t>(num);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendNumSlowThreads() const
 {
-    return dsAttemptNumSlowThreads;
+    return data->dsAttemptNumSlowThreads;
 }
 
 bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
@@ -1551,17 +1679,17 @@ bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
         return false;
     }
 
-    dsAttemptQueueMaxMemory = static_cast<uint64_t>(max);
+    data->dsAttemptQueueMaxMemory = static_cast<uint64_t>(max);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendQueueMaxMemory() const
 {
-    return dsAttemptQueueMaxMemory;
+    return data->dsAttemptQueueMaxMemory;
 }
 
 int64_t GlobalConfig::GetSafeModeMaxForkDistance() const
 {
-    return safeModeMaxForkDistance;
+    return data->safeModeMaxForkDistance;
 }
 
 bool GlobalConfig::SetSafeModeMaxForkDistance(int64_t distance, std::string* err)
@@ -1575,13 +1703,13 @@ bool GlobalConfig::SetSafeModeMaxForkDistance(int64_t distance, std::string* err
         return false;
     }
 
-    safeModeMaxForkDistance = distance;
+    data->safeModeMaxForkDistance = distance;
     return true;
 }
 
 int64_t GlobalConfig::GetSafeModeMinForkLength() const
 {
-    return safeModeMinForkLength;
+    return data->safeModeMinForkLength;
 }
 
 bool GlobalConfig::SetSafeModeMinForkLength(int64_t length, std::string* err)
@@ -1595,18 +1723,18 @@ bool GlobalConfig::SetSafeModeMinForkLength(int64_t length, std::string* err)
         return false;
     }
 
-    safeModeMinForkLength = length;
+    data->safeModeMinForkLength = length;
     return true;
 }
 
 int64_t GlobalConfig::GetSafeModeMinForkHeightDifference() const
 {
-    return safeModeMinHeightDifference;
+    return data->safeModeMinHeightDifference;
 }
 
 bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err)
 {
-    safeModeMinHeightDifference = heightDifference;
+    data->safeModeMinHeightDifference = heightDifference;
     return true;
 }
 
@@ -1630,9 +1758,9 @@ bool GlobalConfig::SetDoubleSpendDetectedWebhookURL(const std::string& url, std:
             return false;
         }
 
-        dsDetectedWebhookAddress = host;
-        dsDetectedWebhookPort = port;
-        dsDetectedWebhookPath = endpoint;
+        data->dsDetectedWebhookAddress = host;
+        data->dsDetectedWebhookPort = port;
+        data->dsDetectedWebhookPath = endpoint;
     }
     catch(const std::exception&)
     {
@@ -1642,20 +1770,19 @@ bool GlobalConfig::SetDoubleSpendDetectedWebhookURL(const std::string& url, std:
         }
         return false;
     }
-
     return true;
 }
 std::string GlobalConfig::GetDoubleSpendDetectedWebhookAddress() const
 {
-    return dsDetectedWebhookAddress;
+    return data->dsDetectedWebhookAddress;
 }
 int16_t GlobalConfig::GetDoubleSpendDetectedWebhookPort() const
 {
-    return dsDetectedWebhookPort;
+    return data->dsDetectedWebhookPort;
 }
 std::string GlobalConfig::GetDoubleSpendDetectedWebhookPath() const
 {
-    return dsDetectedWebhookPath;
+    return data->dsDetectedWebhookPath;
 }
 
 bool GlobalConfig::SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err)
@@ -1669,12 +1796,12 @@ bool GlobalConfig::SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::str
         return false;
     }
 
-    dsDetectedWebhookMaxTxnSize = static_cast<uint64_t>(max);
+    data->dsDetectedWebhookMaxTxnSize = static_cast<uint64_t>(max);
     return true;
 }
 uint64_t GlobalConfig::GetDoubleSpendDetectedWebhookMaxTxnSize() const
 {
-    return dsDetectedWebhookMaxTxnSize;
+    return data->dsDetectedWebhookMaxTxnSize;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
@@ -1687,13 +1814,13 @@ bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
             return false;
         }
     }
-    mDisableBIP30Checks = disable;
+    data->mDisableBIP30Checks = disable;
     return true;
 }
 
 bool GlobalConfig::GetDisableBIP30Checks() const
 {
-    return mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
+    return data->mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
 }
 
 #if ENABLE_ZMQ
@@ -1704,13 +1831,13 @@ bool GlobalConfig::SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err)
         return false;
     }
 
-    invalidTxZMQMaxMessageSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
+    data->invalidTxZMQMaxMessageSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
     return true;
 }
 
 int64_t GlobalConfig::GetInvalidTxZMQMaxMessageSize() const
 {
-    return invalidTxZMQMaxMessageSize;
+    return data->invalidTxZMQMaxMessageSize;
 }
 #endif
 
@@ -1721,13 +1848,13 @@ bool GlobalConfig::SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, s
         return false;
     }
 
-    maxMerkleTreeMemoryCacheSize = static_cast<uint64_t>(maxMemoryCacheSize);
+    data->maxMerkleTreeMemoryCacheSize = static_cast<uint64_t>(maxMemoryCacheSize);
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxMerkleTreeMemoryCacheSize() const
 {
-    return maxMerkleTreeMemoryCacheSize;
+    return data->maxMerkleTreeMemoryCacheSize;
 }
 
 bool GlobalConfig::SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err)
@@ -1751,11 +1878,11 @@ bool GlobalConfig::SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* 
         return false;
     }
 
-    maxProtocolRecvPayloadLength = value;
+    data->maxProtocolRecvPayloadLength = value;
 
     // Since value is between LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH and ONE_GIGABYTE and MAX_PROTOCOL_SEND_PAYLOAD_FACTOR is set to 4
     // this cannot overflow unsigned int
-    maxProtocolSendPayloadLength = static_cast<unsigned int>(value * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR);
+    data->maxProtocolSendPayloadLength = static_cast<unsigned int>(value * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR);
     
     return true;
 }
@@ -1771,23 +1898,23 @@ bool GlobalConfig::SetRecvInvQueueFactor(uint64_t value, std::string* err)
         }
         return false;
     }
-    recvInvQueueFactor = value;
+    data->recvInvQueueFactor = value;
     return true;
 }
 
 unsigned int GlobalConfig::GetMaxProtocolRecvPayloadLength() const
 {
-  return maxProtocolRecvPayloadLength;
+  return data->maxProtocolRecvPayloadLength;
 }
 
 unsigned int GlobalConfig::GetMaxProtocolSendPayloadLength() const
 {
-  return maxProtocolSendPayloadLength;
+  return data->maxProtocolSendPayloadLength;
 }
 
 unsigned int GlobalConfig::GetRecvInvQueueFactor() const
 {
-  return recvInvQueueFactor;
+  return data->recvInvQueueFactor;
 }
 
 DummyConfig::DummyConfig()
@@ -1823,12 +1950,32 @@ int DummyConfig::GetPerBlockScriptValidationMaxBatchSize() const
 void DummyConfig::Reset() {}
 
 void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
-    feePerKB = fee;
+    data->feePerKB = fee;
 }
 
 CFeeRate GlobalConfig::GetMinFeePerKB() const {
-    return feePerKB;
+    return data->feePerKB;
 }
+
+bool GlobalConfig::SetDustRelayFee(Amount n, std::string* err)
+{
+    if(n == Amount(0))
+    {
+        if(err)
+        {
+            *err = "DustRelayFee amount should be larger than 0";
+        }
+        return false;
+    }
+
+    data->dustRelayFee = CFeeRate(n);
+    return true;
+};
+
+CFeeRate GlobalConfig::GetDustRelayFee() const 
+{
+    return data->dustRelayFee;
+};
 
 bool GlobalConfig::SetDustLimitFactor(int64_t factor, std::string* err) {
     if (factor < 0 || factor > DEFAULT_DUST_LIMIT_FACTOR)
@@ -1839,20 +1986,20 @@ bool GlobalConfig::SetDustLimitFactor(int64_t factor, std::string* err) {
         }
         return false;
     }
-    dustLimitFactor = factor;
+    data->dustLimitFactor = factor;
     return true;
 }
 
 int64_t GlobalConfig::GetDustLimitFactor() const {
-    return dustLimitFactor;
+    return data->dustLimitFactor;
 }
 
 void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {
-    blockMinFeePerKB = fee;
+    data->blockMinFeePerKB = fee;
 }
 
 CFeeRate GlobalConfig::GetBlockMinFeePerKB() const {
-    return blockMinFeePerKB;
+    return data->blockMinFeePerKB;
 }
 
 bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
@@ -1872,11 +2019,11 @@ bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::st
     }
     if (maxTxSigOpsCountInUnsigned == 0)
     {
-        maxTxSigOpsCountPolicy = MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
+        data->maxTxSigOpsCountPolicy = MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
     }
     else
     {
-        maxTxSigOpsCountPolicy = maxTxSigOpsCountInUnsigned;
+        data->maxTxSigOpsCountPolicy = maxTxSigOpsCountInUnsigned;
     }
     return true;
 }
@@ -1893,7 +2040,7 @@ uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const
         return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
     }
 
-    return maxTxSigOpsCountPolicy;
+    return data->maxTxSigOpsCountPolicy;
 }
 
 bool GlobalConfig::SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err) {
@@ -1911,11 +2058,11 @@ bool GlobalConfig::SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::st
         return false;
     }
     else if (maxScriptSizePolicyInUnsigned == 0 ) {
-        maxScriptSizePolicy = MAX_SCRIPT_SIZE_AFTER_GENESIS;
+        data->maxScriptSizePolicy = MAX_SCRIPT_SIZE_AFTER_GENESIS;
     }
     else
     {
-        maxScriptSizePolicy = maxScriptSizePolicyInUnsigned;
+        data->maxScriptSizePolicy = maxScriptSizePolicyInUnsigned;
     }
     return true;
 }
@@ -1929,7 +2076,7 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
     {
         return MAX_SCRIPT_SIZE_AFTER_GENESIS;
     }
-    return maxScriptSizePolicy;
+    return data->maxScriptSizePolicy;
 }
 
 bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
@@ -1946,13 +2093,13 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
         return false;
     }
 
-    mMaxMempool = static_cast<uint64_t>(maxMempool);
+    data->mMaxMempool = static_cast<uint64_t>(maxMempool);
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxMempool() const {
-    return mMaxMempool;
+    return data->mMaxMempool;
 }
 
 bool GlobalConfig::SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) {
@@ -1961,13 +2108,13 @@ bool GlobalConfig::SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string
         return false;
     }
 
-    mMaxMempoolSizeDisk = static_cast<uint64_t>(maxMempoolSizeDisk);
+    data->mMaxMempoolSizeDisk = static_cast<uint64_t>(maxMempoolSizeDisk);
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxMempoolSizeDisk() const {
-    return mMaxMempoolSizeDisk;
+    return data->mMaxMempoolSizeDisk;
 }
 
 bool GlobalConfig::SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) {
@@ -1985,13 +2132,13 @@ bool GlobalConfig::SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::
         return false;
     }
 
-    mMempoolMaxPercentCPFP = static_cast<uint64_t>(mempoolMaxPercentCPFP);
+    data->mMempoolMaxPercentCPFP = static_cast<uint64_t>(mempoolMaxPercentCPFP);
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMempoolMaxPercentCPFP() const {
-    return mMempoolMaxPercentCPFP;
+    return data->mMempoolMaxPercentCPFP;
 }
 
 bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
@@ -2000,13 +2147,13 @@ bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
         return false;
     }
 
-    mMemPoolExpiry = static_cast<uint64_t>(memPoolExpiry);
+    data->mMemPoolExpiry = static_cast<uint64_t>(memPoolExpiry);
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMemPoolExpiry() const {
-    return mMemPoolExpiry;
+    return data->mMemPoolExpiry;
 }
 
 bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) {
@@ -2015,13 +2162,13 @@ bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err)
         return false;
     }
 
-    mMaxOrphanTxSize = static_cast<uint64_t>(maxOrphanTxSize);
+    data->mMaxOrphanTxSize = static_cast<uint64_t>(maxOrphanTxSize);
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
-    return mMaxOrphanTxSize;
+    return data->mMaxOrphanTxSize;
 }
 
 
@@ -2035,12 +2182,12 @@ bool GlobalConfig::SetMaxOrphansInBatchPercentage(uint64_t percent, std::string*
         return false;
     }
 
-    mMaxPercentageOfOrphansInMaxBatchSize = percent;
+    data->mMaxPercentageOfOrphansInMaxBatchSize = percent;
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxOrphansInBatchPercentage() const {
-    return mMaxPercentageOfOrphansInMaxBatchSize;
+    return data->mMaxPercentageOfOrphansInMaxBatchSize;
 }
 
 bool GlobalConfig::SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) {
@@ -2049,12 +2196,12 @@ bool GlobalConfig::SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::str
         return false;
     }
 
-    mMaxInputsForSecondLayerOrphan = maxInputs;
+    data->mMaxInputsForSecondLayerOrphan = maxInputs;
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxInputsForSecondLayerOrphan() const {
-    return mMaxInputsForSecondLayerOrphan;
+    return data->mMaxInputsForSecondLayerOrphan;
 }
 
 bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
@@ -2063,12 +2210,12 @@ bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
         return false;
     }
 
-    mStopAtHeight = stopAtHeight;
+    data->mStopAtHeight = stopAtHeight;
     return true;
 }
 
 int32_t GlobalConfig::GetStopAtHeight() const {
-    return mStopAtHeight;
+    return data->mStopAtHeight;
 }
 
 bool GlobalConfig::SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) {
@@ -2076,17 +2223,17 @@ bool GlobalConfig::SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, s
     {
         return false;
     }
-    mPromiscuousMempoolFlags = static_cast<uint64_t>(promiscuousMempoolFlags);
-    mIsSetPromiscuousMempoolFlags = true;
+    data->mPromiscuousMempoolFlags = static_cast<uint64_t>(promiscuousMempoolFlags);
+    data->mIsSetPromiscuousMempoolFlags = true;
 
     return true;
 }
 
 uint64_t GlobalConfig::GetPromiscuousMempoolFlags() const {
-    return mPromiscuousMempoolFlags;
+    return data->mPromiscuousMempoolFlags;
 }
 bool GlobalConfig::IsSetPromiscuousMempoolFlags() const {
-    return mIsSetPromiscuousMempoolFlags;
+    return data->mIsSetPromiscuousMempoolFlags;
 }
 
 bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err )
@@ -2096,7 +2243,7 @@ bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::s
         return false;
     }
 
-    mSoftConsensusFreezeDuration =
+    data->mSoftConsensusFreezeDuration =
         duration ? duration : std::numeric_limits<std::int32_t>::max();
 
     return true;
@@ -2104,5 +2251,15 @@ bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::s
 
 std::int32_t GlobalConfig::GetSoftConsensusFreezeDuration() const
 {
-    return mSoftConsensusFreezeDuration;
+    return data->mSoftConsensusFreezeDuration;
+}
+
+std::shared_ptr<GlobalConfig::GlobalConfigData> GlobalConfig::getGlobalConfigData() const
+{
+    return data;
+}
+
+GlobalConfig::GlobalConfig(std::shared_ptr<GlobalConfigData> dataIn)
+  : data{dataIn}
+{
 }

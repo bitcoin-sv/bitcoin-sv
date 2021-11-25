@@ -78,9 +78,6 @@ BlockDownloadTracker blockDownloadTracker {};
 /** Number of preferable block download peers. */
 std::atomic<int> nPreferredDownload = 0;
 
-/** Number of peers from which we're downloading blocks. */
-std::atomic<int> nPeersWithValidatedDownloads = 0;
-
 /** Relay map, protected by cs_main. */
 typedef std::map<uint256, CTransactionRef> MapRelay;
 MapRelay mapRelay;
@@ -1002,7 +999,7 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
 
 static bool rejectIfMaxDownloadExceeded(uint64_t maxSendQueuesBytes, CSerializedNetMsg &msg, bool isMostRecentBlock, const CNodePtr& pfrom, CConnman &connman) {
 
-    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::HEADER_SIZE;
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
     if (totalSize > maxSendQueuesBytes) {
 
         if (!isMostRecentBlock) {
@@ -1350,10 +1347,14 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     // a MEMPOOL request.
                     if (!txinfo.IsNull() &&
                         txinfo.nTime <= pfrom->timeLastMempoolReq) {
-                        connman.PushMessage(pfrom,
-                                            msgMaker.Make(NetMsgType::TX,
-                                                          *txinfo.GetTx()));
-                        push = true;
+
+                        if(const auto& pTx{txinfo.GetTx()}; pTx)
+                        {
+                            connman.PushMessage(pfrom,
+                                                msgMaker.Make(NetMsgType::TX,
+                                                              *pTx));
+                            push = true;
+                        }
                     }
                 }
                 if (!push) {
@@ -1417,7 +1418,7 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
             std::string strMsg;
             uint8_t ccode;
             std::string strReason;
-            vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >>
+            vRecv >> LIMITED_STRING(strMsg, CMessageFields::COMMAND_SIZE) >>
                 ccode >>
                 LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
 
@@ -1620,7 +1621,12 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
 
     try {
         vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
+
+        // Set protocol version
         nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
+        pfrom->SetSendVersion(nSendVersion);
+        pfrom->nVersion = nVersion;
+
         nServices = ServiceFlags(nServiceInt);
         if(!pfrom->fInbound) {
             connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
@@ -1757,10 +1763,6 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
         // Set to true after we get the first filter* message
         pfrom->fRelayTxes = fRelay;
     }
-
-    // Change version
-    pfrom->SetSendVersion(nSendVersion);
-    pfrom->nVersion = nVersion;
 
     // Potentially mark this peer as a preferred download peer.
     UpdatePreferredDownload(pfrom);
@@ -3867,19 +3869,20 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     CNetMessage& msg { *nextMsg };
     msg.SetVersion(pfrom->GetRecvVersion());
 
+    const CMessageHeader& hdr = msg.GetHeader();
     std::optional<CLogP2PStallDuration> durationLog;
     using namespace std::literals::chrono_literals;
     if(debugP2PTheadStallsThreshold > 0ms)
     {
-        durationLog = { msg.hdr.GetCommand(), debugP2PTheadStallsThreshold };
+        durationLog = { hdr.GetCommand(), debugP2PTheadStallsThreshold };
     }
 
     // Scan for message start
-    if (memcmp(msg.hdr.pchMessageStart.data(),
+    if (memcmp(hdr.GetMsgStart().data(),
                chainparams.NetMagic().data(),
-               CMessageHeader::MESSAGE_START_SIZE) != 0) {
+               CMessageFields::MESSAGE_START_SIZE) != 0) {
         LogPrint(BCLog::NETMSG, "PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n",
-                  SanitizeString(msg.hdr.GetCommand()), pfrom->id);
+                  SanitizeString(hdr.GetCommand()), pfrom->id);
 
         // Make sure we ban where that come from for some time.
         connman.Ban(pfrom->GetAssociation().GetPeerAddr(), BanReasonNodeMisbehaving);
@@ -3889,7 +3892,6 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Read header
-    CMessageHeader &hdr = msg.hdr;
     if (!hdr.IsValid(config)) {
         LogPrint(BCLog::NETMSG, "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n",
                   SanitizeString(hdr.GetCommand()), pfrom->id);
@@ -3898,51 +3900,51 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     std::string strCommand = hdr.GetCommand();
 
     // Message size
-    unsigned int nPayloadLength = hdr.nPayloadLength;
+    uint64_t nPayloadLength = hdr.GetPayloadLength();
 
-    // Checksum
-    CDataStream &vRecv = msg.vRecv;
-    const uint256 &hash = msg.GetMessageHash();
-    if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=0) {
-        LogPrint(BCLog::NETMSG,
-            "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
-            SanitizeString(strCommand), nPayloadLength,
-            HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
-            HexStr(hdr.pchChecksum,
-                   hdr.pchChecksum + CMessageHeader::CHECKSUM_SIZE));
-        {
-            // Try to obtain an access to the node's state data.
-            const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
-            const CNodeStatePtr& state { stateRef.get() };
-            if (state){
-                auto curTime = std::chrono::system_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
-                unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
-                std::chrono::milliseconds checksumInterval(interval); 
-                if (duration < std::chrono::milliseconds(checksumInterval).count()){
-                    ++ state->dInvalidChecksumFrequency;
+    // Checksum (skipped for extended messages)
+    if(! hdr.IsExtended()) {
+        const uint256 &hash = msg.GetMessageHash();
+        if (memcmp(hash.begin(), hdr.GetChecksum().data(), CMessageFields::CHECKSUM_SIZE) !=0) {
+            LogPrint(BCLog::NETMSG,
+                "%s(%s, %lu bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
+                SanitizeString(strCommand), nPayloadLength,
+                HexStr(hash.begin(), hash.begin() + CMessageFields::CHECKSUM_SIZE),
+                HexStr(hdr.GetChecksum()));
+            {
+                // Try to obtain an access to the node's state data.
+                const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+                const CNodeStatePtr& state { stateRef.get() };
+                if (state){
+                    auto curTime = std::chrono::system_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
+                    unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+                    std::chrono::milliseconds checksumInterval(interval); 
+                    if (duration < std::chrono::milliseconds(checksumInterval).count()){
+                        ++ state->dInvalidChecksumFrequency;
+                    }
+                    else { 
+                        // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
+                        state->dInvalidChecksumFrequency = 0;
+                    }
+                    unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+                    if (state->dInvalidChecksumFrequency > checkSumFreq){
+                        // MisbehavingNode if the count goes above some chosen value 
+                        // 100 conseqitive invalid checksums received with less than 500ms between them
+                        Misbehaving(pfrom, 1, "Invalid Checksum activity");
+                        LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
+                    }
+                    state->nTimeOfLastInvalidChecksumHeader = curTime;
                 }
-                else { 
-                    // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
-                    state->dInvalidChecksumFrequency = 0;
-                }
-                unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-                if (state->dInvalidChecksumFrequency > checkSumFreq){
-                    // MisbehavingNode if the count goes above some chosen value 
-                    // 100 conseqitive invalid checksums received with less than 500ms between them
-                    Misbehaving(pfrom, 1, "Invalid Checksum activity");
-                    LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
-                }
-                state->nTimeOfLastInvalidChecksumHeader = curTime;
             }
+            return fMoreWork;
         }
-        return fMoreWork;
     }
 
     // Process message
     bool fRet = false;
     try {
-        fRet = ProcessMessage(config, pfrom, strCommand, vRecv, msg.nTime,
+        fRet = ProcessMessage(config, pfrom, strCommand, msg.GetData(), msg.GetTime(),
                               chainparams, connman, interruptMsgProc);
         if (interruptMsgProc) {
             return false;
@@ -3950,7 +3952,8 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         if (!pfrom->vRecvGetData.empty()) {
             fMoreWork = true;
         }
-    } catch (const std::ios_base::failure &e) {
+    }
+    catch (const std::ios_base::failure &e) {
         connman.PushMessage(pfrom,
                             CNetMsgMaker(INIT_PROTO_VERSION)
                             .Make(NetMsgType::REJECT, strCommand,
@@ -3959,29 +3962,31 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         if (strstr(e.what(), "end of data")) {
             // Allow exceptions from under-length message on vRecv
             LogPrint(BCLog::NETMSG,
-                     "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
+                     "%s(%s, %lu bytes): Exception '%s' caught, normally caused by a "
                      "message being shorter than its stated length\n",
                      __func__, SanitizeString(strCommand), nPayloadLength, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
-            LogPrint(BCLog::NETMSG, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
+            LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
-            LogPrint(BCLog::NETMSG, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
+            LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e) {
         PrintExceptionContinue(&e, "ProcessMessages()");
-    } catch (...) {
+    }
+    catch (...) {
         PrintExceptionContinue(nullptr, "ProcessMessages()");
     }
 
     if (!fRet) {
-        LogPrint(BCLog::NETMSG, "%s(%s, %u bytes) FAILED peer=%d\n", __func__,
+        LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes) FAILED peer=%d\n", __func__,
                   SanitizeString(strCommand), nPayloadLength, pfrom->id);
     }
 
@@ -4456,13 +4461,19 @@ bool DetectStalling(const Config& config, const CNodePtr& pto, const CNodeStateP
     if (state->vBlocksInFlight.size() > 0) {
         QueuedBlock &queuedBlock = state->vBlocksInFlight.front();
         int nOtherPeersWithValidatedDownloads =
-            nPeersWithValidatedDownloads -
-            (state->nBlocksInFlightValidHeaders > 0);
-        if (nNow > state->nDownloadingSince +
-                       consensusParams.nPowTargetSpacing *
-                           (BLOCK_DOWNLOAD_TIMEOUT_BASE +
-                            BLOCK_DOWNLOAD_TIMEOUT_PER_PEER *
-                                nOtherPeersWithValidatedDownloads)) {
+            blockDownloadTracker.GetPeersWithValidatedDownloadsCount() - 
+            ((state->nBlocksInFlightValidHeaders > 0) ? 1 : 0);
+        assert(nOtherPeersWithValidatedDownloads >= 0);
+
+        auto timeoutBase = IsInitialBlockDownload() 
+                                ? config.GetBlockDownloadTimeoutBaseIBD() 
+                                : config.GetBlockDownloadTimeoutBase();
+        auto timeoutPeers = config.GetBlockDownloadTimeoutPerPeer() * nOtherPeersWithValidatedDownloads;
+        // nPowTargetSpacing is in seconds, timeout is percentage, while maxDownloadTime should be in microseconds
+        // to get seconds we must multiply by 1000000 and divide by 100 which is equivalent to multipy by 10000
+        auto maxDownloadTime = consensusParams.nPowTargetSpacing * (timeoutBase + timeoutPeers) * 10000;
+
+        if (nNow > state->nDownloadingSince + maxDownloadTime) {
             LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n",
                       queuedBlock.hash.ToString(), pto->id);
             pto->fDisconnect = true;

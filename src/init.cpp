@@ -562,6 +562,21 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("Maximum number of parallel requests to different peers we will issue for "
                         "a block that has exceeded the slow fetch detection timeout (default: %u)"),
                         DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
+        strUsage += HelpMessageOpt("-blockdownloadtimeoutbasepercent=<n>",
+            strprintf(_("Block download timeout, expressed as percentage of the block interval which is %d minutes by default."
+                        " (default: %u%%)"),
+                        defaultChainParams->GetConsensus().nPowTargetSpacing / 60,
+                        DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE));
+        strUsage += HelpMessageOpt("-blockdownloadtimeoutbaseibdpercent=<n>",
+            strprintf(_("Block download timeout during the initial block download, expressed as percentage of the block interval which is %d minutes by default."
+                        " (default: %u%%)"),
+                        defaultChainParams->GetConsensus().nPowTargetSpacing / 60,
+                        DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD));
+        strUsage += HelpMessageOpt("-blockdownloadtimeoutperpeerpercent=<n>",
+            strprintf(_("Additional block download time per parallel downloading peer, expressed as percentage of the block interval which is %d minutes by default."
+                        " (default: %u%%)"),
+                        defaultChainParams->GetConsensus().nPowTargetSpacing / 60,
+                        DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER));
     }
 
     strUsage += HelpMessageOpt(
@@ -721,22 +736,41 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 #if ENABLE_ZMQ
     strUsage += HelpMessageGroup(_("ZeroMQ notification options:"));
     strUsage += HelpMessageOpt("-zmqpubhashblock=<address>",
-                               _("Enable publish hash block in <address>"));
+                               _("Enable publish hash block in <address>. "
+                               "For more information see doc/zmq.md."));
     strUsage +=
         HelpMessageOpt("-zmqpubhashtx=<address>",
-                       _("Enable publish hash transaction in <address>"));
+                       _("Enable publish hash transaction in <address>. "
+                       "For more information see doc/zmq.md."));
     strUsage += HelpMessageOpt("-zmqpubrawblock=<address>",
-                               _("Enable publish raw block in <address>"));
+                               _("Enable publish raw block in <address>. "
+                                 "For more information see doc/zmq.md."));
     strUsage +=
         HelpMessageOpt("-zmqpubrawtx=<address>",
-                       _("Enable publish raw transaction in <address>"));
+                       _("Enable publish raw transaction in <address>. "
+                       "For more information see doc/zmq.md."));
     strUsage +=
         HelpMessageOpt("-zmqpubinvalidtx=<address>",
-                       _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified."));
-    strUsage += HelpMessageOpt("-zmqpubdiscardedfrommempool=<address>",
-                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
+                       _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified. "
+                       "For more information see doc/zmq.md."));
+    strUsage += HelpMessageOpt("-zmqpubremovedfrommempool=<address>",
+                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>. "
+                               "For more information see doc/zmq.md."));
     strUsage += HelpMessageOpt("-zmqpubremovedfrommempoolblock=<address>",
-                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
+                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>. "
+                               "For more information see doc/zmq.md."));
+    strUsage += HelpMessageOpt("-zmqpubhashtx2=<address>",
+                       _("Enable publish hash transaction in <address>. "
+                       "For more information see doc/zmq.md."));
+    strUsage += HelpMessageOpt("-zmqpubrawtx2=<address>",
+                       _("Enable publish raw transaction in <address>. "
+                       "For more information see doc/zmq.md."));
+    strUsage += HelpMessageOpt("-zmqpubhashblock2=<address>",
+                               _("Enable publish hash block in <address>. "
+                               "For more information see doc/zmq.md."));
+    strUsage += HelpMessageOpt("-zmqpubrawblock2=<address>",
+                               _("Enable publish raw block in <address>. "
+                               "For more information see doc/zmq.md."));
 #endif
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
@@ -1059,6 +1093,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Ban clients whose User Agent contains specified string (case insensitive). "
                     "This option can be specified multiple times.")));
 
+    strUsage += HelpMessageOpt(
+        "-allowclientua=<ua>",
+        strprintf(_("Allow clients whose User Agent equals specified string (case insensitive). "
+                    "This option can be specified multiple times and has precedence over '-banclientua'.")));
+
     if (showDebug) {
         strUsage +=
             HelpMessageOpt("-blockversion=<n>",
@@ -1215,6 +1254,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-txnvalidationasynchrunfreq=<n>",
         strprintf("Set run frequency in asynchronous mode (default: %dms)",
             CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
+    // The message below assumes that default strategy is TOPO_SORT, therefore we assert here.
+    static_assert(DEFAULT_PTV_TASK_SCHEDULE_STRATEGY == PTVTaskScheduleStrategy::TOPO_SORT);
+    strUsage += HelpMessageOpt(
+            "-txnvalidationschedulestrategy=<strategy>",
+            "Set task scheduling strategy to use in parallel transaction validation."
+                      "Available strategies: CHAIN_DETECTOR (legacy), TOPO_SORT (default)");
     strUsage += HelpMessageOpt(
         "-maxtxnvalidatorasynctasksrunduration=<n>",
         strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
@@ -2231,6 +2276,15 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetBlockDownloadMaxParallelFetch(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetBlockDownloadTimeoutBase(gArgs.GetArg("-blockdownloadtimeoutbasepercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadTimeoutBaseIBD(gArgs.GetArg("-blockdownloadtimeoutbaseibdpercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockDownloadTimeoutPerPeer(gArgs.GetArg("-blockdownloadtimeoutperpeerpercent", DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER), &err)) {
+        return InitError(err);
+    }
 
     // P2P parameters
     if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
@@ -2345,6 +2399,15 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxTxnValidatorAsyncTasksRunDuration(
+        gArgs.GetArg(
+            "-maxtxnvalidatorasynctasksrunduration",
+            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
     if(std::string err; !config.SetMaxTxnChainValidationBudget(
         gArgs.GetArg(
             "-maxtxchainvalidationbudget",
@@ -2362,16 +2425,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 #endif
 
-    if (!(config.GetMaxStdTxnValidationDuration() < config.GetMaxNonStdTxnValidationDuration())) {
-        return InitError(
-            strprintf("maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration"));
+    if(std::string err; !config.CheckTxValidationDurations(err))
+    {
+        return InitError(err);
     }
 
-    if (!(gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration",
-            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()) >
-        config.GetMaxNonStdTxnValidationDuration().count())) {
-        return InitError(
-            strprintf("maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration"));
+    if (gArgs.IsArgSet("-txnvalidationschedulestrategy"))
+    {
+        static_assert(DEFAULT_PTV_TASK_SCHEDULE_STRATEGY == PTVTaskScheduleStrategy::TOPO_SORT);
+        auto strategy = gArgs.GetArg("-txnvalidationschedulestrategy", "TOPO_SORT");
+        if (std::string err; !config.SetPTVTaskScheduleStrategy(strategy, &err))
+        {
+            return InitError(err);
+        }
     }
 
     if(std::string err; !config.SetMaxCoinsViewCacheSize(
@@ -2523,10 +2589,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-dustrelayfee")) {
         Amount n(0);
         auto parsed = ParseMoney(gArgs.GetArg("-dustrelayfee", ""), n);
-        if (!parsed || Amount(0) == n)
+        if (!parsed || !config.SetDustRelayFee(n))
             return InitError(AmountErrMsg("dustrelayfee",
                                           gArgs.GetArg("-dustrelayfee", "")));
-        dustRelayFee = CFeeRate(n);
+    }
+    else
+    {
+        config.SetDustRelayFee(DUST_RELAY_TX_FEE);
     }
 
     fRequireStandard =
@@ -2545,8 +2614,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     fIsBareMultisigStd =
         gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
-    fAcceptDatacarrier =
-        gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
+    config.SetDataCarrier(gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER));
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(gArgs.GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
@@ -2608,7 +2676,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-invalidateblock"))
     {
         std::set<uint256> invalidBlocks;
-        for(auto invalidBlockHashStr : gArgs.GetArgs("-invalidateblock"))
+        for(const auto& invalidBlockHashStr : gArgs.GetArgs("-invalidateblock"))
         {
             uint256 hash = uint256S(invalidBlockHashStr);
             invalidBlocks.insert(hash);
@@ -2619,11 +2687,21 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (gArgs.IsArgSet("-banclientua"))
     {
         std::set<std::string> invalidUAClients;
-        for (auto invalidClient : gArgs.GetArgs("-banclientua"))
+        for (auto& invalidClient : gArgs.GetArgs("-banclientua"))
         {
-            invalidUAClients.insert(invalidClient);
+            invalidUAClients.insert(std::move(invalidClient));
         }
-        config.SetBanClientUA(invalidUAClients);
+        config.SetBanClientUA(std::move(invalidUAClients));
+    }
+
+    if (gArgs.IsArgSet("-allowclientua"))
+    {
+        std::set<std::string> validUAClients;
+        for (auto& validClient : gArgs.GetArgs("-allowclientua"))
+        {
+            validUAClients.insert(std::move(validClient));
+        }
+        config.SetAllowClientUA(std::move(validUAClients));
     }
 
     // Configure maximum disk space that can be taken by Merkle Tree data files.

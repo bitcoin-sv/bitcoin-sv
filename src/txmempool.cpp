@@ -1017,8 +1017,8 @@ void CTxMemPool::RemoveForReorg(
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     const CJournalChangeSetPtr& changeSet,
-    const uint256& blockhash)
-{
+    const uint256& blockhash,
+    std::vector<CTransactionRef>& txNew) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
@@ -1092,6 +1092,7 @@ void CTxMemPool::RemoveForBlock(
                     removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), conflict, MemPoolRemovalReason::CONFLICT);
                 }
             }
+            txNew.push_back(tx);
         }
     }
 
@@ -1587,7 +1588,7 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
     {
         CoinsDBView coinsView{ *pcoinsTip };
-        std::shared_lock lock{smtx};
+        std::lock_guard lock{smtx};
 
         auto resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
         // submit backed-up transactions
@@ -2215,7 +2216,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         //   - Transaction spending this TXO was added to mempool when mempool height was H or above.
         //   - Active chain was reorged back so that mempool height is now below H.
         // NOTE: To avoid re-checking whole mempool every time, we only do this if it is theoretically possible that mempool could
-        //       contain such as transaction. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
+        //       contain such transactions. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
         //       is below or at current mempool height, there is simply no such TXO and we can safely skip the expensive re-check.
         LogPrint(BCLog::MEMPOOL, "Removing any transactions that spend TXOs, which were previously not considered policy frozen, but now are because the mempool height has become lower.\n");
         RemoveFrozen(changeSet);

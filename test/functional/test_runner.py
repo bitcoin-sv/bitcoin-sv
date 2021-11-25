@@ -62,12 +62,14 @@ NON_SCRIPTS = [
 
 LARGE_BLOCK_TESTS = [
     # Tests for block files larger than 4GB. 
-    # This tests take really long time to execute so they are excluded by default. 
+    # This tests take really long time to execute or require a great deal of memory so they
+    # are excluded by default.
     # Use --large-block-tests command line parameter to run them.
     "bsv-genesis-large-blockfile-io.py",
     "bsv-genesis-large-blockfile-reindex.py",
     "bsv-genesis-large-blockfile-max-32-bit.py",
-    "bsv-large-blocks-txindex-data.py"
+    "bsv-large-blocks-txindex-data.py",
+    "bsv-4gb-plus-block.py"
 ]
 
 # This is a list of tests that should not run in parallel.
@@ -91,6 +93,20 @@ SOLO_TESTS = {
     "bsv-p2p-dsdetected.py",
     "bsv-safe-mode.py",
     "bsv-safe-mode-reorg-notification.py"
+}
+
+ENVIRONMENT_TYPE = {
+   1 : "Release build",
+   2 : "Release build with sanitizers enabled",
+   3 : "Debug build",
+   4 : "Debug build with sanitizers enabled"
+}
+
+# collection of timeout factors for time-sensitive tests:
+# test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
+# factor for release build is always 1; it is still present in this map for consistency
+TIMEOUT_FACTOR_FOR_TESTS = {
+    "bsv-4gb-plus-block.py" : [1,2,2,3]
 }
 
 # This tests can be only run by explicitly specifying them on command line. 
@@ -177,7 +193,13 @@ def main():
                                            "it will show bitcoind.log file of the specified node")
     parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
     parser.add_argument('--output-type', type=int, default=2, help="Output type: 2 - Automatic detection. 0 - Primitive output suited for CI. 1 - Advanced suited for console.")
-
+    parser.add_argument('--timeout-factors', type=str, default="1", help="Purpose of this flag is to adjust timeouts in specific tests as needed by test environment (e.g. debug builds need longer timeouts)."
+                                                                         " There are two possible inputs for this argument: You can choose environment type and default timeout factors will be set:"
+                                                                         " 1: Release build. (default) 2: Debug build. 3: Release build with sanitizers. 4: Debug build with sanitizers.\n"
+                                                                         "If these factors do not work for you, you can pass them directly (in JSON): "
+                                                                         " Example: --timeout-factors={{\"bsv-genesis-general.py\" : 2, \"bsv-mempool-eviction.py\" : 3 , ...}}."
+                                                                         " You must pass timeout factors for all the following tests (if you are running them): {}."
+                                                                         .format([test for test in TIMEOUT_FACTOR_FOR_TESTS.keys()]))
     args, unknown_args = parser.parse_known_args()
 
     # Output type. Default is 2: automatic detection
@@ -265,6 +287,25 @@ def main():
     # Add test parameters and remove long running tests if needed
     test_list, solo_position_start = get_tests_to_run(
         test_list, TEST_PARAMS, cutoff, src_timings, build_timings)
+
+    if (args.timeout_factors.isdigit()):
+        for timeout_test in TIMEOUT_FACTOR_FOR_TESTS.keys():
+            if timeout_test in test_list:
+                test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}"
+                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1]))
+
+    else:
+        try:
+            timeout_factors_json = json.loads(args.timeout_factors)
+            if (set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys()) - set(timeout_factors_json.keys()) != set()):
+                print("Timeout factor tests should include timeout factor for tests: {}"
+                    .format([test for test in set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys())]))
+                sys.exit(0)
+            for timeout_test in timeout_factors_json.keys():
+                if timeout_test in test_list:
+                    test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}".format(timeout_factors_json[timeout_test]))
+        except ValueError as e:
+            print ("Error parsing input json: ", e)
 
     if not test_list:
         print("No valid test scripts specified. Check that your test is in one "
@@ -463,7 +504,7 @@ class TestHandler:
                 log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
                 test_argv = t.split()
                 tmpdir = [os.path.join("--tmpdir=%s", "%s_%s") %
-                          (self.tmpdir, re.sub(".py$", "", t), portseed)]
+                          (self.tmpdir, re.sub(".py.*$", "", t), portseed)]
                 running_jobs.append((t,
                              time.time(),
                                   subprocess.Popen([sys.executable, os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,

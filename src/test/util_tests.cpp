@@ -100,6 +100,11 @@ BOOST_AUTO_TEST_CASE(util_DateTimeStrFormat) {
         "Fri, 30 Sep 2011 23:36:17 +0000");
 }
 
+BOOST_AUTO_TEST_CASE(util_DateTimeFormatISO8601) {
+    BOOST_CHECK_EQUAL(DateTimeFormatISO8601(0), "1970-01-01T00:00:00Z");
+    BOOST_CHECK_EQUAL(DateTimeFormatISO8601(1338568343), "2012-06-01T16:32:23Z");
+}
+
 class TestArgsManager : public ArgsManager {
 public:
     std::map<std::string, std::string> &GetMapArgs() { return mapArgs; };

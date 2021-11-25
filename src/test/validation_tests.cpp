@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
     // message start magic, size of block, block
 
     size_t nwritten = fwrite(chainparams.DiskMagic().data(),
-                             CMessageHeader::MESSAGE_START_SIZE, 1, fp.get());
+                             CMessageFields::MESSAGE_START_SIZE, 1, fp.get());
 
     BOOST_CHECK_EQUAL(nwritten, 1UL);
 

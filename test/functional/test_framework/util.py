@@ -823,12 +823,49 @@ def loghash(inhash=None):
     else:
         return inhash
 
-def check_for_log_msg(rpc, log_msg, node_dir):
-    for line in open(glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]):
-        if log_msg in line:
-            rpc.log.info("Found line: %s", line.strip())
-            return True
+
+def check_for_log_msg(rpc, log_msg, node_dir=None):
+    """
+    Checks for occurrence of the log_msg in the bitcoind.log
+    rpc can be any object which has .log member (logger)
+    If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
+    """
+    assert hasattr(rpc, "log")
+
+    if node_dir is None:
+        assert hasattr(rpc, "datadir")
+        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
+    else:
+        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
+
+    with open(logfile_path) as f:
+        for line in f:
+            if log_msg in line:
+                rpc.log.info("Found line: %s", line.strip())
+                return True
     return False
+
+def count_log_msg(rpc, log_msg, node_dir=None):
+    """
+    Checks for number of occurrences of the log_msg in the bitcoind.log
+    rpc can be any object which has .log member (logger)
+    If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
+    """
+    assert hasattr(rpc, "log")
+
+    if node_dir is None:
+        assert hasattr(rpc, "datadir")
+        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
+    else:
+        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
+
+    count = 0
+    with open(logfile_path) as f:
+        for line in f:
+            if log_msg in line:
+                count += 1
+    rpc.log.info(f'String "{log_msg}"" found in {count} lines')
+    return count
 
 def hashToHex(hash):
     return format(hash, '064x')

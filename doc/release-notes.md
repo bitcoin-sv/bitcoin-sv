@@ -1,266 +1,151 @@
-# Public
+# Bitcoin SV Node software – Upgrade to v1.0.10 Release
 
-# Bitcoin SV Node software – Upgrade to v1.0.9 Release
-Version 1.0.9 release is a recommended upgrade from version 1.0.8; This new version brings improved safe mode processing, webhook notifications, block double spend P2P notification messages and the possibility to freeze transaction outputs that are the target of double spends.
+Overview
+--------
 
-Content details listed below:  
+Version 1.0.10 release is a recommended upgrade from version 1.0.9; This new version brings a number of improvements to both functionality and performance.
 
-1. New block double spend P2P notification message.
-2. Improved safe mode processing including new RPCs to manually control safe mode.
-3. Webhook notification of competing chains and double spends.
-4. Possibility to freeze transaction outputs.
-5. Performance improvements to transaction chain processing.
-6. STN Reset
+Parallel Transaction Validation (PTV) Scheduler Improvements
+------------------------------------------------------------
 
-## Response to Block Withholding Attacks
+Performance improvements have been made to the processing of long complex transaction graphs where transactions arrive out of order.
 
-**Background**
+Modification to processing of user agent strings
+------------------------------------------------
 
-In the past few months, there have been several attempted attacks on the BSV network.  The attacks involve mining a hidden alternate chain (in at least one case > 80 blocks in length) and then posting it to the blockchain at once so it became the new main chain. The new chain replaces some of the transactions in the original chain with double spends. Exchanges typically require a certain number of block confirmations (say 50 blocks have been built on the attempted transactions) before coin deposits or withdrawals into their exchange are valid, *for example*, to prevent an attacker from depositing double-spent BSV coins and immediately trade or cash out his position in the hidden chain after previously doing the same thing on the main chain.
+Currently it is possible that a node may connect to BCH nodes (There is advice on how to avoid this on bitcoin-sv github). Connecting to a non-BSV node is not fatal to the operation of the node but leads to wasted bandwidth and unnecessary block processing. Invalid blocks generate error messages which pollute the log files and make it difficult to see what is going on. The following steps have been taken to make it more likely that a node only connects to other BSV nodes.
 
-The BSV blockchain and other PoW blockchains are vulnerable to these types of attacks because of the large amounts of roaming hash-power available that can be used on competing networks.
+*   **banclientua** \- contains the list of banned user agent substrings (the node will ban any peer that returns one of these user agent strings).  The default list is set to: "abc", "cash", "bch"
+*   **allowclientua** \- a newly introduced config option that contains a list of allowed user agent substrings that overrides **banclientua**.  The default list is empty.
 
-Our response to these attacks has included steps to:
+Matching is case insensitive. Note that the default list is cleared if a single **banclientua** parameter is set in the bitcoin config file or command line.  
+  
+Example config setting: 
 
-1. Put global 24 hour/7 day a week monitoring in position and:
-    - notify miners of long, competing chains when they appear.
-    - notify exchanges and application providers of double spends in the new chain.
-2. Enable honest miners to invalidate the block at the base of the hidden chain using **invalidateblock**, and then mine on the original honest chain until it is restored as the main chain.
+**banclientua**\=XYZ  
+**banclientua**\=ABC  
+**allowclientua**\=its-not-abc
 
-**Notification of change of safe mode (competing chains)**
+This will allow/disallow the following user agent strings:
 
-Exchanges and miners will be notified if a suspicious event (most likely an attack) occurs. The trigger is the existence of recent, long, competing chains.
+'ThisAbcClient'   # banned, matches _ABC_  
+'ThisBchClient'   # allowed because the default has been cleared, so connections to nodes that return "cash" or "bch" are allowed
+'I-cant-believe-its-not-ABC'   # allowed, _ABC_ matches but _its-not-abc_ also matches and has precedence
 
-Notification about a block reorganisation is part of the safe mode notification.
+Update default maxscriptsizepolicy, maxscriptnumlengthpolicy
+------------------------------------------------------------
 
-The Bitcoin SV Node software currently contains “safe-mode” logic to detect competing chains and de-activate wallet RPC calls (put into safe-mode). The safe-mode logic has been updated so that chain detection is configurable (allowing for users to customise their sensitivity to suspicious events) and triggers notifications via webhooks to exchanges/miners/application providers.
+The default values for **maxscriptsizepolicy**, **maxscriptnumlengthpolicy** config options have been updated.
 
+*   Default value for **maxscriptsizepolicy** = 500,000 (up from 10,000)
+*   Default value **maxscriptnumlengthpolicy** = 10,000 (down from 250000)
 
-**Notification of double spends**
+P2P Header Update
+-----------------
 
-Exchanges and miners will be notified of recent double spends in competing chains of the BSV network.
+Every P2P message on the network has the same basic structure; a 24 byte header followed by some payload data. One of the fields within the header describes the length of that payload, and is currently encoded as a **uint32_t**. This therefore limits the maximum size of any message payload to 4GB. In order to support block sizes greater than 4GB, a change has been made to the P2P message structure to overcome this limitation.  
 
-Blockchain monitoring applications may send a DSD P2P notifications message to a BSV node (meaning a mining node), which will then relay the message to other nodes. The message contains a double spend proof (Merkle proof of the inclusion of transactions in a block).  Notifications are via webhooks.
+### Versioning
 
+As of this release the P2P protocol version number has been bumped from 70015 to 70016. Doing this allows a node to know in advance whether a connected peer will understand the new extended message format and therefore avoid sending such messages to that peer. Conforming nodes must not send messages in the extended format to peers with a version number lower than 70016, or they will be banned.  
 
-**Freezing of double spends.**
-A BSV node (meaning a mining node) can now "freeze" specific TXOs (e.g. used by double spends).
+### Change Description
 
-If a policy freeze is applied to the TXO, the node will not accept transactions into their block templates that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
+In summary, the changes to the P2P message involve the use of special values of fields within the existing P2P header as flags that can be recognised by a peer that supports such changes to indicate that this is a message with a large payload. These special values also allow a peer that doesn't understand them to reject such a message and fail cleanly if it were to come across one.  
+  
+The existing P2P header contains a 12 byte message type field. We introduce a new message type in this field **extmsg** (short for extended message) that when seen will indicate to the receiver that following this message header are a series of new extended message header fields before the real payload begins.  
+  
+The proposed full extended message format is shown below:  
 
-## Specific Changes
+| Field_Size | Name | Data_Type | Description |
+| --- | --- | --- | --- |
+| 4   | magic | uint32\_t | Existing network magic value. Unchanged here. |
+| 12  | command | char\[12\] | Existing network message type identifier (NULL terminated). For new extended messages this would take the value **extmsg**. |
+| 4   | length | uint32\_t | Existing payload length field. Currently limited to a maximum payload size of 4GB. For new extended messages this will be set to the value **0xFFFFFFFF**. The real  payload length will be read from the extended payload length field below. |
+| 4   | checksum | uint32\_t | Checksum over the payload. For extended format messages this will be set to **0x00000000** and not checked by receivers. This is due to the long time required to  calculate and verify the checksum for very large data sets, and the limited utility of such a checksum. |
+| 12  | ext\_command | char\[12\] | The extended message type identifier (NULL terminated). The real contained message type, for example **block** for a > 4GB block, or could also conceivably  be **tx** if we decide in future to support > 4GB transactions, or any other message type we need to be large. |
+| 8   | ext\_length | uint64\_t | The extended payload length. The real length of the following message payload. |
+| ?   | payload | uint8\_t\[\] | The actual message payload. |
 
-### Interface with DS Detector
+sendrawtransactions - option to skip some policy checks
+-------------------------------------------------------
 
-The node will receive DSD P2P notification message that a double spend has been detected. On receipt of a DSD message, (a) the DSD message is verified/validated (to ensure that is not a malicious fake), (b) the DSD message is relayed to other nodes, and (c) webhooks are used to notify users.
+It is now possible to override policy checks per transaction or per whole batch (transaction specific overrides have precedence over batch specific overrides) when using _sendrawtransactions_ RPC.   
+These parameters do not override consensus rules. 
 
-Note that there is no need to inform peers about every double-spend contained in every block, it is sufficient for a notification to just contain the details of a single transaction from each block containing a conflict. 
+The following configuration parameters can be overridden: _maxtxsizepolicy, datacarriersize, maxscriptsizepolicy, maxscriptnumlengthpolicy, maxstackmemoryusagepolicy, limitancestorcount, limitcpfpgroupmemberscount, acceptnonstdoutputs, datacarrier, dustrelayfee, maxstdtxvalidationduration, maxnonstdtxvalidationduration, minconsolidationfactor, maxconsolidationinputscriptsize, minconfconsolidationinput, acceptnonstdconsolidationinput, dustlimitfactor, skipscriptflags_
 
-#### DSD P2P message
+Example1: Override policy for transactions individually  
+sendrawtransactions(\[{'hex': signed\_tx, 'dontcheckfee': True, 'config': {"maxtxsizepolicy": 10000000, "minconfconsolidationinput": 200, "skipscriptflags": \["CLEANSTACK", "DERSIG"\]}...\])
 
-The format of the new DSD P2P message is 
+Example2: Override policy for all transactions in the batch  
+sendrawtransactions(\[{'hex': signed\_tx, 'dontcheckfee': True}, ...\], {"maxtxsizepolicy": 10000000, "minconfconsolidationinput": 200, "skipscriptflags": \["CLEANSTACK", "DERSIG"\]})
 
-| **Field size** | **Description** | **Data Type**   | **Comments**                                                 |
-| -------------- | --------------- | --------------- | ------------------------------------------------------------ |
-| 2              | version         | uint16_t        | Versioning information for this message. Currently can only contain the value 0x0001. |
-| 1+             | block count     | varint          | The number of blocks containing a double spend transaction this message is reporting. Must be >= 2. |
-| variable       | block list      | block_details[] | An array of details for blocks containing double spend transactions |
+New ZMQ Topics
+--------------
 
-block_details:
+New ZMQ topics have been added to the node. The differences between original and new ZMQ topics are shown below.
 
-| **Field size** | **Description** | **Data Type**  | **Comments**                                                 |
-| -------------- | --------------- | -------------- | ------------------------------------------------------------ |
-| 1+             | header count    | varint         | The number of following block headers (may not be 0).        |
-| variable       | header list     | block_header[] | An array of unique block headers containing details for all the blocks from the one containing the conflicting transaction back to the last common ancestor of all blocks reported in this message. Note that we don't actually need the last common ancestor in this list, it is sufficient for the last header in this list to be for the block where this fork begins, i.e.; the **hashPrevBlock** field from the last block header will be the same for all the blocks reported in this message. |
-| variable       | merkle proof    | merkle_proof   | The transaction contents and a proof that the transaction exists in this block. Follows TSC standard. |
+#### **Original rawtx, hashtx, rawblock, hashblock topics**  
+tx notifications:
 
-block_header:
+*   publish transaction when it is accepted to mempool
+*   publish transaction when block containing it is connected
+*   publish transaction when block containing it is disconnected
 
-| **Field size** | **Description**     | **Data Type** | **Comments**                               |
-| -------------- | ------------------- | ------------- | ------------------------------------------ |
-| 4              | version             | int32_t       | Block version information.                 |
-| 32             | hash previous block | char[32]      | Hash of the previous block in the fork.    |
-| 32             | hash merkle root    | char[32]      | The merkle root for this block.            |safemodemaxforkdistance
-| 4              | time                | uint32_t      | Timestamp for when this block was created. |
-| 4              | bits                | uint32_t      | Difficulty target for this block.          |
-| 4              | nonce               | uint32_t      | Nonce used when hashing this block.        |
+block notifications:
 
+*   publish block when it's connected
+*   on reorg only publish the new tip
 
+When a reorg happens, we get notified 3 times for the same transaction (from a disconnected block):
 
-The DSD P2P message specification can be found at https://github.com/bitcoin-sv-specs/protocol/blob/master/p2p/DSD_P2P.md
+*   on block disconnect
+*   when the transaction is accepted to mempool
+*   when the new block, the transaction is added to, is connected
 
-#### Webhook DSD notification message.
+#### **New rawtx2, hashtx2, rawblock2, hashblock2 topics**  
+tx notifications:
 
-The node will use webhooks to notify listeners that new double spends has been detected on alternate chains on the blockchain. The recipient of the webhook message can be configured using the new command line parameter, ***dsdetectedwebhookurl\***.
+*   publish transaction when it is first seen:
+*   accepted to mempool, or
+*   received in a block if we didn't have it in mempool yet
+*   when we mine (connect) a block, we publish transactions that weren't published before (usually only coinbase)
+*   when we receive a valid block, we publish all the transactions that weren't published before (the ones in block and not in our mempool)
+*   we don't publish the transaction when block containing it is disconnected
 
-The DSD notification message template is shown below
+block notifications:
 
-```
-{
-    "version": number,
-    "blocks : [
-        { 
-            "divergentBlockHash" : string,
-            "headers" : [
-                {
-                    "version" : number,
-                    "hashPrevBlock" : string,
-                    "hashMerkleRoot" : string,
-                    "time" : number,
-                    "bits" : number,
-                    "nonce" : number
-                }
-            ],
-            "merkleProof" : {
-                "index" : number,
-                "txOrId" : string,   // Full transaction, serialised, hex-encoded
-                "targetType": "merkleRoot",        
-                "target" : string,   // Merkle-root
-                "nodes" : [ "hash", ... ]
-            }
-        },
-        ...
-    ]
-}
-```
-
-This notification message is documented in docs/web_hooks.md in the distribution.
-
-The **getblockheader** RPC has been updated to report on the valid/invalidated status of the block.
-
-### Update of Safe-Mode Trigger Methodology
-
-Safe-mode disables node wallet functionality so that users cannot spend coins. Safe-mode is triggered when a long competing (parallel) block chain is detected. i.e. an attack chain is found. Webhooks are used to notify users when safe-mode status has been changed.
-This update also modifies the logic that triggers safe-mode.
-
-This release introduces 3 new command line parameters
-
-1. **safemodemaxforkdistance**, Default = 1000 (7 days of mining)
-2. **safemodeminforklength**, Default = 3
-3. **safemodeminblockdifference**, Default = -72 (12 hours of mining below current tip)
-
-Safe mode is automatically triggered if all of these criteria are satisfied:
-
-- The distance between the current tip and the last common block header of the fork is smaller than the **safemodemaxforkdistance**.
-- The length of the fork is greater than **safemodeminforklength**.
-- The total proof of work of the fork tip is greater than the minimum fork proof of work (POW). The minimum fork POW is calculated relative to the active chain tip using this formula: <total-proof-of-work-active-chain> + **safemodeminblockdifference** * <proof-of-work-of-the-active-tip>. Safe mode is activated if the fork height is bigger than <height-active-chain-tip> + **safemodeminblockdifference**. Note that the negative value of **safemodeminblockdifference** means that it will activate the safe mode for forks with tips below active chain tip.
-The first condition from the current implementation is retained, but triggering occurs before the competing fork surpasses the active chain. Safe mode is activated whenever the competing chain tip approaches the main chain tip closer than **safemodeminforklength** or it is ahead of the main chain tip.
-
-#### Webhook Safe Mode notification message
-
-The node will use webhooks to notify listeners if the node enters or leaves safe-mode or one of the following events occur while in safe mode.
-
-- the non-main chain is extended
-- a block is fetched for the tip of non-main chain.
-- a change in the validity of a chain (e.g. triggered by calls to **invalidateblock**)
-- a blockchain reorg
-
-Notifications will not occur during initial block download or reindex even if safe mode conditions exist.
-
-A users who is only interested in the current safe mode state can check the **safemodeenabled** field in the notification message (see below).
-
-The recipient of the webhook message can be configured using the new command line parameter ***safemodewebhookurl\***.
-
-The safe mode notification message template is shown below.
-
-```
-{
-    "safemodeenabled": boolean,           // Is the node in the safe mode.
-    "activetip": {                        // Tip of the main chain.
-        "hash": string,                   // Block hash.
-        "height": number,                 // Block height.
-        "blocktime": string,              // Human readable, UTC, block time.
-        "firstseentime": string,          // Human readable, UTC, time when the node first received header.
-        "status": "active"                // Status of the block. Possible values: active, invalid
-                                          //     headers-only, valid-fork, and valid-headers.
-    },
-    "timeutc": string,                    // Human readable, UTC, time of creation of this message.
-    "reorg": {                            // Information about possible reorg.
-        "happened": bool,                 // Indicates if an reorg happened.
-        "numberofdisconnectedblocks": number, // Number of blocks disconnected in reorg.
-        "oldtip": {                       // Information about old active tip, "null" if an reorg did not happened.
-            "hash": string,               
-            "height": number,
-            "blocktime": string,
-            "firstseentime": string,
-            "status": string
-        }
-    },
-    "forks": [                             // List of forks that are triggering the safe mode.
-        {
-            "forkfirstblock": {            // Root of the fork, this block's parent is on the main chain.
-                "hash": string,
-                "height": number,
-                "blocktime": string,
-                "firstseentime": string,
-                "status": string
-            },
-            "tips": [                      // List of tips of this fork.
-                {
-                    "hash": string,
-                    "height": number,
-                    "blocktime": string,
-                    "firstseentime": string,
-                    "status": string
-                },
-                ...
-            ],
-            "lastcommonblock": {            // Block on the main chain which is parent of the "forkfirstblock"
-                "hash": string,
-                "height": number,
-                "blocktime": string,
-                "firstseentime": string,
-                "status": string
-            },
-            "activechainfirstblock": {      // Block on the main chain which is child of the "lastcommonblock"
-                "hash": string,
-                "height": number,
-                "blocktime": string,
-                "firstseentime": string,
-                "status": string
-            },
-        },
-    ...
-    ]
-}
-```
-
-
-This notification message is also documented in docs/web_hooks.md in the distribution.
-
-### New RPC functions to enable/disable Safe-Mode
-
-The RPC function allows a user to manually override safe-mode without restarting the node. 
-
-This release introduces 3 new RPCs.
-
-1. **ignoresafemodeforblock <block_hash>** - The specified block and all its descendants will be ignored when calculating criteria for entering the safe mode.
-2. **reconsidersafemodeforblock <block_hash>** - The specified block and all its descendants will be considered when calculating criteria for entering the safe mode.
-3. **getsafemodeinfo** - Detailed information on the safe mode status.
-
-The effect of the RPCs is not preserved across node restarts.
-
-### Support for Transaction Output Freezes
-
-A node can now "freeze" specific transaction outputs (TXOs). A freeze can be applied to both spent and unspent TXOs, and can be used to ensure that a node does not process a known double spend.
-
-If a policy freeze is applied to the TXO, the node will not accept transactions into its block templates that spend the TXO, but it will accept external blocks containing transactions that spend the TXO.
-
-This release introduces new RPCs.
-
-1. **addToPolicyBlacklist \<funds : object\> ** - add TXO to policy blacklist (i.e. do not accept transactions that accesses this TXO, blocks containing transaction may be accepted if not in the consensus blacklist)
-2. **removeFromPolicyBlacklist \<funds : object\>** - remove TXO from policy blacklist
-3. **queryBlacklist** - Returns all frozen TXOs from the DB.
-4. **clearBlacklists \<removeAllEntries : boolean, default=true\> ** - Removes entries from the blacklist.
-
-### Performance Improvements ###
-The release contains optimisation to the processing of long, complex chains of transactions under extreme loads.
-
-**Binaries and source code can be downloaded here:**
-**<https://download.bitcoinsv.io/bitcoinsv/>** 
-
-Should you have any support questions, please direct them via **<support@bitcoinsv.io>** or via telegram at **<https://t.me/bitcoinsvsupport>**
-
-Thank you for your continued support of Bitcoin SV.
-
-**Sent on behalf of Steve Shadders and the Bitcoin SV Infrastructure team.**
+*   we publish every connected block
+
+When a reorg happens, we get notified once for each transaction and connected block:
+
+*   when transaction from a disconnected block is accepted to mempool, or
+*   when the new block from the longer chain that contains the transaction is connected
+*   we publish each connected block from the new, longer chain, not only the tip
+*   ! coinbases from the disconnected blocks are also not published !
+
+Configurable Timeouts
+---------------------
+
+New configuration options are available to address potential issues with download timeouts.
+
+*   **blockdownloadtimeoutbasepercent** (default=100% = 10 minutes)
+*   **blockdownloadtimeoutbaseibdpercent** (default=600% = 60 minutes)
+*   **blockdownloadtimeoutbaseperpeerpercent** (default=50% = 5 minutes)
+
+Block Download Timeout Calculation
+
+If the block is being downloaded as part of an initial block download (IBD), then the
+
+_base-timeout_ = **blockdownloadtimeoutbaseibdpercent,**
+
+otherwise
+
+_base-timeout_ **\= lockdownloadtimeoutbasepercent.**
+
+The timeout is calculated as follows
+
+Max. download timeout = 10 minutes x (_base-timeout_ + no-of-peers x **blockdownloadtimeoutbaseperpeerpercent**)
+
+For example, if there are a 3 connected peers, the default IBD timeout will be 10 minutes x (600 + 3 x 50)% = 10 minutes x (750%) = 75 minutes.

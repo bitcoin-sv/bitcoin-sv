@@ -340,6 +340,24 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadMaxParallelFetch(), 2 * DEFAULT_MAX_BLOCK_PARALLEL_FETCH);
     BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadMaxParallelFetch(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBase(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE);
+    BOOST_CHECK(config.SetBlockDownloadTimeoutBase(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBase(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE);
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBase(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBase(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBaseIBD(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD);
+    BOOST_CHECK(config.SetBlockDownloadTimeoutBaseIBD(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutBaseIBD(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD);
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBaseIBD(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutBaseIBD(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutPerPeer(), DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER);
+    BOOST_CHECK(config.SetBlockDownloadTimeoutPerPeer(2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadTimeoutPerPeer(), 2 * DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER);
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutPerPeer(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadTimeoutPerPeer(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(p2p_config)
@@ -588,6 +606,34 @@ BOOST_AUTO_TEST_CASE(dust_config_test)
     BOOST_CHECK(!config.SetDustLimitFactor(301, &err));
 }
 
+BOOST_AUTO_TEST_CASE(banned_clientua_test)
+{
+    GlobalConfig config {};
+
+    // default patterns are DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"};
+    // but we will set allow patterns to "not-abc-client"
+
+    BOOST_CHECK(config.IsClientUABanned("not-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-abc-client"));
+    BOOST_CHECK(!config.IsClientUABanned("is-bsv-client"));
+
+    config.SetAllowClientUA(std::set<std::string>{"not-abc-client"});
+    BOOST_CHECK(!config.IsClientUABanned("not-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-abc-client"));
+    BOOST_CHECK(!config.IsClientUABanned("is-bsv-client"));
+
+    BOOST_CHECK(!config.IsClientUABanned("not-ABC-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-ABC-client"));
+    BOOST_CHECK(!config.IsClientUABanned("is-BSV-client"));
+
+    config.SetBanClientUA(std::set<std::string>{"abc","cash","bch","BSV"});
+    BOOST_CHECK(!config.IsClientUABanned("not-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-abc-client"));
+    BOOST_CHECK(config.IsClientUABanned("is-bsv-client"));
+
+    // check that default BitcoinSV client is not banned
+    BOOST_CHECK(!config.IsClientUABanned(userAgent()));
+}
 
 
 BOOST_AUTO_TEST_SUITE_END()

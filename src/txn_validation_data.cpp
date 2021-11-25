@@ -2,6 +2,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txn_validation_data.h"
+#include "config.h"
+#include "transaction_specific_config.h"
 #include "logging.h"
 
 // Enable enum_cast for TxSource, so we can log informatively
@@ -45,7 +47,8 @@ CTxInputData::CTxInputData(
     int64_t nAcceptTime,
     Amount nAbsurdFee,
     std::weak_ptr<CNode> pNode,
-    bool fOrphan)
+    bool fOrphan,
+    const std::shared_ptr<const TransactionSpecificConfig> tsc)
 : mpTx(ptx),
   mpNode(pNode),
   mpTxIdTracker(pTxIdTracker),
@@ -54,7 +57,8 @@ CTxInputData::CTxInputData(
   mnAcceptTime(nAcceptTime),
   mTxSource(txSource),
   mTxValidationPriority(txValidationPriority),
-  mfOrphan(fOrphan)
+  mfOrphan(fOrphan),
+  mConfig(tsc)
 {
     // A check on the tracker for nullness and availability
     if(mpTxIdTracker.expired()) {
@@ -67,6 +71,17 @@ CTxInputData::CTxInputData(
     if (pTracker && pTracker->Insert(mpTx->GetId())) {
         mfTxIdStored = true;
     }
+}
+
+
+const Config& CTxInputData::GetConfig( const Config& defaultConfig ) const
+{
+    return mConfig ?  *mConfig : defaultConfig;
+}
+
+uint32_t CTxInputData::GetSkipScriptFlags() const
+{
+    return mConfig ? mConfig->GetSkipScriptFlags() : 0;
 }
 
 // Destructor
