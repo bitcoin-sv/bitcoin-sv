@@ -129,7 +129,7 @@ class CDataStream {
 protected:
     typedef CSerializeData vector_type;
     vector_type vch;
-    unsigned int nReadPos;
+    vector_type::size_type nReadPos;
 
     int nType;
     int nVersion;
@@ -231,32 +231,34 @@ public:
 
     void insert(iterator it, std::vector<char>::const_iterator first,
                 std::vector<char>::const_iterator last) {
-        if (last == first) {
+        size_type span = last - first;
+        if (!span) {
             return;
         }
 
         assert(last - first > 0);
         if (it == vch.begin() + nReadPos &&
-            (unsigned int)(last - first) <= nReadPos) {
+            span <= nReadPos) {
             // special case for inserting at the front when there's room
-            nReadPos -= (last - first);
-            memcpy(&vch[nReadPos], &first[0], last - first);
+            nReadPos -= span;
+            memcpy(&vch[nReadPos], &first[0], span);
         } else {
             vch.insert(it, first, last);
         }
     }
 
     void insert(iterator it, const char *first, const char *last) {
-        if (last == first) {
+        size_type span = last - first;
+        if (!span) {
             return;
         }
 
         assert(last - first > 0);
         if (it == vch.begin() + nReadPos &&
-            (unsigned int)(last - first) <= nReadPos) {
+            span <= nReadPos) {
             // special case for inserting at the front when there's room
-            nReadPos -= (last - first);
-            memcpy(&vch[nReadPos], &first[0], last - first);
+            nReadPos -= span;
+            memcpy(&vch[nReadPos], &first[0], span);
         } else {
             vch.insert(it, first, last);
         }
@@ -320,7 +322,7 @@ public:
         }
 
         // Read from the beginning of the buffer
-        unsigned int nReadPosNext = nReadPos + nSize;
+        size_type nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size()) {
             if (nReadPosNext > vch.size()) {
                 throw std::ios_base::failure(
@@ -341,7 +343,7 @@ public:
             throw std::ios_base::failure(
                 "CDataStream::ignore(): nSize negative");
         }
-        unsigned int nReadPosNext = nReadPos + nSize;
+        size_type nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size()) {
             if (nReadPosNext > vch.size())
                 throw std::ios_base::failure(

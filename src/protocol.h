@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef __cplusplus
@@ -22,6 +22,8 @@
 #include <string>
 
 class Config;
+class CDataStream;
+class CSerializedNetMsg;
 
 /**
  * Default maximum length of incoming protocol messages set to 2MiB.
@@ -61,49 +63,131 @@ static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 10;
 static const unsigned int MIN_RECV_INV_QUEUE_FACTOR = 1;
 
 /**
+ * Message header enumerations.
+ */
+struct CMessageFields
+{
+    enum 
+    {
+        MESSAGE_START_SIZE = 4,
+        COMMAND_SIZE = 12,
+        CHECKSUM_SIZE = 4,
+
+        BASIC_MESSAGE_SIZE_SIZE = 4,
+        BASIC_MESSAGE_SIZE_OFFSET = MESSAGE_START_SIZE + COMMAND_SIZE,
+        CHECKSUM_OFFSET = BASIC_MESSAGE_SIZE_OFFSET + BASIC_MESSAGE_SIZE_SIZE,
+        BASIC_COMMAND_OFFSET = MESSAGE_START_SIZE,
+
+        EXTENDED_MESSAGE_SIZE_SIZE = 8,
+
+        BASIC_HEADER_SIZE = MESSAGE_START_SIZE + COMMAND_SIZE + BASIC_MESSAGE_SIZE_SIZE + CHECKSUM_SIZE,
+        EXTENDED_HEADER_SIZE = MESSAGE_START_SIZE + COMMAND_SIZE + BASIC_MESSAGE_SIZE_SIZE + CHECKSUM_SIZE + COMMAND_SIZE + EXTENDED_MESSAGE_SIZE_SIZE
+    };
+};
+
+/**
+ * Extended message header.
+ * (12) extended command.
+ * (8) extended size
+ */
+class CExtendedMessageHeader
+{
+  public:
+    CExtendedMessageHeader() = default;
+    CExtendedMessageHeader(const char* pszCommand, uint64_t nPayloadLengthIn);
+
+    ADD_SERIALIZE_METHODS
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(FLATDATA(pchCommand));
+        READWRITE(nPayloadLength);
+    }
+
+    std::string GetCommand() const;
+    uint64_t GetPayloadLength() const { return nPayloadLength; }
+    bool IsValid(const Config& config) const;
+    bool IsOversized(const Config& config) const;
+
+    // For unit testing
+    template<typename T> struct UnitTestAccess;
+
+  private:
+
+    std::array<char, CMessageFields::COMMAND_SIZE> pchCommand {};   // 0 initialised
+    uint64_t nPayloadLength { std::numeric_limits<uint64_t>::max() };
+};
+
+/**
  * Message header.
  * (4) message start.
  * (12) command.
  * (4) size.
  * (4) checksum.
+ *
+ * [(12) extended command] - Only in extended header.
+ * [(8) extended size] - Only in extended header.
  */
 class CMessageHeader {
 public:
-    enum {
-        MESSAGE_START_SIZE = 4,
-        COMMAND_SIZE = 12,
-        MESSAGE_SIZE_SIZE = 4,
-        CHECKSUM_SIZE = 4,
+    using MessageMagic = std::array<uint8_t, CMessageFields::MESSAGE_START_SIZE>;
+    using Checksum = std::array<uint8_t, CMessageFields::CHECKSUM_SIZE>;
 
-        MESSAGE_SIZE_OFFSET = MESSAGE_START_SIZE + COMMAND_SIZE,
-        CHECKSUM_OFFSET = MESSAGE_SIZE_OFFSET + MESSAGE_SIZE_SIZE,
-        HEADER_SIZE = MESSAGE_START_SIZE + COMMAND_SIZE + MESSAGE_SIZE_SIZE +
-                      CHECKSUM_SIZE
-    };
-    typedef std::array<uint8_t, MESSAGE_START_SIZE> MessageMagic;
+    CMessageHeader(const MessageMagic& pchMessageStartIn);
+    CMessageHeader(const Config& config, const CSerializedNetMsg& msg);
 
-    CMessageHeader(const MessageMagic &pchMessageStartIn);
-    CMessageHeader(const MessageMagic &pchMessageStartIn,
-                   const char *pszCommand, unsigned int nPayloadLengthIn);
+    uint64_t Read(const char* pch, uint64_t numBytes, CDataStream& buff);
 
     std::string GetCommand() const;
-    bool IsValid(const Config &config) const;
-    bool IsOversized(const Config &config, uint64_t maxBlockSize) const;
+    const MessageMagic& GetMsgStart() const { return pchMessageStart; }
+    const Checksum& GetChecksum() const { return pchChecksum; }
+    uint64_t GetLength() const;
+    uint64_t GetPayloadLength() const;
+    bool IsExtended() const { return extendedFields.has_value(); }
+    bool Complete() const { return complete; }
+    bool IsValid(const Config& config) const;
+    bool IsOversized(const Config& config) const;
+
+    static uint64_t GetHeaderSizeForPayload(uint64_t payloadSize);
+    static uint64_t GetMaxPayloadLength(int version);
+    static bool IsExtended(uint64_t payloadSize);
 
     ADD_SERIALIZE_METHODS
-
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action) {
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
         READWRITE(FLATDATA(pchMessageStart));
         READWRITE(FLATDATA(pchCommand));
         READWRITE(nPayloadLength);
         READWRITE(FLATDATA(pchChecksum));
+
+        if(IsExtended())
+        {
+            READWRITE(*extendedFields);
+        }
     }
 
-    MessageMagic pchMessageStart;
-    char pchCommand[COMMAND_SIZE];
-    uint32_t nPayloadLength;
-    uint8_t pchChecksum[CHECKSUM_SIZE];
+    // For unit testing
+    template<typename T> struct UnitTestAccess;
+
+private:
+
+    // Private constructor for internal delegating and unit testing
+    CMessageHeader(const MessageMagic& pchMessageStartIn,
+                   const char* pszCommand, uint64_t nPayloadLengthIn,
+                   const uint256& payloadHash);
+
+    // Validity checking helper
+    bool CheckHeaderMagicAndCommand(const MessageMagic& magic) const;
+
+    MessageMagic pchMessageStart {};
+    std::array<char, CMessageFields::COMMAND_SIZE> pchCommand {};   // 0 initialised
+    uint32_t nPayloadLength { std::numeric_limits<uint32_t>::max() };
+    Checksum pchChecksum {};
+
+    std::optional<CExtendedMessageHeader> extendedFields { std::nullopt };
+
+    bool complete {false};
 };
 
 /**
@@ -304,6 +388,10 @@ extern const char *STREAMACK;
  * been observed which contains an attempt to double-spend some UTXOs.
  */
 extern const char *DSDETECTED;
+/**
+ * Contains an extended message (one which may exceed 4GB in size).
+ */
+extern const char *EXTMSG;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -315,7 +403,7 @@ bool IsBlockLike(const std::string &strCommand);
 /**
  * Return the maximum message size for the given message type.
  */
-uint64_t GetMaxMessageLength(const std::string& command, const Config& config, uint64_t maxBlockSize);
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config);
 
 } // namespace NetMsgType
 
@@ -368,7 +456,9 @@ enum ServiceFlags : uint64_t {
 class CAddress : public CService {
 public:
     CAddress() = default;
-    explicit CAddress(CService ipIn, ServiceFlags nServicesIn);
+    explicit CAddress(CService ipIn, ServiceFlags nServicesIn)
+        : CService{ipIn}, nServices{nServicesIn}
+    {}
 
     ADD_SERIALIZE_METHODS
 

@@ -185,7 +185,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 # Boost packages
-set(BOOST_PACKAGES_REQUIRED chrono date_time filesystem program_options thread)
+set(BOOST_PACKAGES_REQUIRED chrono filesystem program_options thread)
 
 function(prepend var prefix)
 	set(listVar "")
@@ -316,6 +316,8 @@ add_library(common
 	threadpoolT.h
 	time_locked_mempool.h
 	timedata.h
+	transaction_specific_config.cpp
+	transaction_specific_config.h
 	tx_mempool_info.h
 	txhasher.cpp
 	txhasher.h
@@ -463,6 +465,8 @@ add_library(server
 	net/stream.cpp
 	net/stream_policy.cpp
 	net/stream_policy_factory.cpp
+    net/validation_scheduler.cpp
+    net/validation_scheduler.h
 	netmessagemaker.h
 	noui.cpp
 	noui.h

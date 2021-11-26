@@ -13,6 +13,7 @@ from soft_consensus_freeze_base import Send_node, SoftConsensusFreezeBase
 
 from test_framework.test_framework import ChainManager
 from test_framework.blocktools import PreviousSpendableOutput
+from test_framework.mininode import msg_headers
 from test_framework.script import CScript, OP_TRUE
 
 class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
@@ -43,29 +44,45 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
     def _test_unlimited_freeze(self, spendable_out, node):
         self.log.info("*** Performing soft consensus freeze checks (unlimited)")
-        
+
         node.restart_node()
 
         first_frozen_tx = self._create_tx_mine_block_and_freeze_tx( node, spendable_out )
 
-        # block is rejected as consensus freeze is in effect for parent transaction
-        first_spend_frozen_tx = self._create_tx( PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]) )
-        first_frozen_block = self._mine_and_check_rejected( node, first_spend_frozen_tx )
+        last_valid_tip_hash = node.rpc.getbestblockhash()
 
-        # both blocks are still frozen
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
-        self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
+        # this block is rejected as consensus freeze is in effect for parent transaction
+        first_spend_frozen_tx = self._create_tx( PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]) )
+        self.log.info(f"Mining block with transaction {first_spend_frozen_tx.hash} spending TXO {first_spend_frozen_tx.vin[0].prevout.hash:064x},{first_spend_frozen_tx.vin[0].prevout.n}")
+        first_frozen_block = self._mine_block( first_spend_frozen_tx )
+
+        self.log.info(f"Mining descendants of block {first_frozen_block.hash}")
+        subsequent_frozen_blocks = []
+        for i in range(14): # since we cannot check unlimited number of blocks, number 14 was chosen arbitrarily and we assume it is close enough to infinity for the purpose of this test
+            subsequent_frozen_blocks.append( self._mine_block(None) )
+
+        # Send block headers first to check that they are also all correctly marked as frozen after the actual block is received.
+        self.log.info(f"Sending headers for block {first_frozen_block.hash} and descendants")
+        msg_hdrs = msg_headers()
+        msg_hdrs.headers.append( first_frozen_block )
+        msg_hdrs.headers.extend( subsequent_frozen_blocks )
+        node.p2p.send_and_ping( msg_hdrs )
+        # check that headers were received
+        for tip in node.rpc.getchaintips():
+            if tip["status"] == "active" and tip["hash"] == last_valid_tip_hash:
+                continue
+            if tip["status"] == "headers-only" and tip["hash"] == subsequent_frozen_blocks[-1].hash:
+                continue
+            assert False, "Unexpected tip: "+str(tip)
+
+        self.log.info(f"Sending block {first_frozen_block.hash} and checking that it is rejected")
+        node.send_block(first_frozen_block, last_valid_tip_hash, True)
+        assert(node.check_frozen_tx_log(first_frozen_block.hash))
+        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+first_frozen_block.hash))
+
+        self.log.info(f"Sending descendants of block {first_frozen_block.hash} and checking that they do not become tip")
+        for b in subsequent_frozen_blocks:
+            node.send_block(b, last_valid_tip_hash, False)
 
     def run_test(self):
         node = self._init()

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "protocol.h"
@@ -43,6 +43,7 @@ const char *PROTOCONF = "protoconf";
 const char *CREATESTREAM = "createstrm";
 const char *STREAMACK = "streamack";
 const char *DSDETECTED = "dsdetected";
+const char *EXTMSG = "extmsg";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -50,7 +51,7 @@ bool IsBlockLike(const std::string &strCommand) {
            strCommand == NetMsgType::BLOCKTXN;
 }
 
-uint64_t GetMaxMessageLength(const std::string& command, const Config& config, uint64_t maxBlockSize)
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
 {
     if (command == NetMsgType::PROTOCONF)
     {
@@ -72,7 +73,8 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config, u
 
         // If the message is GETBLOCKTXN, it is limited to an estimate of the maximum number of
         // short TXIDs the message could contain.
-        return (maxBlockSize / MIN_TX_SIZE * SHORT_TXID_SIZE) + CMessageHeader::HEADER_SIZE;
+        uint64_t maxPayload { config.GetMaxBlockSize() / MIN_TX_SIZE * SHORT_TXID_SIZE };
+        return maxPayload + CMessageHeader::GetHeaderSizeForPayload(maxPayload);
     }
     else if (!NetMsgType::IsBlockLike(command))
     {
@@ -83,7 +85,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config, u
     else
     {
         // Maximum accepted block type message size
-        return maxBlockSize;
+        return config.GetMaxBlockSize();
     }
 }
 
@@ -103,67 +105,31 @@ static const std::string allNetMessageTypes[] = {
     NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
     NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
     NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
-    NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,  NetMsgType::DSDETECTED
+    NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,  NetMsgType::DSDETECTED,
+    NetMsgType::EXTMSG
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,
                           allNetMessageTypes + ARRAYLEN(allNetMessageTypes));
 
-CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn) {
-    memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
-           MESSAGE_START_SIZE);
-    memset(pchCommand, 0, sizeof(pchCommand));
-    nPayloadLength = -1;
-    memset(pchChecksum, 0, CHECKSUM_SIZE);
-}
-
-CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn,
-                               const char *pszCommand,
-                               unsigned int nPayloadLengthIn) {
-    memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
-           MESSAGE_START_SIZE);
-    memset(pchCommand, 0, sizeof(pchCommand));
-    GCC_WARNINGS_PUSH;
-    #if defined __GNUC__ && (__GNUC__ >= 8)
-        // -Wstringop-truncation was introduced in GCC 8
-        GCC_WARNINGS_IGNORE(-Wstringop-truncation);
-    #endif
-    // length of pszCommand is always smaller than COMMAND_SIZE
-    strncpy(pchCommand, pszCommand, COMMAND_SIZE);
-    GCC_WARNINGS_POP;
-
-    nPayloadLength = nPayloadLengthIn;
-    memset(pchChecksum, 0, CHECKSUM_SIZE);
-}
-
-std::string CMessageHeader::GetCommand() const {
-    return std::string(pchCommand,
-                       pchCommand + strnlen(pchCommand, COMMAND_SIZE));
-}
-
-static bool
-CheckHeaderMagicAndCommand(const CMessageHeader &header,
-                           const CMessageHeader::MessageMagic &magic) {
-    // Check start string
-    if (memcmp(header.pchMessageStart.data(), magic.data(),
-               CMessageHeader::MESSAGE_START_SIZE) != 0) {
-        return false;
-    }
-
-    // Check the command string for errors
-    for (const char *p1 = header.pchCommand;
-         p1 < header.pchCommand + CMessageHeader::COMMAND_SIZE; p1++) {
-        if (*p1 == 0) {
+// Check a command string for errors
+static bool CheckCommandFormat(const char* cmd)
+{
+    for(const char* p1 = cmd; p1 < cmd + CMessageFields::COMMAND_SIZE; p1++)
+    {
+        if(*p1 == 0) {
             // Must be all zeros after the first zero
             if (!std::all_of(
                     p1 + 1,
-                    header.pchCommand + CMessageHeader::COMMAND_SIZE,
+                    cmd + CMessageFields::COMMAND_SIZE,
                     [](char i) { return i == 0; } ))
             {
                 return false;
             }
             break;
-        } else if (*p1 < ' ' || *p1 > 0x7E) {
+        }
+        else if(*p1 < ' ' || *p1 > 0x7E)
+        {
             return false;
         }
     }
@@ -171,30 +137,211 @@ CheckHeaderMagicAndCommand(const CMessageHeader &header,
     return true;
 }
 
-bool CMessageHeader::IsValid(const Config &config) const {
-    // Check start string
-    if (!CheckHeaderMagicAndCommand(*this,
-                                    config.GetChainParams().NetMagic())) {
+CExtendedMessageHeader::CExtendedMessageHeader(const char* pszCommand, uint64_t nPayloadLengthIn)
+: nPayloadLength { nPayloadLengthIn }
+{
+    GCC_WARNINGS_PUSH;
+    #if defined __GNUC__ && (__GNUC__ >= 8)
+        // -Wstringop-truncation was introduced in GCC 8
+        GCC_WARNINGS_IGNORE(-Wstringop-truncation);
+    #endif
+
+    // length of pszCommand is always smaller than COMMAND_SIZE
+    strncpy(pchCommand.data(), pszCommand, CMessageFields::COMMAND_SIZE);
+    GCC_WARNINGS_POP;
+}
+
+std::string CExtendedMessageHeader::GetCommand() const
+{
+    return { pchCommand.data(), pchCommand.data() + strnlen(pchCommand.data(), CMessageFields::COMMAND_SIZE) };
+}
+
+bool CExtendedMessageHeader::IsValid(const Config& config) const
+{
+    // Check command format
+    if(!CheckCommandFormat(pchCommand.data()))
+    {
         return false;
     }
 
     // Message size
-    uint64_t maxBlockSize = config.GetMaxBlockSize();
-    if (IsOversized(config, maxBlockSize)) {
-        LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) is oversized\n",
-                  GetCommand(), nPayloadLength);
+    if(IsOversized(config))
+    {
+        LogPrintf("CExtendedMessageHeader::IsValid(): (%s, %lu bytes) is oversized\n", GetCommand(), nPayloadLength);
         return false;
     }
 
     return true;
 }
 
-bool CMessageHeader::IsOversized(const Config &config, uint64_t maxBlockSize) const
+bool CExtendedMessageHeader::IsOversized(const Config& config) const
 {
-    return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config, maxBlockSize);
+    return GetPayloadLength() > NetMsgType::GetMaxMessageLength(GetCommand(), config);
 }
 
-CAddress::CAddress(CService ipIn, ServiceFlags nServicesIn) : CService{ipIn}, nServices{nServicesIn} {
+CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn)
+{
+    memcpy(pchMessageStart.data(), pchMessageStartIn.data(), CMessageFields::MESSAGE_START_SIZE);
+    memset(pchChecksum.data(), 0, pchChecksum.size());
+}
+
+CMessageHeader::CMessageHeader(const Config& config, const CSerializedNetMsg& msg)
+: CMessageHeader { config.GetChainParams().NetMagic(), msg.Command().c_str(), msg.Size(), msg.Hash() }
+{
+}
+
+CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn,
+                               const char* pszCommand,
+                               uint64_t nPayloadLengthIn,
+                               const uint256& payloadHash)
+{
+    memcpy(pchMessageStart.data(), pchMessageStartIn.data(), CMessageFields::MESSAGE_START_SIZE);
+
+    GCC_WARNINGS_PUSH;
+    #if defined __GNUC__ && (__GNUC__ >= 8)
+        // -Wstringop-truncation was introduced in GCC 8
+        GCC_WARNINGS_IGNORE(-Wstringop-truncation);
+    #endif
+
+    // Basic or extended header?
+    if(nPayloadLengthIn > std::numeric_limits<uint32_t>::max())
+    {
+        // length of pszCommand is always smaller than COMMAND_SIZE
+        strncpy(pchCommand.data(), NetMsgType::EXTMSG, CMessageFields::COMMAND_SIZE);
+        nPayloadLength = std::numeric_limits<uint32_t>::max();
+        memset(pchChecksum.data(), 0, pchChecksum.size());
+        extendedFields = CExtendedMessageHeader { pszCommand, nPayloadLengthIn };
+    }
+    else
+    {
+        // length of pszCommand is always smaller than COMMAND_SIZE
+        strncpy(pchCommand.data(), pszCommand, CMessageFields::COMMAND_SIZE);
+        nPayloadLength = static_cast<uint32_t>(nPayloadLengthIn);
+
+        // Only set the checksum on non-extended messages
+        memcpy(pchChecksum.data(), payloadHash.begin(), pchChecksum.size());
+    }
+
+    GCC_WARNINGS_POP;
+}
+
+// Read data and deserialise ourselves as we go
+uint64_t CMessageHeader::Read(const char* pch, uint64_t numBytes, CDataStream& buff)
+{
+    // Must only be called for an incomplete header
+    assert(!Complete());
+
+    // Copy as much data as required to the parsing buffer
+    uint64_t requiredLength { GetLength() };
+    uint64_t mumRemaining { requiredLength - buff.size() };
+    uint64_t numToCopy { std::min(mumRemaining, numBytes) };
+    buff.write(pch, numToCopy);
+
+    // Do we have all the data we think we need?
+    if(buff.size() == requiredLength)
+    {
+        // We have all the basic header data, check if we also need more for extended fields
+        if(! IsExtended() && strncmp(buff.data() + CMessageFields::BASIC_COMMAND_OFFSET, NetMsgType::EXTMSG, strlen(NetMsgType::EXTMSG)) == 0)
+        {
+            extendedFields = CExtendedMessageHeader {};
+        }
+        else
+        {
+            // We have enough data to fully deserialise ourselves
+            buff >> *this;
+            complete = true;
+        }
+    }
+
+    return numToCopy;
+}
+
+std::string CMessageHeader::GetCommand() const
+{
+    if(IsExtended())
+    {
+        return extendedFields->GetCommand();
+    }
+
+    return { pchCommand.data(), pchCommand.data() + strnlen(pchCommand.data(), CMessageFields::COMMAND_SIZE) };
+}
+
+uint64_t CMessageHeader::GetLength() const
+{
+    return IsExtended()? CMessageFields::EXTENDED_HEADER_SIZE : CMessageFields::BASIC_HEADER_SIZE;
+}
+
+uint64_t CMessageHeader::GetPayloadLength() const
+{
+    if(IsExtended())
+    {
+        return extendedFields->GetPayloadLength();;
+    }
+
+    return static_cast<uint64_t>(nPayloadLength);
+}
+
+uint64_t CMessageHeader::GetHeaderSizeForPayload(uint64_t payloadSize)
+{
+    if(payloadSize > std::numeric_limits<uint32_t>::max())
+    {
+        return CMessageFields::EXTENDED_HEADER_SIZE;
+    }
+
+    return CMessageFields::BASIC_HEADER_SIZE;
+}
+
+uint64_t CMessageHeader::GetMaxPayloadLength(int version)
+{
+    if(version >= EXTENDED_PAYLOAD_VERSION)
+    {
+        return std::numeric_limits<uint64_t>::max();
+    }
+
+    return std::numeric_limits<uint32_t>::max();
+}
+
+bool CMessageHeader::IsExtended(uint64_t payloadSize)
+{
+    return GetHeaderSizeForPayload(payloadSize) == CMessageFields::EXTENDED_HEADER_SIZE;
+}
+
+bool CMessageHeader::CheckHeaderMagicAndCommand(const MessageMagic& magic) const
+{
+    // Check start string
+    if (memcmp(GetMsgStart().data(), magic.data(),
+               CMessageFields::MESSAGE_START_SIZE) != 0) {
+        return false;
+    }
+
+    // Check the command string for errors
+    return CheckCommandFormat(pchCommand.data());
+}
+
+bool CMessageHeader::IsValid(const Config& config) const {
+    // Check start string
+    if (!CheckHeaderMagicAndCommand(config.GetChainParams().NetMagic())) {
+        return false;
+    }
+
+    // Message size
+    if (IsOversized(config)) {
+        LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) is oversized\n",
+                  GetCommand(), nPayloadLength);
+        return false;
+    }
+
+    // Extended fields
+    if(IsExtended() && !extendedFields->IsValid(config)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool CMessageHeader::IsOversized(const Config& config) const
+{
+    return GetPayloadLength() > NetMsgType::GetMaxMessageLength(GetCommand(), config);
 }
 
 std::string CInv::GetCommand() const {

@@ -104,7 +104,7 @@ class MyAssociationCB(AssociationCB):
 class BlockPriorityTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
-        self.num_txns = 1000
+        self.num_txns = 2000
 
     def setup_network(self):
         self.add_nodes(self.num_nodes)

@@ -1234,9 +1234,9 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("mempoolmaxpercentcpfp", config.GetMempoolMaxPercentCPFP()));
 
     obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
-    obj.push_back(Pair("datacarrier", fAcceptDatacarrier));
+    obj.push_back(Pair("datacarrier", config.GetDataCarrier()));
     obj.push_back(Pair("minrelaytxfee", ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
-    obj.push_back(Pair("dustrelayfee", ValueFromAmount(dustRelayFee.GetFeePerK())));
+    obj.push_back(Pair("dustrelayfee", ValueFromAmount(config.GetDustRelayFee().GetFeePerK())));
     obj.push_back(Pair("dustlimitfactor", config.GetDustLimitFactor()));
     obj.push_back(Pair("blockmintxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));
@@ -1282,6 +1282,43 @@ static UniValue dumpparameters(const Config &config, const JSONRPCRequest &reque
     }
 
     return obj;
+}
+namespace 
+{
+    const std::map<std::string, uint32_t> mapFlagNames = {
+        {"NONE", SCRIPT_VERIFY_NONE},
+        {"P2SH", SCRIPT_VERIFY_P2SH},
+        {"STRICTENC", SCRIPT_VERIFY_STRICTENC},
+        {"DERSIG", SCRIPT_VERIFY_DERSIG},
+        {"LOW_S", SCRIPT_VERIFY_LOW_S},
+        {"SIGPUSHONLY", SCRIPT_VERIFY_SIGPUSHONLY},
+        {"MINIMALDATA", SCRIPT_VERIFY_MINIMALDATA},
+        {"NULLDUMMY", SCRIPT_VERIFY_NULLDUMMY},
+        {"DISCOURAGE_UPGRADABLE_NOPS", SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS},
+        {"CLEANSTACK", SCRIPT_VERIFY_CLEANSTACK},
+        {"MINIMALIF", SCRIPT_VERIFY_MINIMALIF},
+        {"NULLFAIL", SCRIPT_VERIFY_NULLFAIL},
+        {"CHECKLOCKTIMEVERIFY", SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY},
+        {"CHECKSEQUENCEVERIFY", SCRIPT_VERIFY_CHECKSEQUENCEVERIFY},
+        {"COMPRESSED_PUBKEYTYPE", SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE},
+        {"SIGHASH_FORKID", SCRIPT_ENABLE_SIGHASH_FORKID},
+        {"GENESIS", SCRIPT_GENESIS},
+        {"UTXO_AFTER_GENESIS", SCRIPT_UTXO_AFTER_GENESIS},
+    };
+}
+
+std::optional<uint32_t> GetFlagNumber(const std::string& flagName, std::string& err)
+{
+    std::optional<uint32_t> flagNumber;
+    auto findFlagIterator = mapFlagNames.find(flagName);
+    if (findFlagIterator == mapFlagNames.end())
+    {
+        err = "Provided flag (" + flagName + ") is unknown.";
+    }
+    else {
+        flagNumber = findFlagIterator->second;
+    }
+    return flagNumber;
 }
 
 // clang-format off

@@ -34,3 +34,13 @@ bool CZMQAbstractNotifier::NotifyRemovedFromMempoolBlock(const uint256& txid, Me
 {
     return true;
 }
+
+bool CZMQAbstractNotifier::NotifyBlock2(const CBlockIndex*)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyTransaction2(const CTransaction&)
+{
+    return true;
+}
