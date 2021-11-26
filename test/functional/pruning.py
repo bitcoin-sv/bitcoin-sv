@@ -29,7 +29,7 @@ TIMESTAMP_WINDOW = 2 * 60 * 60
 def calc_usage(blockdir):
     return sum(os.path.getsize(blockdir + f) for f in os.listdir(blockdir) if os.path.isfile(blockdir + f)) / (1024. * 1024.)
 
-
+            
 class PruneTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -213,6 +213,8 @@ class PruneTest(BitcoinTestFramework):
         return invalidheight, badhash
 
     def reorg_back(self):
+        # Wait for pruning to complete
+        wait_until(lambda: self.nodes[2].getblockchaininfo()["pruneheight"] >= self.forkheight)
         # Verify that a block on the old main chain fork has been pruned away
         assert_raises_rpc_error(
             -1, "Block file {} not available.".format(self.forkhash), self.nodes[2].getblock, self.forkhash)
