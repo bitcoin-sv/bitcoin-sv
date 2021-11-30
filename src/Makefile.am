@@ -178,6 +178,7 @@ BITCOIN_CORE_H = \
   net/stream.h \
   net/stream_policy.h \
   net/stream_policy_factory.h \
+  net/validation_scheduler.h \
   netmessagemaker.h \
   noui.h \
   orphan_txns.h \
@@ -231,6 +232,7 @@ BITCOIN_CORE_H = \
   threadinterrupt.h \
   timedata.h \
   time_locked_mempool.h \
+  transaction_specific_config.h \
   txdb.h \
   txhasher.h \
   txmempool.h \
@@ -335,6 +337,7 @@ libbitcoin_server_a_SOURCES = \
   net/stream.cpp \
   net/stream_policy.cpp \
   net/stream_policy_factory.cpp \
+  net/validation_scheduler.cpp \
   noui.cpp \
   orphan_txns.cpp \
   policy/fees.cpp \
@@ -497,6 +500,7 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  transaction_specific_config.cpp \
   txhasher.cpp \
   warnings.cpp \
   write_preferring_upgradable_mutex.cpp \

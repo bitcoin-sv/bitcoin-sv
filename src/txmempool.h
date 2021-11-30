@@ -703,7 +703,8 @@ public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             const mining::CJournalChangeSetPtr& changeSet,
-            const uint256& blockhash);
+            const uint256& blockhash,
+            std::vector<CTransactionRef>& txNew);
 
     void RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet);
 

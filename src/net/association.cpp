@@ -389,9 +389,16 @@ void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setEr
         mStreamPolicy->ServiceSockets(mStreams, setRecv, setSend, setError, config,
             gotNewMsgs, bytesRecv, bytesSent);
     }
-    catch(BanStream& ban)
+    catch(const BanPeer& e)
     {
+        LogPrint(BCLog::NETCONN, "Fatal error servicing streams: %s, banning peer=%d\n", e.what(), mNode->GetId());
+        mNode->CloseSocketDisconnect();
         connman.Ban(GetPeerAddr(), BanReasonNodeMisbehaving);
+    }
+    catch(const std::exception& e)
+    {
+        LogPrint(BCLog::NETCONN, "Error servicing streams: %s, peer=%d\n", e.what(), mNode->GetId());
+        mNode->CloseSocketDisconnect();
     }
 }
 
@@ -415,7 +422,7 @@ uint64_t Association::GetTotalSendQueueSize() const
 uint64_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType)
 {
     uint64_t nPayloadLength { msg.Size() };
-    uint64_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
+    uint64_t nTotalSize { nPayloadLength + serialisedHeader.size() };
     uint64_t nBytesSent {0};
 
     try

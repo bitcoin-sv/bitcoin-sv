@@ -394,7 +394,8 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
-    mempool.RemoveForBlock({entryNotPaying1.GetSharedTx(), entryNotPaying3.GetSharedTx()}, mining::CJournalChangeSetPtr{}, uint256{});
+    std::vector<CTransactionRef> vtx;
+    mempool.RemoveForBlock({ entryNotPaying1.GetSharedTx(), entryNotPaying3.GetSharedTx() }, mining::CJournalChangeSetPtr{}, uint256{}, vtx);
 
     for(auto entryIt: {notPaying2, paysFor2})
     {
@@ -561,7 +562,8 @@ BOOST_AUTO_TEST_CASE(conflicts)
         BOOST_CHECK(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
-    mempool.RemoveForBlock({entryDoubleSpendBlock.GetSharedTx(), entryToBeMined.GetSharedTx()}, mining::CJournalChangeSetPtr{}, uint256{});
+    std::vector<CTransactionRef> vtx;
+    mempool.RemoveForBlock({ entryDoubleSpendBlock.GetSharedTx(), entryToBeMined.GetSharedTx() }, mining::CJournalChangeSetPtr{}, uint256{}, vtx);
 
     BOOST_CHECK(tx4->IsInPrimaryMempool());
     BOOST_CHECK(JournalTester(journal).checkTxnExists(JournalEntry{*tx4}));

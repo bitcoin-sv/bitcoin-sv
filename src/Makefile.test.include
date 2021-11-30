@@ -159,6 +159,7 @@ BITCOIN_TESTS =\
   test/undo_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp \
+  test/validation_scheduler_tests.cpp \
   test/validation_tests.cpp \
   test/webhook_client_tests.cpp
 

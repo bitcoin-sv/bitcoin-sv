@@ -10,7 +10,6 @@ from http.server import HTTPServer
 from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG, reset_proofs
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, check_for_log_msg, assert_equal
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 from test_framework.mininode import *
 from test_framework.script import *
 import os
@@ -82,6 +81,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                             '-whitelist=127.0.0.1',
                             '-genesisactivationheight=1',
                             '-maxscriptsizepolicy=0',
+                            '-maxscriptnumlengthpolicy=250000',
                             "-maxnonstdtxvalidationduration=15000",
                             "-maxtxnvalidatorasynctasksrunduration=15001",
                             "-dsnotifylevel=2"]]
@@ -353,7 +353,7 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         # Create funding transactions that will provide funds for other transcations
         ftx = CTransaction()
-        ftx.vout.append(CTxOut(1000000, CScript([bytearray([42] * DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE])))
+        ftx.vout.append(CTxOut(1000000, CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE])))
         ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
@@ -374,7 +374,7 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 1, which means nonstandard transaction will not even validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', "-maxnonstdtxvalidationduration=11", "-dsnotifylevel=1"])
+        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000',"-maxnonstdtxvalidationduration=11", "-dsnotifylevel=1"])
 
         self.createConnection()
         # Create double spend of tx1
@@ -390,7 +390,7 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 2, which means nonstandard transaction will validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', "-maxnonstdtxvalidationduration=11", "-dsnotifylevel=2"])
+        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000',"-maxnonstdtxvalidationduration=11", "-dsnotifylevel=2"])
 
         self.createConnection()
         vin = [

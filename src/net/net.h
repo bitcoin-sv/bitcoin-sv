@@ -31,8 +31,10 @@
 #include "threadinterrupt.h"
 #include "txmempool.h"
 #include "txn_sending_details.h"
+#include "txn_validation_config.h"
 #include "uint256.h"
 #include "validation.h"
+#include "validation_scheduler.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -230,10 +232,15 @@ public:
         std::vector<uint8_t>&& data)
         : mCommand{std::move(command)}
         , mPayloadType{payloadType}
-        , mHash{::Hash(data.data(), data.data() + data.size())}
         , mSize{data.size()}
-        , mData{std::make_unique<CVectorStream>(std::move(data))}
-    {/**/}
+    {
+        // Only calculate message hash for non-extended messages
+        if(! CMessageHeader::IsExtended(mSize))
+        {
+            mHash = ::Hash(data.data(), data.data() + data.size());
+        }
+        mData = std::make_unique<CVectorStream>(std::move(data));
+    }
 
     CSerializedNetMsg(
         std::string&& command,
@@ -374,7 +381,8 @@ public:
             TxInputDataSPtrVec& vNewTxns,
             CTxnHandlers& handlers,
             bool fUseTimedCancellationSource,
-            std::chrono::milliseconds maxasynctasksrunduration)
+            std::chrono::milliseconds maxasynctasksrunduration,
+            PTVTaskScheduleStrategy scheduleStrategy)
         -> std::vector<std::future<typename std::result_of<
             Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
@@ -382,37 +390,49 @@ public:
                 CTxnHandlers&,
                 bool,
                 std::chrono::steady_clock::time_point)>::type>> {
-        using resultType = typename std::result_of<
-            Callable(const TxInputDataSPtrRefVec&,
-                const Config*,
-                CTxMemPool*,
-                CTxnHandlers&,
-                bool,
-                std::chrono::steady_clock::time_point)>::type;
-        auto chains = ScheduleChains(vNewTxns);
-        // Reserve a space for the result set (a pessimistic estimation).
-        std::vector<std::future<resultType>> results {};
-        results.reserve(chains.size());
         // Set end_time_point based on the current time and max duration for async tasks.
         std::chrono::steady_clock::time_point zero_time_point(std::chrono::milliseconds(0));
         std::chrono::steady_clock::time_point end_time_point =
             std::chrono::steady_clock::time_point(maxasynctasksrunduration) == zero_time_point
                 ? zero_time_point : std::chrono::steady_clock::now() + maxasynctasksrunduration;
-        for (auto& chain: chains) {
-                results.emplace_back(
-                    make_task(
-                        mValidatorThreadPool,
-                        chain.second == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
-                        func,
-                        std::move(chain.first),
-                        config,
-                        pool,
-                        handlers,
-                        fUseTimedCancellationSource,
-                        end_time_point));
-        }
 
-        return results;
+        if (scheduleStrategy == PTVTaskScheduleStrategy::TOPO_SORT) {
+            ValidationScheduler::TypeValidationFunc validate =
+                    [func, config, pool, &handlers, fUseTimedCancellationSource, end_time_point]
+                            (const TxInputDataSPtrRefVec &vTxInputData) {
+                        return func(vTxInputData, config, pool, handlers, fUseTimedCancellationSource, end_time_point);
+                    };
+            auto scheduler = std::make_shared<ValidationScheduler>(mValidatorThreadPool, vNewTxns, validate);
+            return scheduler->Schedule();
+        } else {
+            using resultType = typename std::result_of<
+                    Callable(const TxInputDataSPtrRefVec&,
+                             const Config*,
+                             CTxMemPool*,
+                             CTxnHandlers&,
+                             bool,
+                             std::chrono::steady_clock::time_point)>::type;
+            auto chains = ScheduleChains(vNewTxns);
+            // Reserve a space for the result set (a pessimistic estimation).
+            std::vector<std::future<resultType>> results {};
+            results.reserve(chains.size());
+
+            for (auto& chain: chains) {
+                results.emplace_back(
+                        make_task(
+                                mValidatorThreadPool,
+                                chain.second == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
+                                func,
+                                std::move(chain.first),
+                                config,
+                                pool,
+                                handlers,
+                                fUseTimedCancellationSource,
+                                end_time_point));
+            }
+
+            return results;
+        }
     }
 
     /** Get a handle to the TxIdTracker */
@@ -1046,6 +1066,7 @@ public:
     int GetRecvVersion() { return nRecvVersion; }
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
+    bool SendVersionIsSet() const { return nSendVersion != 0; }
 
     uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
 

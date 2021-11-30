@@ -20,12 +20,12 @@ namespace
     {
         ss.clear();
         ss << VARINT(std::numeric_limits<Unsigned>::max());
-        Unsigned j;
+        Unsigned j {0};
         ss >> VARINT(j);
         BOOST_CHECK_EQUAL(j, std::numeric_limits<Unsigned>::max());
         ss.clear();
         ss << VARINT(std::numeric_limits<Signed>::max());
-        Signed k;
+        Signed k {0};
         ss >> VARINT(k);
         BOOST_CHECK_EQUAL(k, std::numeric_limits<Signed>::max());
     }
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(varints) {
         // Deserialising a larger value than can fit into any integral type
         ss.clear();
         ss.insert(ss.end(), 64, char(0x80));
-        uint32_t j;
+        uint32_t j = 0;
         BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
     }
 
@@ -243,7 +243,7 @@ BOOST_AUTO_TEST_CASE(varints) {
         // Deserialising a larger value than can fit into the given type
         ss.clear();
         ss.insert(ss.end(), 4, char(0xFF));
-        uint16_t j;
+        uint16_t j = 0;
         BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
     }
 }

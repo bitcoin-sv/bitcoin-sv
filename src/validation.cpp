@@ -801,9 +801,10 @@ static bool CheckMempoolMinFee(
 
 static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
-                                std::string& errString) {
-    const auto limitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-    const auto limitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
+                                std::string& errString,
+                                const Config& config) {
+    const auto limitAncestors = config.GetLimitAncestorCount();
+    const auto limitSecondaryMempoolAncestors = config.GetLimitSecondaryMempoolAncestorCount();
     return pool.CheckAncestorLimits(entry,
                                     limitAncestors,
                                     limitSecondaryMempoolAncestors,
@@ -1328,7 +1329,7 @@ CTxnValResult TxnValidation(
     }
     // Calculate in-mempool ancestors, up to a limit.
     std::string errString;
-    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString)) {
+    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString, config)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-mempool-chain",
                   errString);
@@ -1344,6 +1345,8 @@ CTxnValResult TxnValidation(
     // We are getting flags as they would be if the utxos are before genesis. 
     // "CheckInputs" is adding specific flags for each input based on its height in the main chain
     uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
+    // Turn off flags that may be on in scriptVerifyFlags, but we explicitly want them to be skipped
+    scriptVerifyFlags &= ~pTxInputData->GetSkipScriptFlags();
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
@@ -1584,7 +1587,7 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
             result =
                 TxnValidation(
                     elem,
-                    config,
+                    elem.get()->GetConfig(config),
                     pool,
                     handlers.mpTxnDoubleSpendDetector,
                     fUseLimits,
@@ -3401,6 +3404,8 @@ private:
 
     void softConsensusFreeze( CBlockIndex& index, std::int32_t duration )
     {
+        assert( duration>=0 );
+
         LogPrintf(
             "Soft consensus freezing block %s for %d blocks.\n",
             index.GetBlockHash().ToString(),
@@ -3411,7 +3416,7 @@ private:
         BlockIndexWithDescendants blocks{
             &index,
             mapBlockIndex,
-            index.GetHeight() + duration };
+            (std::numeric_limits<std::int32_t>::max() - duration > index.GetHeight()) ? index.GetHeight() + duration : duration };
 
         for(auto* item=blocks.Root()->Next(); item!=nullptr; item=item->Next())
         {
@@ -3978,14 +3983,14 @@ static bool ConnectTip(
         auto flushed = pCoinsTipSpan.TryFlush();
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
-
-    auto asyncRemoveForBlock = std::async(std::launch::async, 
-        [&blockConnecting, &changeSet]()
+    std::vector<CTransactionRef> txNew;
+    auto asyncRemoveForBlock = std::async(std::launch::async,
+        [&blockConnecting, &changeSet, &txNew]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash());
+            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash(), txNew);
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
@@ -4007,7 +4012,8 @@ static bool ConnectTip(
     nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-    if(g_connman)
+    
+    if (g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
     }
@@ -4026,6 +4032,7 @@ static bool ConnectTip(
              (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
+    GetMainSignals().BlockConnected2(pindexNew, txNew);
 
     FinalizeGenesisCrossing(config, pindexNew->GetHeight(), changeSet);
 
@@ -4878,6 +4885,13 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     if(tip_disconnected)
     {
         uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->GetPrev());
+    }
+
+    // Make sure all on disk data is consistent after rewinding the tip
+    if(! FlushStateToDisk(config.GetChainParams(), state, FLUSH_STATE_ALWAYS))
+    {
+        LogPrintf("Failed to flush to disk in InvalidateBlock\n");
+        return false;
     }
 
     if (state.IsValid() && g_connman) {
@@ -6288,6 +6302,11 @@ void LoadChainTip(const CChainParams &chainparams) {
         return;
     }
 
+    if(setBlockIndexCandidates.count(index) == 0)
+    {
+        throw std::runtime_error("LoadChainTip error: CoinsDB best block not in setBlockIndexCandidates");
+    }
+
     chainActive.SetTip(index);
     PruneBlockIndexCandidates();
 
@@ -6801,12 +6820,12 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
             uint32_t nSizeLegacy = 0;
             try {
                 // Locate a header.
-                uint8_t buf[CMessageHeader::MESSAGE_START_SIZE];
+                uint8_t buf[CMessageFields::MESSAGE_START_SIZE];
                 blkdat.FindByte(chainparams.DiskMagic()[0]);
                 nRewind = blkdat.GetPos() + 1;
                 blkdat >> FLATDATA(buf);
                 if (memcmp(buf, chainparams.DiskMagic().data(),
-                           CMessageHeader::MESSAGE_START_SIZE)) {
+                           CMessageFields::MESSAGE_START_SIZE)) {
                     continue;
                 }
                 // Read 32 bit size. If it is equal to 32 max than read also 64 bit size.

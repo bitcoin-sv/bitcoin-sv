@@ -47,7 +47,6 @@ from test_framework.blocktools import create_transaction, PreviousSpendableOutpu
 from test_framework.util import assert_equal, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, CTransaction, CTxIn, CTxOut, COutPoint
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 import random
 
 class PVQTimeoutTest(ComparisonTestFramework):
@@ -63,7 +62,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # Locking scripts used in the test.
         self.locking_script_1 = CScript([self.coinbase_pubkey, OP_CHECKSIG])
         self.locking_script_2 = CScript([1, 1, OP_ADD, OP_DROP])
-        self.locking_script_3 = CScript([bytearray([42] * DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP])
+        self.locking_script_3 = CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP])
 
         self.default_args = ['-debug', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight]
         self.extra_args = [self.default_args] * self.num_nodes
@@ -276,7 +275,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         args = ['-checkmempool=0', '-persistmempool=0',
                 '-maxnonstdtxvalidationduration=100000', # On slow/busy machine txn validation times have to be high
                 '-maxtxnvalidatorasynctasksrunduration=100001', # This needs to mehigher then maxnonstdtxvalidationduration
-                '-maxscriptsizepolicy=0']
+                '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000']
         with self.run_node_with_connections('TC3: {} txs with large bignums detected as non-std txs and then finally accepted.'.format(tc3_txs_num),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
@@ -305,7 +304,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - one funding transaction is needed in this test case.
         spend_txs = out[tc1_txs_num+2:tc1_txs_num+3]
         args = ['-checkmempool=0', '-persistmempool=0',
-                '-maxscriptsizepolicy=0']
+                '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000']
         with self.run_node_with_connections('TC4: {} txs with large bignums detected as non-std txs and then finally rejected.'.format(tc4_txs_num),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.

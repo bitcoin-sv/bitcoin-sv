@@ -47,7 +47,14 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
         CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolNotifier>;
     factories["pubremovedfrommempoolblock"] =
         CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolBlockNotifier>;
-
+    factories["pubhashblock2"] =
+        CZMQAbstractNotifier::Create<CZMQPublishHashBlockNotifier2>;
+    factories["pubrawblock2"] =
+        CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier2>;
+    factories["pubhashtx2"] =
+        CZMQAbstractNotifier::Create<CZMQPublishHashTransactionNotifier2>;
+    factories["pubrawtx2"] =
+        CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier2>;
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i =
              factories.begin();
@@ -153,10 +160,11 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
          i != notifiers.end();) {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyBlock(pindexNew)) {
-            i++;
+            ++i;
         } else {
             notifier->Shutdown();
             i = notifiers.erase(i);
+            delete notifier;
         }
     }
 }
@@ -168,12 +176,13 @@ void CZMQNotificationInterface::InvalidTxMessageZMQ(std::string_view message)
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyTextMessage("invalidtx", message)) 
         {
-            i++;
+            ++i;
         } 
         else 
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
+            delete notifier;
         }
     }
 }
@@ -188,10 +197,11 @@ void CZMQNotificationInterface::TransactionAddedToMempool(
          i != notifiers.end();) {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyTransaction(tx)) {
-            i++;
+            ++i;
         } else {
             notifier->Shutdown();
             i = notifiers.erase(i);
+            delete notifier;
         }
     }
 }
@@ -212,6 +222,7 @@ void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txi
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
+            delete notifier;
         }
     }
 }
@@ -229,6 +240,28 @@ void CZMQNotificationInterface::TransactionRemovedFromMempoolBlock(const uint256
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
+            delete notifier;
+        }
+    }
+}
+
+void CZMQNotificationInterface::TransactionAdded(const CTransactionRef& ptx)
+{
+    // Used by BlockConnected2 and BlockDisconnected2 as well
+    const CTransaction& tx = *ptx;
+
+    for (auto i = notifiers.begin(); i != notifiers.end();) 
+    {
+        CZMQAbstractNotifier* notifier = *i;
+        if (notifier->NotifyTransaction2(tx)) 
+        {
+            ++i;
+        } 
+        else 
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+            delete notifier;
         }
     }
 }
@@ -242,6 +275,39 @@ void CZMQNotificationInterface::BlockConnected(
         TransactionAddedToMempool(ptx);
     }
 }
+
+// Notify for every connected block, even on re-org
+// Only notify for transactions in vtxNew (that are not already in mempool)
+void CZMQNotificationInterface::BlockConnected2(
+    const CBlockIndex* pindexConnected,
+    const std::vector<CTransactionRef>& vtxNew)
+{
+    if (IsInitialBlockDownload()) 
+    {
+        return;
+    }
+
+    for (const CTransactionRef& ptx : vtxNew) 
+    {
+        TransactionAdded(ptx);
+    }
+
+    for (auto i = notifiers.begin(); i != notifiers.end();) 
+    {
+        CZMQAbstractNotifier* notifier = *i;
+        if (notifier->NotifyBlock2(pindexConnected)) 
+        {
+            ++i;
+        } 
+        else 
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+            delete notifier;
+        }
+    }
+}
+
 
 void CZMQNotificationInterface::BlockDisconnected(
     const std::shared_ptr<const CBlock> &pblock) {

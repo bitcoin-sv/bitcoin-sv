@@ -2,7 +2,7 @@
 # Copyright (c) 2021 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
-Test soft consensus freeze - unlimited freeze
+Test soft consensus freeze - default freeze
 
 Make sure that not setting softconsensusfreezeduration attribute freezes block
 for expected duration and check rpc method preciousblock has no impact on soft freeze duration.

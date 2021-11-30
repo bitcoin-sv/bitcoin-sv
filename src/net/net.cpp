@@ -993,7 +993,7 @@ void CNode::SetSendVersion(int nVersionIn) {
 int CNode::GetSendVersion() const {
     // The send version should always be explicitly set to INIT_PROTO_VERSION
     // rather than using this value until SetSendVersion has been called.
-    if (nSendVersion == 0) {
+    if (! SendVersionIsSet()) {
         error("Requesting unset send version for node: %i. Using %i", id,
               INIT_PROTO_VERSION);
         return INIT_PROTO_VERSION;
@@ -3017,9 +3017,13 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
     return pnode && pnode->fSuccessfullyConnected && !pnode->fDisconnect;
 }
 
-void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream) {
-    uint64_t nPayloadLength = msg.Size();
-    if (nPayloadLength > std::numeric_limits<uint32_t>::max())
+void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg&& msg, StreamType stream)
+{
+    // Ensure we don't send extended messages to a peer that won't understand them
+    uint64_t nPayloadLength { msg.Size() };
+    int sendVersion { pnode->SendVersionIsSet()? pnode->GetSendVersion() : INIT_PROTO_VERSION };
+    uint64_t maxPayloadLength { CMessageHeader::GetMaxPayloadLength(sendVersion) };
+    if(nPayloadLength > maxPayloadLength)
     {
         LogPrint(BCLog::NETMSG, "message %s (%d bytes) cannot be sent because it exceeds max P2P message limit peer=%d\n",
             SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
@@ -3028,13 +3032,10 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, Strea
     LogPrint(BCLog::NETMSGVERB, "sending %s (%d bytes) peer=%d\n",
              SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
-    std::vector<uint8_t> serializedHeader;
-    serializedHeader.reserve(CMessageHeader::HEADER_SIZE);
-    CMessageHeader hdr(config->GetChainParams().NetMagic(),
-                       msg.Command().c_str(), nPayloadLength);
-    memcpy(hdr.pchChecksum, msg.Hash().begin(), CMessageHeader::CHECKSUM_SIZE);
-
-    CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
+    CMessageHeader hdr { *config, msg };
+    std::vector<uint8_t> serializedHeader {};
+    serializedHeader.reserve(hdr.GetLength());
+    CVectorWriter { SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr };
 
     uint64_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg), stream) };
     if (nBytesSent > 0)

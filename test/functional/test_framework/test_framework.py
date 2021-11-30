@@ -314,18 +314,22 @@ class BitcoinTestFramework():
     # This method runs and stops bitcoind node with index 'node_index'.
     # It also creates (and handles closing of) 'number_of_connections' connections to bitcoind node with index 'node_index'.
     @contextlib.contextmanager
-    def run_node_with_connections(self, title, node_index, args, number_of_connections, ip='127.0.0.1', strSubVer=None, wait_for_verack=True):
+    def run_node_with_connections(self, title, node_index, args, number_of_connections, connArgs=[{}], cb_class=NodeConnCB, ip='127.0.0.1', wait_for_verack=True):
         logger.debug("setup %s", title)
 
         self.start_node(node_index, args)
 
+        connections = []
         connectionCbs = []
         for i in range(number_of_connections):
-            connectionCbs.append(NodeConnCB())
+            connCb = cb_class()
+            connectionCbs.append(connCb)
 
-        connections = []
-        for connCb in connectionCbs:
-            connection = NodeConn(ip, p2p_port(0), self.nodes[node_index], connCb, strSubVer=strSubVer)
+            thisConnArgs = {}
+            if len(connArgs) > i:
+                thisConnArgs = connArgs[i]
+
+            connection = NodeConn(ip, p2p_port(node_index), self.nodes[node_index], connCb, **thisConnArgs)
             connections.append(connection)
             connCb.add_connection(connection)
 
@@ -405,7 +409,7 @@ class BitcoinTestFramework():
     # It also creates (and handles closing of) some number of associations (desribed by their stream policies)
     # to bitcoind node with index 'node_index'.
     @contextlib.contextmanager
-    def run_node_with_associations(self, title, node_index, args, stream_policies, cb_class=AssociationCB, ip='127.0.0.1', strSubVer=None):
+    def run_node_with_associations(self, title, node_index, args, stream_policies, cb_class=AssociationCB, ip='127.0.0.1', connArgs={}):
         logger.debug("setup %s", title)
 
         self.start_node(node_index, args)
@@ -414,7 +418,7 @@ class BitcoinTestFramework():
         associations = []
         for stream_policy in stream_policies:
             association = Association(stream_policy, cb_class)
-            association.create_streams(self.nodes[node_index], ip, strSubVer)
+            association.create_streams(self.nodes[node_index], ip, connArgs)
             associations.append(association)
 
         # Start network handling thread

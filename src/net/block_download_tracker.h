@@ -89,6 +89,9 @@ class BlockDownloadTracker
     InFlightBlock GetBlockDetails(const BlockSource& block) const;
     std::vector<InFlightBlock> GetBlockDetails(const uint256& hash) const;
 
+    // Get number of peers from which we are downloading blocks
+    int GetPeersWithValidatedDownloadsCount() const;
+
   private:
 
     // Record whether a node should be punished for a block that fails validation

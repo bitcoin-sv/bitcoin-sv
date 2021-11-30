@@ -43,9 +43,11 @@ protected:
                                                MemPoolRemovalReason reason,
                                                const CTransactionConflict& conflictedWith) {}
     virtual void TransactionRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason) {}
+    virtual void TransactionAdded(const CTransactionRef& ptxn) {}
     virtual void BlockConnected(const std::shared_ptr<const CBlock> &block,
                    const CBlockIndex *pindex,
                    const std::vector<CTransactionRef> &txnConflicted) {}
+    virtual void BlockConnected2(const CBlockIndex* pindex, const std::vector<CTransactionRef>& txnNew) {}
     virtual void BlockDisconnected(const std::shared_ptr<const CBlock> &block) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
     virtual void Inventory(const uint256 &hash) {}
@@ -87,6 +89,13 @@ struct CMainSignals {
                                  const CBlockIndex *pindex,
                                  const std::vector<CTransactionRef> &)>
         BlockConnected;
+    /**
+     * Notifies listeners of a block being connected.
+     * Provides a vector of transactions evicted from the mempool without those which were already in the mempool.
+     */
+    boost::signals2::signal<void(const CBlockIndex* pindex,
+                                 const std::vector<CTransactionRef> &)>
+        BlockConnected2;
     /** Notifies listeners of a block being disconnected */
     boost::signals2::signal<void(const std::shared_ptr<const CBlock> &)> BlockDisconnected;
     /** Notifies listeners of a new active block chain. */
