@@ -51,7 +51,9 @@ public:
         const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN)
     {
-        mempool.RemoveRecursive(tx, changeSet, reason);
+        std::unique_lock lock{ mempool.smtx };
+
+        mempool.removeRecursiveNL(tx, changeSet, mempool.noConflict, reason);
     }
   
     mining::CJournalBuilder& getJournalBuilder()

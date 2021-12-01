@@ -654,7 +654,7 @@ private:
     SecondaryMempoolEntryData CalculateSecondaryMempoolData(txiter entryIt) const;
 
     // modifies entry by adding grouping data
-    void SetGroupingData(txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData);
+    void SetGroupingDataNL(txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData);
 
     // forms a group out of groupMembers, modifys mempool entry (remove grouping data and create group object) and adds
     // changes to the changeSet
@@ -698,6 +698,9 @@ private:
 
     // walks recursively through all descedants of the items in the set and updates theirs ancestorsCouunt
     void UpdateAncestorsCountNL(setEntriesTopoSorted entries);
+
+
+    void RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet);
 
 public:
     void RemoveForBlock(
@@ -1119,11 +1122,6 @@ public:
         const std::vector<CTransactionRef> &vtx);
 
 private:
-    void RemoveRecursive(
-        const CTransaction &tx,
-        const mining::CJournalChangeSetPtr& changeSet,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
-
     // A non-locking version of CheckMempool
     void CheckMempoolNL(
             CoinsDBView& view,
@@ -1140,7 +1138,7 @@ private:
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
 
-    void RemoveForReorg(
+    void RemoveForReorgNL(
         const Config &config,
         const CoinsDB& coinsTip,
         const mining::CJournalChangeSetPtr& changeSet,
