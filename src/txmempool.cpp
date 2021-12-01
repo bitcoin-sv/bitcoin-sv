@@ -2913,10 +2913,8 @@ bool CTxMemPool::LoadMempool(const Config &config,
                 PrioritiseTransaction(txid, txid.ToString(), Amount{nFeeDelta});
             }
             if (nTime + nExpiryTimeout > nNow) {
-                // Mempool Journal ChangeSet
-                CJournalChangeSetPtr changeSet {
-                    getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
-                };
+                // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+                CJournalChangeSetPtr changeSet {nullptr};
                 const auto txStorage = (txFromMemory ? TxStorage::memory : TxStorage::txdb);
                 const CValidationState state {
                     // Execute txn validation synchronously.
