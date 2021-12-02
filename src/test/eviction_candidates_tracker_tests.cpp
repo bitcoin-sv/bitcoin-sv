@@ -69,7 +69,7 @@ class MempoolMockup
 public:
     std::optional<CEvictionCandidateTracker> tracker;
     CTxMemPoolTestAccess::txlinksMap links;
-    CTxMemPool::indexed_transaction_set mapTx;
+    CTxMemPoolTestAccess::Indexed_transaction_set mapTx;
 
     CTxMemPoolTestAccess::txiter AddTx(CTxMemPoolEntry entry)
     {

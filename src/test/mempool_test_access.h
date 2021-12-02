@@ -21,6 +21,8 @@ template<>
 struct CTxMemPool::UnitTestAccess<UnitTestAccessTag>
 {
 public:
+    using Indexed_transaction_set = indexed_transaction_set;
+
     CTxMemPool& mempool;
 
     UnitTestAccess(CTxMemPool& _mempool)
@@ -51,7 +53,9 @@ public:
         const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN)
     {
-        mempool.RemoveRecursive(tx, changeSet, reason);
+        std::unique_lock lock{ mempool.smtx };
+
+        mempool.removeRecursiveNL(tx, changeSet, mempool.noConflict, reason);
     }
   
     mining::CJournalBuilder& getJournalBuilder()

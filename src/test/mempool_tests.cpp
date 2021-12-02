@@ -152,24 +152,25 @@ BOOST_AUTO_TEST_CASE(MempoolClearTest) {
     // Add the transaction
     testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
-    BOOST_CHECK_EQUAL(testPool.mapTx.size(), 1UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.mapTx().size(), 1UL);
     BOOST_CHECK_EQUAL(testPoolAccess.mapNextTx().size(), 1UL);
 
     // CTxMemPool's members should be empty after a clear
     testPool.Clear();
     BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
-    BOOST_CHECK_EQUAL(testPool.mapTx.size(), 0UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.mapTx().size(), 0UL);
     BOOST_CHECK_EQUAL(testPoolAccess.mapNextTx().size(), 0UL);
 }
 
 template <typename name>
 void CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder) {
     BOOST_CHECK_EQUAL(pool.Size(), sortedOrder.size());
-    typename CTxMemPool::indexed_transaction_set::index<name>::type::iterator
-        it = pool.mapTx.get<name>().begin();
+    CTxMemPoolTestAccess testPoolAccess{ pool };
     int count = 0;
-    for (; it != pool.mapTx.get<name>().end(); ++it, ++count) {
-        BOOST_CHECK_EQUAL(it->GetTxId().ToString(), sortedOrder[count]);
+    for ( auto& item : testPoolAccess.mapTx().get<name>() )
+    {
+        BOOST_CHECK_EQUAL( item.GetTxId().ToString(), sortedOrder[count] );
+        ++count;
     }
 }
 
@@ -232,7 +233,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     BOOST_CHECK_EQUAL(pool.Size(), 6UL);
 
     CTxMemPoolTestAccess::setEntries setAncestors;
-    setAncestors.insert(pool.mapTx.find(tx6.GetId()));
+    setAncestors.insert(testPoolAccess.mapTx().find(tx6.GetId()));
     CMutableTransaction tx7 = CMutableTransaction();
     tx7.vin.resize(1);
     tx7.vin[0].prevout = COutPoint(tx6.GetId(), 0);
@@ -483,7 +484,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         // This should add a new entry into mapDeltas.
         check_entry_added_to_mapdeltas(txid);
         // Remove txid from the mapTx.
-        testPool.mapTx.erase(txid);
+        testPoolAccess.mapTx().erase(txid);
     }
     // During txPrioritizer's destruction txid should be removed from mapDeltas.
     BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
@@ -498,7 +499,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         // This should add a new entry into mapDeltas.
         check_entry_added_to_mapdeltas(txid);
         // Remove txid from the mapTx.
-        testPool.mapTx.erase(txid);
+        testPoolAccess.mapTx().erase(txid);
     }
     // During txPrioritizer's destruction txid should be removed from mapDeltas.
     BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
@@ -513,7 +514,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         // There should be no operations on the mapDeltas.
         BOOST_CHECK(testPoolAccess.mapDeltas().empty());
         // Remove txid from the mapTx.
-        testPool.mapTx.erase(txid);
+        testPoolAccess.mapTx().erase(txid);
     }
     // Check if mapDeltas remains empty.
     BOOST_CHECK(testPoolAccess.mapDeltas().empty());
@@ -528,7 +529,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         // There should be no operations on the mapDeltas.
         BOOST_CHECK(testPoolAccess.mapDeltas().empty());
         // Remove txid from the mapTx.
-        testPool.mapTx.erase(txid);
+        testPoolAccess.mapTx().erase(txid);
     }
     // Check if mapDeltas remains empty.
     BOOST_CHECK(testPoolAccess.mapDeltas().empty());
