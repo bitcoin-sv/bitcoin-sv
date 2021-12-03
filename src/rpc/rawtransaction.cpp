@@ -1842,19 +1842,19 @@ void sendrawtransactions(const Config& config,
 
             "\nExamples:\n" +
             HelpExampleCli("sendrawtransactions",
-                           "\"[{\\\"hex\\\":\\\"hexstring\\\"}]\"") +
+                           R"("[{\"hex\":\"hexstring\"}]")") +
             HelpExampleCli("sendrawtransactions",
-                           "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true}]\"") +
+                           R"("[{\"hex\":\"hexstring\", \"allowhighfees\":true}]")") +
             HelpExampleCli("sendrawtransactions",
-                           "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true, \\\"dontcheckfee\\\":true}]\"") +
+                           R"("[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true, \"config\":{\"minconsolidationfactor\":10}}]")") +
             HelpExampleCli("sendrawtransactions",
-                           R"("[{\"hex\":\"hexstring\", \"listunconfirmedancestors\":true}]")") +
+                           R"("[{\"hex\":\"hexstring\", \"listunconfirmedancestors\":true}]" "{\"minconsolidationfactor\":10}")") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\"}]") +
+                           R"([{"hex":"hexstring"}])") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true}]") +
+                           R"([{"hex":"hexstring", "allowhighfees":true, "config":{"minconsolidationfactor":10}}])") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]") +
+                           R"([{"hex":"hexstring", "allowhighfees":true, "dontcheckfee":true}], {"minconsolidationfactor":10})") +
             HelpExampleRpc("sendrawtransactions",
                            R"([{"hex":"hexstring", "listunconfirmedancestors":true}])"));
     }
