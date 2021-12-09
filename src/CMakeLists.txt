@@ -477,6 +477,8 @@ add_library(server
 	pow.cpp
 	processing_block_index.cpp
 	processing_block_index.h
+	rawtxvalidator.cpp
+	rawtxvalidator.h
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp
