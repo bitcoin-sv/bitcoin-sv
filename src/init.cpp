@@ -485,8 +485,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               "entire blockchain. "
               "(default: 0 = disable pruning blocks, 1 = allow manual pruning "
               "via RPC, >%u = automatically prune block files to stay under "
-              "the specified target size in MiB)"),
-            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE));
+              "the specified target size in MiB, but still keep the last %u blocks "
+              "to speed up a potential reorg even if this results in the pruning "
+              "target being exceeded)"),
+            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, MIN_BLOCKS_TO_KEEP));
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
