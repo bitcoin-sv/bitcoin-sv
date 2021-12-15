@@ -382,8 +382,11 @@ static void FindNextBlocksToDownload(
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->GetHeight(), nWindowEnd + 1);
     NodeId waitingfor = -1;
 
+    unsigned int nDownloadHeightThreshold =
+        chainActive.Height() + 10;
+
     // Lambda to record a block we should fetch
-    auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor](const CBlockIndex* pindex)
+    auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor, nDownloadHeightThreshold](const CBlockIndex* pindex)
     {
         // The block is not already downloaded, and not yet in flight.
         if (pindex->GetHeight() > nWindowEnd) {
@@ -395,6 +398,11 @@ static void FindNextBlocksToDownload(
             }
             return false;
         }
+
+        if (pindex->GetHeight() > nDownloadHeightThreshold) {
+            return false;
+        }
+
         vBlocks.push_back(pindex);
         if (vBlocks.size() == count) {
             return false;

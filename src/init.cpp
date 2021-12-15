@@ -487,7 +487,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               "via RPC, >%u = automatically prune block files to stay under "
               "the specified target size in MiB, but still keep the last %u blocks "
               "to speed up a potential reorg even if this results in the pruning "
-              "target being exceeded)"),
+              "target being exceeded)"
+              "Note: Currently achievable prune target is ~100GB (mainnet). "
+              "Setting the target size too low will not affect pruning function, "
+              "but will not guarantee block files size staying under the threshold at all times. "),
             MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, MIN_BLOCKS_TO_KEEP));
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
