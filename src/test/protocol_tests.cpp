@@ -317,17 +317,21 @@ BOOST_AUTO_TEST_CASE(net_messages)
 
 // Windows does not support total size of array exceeding 0x7fffffff bytes
 #ifndef WIN32
-    // A max size non-extended block message, reading as much as we can
-    auto max32bit { std::make_unique<std::array<uint8_t, std::numeric_limits<uint32_t>::max()>>() };
-    lambda(NullHdrMutate, max32bit->size() * 2, NetMsgType::BLOCK, FLATDATA(*max32bit));
-    max32bit.release();
+    // A max size non-extended block message, reading as much as we can.
+    // max32bit needs to go out of scope immediately after call to lambda to prevent next allocation failing.
+    {
+        auto max32bit { std::make_unique<std::array<uint8_t, std::numeric_limits<uint32_t>::max()>>() };
+        lambda(NullHdrMutate, max32bit->size() * 2, NetMsgType::BLOCK, FLATDATA(*max32bit));
+    }
 
     // An extended block message, reading as much as we can
-    auto extendedPayload { std::make_unique<std::array<uint8_t, std::numeric_limits<uint32_t>::max() + 1UL>>() };
-    lambda(NullHdrMutate, extendedPayload->size() * 2, NetMsgType::BLOCK, FLATDATA(*extendedPayload));
+    {
+        auto extendedPayload { std::make_unique<std::array<uint8_t, std::numeric_limits<uint32_t>::max() + 1UL>>() };
+        lambda(NullHdrMutate, extendedPayload->size() * 2, NetMsgType::BLOCK, FLATDATA(*extendedPayload));
 
-    // Verify an extended message with a bad length throws
-    BOOST_CHECK_THROW(lambda(setBadLength, extendedPayload->size() * 2, NetMsgType::PING, FLATDATA(*extendedPayload)), BanPeer);
+        // Verify an extended message with a bad length throws
+        BOOST_CHECK_THROW(lambda(setBadLength, extendedPayload->size() * 2, NetMsgType::PING, FLATDATA(*extendedPayload)), BanPeer);
+    }
 #endif
 }
 
