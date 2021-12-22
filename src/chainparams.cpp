@@ -242,8 +242,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = false;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = false;
     }
 };
 
@@ -345,8 +345,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
     }
 };
 
@@ -467,8 +467,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
     }
 };
 
@@ -573,8 +573,8 @@ public:
         };
 
         fTestBlockCandidateValidity = true;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
     }
 };
 
