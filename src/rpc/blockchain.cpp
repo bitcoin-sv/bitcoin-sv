@@ -2010,7 +2010,12 @@ void gettxouts(const Config& config,
                 jWriter.pushKV("size", int64_t(tx->GetTotalSize()));
                 if(missingTxIds.insert(tx->GetId()).second)
                 {
-                    jWriter.pushKV("hex", EncodeHexTx(*tx));
+                    jWriter.pushK("hex");
+                    jWriter.pushQuote();
+                    jWriter.flush();
+                    // EncodeHexTx supports streaming (large transaction's hex should be chunked)
+                    EncodeHexTx(*tx, jWriter.getWriter(), RPCSerializationFlags());
+                    jWriter.pushQuote();
                 }
                 jWriter.writeEndObject();
             }
