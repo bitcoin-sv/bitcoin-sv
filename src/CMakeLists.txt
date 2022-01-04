@@ -580,6 +580,10 @@ endif()
 add_library(rpcclient
 	cfile_util.cpp
 	cfile_util.h
+    net/netaddress.cpp
+    net/netaddress.h
+    net/netbase.cpp
+    net/netbase.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp
