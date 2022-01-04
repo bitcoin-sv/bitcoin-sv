@@ -36,6 +36,7 @@ class RPCClientConfig
     // Accessors
     const std::string& GetServerIP() const { return mServerIP; }
     int GetServerPort() const { return mServerPort; }
+    std::string GetServerHTTPHost() const;
     int GetConnectionTimeout() const { return mConnectionTimeout; }
     const std::string& GetCredentials() const { return mUsernamePassword; }
     const std::string& GetWallet() const { return mWallet; }

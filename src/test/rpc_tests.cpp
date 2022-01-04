@@ -650,6 +650,7 @@ BOOST_AUTO_TEST_CASE(client_config_ds_endpoint)
     using namespace rpc::client;
     GlobalConfig config {};
 
+    // IPv4
     BOOST_CHECK_NO_THROW(
         // Create DSCallbackMsg to base config from
         std::string ip {"127.0.0.1"};
@@ -667,6 +668,32 @@ BOOST_AUTO_TEST_CASE(client_config_ds_endpoint)
 
         BOOST_CHECK_EQUAL(clientConfig.GetServerIP(), ip);
         BOOST_CHECK_EQUAL(clientConfig.GetServerPort(), RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT);
+        BOOST_CHECK_EQUAL(clientConfig.GetServerHTTPHost(), ip);
+        BOOST_CHECK_EQUAL(clientConfig.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT);
+        BOOST_CHECK(! clientConfig.UsesAuth());
+        BOOST_CHECK_EQUAL(clientConfig.GetEndpoint(), "/dsnt/1/");
+    );
+
+    // IPv6
+    BOOST_CHECK_NO_THROW(
+        // Create DSCallbackMsg to base config from
+        std::string ip {"::1"};
+        std::string host { "[" + ip + "]" };
+        DSCallbackMsg ipv6_callback(0x81, {ip}, {});
+
+        // Create RPC config using DSCallbackMsg
+        RPCClientConfig clientConfig {
+            RPCClientConfig::CreateForDoubleSpendEndpoint(
+                config,
+                DSCallbackMsg::IPAddrToString(ipv6_callback.GetAddresses()[0]),
+                RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT,
+                ipv6_callback.GetProtocolVersion()
+            )
+        };
+
+        BOOST_CHECK_EQUAL(clientConfig.GetServerIP(), ip);
+        BOOST_CHECK_EQUAL(clientConfig.GetServerPort(), RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT);
+        BOOST_CHECK_EQUAL(clientConfig.GetServerHTTPHost(), host);
         BOOST_CHECK_EQUAL(clientConfig.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT);
         BOOST_CHECK(! clientConfig.UsesAuth());
         BOOST_CHECK_EQUAL(clientConfig.GetEndpoint(), "/dsnt/1/");
@@ -688,6 +715,7 @@ BOOST_AUTO_TEST_CASE(client_config_bitcoind)
         RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
         BOOST_CHECK_EQUAL(config.GetServerIP(), "localhost");
         BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+        BOOST_CHECK_EQUAL(config.GetServerHTTPHost(), "localhost");
         BOOST_CHECK(config.UsesAuth());
         BOOST_CHECK_EQUAL(config.GetCredentials(), "user:passwd");
         BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 100);
