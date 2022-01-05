@@ -1283,7 +1283,7 @@ CTxnValResult TxnValidation(
     // the priority
     bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
     if (skipFeeTest) {
-        const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
+        const CFeeRate blockMinTxFee = pool.GetBlockMinTxFee();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
         if (nModifiedFees == nFees) {
             pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);

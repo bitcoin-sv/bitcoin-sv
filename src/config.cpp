@@ -48,7 +48,6 @@ void GlobalConfig::Reset()
 {
     data->feePerKB = CFeeRate {};
     data->dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
-    data->blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
     data->preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     data->factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
 
@@ -2090,14 +2089,6 @@ bool GlobalConfig::SetDustLimitFactor(int64_t factor, std::string* err) {
 
 int64_t GlobalConfig::GetDustLimitFactor() const {
     return data->dustLimitFactor;
-}
-
-void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {
-    data->blockMinFeePerKB = fee;
-}
-
-CFeeRate GlobalConfig::GetBlockMinFeePerKB() const {
-    return data->blockMinFeePerKB;
 }
 
 bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
