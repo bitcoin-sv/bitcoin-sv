@@ -543,6 +543,8 @@ libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
   cfile_util.cpp \
+  net/netaddress.cpp \
+  net/netbase.cpp \
   rpc/client.cpp \
   rpc/client_config.cpp \
   rpc/client_utils.cpp \

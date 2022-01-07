@@ -117,7 +117,7 @@ void RPCClient::SubmitRequest(HTTPRequest& request, HTTPResponse* response) cons
     // Add required headers
     struct evkeyvalq* output_headers { evhttp_request_get_output_headers(req.get()) };
     assert(output_headers);
-    evhttp_add_header(output_headers, "Host", mConfig.GetServerIP().c_str());
+    evhttp_add_header(output_headers, "Host", mConfig.GetServerHTTPHost().c_str());
     evhttp_add_header(output_headers, "Connection", "close");
     if(mConfig.UsesAuth())
     {
