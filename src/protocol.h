@@ -246,6 +246,14 @@ extern const char *GETBLOCKS;
  */
 extern const char *GETHEADERS;
 /**
+ * The gethdrsen message requests a headers message that provides block
+ * headers starting from a particular point in the block chain.  The 
+ * gethdrsen message is an upgrade of getheaders message that also
+ * sends number of transaction, coinbase transaction and merkleproof
+ * for coinbase transaction
+ */
+extern const char* GETHDRSEN;
+/**
  * The tx message transmits a single transaction.
  * @see https://bitcoin.org/en/developer-reference#tx
  */
@@ -257,6 +265,11 @@ extern const char *TX;
  * @see https://bitcoin.org/en/developer-reference#headers
  */
 extern const char *HEADERS;
+/**
+ * The hdrsen message sends one or more block headers to a node which
+ * previously requested certain headers with a gethdrsen message.
+ */
+extern const char* HDRSEN;
 /**
  * The block message transmits a single serialized block.
  * @see https://bitcoin.org/en/developer-reference#block
@@ -336,6 +349,11 @@ extern const char *REJECT;
  * @see https://bitcoin.org/en/developer-reference#sendheaders
  */
 extern const char *SENDHEADERS;
+/**
+ * Same as "sendheaders" except that new new blocks are announced via
+ * "hdrsen" message.
+ */
+extern const char *SENDHDRSEN;
 /**
  * The feefilter message tells the receiving peer not to inv us any txs
  * which do not meet the specified min fee rate.

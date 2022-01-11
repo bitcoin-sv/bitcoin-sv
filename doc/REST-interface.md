@@ -28,6 +28,10 @@ With the /notxdetails/ option JSON response will only contain the transaction ha
 
 Given a block hash: returns <COUNT> amount of blockheaders in upward direction.
 
+`GET /rest/headers/extended/<COUNT>/<BLOCK-HASH>.<bin|hex|json>`
+
+Returns same as headers rest method with additional data for coinbase transaction and proof of inclusion for coinbase transaction
+
 ####Chaininfos
 `GET /rest/chaininfo.json`
 

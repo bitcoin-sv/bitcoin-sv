@@ -334,7 +334,7 @@ class ChainManager():
     def set_tip(self, number):
         self.tip = self.blocks[number]
 
-    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False):
+    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
         if self.tip == None:
             base_block_hash = self._genesis_hash
             block_time = int(time.time()) + 1
@@ -472,6 +472,9 @@ class ChainManager():
         if extra_sigops >  0:
             raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
+        if version != None:
+            block.nVersion = version
+            
         # Do PoW, which is cheap on regnet
         if do_solve_block:
             block.solve()

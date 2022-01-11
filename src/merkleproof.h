@@ -87,6 +87,10 @@ public:
     [[nodiscard]] const_iterator begin() const noexcept { return mNodes.begin(); } 
     [[nodiscard]] const_iterator end() const noexcept { return mNodes.end(); } 
 
+    void TxnId(const TxId& txnId) noexcept { mTxnId=txnId; }
+    void Target(const uint256& target) noexcept { mTarget=target; }
+    void Nodes(nodes_type&& nodes) noexcept { mNodes = std::move(nodes); }
+
     // Recompute root and check if it matches the target value
     [[nodiscard]] bool Verify() const;
 

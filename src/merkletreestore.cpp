@@ -524,7 +524,7 @@ CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databas
     }
 }
 
-CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight)
+CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, const CBlockIndex& blockIndex, const int32_t currentChainHeight)
 {
     {
         LOCK(cs_merkleTreeFactory);
