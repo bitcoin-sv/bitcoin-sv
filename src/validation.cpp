@@ -3643,7 +3643,8 @@ void PruneAndFlush() {
  * Update chainActive and related internal data structures when adding a new
  * block to the chain tip.
  */
-static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
+static void UpdateTip(const Config &config, CBlockIndex *pindexNew)
+{
     chainActive.SetTip(pindexNew);
 
     // New best block
@@ -3651,29 +3652,8 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
 
     cvBlockChange.notify_all();
 
-    std::vector<std::string> warningMessages;
-    if (!IsInitialBlockDownload()) {
-        int nUpgraded = 0;
-        const CBlockIndex *pindex = chainActive.Tip();
-
-        // Check the version of the last 100 blocks to see if we need to
-        // upgrade:
-        for (int i = 0; i < 100 && pindex != nullptr; i++) {
-            int32_t nExpectedVersion = VERSIONBITS_TOP_BITS;
-            if (pindex->GetVersion() > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
-                (pindex->GetVersion() & ~nExpectedVersion) != 0) {
-                ++nUpgraded;
-            }
-            pindex = pindex->GetPrev();
-        }
-        if (nUpgraded > 0) {
-            warningMessages.push_back(strprintf(
-                "%d of last 100 blocks have unexpected version", nUpgraded));
-        }
-    }
-
     LogPrintf("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu "
-              "date='%s' progress=%f cache=%.1fMiB(%utxo)",
+              "date='%s' progress=%f cache=%.1fMiB(%utxo)\n",
               __func__, chainActive.Tip()->GetBlockHash().ToString(),
               chainActive.Height(), chainActive.Tip()->GetVersion(),
               log(chainActive.Tip()->GetChainWork().getdouble()) / log(2.0),
@@ -3684,12 +3664,6 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
                                         chainActive.Tip()),
               pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)),
               pcoinsTip->GetCacheSize());
-
-    if (!warningMessages.empty()) {
-        LogPrintf(" warning='%s'",
-                  boost::algorithm::join(warningMessages, ", "));
-    }
-    LogPrintf("\n");
 }
 
 static void FinalizeGenesisCrossing(const Config &config, int32_t height, const CJournalChangeSetPtr& changeSet)
