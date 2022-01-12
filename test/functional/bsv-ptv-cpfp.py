@@ -4,12 +4,14 @@
 
 from test_framework.blocktools import create_block, create_coinbase, create_transaction, create_block_from_candidate
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN
+from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN, mininode_lock
 from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals, assert_greater_than
 
 import time
+import multiprocessing
+import threading
 
 """
 The test aims to:
@@ -117,27 +119,38 @@ class PtvCpfp(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-    def generate_txchain(self, fund_txn, vout_idx, chain_length, tx_fee, locking_script):
+    # Create a single tx chain.
+    def create_txchain(self, spend, vout_idx, chain_length, tx_fee, locking_script):
         txs = []
-        req_start_time = time.time()
-        txs.append(self.create_tx([(fund_txn, vout_idx)], 1, tx_fee, locking_script))
+        txs.append(self.create_tx([(spend, vout_idx)], 1, tx_fee, locking_script))
         for idx in range(chain_length-1):
             txs.append(self.create_tx([(txs[idx], 0)], 1, tx_fee, locking_script))
-        self.log.info("Generate txchain[%d] of length %d, took: %.6f sec", vout_idx, chain_length,
-                time.time() - req_start_time)
         return txs[chain_length-1], txs
 
-    def generate_txchains(self, fund_txn, chain_length, num_of_chains, tx_fee, locking_script):
-        txs = []
+    # Create a required number of tx chains (equal lengths) in parallel.
+    def create_txchains(self, num_of_chains, chain_length, spend, tx_fee, locking_script):
+        txchains = []
         last_descendant_from_each_txchain = []
+        ths = []
         req_start_time = time.time()
-        for chain_idx in range (num_of_chains):
-            last_descendant_in_txchain, txchain = self.generate_txchain(fund_txn, chain_idx, chain_length, tx_fee, locking_script)
-            txs.extend(txchain)
-            last_descendant_from_each_txchain.append(last_descendant_in_txchain)
+        def make_chained_txs(chain_id, spend, chain_length, tx_fee, locking_script):
+            self.log.info("Creating txchain[%d], length=%d", chain_id, chain_length)
+            nonlocal txchains
+            last_descendant_in_txchain, txchain = self.create_txchain(spend, chain_id, chain_length, tx_fee, locking_script)
+            with mininode_lock:
+                txchains += txchain
+                last_descendant_from_each_txchain.append(last_descendant_in_txchain)
+            self.log.info("txchain[%d] created", chain_id)
+        # Make tx chains in parallel.
+        for x in range(0, num_of_chains):
+            th = threading.Thread(target=make_chained_txs, args=(x, spend, chain_length, tx_fee, locking_script,))
+            ths.append(th)
+            th.start()
+        for _, th in enumerate(ths):
+            th.join()
         self.log.info("The total time to generate all %d txchains (of length %d): %.6f sec", num_of_chains, chain_length,
                 time.time() - req_start_time)
-        return last_descendant_from_each_txchain, txs
+        return last_descendant_from_each_txchain, txchains
 
     def create_fund_txn(self, conn, noutput, tx_fee, locking_script, pubkey=None):
         # create a new block with coinbase
@@ -273,7 +286,7 @@ class PtvCpfp(BitcoinTestFramework):
             # - 300K txs: 300 chains of length 1000
             txchain_length = 1000
             num_of_txchains = 300
-            last_descendant_from_each_txchain, txchains = self.generate_txchains(low_fee_std_tx, txchain_length, num_of_txchains, relay_fee, self.locking_script)
+            last_descendant_from_each_txchain, txchains = self.create_txchains(num_of_txchains, txchain_length, low_fee_std_tx, relay_fee, self.locking_script)
 
             #
             # Check max memory usage (required by the next test cases) on the running platform.
