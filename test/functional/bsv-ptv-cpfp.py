@@ -276,10 +276,6 @@ class PtvCpfp(BitcoinTestFramework):
             # Prevent RPC timeout for sendrawtransactions call that take longer to return.
             self.nodes[0].rpc_timeout = 600
 
-            # Time duration to submit and process txs.
-            p2p_td = 0 # ... through p2p interface
-            rpc_td = 0 # ... through rpc interface
-
             # Generate low fee cpfp std txn chains:
             # - 300K txs: 300 chains of length 1000
             txchain_length = 1000
@@ -306,7 +302,7 @@ class PtvCpfp(BitcoinTestFramework):
             TC_1_1_msg = "TC_1_1: Send {} txs (num_of_txchains= {}, txchain_length= {}) through P2P interface"
             with self.run_node_with_connections(TC_1_1_msg.format(txchain_length*num_of_txchains, num_of_txchains, txchain_length),
                     0, ['-maxmempool=%dB' % mempool_usage] + args + self.default_args, number_of_connections=1) as (conn,):
-                p2p_td = self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
+                self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
                         mining_fee, self.locking_script, timeout=timeout)
                 # Uses high_fee_nonstd_tx to generate 30K high fee nonstandard txs
                 self.run_cpfp_scenario1_override_txs(conn, high_fee_nonstd_tx, mining_fee, self.locking_script2, timeout=timeout)
@@ -318,13 +314,10 @@ class PtvCpfp(BitcoinTestFramework):
             with self.run_node_with_connections(TC_1_2_msg.format(txchain_length*num_of_txchains, num_of_txchains, txchain_length),
                     0, ['-maxmempool=%dB' % mempool_usage] + args + self.default_args, number_of_connections=1) as (conn,):
                 rpc = conn.rpc
-                rpc_td = self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
+                self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
                         mining_fee, self.locking_script, rpc.sendrawtransactions, timeout=timeout)
                 # Uses high_fee_nonstd_tx to generate 30K high fee nonstandard txs
                 self.run_cpfp_scenario1_override_txs(conn, high_fee_nonstd_tx, mining_fee, self.locking_script2, rpc.sendrawtransactions, timeout=timeout)
-
-            # Check that rpc interface is faster than p2p
-            assert_greater_than(p2p_td, rpc_td)
 
     def run_test(self):
         # Test long chains of cpfp txs.
