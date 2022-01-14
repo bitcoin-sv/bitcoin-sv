@@ -243,7 +243,8 @@ bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
             batch.Clear();
             if (crash_simulate) {
                 static FastRandomContext rng;
-                if (rng.randrange(crash_simulate) == 0) {
+                static int64_t crash_notbefore = gArgs.GetArg("-dbcrashnotbefore", 0);
+                if (rng.randrange(crash_simulate) == 0 && GetSystemTimeInSeconds() > crash_notbefore) {
                     LogPrintf("Simulating a crash. Goodbye.\n");
                     _Exit(0);
                 }

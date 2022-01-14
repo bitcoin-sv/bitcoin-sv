@@ -30,6 +30,7 @@ import http.client
 import random
 import sys
 import time
+import math
 
 from test_framework.mininode import *
 from test_framework.script import *
@@ -81,7 +82,12 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         while time.time() - time_start < 120:
             try:
                 # Any of these RPC calls could throw due to node crash
-                self.start_node(node_index)
+                if time.time() - time_start > 20:
+                    # We had many unsuccessful restart attempts, disable -dbcrashratio for some time
+                    print("Restarting with -dbcrashnotbefore, node %s" % node_index)
+                    self.start_node(node_index, extra_args=self.extra_args[node_index] + ["-dbcrashnotbefore="+str(math.ceil(time.time()+20))])
+                else:
+                    self.start_node(node_index, extra_args=self.extra_args[node_index])
                 self.nodes[node_index].waitforblockheight(expected_tip)
                 utxo_hash = self.nodes[node_index].gettxoutsetinfo()[
                     'hash_serialized']
@@ -94,11 +100,9 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
             self.crashed_on_restart += 1
             time.sleep(1)
 
-        # If we got here, bitcoind isn't coming back up on restart.  Could be a
-        # bug in bitcoind, or we've gotten unlucky with our dbcrash ratio --
+        # If we got here, bitcoind isn't coming back up on restart. Could be a
+        # bug in bitcoind, or -dbcrashnotbefore is not long enough?
         # perhaps we generated a test case that blew up our cache?
-        # TODO: If this happens a lot, we should try to restart without -dbcrashratio
-        # and make sure that recovery happens.
         raise AssertionError(
             "Unable to successfully restart node %d in allotted time", node_index)
 
@@ -193,6 +197,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
                     'hash_serialized']
             except OSError:
                 # probably a crash on db flushing
+                self.wait_for_node_exit(i, 30)
                 nodei_utxo_hash = self.restart_node(
                     i, self.nodes[3].getblock(self.nodes[3].getbestblockhash(),1)['height'])
             assert_equal(nodei_utxo_hash, node3_utxo_hash)
@@ -298,8 +303,18 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         # Warn if any of the nodes escaped restart.
         for i in range(3):
             if self.restart_counts[i] == 0:
-                self.log.warn("Node %d never crashed during utxo flush!", i)
+                self.log.warning("Node %d never crashed during utxo flush!", i)
 
+        # Restart all nodes without --dbcrashratio to prevent simulating a crash during shutdown
+        self.log.info("Restarting nodes without --dbcrashratio")
+        for i in range(len(self.nodes)):
+            try:
+                self.stop_node(i)
+            except:
+                print("Node %s already stopped or crashed" % i)
+                self.wait_for_node_exit(i, 30)
+
+            self.start_node(i, extra_args=self.base_args)
 
 if __name__ == "__main__":
     ChainstateWriteCrashTest().main()
