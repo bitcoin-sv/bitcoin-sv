@@ -4,6 +4,7 @@
 #pragma once
 
 #include <mining/assembler.h>
+#include <mining/group_builder.h>
 #include <mining/journal.h>
 
 #include <future>
@@ -22,6 +23,7 @@ class JournalingBlockAssembler : public BlockAssembler
     // Default config values
     static constexpr uint64_t DEFAULT_MAX_SLOT_TRANSACTIONS {20000};
     static constexpr bool DEFAULT_NEW_BLOCK_FILL {false};
+    static constexpr unsigned DEFAULT_THROTTLE_THRESHOLD {100};
 
     // Construction/destruction
     JournalingBlockAssembler(const Config& config);
@@ -52,16 +54,30 @@ class JournalingBlockAssembler : public BlockAssembler
     // Create a new block for us to start working on
     void newBlock();
 
+    // Result of attempt to add a transaction or group
+    struct AddTransactionResult
+    {
+        enum class Result { SUCCESS, ERROR, SKIPPED, BLOCKFULL };
+        Result result { Result::SUCCESS };
+        size_t numAdded {0};
+    };
+
     // Test whether we can add another transaction to the next block and
     // return the number of transactions actually added
-    size_t addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd, uint64_t maxBlockSizeComputed);
-    size_t addTransaction(const CBlockIndex* pindex, uint64_t maxBlockSizeComputed);
+    AddTransactionResult addTransactionOrGroup(const CBlockIndex* pindex,
+                                               const CJournal::Index& journalEnd,
+                                               uint64_t maxBlockSizeComputed);
+    AddTransactionResult addTransaction(const CBlockIndex* pindex,
+                                        uint64_t maxBlockSizeComputed,
+                                        const CJournalEntry& entry);
 
     // Our internal mutex
     mutable std::mutex mMtx {};
 
     // Flag to indicate whether we have been updated
     std::atomic_bool mRecentlyUpdated {false};
+    // Time most recent txn was added to the latest template
+    int64_t mLastUpdateTime {0};
 
 
     // Chain context for the block
@@ -81,6 +97,10 @@ class JournalingBlockAssembler : public BlockAssembler
     // or whether sometimes only a subset may be returned.
     std::atomic_bool mNewBlockFill {DEFAULT_NEW_BLOCK_FILL};
 
+    // Selfish mining prevention throttling threshold
+    unsigned mThrottlingThreshold {DEFAULT_THROTTLE_THRESHOLD};
+    bool mEnteredThrottling {false};
+
     // The journal we're reading from and our current position in that journal
     CJournalPtr mJournal {nullptr};
 
@@ -91,19 +111,24 @@ class JournalingBlockAssembler : public BlockAssembler
     static constexpr uint64_t COINBASE_SIG_OPS {100};
     static constexpr uint64_t COINBASE_SIZE {1000};
 
+    // Position where we're reading from the index
+    CJournal::Index mJournalPos {};
+
     // Block assembly state, without the huge vectors
-    struct BlockAssemblyState {
+    struct BlockAssemblyState
+    {
         uint64_t mBlockSigOps {COINBASE_SIG_OPS};
         uint64_t mBlockSize {COINBASE_SIZE};
         // Amount of fees in the current block template
         Amount mBlockFees {0};
-        // Position where we're reading from the index
-        CJournal::Index mJournalPos {};
     };
     std::vector<CTransactionRef> mBlockTxns {};
     std::vector<Amount> mTxFees {};
 
     BlockAssemblyState mState {};
+
+    TxnGroupBuilder mGroupBuilder {};
+
     // When adding transaction group we optimize for the happy case
     // and do serious extra work only when we need to rollback() when
     // the group would push the block over the limit
