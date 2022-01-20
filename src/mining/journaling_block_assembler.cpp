@@ -38,12 +38,16 @@ namespace
         }
         return static_cast<unsigned>(threshold);
     }
+    unsigned GetRunFrequency()
+    {
+        return static_cast<unsigned>(gArgs.GetArg("-jbarunfrequency", JournalingBlockAssembler::DEFAULT_RUN_FREQUENCY_MILLIS));
+    }
 }
 
 // Construction
 JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
-: BlockAssembler{config}, mMaxSlotTransactions{GetMaxTxnBatch()}, mNewBlockFill{GetFillAfterNewBlock()},
-  mThrottlingThreshold{GetThrottleThreshold()}
+: BlockAssembler{config}, mRunFrequency{GetRunFrequency()}, mMaxSlotTransactions{GetMaxTxnBatch()},
+  mNewBlockFill{GetFillAfterNewBlock()}, mThrottlingThreshold{GetThrottleThreshold()}
 {
     // Create a new starting block
     newBlock();

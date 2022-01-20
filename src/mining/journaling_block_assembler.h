@@ -24,6 +24,7 @@ class JournalingBlockAssembler : public BlockAssembler
     static constexpr uint64_t DEFAULT_MAX_SLOT_TRANSACTIONS {20000};
     static constexpr bool DEFAULT_NEW_BLOCK_FILL {false};
     static constexpr unsigned DEFAULT_THROTTLE_THRESHOLD {100};
+    static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {100};
 
     // Construction/destruction
     JournalingBlockAssembler(const Config& config);
@@ -88,7 +89,6 @@ class JournalingBlockAssembler : public BlockAssembler
     std::promise<void> promise_;
 
     // Frequency we run
-    static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {100};
     std::chrono::milliseconds mRunFrequency {DEFAULT_RUN_FREQUENCY_MILLIS};
 
     // Maximum number of transactions to process per time slot
