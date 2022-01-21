@@ -51,6 +51,7 @@ BITCOIN_TESTS =\
   test/bswap_tests.cpp \
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
+  test/check_selfish_mining_tests.cpp \
   test/coins_tests.cpp \
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \

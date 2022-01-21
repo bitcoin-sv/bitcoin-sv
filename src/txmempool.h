@@ -706,7 +706,28 @@ public:
             const std::vector<CTransactionRef> &vtx,
             const mining::CJournalChangeSetPtr& changeSet,
             const uint256& blockhash,
-            std::vector<CTransactionRef>& txNew);
+            std::vector<CTransactionRef>& txNew,
+            const Config& config);
+
+    /**
+    * Returns the result of checking if the received block is selfishly mined.
+    * Block's txs are compared with mempool's txs. If the time difference between
+    * the last transaction that was included in the block and the last transaction
+    * that was left in the mempool is more than time difference selfish threshold
+    * (-minblockmempooltimedifferenceselfish), then it is checked if there are
+    * txs in mempool that were not included in the block.
+    * All txs that were not included are checked against block fee rate.
+    * If percentage of those txs in mempool that are not included
+    * in received block is above threshold (-selfishtxpercentthreshold),
+    * the block is considered as selfishly mined. The results are logged.
+    * Functionality is enabled with the -detectselfishmining parameter
+    * set to true (by default).
+    */
+    bool CheckSelfishNL(const setEntries& block_entries,
+                        int64_t last_block_tx_time,
+                        const CFeeRate& minBlockFeeRate, 
+                        const Config& config);
+
 
     void RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet);
 

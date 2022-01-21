@@ -1083,6 +1083,20 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. (default: %s)"),
                   CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)));
+    strUsage +=
+        HelpMessageOpt("-detectselfishmining=<n>",
+                       strprintf(_("Detect selfish mining (default: %u). "),
+                                 DEFAULT_DETECT_SELFISH_MINING));
+    strUsage +=
+        HelpMessageOpt("-selfishtxpercentthreshold=<n>",
+        strprintf(_("Set percentage threshold of number of txs in mempool "
+                    "that are not included in received block for "
+                    "the block to be classified as selfishly mined (default: %u). "),
+                        DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT));
+    strUsage += HelpMessageOpt("-minblockmempooltimedifferenceselfish=<n>",
+        strprintf(_("Set lowest time difference in sec between the last block and last mempool "
+                    "transaction for the block to be classified as selfishly mined (default: %ds)"),
+                    DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH));
     strUsage += HelpMessageOpt(
         "-invalidateblock=<hash>",
         strprintf(_("Permanently marks an existing block as invalid as if it violated "
@@ -2658,6 +2672,31 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     config.SetAcceptNonStandardOutput(
         gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+
+
+    // Enable selfish mining detection
+    config.SetDetectSelfishMining(gArgs.GetBoolArg("-detectselfishmining", DEFAULT_DETECT_SELFISH_MINING));
+    
+    // Min time difference in sec between the last block and last mempool 
+    // transaction for the block to be classified as selfishly mined
+    if (gArgs.IsArgSet("-minblockmempooltimedifferenceselfish")) {
+        int64_t minBlockMempoolTimeDiff = gArgs.GetArg("-minblockmempooltimedifferenceselfish", DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH);
+        if (std::string err;
+            !config.SetMinBlockMempoolTimeDifferenceSelfish(minBlockMempoolTimeDiff, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // Set percentage threshold of number of txs in mempool 
+    // that are not included in received block for the block to be classified as selfishly mined
+    if (gArgs.IsArgSet("-selfishtxpercentthreshold"))
+    {
+        int64_t selfishTxPercentThreshold = gArgs.GetArg("-selfishtxpercentthreshold", DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT);
+        if (std::string err; !config.SetSelfishTxThreshold(selfishTxPercentThreshold, &err))
+        {
+            return InitError(err);
+        }
+    }
 
 #ifdef ENABLE_WALLET
     if (!CWallet::ParameterInteraction()) return false;
