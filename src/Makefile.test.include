@@ -80,6 +80,7 @@ BITCOIN_TESTS =\
   test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
   test/invalid_txn_publisher_tests.cpp \
+  test/jba_selfish_mining_tests.cpp \
   test/journal_assembler_group_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \

@@ -44,6 +44,9 @@ class JournalingBlockAssembler : public BlockAssembler
 
     BlockStats getLastBlockStats() const override { return mLastBlockStats; }
 
+    // Unit test access
+    template<typename T> struct UnitTestAccess;
+
   private:
 
     // Thread entry point for block update processing
