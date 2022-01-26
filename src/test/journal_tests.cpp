@@ -14,6 +14,24 @@ using namespace mining;
 
 namespace
 {
+    // Only used as unique identifier
+    class journal_tests_uid;
+}
+
+// For private member access to CJournalEntry
+template<>
+struct CJournalEntry::UnitTestAccess<journal_tests_uid>
+{
+    template<typename... Args>
+    static CJournalEntry Make(Args&&... args)
+    {
+        return { std::forward<Args>(args)... };
+    }
+};
+using JournalEntryAccess = CJournalEntry::UnitTestAccess<journal_tests_uid>;
+
+namespace
+{
     // Generate a new random transaction
     CJournalEntry NewTxn()
     {
@@ -21,8 +39,9 @@ namespace
         CMutableTransaction txn {};
         txn.nLockTime = lockTime++;
         const auto tx = MakeTransactionRef(std::move(txn));
-        return { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                 tx->GetTotalSize(), Amount{0}, std::nullopt, false};
+        return JournalEntryAccess::Make(
+            std::make_shared<CTransactionWrapper>(tx, nullptr),
+            tx->GetTotalSize(), Amount{0}, GetTime(), std::nullopt, false);
     }
     // Generate a new random transaction that depends on another
     CJournalEntry NewTxn(std::initializer_list<CTransactionWrapperRef> other)
@@ -34,8 +53,9 @@ namespace
         }
         txn.nLockTime = lockTime++;
         const auto tx = MakeTransactionRef(std::move(txn));
-        return { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                 tx->GetTotalSize(), Amount{0}, std::nullopt, false};
+        return JournalEntryAccess::Make(
+             std::make_shared<CTransactionWrapper>(tx, nullptr),
+             tx->GetTotalSize(), Amount{0}, GetTime(), std::nullopt, false);
     }
 
     CJournalChangeSetPtr changeSet(CJournalBuilder* builder, JournalUpdateReason reason, std::initializer_list<std::pair<CJournalChangeSet::Operation, CJournalEntry>> ops)
