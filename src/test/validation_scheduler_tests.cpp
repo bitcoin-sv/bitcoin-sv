@@ -400,8 +400,10 @@ BOOST_AUTO_TEST_CASE(txs_detectChainInGraph) {
     std::vector<std::vector<size_t>> v1 {{0}, {1}, {2,3}};
     std::vector<std::vector<size_t>> v2 {{1}, {0}, {2,3}};
     std::vector<std::vector<size_t>> v3 {{1}, {0}, {2}, {3}};
+    std::vector<std::vector<size_t>> v4 {{0}, {1}, {2}, {3}};
+    std::vector<std::vector<size_t>> v5 {{1}, {2}, {0}, {3}};
 
-    RunPermutedTest(txsToValidate, {v1,v2,v3});
+    RunPermutedTest(txsToValidate, {v1,v2,v3,v4,v5});
 }
 
 // Transactions from the same chain are scheduled in one task.
