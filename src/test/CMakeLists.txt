@@ -124,6 +124,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	mempool_limit_tests.cpp
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp
+    mining_group_builder_tests.cpp
     miner_id_db_tests.cpp 
 	miner_tests.cpp
 	minerid_tests.cpp

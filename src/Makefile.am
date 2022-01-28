@@ -158,6 +158,7 @@ BITCOIN_CORE_H = \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
+  mining/group_builder.h \
   mining/journal.h \
   mining/journal_builder.h \
   mining/journal_change_set.h \
@@ -322,6 +323,7 @@ libbitcoin_server_a_SOURCES = \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
+  mining/group_builder.cpp \
   mining/journal.cpp \
   mining/journal_builder.cpp \
   mining/journal_change_set.cpp \

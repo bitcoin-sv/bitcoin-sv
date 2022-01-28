@@ -258,6 +258,7 @@ add_library(common
 	mining/assembler.h
 	mining/candidates.h
 	mining/factory.h
+	mining/group_builder.h
 	mining/journal.h
 	mining/journal_builder.h
 	mining/journal_change_set.h
@@ -446,6 +447,7 @@ add_library(server
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
+	mining/group_builder.cpp
 	mining/journal.cpp
 	mining/journal_builder.cpp
 	mining/journal_change_set.cpp
