@@ -18,40 +18,76 @@ void RawTxValidator::ThreadFunc()
             return;
         }
 
-        TxInputDataSPtrVec vTxInputData{};
-        vTxInputData.reserve(batch.value().size());
-        for (const auto &txData : batch.value()) 
+        const auto txValidator = g_connman->getTxnValidator();
+        if(!txValidator)
         {
-            vTxInputData.push_back(txData.txInputData);
+            queue.Close(true);
+            return;
         }
-        LogPrint(BCLog::RPC, "Processing a batch of %s transactions from sendrawtransaction/sendrawtransactions\n", batch->size());
-        CTxnValidator::RejectedTxns rejectedTxns{};
-        // Apply journal changeSet straight after processValidation call.
+
+
+        if (batch.value().size() == 1)
         {
+            
             // Mempool Journal ChangeSet
             mining::CJournalChangeSetPtr changeSet{ mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)};
+            
             // Run synch batch validation and wait for results.
-            const auto txValidator = g_connman->getTxnValidator();
-            rejectedTxns = txValidator->processValidation(
-                vTxInputData, // A vector of txns that need to be processed
+            auto& validationData = batch.value().front();
+
+            LogPrint(BCLog::RPC, "Processing a batch of 1 transaction from sendrawtransaction/sendrawtransactions\n");
+
+            auto state = txValidator->processValidation(
+                validationData.txInputData,  // 
                 changeSet,    // an instance of the journal
                 true);        // fLimitMempoolSize
+
+            changeSet.reset();
+            
+            RawTxValidatorResult result{validationData.txInputData->GetTxnPtr()->GetId(),
+                                        (state.IsValid())
+                                            ? std::nullopt
+                                            : std::optional<CValidationState>{state},
+                                        state.GetRejectReason() == "mempool full"};
+            validationData.promise.set_value(result);
+
         }
-
-        auto &[mapRejectReasons, evictedTxsVector] = rejectedTxns;
-        std::set<TxId> evictedTxsSet{ evictedTxsVector.begin(), evictedTxsVector.end() };
-
-        for (auto &txData : batch.value()) 
+        else
         {
-            const auto txid = txData.txInputData->GetTxnPtr()->GetId();
-            const auto itReject = mapRejectReasons.find(txid);
-            const auto itEvict = evictedTxsSet.find(txid);
-            RawTxValidatorResult result{txid,
-                                        (itReject != mapRejectReasons.end())
-                                            ? std::optional<CValidationState>{itReject->second}
-                                            : std::nullopt,
-                                        itEvict != evictedTxsSet.end()};
-            txData.promise.set_value(result);
+            TxInputDataSPtrVec vTxInputData{};
+            vTxInputData.reserve(batch.value().size());
+            for (const auto &txData : batch.value()) 
+            {
+                vTxInputData.push_back(txData.txInputData);
+            }
+            LogPrint(BCLog::RPC, "Processing a batch of %s transactions from sendrawtransaction/sendrawtransactions\n", batch->size());
+            CTxnValidator::RejectedTxns rejectedTxns{};
+            // Apply journal changeSet straight after processValidation call.
+            {
+                // Mempool Journal ChangeSet
+                mining::CJournalChangeSetPtr changeSet{ mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)};
+                // Run synch batch validation and wait for results.
+                rejectedTxns = txValidator->processValidation(
+                    vTxInputData, // A vector of txns that need to be processed
+                    changeSet,    // an instance of the journal
+                    true);        // fLimitMempoolSize
+            }
+
+            auto &[mapRejectReasons, evictedTxsVector] = rejectedTxns;
+            std::set<TxId> evictedTxsSet{ evictedTxsVector.begin(), evictedTxsVector.end() };
+
+            for (auto &txData : batch.value()) 
+            {
+                const auto txid = txData.txInputData->GetTxnPtr()->GetId();
+                const auto itReject = mapRejectReasons.find(txid);
+                const auto itEvict = evictedTxsSet.find(txid);
+                RawTxValidatorResult result{txid,
+                                            (itReject != mapRejectReasons.end())
+                                                ? std::optional<CValidationState>{itReject->second}
+                                                : std::nullopt,
+                                            itEvict != evictedTxsSet.end()};
+                txData.promise.set_value(result);
+            }
         }
     }
 }
