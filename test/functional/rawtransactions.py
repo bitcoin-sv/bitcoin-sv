@@ -354,13 +354,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(txid2 not in mempool)
         # Don't check fee.
         rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True }, {'hex': txnhex2, 'dontcheckfee': True}])
-        assert_equal(len(rejectedTxns), 1)
-        assert_equal(len(rejectedTxns['evicted']), 2)
+        assert_equal(len(rejectedTxns), 0)
         mempool = self.nodes[3].getrawmempool()
         assert(txid1 in mempool)
         assert(txid2 in mempool)
-        assert(rejectedTxns['evicted'][0] not in mempool)
-        assert(rejectedTxns['evicted'][1] not in mempool)
         # Test listunconfirmedancestors option
         # Create two parents and send one child
         parent_tx_1 = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("0.1"))

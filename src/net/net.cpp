@@ -23,6 +23,7 @@
 #include "taskcancellation.h"
 #include "txn_propagator.h"
 #include "txn_validator.h"
+#include "rawtxvalidator.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 #include "invalid_txn_publisher.h"
@@ -2440,6 +2441,8 @@ CConnman::CConnman(
             mempool,
             std::make_shared<CTxnDoubleSpendDetector>(),
             mTxIdTracker);
+
+    mRawTxnValidator = std::make_shared<RawTxValidator>(*config);
 }
 
 NodeId CConnman::GetNewNodeId() {
@@ -2652,6 +2655,8 @@ void CConnman::Stop() {
         DumpData();
         fAddressesInitialized = false;
     }
+    
+    mRawTxnValidator = nullptr;
 
    mTxnValidator->shutdown();
    mTxnPropagator->shutdown();
@@ -3116,6 +3121,10 @@ const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {
 
 const std::shared_ptr<CTxnValidator>& CConnman::getTxnValidator() {
 	return mTxnValidator;
+}
+
+const std::shared_ptr<RawTxValidator>& CConnman::getRawTxValidator() {
+    return mRawTxnValidator;
 }
 
 CInvalidTxnPublisher& CConnman::getInvalidTxnPublisher()
