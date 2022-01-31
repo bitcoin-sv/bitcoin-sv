@@ -980,7 +980,7 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
 
     static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
 
-    // Test IsDustReturnTxn function which is called by IsConsolidationTxn
+    // Test IsDustReturnTxn function which is called by IsFreeConsolidationTxn
     // IsDustReturnTxn calls IsDustReturnScript which is tested in module script_tests.
 
     // good
@@ -1002,13 +1002,13 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
     // Correct Dust transaction, Note that IsDustReturnScript is tested elsewhere
     CreateDustReturnTransaction(t, testConfig, inputTxns);
     t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
-    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
+    BOOST_CHECK(IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, 1));
 
     /* testing switching dust on and of together with consolidation transactions */
     CreateDustReturnTransaction(t, testConfig, inputTxns);
     t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
     testConfig.SetMinConsolidationFactor(0);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, 1));
 }
 
 uint64_t CreateTestConsolidationTxn(CMutableTransaction & t, ConfigInit & config, size_t nbInputs, size_t outputScriptSize, const std::vector<CMutableTransaction> & inputTxns, size_t scriptSigLen)
@@ -1058,29 +1058,29 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
     // check correct consolidation transaction
     uint64_t sumInputScriptPubKeySize = CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, 65);
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2, inputTxns, 65);
-    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+        BOOST_CHECK(IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 
     // consolidation transactions turned off
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2, inputTxns, 65);
     testConfig.SetMinConsolidationFactor(0);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 
     // not enough confirmations
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2 , inputTxns, 65);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight - 1));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight - 1));
 
     // not enough inputs
     CreateTestConsolidationTxn(t,  testConfig, 1, sumInputScriptPubKeySize / 2, inputTxns, 65);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 
     // output script to big, i.e. sum of inputs sizes divided by sum of output sizes
     // smaller than consolidation factor
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2 + 1, inputTxns, 65);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 
     // spam inputs
     CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize() + 1);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 }
 
 BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
@@ -1098,12 +1098,12 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
     // non-standard transaction and non-standard inputs allowed
     CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize());
     testConfig.SetAcceptNonStdConsolidationInput(true);
-    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    BOOST_CHECK(IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 
     // non-standard transaction and non-standard inputs disallowed
     CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize());
     testConfig.SetAcceptNonStdConsolidationInput(false);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    BOOST_CHECK(!IsFreeConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
 }
 
 

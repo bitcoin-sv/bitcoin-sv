@@ -288,4 +288,12 @@ auto Average(InputIterator first, InputIterator last)
     return sum / rangeSize;
 }
 
+template <typename T>
+struct ResultWithHint {
+    T value = T{};
+    std::optional<std::string> hint = std::nullopt;
+    operator T () const {return value;}
+};
+
+
 #endif // BITCOIN_UTIL_H

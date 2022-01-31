@@ -1281,15 +1281,17 @@ CTxnValResult TxnValidation(
     // Note that consolidation transactions paying a voluntary fee will
     // be treated with higher priority. The higher the fee the higher
     // the priority
-    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
-    if (skipFeeTest) {
+    ResultWithHint<bool> isFree = IsFreeConsolidationTxn(config, tx, view, chainActive.Height());
+    if (isFree) {
         const CFeeRate blockMinTxFee = pool.GetBlockMinTxFee();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
         if (nModifiedFees == nFees) {
             pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
             pool.ApplyDeltas(txid, nModifiedFees);
         }
-        LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
+        if(isFree.hint) {
+            LogPrint(BCLog::TXNVAL,isFree.hint.value());
+        }
     }
 
     // Keep track of transactions that spend a coinbase, which we re-scan
@@ -1299,6 +1301,10 @@ CTxnValResult TxnValidation(
     // Check mempool minimal fee requirement.
     const Amount& nMempoolRejectFee = GetMempoolRejectFee(config, pool, nTxSize);
     if(!CheckMempoolMinFee(nModifiedFees, nMempoolRejectFee)) {
+        // If this was considered a consolidation but not accepted as such,
+        // then print us a hint
+        if (!isFree && isFree.hint)
+            LogPrint(BCLog::TXNVAL,isFree.hint.value());
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                  "mempool min fee not met",
                   strprintf("%d < %d", nFees, nMempoolRejectFee));
@@ -1318,10 +1324,14 @@ CTxnValResult TxnValidation(
             uiChainActiveHeight,
             fSpendsCoinbase,
             lp) };
-    if (!skipFeeTest) {
+    if (!isFree) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
         if ( nModifiedFees < minRelayTxFee.GetFee(nTxSize)) {
+            // If this was considered a consolidation but not accepted as such,
+            // then print us a hint
+            if (isFree.hint)
+                LogPrint(BCLog::TXNVAL,isFree.hint.value());
             // Require that free transactions have sufficient priority to be
             // mined in the next block.
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,

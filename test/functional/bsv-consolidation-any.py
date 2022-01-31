@@ -24,7 +24,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.minrelaytxfee_sats = 250
         self.extra_args = [[
             "-whitelist=127.0.0.1",
-            "-txindex=1"
+            "-txindex=1",
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
@@ -34,7 +34,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-acceptnonstdconsolidationinput=1"
             ],[
             "-whitelist=127.0.0.1",
-            "-txindex=1"
+            "-txindex=1",
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",

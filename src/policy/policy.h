@@ -9,6 +9,7 @@
 #include "consensus/consensus.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
+#include "util.h"
 
 #include <optional>
 #include <string>
@@ -199,7 +200,7 @@ inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
 
 /** Consolidation transactions are free */
 bool IsDustReturnTxn (const CTransaction &tx);
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
+ResultWithHint<bool> IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
 
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
 
