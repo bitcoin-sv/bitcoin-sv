@@ -51,6 +51,20 @@ namespace
     class miner_tests_uid; // only used as unique identifier
 }
 
+// For inspection / modification of the JBA
+template<>
+struct JournalingBlockAssembler::UnitTestAccess<miner_tests_uid>
+{
+    static void NewBlock(JournalingBlockAssembler& jba)
+    {
+        std::lock_guard lock { jba.mMtx };
+        jba.newBlock();
+        CJournal::ReadLock journalLock { jba.mJournal };
+        jba.mJournalPos = journalLock.begin();
+    }
+};
+using JBAAccess = JournalingBlockAssembler::UnitTestAccess<miner_tests_uid>;
+
 template <>
 struct CoinsDB::UnitTestAccess<miner_tests_uid>
 {
@@ -85,9 +99,11 @@ struct CBlockIndex::UnitTestAccess<miner_tests_uid>
         index.nTime -= time;
     }
 
-    static void SetHeight( CBlockIndex& index, int32_t height)
+    static void SetHeight( CBlockIndex& index, int32_t height, JournalingBlockAssembler& jba)
     {
         index.nHeight = height;
+        // Since the height has changed force JBA to start a new block
+        JBAAccess::NewBlock(jba);
     }
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
@@ -157,8 +173,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     fCheckpointsEnabled = false;
 
     // Simple block creation, nothing special yet:
+    auto jba { std::dynamic_pointer_cast<JournalingBlockAssembler>(mining::g_miningFactory->GetAssembler()) };
     CBlockIndex* pindexPrev {nullptr};
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
 
     // We can't make transactions until we have inputs. Therefore, load 100
     // blocks :)
@@ -191,7 +208,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     }
 
     // Just to make sure we can still make simple blocks.
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
 
     const Amount BLOCKSUBSIDY = 50 * COIN;
     const Amount LOWFEE = CENT;
@@ -225,9 +242,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     }
     testingSetup.testConfig.SetGenesisActivationHeight(500);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
-    BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     
     mempool.Clear();
 
@@ -256,16 +273,16 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
                              nullChangeSet);
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.Clear();
 
     // Orphan in mempool, template creation fails.
     hash = tx.GetId();
     mempool.AddUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
-    BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     
     mempool.Clear();
 
@@ -289,7 +306,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         hash,
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         TxStorage::memory, nullChangeSet);
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.Clear();
 
     // Coinbase in mempool, template creation fails.
@@ -304,9 +321,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx),
         TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
-    BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
 
@@ -342,9 +359,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx),
         TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
-    BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
@@ -371,9 +388,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
-    BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.Clear();
 
     {
@@ -389,7 +406,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
             TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
             chainActive.SetTip(next);
         }
-        BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+        BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
         // Extend to a 210000-long block chain.
         while (chainActive.Tip()->GetHeight() < 210000) {
             CBlockHeader header;
@@ -400,22 +417,17 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
             TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
             chainActive.SetTip(next);
         }
-        BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-        
-        if (testingSetup.testConfig.GetMiningCandidateBuilder() == mining::CMiningFactory::BlockAssemblerType::JOURNALING)
-        {
-            mining::g_miningFactory.reset();
-        }
+        BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
+
+        mining::g_miningFactory.reset();
 
         // Remove dummy blocks that were created in this scope from the active chain.
         chainActive.SetTip( tipMarker );
         TestAccessCoinsDB::SetBestBlock(*pcoinsTip, tipMarker->GetBlockHash());
     }
 
-    if (testingSetup.testConfig.GetMiningCandidateBuilder() == mining::CMiningFactory::BlockAssemblerType::JOURNALING)
-    {
-        mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testingSetup.testConfig);
-    }
+    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testingSetup.testConfig);
+    jba = std::dynamic_pointer_cast<JournalingBlockAssembler>(mining::g_miningFactory->GetAssembler());
 
     // non-final txs in mempool
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
@@ -462,7 +474,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     {
         CBlockIndex::TemporaryBlockIndex index{ *chainActive.Tip(), {} };
 
-        TestAccessCBlockIndex::SetHeight(index, index->GetHeight() + 1);
+        TestAccessCBlockIndex::SetHeight(index, index->GetHeight() + 1, *jba);
         // Sequence locks pass on 2nd block.
         BOOST_CHECK(SequenceLocks(CTransaction(tx), flags, &prevheights, index));
     }
@@ -614,7 +626,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // Sequence locks fail.
     BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), testingSetup.testConfig, flags));
 
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
 
     // None of the of the absolute height/time locked tx should have made it
     // into the template because we still check IsFinalTx in CreateNewBlock, but
@@ -629,13 +641,13 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
             *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
             512);
     }
-    TestAccessCBlockIndex::SetHeight( *chainActive.Tip(), chainActive.Tip()->GetHeight() + 1 );
+    TestAccessCBlockIndex::SetHeight(*chainActive.Tip(), chainActive.Tip()->GetHeight() + 1, *jba);
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
 
-    TestAccessCBlockIndex::SetHeight( *chainActive.Tip(), chainActive.Tip()->GetHeight() - 1 );
+    TestAccessCBlockIndex::SetHeight(*chainActive.Tip(), chainActive.Tip()->GetHeight() - 1, *jba);
     SetMockTime(0);
     mempool.Clear();
 
