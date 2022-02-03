@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <cstddef>
 #include <stdint.h>
 #include <iomanip>
 #include <sstream>
@@ -38,7 +39,7 @@ bool UniValue::setBool(bool val_)
 static bool validNumStr(const std::string& s)
 {
     std::string tokenVal;
-    unsigned int consumed;
+    std::ptrdiff_t consumed;
     enum jtokentype tt = getJsonToken(tokenVal, consumed, s.data(), s.data() + s.size());
     return (tt == JTOK_NUMBER);
 }
