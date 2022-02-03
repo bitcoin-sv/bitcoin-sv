@@ -60,7 +60,7 @@ bool IsDustReturnTxn (const CTransaction &tx)
 // A consolidation transaction is a transaction which reduces the size of the UTXO database to
 // an extent that is rewarding enough for the miner to mine the transaction for free.
 // However, if a consolidation transaction is donated to the miner, then we do not need to honour the consolidation factor
-ResultWithHint<bool>  IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
+AnnotatedType<bool>  IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
     // Allow disabling free consolidation txns via configuring
     // the consolidation factor to zero

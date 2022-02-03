@@ -1281,8 +1281,8 @@ CTxnValResult TxnValidation(
     // Note that consolidation transactions paying a voluntary fee will
     // be treated with higher priority. The higher the fee the higher
     // the priority
-    ResultWithHint<bool> isFree = IsFreeConsolidationTxn(config, tx, view, chainActive.Height());
-    if (isFree) {
+    AnnotatedType<bool> isFree = IsFreeConsolidationTxn(config, tx, view, chainActive.Height());
+    if (isFree.value) {
         const CFeeRate blockMinTxFee = pool.GetBlockMinTxFee();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
         if (nModifiedFees == nFees) {
@@ -1303,7 +1303,7 @@ CTxnValResult TxnValidation(
     if(!CheckMempoolMinFee(nModifiedFees, nMempoolRejectFee)) {
         // If this was considered a consolidation but not accepted as such,
         // then print us a hint
-        if (!isFree && isFree.hint)
+        if (!isFree.value && isFree.hint)
             LogPrint(BCLog::TXNVAL,isFree.hint.value());
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                  "mempool min fee not met",
@@ -1324,7 +1324,7 @@ CTxnValResult TxnValidation(
             uiChainActiveHeight,
             fSpendsCoinbase,
             lp) };
-    if (!isFree) {
+    if (!isFree.value) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
         if ( nModifiedFees < minRelayTxFee.GetFee(nTxSize)) {

@@ -289,10 +289,9 @@ auto Average(InputIterator first, InputIterator last)
 }
 
 template <typename T>
-struct ResultWithHint {
+struct AnnotatedType {
     T value = T{};
     std::optional<std::string> hint = std::nullopt;
-    operator T () const {return value;}
 };
 
 
