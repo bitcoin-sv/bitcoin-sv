@@ -31,7 +31,7 @@ struct CThreadSafeQueue<T>::UnitTestAccess
     }
 };
 
-BOOST_FIXTURE_TEST_SUITE(thread_safe_queue_tests, BasicTestingSetup)
+BOOST_AUTO_TEST_SUITE(thread_safe_queue_tests)
 
 bool WaitFor(std::function<bool()> f)
 {
@@ -240,38 +240,61 @@ BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
     BOOST_CHECK(contents.value().size() == 3);
 }
 
-BOOST_AUTO_TEST_CASE(multiple_outputs) {
-    
-    CThreadSafeQueue<int> theQueue(5, 1);
-
+BOOST_AUTO_TEST_CASE(multiple_outputs)
+{
+    using namespace std::chrono_literals;
+   
+    constexpr auto nElements{5};
+    CThreadSafeQueue<int> theQueue(nElements, 1);
     theQueue.ReplaceContent(std::initializer_list<int>{0, 1, 2, 3, 4});
-    BOOST_CHECK(get_Size(theQueue) == 5);
-
+    BOOST_CHECK(get_Size(theQueue) == nElements);
 
     CThreadSafeQueue<int> collectingQueue;
     std::vector<std::future<void>> outs;
 
+    constexpr auto nThreads{nElements + 3}; 
+    std::array<std::promise<void>, nThreads> ready;
+    std::promise<void> go;
+    std::shared_future<void> sf{go.get_future()};
+
     // getting one value from eight threads and pushing them to the collectingQueue
-    for(int i = 0; i < 8; i++)
+    for(int i = 0; i < nThreads; ++i)
     {
-        outs.push_back(std::async(std::launch::async, 
-            [&theQueue, &collectingQueue](){ 
+        auto f = std::async(std::launch::async, 
+            [&theQueue, &collectingQueue, &sf](std::promise<void>* ready){ 
+
+                ready->set_value();
+                sf.wait();                
+
                 std::optional<int> popped = theQueue.PopWait();
                 if(popped.has_value())
                 {
                     collectingQueue.PushWait(popped.value());
                 }
-            }));
+            }, &ready[i]);
+        outs.push_back(move(f));
+    }
+
+    // wait until all threads are ready then set them running
+    for(auto& p : ready)
+        p.get_future().wait();
+    go.set_value();
+
+    // wait until enough threads to move all elements have finished
+    while(true)
+    {
+        const auto n = count_if(begin(outs), end(outs), [](const auto& f) {
+            return f.wait_for(0s) == std::future_status::ready;
+        });
+        if(n >= nElements)
+            break;
     }
 
     // queue is emptied
-    BOOST_CHECK(WaitFor(
-        [&theQueue](){ 
-            return get_Size(theQueue) == 0;
-        }));
+    BOOST_CHECK(WaitFor([&theQueue]() { return get_Size(theQueue) == 0; }));
 
     // values are transferred to the collecting queue
-    BOOST_CHECK(get_Count(collectingQueue) == 5);
+    BOOST_CHECK_EQUAL(nElements, get_Count(collectingQueue));
 
     // three more threads are waiting to pop next value
     BOOST_CHECK(CheckNumberOfRunningThreads(outs, 3));
