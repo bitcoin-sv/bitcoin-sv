@@ -55,15 +55,14 @@ JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
     mJournalPos = CJournal::ReadLock{mJournal}.begin();
 
     // Launch our main worker thread
-    future_ = std::async(std::launch::async,
-                         &JournalingBlockAssembler::threadBlockUpdate, this);
+    mFuture = std::async(std::launch::async, &JournalingBlockAssembler::threadBlockUpdate, this);
 }
 
 // Destruction
 JournalingBlockAssembler::~JournalingBlockAssembler()
 {
-    promise_.set_value(); // Tell worker to finish
-    future_.wait();       // Wait for worker to finish
+    mPromise.set_value(); // Tell worker to finish
+    mFuture.wait();       // Wait for worker to finish
 }
 
 
@@ -145,7 +144,7 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
     try
     {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread starting\n");
-        const auto future{promise_.get_future()};
+        const auto future { mPromise.get_future() };
         while(true)
         {
             // Run every few seconds or until stopping
@@ -157,7 +156,9 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
                 updateBlock(chainActive.Tip(), mMaxSlotTransactions);
             }
             else if(status == std::future_status::ready)
+            {
                 break;
+            }
         }
 
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread stopping\n");
@@ -210,7 +211,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
 
         // Read and process transactions from the journal until either we've done as many
         // as we allow this go or we reach the end of the journal.
-        CJournal::Index journalEnd {journalLock.end()};
+        CJournal::Index journalEnd { journalLock.end() };
         bool finished { mJournalPos == journalEnd };
         // ComputeMaxGeneratedBlockSize depends on two values (GetMaxGeneratedBlockSize and GetMaxBlockSize) 
         // each of which can be updated independently (two RPC functions). 
@@ -373,7 +374,8 @@ JournalingBlockAssembler::GroupCheckpoint::GroupCheckpoint(JournalingBlockAssemb
 
 void JournalingBlockAssembler::GroupCheckpoint::rollback()
 {
-    if (!mShouldRollback) {
+    if(!mShouldRollback)
+    {
         return;
     }
     mShouldRollback = false;

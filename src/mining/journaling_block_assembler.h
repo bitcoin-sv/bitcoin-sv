@@ -88,8 +88,8 @@ class JournalingBlockAssembler : public BlockAssembler
     int64_t mLockTimeCutoff {0};
 
     // Worker thread management
-    std::future<void> future_;
-    std::promise<void> promise_;
+    std::future<void> mFuture {};
+    std::promise<void> mPromise {};
 
     // Frequency we run
     std::chrono::milliseconds mRunFrequency {DEFAULT_RUN_FREQUENCY_MILLIS};
