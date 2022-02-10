@@ -71,8 +71,9 @@ class GetBlockTemplateLPTest(BitcoinTestFramework):
         thr = LongpollThread(self.nodes[0])
         thr.start()
         # generate a random transaction and submit it
+        min_fee = self.nodes[0].getnetworkinfo()['relayfee']
         (txid, txhex, fee) = random_transaction(self.nodes,
-                                                Decimal("1.1"), Decimal("0.0"), Decimal("0.001"), 20)
+                                                Decimal("1.1"), min_fee, Decimal("0.001"), 20)
         # Check if the validation queues are empty
         wait_for_ptv_completion(self.nodes[0], 1)
         # after one minute, every 10 seconds the mempool is probed, so in 80
