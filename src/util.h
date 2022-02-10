@@ -288,4 +288,11 @@ auto Average(InputIterator first, InputIterator last)
     return sum / rangeSize;
 }
 
+template <typename T>
+struct AnnotatedType {
+    T value = T{};
+    std::optional<std::string> hint = std::nullopt;
+};
+
+
 #endif // BITCOIN_UTIL_H
