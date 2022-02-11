@@ -11,7 +11,9 @@ import re
 
 from test_framework.util import (
     assert_equal,
-    p2p_port
+    p2p_port,
+    wait_until,
+    count_log_msg
 )
 
 from test_framework.mininode import (
@@ -202,7 +204,10 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self.stop_node(0)
         self.start_node(0, extra_args=["-reindex=1"])
 
+        # Waiting for last valid block. Waiting just for old_tip_height is not enough becuase next block (to be rejected) may not be processed yet.
         send_node.rpc.waitforblockheight(old_tip_height)
+        # Wait for next block to be rejected. We need to wait for the second occurrence of the same log because one rejection happens before
+        wait_until(lambda: count_log_msg(self, "InvalidChainFound: invalid block="+rejected_block_hash+"  height=105", "/node0") == 2, timeout=5)
 
         assert_equal(send_node.rpc.getbestblockhash(), old_tip_hash)
 
