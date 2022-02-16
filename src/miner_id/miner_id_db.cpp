@@ -252,29 +252,33 @@ void MinerIdDatabase::UpdateToTip(bool rebuild)
     CBlockIndex* pindex { chainActive[startHeight] };
     while(pindex != nullptr)
     {
-        auto blockReader { pindex->GetDiskBlockStreamReader() };
-        if(blockReader)
+        // Check block has a file associated with it (it might have been pruned)
+        if(pindex->GetFileNumber() && pindex->GetFileNumber().value() >= 0)
         {
-            const uint256& hash { pindex->GetBlockHash() };
-            int32_t height { pindex->GetHeight() };
-
-            // Fetch coinbase
-            const CTransaction& coinbase { blockReader->ReadTransaction() };
-
-            // If we're rebuilding, update all the miner ID tables
-            if(rebuild)
+            auto blockReader { pindex->GetDiskBlockStreamReader() };
+            if(blockReader)
             {
-                BlockAddedNL(hash, height, coinbase);
-            }
-            else
-            {
-                // Just populate recent blocks list
-                std::optional<MinerUUId> minerUUId { GetMinerForBlockNL(height, coinbase) };
-                if(!minerUUId)
+                const uint256& hash { pindex->GetBlockHash() };
+                int32_t height { pindex->GetHeight() };
+
+                // Fetch coinbase
+                const CTransaction& coinbase { blockReader->ReadTransaction() };
+
+                // If we're rebuilding, update all the miner ID tables
+                if(rebuild)
                 {
-                    minerUUId = boost::uuids::nil_uuid();
+                    BlockAddedNL(hash, height, coinbase);
                 }
-                mLastBlocksTable.get<TagBlockId>().insert( { hash, height, *minerUUId });
+                else
+                {
+                    // Just populate recent blocks list
+                    std::optional<MinerUUId> minerUUId { GetMinerForBlockNL(height, coinbase) };
+                    if(!minerUUId)
+                    {
+                        minerUUId = boost::uuids::nil_uuid();
+                    }
+                    mLastBlocksTable.get<TagBlockId>().insert( { hash, height, *minerUUId });
+                }
             }
         }
 
