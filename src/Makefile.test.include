@@ -80,6 +80,8 @@ BITCOIN_TESTS =\
   test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
   test/invalid_txn_publisher_tests.cpp \
+  test/jba_selfish_mining_tests.cpp \
+  test/journal_assembler_group_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
   test/json_tests.cpp \
@@ -99,6 +101,7 @@ BITCOIN_TESTS =\
   test/mempooltxdb_tests.cpp \
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
+  test/mining_group_builder_tests.cpp \
   test/miner_id_db_tests.cpp \
   test/miner_tests.cpp \
   test/minerid_tests.cpp \

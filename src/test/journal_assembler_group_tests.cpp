@@ -17,6 +17,24 @@ using namespace mining;
 
 namespace
 {
+    // Only used as unique identifier
+    class journal_tests_uid;
+}
+
+// For private member access to CJournalEntry
+template<>
+struct CJournalEntry::UnitTestAccess<journal_tests_uid>
+{
+    template<typename... Args>
+    static CJournalEntry Make(Args&&... args)
+    {
+        return { std::forward<Args>(args)... };
+    }
+};
+using JournalEntryAccess = CJournalEntry::UnitTestAccess<journal_tests_uid>;
+
+namespace
+{
     const size_t txnSize = 500;
     // Generate a new random transaction
     CJournalEntry NewTxn(GroupID groupId, bool isPaying)
@@ -28,8 +46,9 @@ namespace
         stuff.resize(txnSize - 32); // make serialized transaction 500 bytes
         txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
         const auto tx = MakeTransactionRef(std::move(txn));
-        return { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                 tx->GetTotalSize(), Amount{0}, groupId, isPaying};
+        return JournalEntryAccess::Make(
+            std::make_shared<CTransactionWrapper>(tx, nullptr),
+            tx->GetTotalSize(), Amount{0}, GetTime(), groupId, isPaying);
     }
     void NewChangeSet(CJournalBuilder &builder, size_t groupSize, GroupID groupId)
     {
@@ -74,8 +93,6 @@ namespace
         return builder.getCurrentJournal()->size();
     }
 
-
-
     void PretendTransactionsMinedElsewhere(CJournalBuilder &builder,
                                            std::unique_ptr<CBlockTemplate> pblocktemplate,
                                            size_t transactionsToDrop)
@@ -88,8 +105,9 @@ namespace
         {
             auto txn = *iter;
             const auto tx = MakeTransactionRef(*txn);
-            CJournalEntry entry { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                                  tx->GetTotalSize(), Amount{0}, std::nullopt, false};
+            CJournalEntry entry { JournalEntryAccess::Make(
+                std::make_shared<CTransactionWrapper>(tx, nullptr),
+                tx->GetTotalSize(), Amount{0}, GetTime(), std::nullopt, false) };
             changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, entry);
         }
         changeSet->apply();

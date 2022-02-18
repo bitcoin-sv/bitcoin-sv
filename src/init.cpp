@@ -1154,7 +1154,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                         "subset of the available transactions from the mempool (default: %d)"),
                 mining::JournalingBlockAssembler::DEFAULT_NEW_BLOCK_FILL)
         );
+        strUsage += HelpMessageOpt(
+            "-jbarunfrequency",
+            strprintf(_("How frequently (in milliseconds) does the jounaling block assembler background thread "
+                        "run to sweep up newly seen transactions and add them to the latest block template "
+                        "(default: %dms)"),
+                mining::JournalingBlockAssembler::DEFAULT_RUN_FREQUENCY_MILLIS)
+        );
     }
+    strUsage += HelpMessageOpt(
+        "-jbathrottlethreshold",
+        strprintf(_("To prevent the appearance of selfish mining when a block template becomes full, "
+                    "the journaling block assembler will start to throttle back the rate at which it "
+                    "adds new transactions from the journal to the next block template when the block "
+                    "template reaches this percent full (default: %d%%"),
+            mining::JournalingBlockAssembler::DEFAULT_THROTTLE_THRESHOLD)
+    );
 
     strUsage += HelpMessageGroup(_("RPC client/server options:"));
     strUsage += HelpMessageOpt("-server",
