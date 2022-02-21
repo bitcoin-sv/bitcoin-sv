@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <memory>
 #include <thread>
 
 #include "txn_validator.h"
@@ -25,7 +26,7 @@ public:
 private:
     struct ValidationTaskData 
     {
-        TxInputDataSPtr txInputData;
+        std::unique_ptr<CTxInputData> txInputData;
         std::promise<RawTxValidatorResult> promise;
         size_t ApproximateSize() const 
         {
@@ -48,9 +49,6 @@ public:
 
     ~RawTxValidator();
 
-public:
-
-    std::future<RawTxValidatorResult> SubmitSingle(TxInputDataSPtr txInputData);
-
-    std::vector<std::future<RawTxValidatorResult>> SubmitMany(const std::vector<TxInputDataSPtr> &txInputDataVec);
+    std::future<RawTxValidatorResult> SubmitSingle(std::unique_ptr<CTxInputData>);
+    std::vector<std::future<RawTxValidatorResult>> SubmitMany(std::vector<std::unique_ptr<CTxInputData>>&);
 };

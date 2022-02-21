@@ -1541,8 +1541,8 @@ static UniValue sendrawtransaction(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
     // Make transaction's input data object.
-    TxInputDataSPtr pTxInputData =
-        std::make_shared<CTxInputData>(
+    std::unique_ptr<CTxInputData> pTxInputData =
+        std::make_unique<CTxInputData>(
             g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
             std::move(tx),                  // a pointer to the tx
             TxSource::rpc,                  // tx source
@@ -1582,7 +1582,7 @@ static UniValue sendrawtransaction(const Config &config,
         // - no-op in terms of prioritise/clear operations
         CTxPrioritizer txPrioritizer{mempool, dontCheckFee ? txid : TxId()};
 
-        auto futureResult = g_connman->getRawTxValidator()->SubmitSingle(pTxInputData);
+        auto futureResult = g_connman->getRawTxValidator()->SubmitSingle(move(pTxInputData));
         auto result = futureResult.get();
         
         if (result.state.has_value())
@@ -1915,7 +1915,7 @@ void sendrawtransactions(const Config& config,
     // Check if inputs are present
     UniValue inputs = request.params[0].get_array();
     // A vector to store input transactions.
-    TxInputDataSPtrVec vTxInputData {};
+    std::vector<std::unique_ptr<CTxInputData>> vTxInputData {};
     vTxInputData.reserve(inputs.size());
     // A vector to store transactions that need to be prioritised.
     std::vector<TxId> vTxToPrioritise {};
@@ -2025,8 +2025,8 @@ void sendrawtransactions(const Config& config,
         std::shared_ptr<TransactionSpecificConfig> transactionConfig = (tsc == nullptr) ? global_tsc : tsc;
 
         // Create an object with transaction's input data.
-        TxInputDataSPtr pTxInputData =
-            std::make_shared<CTxInputData>(
+        std::unique_ptr<CTxInputData> pTxInputData =
+            std::make_unique<CTxInputData>(
                 g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
                 std::move(tx),                  // a pointer to the tx
                 TxSource::rpc,                  // tx source

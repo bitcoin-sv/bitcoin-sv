@@ -6,7 +6,6 @@
 #include "mining/journal_change_set.h"
 #include "config.h"
 
-
 void RawTxValidator::ThreadFunc() 
 {
     while (true)
@@ -25,7 +24,6 @@ void RawTxValidator::ThreadFunc()
             return;
         }
 
-
         if (batch.value().size() == 1)
         {
             
@@ -37,14 +35,15 @@ void RawTxValidator::ThreadFunc()
 
             LogPrint(BCLog::RPC, "Processing a batch of 1 transaction from sendrawtransaction/sendrawtransactions\n");
 
+            std::shared_ptr<CTxInputData> sp{move(validationData.txInputData)};
             auto state = txValidator->processValidation(
-                validationData.txInputData,  // 
+                sp, 
                 changeSet,    // an instance of the journal
                 true);        // fLimitMempoolSize
 
             changeSet.reset();
             
-            RawTxValidatorResult result{validationData.txInputData->GetTxnPtr()->GetId(),
+            RawTxValidatorResult result{sp->GetTxnPtr()->GetId(),
                                         (state.IsValid())
                                             ? std::nullopt
                                             : std::optional<CValidationState>{state},
@@ -54,11 +53,11 @@ void RawTxValidator::ThreadFunc()
         }
         else
         {
-            TxInputDataSPtrVec vTxInputData{};
+            std::vector<std::shared_ptr<CTxInputData>> vTxInputData{};
             vTxInputData.reserve(batch.value().size());
-            for (const auto &txData : batch.value()) 
+            for(auto& txData : batch.value()) 
             {
-                vTxInputData.push_back(txData.txInputData);
+                vTxInputData.emplace_back(move(txData.txInputData));
             }
             LogPrint(BCLog::RPC, "Processing a batch of %s transactions from sendrawtransaction/sendrawtransactions\n", batch->size());
             CTxnValidator::RejectedTxns rejectedTxns{};
@@ -76,17 +75,20 @@ void RawTxValidator::ThreadFunc()
             auto &[mapRejectReasons, evictedTxsVector] = rejectedTxns;
             std::set<TxId> evictedTxsSet{ evictedTxsVector.begin(), evictedTxsVector.end() };
 
-            for (auto &txData : batch.value()) 
+            for(size_t i{}; i < batch.value().size(); ++i)
             {
-                const auto txid = txData.txInputData->GetTxnPtr()->GetId();
+                const auto txid = vTxInputData[i]->GetTxnPtr()
+                                      ->GetId(); 
                 const auto itReject = mapRejectReasons.find(txid);
                 const auto itEvict = evictedTxsSet.find(txid);
-                RawTxValidatorResult result{txid,
-                                            (itReject != mapRejectReasons.end())
-                                                ? std::optional<CValidationState>{itReject->second}
-                                                : std::nullopt,
-                                            itEvict != evictedTxsSet.end()};
-                txData.promise.set_value(result);
+                RawTxValidatorResult
+                    result{txid,
+                           (itReject != mapRejectReasons.end())
+                               ? std::optional<CValidationState>{itReject
+                                                                     ->second}
+                               : std::nullopt,
+                           itEvict != evictedTxsSet.end()};
+                batch.value()[i].promise.set_value(result);
             }
         }
     }
@@ -113,7 +115,7 @@ RawTxValidator::~RawTxValidator()
 }
 
 std::future<RawTxValidator::RawTxValidatorResult> 
-RawTxValidator::SubmitSingle(TxInputDataSPtr txInputData) 
+RawTxValidator::SubmitSingle(std::unique_ptr<CTxInputData> txInputData) 
 {
     ValidationTaskData taskData{std::move(txInputData), std::promise<RawTxValidatorResult>()};
     auto future = taskData.promise.get_future();
@@ -122,13 +124,13 @@ RawTxValidator::SubmitSingle(TxInputDataSPtr txInputData)
 }
 
 std::vector<std::future<RawTxValidator::RawTxValidatorResult>> 
-RawTxValidator::SubmitMany(const std::vector<TxInputDataSPtr> &txInputDataVec) 
+RawTxValidator::SubmitMany(std::vector<std::unique_ptr<CTxInputData>>& txInputDataVec) 
 {
     std::vector<std::future<RawTxValidatorResult>> futures;
     std::vector<ValidationTaskData> taskDataVec;
-    for (const auto &txInputData : txInputDataVec)
+    for(auto& txInputData : txInputDataVec)
     {
-        ValidationTaskData taskData{txInputData, std::promise<RawTxValidatorResult>()};
+        ValidationTaskData taskData{move(txInputData), std::promise<RawTxValidatorResult>()};
         futures.push_back(taskData.promise.get_future());
         taskDataVec.emplace_back(std::move(taskData));
     }
