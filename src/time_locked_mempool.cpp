@@ -21,6 +21,7 @@ CTimeLockedMempool::CTimeLockedMempool()
     mPeriodRunFreq = DEFAULT_NONFINAL_CHECKS_FREQ;
     mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mMaxUpdateRate = DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE;
+    mUpdatePeriodMins = DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD;
 }
 
 // Add or update a time-locked transaction
@@ -40,7 +41,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(
         if(state.IsNonFinal())
         {
             // New addition
-            insertNL(info, state);
+            insertNL({info, mUpdatePeriodMins, mMaxUpdateRate}, state);
         }
         else
         {
@@ -52,8 +53,9 @@ void CTimeLockedMempool::addOrUpdateTransaction(
     {
         // Validate update
         const CTransactionRef& oldTxn { *updated.begin() };
-        bool finalised;
-        if(validateUpdate(txn, oldTxn, state, finalised))
+        bool finalised {false};
+        RateLeakyBucket newRate {};
+        if(validateUpdateNL(txn, oldTxn, state, finalised, newRate))
         {
             // Remove old txn this new one updates
             removeNL(oldTxn);
@@ -70,7 +72,8 @@ void CTimeLockedMempool::addOrUpdateTransaction(
             }
             else
             {
-                insertNL(info, state);
+                // Replace it
+                insertNL({info, newRate}, state);
             }
         }
         else
@@ -91,9 +94,9 @@ std::vector<TxId> CTimeLockedMempool::getTxnIDs() const
     std::vector<TxId> res {};
 
     std::shared_lock lock { mMtx };
-    for(const auto& info : mTransactionMap.get<TagTxID>())
+    for(const auto& nft : mTransactionMap.get<TagTxID>())
     {
-        res.emplace_back(info.GetTxId());
+        res.emplace_back(nft.info.GetTxId());
     }
 
     return res;
@@ -167,6 +170,32 @@ std::set<CTransactionRef> CTimeLockedMempool::checkForDoubleSpend(const CTransac
     return conflictsWith;
 }
 
+// Check if an impending update exceeds our configured allowable rate
+bool CTimeLockedMempool::checkUpdateWithinRate(const CTransactionRef& txn, CValidationState& state) const
+{
+    std::shared_lock lock { mMtx };
+
+    // Lookup txns that will be updated by this txn
+    std::set<CTransactionRef> updated { getTransactionsUpdatedByNL(txn) };
+
+    // Check updated txn replacement rate for replaced txns
+    const auto& index { mTransactionMap.get<TagTxID>() };
+    for(const auto& oldTxn : updated)
+    {
+        const auto txit { index.find(oldTxn) };
+        if(txit != index.end())
+        {
+            // See if this update would cause the rate to exceed the limit
+            if(updateReplacementRateNL(*txit, state).Overflowing())
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 // Is the given txn ID for one currently held?
 bool CTimeLockedMempool::exists(const uint256& id) const
 {
@@ -193,7 +222,7 @@ TxMempoolInfo CTimeLockedMempool::getInfo(const uint256& id) const
     const auto& index { mTransactionMap.get<TagRawTxID>() };
     if(const auto& it { index.find(id) }; it != index.end())
     {
-        info = *it;
+        info = it->info;
     }
 
     return info;
@@ -229,8 +258,8 @@ void CTimeLockedMempool::dumpMempool() const
 
         for(const auto& details : index)
         {
-            file << *(details.GetTx());
-            file << details.nTime;
+            file << *(details.info.GetTx());
+            file << details.info.nTime;
         }
 
         FileCommit(file.Get());
@@ -366,6 +395,8 @@ void CTimeLockedMempool::loadConfig()
     mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR;
     // Get configured maximum update rate
     mMaxUpdateRate = gArgs.GetArg("-mempoolnonfinalmaxreplacementrate", DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE);
+    // Get configured maximum update rate period
+    mUpdatePeriodMins = gArgs.GetArg("-mempoolnonfinalmaxreplacementrateperiod", DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD);
 }
 
 // Fetch all transactions updated by the given new transaction.
@@ -386,14 +417,32 @@ std::set<CTransactionRef> CTimeLockedMempool::getTransactionsUpdatedByNL(const C
     return txns;
 }
 
-// Insert a new transaction
-void CTimeLockedMempool::insertNL(const TxMempoolInfo& info, CValidationState& state)
+// Calculate updated replacement rate for txn
+CTimeLockedMempool::RateLeakyBucket CTimeLockedMempool::updateReplacementRateNL(
+    const NonFinalTxn& txn,
+    CValidationState& state) const
 {
-    CTransactionRef txn { info.GetTx() };
+    RateLeakyBucket newRate { txn.updateRate };
+    newRate += 1;
+
+    // Set invalid state if we're overflowing
+    if(newRate.Overflowing())
+    {
+        LogPrint(BCLog::MEMPOOL, "Update to non-final txn exceeds allowable rate\n");
+        state.Invalid(false, REJECT_RATE_EXCEEDED, "non-final-txn-replacement-rate");
+    }
+
+    return newRate;
+}
+
+// Insert a new transaction
+void CTimeLockedMempool::insertNL(NonFinalTxn&& nonfinaltxn, CValidationState& state)
+{
+    CTransactionRef txn { nonfinaltxn.GetTx() };
 
     // Put new txn in the main index
     auto& index { mTransactionMap.get<TagTxID>() };
-    index.emplace(info);
+    index.emplace(std::move(nonfinaltxn));
 
     // Record UTXOs locked by this transaction
     for(const CTxIn& input : txn->vin)
@@ -456,10 +505,11 @@ void CTimeLockedMempool::removeNL(const CTransactionRef& txn)
 }
 
 // Perform checks on a transaction before allowing an update
-bool CTimeLockedMempool::validateUpdate(const CTransactionRef& newTxn,
-                                        const CTransactionRef& oldTxn,
-                                        CValidationState& state,
-                                        bool& finalised) const
+bool CTimeLockedMempool::validateUpdateNL(const CTransactionRef& newTxn,
+                                          const CTransactionRef& oldTxn,
+                                          CValidationState& state,
+                                          bool& finalised,
+                                          RateLeakyBucket& newRate) const
 {
     // Must have same number of inputs
     if(newTxn->vin.size() != oldTxn->vin.size())
@@ -504,12 +554,27 @@ bool CTimeLockedMempool::validateUpdate(const CTransactionRef& newTxn,
         }
     }
 
-    // Finally, must have seen at least 1 increase in an nSequence number
+    // Must have seen at least 1 increase in an nSequence number
     if(!seenIncrease)
     {
         LogPrint(BCLog::MEMPOOL, "Update to non-final txn didn't increase any nSequence\n");
         state.DoS(10, false, REJECT_INVALID, "bad-txn-update");
         return false;
+    }
+
+    // Rate of updates to txn must be within limits
+    const auto& index { mTransactionMap.get<TagTxID>() };
+    const auto txit { index.find(oldTxn) };
+    if(txit != index.end())
+    {
+        // Calculate updated replacement rate including this one
+        newRate = updateReplacementRateNL(*txit, state);
+        if(newRate.Overflowing())
+        {
+            // state already set by updateReplacementRateNL
+            LogPrint(BCLog::MEMPOOL, "Warning: Non-final txn that exceeds replacement rate made it to validation\n");
+            return false;
+        }
     }
 
     return true;
@@ -549,8 +614,8 @@ void CTimeLockedMempool::periodicChecks()
     auto it { index.begin() };
     while(it != index.end())
     {
-        CTransactionRef txn { it->GetTx() };
-        int64_t insertionTime { it->nTime };
+        CTransactionRef txn { it->info.GetTx() };
+        int64_t insertionTime { it->info.nTime };
         int64_t timeInPool { now - insertionTime };
 
         // Move iterator on so we don't have to care whether this txn gets removed
