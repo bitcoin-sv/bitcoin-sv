@@ -20,6 +20,7 @@ CTimeLockedMempool::CTimeLockedMempool()
     mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * ONE_MEBIBYTE;
     mPeriodRunFreq = DEFAULT_NONFINAL_CHECKS_FREQ;
     mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
+    mMaxUpdateRate = DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE;
 }
 
 // Add or update a time-locked transaction
@@ -363,6 +364,8 @@ void CTimeLockedMempool::loadConfig()
     mPeriodRunFreq = gArgs.GetArg("-checknonfinalfreq", DEFAULT_NONFINAL_CHECKS_FREQ);
     // Get configured purge age (convert hours to seconds)
     mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR;
+    // Get configured maximum update rate
+    mMaxUpdateRate = gArgs.GetArg("-mempoolnonfinalmaxreplacementrate", DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE);
 }
 
 // Fetch all transactions updated by the given new transaction.

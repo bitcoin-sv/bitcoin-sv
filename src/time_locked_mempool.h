@@ -189,6 +189,7 @@ class CTimeLockedMempool final
     std::atomic<size_t>         mMaxMemory {0};     // Max memory target
     int64_t                     mPeriodRunFreq {0}; // Run frequency for periodic checks
     int64_t                     mPurgeAge {0};      // Age at which we purge unfinalised txns
+    uint64_t                    mMaxUpdateRate {0}; // Max rate to accept updates to transactions
 
     // Our mutex
     mutable std::shared_mutex   mMtx {};

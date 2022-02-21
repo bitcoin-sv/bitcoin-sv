@@ -96,6 +96,10 @@ static const uint64_t DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT = 25;
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
+/** Default for -mempoolnonfinalmaxreplacementrate, max update rate for non-final transactions (by default in txns/hour) */
+static const unsigned int DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE = 7200;
+/** Default for number of minutes over which non-final update rate is calculated */
+static const unsigned int DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD = 60;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 
