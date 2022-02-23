@@ -1178,7 +1178,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("To prevent the appearance of selfish mining when a block template becomes full, "
                     "the journaling block assembler will start to throttle back the rate at which it "
                     "adds new transactions from the journal to the next block template when the block "
-                    "template reaches this percent full (default: %d%%"),
+                    "template reaches this percent full (default: %d%%)"),
             mining::JournalingBlockAssembler::DEFAULT_THROTTLE_THRESHOLD)
     );
 
