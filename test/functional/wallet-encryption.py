@@ -10,6 +10,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
+    try_rpc,
+    wait_until
 )
 
 
@@ -40,10 +42,9 @@ class WalletEncryptionTest(BitcoinTestFramework):
         self.nodes[0].walletpassphrase(passphrase, 2)
         assert_equal(privkey, self.nodes[0].dumpprivkey(address))
 
-        # Check that the timeout is right
-        time.sleep(2)
-        assert_raises_rpc_error(-13, "Please enter the wallet passphrase with walletpassphrase first",
-                                self.nodes[0].dumpprivkey, address)
+        # Check passphrase
+        wait_until(lambda: try_rpc(-13, "Please enter the wallet passphrase with walletpassphrase first",
+                                   self.nodes[0].dumpprivkey, address) is not False)
 
         # Test wrong passphrase
         assert_raises_rpc_error(-14, "wallet passphrase entered was incorrect",
