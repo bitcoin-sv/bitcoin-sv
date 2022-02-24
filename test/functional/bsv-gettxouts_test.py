@@ -106,6 +106,14 @@ class GettxoutsTest(BitcoinTestFramework):
         assert_equal(gettxouts_res["txouts"][2].keys(),
                      {"scriptPubKey", "scriptPubKeyLen", "value", "isStandard", "confirmations"})
 
+        # Check that txouts returns only first hex of transactions if the same transaction appears multiple times in collidedWith
+        gettxouts_res = self.nodes[0].gettxouts([{"txid": spent_utxo_txid, "n": 0}, {"txid": spent_utxo_txid, "n": 0}],
+                                                ["*"], True)
+        assert_equal(len(gettxouts_res["txouts"]), 2)
+        assert_equal(gettxouts_res["txouts"][0]["collidedWith"]["txid"], gettxouts_res["txouts"][1]["collidedWith"]["txid"])
+        assert_equal(gettxouts_res["txouts"][0]["collidedWith"].keys(), {"txid", "size", "hex"})
+        assert_equal(gettxouts_res["txouts"][1]["collidedWith"].keys(), {"txid", "size"})
+
         # now generate block - transaction with txid: new_utxo_txid is now in block
         # it should be returned regardles of include_mempool parameter value
         self.nodes[0].generate(1)
