@@ -2792,6 +2792,8 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
     CBlockHeaderAndShortTxIDs cmpctblock;
     vRecv >> cmpctblock;
 
+    LogPrint(BCLog::NETMSG, "Got compact block for %s from peer=%d\n", cmpctblock.header.GetHash().ToString(), pfrom->id);
+
     {
         LOCK(cs_main);
 
@@ -2810,17 +2812,20 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         }
     }
 
+    BlockDownloadTracker::BlockSource blockSource { cmpctblock.header.GetHash(), pfrom->id };
+
     const CBlockIndex *pindex = nullptr;
     CValidationState state;
-    if(!ProcessNewBlockHeaders(config, {cmpctblock.header}, state, &pindex)) {
+    if(!ProcessNewBlockHeaders(config, {cmpctblock.header}, state, &pindex))
+    {
         int nDoS;
-        if(state.IsInvalid(nDoS)) {
-            if (nDoS > 0) {
-                LogPrint(BCLog::NETMSG, "Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
+        if(state.IsInvalid(nDoS))
+        {
+            LogPrint(BCLog::NETMSG, "Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
+            blockDownloadTracker.MarkBlockAsFailed(blockSource, GetState(pfrom->id).get());
+            if(nDoS > 0)
+            {
                 Misbehaving(pfrom, nDoS, state.GetRejectReason());
-            }
-            else {
-                LogPrint(BCLog::NETMSG, "Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
             }
             return true;
         }
@@ -2828,11 +2833,11 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         // safety net: if the first block header is not accepted but the state is not marked
         // as invalid pindexLast will stay null
         // in that case we have nothing to do...
-        if (pindex == nullptr)
+        if(pindex == nullptr)
         {
+            blockDownloadTracker.MarkBlockAsFailed(blockSource, GetState(pfrom->id).get());
             return error("header is not accepted");
         }
-
     }
 
     // When we succeed in decoding a block's txids from a cmpctblock
@@ -2853,7 +2858,6 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 
     // If AcceptBlockHeader returned true, it set pindex
     assert(pindex);
-    BlockDownloadTracker::BlockSource blockSource { pindex->GetBlockHash(), pfrom->id };
 
     {
         LOCK(cs_main);
@@ -2869,6 +2873,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 
         if(pindex->getStatus().hasData()) {
             // Nothing to do here
+            blockDownloadTracker.MarkBlockAsFailed(blockSource, nodestate);
             return true;
         }
 
