@@ -2288,11 +2288,11 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
 
     CScript opReturn = CScript() << OP_RETURN << data;
 
-    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, dustLimitFactor, false));
-    BOOST_CHECK(!CTxOut(Amount(10), opReturn).IsDust(feerate, dustLimitFactor, false));
+    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(feerate, dustLimitFactor, false));
+    BOOST_CHECK(!CTxOut(Amount(1), opReturn).IsDust(feerate, dustLimitFactor, false));
 
-    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, dustLimitFactor, true));
-    BOOST_CHECK(CTxOut(Amount(10), opReturn).IsDust(feerate, dustLimitFactor, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
+    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(feerate, dustLimitFactor, true));
+    BOOST_CHECK(CTxOut(Amount(0), opReturn).IsDust(feerate, dustLimitFactor, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
 }
 
 BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {

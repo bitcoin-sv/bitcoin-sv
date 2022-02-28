@@ -10,7 +10,7 @@ from decimal import Decimal
 from itertools import chain
 from collections import defaultdict
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, check_for_log_msg, wait_until
 
 def scale_params(*params, scale):
     if isinstance(params, str):
@@ -125,6 +125,12 @@ class BSVNodeSettings(BitcoinTestFramework):
         self.test_getsettings(parameters1)
         self.test_getsettings(parameters2)
 
+        # verify the warning messages of -minrelayfee, -dustrelayfee and -dustlimitfactor are deprecated on log file
+        self.restart_node(0, extra_args=['-minrelaytxfee=0', '-dustrelayfee=0', '-dustlimitfactor=0','-blockmintxfee'])
+        wait_until(lambda: check_for_log_msg(self, "-minrelaytxfee", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "-dustrelayfee", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "-dustlimitfactor", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "-blockmintxfee", "/node0"))
 
 if __name__ == '__main__':
     BSVNodeSettings().main()
