@@ -189,6 +189,7 @@ BITCOIN_CORE_H = \
   processing_block_index.h \
   protocol.h \
   random.h \
+  rawtxvalidator.h \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
@@ -346,6 +347,7 @@ libbitcoin_server_a_SOURCES = \
   policy/policy.cpp \
   pow.cpp \
   processing_block_index.cpp \
+  rawtxvalidator.cpp \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \

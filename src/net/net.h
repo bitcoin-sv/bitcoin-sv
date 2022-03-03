@@ -63,6 +63,7 @@ class CScheduler;
 class CTxIdTracker;
 class CTxnPropagator;
 class CTxnValidator;
+class RawTxValidator;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -439,6 +440,8 @@ public:
     const TxIdTrackerSPtr& GetTxIdTracker();
     /** Get a handle to our transaction validator */
     const std::shared_ptr<CTxnValidator>& getTxnValidator();
+    /** Get a handle to raw transaction validator */
+    const std::shared_ptr<RawTxValidator>& getRawTxValidator();
     /** Get a handle to invalid tx publisher*/
     CInvalidTxnPublisher& getInvalidTxnPublisher();
     /** Enqueue a new transaction for validation */
@@ -737,6 +740,9 @@ private:
     /** Transaction validator */
     std::shared_ptr<CTxnValidator> mTxnValidator {};
     CThreadPool<CDualQueueAdaptor> mValidatorThreadPool;
+
+    /** Batching */
+    std::shared_ptr<RawTxValidator> mRawTxnValidator {};
 
     /** Double-spend attempt processor */
     DSAttemptHandler mDSHandler;

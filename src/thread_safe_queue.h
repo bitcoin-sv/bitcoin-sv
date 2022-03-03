@@ -117,23 +117,24 @@ public:
     }
 
     // appends the sequence to the end of the queue, 
-    // moving out if we got r-value reference container, copying otherwise
+    // copying because sequence is an reference l-value const reference
+    template <typename C>
+    void AppendSequence(const C& value_sequence)
+    {
+        for(const auto& value: value_sequence)
+        {
+            theQueue.emplace_back(value);
+        }
+    }
+
+    // appends the sequence to the end of the queue, 
+    // moving out because the sequence is an r-value reference to a container
     template <typename C>
     void AppendSequence(C&& value_sequence)
     {
-        if(std::is_rvalue_reference<C&&>::value)
+        for(auto&& value: value_sequence)
         {
-            for(auto&& value: value_sequence)
-            {
-                theQueue.emplace_back(std::move(value));
-            }
-        }
-        else
-        {
-            for(const auto& value: value_sequence)
-            {
-                theQueue.emplace_back(value);
-            }
+            theQueue.emplace_back(std::move(value));
         }
     }
 
