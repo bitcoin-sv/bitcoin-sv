@@ -20,15 +20,30 @@ template<typename LeakInterval>
 class LeakyBucket
 {
   public:
-    LeakyBucket(size_t maxFill, LeakInterval leakInterval)
-        : mMaxFillLevel{maxFill}, mLeakInterval{leakInterval}
+
+    LeakyBucket() = default;
+
+    LeakyBucket(size_t maxFill,
+                LeakInterval leakInterval,
+                double drainAmount = 1)
+        : mMaxFillLevel{maxFill},
+          mDrainAmount{drainAmount},
+          mLeakInterval{leakInterval}
     {}
-    LeakyBucket(size_t maxFill, size_t startFill, LeakInterval leakInterval)
-        : mMaxFillLevel{maxFill}, mFillLevel{startFill}, mLeakInterval{leakInterval}
+
+    LeakyBucket(size_t maxFill,
+                double startFill,
+                LeakInterval leakInterval,
+                double drainAmount = 1)
+        : mMaxFillLevel{maxFill},
+          mFillLevel{startFill},
+          mDrainAmount{drainAmount},
+          mLeakInterval{leakInterval}
     {}
 
     // Topup the bucket and return whether or not we are overflowing
-    bool operator+=(size_t amount)
+    template<typename Amount>
+    bool operator+=(Amount amount)
     {
         // Increase fill by given amount
         mFillLevel += amount;
@@ -43,7 +58,7 @@ class LeakyBucket
     }
 
     // Return our current fill level
-    size_t GetFillLevel() const
+    double GetFillLevel() const
     {
         UpdateFillLevel();
         return mFillLevel;
@@ -56,16 +71,12 @@ class LeakyBucket
     {
         // How many leak intervals have passed since we last updated?
         auto now { std::chrono::system_clock::now() };
-        auto timeDiff { now - mLastDrainTime };
-        auto intervals { timeDiff / mLeakInterval };
+        std::chrono::duration<double> timeDiff { now - mLastDrainTime };
+        double intervals { timeDiff / mLeakInterval };
 
         // Calculate how much we have drained over those intervals
-        size_t drained { static_cast<size_t>(intervals) };
-        if(drained <= mFillLevel)
-        {
-            mFillLevel -= drained;
-        }
-        else
+        mFillLevel -= (intervals * mDrainAmount);
+        if(mFillLevel < 0)
         {
             mFillLevel = 0;
         }
@@ -75,14 +86,17 @@ class LeakyBucket
     }
 
     // Max fill level (overflow point)
-    const size_t mMaxFillLevel {};
+    size_t mMaxFillLevel {};
 
     // Our fill level
-    mutable size_t mFillLevel {0};
+    mutable double mFillLevel {0};
 
-    // Frequency at which we leak. The fill level is reduced by 1 after each
-    // interval of this time.
-    const LeakInterval mLeakInterval {};
+    // How much we drain by each interval
+    double mDrainAmount {0};
+
+    // Frequency at which we leak. The fill level is reduced by mDrainAmount
+    // after each interval of this time.
+    LeakInterval mLeakInterval {};
 
     // Time of last drain
     mutable std::chrono::time_point<std::chrono::system_clock> mLastDrainTime { std::chrono::system_clock::now() };

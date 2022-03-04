@@ -322,5 +322,71 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
     }
 }
  
+BOOST_AUTO_TEST_CASE(RateLimitUpdateTest)
+{
+    // Set update rate limit
+    gArgs.ForceSetArg("-mempoolnonfinalmaxreplacementrate", "10");
+    gArgs.ForceSetArg("-mempoolnonfinalmaxreplacementrateperiod", "1");
+
+    // The time locked pool tester
+    CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
+    MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
+
+    // Build transaction to use in tests
+    CMutableTransaction original;
+    original.vin.resize(1);
+    original.vin[0].nSequence = 1;
+    original.vout.resize(1);
+
+    const TxIdTrackerSPtr& pTxIdTracker = std::make_shared<CTxIdTracker>();
+    CTransactionRef txnRef { MakeTransactionRef(original) };
+    TxInputDataSPtr pTxInputData {
+        std::make_shared<CTxInputData>(
+            pTxIdTracker,
+            txnRef,
+            TxSource::unknown,
+            TxValidationPriority::high,
+            TxStorage::memory,
+            GetTime()
+        )
+    };
+    CValidationState state { NonFinalState() };
+    tlMempool.addOrUpdateTransaction({txnRef}, pTxInputData, state);
+
+    // Check replacement rate tracking while under max rate
+    for(int i = 0; i < 10; ++i)
+    {
+        CMutableTransaction update { original };
+        update.vin[0].nSequence += 1;
+        CTransactionRef originalRef { MakeTransactionRef(original) };
+        CTransactionRef updateRef { MakeTransactionRef(update) };
+        state = NonFinalState();
+        BOOST_CHECK(tlMempool.checkUpdateWithinRate(updateRef, state));
+        BOOST_CHECK(state.IsValid());
+        state = NonFinalState();
+        tlMempool.addOrUpdateTransaction({updateRef}, pTxInputData, state);
+        BOOST_CHECK(state.IsValid());
+        BOOST_CHECK(tester.isInMempool(updateRef));
+        BOOST_CHECK(!tester.isInMempool(originalRef));
+        original = update;
+    }
+
+    // Now try exceeding the max replacement rate
+    CMutableTransaction update { original };
+    update.vin[0].nSequence += 1;
+    CTransactionRef originalRef { MakeTransactionRef(original) };
+    CTransactionRef updateRef { MakeTransactionRef(update) };
+    state = NonFinalState();
+    BOOST_CHECK(!tlMempool.checkUpdateWithinRate(updateRef, state));
+    BOOST_CHECK(!state.IsValid());
+    state = NonFinalState();
+    tlMempool.addOrUpdateTransaction({updateRef}, pTxInputData, state);
+    BOOST_CHECK(!state.IsValid());
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "non-final-txn-replacement-rate");
+    BOOST_CHECK(!tester.isInMempool(updateRef));
+    BOOST_CHECK(tester.isInMempool(originalRef));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 

@@ -1148,6 +1148,12 @@ CTxnValResult TxnValidation(
                 return Result{state, pTxInputData};
             }
 
+            // Bail out early if replacement of non-final txns exceeds rate limit
+            if(!mempool.getNonFinalPool().checkUpdateWithinRate(ptx, state)) {
+                // state set in call to checkUpdateWithinRate
+                return Result{state, pTxInputData};
+            }
+
             // Currently we don't allow chains of non-final txns
             if(DoesNonFinalSpendNonFinal(tx)) {
                 state.DoS(0, false, REJECT_NONSTANDARD, "too-long-non-final-chain",

@@ -413,7 +413,18 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                        strprintf(_("Do not keep transactions in the non-final mempool "
                                    "longer than <n> hours (default: %u)"),
                                  DEFAULT_NONFINAL_MEMPOOL_EXPIRY));
-
+    strUsage +=
+        HelpMessageOpt("-mempoolnonfinalmaxreplacementrate=<n>",
+                       strprintf(_("The maximum rate at which a transaction in the non-final mempool can be replaced by "
+                                   "another updated transaction, expressed as transactions per hour. (default: %u/hour)"),
+                                 DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE));
+    if (showDebug) {
+        strUsage +=
+            HelpMessageOpt("-mempoolnonfinalmaxreplacementrateperiod=<n>",
+                           strprintf(_("The period of time (in minutes) over which the maximum rate for non-final transactions "
+                                       "is measured (see -mempoolnonfinalmaxreplacementrate above). (default: %u)"),
+                                     DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD));
+    }
     if (showDebug) {
         strUsage += HelpMessageOpt("-checknonfinalfreq=<n>",
                        strprintf(_("Run checks on non-final transactions every <n> "
@@ -1167,7 +1178,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("To prevent the appearance of selfish mining when a block template becomes full, "
                     "the journaling block assembler will start to throttle back the rate at which it "
                     "adds new transactions from the journal to the next block template when the block "
-                    "template reaches this percent full (default: %d%%"),
+                    "template reaches this percent full (default: %d%%)"),
             mining::JournalingBlockAssembler::DEFAULT_THROTTLE_THRESHOLD)
     );
 
