@@ -5923,7 +5923,7 @@ static bool AcceptBlock(const Config& config,
                  block.GetHash().ToString(),
                  nHeight,
                  metaData.diskDataSize,
-                 (unsigned)block.vtx.size(),
+                 block.vtx.size(),
                  blockTimeAsString,
                  blockPos.File());
     }
