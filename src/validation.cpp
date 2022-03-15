@@ -5916,6 +5916,16 @@ static bool AcceptBlock(const Config& config,
         if (!ReceivedBlockTransactions(config, block, state, pindex, blockPos, metaData, source)) {
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
         }
+        std::string blockTimeAsString =
+                        DateTimeStrFormat("%Y-%m-%d %H:%M:%S",
+                                          block.GetBlockHeader().GetBlockTime());
+        LogPrint(BCLog::BENCH, "Accepted block hash=%s, height=%d, size=%ld, num_tx=%u, block-time=%s, file=blk%05u.dat\n",
+                 block.GetHash().ToString(),
+                 nHeight,
+                 metaData.diskDataSize,
+                 (unsigned)block.vtx.size(),
+                 blockTimeAsString,
+                 blockPos.File());
     }
     catch (const std::runtime_error& e) {
         return AbortNode(state, std::string("System error: ") + e.what());
