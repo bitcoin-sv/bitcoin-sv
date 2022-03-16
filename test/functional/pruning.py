@@ -180,7 +180,7 @@ class PruneTest(BitcoinTestFramework):
         self.log.info("Reconnect nodes")
         connect_nodes(self.nodes, 0, 1)
         connect_nodes(self.nodes, 2, 1)
-        sync_blocks(self.nodes[0:3], timeout=120)
+        sync_blocks(self.nodes[0:3], timeout=300)
 
         self.log.info("Verify height on node 2: %d" %
                       self.nodes[2].getblockcount())
@@ -194,11 +194,11 @@ class PruneTest(BitcoinTestFramework):
         # mined blocks from being too small.
         self.nodes[0].resendwallettransactions()
 
-        for i in range(22):
+        for i in range(110):
             # This can be slow, so do this in multiple RPC calls to avoid
             # RPC timeouts.
             # node 0 has many large tx's in its mempool from the disconnects
-            self.nodes[0].generate(10)
+            self.nodes[0].generate(2)
         sync_blocks(self.nodes[0:3], timeout=300)
 
         usage = calc_usage(self.prunedir)
@@ -372,7 +372,7 @@ class PruneTest(BitcoinTestFramework):
         self.log.info("Syncing node 5 to test wallet")
         connect_nodes(self.nodes, 0, 5)
         nds = [self.nodes[0], self.nodes[5]]
-        sync_blocks(nds, wait=5, timeout=300)
+        sync_blocks(nds, wait=15, timeout=700)
         self.stop_node(5)  # stop and start to trigger rescan
         self.start_node(5, extra_args=["-disablesafemode=1", "-prune=550"])
         self.log.info("Success")

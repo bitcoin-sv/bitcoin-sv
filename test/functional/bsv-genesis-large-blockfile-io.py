@@ -93,7 +93,7 @@ class LargeBlockFileIO(ComparisonTestFramework):
 
         # Mine block with new transaction.
         minedBlock3 = node.generate(1)                
-
+        sleep(2)
         # Restart node to make sure that the index is written to disk
         self.stop_nodes()
         self.nodes[0].rpc_timeout = 6000

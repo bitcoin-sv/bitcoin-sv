@@ -278,8 +278,8 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                 ["-blockmintxfee=0.00001",
                  "-relayfee=0.000005",
                  "-maxtxsizepolicy=0",
-                 '-maxnonstdtxvalidationduration=100000',
-                 '-maxtxnvalidatorasynctasksrunduration=100001',
+                 '-maxnonstdtxvalidationduration=200000',
+                 '-maxtxnvalidatorasynctasksrunduration=200010',
                  '-genesisactivationheight=1',
                  '-maxstackmemoryusageconsensus=2GB',
                  "-maxscriptsizepolicy=2GB",
@@ -294,7 +294,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                 conn.send_message(msg_tx(tx))
 
             # send transactions that are spending outputs from the soon-to-be-disconnected block (a1)
-            check_mempool_equals(conn.rpc, a1_spends, timeout=100)
+            check_mempool_equals(conn.rpc, a1_spends, timeout=120)
 
             # announce blocks d1, and d2 and send them triggering the reorg
             headers = msg_headers()
