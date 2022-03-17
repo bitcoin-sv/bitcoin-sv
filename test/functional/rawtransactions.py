@@ -31,7 +31,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.num_nodes = 4
         self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
         self.extra_args = [[],[],[],['-maxmempool=300', '-maxmempoolsizedisk=0', f"-blockmintxfee={self.relayfee}"
-                                     , f"-minrelaytxfee={self.relayfee}"]]
+                                     , f"-mindebugrejectionfee={self.relayfee}"]]
 
     def setup_network(self, split=False):
         super().setup_network()
@@ -289,7 +289,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         raw_tx2 = self.nodes[3].createrawtransaction(inputs2, outputs2)
         tx_hex2 = self.nodes[3].signrawtransaction(raw_tx2)["hex"]
         assert_raises_rpc_error(
-            -26, "insufficient priority", self.nodes[3].sendrawtransaction, tx_hex2, False, False
+            -26, "mempool min fee not met", self.nodes[3].sendrawtransaction, tx_hex2, False, False
         )
         txid2 = self.nodes[3].sendrawtransaction(tx_hex2, False, True)
         mempool = self.nodes[3].getrawmempool(False)
@@ -303,7 +303,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         #
         # Submit transaction without checking fee 2/2 #
         #
-        relayfee = self.nodes[3].getnetworkinfo()['relayfee']
+        relayfee = self.relayfee
         base_fee = relayfee * 1000
         utxos = create_confirmed_utxos(relayfee, self.nodes[3], 335)
         # fill up mempool
@@ -326,7 +326,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         signedTxn = self.make_data_transaction(self.nodes[3], utxos.pop())
         # without sufficient fee shouldn't get to mempool
         assert_raises_rpc_error(
-            -26, "insufficient priority", self.nodes[3].sendrawtransaction, signedTxn, False, False
+            -26, "mempool min fee not met", self.nodes[3].sendrawtransaction, signedTxn, False, False
         )
         txid_new = self.nodes[3].sendrawtransaction(signedTxn, False, True)
         mempoolsize_new = self.nodes[3].getmempoolinfo()['size']

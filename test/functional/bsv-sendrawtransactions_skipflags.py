@@ -62,7 +62,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.extra_args = [["-debug",
                             "-genesisactivationheight=1",
                             "-blockmintxfee=0.00001",
-                            "-minrelaytxfee=0.0000025",
+                            "-mindebugrejectionfee=0.0000025",
                             "-checkmempool=0",
                             "-maxscriptsizepolicy=%d" % self.maxscriptsize,
                             "-maxtxsizepolicy=%d" % self.maxtxsize,

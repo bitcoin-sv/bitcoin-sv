@@ -34,13 +34,13 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.minrelaytxfee_sats = 250
         self.extra_args = [[
             "-whitelist=127.0.0.1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
             "-acceptnonstdtxn=1",
             ],[
             "-whitelist=127.0.0.1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             #"-minconsolidationfactor=10", # test default consolidation factor
             "-acceptnonstdtxn=1",
@@ -113,12 +113,12 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             # FAILING CONDITION: input_sizes <= consolidation_factor * output_size
             # We assume scriptSig ~ 4 * scriptPubKey
             tx_hex = self.create_and_sign_tx (node, in_count = enough_inputs - 1 , min_confirmations = enough_confirmations)
-            assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
+            assert_raises_rpc_error(-26, "66: mempool min fee not met", node.sendrawtransaction, tx_hex)
             self.log.info ("test 1: PASS")
 
             # FAILING CONDITION: not enough input confirmations
             tx_hex = self.create_and_sign_tx (node, in_count = enough_inputs , min_confirmations = enough_confirmations - 1)
-            assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
+            assert_raises_rpc_error(-26, "66: mempool min fee not met", node.sendrawtransaction, tx_hex)
             self.log.info ("test 2: PASS")
 
             # ALL CONDITIONS MET: must succeed

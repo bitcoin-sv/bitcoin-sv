@@ -44,7 +44,7 @@ class FeeFilterTest(BitcoinTestFramework):
         self.extra_args = [[
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
@@ -52,7 +52,7 @@ class FeeFilterTest(BitcoinTestFramework):
             ],[
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
@@ -161,7 +161,7 @@ class FeeFilterTest(BitcoinTestFramework):
         # Now the feefilter is set to blockmintxfee+1;
         # tx3 is not relayed as modified fees < feefilter
         # tx4 is relayed, as node1's txfee is set high enough - control tx
-        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+1))
+        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+10))
 
         txid3 = node1.sendrawtransaction(tx_hex3)
         txid4 = node1.sendtoaddress(node1.getnewaddress(), 1)

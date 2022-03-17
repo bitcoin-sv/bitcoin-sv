@@ -57,9 +57,10 @@ class JournalReorg(BitcoinTestFramework):
         # Create and send a txn that is only valid post-genesis
         utxos = node.listunspent()
         spendTxn = utxos.pop()
-        relayfee = node.getnetworkinfo()['relayfee']
-        send_value1 = int((spendTxn['amount'] - relayfee) * 100000000)
-        send_value2 = int((spendTxn['amount'] - relayfee*2) * 100000000)
+        fee = Decimal(0.0000025) #node.getnetworkinfo()['relayfee']
+        send_value1 = int((spendTxn['amount'] - fee) * 100000000)
+        send_value2 = int((spendTxn['amount'] - fee*2) * 100000000)
+
 
         txOpAdd1 = CTransaction()
         txOpAdd1.vin.append(CTxIn(COutPoint(int(spendTxn["txid"], 16), spendTxn["vout"]), b'', 0xffffffff))
