@@ -8,7 +8,7 @@ from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoin
 from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals, assert_greater_than
-
+from decimal import Decimal
 import time
 import threading
 
@@ -38,7 +38,7 @@ class PtvCpfp(BitcoinTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
         self.locking_script2 = CScript([b"X"*10, OP_DROP, OP_TRUE])
-        self.default_args = ['-debug', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight]
+        self.default_args = ['-debug', '-mindebugrejectionfee=0.0000025', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight, '-whitelist=127.0.0.1']
         self.extra_args = [self.default_args] * self.num_nodes
 
     def setup_network(self):
@@ -266,7 +266,7 @@ class PtvCpfp(BitcoinTestFramework):
                 0, ['-maxmempool=600MB'] + args + self.default_args, number_of_connections=1) as (conn,):
 
             mining_fee = 1.01 # in satoshi per byte
-            relay_fee = float(conn.rpc.getnetworkinfo()["relayfee"] * COIN / 1000) + 0.15  # in satoshi per byte
+            relay_fee = float(Decimal("0.0000025") * COIN / 1000) + 0.15  # in satoshi per byte
 
             # Create a low and high fee txn.
             low_fee_std_tx = self.create_fund_txn(conn, 300, relay_fee, self.locking_script, pubkey=self.coinbase_pubkey)

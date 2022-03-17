@@ -375,12 +375,16 @@ class ChainManager():
 
                     if script == CScript([OP_TRUE]):
                         tx.vout.append(CTxOut(1, CScript([random.randint(0, 256), OP_RETURN])))
+                        coinbase.vout[0].nValue -= 1
+                        coinbase.rehash()
+
                     sign_tx(tx, spend.tx, spend.n, coinbase_key)
                     self.add_transactions_to_block(block, [tx])
                     block.hashMerkleRoot = block.calc_merkle_root()
                 else:
                     # Make sure we have plenty engough to spend going forward.
                     spendable_outputs = deque([spend])
+                    coinbase.vout[0].nValue -= 1
 
                     def get_base_transaction():
                         # Create the new transaction
@@ -393,7 +397,7 @@ class ChainManager():
                         tx.vin.append(CTxIn(COutPoint(spend.tx.sha256, spend.n)))
                         # Add spendable outputs
                         spend_amount = int(input_value / 4)
-                        fee = input_value - spend_amount * 4
+                        fee = input_value - spend_amount * 4 + extraCash[0]
                         coinbase.vout[0].nValue += fee
                         for i in range(4):
                             tx.vout.append(CTxOut(spend_amount, CScript([OP_TRUE])))

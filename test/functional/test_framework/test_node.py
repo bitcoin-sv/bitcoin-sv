@@ -86,7 +86,7 @@ class TestNode():
             return inputArgs
 
         requiredArgs = ["-maxstackmemoryusageconsensus=0",
-                        "-minminingtxfee=500",
+                        "-minminingtxfee=0.000005",
                         "-excessiveblocksize=0"]
 
         allSetArgs = []

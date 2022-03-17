@@ -116,8 +116,8 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
     def run_test(self):
         with self.run_node_with_connections("Preparation", 0,
                                             ["-minminingtxfee=0.00001",
-                                             "-relayfee=0.000005",
-                                             "-checkmempool=0",],
+                                             "-mindebugrejectionfee=0.000005",
+                                             "-checkmempool=0"],
                                             number_of_connections=1) as (conn,):
             mining_fee = 1.1
 
@@ -183,7 +183,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         with self.run_node_with_connections("1. Try sending the same transaction that are in the disconnected block during the reorg",
                                             0,
                                             ["-minminingtxfee=0.00001",
-                                             "-relayfee=0.000005",
+                                             "-mindebugrejectionfee=0.000005",
                                              "-maxtxsizepolicy=0",
                                              "-maxstdtxnsperthreadratio=1",
                                              "-maxnonstdtxnsperthreadratio=1",
@@ -227,7 +227,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         with self.run_node_with_connections("2. Try sending transaction that are spending same inputs as transactions in the disconnected block during the reorg",
                                             0,
                                             ["-minminingtxfee=0.00001",
-                                             "-relayfee=0.000005",
+                                             "-mindebugrejectionfee=0.000005",
                                              "-maxtxsizepolicy=0",
                                              "-maxstdtxnsperthreadratio=1",
                                              "-maxnonstdtxnsperthreadratio=1",
@@ -276,7 +276,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         with self.run_node_with_connections("3. Submit transactions that are spending ouputs from disconnecting block and try to mine a block during the reorg",
                 0,
                 ["-minminingtxfee=0.00001",
-                 "-relayfee=0.000005",
+                 "-mindebugrejectionfee=0.000005",
                  "-maxtxsizepolicy=0",
                  '-maxnonstdtxvalidationduration=200000',
                  '-maxtxnvalidatorasynctasksrunduration=200010',
