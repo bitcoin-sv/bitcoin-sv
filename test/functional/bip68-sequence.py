@@ -32,10 +32,10 @@ class BIP68Test(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.blockmintxfee_sats = 50
-        self.blockmintxfee = Decimal(self.blockmintxfee_sats) / COIN
-        self.relayfee = Decimal(0)/COIN # half the value of the blockmintxfee
-        self.extra_args = [["-disablesafemode=1", "-blockmintxfee={:10f}".format(self.blockmintxfee)],
-                           ["-acceptnonstdtxn=0", "-blockmintxfee={:10f}".format(self.blockmintxfee), "-disablesafemode=1"]]
+        self.minminingtxfee = Decimal(self.blockmintxfee_sats) / COIN
+        self.relayfee = Decimal(0)/COIN # half the value of the minminingtxfee
+        self.extra_args = [["-disablesafemode=1", "-minminingtxfee={:10f}".format(self.minminingtxfee)],
+                           ["-acceptnonstdtxn=0", "-minminingtxfee={:10f}".format(self.minminingtxfee), "-disablesafemode=1"]]
 
     def run_test(self):
         # Generate some coins

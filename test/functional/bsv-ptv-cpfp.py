@@ -253,7 +253,7 @@ class PtvCpfp(BitcoinTestFramework):
         # Node's config
         args = ['-txnvalidationasynchrunfreq=0',
                 '-limitancestorcount=1001',
-                '-blockmintxfee=0.00001',
+                '-minminingtxfee=0.00001',
                 '-maxorphantxsize=600MB',
                 '-maxmempoolsizedisk=0',
                 '-disablebip30checks=1',

@@ -51,11 +51,11 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         self.extra_args = [[
             "-whitelist=127.0.0.1",
             "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
             ],[
             "-whitelist=127.0.0.1",
             "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
-            "-blockmintxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
         ]]
 
     def run_test(self):

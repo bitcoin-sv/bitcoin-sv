@@ -20,8 +20,8 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         self.setup_clean_chain = True
         self.num_nodes = 2
         self.chain = ChainManager()
-        self.extra_args = [["-whitelist=127.0.0.1", "-blockmintxfee=0", "-acceptnonstdtxn=1", "-minrelaytxfee=0", "-softconsensusfreezeduration=4"],
-                           ["-whitelist=127.0.0.1", "-blockmintxfee=0", "-acceptnonstdtxn=1", "-minrelaytxfee=0", "-softconsensusfreezeduration=4"]]
+        self.extra_args = [["-whitelist=127.0.0.1", "-minminingtxfee=0", "-acceptnonstdtxn=1", "-minrelaytxfee=0", "-softconsensusfreezeduration=4"],
+                           ["-whitelist=127.0.0.1", "-minminingtxfee=0", "-acceptnonstdtxn=1", "-minrelaytxfee=0", "-softconsensusfreezeduration=4"]]
         self.block_count = 0
 
     def _init(self):

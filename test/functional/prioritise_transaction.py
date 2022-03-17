@@ -24,7 +24,7 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         self.num_nodes = 1
 
     def run_test(self):
-        self.start_node(0, ["-blockmintxfee=0.00003"] )
+        self.start_node(0, ["-minminingtxfee=0.00003"] )
 
         node = self.nodes[0]
         self.txouts = gen_return_txouts()

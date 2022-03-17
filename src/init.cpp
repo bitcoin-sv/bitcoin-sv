@@ -1069,7 +1069,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter / ONE_MEGABYTE
                     ));
     strUsage += HelpMessageOpt(
-        "-blockmintxfee=<amt>",
+        "-minminingtxfee=<amt>",
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. This is a mandatory setting"),
                   CURRENCY_UNIT));
@@ -2556,15 +2556,15 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Sanity check argument for min fee for including tx in block
     // TODO: Harmonize which arguments need sanity checking and where that
     // happens.
-    if (gArgs.IsArgSet("-blockmintxfee")) {
+    if (gArgs.IsArgSet("-minminingtxfee")) {
         Amount n(0);
-        if (!ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n)) {
-            return InitError(AmountErrMsg("blockmintxfee",
-                                          gArgs.GetArg("-blockmintxfee", "")));
+        if (!ParseMoney(gArgs.GetArg("-minminingtxfee", ""), n)) {
+            return InitError(AmountErrMsg("minminingtxfee",
+                                          gArgs.GetArg("-minminingtxfee", "")));
         }
         mempool.SetBlockMinTxFee(CFeeRate(n));
     } else {
-        return InitError("-blockmintxfee is mandatory");
+        return InitError("-minminingtxfee is mandatory");
     }
 
     if (gArgs.IsArgSet("-mindebugrejectionfee")) {

@@ -49,7 +49,7 @@ class Cpfp(BitcoinTestFramework):
 
 
     def run_test(self):
-        with self.run_node_with_connections("Scenario 1: Low fee, non-whitelisted peer", 0, ["-blockmintxfee=0.00001", "-mindebugrejectionfee=0.00000250"],
+        with self.run_node_with_connections("Scenario 1: Low fee, non-whitelisted peer", 0, ["-minminingtxfee=0.00001", "-mindebugrejectionfee=0.00000250"],
                                             number_of_connections=1) as (conn,):
 
             mining_fee = 1.01 # in satoshi per byte

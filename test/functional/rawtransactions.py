@@ -30,7 +30,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 4
         self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
-        self.extra_args = [[],[],[],['-maxmempool=300', '-maxmempoolsizedisk=0', f"-blockmintxfee={self.relayfee}"
+        self.extra_args = [[],[],[],['-maxmempool=300', '-maxmempoolsizedisk=0', f"-minminingtxfee={self.relayfee}"
                                      , f"-mindebugrejectionfee={self.relayfee}"]]
 
     def setup_network(self, split=False):

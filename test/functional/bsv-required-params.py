@@ -21,7 +21,7 @@ class BSVRequiredParams(BitcoinTestFramework):
         with open(os.path.join(self.options.tmpdir + "/node0", "bitcoin.conf"), 'a', encoding='utf8') as configFile:
             configFile.write("maxstackmemoryusageconsensus=0\n")
             configFile.write("excessiveblocksize=0\n")
-            configFile.write("blockmintxfee=500\n")
+            configFile.write("minminingtxfee=500\n")
 
     def add_options(self, parser):
         super().add_options(parser)

@@ -45,7 +45,7 @@ class FeeFilterTest(BitcoinTestFramework):
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
             "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
             "-txindex=1"
@@ -53,7 +53,7 @@ class FeeFilterTest(BitcoinTestFramework):
             "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
             "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
             "-txindex=1"
@@ -145,7 +145,7 @@ class FeeFilterTest(BitcoinTestFramework):
         test_node.clear_invs()
 
         # Consolidation transaction will be relayed,
-        # as the modified fees are set to blockmintxfee >= feefilter
+        # as the modified fees are set to minminingtxfee >= feefilter
         test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats))
 
         # Send consolidation and regular tx - both should be accepted and relayed
@@ -158,7 +158,7 @@ class FeeFilterTest(BitcoinTestFramework):
         # Check that tx1 and tx2 were relayed to test_node
         wait_until(lambda: sorted([txid1, txid2]) == sorted(test_node.txinvs), lock=mininode_lock, timeout=60)
 
-        # Now the feefilter is set to blockmintxfee+1;
+        # Now the feefilter is set to minminingtxfee+1;
         # tx3 is not relayed as modified fees < feefilter
         # tx4 is relayed, as node1's txfee is set high enough - control tx
         test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+10))

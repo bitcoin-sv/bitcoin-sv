@@ -35,13 +35,13 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.extra_args = [[
             "-whitelist=127.0.0.1",
             "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
             "-acceptnonstdtxn=1",
             ],[
             "-whitelist=127.0.0.1",
             "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             #"-minconsolidationfactor=10", # test default consolidation factor
             "-acceptnonstdtxn=1",
         ]]
