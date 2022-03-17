@@ -773,7 +773,11 @@ def mine_large_block(node, utxos=None):
     if len(utxos) < num:
         utxos.clear()
         utxos.extend(node.listunspent())
-    fee = 200 * node.getnetworkinfo()["relayfee"]
+
+    # we pay a fee so we are not rejected by mempool rejection fee
+    # Before we used the relayfee which does not exist any more
+    # fee = 200 * node.getnetworkinfo()["relayfee"]
+    fee = 200 * Decimal("0.00000250")
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
 
