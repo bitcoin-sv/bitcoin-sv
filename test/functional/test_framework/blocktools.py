@@ -392,23 +392,22 @@ class ChainManager():
                         # Spend from one of the spendable outputs
                         spend = spendable_outputs.popleft()
                         # we guess generously the extra cash needed, but we will assert its correctness on use
-                        extraCash = [10]
-                        input_value = spend.tx.vout[spend.n].nValue - extraCash[0]
+                        extraCash = 10
+                        input_value = spend.tx.vout[spend.n].nValue - extraCash
                         tx.vin.append(CTxIn(COutPoint(spend.tx.sha256, spend.n)))
                         # Add spendable outputs
                         spend_amount = int(input_value / 4)
-                        fee = input_value - spend_amount * 4 + extraCash[0]
+                        fee = input_value - spend_amount * 4 + extraCash
                         coinbase.vout[0].nValue += fee
                         for i in range(4):
                             tx.vout.append(CTxOut(spend_amount, CScript([OP_TRUE])))
                             spendable_outputs.append(PreviousSpendableOutput(tx, i))
                         return tx, extraCash
 
-                    def spendExtraCash(toSpend, extraCash):
-                        assert (extraCash[0] > 0)
-                        extraCash[0] -= 1
-                        coinbase.vout[0].nValue -= 1
-                        return toSpend
+                    def CreateCTxOut(toSpend_, extraCash_, script_):
+                        assert (extraCash_ - toSpend_ >= 0)
+                        coinbase.vout[0].nValue -= toSpend_ 
+                        return extraCash_ - toSpend_, CTxOut(toSpend_, script_)
 
                     tx, extraCash = get_base_transaction()
 
@@ -418,10 +417,12 @@ class ChainManager():
 
                     # If a specific script is required, add it.
                     if script != None:
-                        tx.vout.append(CTxOut(spendExtraCash(1,extraCash), script))
+                        extraCash, txout = CreateCTxOut(1, extraCash, script)
+                        tx.vout.append(txout)
 
                     # Put some random data into the first transaction of the chain to randomize ids.
-                    tx.vout.append(CTxOut(spendExtraCash(1,extraCash), CScript([random.randint(0, 256), OP_RETURN])))
+                    extraCash, txout = CreateCTxOut(1, extraCash, CScript([random.randint(0, 256), OP_RETURN]))
+                    tx.vout.append(txout)
 
                     # Add the transaction to the block
                     self.add_transactions_to_block(block, [tx])
@@ -467,7 +468,8 @@ class ChainManager():
                         script_pad_len = script_length - tx_sigops - len(ser_compact_size(script_length - tx_sigops))
                         script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
 
-                        tx.vout.append(CTxOut(spendExtraCash(1,extraCash), script_output))
+                        extraCash, txout = CreateCTxOut(1, extraCash, script_output)
+                        tx.vout.append(txout)
 
                         # Add the tx to the list of transactions to be included
                         # in the block.
