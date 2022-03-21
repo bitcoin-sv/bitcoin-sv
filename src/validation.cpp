@@ -1263,15 +1263,6 @@ CTxnValResult TxnValidation(
                       strprintf("%d > %d", nFees, nAbsurdFee));
         return Result{state, pTxInputData, vCoinsToUncache};
     }
-    if ( nFees < Amount{0}) {
-        // Require that free transactions have sufficient priority to be
-        // mined in the next block.
-        state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                  "insufficient priority");
-        return Result{state, pTxInputData, vCoinsToUncache};
-    }
-
-
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     Amount nModifiedFees = nFees;
 
