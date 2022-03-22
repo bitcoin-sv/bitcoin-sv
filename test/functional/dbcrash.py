@@ -30,6 +30,7 @@ import http.client
 import random
 import sys
 import time
+from decimal import Decimal
 
 from test_framework.mininode import *
 from test_framework.script import *
@@ -52,7 +53,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         # Set -rpcservertimeout=900 to reduce socket disconnects in this
         # long-running test
         self.base_args = ["-maxmempool=0", "-maxmempoolsizedisk=0", "-disablesafemode=1",
-                          "-rpcservertimeout=900", "-dbbatchsize=200000"]
+                          "-rpcservertimeout=900", "-dbbatchsize=200000", "-mindebugrejectionfee"]
 
         # Set different crash ratios and cache sizes.  Note that not all of
         # -dbcache goes to pcoinsTip.
@@ -231,8 +232,8 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
 
         # Start by creating a lot of utxos on node3
         initial_height = self.nodes[3].getblockcount()
-        utxo_list = create_confirmed_utxos(self.nodes[3].getnetworkinfo()[
-                                           'relayfee'], self.nodes[3], 5000)
+        relayfee = Decimal("0.0000025")
+        utxo_list = create_confirmed_utxos(relayfee, self.nodes[3], 5000)
         self.log.info("Prepped %d utxo entries", len(utxo_list))
 
         # Sync these blocks with the other nodes

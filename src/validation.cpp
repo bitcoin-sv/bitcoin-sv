@@ -773,12 +773,12 @@ static bool CheckTxSpendsCoinbase(
 }
 
 static Amount GetMempoolRejectFee(
-    const Config& config,
-    const CTxMemPool &pool,
-    unsigned int nTxSize) {
+        const Config& config,
+        const CTxMemPool &pool,
+        unsigned int nTxSize) {
     // Get mempool reject fee
     return pool.GetMinFee(config.GetMaxMempool())
-        .GetFee(nTxSize);
+            .GetFee(nTxSize);
 }
 
 static bool CheckMempoolMinFee(
@@ -1309,17 +1309,6 @@ CTxnValResult TxnValidation(
             uiChainActiveHeight,
             fSpendsCoinbase,
             lp) };
-    if (!skipFeeTest) {
-        // Check tx's priority based on relaypriority flag and relay fee.
-        const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
-        if ( nModifiedFees < minRelayTxFee.GetFee(nTxSize)) {
-            // Require that free transactions have sufficient priority to be
-            // mined in the next block.
-            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                      "insufficient priority");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-    }
     // Calculate in-mempool ancestors, up to a limit.
     std::string errString;
     if (!CheckAncestorLimits(pool, *pMempoolEntry, errString, config)) {

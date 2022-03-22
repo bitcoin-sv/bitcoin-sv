@@ -93,7 +93,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
     def run_test(self):
         
         self.stop_node(0)
-        with self.run_node_with_connections("test getblocktemplate RPC call", 0, ["-blockmintxfee=0.0000001"], 1) as connections:
+        with self.run_node_with_connections("test getblocktemplate RPC call", 0, ["-minminingtxfee=0.0000001"], 1) as connections:
 
             connection = connections[0]
 
