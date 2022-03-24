@@ -186,7 +186,7 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(const CFeeRate &minRelayTxFee, int64_t dustLimitFactor, bool isGenesisEnabled) const {
+    Amount GetDustThreshold(bool isGenesisEnabled) const {
         // dust threshold is now hardcoded to 1 satoshi per output
         if (scriptPubKey.IsUnspendable(isGenesisEnabled))
             return Amount{0};
@@ -194,8 +194,8 @@ public:
         return Amount{1};
     }
 
-    bool IsDust(const CFeeRate &minRelayTxFee, int64_t dustLimitFactor, bool isGenesisEnabled) const {
-        return (nValue < GetDustThreshold(minRelayTxFee, dustLimitFactor, isGenesisEnabled));
+    bool IsDust(bool isGenesisEnabled) const {
+        return (nValue < GetDustThreshold(isGenesisEnabled));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {
