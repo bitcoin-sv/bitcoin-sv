@@ -2534,7 +2534,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     nConnectTimeout = gArgs.GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0) nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
-    // Optoin -minrelaytxfee has been removed
+    // Option -minrelaytxfee has been removed
     if (gArgs.IsArgSet("-minrelaytxfee")) {
         LogPrintf("Warning: configuration parameter -minrelaytxfee was removed\n");
     }
@@ -2585,7 +2585,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Feerate used to define dust.  Shouldn't be changed lightly as old
     // implementations may inadvertently create non-standard transactions.
     if (gArgs.IsArgSet("-dustrelayfee")) {
-        LogPrintf("Warning: configuration parameter -dustrelayfee was removed");
+        LogPrintf("Warning: configuration parameter -dustrelayfee was removed\n");
     }
     // TODO: remove dust settings
     config.SetDustRelayFee(DUST_RELAY_TX_FEE);
