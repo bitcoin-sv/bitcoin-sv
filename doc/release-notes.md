@@ -1,3 +1,5 @@
+# Bitcoin SV Node software – Upgrade to v1.0.11 Release
+
 Overview
 --------
 
@@ -8,7 +10,7 @@ Removed options -dustrelayfee, -dustlimitfactor
 
 These options have been removed. The dust threshold is now hard coded to one Satoshi per transaction output.
 
-Note that blocks containing transactions with dust outputs will still be accepted.
+Note that blocks containing transactions with dust outputs (i.e. outputs with a zero Satoshi amount)  will still be accepted.
 
 Attempting to set these options will have no effect other than a warning message in the bitcoin logs.
 
@@ -22,7 +24,7 @@ Attempting to set this option will have no effect other than a warning message i
 Changed option name -blockmintxfee to -minminingtxfee
 -----------------------------------------------------
 
-Note that setting -minminingtxfee is a mandatory setting. The option -blockmintxfee has been removed. Setting it will emit a warning in the bitcoin logs.
+Note that setting -minminingtxfee is a mandatory setting. The option -blockmintxfee has been removed. Setting it will emit a warning in the bitcoin logs. To repeat the default setting from the last release a miner needs to configure -_minminingtxfee=0.00000500_ (.i.e 500 Satoshis).
 
 Bug fixes
 ---------
@@ -31,7 +33,6 @@ Bug fixes
 
 2) Dropped connections due to "Timeout downloading block"
 
-3) Pruning target is now matched as closely as possible during initial block download
+3)  Pruning target is now matched as closely as possible during initial block download
 
 4) Disable a Bloom filtered connection by default
-
