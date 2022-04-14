@@ -1261,9 +1261,9 @@ namespace
     {
         const std::set<std::string> allPolicySettings = {"maxtxsizepolicy","datacarriersize","maxscriptsizepolicy","maxscriptnumlengthpolicy",
                                                          "maxstackmemoryusagepolicy","maxscriptnumlengthpolicy","limitancestorcount", "limitcpfpgroupmemberscount",
-                                                         "acceptnonstdoutputs", "datacarrier", "dustrelayfee", "maxstdtxvalidationduration", "maxnonstdtxvalidationduration",
+                                                         "acceptnonstdoutputs", "datacarrier", "maxstdtxvalidationduration", "maxnonstdtxvalidationduration",
                                                          "minconsolidationfactor", "maxconsolidationinputscriptsize", "minconfconsolidationinput", "acceptnonstdconsolidationinput",
-                                                         "dustlimitfactor", "maxtxnvalidatorasynctasksrunduration", "skipscriptflags"};
+                                                         "maxtxnvalidatorasynctasksrunduration", "skipscriptflags"};
 
         // Check if we only have flags that are supported
         for(UniValue jsonConfigValue : jsonConfig.getKeys())
@@ -1362,18 +1362,6 @@ namespace
             return false;
         }
 
-        if (UniValue dustrelayfee_uv; getNumOrRejectReason(jsonConfig, "dustrelayfee", dustrelayfee_uv, rejectReason))
-        {
-            if(!dustrelayfee_uv.isNull())
-            {
-                tsc.SetTransactionSpecificDustRelayFee(CFeeRate(Amount(dustrelayfee_uv.get_int64())));
-            }
-        }
-        else
-        {
-            return false;
-        }
-
         if (UniValue maxstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxstdtxvalidationduration", maxstdtxvalidationduration_uv, rejectReason) ||
             (!maxstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxStdTxnValidationDuration(maxstdtxvalidationduration_uv.get_int64(), &rejectReason)))
         {
@@ -1406,12 +1394,6 @@ namespace
    
         if (UniValue acceptnonstdconsolidationinput_uv; !getBoolOrRejectReason(jsonConfig, "acceptnonstdconsolidationinput", acceptnonstdconsolidationinput_uv, rejectReason) ||
             (!acceptnonstdconsolidationinput_uv.isNull() && !tsc.SetTransactionSpecificAcceptNonStdConsolidationInput(acceptnonstdconsolidationinput_uv.get_bool(), &rejectReason)))
-        {
-            return false;
-        }
-
-        if (UniValue dustlimitfactor_uv; !getNumOrRejectReason(jsonConfig, "dustlimitfactor", dustlimitfactor_uv, rejectReason) ||
-            (!dustlimitfactor_uv.isNull() && !tsc.SetTransactionSpecificDustLimitFactor(dustlimitfactor_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
@@ -1771,14 +1753,12 @@ void sendrawtransactions(const Config& config,
             "        \"limitcpfpgroupmemberscount\": n,      (integer, optional) Do not accept transactions if number of in-mempool transactions which we are not willing to mine due to a low fee is <n> or more\n"
             "        \"acceptnonstdoutputs\": n,             (boolean, optional) Relay and mine transactions that create or consume non standard after Genesis is activated\n"
             "        \"datacarrier\": n,                     (boolean, optional) Relay and mine data carrier transactions\n"
-            "        \"dustrelayfee\": n,                    (integer, optional) Fee rate (in %s/kB) used to define dust. A transaction output paying less than (dustlimitfactor * output_dust_fee / 100) is considered dust.\n"
             "        \"maxstdtxvalidationduration\": n,      (integer, optional) Set the single standard transaction validation duration threshold in milliseconds after which the standard transaction validation will terminate with error and the transaction is not accepted to mempool\n"
             "        \"maxnonstdtxvalidationduration\": n,   (integer, optional) Set the single non-standard transaction validation duration threshold in milliseconds after which the standard transaction validation will terminate with error and the transaction is not accepted to mempool\n"
             "        \"minconsolidationfactor\": n,          (integer, optional)Set minimum ratio between sum of utxo scriptPubKey sizes spent in a consolidation transaction, to the corresponding sum of output scriptPubKey sizes.\n"
             "        \"maxconsolidationinputscriptsize\": n, (integer, optional) This number is the maximum length for a scriptSig input in a consolidation txn\n"
             "        \"minconfconsolidationinput\": n,       (integer, optional) Minimum number of confirmations of inputs spent by consolidation transactions \n"
             "        \"acceptnonstdconsolidationinput\": n,  (boolean, optional) Accept consolidation transactions spending non standard inputs\n"
-            "        \"dustlimitfactor\": n,                 (integer, optional) The dust limit factor (a value in percent) is applied to the dust relay fee to determine if an output is dust.\n"
             "        \"skipscriptflags\": n                  (array of strings, optional) Specify standard non-mandatory flags that you wish to be skipped. Options are: \"DERSIG\", \"MINIMALDATA\", \"NULLDUMMY\", \"DISCOURAGE_UPGRADABLE_NOPS\", \"CLEANSTACK\"\n"
             "    }\n"
             "       } \n"

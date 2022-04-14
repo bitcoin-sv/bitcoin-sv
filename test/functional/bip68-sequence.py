@@ -12,6 +12,7 @@ from test_framework.util import *
 from test_framework.script import *
 from test_framework.mininode import *
 from test_framework.blocktools import *
+from decimal import Decimal
 
 SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31)
 SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22)  # this means use time (0 means height)
@@ -23,14 +24,20 @@ NOT_FINAL_ERROR = "64: non-BIP68-final"
 
 
 class BIP68Test(BitcoinTestFramework):
+    def calculate_mining_fee(self, tx):
+        tx_size = len(ToHex(tx))
+        fee = self.blockmintxfee_sats * tx_size
+        return fee
+
     def set_test_params(self):
         self.num_nodes = 2
-        self.extra_args = [["-disablesafemode=1"],
-                           ["-acceptnonstdtxn=0", "-disablesafemode=1"]]
+        self.blockmintxfee_sats = 500
+        self.minminingtxfee = Decimal(self.blockmintxfee_sats) / COIN
+        self.relayfee = self.minminingtxfee / 2
+        self.extra_args = [["-disablesafemode=1", "-minminingtxfee={:10f}".format(self.minminingtxfee), "-mindebugrejectionfee={:10f}".format(self.relayfee)],
+                           ["-acceptnonstdtxn=0", "-minminingtxfee={:10f}".format(self.minminingtxfee), "-disablesafemode=1", "-mindebugrejectionfee={:10f}".format(self.relayfee)]]
 
     def run_test(self):
-        self.relayfee = self.nodes[0].getnetworkinfo()["relayfee"]
-
         # Generate some coins
         self.nodes[0].generate(110)
 
@@ -287,7 +294,7 @@ class BIP68Test(BitcoinTestFramework):
 
         # Mine tx2, and then try again
         self.nodes[0].prioritisetransaction(
-            tx2.hash, 0, self.nodes[0].calculate_fee(tx2))
+            tx2.hash, 0, self.calculate_mining_fee(tx2))
 
         # Advance the time on the node so that we can test timelocks
         self.nodes[0].setmocktime(cur_time + 600)
@@ -300,6 +307,8 @@ class BIP68Test(BitcoinTestFramework):
             tx2, self.nodes[0], self.relayfee, use_height_lock=False)
         assert(tx3.hash in self.nodes[0].getrawmempool())
 
+        self.nodes[0].prioritisetransaction(
+            tx3.hash, 0, self.calculate_mining_fee(tx2))
         self.nodes[0].generate(1)
         assert(tx3.hash not in self.nodes[0].getrawmempool())
 

@@ -2281,18 +2281,16 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
 
 BOOST_AUTO_TEST_CASE(txout_IsDust) {
 
-    CFeeRate feerate(Amount(1000));
-    int64_t dustLimitFactor{DEFAULT_DUST_LIMIT_FACTOR};
     std::vector<uint8_t> data(100, 3);
     CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN << data;
 
     CScript opReturn = CScript() << OP_RETURN << data;
 
-    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, dustLimitFactor, false));
-    BOOST_CHECK(!CTxOut(Amount(10), opReturn).IsDust(feerate, dustLimitFactor, false));
+    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(false));
+    BOOST_CHECK(!CTxOut(Amount(1), opReturn).IsDust(false));
 
-    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, dustLimitFactor, true));
-    BOOST_CHECK(CTxOut(Amount(10), opReturn).IsDust(feerate, dustLimitFactor, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
+    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(true));
+    BOOST_CHECK(CTxOut(Amount(0), opReturn).IsDust(true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
 }
 
 BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {

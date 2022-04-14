@@ -11,36 +11,48 @@ from test_framework.util import assert_raises_rpc_error
 from test_framework.mininode import COIN
 from decimal import Decimal
 
+
+def create_zero_fee_tx_funded_from(node, tx_id, small_value):
+    addr = node.getnewaddress()
+    addr2 = node.getnewaddress()
+    tx = node.getrawtransaction(tx_id, 1)
+    n = -1
+
+    for vout in tx['vout']:
+        val = vout['value']
+        if val > 100 * small_value:
+            n = vout['n']
+            break
+
+    assert(n > -1)
+
+    inputs = [{'txid': tx_id, 'vout': n}]
+    small_value = float(small_value)
+    val = float(val)
+    outputs = {addr: val - small_value, addr2: small_value}
+    rawtx = node.createrawtransaction(inputs, outputs)
+    signed = node.signrawtransaction(rawtx)
+    return signed["hex"]
+
 class DustRelayFeeTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
-        self.num_nodes = 3
-        self.extra_args = [[],[],[]]
+        self.num_nodes = 1
+        self.extra_args = [[]]
 
     # Parameterized test for node launched with different fee settings, which checks:
     # - wallet does not allow sending dust amount
     # - wallet accepts sending amount which meets dust threshold
     # - node does not accept tx output with dust
     # - node accepts tx output which meets dust threshold
-    def test_node_with_fees(self, nodeid, dustlimitfactor, dustrelayfee_sats, minrelayfee_sats):
+    def test_node_with_fees(self, nodeid):
         node = self.nodes[nodeid]
-        dustrelayfee = Decimal(dustrelayfee_sats)/COIN
-        minrelayfee = Decimal(minrelayfee_sats)/COIN
         self.restart_node(nodeid, extra_args=[
-            "-dustrelayfee="+str(dustrelayfee),
-            "-dustlimitfactor="+str(dustlimitfactor),
-            "-minrelaytxfee="+str(minrelayfee),
             "-acceptnonstdtxn=0"])
 
-        # Calculate dust threshold as defined in transaction.h, GetDustThreshold()
-        # For e.g. if dustrelayfee is 300% then we have following mapping
-        # dustrelayfee 1000 --> threshold 546
-        # dustrelayfee  250 --> threshold 135
-        dust_threshold_sats = (dustlimitfactor * int(182 * dustrelayfee_sats / 1000)) / 100
+        dust_threshold_sats = 1
         amount_is_not_dust = Decimal(dust_threshold_sats)/COIN
-        amount_is_dust = Decimal(dust_threshold_sats - 1)/COIN
-        if dustlimitfactor == 0:
-            amount_is_not_dust = 1
+        amount_is_dust = Decimal(0.0)
 
         # Test: Wallet will allow sending amount which meets dust threshold
         addr = node.getnewaddress()
@@ -48,9 +60,12 @@ class DustRelayFeeTest(BitcoinTestFramework):
         txid = node.sendtoaddress(addr, amount_is_not_dust)
         assert(txid in node.getrawmempool())
 
+        tx_id = node.sendtoaddress(addr, 1.0)
+
         # Test: Wallet will not allow sending dust amount
-        if dustlimitfactor > 0:
-            assert_raises_rpc_error(-4, "Transaction amount too small", node.sendtoaddress, addr, amount_is_dust)
+
+        tx_hex = create_zero_fee_tx_funded_from(node, tx_id, 0)
+        assert_raises_rpc_error(-26, "64: dust", node.sendrawtransaction, tx_hex)
 
         # Get confirmed utxo to spend
         utxo_list = node.listunspent(1)
@@ -61,14 +76,14 @@ class DustRelayFeeTest(BitcoinTestFramework):
         inputs = []
         outputs = {}
         inputs.append({"txid": utxo["txid"], "vout": utxo["vout"]})
-        if dustlimitfactor > 0:
-            outputs[addr] = amount_is_dust
-            outputs[addr2] = utxo["amount"] - amount_is_dust - fee_amount
-            raw_tx = node.createrawtransaction(inputs, outputs)
-            tx_hex = node.signrawtransaction(raw_tx)["hex"]
-            txid = node.decoderawtransaction(tx_hex)["txid"]
-            assert_raises_rpc_error(-26, "64: dust", node.sendrawtransaction, tx_hex)
-            assert(txid not in node.getrawmempool())
+
+        outputs[addr] = amount_is_dust
+        outputs[addr2] = utxo["amount"] - amount_is_dust - fee_amount
+        raw_tx = node.createrawtransaction(inputs, outputs)
+        tx_hex = node.signrawtransaction(raw_tx)["hex"]
+        txid = node.decoderawtransaction(tx_hex)["txid"]
+        assert_raises_rpc_error(-26, "64: dust", node.sendrawtransaction, tx_hex)
+        assert(txid not in node.getrawmempool())
 
         # Test: update output value so it meets dust threshold and tx is accepted
         outputs[addr] = amount_is_not_dust
@@ -82,35 +97,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
         self.nodes[0].generate(120)
 
         # 1. Default settings of BSV node before Genesis release
-        self.test_node_with_fees(0, 300, dustrelayfee_sats=1000, minrelayfee_sats=1000)
-
-        # 2. Default settings of BSV node running Genesis release
-        self.test_node_with_fees(0, 300, dustrelayfee_sats=1000, minrelayfee_sats=250)
-        
-        # 3. BSV node where dustrelayfee is lowered to match minrelayfee
-        self.test_node_with_fees(0, 300, dustrelayfee_sats=250, minrelayfee_sats=250)
-
-        self.nodes[1].generate(120)
-
-        # 4. Default settings of BSV node before Genesis release (but dust limit 200%)
-        self.test_node_with_fees(1, 200, dustrelayfee_sats=1000, minrelayfee_sats=1000)
-
-        # 5. Default settings of BSV node running Genesis release (but dust limit 200%)
-        self.test_node_with_fees(1, 200, dustrelayfee_sats=1000, minrelayfee_sats=250)
-        
-        # 6. BSV node where dustrelayfee is lowered to match minrelayfee (but dust limit 200%)
-        self.test_node_with_fees(1, 200, dustrelayfee_sats=250, minrelayfee_sats=250)
-
-        self.nodes[2].generate(120)
-
-        # 7. Default settings of BSV node before Genesis release (but dust limit 0%)
-        self.test_node_with_fees(2, 0, dustrelayfee_sats=1000, minrelayfee_sats=1000)
-
-        # 8. Default settings of BSV node running Genesis release (but dust limit 0%)
-        self.test_node_with_fees(2, 0, dustrelayfee_sats=1000, minrelayfee_sats=250)
-        
-        # 9. BSV node where dustrelayfee is lowered to match minrelayfee (but dust limit 0%)
-        self.test_node_with_fees(2, 0, dustrelayfee_sats=250, minrelayfee_sats=250)
+        self.test_node_with_fees(0)
 
 if __name__ == '__main__':
     DustRelayFeeTest().main()

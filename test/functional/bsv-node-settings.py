@@ -10,7 +10,7 @@ from decimal import Decimal
 from itertools import chain
 from collections import defaultdict
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, check_for_log_msg, wait_until
 
 def scale_params(*params, scale):
     if isinstance(params, str):
@@ -36,7 +36,7 @@ class BSVNodeSettings(BitcoinTestFramework):
 
         node_settings = self.nodes[0].getsettings()
         # check we received expected fields (parameter settings)
-        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput','dustlimitfactor'])
+        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput'])
         expected_settings = set(parameters).union(optional)
         actual_settings = set(node_settings)
         unexpected_settings = actual_settings - expected_settings
@@ -74,9 +74,7 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxmempoolsizedisk': 4321,
                        'acceptnonstdoutputs': 1,
                        'datacarrier': 1,
-                       'minrelaytxfee': Decimal('0.00000250'),
-                       'dustrelayfee': Decimal('0.00000250'),
-                       'blockmintxfee': Decimal('0.00000500'),
+                       'minminingtxfee': Decimal('0.00000500'),
                        'maxstdtxvalidationduration': 10,
                        'maxnonstdtxvalidationduration': 1000,
                        'maxtxchainvalidationbudget': 0,
@@ -107,9 +105,7 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxmempoolsizedisk': 4312,
                        'acceptnonstdoutputs': 0,
                        'datacarrier': 0,
-                       'minrelaytxfee': Decimal('0.00000150'),
-                       'dustrelayfee': Decimal('0.00000150'),
-                       'blockmintxfee': Decimal('0.00000250'),
+                       'minminingtxfee': Decimal('0.00000250'),
                        'maxstdtxvalidationduration': 3,
                        'maxnonstdtxvalidationduration': 90,
                        'maxtxchainvalidationbudget': 50,
@@ -125,6 +121,12 @@ class BSVNodeSettings(BitcoinTestFramework):
         self.test_getsettings(parameters1)
         self.test_getsettings(parameters2)
 
+        # verify the warning messages of -minrelayfee, -dustrelayfee and -dustlimitfactor are deprecated on log file
+        self.restart_node(0, extra_args=['-minrelaytxfee=0', '-dustrelayfee=0', '-dustlimitfactor=0','-blockmintxfee=0.000005'])
+        wait_until(lambda: check_for_log_msg(self, "-minrelaytxfee", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "-dustrelayfee", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "-dustlimitfactor", "/node0"))
+        wait_until(lambda: check_for_log_msg(self, "-blockmintxfee", "/node0"))
 
 if __name__ == '__main__':
     BSVNodeSettings().main()

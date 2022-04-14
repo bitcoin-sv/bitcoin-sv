@@ -59,7 +59,7 @@ static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEG
 static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
 
-/** Default for -blockmintxfee, which sets the minimum feerate for a transaction
+/** Default for -minminingtxfee, which sets the minimum feerate for a transaction
  * in blocks created by mining code **/
 static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
 /** The maximum size for transactions we're willing to relay/mine - before genesis*/

@@ -76,7 +76,7 @@ bool BlockDownloadTracker::MarkBlockAsReceived(const BlockSource& block, bool pu
     return removeFromBlockMapNL(block, state);
 }
 
-// Notification that a block download was timed out or otherwise failed
+// Notification that a block download was cancelled, timed out or otherwise failed
 bool BlockDownloadTracker::MarkBlockAsFailed(const BlockSource& block, const CNodeStatePtr& state)
 {
     std::lock_guard lock { mMtx };

@@ -63,7 +63,7 @@ class Evictions(BitcoinTestFramework):
     def run_test(self):
 
         with self.run_node_with_connections("Eviction order test; fill the memppol over its size and see what txs will be evicted.",
-                                            0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
+                                            0, ["-minminingtxfee=0.00001", # 1 satoshi/byte
                                                 "-minrelaytxfee=0",
                                                 "-maxmempool=300MB",
                                                 "-maxmempoolsizedisk=0",
@@ -189,13 +189,13 @@ class Evictions(BitcoinTestFramework):
 
                 # when there are still some secondary mempool transaction in the mempool
                 if len(txs_in_mempool & set(secondaryMempoolTxs)) != 0:
-                    # the mempoolminfee should not exceed blockmintxfee
-                    assert  conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['blockmintxfee']
+                    # the mempoolminfee should not exceed minminingtxfee
+                    assert  conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['minminingtxfee']
 
 
 
         with self.run_node_with_connections("Restart the node with using the disk for storing transactions.",
-                                            0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
+                                            0, ["-minminingtxfee=0.00001", # 1 satoshi/byte
                                                 "-minrelaytxfee=0",
                                                 "-maxmempool=300MB",
                                                 "-maxmempoolsizedisk=10MB",
@@ -227,7 +227,7 @@ class Evictions(BitcoinTestFramework):
             assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
 
         with self.run_node_with_connections("Restart the node once again to see if transaction were stored in the db.",
-                                            0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
+                                            0, ["-minminingtxfee=0.00001", # 1 satoshi/byte
                                                 "-minrelaytxfee=0",
                                                 "-maxmempool=300MB",
                                                 "-maxmempoolsizedisk=10MB",

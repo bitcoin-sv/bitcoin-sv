@@ -2,14 +2,15 @@
 # Copyright (c) 2021  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.blocktools import create_block, create_coinbase, create_transaction, create_block_from_candidate
+from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN
+from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN, mininode_lock
 from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals, assert_greater_than
-
+from decimal import Decimal
 import time
+import threading
 
 """
 The test aims to:
@@ -37,7 +38,7 @@ class PtvCpfp(BitcoinTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
         self.locking_script2 = CScript([b"X"*10, OP_DROP, OP_TRUE])
-        self.default_args = ['-debug', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight]
+        self.default_args = ['-debug', '-mindebugrejectionfee=0.0000025', '-maxgenesisgracefulperiod=0', '-genesisactivationheight=%d' % self.genesisactivationheight, '-whitelist=127.0.0.1']
         self.extra_args = [self.default_args] * self.num_nodes
 
     def setup_network(self):
@@ -86,7 +87,6 @@ class PtvCpfp(BitcoinTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
         sighash = SignatureHashForkId(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
@@ -117,27 +117,38 @@ class PtvCpfp(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-    def generate_txchain(self, fund_txn, vout_idx, chain_length, tx_fee, locking_script):
+    # Create a single tx chain.
+    def create_txchain(self, spend, vout_idx, chain_length, tx_fee, locking_script):
         txs = []
-        req_start_time = time.time()
-        txs.append(self.create_tx([(fund_txn, vout_idx)], 1, tx_fee, locking_script))
+        txs.append(self.create_tx([(spend, vout_idx)], 1, tx_fee, locking_script))
         for idx in range(chain_length-1):
             txs.append(self.create_tx([(txs[idx], 0)], 1, tx_fee, locking_script))
-        self.log.info("Generate txchain[%d] of length %d, took: %.6f sec", vout_idx, chain_length,
-                time.time() - req_start_time)
         return txs[chain_length-1], txs
 
-    def generate_txchains(self, fund_txn, chain_length, num_of_chains, tx_fee, locking_script):
-        txs = []
+    # Create a required number of tx chains (equal lengths) in parallel.
+    def create_txchains(self, num_of_chains, chain_length, spend, tx_fee, locking_script):
+        txchains = []
         last_descendant_from_each_txchain = []
+        ths = []
         req_start_time = time.time()
-        for chain_idx in range (num_of_chains):
-            last_descendant_in_txchain, txchain = self.generate_txchain(fund_txn, chain_idx, chain_length, tx_fee, locking_script)
-            txs.extend(txchain)
-            last_descendant_from_each_txchain.append(last_descendant_in_txchain)
+        def make_chained_txs(chain_id, spend, chain_length, tx_fee, locking_script):
+            self.log.info("Creating txchain[%d], length=%d", chain_id, chain_length)
+            nonlocal txchains
+            last_descendant_in_txchain, txchain = self.create_txchain(spend, chain_id, chain_length, tx_fee, locking_script)
+            with mininode_lock:
+                txchains += txchain
+                last_descendant_from_each_txchain.append(last_descendant_in_txchain)
+            self.log.info("txchain[%d] created", chain_id)
+        # Make tx chains in parallel.
+        for x in range(0, num_of_chains):
+            th = threading.Thread(target=make_chained_txs, args=(x, spend, chain_length, tx_fee, locking_script,))
+            ths.append(th)
+            th.start()
+        for _, th in enumerate(ths):
+            th.join()
         self.log.info("The total time to generate all %d txchains (of length %d): %.6f sec", num_of_chains, chain_length,
                 time.time() - req_start_time)
-        return last_descendant_from_each_txchain, txs
+        return last_descendant_from_each_txchain, txchains
 
     def create_fund_txn(self, conn, noutput, tx_fee, locking_script, pubkey=None):
         # create a new block with coinbase
@@ -242,21 +253,20 @@ class PtvCpfp(BitcoinTestFramework):
         # Node's config
         args = ['-txnvalidationasynchrunfreq=0',
                 '-limitancestorcount=1001',
-                '-maxmempool=416784kB', # the mempool size when 300300 std txs are accepted
-                '-blockmintxfee=0.00001',
+                '-minminingtxfee=0.00001',
                 '-maxorphantxsize=600MB',
                 '-maxmempoolsizedisk=0',
                 '-disablebip30checks=1',
                 '-checkmempool=0',
                 '-persistmempool=0',
-                # A new CPFP config params:
+                # CPFP config params:
                 '-mempoolmaxpercentcpfp=100',
-                '-limitcpfpgroupmemberscount=1001',]
+                '-limitcpfpgroupmemberscount=1001']
         with self.run_node_with_connections("Scenario 1: Long cpfp std tx chains, non-whitelisted peer",
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                0, ['-maxmempool=600MB'] + args + self.default_args, number_of_connections=1) as (conn,):
 
             mining_fee = 1.01 # in satoshi per byte
-            relay_fee = float(conn.rpc.getnetworkinfo()["relayfee"] * COIN / 1000) + 0.15  # in satoshi per byte
+            relay_fee = float(Decimal("0.0000025") * COIN / 1000) + 0.15  # in satoshi per byte
 
             # Create a low and high fee txn.
             low_fee_std_tx = self.create_fund_txn(conn, 300, relay_fee, self.locking_script, pubkey=self.coinbase_pubkey)
@@ -266,23 +276,33 @@ class PtvCpfp(BitcoinTestFramework):
             # Prevent RPC timeout for sendrawtransactions call that take longer to return.
             self.nodes[0].rpc_timeout = 600
 
-            # Time duration to submit and process txs.
-            p2p_td = 0 # ... through p2p interface
-            rpc_td = 0 # ... through rpc interface
-
             # Generate low fee cpfp std txn chains:
             # - 300K txs: 300 chains of length 1000
             txchain_length = 1000
             num_of_txchains = 300
-            last_descendant_from_each_txchain, txchains = self.generate_txchains(low_fee_std_tx, txchain_length, num_of_txchains, relay_fee, self.locking_script)
+            last_descendant_from_each_txchain, txchains = self.create_txchains(num_of_txchains, txchain_length, low_fee_std_tx, relay_fee, self.locking_script)
+
+            #
+            # Check max memory usage (required by the next test cases) on the running platform.
+            #
+            mempool_usage = 0
+            TC_1_0_msg = "TC_1_0: Check memory usage needed to store {} txs (num_of_chains= {}, chain_length= {}) in the mempool."
+            with self.run_node_with_connections(TC_1_0_msg.format(txchain_length*num_of_txchains, num_of_txchains, txchain_length),
+                    0, ['-maxmempool=600MB'] + args + self.default_args, number_of_connections=1) as (conn,):
+                rpc = conn.rpc
+                self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
+                        mining_fee, self.locking_script, rpc.sendrawtransactions, timeout=timeout)
+                # The mempool usage when 300300 std txs are accepted
+                mempool_usage = conn.rpc.getmempoolinfo()['usage']
+                self.log.info("mempool_usage= %dB", mempool_usage)
 
             #
             # Send txs through P2P interface.
             #
             TC_1_1_msg = "TC_1_1: Send {} txs (num_of_txchains= {}, txchain_length= {}) through P2P interface"
             with self.run_node_with_connections(TC_1_1_msg.format(txchain_length*num_of_txchains, num_of_txchains, txchain_length),
-                    0, args + self.default_args, number_of_connections=1) as (conn,):
-                p2p_td = self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
+                    0, ['-maxmempool=%dB' % mempool_usage] + args + self.default_args, number_of_connections=1) as (conn,):
+                self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
                         mining_fee, self.locking_script, timeout=timeout)
                 # Uses high_fee_nonstd_tx to generate 30K high fee nonstandard txs
                 self.run_cpfp_scenario1_override_txs(conn, high_fee_nonstd_tx, mining_fee, self.locking_script2, timeout=timeout)
@@ -292,15 +312,12 @@ class PtvCpfp(BitcoinTestFramework):
             #
             TC_1_2_msg = "TC_1_2: Send {} txs (num_of_chains= {}, chain_length= {}) through RPC interface (a bulk submit)"
             with self.run_node_with_connections(TC_1_2_msg.format(txchain_length*num_of_txchains, num_of_txchains, txchain_length),
-                    0, args + self.default_args, number_of_connections=1) as (conn,):
+                    0, ['-maxmempool=%dB' % mempool_usage] + args + self.default_args, number_of_connections=1) as (conn,):
                 rpc = conn.rpc
-                rpc_td = self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
+                self.run_cpfp_scenario1(conn, txchains, last_descendant_from_each_txchain, txchain_length, num_of_txchains,
                         mining_fee, self.locking_script, rpc.sendrawtransactions, timeout=timeout)
                 # Uses high_fee_nonstd_tx to generate 30K high fee nonstandard txs
                 self.run_cpfp_scenario1_override_txs(conn, high_fee_nonstd_tx, mining_fee, self.locking_script2, rpc.sendrawtransactions, timeout=timeout)
-
-            # Check that rpc interface is faster than p2p
-            assert_greater_than(p2p_td, rpc_td)
 
     def run_test(self):
         # Test long chains of cpfp txs.

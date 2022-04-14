@@ -161,7 +161,7 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                 // socket closed gracefully
                 if (!mNode->GetDisconnect())
                 {   
-                    LogPrint(BCLog::NETCONN, "stream socket closed\n");
+                    LogPrint(BCLog::NETCONN, "stream socket gracefully closed by peer=%d\n", mNode->id);
                 }
                 mNode->CloseSocketDisconnect();
             }
@@ -173,7 +173,8 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                 {
                     if (!mNode->GetDisconnect())
                     {
-                        LogPrintf("stream socket recv error %s\n", NetworkErrorString(nErr));
+                        LogPrint(BCLog::NETCONN, "stream socket recv error %s peer=%d\n",
+                            NetworkErrorString(nErr), mNode->id);
                     }
                     mNode->CloseSocketDisconnect();
                 }

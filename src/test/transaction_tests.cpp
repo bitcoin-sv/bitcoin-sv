@@ -647,8 +647,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
 
     // Check dust with default relay fee:
-    Amount nDustThreshold = 3 * Amount(182 * testConfig.GetDustRelayFee().GetFeePerK() / 1000);
-    BOOST_CHECK_EQUAL(nDustThreshold, Amount(135));
+    Amount nDustThreshold = Amount{1};
     // dust:
     t.vout[0].nValue = nDustThreshold - Amount(1);
     BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
@@ -660,10 +659,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     // nDustThreshold = 182 * 1234 / 1000 * 3
     testConfig.SetDustRelayFee(Amount(1234));
     // dust:
-    t.vout[0].nValue = Amount(672 - 1);
+    t.vout[0].nValue = Amount(0);
     BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
     // not dust:
-    t.vout[0].nValue = Amount(672);
+    t.vout[0].nValue = Amount(1);
     BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
     testConfig.SetDustRelayFee(DUST_RELAY_TX_FEE);
 

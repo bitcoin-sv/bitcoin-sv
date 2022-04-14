@@ -202,8 +202,6 @@ static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 /** Maximum number of unconnecting headers announcements before DoS score */
 static const int MAX_UNCONNECTING_HEADERS = 10;
 
-static const bool DEFAULT_PEERBLOOMFILTERS = true;
-
 /** Default for -stopatheight */
 static const int32_t DEFAULT_STOPATHEIGHT = 0;
 
@@ -285,8 +283,7 @@ enum FlushStateMode {
  * We want the low water mark after pruning to be at least 397 MB and since we
  * prune in full block file chunks, we need the high water mark which triggers
  * the prune to be one 128MB block file + added 15% undo data = 147MB greater
- * for a total of 545MB. Setting the target to > than 550MB will make it likely
- * we can respect the target.
+ * for a total of 545MB.
  */
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 

@@ -670,11 +670,16 @@ def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
 # Pass in a fee that is sufficient for relay and mining new transactions.
 
 
-def create_confirmed_utxos(fee, node, count, age=101):
+def create_confirmed_utxos(fee, node, count, age=101, nodes=None):
+
     to_generate = int(0.5 * count) + age
     while to_generate > 0:
         node.generate(min(25, to_generate))
         to_generate -= 25
+
+    if nodes is not None:
+        sync_blocks(nodes)
+
     utxos = node.listunspent()
     iterations = count - len(utxos)
     addr1 = node.getnewaddress()
@@ -695,6 +700,10 @@ def create_confirmed_utxos(fee, node, count, age=101):
 
     while (node.getmempoolinfo()['size'] > 0):
         node.generate(1)
+
+    # If running multiple nodes they have to be synced regularly to prevent simultaneous syncing of blocks and txs
+    if nodes is not None:
+        sync_blocks(nodes)
 
     utxos = node.listunspent()
     assert(len(utxos) >= count)
@@ -764,7 +773,11 @@ def mine_large_block(node, utxos=None):
     if len(utxos) < num:
         utxos.clear()
         utxos.extend(node.listunspent())
-    fee = 200 * node.getnetworkinfo()["relayfee"]
+
+    # we pay a fee so we are not rejected by mempool rejection fee
+    # Before we used the relayfee which does not exist any more
+    # fee = 200 * node.getnetworkinfo()["relayfee"]
+    fee = 200 * Decimal("0.00000250")
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
 

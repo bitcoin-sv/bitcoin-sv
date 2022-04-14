@@ -415,6 +415,7 @@ private:
 
     // fee that a transaction or a group needs to pay to enter the primary mempool
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
+    CFeeRate minDebugRejectionFee {Amount{0}};
 
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
@@ -618,7 +619,9 @@ public:
     void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
-    CFeeRate GetBlockMinTxFee() { return blockMinTxfee; };
+    CFeeRate GetBlockMinTxFee() const { return blockMinTxfee; };
+    void SetMinDebugRejectionFee(CFeeRate feerate) { minDebugRejectionFee = feerate; };
+    CFeeRate GetMinDebugRejectionFee() const { return minDebugRejectionFee; };
 
     /** Rebuilds the mempool by reseting it and then resubmitting transactions that were inside before.
         As consequence the journal is rebuilt. The caller must apply the changeset. */

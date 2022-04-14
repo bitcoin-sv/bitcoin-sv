@@ -485,8 +485,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               "entire blockchain. "
               "(default: 0 = disable pruning blocks, 1 = allow manual pruning "
               "via RPC, >%u = automatically prune block files to stay under "
-              "the specified target size in MiB)"),
-            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE));
+              "the specified target size in MiB, but still keep the last %u blocks "
+              "to speed up a potential reorg even if this results in the pruning "
+              "target being exceeded)"
+              "Note: Currently achievable prune target is ~100GB (mainnet). "
+              "Setting the target size too low will not affect pruning function, "
+              "but will not guarantee block files size staying under the threshold at all times. "),
+            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, MIN_BLOCKS_TO_KEEP));
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
@@ -897,12 +902,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                       DEFAULT_MAX_TIP_AGE));
     }
     strUsage += HelpMessageOpt(
-        "-minrelaytxfee=<amt>",
-        strprintf(
-            _("Fees (in %s/kB) smaller than this are considered zero fee for "
-              "relaying, mining and transaction creation (default: %s)"),
-            CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)));
-    strUsage += HelpMessageOpt(
         "-maxtxfee=<amt>",
         strprintf(_("Maximum total fees (in %s) to use in a single wallet "
                     "transaction or raw transaction; setting this too low may "
@@ -932,22 +931,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                 "testnet/regtest only; ",
                 defaultChainParams->RequireStandard()));
         strUsage += HelpMessageOpt(
+                "-mindebugrejectionfee",
+                strprintf(
+                        "For testing on testnet/regtest only;"));
+        strUsage += HelpMessageOpt(
             "-acceptnonstdoutputs",
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
                 config.GetAcceptNonStandardOutput(true)));
-        strUsage += HelpMessageOpt(
-            "-dustrelayfee=<amt>",
-            strprintf("Fee rate (in %s/kB) used to define dust. A transaction output paying less than "
-                      "(dustlimitfactor * output_dust_fee / 100) is considered dust. "
-                      "The output_dust_fee is calculated from the outputsize and "
-                      "the dustrelayfee. (default: %s)",
-                      CURRENCY_UNIT, FormatMoney(DUST_RELAY_TX_FEE)));
-        strUsage += HelpMessageOpt(
-                "-dustlimitfactor=<n>",
-                strprintf(_("The dust limit factor (a value in percent) is applied to the dust relay fee to determine if an output is dust. "
-                            "Default value is %ld%%, minimum value is 0%%, maximum value is %ld%% "), DEFAULT_DUST_LIMIT_FACTOR, DEFAULT_DUST_LIMIT_FACTOR));
+
     }
     strUsage += HelpMessageOpt(
         "-datacarrier",
@@ -1076,10 +1069,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter / ONE_MEGABYTE
                     ));
     strUsage += HelpMessageOpt(
-        "-blockmintxfee=<amt>",
+        "-minminingtxfee=<amt>",
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
-                    "included in block creation. (default: %s)"),
-                  CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)));
+                    "included in block creation. This is a mandatory setting"),
+                  CURRENCY_UNIT));
     strUsage += HelpMessageOpt(
         "-invalidateblock=<hash>",
         strprintf(_("Permanently marks an existing block as invalid as if it violated "
@@ -2541,62 +2534,61 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     nConnectTimeout = gArgs.GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0) nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
-    // Fee-per-kilobyte amount considered the same as "free". If you are mining,
-    // be careful setting this: if you set it to zero then a transaction spammer
-    // can cheaply fill blocks using 1-satoshi-fee transactions. It should be
-    // set above the real cost to you of processing a transaction.
+    // Option -minrelaytxfee has been removed
     if (gArgs.IsArgSet("-minrelaytxfee")) {
-        Amount n(0);
-        auto parsed = ParseMoney(gArgs.GetArg("-minrelaytxfee", ""), n);
-        if (!parsed)
-            return InitError(AmountErrMsg("minrelaytxfee",
-                                          gArgs.GetArg("-minrelaytxfee", "")));
-        // High fee check is done afterward in CWallet::ParameterInteraction()
-        config.SetMinFeePerKB(CFeeRate(n));
-    } else {
-        config.SetMinFeePerKB(CFeeRate(DEFAULT_MIN_RELAY_TX_FEE));
+        LogPrintf("Warning: configuration parameter -minrelaytxfee was removed\n");
     }
+    // TODO: remove relayfee settings
+    config.SetMinFeePerKB(CFeeRate(Amount{0}));
 
-    // Dust limit is expressed as a multiple in percent of the dust relay fee applied to
-    // an output.
     if (gArgs.IsArgSet("-dustlimitfactor")) {
-        auto factor = gArgs.GetArg("-dustlimitfactor", DEFAULT_DUST_LIMIT_FACTOR);
+        LogPrintf("Warning: configuration parameter -dustlimitfactor was removed\n");
+    }
+    // TODO: remove dust settings
+    config.SetDustLimitFactor(DEFAULT_DUST_LIMIT_FACTOR);
 
-        if (std::string err; !config.SetDustLimitFactor(factor, &err))
-        {
-            return InitError(err);
-        }
-    } else {
-        config.SetDustLimitFactor(DEFAULT_DUST_LIMIT_FACTOR);
+
+    // Deprecated. The -blockmintxfee is now zero.
+    if (gArgs.IsArgSet("-blockmintxfee")) {
+        LogPrintf("Warning: Optional parameter -blockmintxfee was replaced with mandatory -minminingtxfee\n");
     }
 
     // Sanity check argument for min fee for including tx in block
     // TODO: Harmonize which arguments need sanity checking and where that
     // happens.
-    if (gArgs.IsArgSet("-blockmintxfee")) {
+    if (gArgs.IsArgSet("-minminingtxfee")) {
         Amount n(0);
-        if (!ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n)) {
-            return InitError(AmountErrMsg("blockmintxfee",
-                                          gArgs.GetArg("-blockmintxfee", "")));
+        if (!ParseMoney(gArgs.GetArg("-minminingtxfee", ""), n)) {
+            return InitError(AmountErrMsg("minminingtxfee",
+                                          gArgs.GetArg("-minminingtxfee", "")));
         }
         mempool.SetBlockMinTxFee(CFeeRate(n));
     } else {
-        mempool.SetBlockMinTxFee(CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE));
+        return InitError("-minminingtxfee is mandatory");
     }
+
+    if (gArgs.IsArgSet("-mindebugrejectionfee")) {
+        if (chainparams.NetworkIDString() != "main") {
+            Amount n(0);
+            if (!ParseMoney(gArgs.GetArg("-mindebugrejectionfee", ""), n)) {
+                return InitError(AmountErrMsg("mindebugrejectionfee",
+                                              gArgs.GetArg("--mindebugrejectionfee", "")));
+            }
+            mempool.SetMinDebugRejectionFee(CFeeRate(n));
+        } else {
+            // Only for testing in non-mainnet. The -mindebugrejectionfee is now zero.
+            return InitError("configuration parameter -mindebugrejectionfee is only for testing");
+        }
+    }
+
 
     // Feerate used to define dust.  Shouldn't be changed lightly as old
     // implementations may inadvertently create non-standard transactions.
     if (gArgs.IsArgSet("-dustrelayfee")) {
-        Amount n(0);
-        auto parsed = ParseMoney(gArgs.GetArg("-dustrelayfee", ""), n);
-        if (!parsed || !config.SetDustRelayFee(n))
-            return InitError(AmountErrMsg("dustrelayfee",
-                                          gArgs.GetArg("-dustrelayfee", "")));
+        LogPrintf("Warning: configuration parameter -dustrelayfee was removed\n");
     }
-    else
-    {
-        config.SetDustRelayFee(DUST_RELAY_TX_FEE);
-    }
+    // TODO: remove dust settings
+    config.SetDustRelayFee(DUST_RELAY_TX_FEE);
 
     fRequireStandard =
         !gArgs.GetBoolArg("-acceptnonstdtxn", !chainparams.RequireStandard());
