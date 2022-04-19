@@ -1064,6 +1064,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB).",
             DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
 
+    strUsage += HelpMessageOpt(
+        "-softconsensusfreezeduration",
+        strprintf("Set for how many blocks a block that contains transaction spending "
+                  "consensus frozen TXO will remain frozen before it auto unfreezes "
+                  "due to the amount of child blocks that were mined after it "
+                  "(default: %u; note: 0 - soft consensus freeze duration is "
+                  "disabled and block is frozen indefinitely).",
+                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -1430,6 +1439,17 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
 
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookurl=<url>",
+        "URL of a webhook to notify on receipt of a double-spend detected P2P message from another node. For example: "
+        "http://127.0.0.1/dsdetected/webhook");
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookmaxtxnsize=<n>",
+        strprintf(_("Maximum size of transaction to forward to the double-spend detected webhook. For double-spent transactions "
+                    "above this size only the transaction ID will be reported to the webhook (default: %uMB). "
+                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
+
     /** MinerID */
     strUsage += HelpMessageGroup(_("Miner ID database options:"));
     strUsage += HelpMessageOpt(
@@ -1456,29 +1476,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "This parameter sets the N value for that test. (default: %u, maximum %u)"),
             MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N));
     
-    // DSDectected
-    strUsage += HelpMessageOpt(
-        "-dsdetectedwebhookurl=<url>",
-        "URL of a webhook to notify on receipt of a double-spend detected P2P message from another node. For example: "
-        "http://127.0.0.1/dsdetected/webhook");
-    strUsage += HelpMessageOpt(
-        "-dsdetectedwebhookmaxtxnsize=<n>",
-        strprintf(_("Maximum size of transaction to forward to the double-spend detected webhook. For double-spent transactions "
-                    "above this size only the transaction ID will be reported to the webhook (default: %uMB). "
-                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-            DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
-
-    strUsage += HelpMessageOpt(
-        "-softconsensusfreezeduration",
-        strprintf("Set for how many blocks a block that contains transaction spending "
-                  "consensus frozen TXO will remain frozen before it auto unfreezes "
-                  "due to the amount of child blocks that were mined after it "
-                  "(default: %u; note: 0 - soft consensus freeze duration is "
-                  "disabled and block is frozen indefinitely).",
-                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
-
-
-    /** Double-Spend detection/reporting */
+    /** Safe mode */
     strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
 
     strUsage += HelpMessageOpt(
