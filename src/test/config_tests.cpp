@@ -571,6 +571,12 @@ BOOST_AUTO_TEST_CASE(minerid_config)
     GlobalConfig config {};
     std::string err {};
 
+    BOOST_CHECK_EQUAL(config.GetMinerIdEnabled(), MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED);
+    BOOST_CHECK(config.SetMinerIdEnabled(false, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdEnabled(), false);
+    BOOST_CHECK(config.SetMinerIdEnabled(true, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdEnabled(), true);
+
     BOOST_CHECK_EQUAL(config.GetMinerIdCacheSize(), MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE);
     BOOST_CHECK(config.SetMinerIdCacheSize(2 * MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE, &err));
     BOOST_CHECK_EQUAL(config.GetMinerIdCacheSize(), 2 * MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE);

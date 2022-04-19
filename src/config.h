@@ -158,6 +158,7 @@ public:
     virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
     // MinerID
+    virtual bool GetMinerIdEnabled() const = 0;
     virtual uint64_t GetMinerIdCacheSize() const = 0;
     virtual uint64_t GetMinerIdsNumToKeep() const = 0;
     virtual uint32_t GetMinerIdReputationM() const = 0;
@@ -315,6 +316,7 @@ public:
 
 
     // MinerID
+    virtual bool SetMinerIdEnabled(bool enabled, std::string* err) = 0;
     virtual bool SetMinerIdCacheSize(int64_t size, std::string* err) = 0;
     virtual bool SetMinerIdsNumToKeep(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationM(int64_t num, std::string* err) = 0;
@@ -615,6 +617,8 @@ public:
 
 
     // MinerID
+    bool SetMinerIdEnabled(bool enabled, std::string* err) override;
+    bool GetMinerIdEnabled() const override;
     bool SetMinerIdCacheSize(int64_t size, std::string* err) override;
     uint64_t GetMinerIdCacheSize() const override;
     bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override;
@@ -787,6 +791,7 @@ private:
         int64_t safeModeMinHeightDifference;
 
         // MinerID
+        bool minerIdEnabled;
         uint64_t minerIdCacheSize;
         uint64_t numMinerIdsToKeep;
         uint32_t minerIdReputationM;
@@ -1273,6 +1278,8 @@ public:
     uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override { return DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE; }
 
     // MinerID
+    bool SetMinerIdEnabled(bool enabled, std::string* err) override { return true; }
+    bool GetMinerIdEnabled() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED; }
     bool SetMinerIdCacheSize(int64_t size, std::string* err) override { return true; }
     uint64_t GetMinerIdCacheSize() const override { return MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE; }
     bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override { return true; }

@@ -1452,6 +1452,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     /** MinerID */
     strUsage += HelpMessageGroup(_("Miner ID database options:"));
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-minerid",
+            strprintf(_("Eanable the building and use of the miner ID database (default: %d)"),
+                MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED));
+    }
     strUsage += HelpMessageOpt(
         "-mineridcachesize=<n>",
         strprintf(_("Cache size to use for the miner ID database (default: %uMB, maximum: %uMB). "
@@ -2593,6 +2599,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // MinerID parameters
+    if(std::string err; !config.SetMinerIdEnabled(
+        gArgs.GetBoolArg("-minerid", MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED), &err))
+    {
+        return InitError(err);
+    }
     if(std::string err; !config.SetMinerIdCacheSize(
         gArgs.GetArgAsBytes("-mineridcachesize", MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE), &err))
     {
@@ -3551,13 +3562,15 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     preloadChainState(threadGroup);
 
-    // Create minerID database
-    try {
-        g_minerIDs = std::make_unique<MinerIdDatabase>(config);
-        ScheduleMinerIdPeriodicTasks(scheduler, *g_minerIDs);
-    }
-    catch(const std::exception& e) {
-        LogPrintf("Error creating miner ID database: %s\n", e.what());
+    // Create minerID database if required
+    if(config.GetMinerIdEnabled()) {
+        try {
+            g_minerIDs = std::make_unique<MinerIdDatabase>(config);
+            ScheduleMinerIdPeriodicTasks(scheduler, *g_minerIDs);
+        }
+        catch(const std::exception& e) {
+            LogPrintf("Error creating miner ID database: %s\n", e.what());
+        }
     }
 
     // Step 11: start node

@@ -159,6 +159,7 @@ void GlobalConfig::Reset()
     data->dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
 
     // MinerID
+    data->minerIdEnabled = MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED;
     data->minerIdCacheSize = MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE;
     data->numMinerIdsToKeep = MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP;
     data->minerIdReputationM = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
@@ -1828,6 +1829,16 @@ bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
 }
 
 // MinerID
+bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* err)
+{
+    data->minerIdEnabled = enabled;
+    return true;
+}
+bool GlobalConfig::GetMinerIdEnabled() const
+{
+    return data->minerIdEnabled;
+}
+
 bool GlobalConfig::SetMinerIdCacheSize(int64_t size, std::string* err)
 {
     if(size < 0 || static_cast<uint64_t>(size) > MinerIdDatabaseDefaults::MAX_CACHE_SIZE)

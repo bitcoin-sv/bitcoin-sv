@@ -14,6 +14,9 @@
  */
 struct MinerIdDatabaseDefaults
 {
+    // Default DB enabled or disabled
+    static constexpr bool DEFAULT_MINER_ID_ENABLED {true};
+
     // Default LevelDB cache size
     static constexpr uint64_t DEFAULT_CACHE_SIZE { 1 << 20 };
     static constexpr uint64_t MAX_CACHE_SIZE { 1 << 24 };
