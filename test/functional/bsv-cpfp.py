@@ -8,6 +8,7 @@ from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxO
 from test_framework.script import CScript, OP_DROP, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
+from decimal import Decimal
 
 
 class Cpfp(BitcoinTestFramework):
@@ -48,11 +49,11 @@ class Cpfp(BitcoinTestFramework):
 
 
     def run_test(self):
-        with self.run_node_with_connections("Scenario 1: Low fee, non-whitelisted peer", 0, ["-blockmintxfee=0.00001"],
+        with self.run_node_with_connections("Scenario 1: Low fee, non-whitelisted peer", 0, ["-minminingtxfee=0.00001", "-mindebugrejectionfee=0.00000250"],
                                             number_of_connections=1) as (conn,):
 
             mining_fee = 1.01 # in satoshi per byte
-            relayfee = float(conn.rpc.getnetworkinfo()["relayfee"] * COIN / 1000) + 0.01  # in satoshi per byte
+            relayfee = float(Decimal("0.00000250") * COIN / 1000) + 0.01  # in satoshi per byte
 
             # create block with coinbase
             coinbase = create_coinbase(height=1)

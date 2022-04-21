@@ -51,12 +51,12 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         self.minrelaytxfee_sats = 250
         self.extra_args = [[
             "-whitelist=127.0.0.1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
             ],[
             "-whitelist=127.0.0.1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
-            "-blockmintxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
         ]]
 
     def run_test(self):
@@ -105,7 +105,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
             # first signed transaction is only for calculating relayfee
             if i == dummy_index:
                 size_in_kilobyte = Decimal(len(signed_tx)) / Decimal(1000)
-                relayfeerate = node1.getnetworkinfo()['relayfee']
+                relayfeerate = Decimal(self.minrelaytxfee_sats) / 100000000
                 relayfee = size_in_kilobyte * relayfeerate
                 relayfee += satoshi_round(relayfee / Decimal(10.0)) #size of these txns fluctuates
                 signed_txns.append(None) # dummy

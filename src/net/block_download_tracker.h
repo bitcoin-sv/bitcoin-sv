@@ -62,7 +62,7 @@ class BlockDownloadTracker
     // Notification that a block download was received
     bool MarkBlockAsReceived(const BlockSource& block, bool punish, const CNodeStatePtr& state);
 
-    // Notification that a block download was timed out or otherwise failed
+    // Notification that a block download was cancelled, timed out or otherwise failed
     bool MarkBlockAsFailed(const BlockSource& block, const CNodeStatePtr& state);
 
     // Notification that a downloaded block has been checked

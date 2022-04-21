@@ -88,7 +88,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
         with self.run_node_with_connections("Tests for ancestors count limit for primary and secondary mempool. "
                                             "Transactions arranged in chain.",
                                             0,
-                                            ["-blockmintxfee=0.00001",
+                                            ["-minminingtxfee=0.00001",
                                              "-relayfee=0.000005",
                                              f"-limitancestorcount={limitancestorcount}",
                                              f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",
@@ -170,7 +170,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
         with self.run_node_with_connections(f"Tests for ancestors count limit in {mempool_type} mempool."
                                             "Transactions arranged in graph.",
                                             0,
-                                            ["-blockmintxfee=0.00001",
+                                            ["-minminingtxfee=0.00001",
                                              "-relayfee=0.000005",
                                              f"-limitancestorcount={limitancestorcount}",
                                              f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",

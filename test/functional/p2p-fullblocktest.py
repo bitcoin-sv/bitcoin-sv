@@ -63,6 +63,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.tip = None
         self.blocks = {}
+        self.extra_args = [['-mindebugrejectionfee=0.0000025','-whitelist=127.0.0.1']]
 
     def add_options(self, parser):
         super().add_options(parser)

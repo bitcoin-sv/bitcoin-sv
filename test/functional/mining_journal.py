@@ -163,7 +163,7 @@ class MiningJournal(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.maxblocksize = 1 * ONE_MEGABYTE
         self.num_nodes = 2
-        self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=300', '-maxmempoolsizedisk=0',
+        self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=300', '-maxmempoolsizedisk=0', '-mindebugrejectionfee=0.0000025',
                             '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool',
@@ -219,7 +219,7 @@ class MiningJournal(BitcoinTestFramework):
             conn.wait_for_verack()
 
         # Fee for txns
-        self.relayfee = self.nodes[0].getnetworkinfo()['relayfee']
+        self.relayfee = Decimal("250") / COIN
 
 
     # Fill the mempool with some different kinds of txns and check the journal accurately tracks it

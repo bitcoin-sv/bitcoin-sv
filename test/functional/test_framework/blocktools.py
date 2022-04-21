@@ -367,35 +367,49 @@ class ChainManager():
                     self.add_transactions_to_block(block, [tx])
                     block.hashMerkleRoot = block.calc_merkle_root()
             else:
-                # all but one satoshi to fees
-                coinbase.vout[0].nValue += spend.tx.vout[spend.n].nValue - 1
-                coinbase.rehash()
                 block = create_block(base_block_hash, coinbase, block_time)
                 if simple_output:
+                    coinbase.vout[0].nValue += spend.tx.vout[spend.n].nValue - 1
+                    coinbase.rehash()
                     tx = create_transaction(spend.tx, spend.n, b"", 1, script)  # spend 1 satoshi
 
                     if script == CScript([OP_TRUE]):
-                        tx.vout.append(CTxOut(0, CScript([random.randint(0, 256), OP_RETURN])))
+                        tx.vout.append(CTxOut(1, CScript([random.randint(0, 256), OP_RETURN])))
+                        coinbase.vout[0].nValue -= 1
+                        coinbase.rehash()
+
                     sign_tx(tx, spend.tx, spend.n, coinbase_key)
                     self.add_transactions_to_block(block, [tx])
                     block.hashMerkleRoot = block.calc_merkle_root()
                 else:
                     # Make sure we have plenty engough to spend going forward.
                     spendable_outputs = deque([spend])
+                    coinbase.vout[0].nValue -= 1
 
                     def get_base_transaction():
                         # Create the new transaction
                         tx = CTransaction()
                         # Spend from one of the spendable outputs
                         spend = spendable_outputs.popleft()
+                        # we guess generously the extra cash needed, but we will assert its correctness on use
+                        extraCash = 10
+                        input_value = spend.tx.vout[spend.n].nValue - extraCash
                         tx.vin.append(CTxIn(COutPoint(spend.tx.sha256, spend.n)))
                         # Add spendable outputs
+                        spend_amount = int(input_value / 4)
+                        fee = input_value - spend_amount * 4 + extraCash
+                        coinbase.vout[0].nValue += fee
                         for i in range(4):
-                            tx.vout.append(CTxOut(0, CScript([OP_TRUE])))
+                            tx.vout.append(CTxOut(spend_amount, CScript([OP_TRUE])))
                             spendable_outputs.append(PreviousSpendableOutput(tx, i))
-                        return tx
+                        return tx, extraCash
 
-                    tx = get_base_transaction()
+                    def CreateCTxOut(toSpend_, extraCash_, script_):
+                        assert (extraCash_ - toSpend_ >= 0)
+                        coinbase.vout[0].nValue -= toSpend_ 
+                        return extraCash_ - toSpend_, CTxOut(toSpend_, script_)
+
+                    tx, extraCash = get_base_transaction()
 
                     # Make it the same format as transaction added for padding and save the size.
                     tx.rehash()
@@ -403,18 +417,20 @@ class ChainManager():
 
                     # If a specific script is required, add it.
                     if script != None:
-                        tx.vout.append(CTxOut(1, script))
+                        extraCash, txout = CreateCTxOut(1, extraCash, script)
+                        tx.vout.append(txout)
 
                     # Put some random data into the first transaction of the chain to randomize ids.
-                    tx.vout.append(
-                        CTxOut(0, CScript([random.randint(0, 256), OP_RETURN])))
+                    extraCash, txout = CreateCTxOut(1, extraCash, CScript([random.randint(0, 256), OP_RETURN]))
+                    tx.vout.append(txout)
 
                     # Add the transaction to the block
                     self.add_transactions_to_block(block, [tx])
 
                     # Add transaction until we reach the expected transaction count
                     for _ in range(extra_txns):
-                        self.add_transactions_to_block(block, [get_base_transaction()])
+                        newtx, extraCash = get_base_transaction()
+                        self.add_transactions_to_block(block, [newtx])
 
                     # If we have a block size requirement, just fill
                     # the block until we get there
@@ -430,7 +446,7 @@ class ChainManager():
                         current_block_size += len(ser_compact_size(len(block.vtx) + 1))
 
                         # Create the new transaction
-                        tx = get_base_transaction()
+                        tx, extraCash = get_base_transaction()
 
                         # Add padding to fill the block.
                         script_length = block_size - current_block_size
@@ -452,7 +468,8 @@ class ChainManager():
                         script_pad_len = script_length - tx_sigops - len(ser_compact_size(script_length - tx_sigops))
                         script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
 
-                        tx.vout.append(CTxOut(0, script_output))
+                        extraCash, txout = CreateCTxOut(1, extraCash, script_output)
+                        tx.vout.append(txout)
 
                         # Add the tx to the list of transactions to be included
                         # in the block.
@@ -461,6 +478,7 @@ class ChainManager():
 
                     # Now that we added a bunch of transaction, we need to recompute
                     # the merkle root.
+                    coinbase.rehash()
                     block.hashMerkleRoot = block.calc_merkle_root()
 
 
@@ -482,6 +500,7 @@ class ChainManager():
         self.block_heights[block.sha256] = height
         assert number not in self.blocks
         self.blocks[number] = block
+
         return block
 
     # adds transactions to the block and updates state

@@ -234,7 +234,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
-        } else if (txout.IsDust(config.GetDustRelayFee(), config.GetDustLimitFactor(), IsGenesisEnabled(config, nHeight))) {
+        } else if (txout.IsDust(IsGenesisEnabled(config, nHeight))) {
             reason = "dust";
             return false;
         }
@@ -320,5 +320,3 @@ std::optional<bool> AreInputsStandard(
 
     return true;
 }
-
-static_assert(DUST_RELAY_TX_FEE == DEFAULT_MIN_RELAY_TX_FEE, "lowering only fees increases dust");

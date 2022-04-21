@@ -44,6 +44,7 @@ class MempoolEvictionPriorityTest(BitcoinTestFramework):
                             "-spendzeroconfchange=0",
                             "-genesisactivationheight=1",
                             "-maxtxsizepolicy=0",
+                            "-mindebugrejectionfee=0.0000025",
                             '-maxtxfee=1.0']]
 
     def run_test(self):
@@ -55,7 +56,7 @@ class MempoolEvictionPriorityTest(BitcoinTestFramework):
         last_transaction_factor = total_number_of_transactions * 15 // 100
         transaction_size = mempool_size * ONE_MEGABYTE // total_number_of_transactions - transaction_overhead
 
-        relayfee = self.nodes[0].getnetworkinfo()['relayfee']
+        relayfee = decimal.Decimal("0.0000025")
         utxos = create_confirmed_utxos(relayfee, self.nodes[0], total_number_of_transactions + 1)
 
         # Transactions with higher fee rate

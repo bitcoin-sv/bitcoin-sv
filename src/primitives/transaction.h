@@ -191,34 +191,16 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(const CFeeRate &minRelayTxFee, int64_t dustLimitFactor, bool isGenesisEnabled) const {
-        /**
-         * "Dust" is defined in terms of CTransaction::minRelayTxFee, which has
-         * units satoshis-per-kilobyte. In the default case, if your transaction pays less than
-         * 3 times the dustrelayfee for any output, then the output is considered dust and the
-         * corresponding transaction will be rejected.
-         * The default factor of 3 (i.e. 300%) can be replaced via the dustlimitfactor which can be set
-         * to integral values between 0% and 300%.
-         * A typical spendable non-segwit txout is 34 bytes big, and will need a CTxIn of at least
-         * 148 bytes to spend: so dust is a spendable txout less than
-         * 546*minRelayTxFee/1000 (in satoshis). A typical spendable segwit
-         * txout is 31 bytes big, and will need a CTxIn of at least 67 bytes to
-         * spend: so dust is a spendable txout less than 294*minRelayTxFee/1000
-         * (in satoshis).
-         */
-        if (scriptPubKey.IsUnspendable(isGenesisEnabled)) return Amount(0);
+    Amount GetDustThreshold(bool isGenesisEnabled) const {
+        // dust threshold is now hardcoded to 1 satoshi per output
+        if (scriptPubKey.IsUnspendable(isGenesisEnabled))
+            return Amount{0};
 
-        size_t nSize = GetSerializeSize(*this, SER_DISK, 0);
-
-        // the 148 mentioned above
-        nSize += (32 + 4 + 1 + 107 + 4);
-
-        // dust limit factor was previously hard coded to the default value 300%
-        return (dustLimitFactor * minRelayTxFee.GetFee(nSize)) / 100;
+        return Amount{1};
     }
 
-    bool IsDust(const CFeeRate &minRelayTxFee, int64_t dustLimitFactor, bool isGenesisEnabled) const {
-        return (nValue < GetDustThreshold(minRelayTxFee, dustLimitFactor, isGenesisEnabled));
+    bool IsDust(bool isGenesisEnabled) const {
+        return (nValue < GetDustThreshold(isGenesisEnabled));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {

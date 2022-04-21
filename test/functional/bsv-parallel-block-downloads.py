@@ -17,14 +17,20 @@ class ParallelBlockDownloadTest(BitcoinTestFramework):
         self.extra_args = [
             [
                 '-whitelist=127.0.0.1',
+                '-acceptnonstdtxn=1',
+                '-mindebugrejection=0.0000025'
             ],
             [
                 '-whitelist=127.0.0.1',
-                '-streamsendratelimit=20000'
+                '-streamsendratelimit=20000',
+                '-acceptnonstdtxn=1',
+                '-mindebugrejection=0.0000025'
             ],
             [
                 '-whitelist=127.0.0.1',
-                '-blockdownloadslowfetchtimeout=20'
+                '-blockdownloadslowfetchtimeout=20',
+                '-acceptnonstdtxn=1',
+                '-mindebugrejection=0.0000025'
             ]
         ]
 

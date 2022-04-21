@@ -26,7 +26,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-whitelist=127.0.0.1",
             "-txindex=1",
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
             "-maxconsolidationinputscriptsize=151",
             "-minconfconsolidationinput=5",
@@ -36,7 +36,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-whitelist=127.0.0.1",
             "-txindex=1",
             "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
             "-acceptnonstdconsolidationinput=1"

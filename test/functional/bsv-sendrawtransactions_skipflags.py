@@ -74,8 +74,6 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.limitcpfpgroupmemberscount = 7
         self.acceptnonstdoutputs = 1 #default
         self.datacarrier = 1 #default
-        self.dustrelayfee = 0.0000030
-        self.dustlimitfactor = 250
         self.maxstdtxvalidationduration = 5
         self.maxnonstdtxvalidationduration = 10
         self.minconsolidationfactor = 10
@@ -84,8 +82,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.acceptnonstdconsolidationinput = False
         self.extra_args = [["-debug",
                             "-genesisactivationheight=1",
-                            "-blockmintxfee=0.000003",
-                            "-minrelaytxfee=0.0000025",
+                            "-minminingtxfee=0.00001",
+                            "-mindebugrejectionfee=0.0000025",
                             "-checkmempool=0",
                             "-maxscriptsizepolicy=%d" % self.maxscriptsize,
                             "-maxtxsizepolicy=%d" % self.maxtxsize,
@@ -96,8 +94,6 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                             "-limitcpfpgroupmemberscount=%d" % self.limitcpfpgroupmemberscount,
                             "-acceptnonstdoutputs=%s" % self.acceptnonstdoutputs,
                             "-datacarrier=%s" % self.datacarrier,
-                            "-dustrelayfee=%.8f" % self.dustrelayfee,
-                            "-dustlimitfactor=%f" % self.dustlimitfactor,
                             "-acceptnonstdtxn=false", #avoid accepting nonstd txes (doesnt check datacarrier size..) - regtest policy
                             "-minconsolidationfactor=%d" % self.minconsolidationfactor,
                             "-maxconsolidationinputscriptsize=%d" % self.maxconsolidationinputscriptsize,
@@ -355,12 +351,12 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         config_overrides_decrease = {"maxtxsizepolicy": 100000, "datacarriersize": 99000, "maxscriptsizepolicy": 7000,
                                      "maxscriptnumlengthpolicy": 200, "maxstackmemoryusagepolicy": 6000, "limitancestorcount": 3,
-                                     "limitcpfpgroupmemberscount": 5, "dustrelayfee": 150, "dustlimitfactor": 200,
+                                     "limitcpfpgroupmemberscount": 5, 
                                      "minconsolidationfactor": 2, "minconfconsolidationinput": 3,
                                       "acceptnonstdconsolidationinput": False}
         config_overrides_increase = {"maxtxsizepolicy": ONE_MEGABYTE*100, "datacarriersize": 99995000, "maxscriptsizepolicy": 20000000,
                                      "maxscriptnumlengthpolicy": 250000, "maxstackmemoryusagepolicy": ONE_MEGABYTE*100,
-                                     "limitancestorcount": 7, "limitcpfpgroupmemberscount": 10, "dustlimitfactor": 300,
+                                     "limitancestorcount": 7, "limitcpfpgroupmemberscount": 10, 
                                      "minconsolidationfactor": 15, "minconfconsolidationinput": 8, "acceptnonstdconsolidationinput": True}
 
         self.log.info("Test sendrawtransactions with overriden policy values")
@@ -758,85 +754,6 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         assert (len(self.nodes[0].getrawmempool()) == 0), "Not all transactions were mined"
         self.log.info("PASS\n")
 
-        # Test dustrelayfee and dustrelayfactor
-        self.log.info("Test dustrelayfee and dustlimitfactor")
-        dr = self.dustrelayfee * (self.dustlimitfactor / 100)
-        config_overrides_increase['dustrelayfee'] = 500
-
-        invalid_txs = falses(4) + [{'reject_reason': "dust"} for _ in range(5)] + falses(4) + [{'reject_reason': "dust"}
-                                                                                               for _ in range(3)]
-        overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
-                                                      {"dustrelayfee": 150}, None, None, None]
-
-        txes = []
-        for j in range(16):
-            tx = self.create_transaction(100000, [], [(utxos[i_utxo + j], 0)], 1, float(utxos[i_utxo + j]['amount']) * COIN, dustrelay=dr)
-            txes.append({"hex": tx, "config": overrides_pertx[j]})
-            invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
-
-        self.send_and_check_batch(txes, config_overrides_increase, invalid_txs)
-
-        config_overrides_increase.pop('dustrelayfee')
-        i_utxo += 16
-
-        dr = (self.dustrelayfee - 0.00000002) * (self.dustlimitfactor / 100)
-        invalid_txs = [{'reject_reason': "dust"} for _ in range(4)] +falses(5) + [{'reject_reason': "dust"} for _ in
-                                                                                range(4)] + falses(3)
-        overrides_pertx = [None for _ in range(8)] + [config_overrides_decrease, None, None, None,
-                                                      {"dustrelayfee": 500}, None, None, None]
-
-        txes = []
-        for j in range(16):
-            tx = self.create_transaction(100000, [], [(utxos[i_utxo + j], 0)], 1, float(utxos[i_utxo + j]['amount']) * COIN,
-                                         dustrelay=dr)
-            txes.append({"hex": tx, "config": overrides_pertx[j]})
-            invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
-
-        self.send_and_check_batch(txes, config_overrides_decrease, invalid_txs)
-
-        i_utxo += 16
-
-        # dustlimitfactor
-        dr = self.dustrelayfee * ((self.dustlimitfactor + 10) / 100)
-
-        invalid_txs = falses(4) + [{'reject_reason': "dust"} for _ in range(5)] + falses(4) + [{'reject_reason': "dust"}
-                                                                                               for _ in range(3)]
-        overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
-                                                      {"dustlimitfactor": 200}, None, None, None]
-
-        txes = []
-        for j in range(16):
-            tx = self.create_transaction(100000, [], [(utxos[i_utxo + j], 0)], 1,
-                                         float(utxos[i_utxo + j]['amount']) * COIN, dustrelay=dr)
-            txes.append({"hex": tx, "config": overrides_pertx[j]})
-            invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
-
-        self.send_and_check_batch(txes, config_overrides_increase, invalid_txs)
-
-        i_utxo += 16
-
-        dr = self.dustrelayfee * ((self.dustlimitfactor - 10) / 100)
-        invalid_txs = [{'reject_reason': "dust"} for _ in range(4)] + falses(5) + [{'reject_reason': "dust"} for _ in
-                                                                                   range(4)] + falses(3)
-        overrides_pertx = [None for _ in range(8)] + [config_overrides_decrease, None, None, None,
-                                                      {"dustlimitfactor": 300}, None, None, None]
-
-        txes = []
-        for j in range(16):
-            tx = self.create_transaction(100000, [], [(utxos[i_utxo + j], 0)], 1,
-                                         float(utxos[i_utxo + j]['amount']) * COIN, dustrelay=dr)
-            txes.append({"hex": tx, "config": overrides_pertx[j]})
-            invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
-
-        self.send_and_check_batch(txes, config_overrides_decrease, invalid_txs)
-
-        i_utxo += 16
-
-        self.nodes[0].generate(1)
-        assert (len(self.nodes[0].getrawmempool()) == 0), "Not all transactions were mined"
-        self.log.info("PASS\n")
-
-
         # Test consolidation tx settings
         self.log.info("Test minconsolidationfactor")
         # Test ratio between size of input script and size of output script
@@ -850,8 +767,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         enough_inputs = max(enough_inputs, 2)
         enough_confirmations = self.minconfconsolidationinput
 
-        invalid_txs = falses(4) + [{'reject_reason':"insufficient priority"} for _ in range(5)] + falses(4) + [{'reject'
-                                                                 '_reason': "insufficient priority"} for _ in range(3)]
+        invalid_txs = falses(4) + [{'reject_reason':"mempool min fee not met"} for _ in range(5)] + falses(4) + [{'reject'
+                                                                 '_reason': "mempool min fee not met"} for _ in range(3)]
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
                                                       {"minconsolidationfactor": 2}, None, None, None]
 
@@ -872,8 +789,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.send_and_check_batch(txes, config_overrides_increase, invalid_txs)
 
 
-        invalid_txs = [{'reject_reason': "insufficient priority"} for _ in range(4)] + falses(5) + [{'reject_reason':
-        "insufficient priority"} for _ in range(4)] + falses(3)
+        invalid_txs = [{'reject_reason': "mempool min fee not met"} for _ in range(4)] + falses(5) + [{'reject_reason':
+        "mempool min fee not met"} for _ in range(4)] + falses(3)
         overrides_pertx = [None for _ in range(8)] + [config_overrides_decrease, None, None, None,
                                                       {"minconsolidationfactor": 15}, None, None, None]
         # Test that input_sizes <= consolidation_factor * output_size
@@ -898,8 +815,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         self.log.info("Test minconfconsolidationinput")
         # Test that input_tx has enough confirmations
-        invalid_txs = falses(4) + [{'reject_reason': "insufficient priority"} for _ in range(5)] + falses(4) + [
-            {'reject_reason': "insufficient priority"} for _ in range(3)]
+        invalid_txs = falses(4) + [{'reject_reason': "mempool min fee not met"} for _ in range(5)] + falses(4) + [
+            {'reject_reason': "mempool min fee not met"} for _ in range(3)]
 
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
                                                       {"minconfconsolidationinput": 3}, None, None, None]
@@ -918,8 +835,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.send_and_check_batch(txes, config_overrides_increase, invalid_txs)
 
 
-        invalid_txs = [{'reject_reason': "insufficient priority"} for _ in range(4)] + falses(5) + [{'reject_reason':
-        "insufficient priority"} for _ in range(4)] + falses(3)
+        invalid_txs = [{'reject_reason': "mempool min fee not met"} for _ in range(4)] + falses(5) + [{'reject_reason':
+        "mempool min fee not met"} for _ in range(4)] + falses(3)
         overrides_pertx = [None for _ in range(8)] + [config_overrides_decrease, None, None, None,
                                                       {"minconfconsolidationinput": 15}, None, None, None]
         txes = []
@@ -952,8 +869,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         enough_confirmations = self.minconfconsolidationinput
         i_utxo += 1
 
-        invalid_txs = falses(4) + [{'reject_reason': "insufficient priority"} for _ in range(5)] + falses(4) + [
-            {'reject_reason': "insufficient priority"} for _ in range(3)]
+        invalid_txs = falses(4) + [{'reject_reason': "mempool min fee not met"} for _ in range(5)] + falses(4) + [
+            {'reject_reason': "mempool min fee not met"} for _ in range(3)]
         overrides_pertx = [None for _ in range(8)] + [{"maxconsolidationinputscriptsize": 100}, None, None, None,
                                                       {"maxconsolidationinputscriptsize": 151}, None, None, None]
         txes = []
@@ -982,8 +899,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         self.log.info("Test acceptnonstdconsolidationinput")
         script = CScript([b"a" * 1000, b"b", OP_CAT])
-        invalid_txs = [{'reject_reason': "insufficient priority"} for _ in range(4)] + falses(5) + [
-            {'reject_reason': "insufficient priority"} for _ in range(4)] + falses(3)
+        invalid_txs = [{'reject_reason': "mempool min fee not met"} for _ in range(4)] + falses(5) + [
+            {'reject_reason': "mempool min fee not met"} for _ in range(4)] + falses(3)
         overrides_pertx = [None for _ in range(8)] + [{"acceptnonstdconsolidationinput": True}, None, None, None,
                                                       {"acceptnonstdconsolidationinput": False}, None, None, None]
         txes = []
@@ -1109,13 +1026,13 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                    "max-script-num-length-policy-limit-violated (Script number overflow)",
                    "too-long-mempool-chain, too many unconfirmed parents,",
                    "too-long-mempool-chain, too many unconfirmed parents which we are not willing to mine",
-                   "non-mandatory-script-verify-flag (Stack size limit exceeded)", "tx-size", "dust "]
+                   "non-mandatory-script-verify-flag (Stack size limit exceeded)", "tx-size" ]
 
         for msg in rejects:
-            # we get 8 reject msgs per the looser tx override -- for all the transactions that were accepted then,
+            # we get 7 reject msgs per the looser tx override -- for all the transactions that were accepted then,
             # but are now under/over policy limit
             self.log.info("Message: " + msg)
-            assert count_in_log(self, msg, "/node0", from_line=from_line) >= 8
+            assert count_in_log(self, msg, "/node0", from_line=from_line) >= 7
             self.log.info("OK\n")
 
         self.log.info("Message: non-mandatory-script-verify-flag (Script did not clean its stack)")

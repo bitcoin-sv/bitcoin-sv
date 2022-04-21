@@ -153,7 +153,7 @@ class MiningTest(BitcoinTestFramework):
 
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
-        self.relayfee = node.getnetworkinfo()['relayfee']
+        self.relayfee = Decimal("250") / 100000000
         utxos = create_confirmed_utxos(self.relayfee, node, 100, nodes=self.nodes)
         self.sync_all()
 
@@ -265,7 +265,7 @@ class MiningTest(BitcoinTestFramework):
         """
         node.generate(40)
         num_transactions = 40
-        relay_fee = node.getnetworkinfo()['relayfee']
+        relay_fee = Decimal("250") / 100000000
         size_txs = 0
         for i in range(0, num_transactions):
             utx = get_any_unspent(node.listunspent(), threshold_amount=1.0)
