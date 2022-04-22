@@ -15,7 +15,7 @@ public:
     virtual void Write(char val) = 0;
     virtual void Write(const std::string& jsonText) = 0;
     virtual void Flush() = 0;
-    virtual void ReserveAdditional(size_t size){};
+    virtual void ReserveAdditional(size_t size){}
 
     void WriteLine(const std::string& jsonText) {
         Write(jsonText);

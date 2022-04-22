@@ -5,7 +5,7 @@
 
 void CStringWriter::ReserveAdditional(size_t size)
 {
-    if(size > 0)
+    if(strBuffer.size() + size > strBuffer.capacity())
     {
         strBuffer.reserve(strBuffer.size() + size);
     }
