@@ -131,6 +131,7 @@ add_library(util
 	random.h
 	rpc/protocol.cpp
 	rpc/protocol.h
+	rpc/text_writer.cpp
 	rpc/text_writer.h
 	serialize.h
 	support/cleanse.cpp

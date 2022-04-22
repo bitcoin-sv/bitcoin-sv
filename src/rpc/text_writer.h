@@ -15,7 +15,7 @@ public:
     virtual void Write(char val) = 0;
     virtual void Write(const std::string& jsonText) = 0;
     virtual void Flush() = 0;
-    virtual void ReserveAdditional(size_t size) = 0;
+    virtual void ReserveAdditional(size_t size){};
 
     void WriteLine(const std::string& jsonText) {
         Write(jsonText);
@@ -44,13 +44,7 @@ public:
 
 
     // We implement our own buffering
-    void ReserveAdditional(size_t size) override
-    {
-        if (size > 0)
-        {
-            strBuffer.reserve(strBuffer.size() + size);
-        }
-    }
+    void ReserveAdditional(size_t size) override;
 
     std::string MoveOutString()
     {
@@ -89,8 +83,6 @@ public:
     {
         FlushNonVirtual();
     }
-
-    void ReserveAdditional(size_t size) override {}
 
 private:
     static constexpr size_t BUFFER_SIZE = ONE_MEGABYTE;
@@ -167,8 +159,6 @@ public:
     {
         FlushNonVirtual();
     }
-
-    void ReserveAdditional(size_t size) override {}
 
     // returns empty string if no errors occurred
     std::string GetError()
