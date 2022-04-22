@@ -153,6 +153,7 @@ enum {
 #define READWRITE(obj) (::SerReadWrite(s, (obj), ser_action))
 #define READWRITECOMPACTSIZE(obj) (::SerReadWriteCompactSize(s, (obj), ser_action))
 #define READWRITEMANY(...) (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
+#define READWRITEENUM(e) (::SerReadWriteEnum(s, (e), ser_action))
 
 /**
  * Implement three methods for serializable objects. These are actually wrappers
@@ -969,6 +970,23 @@ inline void SerReadWriteCompactSize(Stream &s, const uint64_t &obj,
 template <typename Stream>
 inline void SerReadWriteCompactSize(Stream &s, uint64_t &obj, CSerActionUnserialize ser_action) {
     obj = ::ReadCompactSize(s);
+}
+
+/**
+ * Support for READWRITEENUM macro
+ */
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, const E& e, CSerActionSerialize) {
+    typename std::underlying_type_t<E> val { static_cast<decltype(val)>(e) };
+    ::Serialize(s, val);
+}
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
+    typename std::underlying_type_t<E> val {};
+    ::Unserialize(s, val);
+    e = static_cast<E>(val);
 }
 
 /**
