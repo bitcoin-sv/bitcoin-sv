@@ -10,11 +10,12 @@ using namespace InvalidTxnPublisher;
 #if ENABLE_ZMQ
 void CInvalidTxnZmqSink::Publish(const InvalidTxnInfo& invalidTxInfo)
 {
-    auto messageSize = EstimateMessageSize(invalidTxInfo, true);
-    CStringWriter tw;
-    CJSONWriter jw(tw, false);
+    const auto messageSize = EstimateMessageSize(invalidTxInfo, true);
+    CStringWriter sw;
+    sw.ReserveAdditional(messageSize); 
+    CJSONWriter jw(sw, false);
     invalidTxInfo.ToJson(jw, messageSize <= maxMessageSize);
-    std::string jsonString = tw.MoveOutString();
+    std::string jsonString = sw.MoveOutString();
     GetMainSignals().InvalidTxMessageZMQ(jsonString);
 }
 #endif
