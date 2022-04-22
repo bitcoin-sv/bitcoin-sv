@@ -2390,6 +2390,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
                 assert(requestedBlockHash == hashBlock);
 
             CStringWriter writer;
+            writer.ReserveAdditional(tx->GetTotalSize() * 2);
             EncodeHexTx(*tx, writer, RPCSerializationFlags());
             std::string hex = writer.MoveOutString();
             callbackDataObject.pushKV("txOrId", hex);
