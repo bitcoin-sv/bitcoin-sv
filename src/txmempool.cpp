@@ -3063,3 +3063,10 @@ DisconnectedBlockTransactions::~DisconnectedBlockTransactions()
             " Some transactions will be dropped from mempool.\n");
     }
 }
+
+std::ostream& operator<<(std::ostream& os, const MemPoolRemovalReason& reason)
+{
+    os << enum_cast<std::string>(reason);
+    return os;
+}
+
