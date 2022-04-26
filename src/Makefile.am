@@ -526,6 +526,7 @@ libbitcoin_util_a_SOURCES = \
   logging.cpp \
   random.cpp \
   rpc/protocol.cpp \
+  rpc/text_writer.cpp \
   support/cleanse.cpp \
   sync.cpp \
   threadinterrupt.cpp \

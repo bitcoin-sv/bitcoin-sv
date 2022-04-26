@@ -749,6 +749,7 @@ static void OutputTxJSON(const CTransaction &tx) {
         });
 
     CStringWriter strWriter;
+    strWriter.ReserveAdditional(tx.GetTotalSize() * 2);
     CJSONWriter jWriter(strWriter, true);
     TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
 
