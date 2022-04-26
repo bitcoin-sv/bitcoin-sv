@@ -117,7 +117,8 @@ class BlockPriorityTest(BitcoinTestFramework):
 
         # Initial node setup
         extra_args = [
-            '-checkmempool=0'
+            '-checkmempool=0',
+            '-mindebugrejectionfee=0.00000250'
         ]
         with self.run_node_with_connections("Setup node", 0, extra_args, 1) as connections:
             conn = connections[0]
@@ -135,7 +136,8 @@ class BlockPriorityTest(BitcoinTestFramework):
         # Restart node with associations
         associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
         extra_args = [
-            '-whitelist=127.0.0.1'
+            '-whitelist=127.0.0.1',
+            '-mindebugrejectionfee=0.00000250'
         ]
         with self.run_node_with_associations("Test block priority", 0, extra_args, associations_stream_policies, cb_class=MyAssociationCB) as associations:
             # Wait for node to fully reinitialise itself

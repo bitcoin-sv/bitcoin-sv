@@ -24,8 +24,9 @@ class SelfishMiningTest(BitcoinTestFramework):
         # transaction for the block to be classified as selfishly mined.
         # Set threshold of number of txs in mempool that are not included in received block 
         # for the block to be classified as selfishly mined to 40%.
-        self.start_node(0, ['-detectselfishmining=1','-minblockmempooltimedifferenceselfish=10', '-selfishtxpercentthreshold=40'])
-        self.start_node(1)
+        self.start_node(0, ['-detectselfishmining=1','-minblockmempooltimedifferenceselfish=10', '-selfishtxpercentthreshold=40',
+                           '-minminingtxfee=0.00000500','-fallbackfee=0.00000250'])
+        self.start_node(1,['-minminingtxfee=0.00000500','-fallbackfee=0.00000250'])
         connect_nodes_bi(self.nodes, 0, 1)
 
 

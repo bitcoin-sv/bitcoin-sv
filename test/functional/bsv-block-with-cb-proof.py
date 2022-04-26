@@ -93,7 +93,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
 
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
-        self.relayfee = node.getnetworkinfo()['relayfee']
+        self.relayfee = Decimal("0.00000250")
         utxos = create_confirmed_utxos(self.relayfee, node, 100, nodes=self.nodes)
         self.sync_all()
 

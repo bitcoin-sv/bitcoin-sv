@@ -82,7 +82,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.acceptnonstdconsolidationinput = False
         self.extra_args = [["-debug",
                             "-genesisactivationheight=1",
-                            "-minminingtxfee=0.00001",
+                            "-minminingtxfee=0.000003",
                             "-mindebugrejectionfee=0.0000025",
                             "-checkmempool=0",
                             "-maxscriptsizepolicy=%d" % self.maxscriptsize,
