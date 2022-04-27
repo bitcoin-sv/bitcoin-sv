@@ -422,7 +422,51 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # No transactions that were already mined should be in the mempool. The rest should be
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchains) - len(to_mine))
 
+    # Submit a transaction (via rpc interface) which is already known
+    def run_scenario7(self, conn, spend, rpcsend, allowhighfees=False, dontcheckfee=False, timeout=30):
+        # Create the following txchain: tx1 (parent) -> tx2 (child).
+        # (a) tx1 - parent - is at the index 0
+        # (b) tx2 - child - is at the index 1
+        txchain, _, _ = self.get_txchains_n(1, 2, spend, num_of_bad_chains=0)
 
+        # Send tx2 (the child tx) to the node through p2p interface.
+        assert_equal(conn.rpc.getorphaninfo()["size"], 0)
+        conn.send_message(msg_tx(txchain[1]))
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == 1, timeout=timeout)
+
+        # Get block's basic data.
+        root_block_info = conn.rpc.getblock(conn.rpc.getbestblockhash())
+        root_hash = root_block_info["hash"]
+        root_height = root_block_info["height"]
+        root_time = root_block_info["time"]
+
+        # The parent tx1 transaction will be mined in a block, then the block will be relayed to the node.
+        to_mine = []
+        to_mine.append(txchain[0])
+
+        # create the block
+        block = self.make_block(to_mine, root_hash, root_height, root_time)
+        conn.send_message(msg_block(block))
+        wait_until(lambda: conn.rpc.getbestblockhash() == block.hash, check_interval=0.3)
+
+        # Check if tx2 (the child tx) has not been removed by the BlockConnect operation.
+        assert_equal(conn.rpc.getorphaninfo()["size"], 1)
+
+        # Submit tx2 (the child tx) through rpc interface.
+        if "sendrawtransactions" == rpcsend._service_name:
+            # Prepare the input data.
+            rpc_txs_bulk_input = []
+            # Add tx2 to the input data request.
+            rpc_txs_bulk_input.append({'hex': ToHex(txchain[1]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
+            rejected_txns = rpcsend(rpc_txs_bulk_input)
+            # Check if tx2 has not been rejected by the node.
+            assert_equal(len(rejected_txns), 0)
+        elif "sendrawtransaction" == rpcsend._service_name:
+            assert_equal(rpcsend(ToHex(txchain[1]), allowhighfees, dontcheckfee), txchain[1].hash)
+        else:
+            raise Exception("Unsupported rpc method!")
+        # tx2 should be the only transaction in the mempool.
+        assert_equal(conn.rpc.getrawmempool(), [txchain[1].hash])
 
     def get_tests(self):
         rejected_txs = []
@@ -741,6 +785,50 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario6(conn, num_of_chains, chain_length, out, timeout=20)
+
+        # Scenario 12 (TS12).
+        #
+        # This test case checks the following scenario:
+        #
+        # 1. Create txchain: tx1 (parent) -> tx2 (child)
+        # 2. Submit tx2 child tx to the node through the p2p interface.
+        #    (a) due to the missing parent the node detects tx2 as an orphan tx and puts it into the p2p orphan pool
+        # 3. The node gets a new block from the network which contains tx1 parent transaction.
+        #    (a) processes the new block and updates the tip
+        #    (b) tx2 child tx remains in the node's p2p orphan pool.
+        # 4. tx2 is resubmitted to the node through the rpc interface.
+        #    (a) the node processes tx2 and adds it into the mempool
+        #    (b) removes tx2 duplicate from the p2p orphan pool
+        # 5. Check if tx2 is the only transaction in the mempool.
+        #
+        # The above scenario tests both sendrawtransaction(s) rpc interfaces (including 'dontcheckfee' flag).
+        #
+        # Test case config
+        args = ['-checkmempool=0',
+                '-persistmempool=0']
+        out = out[1:] # skip the spent coin from the previous test case
+        tc_desc = '{} chain of length {}. Child tx2 is detected as p2p orphan tx, then parent tx1 is received in the next block, then tx2 is resubmitted through rpc'.format(1, 2)
+        with self.run_node_with_connections('TS12a: ' + tc_desc,
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario7(conn, out, conn.rpc.sendrawtransactions, timeout=20) # dontcheckfee=False
+        # dontcheckfee=True
+        out = out[1:] # skip the spent coin from the previous test case
+        with self.run_node_with_connections('TS12b: ' + tc_desc,
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario7(conn, out, conn.rpc.sendrawtransactions, dontcheckfee=True, timeout=20)
+        out = out[1:] # skip the spent coin from the previous test case
+        with self.run_node_with_connections('TS12c: ' + tc_desc,
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario7(conn, out, conn.rpc.sendrawtransaction, timeout=20) # dontcheckfee=False
+        # dontcheckfee=True
+        out = out[1:] # skip the spent coin from the previous test case
+        with self.run_node_with_connections('TS12d: ' + tc_desc,
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario7(conn, out, conn.rpc.sendrawtransaction, dontcheckfee=True, timeout=20)
 
 if __name__ == '__main__':
     RPCSendRawTransactions().main()
