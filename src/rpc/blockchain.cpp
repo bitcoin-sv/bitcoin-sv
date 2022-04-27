@@ -3648,34 +3648,40 @@ UniValue waitforptvcompletion(const Config &config, const JSONRPCRequest &reques
     return NullUniValue;
 }
 
-UniValue mineriddump(const Config& config, const JSONRPCRequest& request)
+UniValue dumpminerids(const Config& config, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 0)
     {
         throw std::runtime_error(
-            "mineriddump\n"
+            "dumpminerids\n"
 
             "\nReturns details for all currently known miner IDs"
             "\nResult\n"
-            "[\n"
+            "state {\n"
+            "  \"synced\": xxxx,             (boolean) Whether the miner ID database has finished syncing with the blockchain\n"
+            "  \"bestblock\": xxxx,          (boolean) The latest block scanned and parsed by the database\n"
+            "}\n"
+            "miners [\n"
             "  {\n"
             "    \"uuid\": xxxxxx,           (string) UUID for this miner\n"
-            "    \"reputation\": xxxx,       (integer) Accumulated reputation score for this miner\n"
             "    \"firstblock\": xxxx,       (string) Hash of first block seen for this miner\n"
             "    \"latestblock\": xxxx,      (string) Hash of most recent block seen for this miner\n"
+            "    \"numrecentblocks\": xxxx,  (string) An indication of how many of the recent blocks were from this miner\n"
+            "    \"reputationvoid\": xxxx,   (boolean) Whether this miner has voided their reputation with us\n"
             "    \"minerids\": [\n"
             "       \"minerid\": xxxx,       (string) This miner id\n"
-            "       \"current\": xx,         (boolean) Whether this miner id is considered to be the current one\n"
-            "       \"rotationblock\": xxxx, (string) Hash of block in which this miner id was rotated to a new one\n"
+            "       \"version\": xxxx,       (string) The version number of the miner ID spec this ID follows\n"
+            "       \"state\": xxxx,         (string) Whether this miner id is CURRENT, ROTATED or REVOKED\n"
+            "       \"creationblock\": xxxx, (string) Hash of block in which this miner id was created\n"
             "    ]\n"
             "  }\n"
             "[\n"
             "\nExamples:\n" +
-            HelpExampleCli("mineriddump", "") +
-            HelpExampleRpc("mineriddump", ""));
+            HelpExampleCli("dumpminerids", "") +
+            HelpExampleRpc("dumpminerids", ""));
     }
 
-    // Check we have a miner ID databse to dump
+    // Check we have a miner ID database to dump
     if(g_minerIDs)
     {
         return g_minerIDs->DumpJSON();
@@ -3684,6 +3690,42 @@ UniValue mineriddump(const Config& config, const JSONRPCRequest& request)
     {
         throw std::runtime_error("Miner ID database unavailable");
     }
+}
+
+UniValue rebuildminerids(const Config& config, const JSONRPCRequest& request)
+{
+    if(request.fHelp || request.params.size() > 1)
+    {
+        throw std::runtime_error(
+            "rebuildminerids ( fullrebuild )\n"
+            "\nForce a rebuild (in the background) of the miner ID database and synchronise it to the blockchain.\n"
+            "\nArguments:\n"
+            "1. fullrebuild (boolean, optional, default=false) True forces a full rebuild starting from the Genesis block, "
+            "False does a much quicker rebuild only scanning as many blocks back as we think we need to determine "
+            "the miners reputations.\n"
+            "\nResult:\n"
+            "\nExamples:\n" +
+            HelpExampleCli("rebuildminerids", "true") +
+            HelpExampleRpc("rebuildminerids", "true"));
+    }
+
+    bool fullRebuild {false};
+    if(request.params.size() == 1)
+    {
+        fullRebuild = request.params[0].get_bool();
+    }
+
+    // Check we have a miner ID database to rebuild
+    if(g_minerIDs)
+    {
+        g_minerIDs->TriggerSync(true, fullRebuild);
+    }
+    else
+    {
+        throw std::runtime_error("Miner ID database unavailable");
+    }
+
+    return true;
 }
 
 // clang-format off
@@ -3716,6 +3758,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "preciousblock",          preciousblock,          true,  {"blockhash"} },
     { "blockchain",         "checkjournal",           checkjournal,           true,  {} },
     { "blockchain",         "rebuildjournal",         rebuildjournal,         true,  {} },
+    { "blockchain",         "rebuildminerids",        rebuildminerids,        true,  {"fullrebuild"} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
@@ -3731,7 +3774,7 @@ static const CRPCCommand commands[] = {
     { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
     { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
     { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} },
-    { "hidden",             "mineriddump",            mineriddump,            true,  {} },
+    { "hidden",             "dumpminerids",           dumpminerids,            true,  {} },
 };
 // clang-format on
 
