@@ -3703,8 +3703,9 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
+    int32_t blockHeight { pindexDelete->GetHeight() };
 
-    FinalizeGenesisCrossing(config, pindexDelete->GetHeight(), changeSet);
+    FinalizeGenesisCrossing(config, blockHeight, changeSet);
 
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -3744,7 +3745,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         //  The amount of transactions we are willing to store during reorg is the same as max mempool size
         uint64_t maxDisconnectedTxPoolSize = config.GetMaxMempool();
         // Save transactions to re-add to mempool at end of reorg
-        mempool.AddToDisconnectPoolUpToLimit(changeSet, disconnectpool, maxDisconnectedTxPoolSize, block.vtx);
+        mempool.AddToDisconnectPoolUpToLimit(changeSet, disconnectpool, maxDisconnectedTxPoolSize, block, blockHeight);
     }
 
     // Update chainActive and related variables.
