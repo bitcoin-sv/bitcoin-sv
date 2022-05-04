@@ -21,6 +21,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -615,6 +616,14 @@ template <typename Stream, typename T>
 void Unserialize(Stream &os, std::unique_ptr<const T> &p);
 
 /**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream &os, const std::optional<T> &o);
+template <typename Stream, typename T>
+void Unserialize(Stream &is, std::optional<T> &o);
+
+/**
  * If none of the specialized versions above matched, default to calling member
  * function.
  */
@@ -934,6 +943,33 @@ void Unserialize(Stream &is, boost::uuids::uuid &v) {
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
     is.read(reinterpret_cast<char*>(v.data), uuid_size);
+}
+
+/**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream& os, const std::optional<T>& o) {
+    if(o.has_value()) {
+        Serialize(os, true);
+        Serialize(os, *o);
+    }
+    else {
+        Serialize(os, false);
+    }
+}
+template <typename Stream, typename T>
+void Unserialize(Stream& is, std::optional<T>& o) {
+    bool hasValue {};
+    Unserialize(is, hasValue);
+    if(hasValue) {
+        T obj {};
+        Unserialize(is, obj);
+        o = std::move(obj);
+    }
+    else {
+        o = std::nullopt;
+    }
 }
 
 /**
