@@ -25,8 +25,15 @@ void encode_hex_tx(benchmark::State& state)
     constexpr int unlocking_script_len{107};
     script.insert(script.begin(), unlocking_script_len, OP_NOP);
     CTxIn input{outpoint, script};
-
     generate_n(back_inserter(mtx.vin), nInputs, [&input](){ return input;});
+
+    CScript op_script;
+    op_script << OP_0 << OP_RETURN;
+    const size_t count{3'000'000};
+    op_script.insert(op_script.end(), count, 42);
+    CTxOut output;
+    output.scriptPubKey = op_script;
+    mtx.vout.push_back(output);
 
     const CTransaction tx(mtx);
     while (state.KeepRunning())
@@ -39,4 +46,5 @@ void encode_hex_tx(benchmark::State& state)
     }
 }
 BENCHMARK(encode_hex_tx);
+
 
