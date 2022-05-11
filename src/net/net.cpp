@@ -2971,6 +2971,8 @@ void CNode::AskFor(const CInv &inv, const Config &config) {
     const size_t idIndexMaxSize { mapAskForMaxSize * IDINDEXSIZE_FACTOR };
     auto& idIndex { indexAskFor.get<TagTxnID>() };
     if(mapAskFor.size() > mapAskForMaxSize || idIndex.size() > idIndexMaxSize) {
+        LogPrint(BCLog::NETMSG, "mapAskFor exceeds the max size limit: %ld. Dropping askfor %s request to peer=%d. Increase -recvinvqueuefactor=%d value to prevent inv requests from being dropped.\n",
+            mapAskForMaxSize, inv.ToString(), id, config.GetRecvInvQueueFactor());
         return;
     }
 
