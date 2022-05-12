@@ -282,6 +282,7 @@ class BitcoinTestFramework():
 
         node.start(self.runNodesWithRequiredParams, extra_args, stderr)
         node.wait_for_rpc_connection()
+        wait_until(lambda: node.rpc.getinfo()["initcomplete"])
 
         if self.options.coveragedir is not None:
             coverage.write_all_rpc_commands(self.options.coveragedir, node.rpc)
@@ -297,6 +298,7 @@ class BitcoinTestFramework():
                 node.start(self.runNodesWithRequiredParams, extra_args[i])
             for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
+                wait_until(lambda: node.rpc.getinfo()["initcomplete"])
                 if(self.options.waitforpid):
                     print('Node {} started, pid is {}'.format(i, node.process.pid))
                     print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))

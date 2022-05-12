@@ -3643,3 +3643,11 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     return !shutdownToken.IsCanceled();
 }
+
+// Get/set AppInit finished flag
+std::atomic_bool& GetAppInitCompleted()
+{
+    static std::atomic_bool appInitCompleted {false};
+    return appInitCompleted;
+}
+
