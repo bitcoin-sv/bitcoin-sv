@@ -173,6 +173,7 @@ void ScriptToAsmStr(const CScript& script,
 std::string EncodeHexTx(const CTransaction& tx, const int serialFlags)
 {
     CStringWriter stringWriter;
+    stringWriter.ReserveAdditional(tx.GetTotalSize() * 2);
     EncodeHexTx(tx, stringWriter, serialFlags);
     return stringWriter.MoveOutString();
 }
