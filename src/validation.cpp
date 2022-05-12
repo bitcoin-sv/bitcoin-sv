@@ -887,6 +887,10 @@ std::vector<TxId> LimitMempoolSize(
         vRemovedTxIds =
             pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
         usageTotal = pool.DynamicMemoryUsage();
+        for (const auto& txid: vRemovedTxIds) {
+            LogPrint(BCLog::MEMPOOL, "Limit mempool size: txn= %s removed from the memory pool\n",
+                txid.ToString());
+        }
     }
 
     // Disk usage is eventually consistent with total usage.
