@@ -165,6 +165,17 @@ bool IsMinerId(const bsv::span<const uint8_t> script)
            script[7] <= OP_PUSHDATA4;
 }
 
+bool IsMinerInfo(const bsv::span<const uint8_t> script)
+{
+    static constexpr std::array<uint8_t, 4> protocol_id{0x60, 0x1d, 0xfa, 0xce};
+    return script.size() >= 8 && 
+           script[0] == OP_FALSE &&
+           script[1] == OP_RETURN && 
+           script[2] == protocol_id.size() &&
+           std::equal(protocol_id.begin(), protocol_id.end(), script.begin() + 3) &&
+           script[7] <= OP_PUSHDATA4;
+}
+
 bool CScript::IsPushOnly(const_iterator pc) const {
     while (pc < end()) {
         opcodetype opcode;
