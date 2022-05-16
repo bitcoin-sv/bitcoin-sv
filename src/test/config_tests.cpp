@@ -607,6 +607,12 @@ BOOST_AUTO_TEST_CASE(minerid_config)
     config.SetMinerIdReputationM(MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err);
     BOOST_CHECK(config.SetMinerIdReputationN(config.GetMinerIdReputationM(), &err));
     BOOST_CHECK(!config.SetMinerIdReputationN(config.GetMinerIdReputationM() - 1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationMScale(), MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR);
+    BOOST_CHECK(config.SetMinerIdReputationMScale(2 * MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationMScale(), 2 * MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR);
+    BOOST_CHECK(config.SetMinerIdReputationMScale(1, &err));
+    BOOST_CHECK(!config.SetMinerIdReputationMScale(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(disable_BIP30)

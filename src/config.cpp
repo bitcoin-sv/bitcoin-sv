@@ -164,6 +164,7 @@ void GlobalConfig::Reset()
     data->numMinerIdsToKeep = MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP;
     data->minerIdReputationM = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
     data->minerIdReputationN = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N;
+    data->minerIdReputationMScale = MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR;
 
     data->mDisableBIP30Checks = std::nullopt;
 
@@ -1934,6 +1935,25 @@ uint32_t GlobalConfig::GetMinerIdReputationN() const
 bool GlobalConfig::GetDisableBIP30Checks() const
 {
     return data->mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
+}
+
+bool GlobalConfig::SetMinerIdReputationMScale(double num, std::string* err)
+{
+    if(num < 1)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M scale factor must be >= 1.";
+        }
+        return false;
+    }
+
+    data->minerIdReputationMScale = num;
+    return true;
+}
+double GlobalConfig::GetMinerIdReputationMScale() const
+{
+    return data->minerIdReputationMScale;
 }
 
 #if ENABLE_ZMQ

@@ -1481,7 +1481,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. "
             "This parameter sets the N value for that test. (default: %u, maximum %u)"),
             MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N));
-    
+    strUsage += HelpMessageOpt(
+        "-mineridreputation_mscale=<n>",
+        strprintf(_("Miners who lose their good reputation can in some circumstances recover that reputation, "
+            "but at the cost of a temporarily increased M of N block target. This parameter determines how "
+            "much to scale the base M value in such cases. (default: %f)"),
+            MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR));
+
     /** Safe mode */
     strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
 
@@ -2621,6 +2627,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
     if(std::string err; !config.SetMinerIdReputationN(
         gArgs.GetArg("-mineridreputation_n", MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationMScale(
+        gArgs.GetDoubleArg("-mineridreputation_mscale", MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR), &err))
     {
         return InitError(err);
     }

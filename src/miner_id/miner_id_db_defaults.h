@@ -31,5 +31,8 @@ struct MinerIdDatabaseDefaults
     // Default and maximum values for M in miner reputation test
     static constexpr uint32_t DEFAULT_MINER_REPUTATION_M {14};
     static constexpr uint32_t MAX_MINER_REPUTATION_M { MAX_MINER_REPUTATION_N };
+
+    // Dafualt scale factor to use for M in miner reputation test
+    static constexpr double DEFAULT_M_SCALE_FACTOR {1.5};
 };
 
