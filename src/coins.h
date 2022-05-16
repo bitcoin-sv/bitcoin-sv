@@ -57,6 +57,11 @@ class CoinImpl
     uint32_t nHeightAndIsCoinBase{0};
 
     /**
+     * Iff true, this output was created by confiscation transaction.
+     */
+    bool isConfiscation{false};
+
+    /**
      * Size of the storage.scriptPubKey that is available even if the script
      * itself is not loaded.
      */
@@ -65,10 +70,11 @@ class CoinImpl
 public:
     CoinImpl() : storage{CTxOut{}}, out{&storage.value()} {}
 
-    CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
+    CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : storage{CTxOut{amount, {}}}
         , out{&storage.value()}
         , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
+        , isConfiscation(IsConfiscation)
         , mScriptSize{scriptSize}
     {}
 
@@ -76,6 +82,7 @@ public:
         : storage{std::move(other.storage)}
         , out{storage.has_value() ? &storage.value() : other.out}
         , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
+        , isConfiscation(other.isConfiscation)
         , mScriptSize{other.mScriptSize}
     {
         other.Clear();
@@ -88,6 +95,7 @@ public:
         storage = std::move(other.storage);
         out = (storage.has_value() ? &storage.value() : other.out);
         nHeightAndIsCoinBase = other.nHeightAndIsCoinBase;
+        isConfiscation = other.isConfiscation;
         mScriptSize = other.mScriptSize;
 
         other.Clear();
@@ -97,17 +105,17 @@ public:
 
     CoinImpl MakeOwning() const
     {
-        return {CTxOut{GetTxOut()}, GetScriptSize(), GetHeight(), IsCoinBase()};
+        return {CTxOut{GetTxOut()}, GetScriptSize(), GetHeight(), IsCoinBase(), IsConfiscation()};
     }
 
     CoinImpl MakeNonOwning() const
     {
-        return {GetTxOut(), GetScriptSize(), GetHeight(), IsCoinBase()};
+        return {GetTxOut(), GetScriptSize(), GetHeight(), IsCoinBase(), IsConfiscation()};
     }
 
-    static CoinImpl MakeNonOwningWithScript(const CTxOut& outIn, int32_t nHeightIn, bool IsCoinbase)
+    static CoinImpl MakeNonOwningWithScript(const CTxOut& outIn, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
     {
-        return {outIn, outIn.scriptPubKey.size(), nHeightIn, IsCoinbase};
+        return {outIn, outIn.scriptPubKey.size(), nHeightIn, IsCoinbase, IsConfiscation};
     }
 
     //! NOTE: serialization is only allowed if scriptPubKey is loaded!
@@ -115,7 +123,7 @@ public:
         assert(!IsSpent());
         assert(HasScript());
 
-        ::Serialize(s, VARINT(nHeightAndIsCoinBase));
+        ::Serialize(s, VARINT( static_cast<std::uint64_t>(nHeightAndIsCoinBase) | (isConfiscation ? 0x100000000ull : 0ull) ));
         ::Serialize(s, CTxOutCompressor(REF(*out)));
     }
 
@@ -123,7 +131,10 @@ public:
     {
         assert(storage.has_value());
 
-        ::Unserialize(s, VARINT(nHeightAndIsCoinBase));
+        std::uint64_t v=0;
+        ::Unserialize(s, VARINT(v));
+        nHeightAndIsCoinBase = v & 0xffffffffull;
+        isConfiscation = v & 0x100000000ull;
         ::Unserialize(s, REF(CTxOutCompressor(storage.value())));
         mScriptSize = out->scriptPubKey.size();
     }
@@ -132,6 +143,7 @@ public:
         return static_cast<int32_t>(nHeightAndIsCoinBase >> 1);
     }
     bool IsCoinBase() const { return nHeightAndIsCoinBase & 0x01; }
+    bool IsConfiscation() const { return isConfiscation; }
     uint64_t GetScriptSize() const { return mScriptSize; }
 
     bool IsSpent() const { return out->nValue == Amount{-1}; }
@@ -150,20 +162,23 @@ protected:
         : storage{other.storage}
         , out{storage.has_value() ? &storage.value() : other.out}
         , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
+        , isConfiscation{other.isConfiscation}
         , mScriptSize{other.mScriptSize}
     {}
 
-    CoinImpl(CTxOut&& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
+    CoinImpl(CTxOut&& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : storage{std::move(outIn)}
         , out{&storage.value()}
         , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
+        , isConfiscation(IsConfiscation)
         , mScriptSize{scriptSize}
     {}
 
 private:
-    CoinImpl(const CTxOut& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
+    CoinImpl(const CTxOut& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : out{&outIn}
         , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
+        , isConfiscation(IsConfiscation)
         , mScriptSize{scriptSize}
     {}
 
@@ -174,6 +189,7 @@ private:
         storage = CTxOut{};
         out = &storage.value();
         nHeightAndIsCoinBase = 0;
+        isConfiscation = false;
     }
 };
 
@@ -191,6 +207,8 @@ class Coin
     // The reason is that shifting on negative numbers causes undefined behavior.
     uint32_t nHeightAndIsCoinBase{ 0 };
 
+    bool isConfiscation{ false };
+
     uint64_t mScriptSize{ 0 };
 
 public:
@@ -199,6 +217,7 @@ public:
     explicit Coin(const CoinImpl& coin)
         : mAmount{coin.GetTxOut().nValue}
         , nHeightAndIsCoinBase((static_cast<uint32_t>(coin.GetHeight()) << 1) | (coin.IsCoinBase()? 1u : 0u))
+        , isConfiscation(coin.IsConfiscation())
         , mScriptSize{coin.GetScriptSize()}
     {}
 
@@ -207,6 +226,7 @@ public:
         return static_cast<int32_t>(nHeightAndIsCoinBase >> 1);
     }
     bool IsCoinBase() const { return nHeightAndIsCoinBase & 0x01; }
+    bool IsConfiscation() const { return isConfiscation; }
     bool IsSpent() const { return mAmount == Amount{-1}; }
     uint64_t GetScriptSize() const { return mScriptSize; }
 
@@ -253,12 +273,12 @@ public:
 
     CoinWithScript MakeOwning() const
     {
-        return {CTxOut(GetTxOut()), GetHeight(), IsCoinBase()};
+        return {CTxOut(GetTxOut()), GetHeight(), IsCoinBase(), IsConfiscation()};
     }
 
-    static CoinWithScript MakeOwning(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase)
+    static CoinWithScript MakeOwning(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
     {
-        return {std::move(outIn), nHeightIn, IsCoinbase};
+        return {std::move(outIn), nHeightIn, IsCoinbase, IsConfiscation};
     }
 
     CoinWithScript& operator=(CoinWithScript&& other)
@@ -274,6 +294,7 @@ public:
         CoinImpl::DynamicMemoryUsage,
         CoinImpl::GetHeight,
         CoinImpl::IsCoinBase,
+        CoinImpl::IsConfiscation,
         CoinImpl::IsSpent,
         CoinImpl::GetScriptSize,
         CoinImpl::IsStorageOwner;
@@ -282,8 +303,8 @@ public:
 
 private:
     //! Constructor from a CTxOut and height/coinbase information.
-    CoinWithScript(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase)
-        : CoinImpl{std::move(outIn), outIn.scriptPubKey.size(), nHeightIn, IsCoinbase}
+    CoinWithScript(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
+        : CoinImpl{std::move(outIn), outIn.scriptPubKey.size(), nHeightIn, IsCoinbase, IsConfiscation}
     {}
 
     CoinImpl ToCoinImpl() && { return std::move( *this ); }
@@ -651,7 +672,7 @@ protected:
 // an addition is an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, int32_t genesisActivationHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, bool fConfiscation, int32_t nHeight, int32_t genesisActivationHeight,
               bool check = false);
 
 #endif // BITCOIN_COINS_H

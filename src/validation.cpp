@@ -766,14 +766,14 @@ static bool IsAbsurdlyHighFeeSetForTxn(
     return !(nAbsurdFee != Amount(0) && nFees > nAbsurdFee);
 }
 
-static bool CheckTxSpendsCoinbase(
+static bool CheckTxSpendsCoinbaseOrConfiscation(
     const CTransaction &tx,
     const CCoinsViewCache& view) {
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     for (const CTxIn &txin : tx.vin) {
         if (auto coin = view.GetCoin(txin.prevout);
-            coin.has_value() && coin->IsCoinBase()) {
+            coin.has_value() && (coin->IsCoinBase() || coin->IsConfiscation())) {
             return true;
         }
     }
@@ -1307,7 +1307,7 @@ CTxnValResult TxnValidation(
 
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
-    const bool fSpendsCoinbase = CheckTxSpendsCoinbase(tx, view);
+    const bool fSpendsCoinbaseOrConfiscation = CheckTxSpendsCoinbaseOrConfiscation(tx, view);
 
     // Check mempool minimal fee requirement.
     const Amount& nMempoolRejectFee = GetMempoolRejectFee(config, pool, nTxSize);
@@ -1333,7 +1333,7 @@ CTxnValResult TxnValidation(
             nFees,
             nAcceptTime,
             uiChainActiveHeight,
-            fSpendsCoinbase,
+            fSpendsCoinbaseOrConfiscation,
             lp) };
 
     // Calculate in-mempool ancestors, up to a limit.
@@ -2468,7 +2468,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
     }
 
     // Add outputs.
-    AddCoins(inputs, tx, nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
+    AddCoins(inputs, tx, CFrozenTXOCheck::IsConfiscationTx(tx), nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
 }
 
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight) {
@@ -2568,6 +2568,17 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
                     false, REJECT_INVALID,
                     "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d",
+                              nSpendHeight - coin->GetHeight()));
+            }
+        }
+
+        // If prev is output of a confiscation transaction, check that it's matured
+        if (coin->IsConfiscation()) {
+            if (nSpendHeight - coin->GetHeight() < CONFISCATION_MATURITY) {
+                return state.Invalid(
+                    false, REJECT_INVALID,
+                    "bad-txns-premature-spend-of-confiscation",
+                    strprintf("tried to spend confiscation at depth %d",
                               nSpendHeight - coin->GetHeight()));
             }
         }
@@ -6638,7 +6649,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
         }
 
         // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, *tx, pindex->GetHeight(), config.GetGenesisActivationHeight(), true);
+        AddCoins(inputs, *tx, CFrozenTXOCheck::IsConfiscationTx(*tx), pindex->GetHeight(), config.GetGenesisActivationHeight(), true);
     }
 
     return true;

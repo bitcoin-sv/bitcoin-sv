@@ -71,6 +71,10 @@ static const uint64_t MAX_COINBASE_SCRIPTSIG_SIZE = 100;
  * blocks (network rule).
  */
 static const int COINBASE_MATURITY = 100;
+/**
+ * Confiscation transaction outputs can only be spent after this number of new blocks.
+ */
+static const int CONFISCATION_MATURITY = 1000;
 /** Activation time for P2SH (April 1st 2012) */
 static const int64_t P2SH_ACTIVATION_TIME = 1333234914;
 

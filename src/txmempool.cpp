@@ -49,7 +49,7 @@ using namespace mining;
             CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
             if (ptx) {
                 if (outpoint.GetN() < ptx->vout.size()) {
-                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false, CFrozenTXOCheck::IsConfiscationTx(*ptx));
                 }
                 return {};
             }
@@ -118,7 +118,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
                                  int32_t _entryHeight,
-                                 bool _spendsCoinbase,
+                                 bool _spendsCoinbaseOrConfiscation,
                                  LockPoints lp)
     : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
@@ -128,7 +128,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
       feeDelta{Amount{0}},
       lockPoints{lp},
       entryHeight{_entryHeight},
-      spendsCoinbase{_spendsCoinbase}
+      spendsCoinbaseOrConfiscation{_spendsCoinbaseOrConfiscation}
 {}
 
 // CPFP group, if any that this transaction belongs to.
@@ -964,7 +964,7 @@ void CTxMemPool::RemoveForReorgNL(
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.
             txToRemove.insert(it);
-        } else if (it->GetSpendsCoinbase()) {
+        } else if (it->GetSpendsCoinbaseOrConfiscation()) {
             for (const auto& prevout: GetOutpointsSpentByNL(it)) {
                 txiter it2 = mapTx.find(prevout.GetTxId());
                 if (it2 != mapTx.end()) {
@@ -980,7 +980,10 @@ void CTxMemPool::RemoveForReorgNL(
                 if (!coin.has_value() || coin->IsSpent() ||
                     (coin->IsCoinBase() &&
                      nMemPoolHeight - coin->GetHeight() <
-                         COINBASE_MATURITY)) {
+                         COINBASE_MATURITY) ||
+                    (coin->IsConfiscation() &&
+                     nMemPoolHeight - coin->GetHeight() <
+                         CONFISCATION_MATURITY)) {
                     txToRemove.insert(it);
                     break;
                 }
@@ -2048,7 +2051,7 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
     CTransactionRef ptx = GetCachedTransactionRef(outpoint);
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
-            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false, CFrozenTXOCheck::IsConfiscationTx(*ptx));
         }
         return {};
     }

@@ -1858,6 +1858,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             "     ]\n"
             "  },\n"
             "  \"coinbase\" : true|false   (boolean) Coinbase or not\n"
+            "  \"confiscation\" : true|false (boolean) Output of confiscation transaction or not\n"
             "}\n"
 
             "\nExamples:\n"
@@ -1902,6 +1903,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
                                IsGenesisEnabled(config, height), o);
             ret.push_back(Pair("scriptPubKey", o));
             ret.push_back(Pair("coinbase", coin.IsCoinBase()));
+            ret.push_back(Pair("confiscation", coin.IsConfiscation()));
         };
 
     if (fMempool) {

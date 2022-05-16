@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(negative_Consensus_CheckTxInputs)
 
     inputs.AddCoin(
         txTemplate.vin[0].prevout,
-        CoinWithScript::MakeOwning(CTxOut{Amount{3}, {}}, 1, false),
+        CoinWithScript::MakeOwning(CTxOut{Amount{3}, {}}, 1, false, false),
         false,
         0);
 
@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(confiscationTransaction_CheckTxInputs)
     CCoinsViewCache inputs{dummy};
     inputs.AddCoin(
         ctxTemplate.vin[0].prevout,
-        CoinWithScript::MakeOwning(CTxOut{Amount{3}, {}}, 1, false),
+        CoinWithScript::MakeOwning(CTxOut{Amount{3}, {}}, 1, false, false),
         false,
         0);
 

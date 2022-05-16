@@ -625,7 +625,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
             // and Genesis activation height is 1, effectively using Genesis rules. 
             // This basically means, that output script starting with OP_RETURN will
             // be treated as possibly spendable.
-            view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), 1, false), true, 1);
+            view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), 1, false, false), true, 1);
         }
 
         // If redeemScript given and private keys given, add redeemScript to the
