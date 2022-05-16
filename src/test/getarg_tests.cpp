@@ -142,6 +142,20 @@ BOOST_AUTO_TEST_CASE(intarg) {
     BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7, 10), 70);
 }
 
+BOOST_AUTO_TEST_CASE(doublearg)
+{
+    ResetArgs("");
+    BOOST_CHECK_EQUAL(gArgs.GetDoubleArg("-foo", 11.5), 11.5);
+    BOOST_CHECK_EQUAL(gArgs.GetDoubleArg("-foo", 0.0), 0.0);
+
+    ResetArgs("-foo -bar");
+	BOOST_CHECK_EQUAL(gArgs.GetDoubleArg("-foo",11.5),11.5);
+	BOOST_CHECK_EQUAL(gArgs.GetDoubleArg("-bar",11.5),11.5);
+    ResetArgs("-foo=11.5 -bar=12.5");
+    BOOST_CHECK_EQUAL(gArgs.GetDoubleArg("-foo", 0), 11.5);
+    BOOST_CHECK_EQUAL(gArgs.GetDoubleArg("-bar", 11.5), 12.5);
+}
+
 BOOST_AUTO_TEST_CASE(doubledash) {
     ResetArgs("--foo");
     BOOST_CHECK_EQUAL(gArgs.GetBoolArg("-foo", false), true);

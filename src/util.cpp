@@ -268,6 +268,30 @@ int64_t ArgsManager::GetArg(const std::string& strArg, int64_t nDefault) {
     return returnValue;
 }
 
+double ArgsManager::GetDoubleArg(const std::string& strArg, double dDefault)
+{
+    LOCK(cs_args);
+    double retValue { dDefault };
+    if (mapArgs.count(strArg))
+    {
+        const std::string& argValue { mapArgs[strArg] };
+        if(argValue.find_first_not_of("\t\r\n\f ") != std::string::npos)
+        {
+            try
+            {
+                retValue = std::stod(argValue);
+            }
+            catch (std::exception& e)
+            {
+                std::string argError = "\nArgsManager::GetArg '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
+                PrintExceptionContinue(&e, argError.c_str());
+            }
+        }
+    }
+
+    return retValue;
+}
+
 int64_t ArgsManager::GetArgAsBytes(const std::string& strArg, int64_t nDefault, int64_t nMultiples) {
     LOCK(cs_args);
     int64_t returnValue(nDefault * nMultiples);
