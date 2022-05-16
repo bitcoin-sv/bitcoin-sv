@@ -714,8 +714,8 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
     mempool.RemoveForBlock({block_tx},
                            mining::CJournalChangeSetPtr{},
                            block_hash,
-                           vtx);
-
+                           vtx,
+                           GlobalConfig::GetConfig());
     BOOST_CHECK_EQUAL(0, mempool.Size());
 
     test_validator::notifications_type
