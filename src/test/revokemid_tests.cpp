@@ -49,6 +49,9 @@ namespace
             return { revocationKey, minerIdKey, minerIdToRevoke.GetPubKey() };
         }
     }
+
+    // For ID only
+    struct revokemid_tests;
 }
 
 // RevokeMid class inspection

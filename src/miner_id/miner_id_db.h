@@ -25,6 +25,7 @@ class CBlock;
 class Config;
 class CScheduler;
 class MinerId;
+class RevokeMid;
 class UniValue;
 
 /**
@@ -43,7 +44,9 @@ class MinerIdDatabase final
     MinerIdDatabase& operator=(const MinerIdDatabase&) = delete;
     MinerIdDatabase& operator=(MinerIdDatabase&&) = delete;
 
-    // Trigger a database sync to the blockchain
+    /**
+     *  Trigger a database sync to the blockchain.
+     */
     void TriggerSync(bool fromScratch, bool fromGenesis);
 
     /**
@@ -63,6 +66,12 @@ class MinerIdDatabase final
      * Check for a miner ID coinbase document and update the database accordingly.
      */
     void InvalidBlock(const CBlock& block, int32_t height);
+
+    /**
+     * Process a P2P revokemid message.
+     * Chaeck message and update the database accordingly.
+     */
+    void ProcessRevokemidMessage(const RevokeMid& msg);
 
     /**
      * Does a miner with the specifed id have a good reputation?

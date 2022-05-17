@@ -96,6 +96,10 @@ class RevokeMid
         }
     }
 
+    // Unit testing support
+    template <typename T>
+    struct UnitTestAccess;
+
   private:
 
     // Protocol version for this message
