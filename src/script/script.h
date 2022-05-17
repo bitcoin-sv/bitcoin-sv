@@ -308,6 +308,7 @@ bool IsP2SH(bsv::span<const uint8_t>);
 bool IsDSNotification(bsv::span<const uint8_t>);
 bool IsDustReturnScript(bsv::span<const uint8_t> script);
 bool IsMinerId(bsv::span<const uint8_t> script);
+bool IsMinerInfo(bsv::span<const uint8_t> script);
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 
