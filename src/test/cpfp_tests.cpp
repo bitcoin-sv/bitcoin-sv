@@ -623,11 +623,11 @@ namespace
         return mtx;
     }
 
-    std::unique_ptr<CTransaction> MakeTx(const std::vector<COutPoint>& inputs,
+    std::unique_ptr<const CTransaction> MakeTx(const std::vector<COutPoint>& inputs,
                                          const size_t nOutputs=0)
     {
         const CMutableTransaction mtx{MakeMutableTx(inputs)};
-        return std::make_unique<CTransaction>(mtx);
+        return std::make_unique<const CTransaction>(mtx);
     }
     
     CTxMemPoolEntry MakeMemPoolEntry(const std::vector<COutPoint>& inputs,
@@ -644,6 +644,15 @@ namespace
     
     struct test_validator : CValidationInterface
     {
+        test_validator()
+        {
+            RegisterValidationInterface(this);
+        }
+        ~test_validator()
+        {
+            UnregisterValidationInterface(this);
+        }
+
         void TransactionRemovedFromMempool(
             const uint256& txid,
             MemPoolRemovalReason reason,
@@ -652,10 +661,10 @@ namespace
             notifications_.emplace_back(txid, reason, conflictedWith);
         }
 
-        using tofan_type = std::tuple<uint256,
-                                      MemPoolRemovalReason,
-                                      std::optional<CTransactionConflictData>>;
-        using notifications_type = std::vector<tofan_type>;
+        using value_type  = std::tuple<uint256,
+                                       MemPoolRemovalReason,
+                                       std::optional<CTransactionConflictData>>;
+        using notifications_type = std::vector<value_type>;
         notifications_type notifications_;
     };
 }
@@ -665,7 +674,6 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
     using namespace std;
 
     test_validator validator;
-    RegisterValidationInterface(&validator);
     CTxMemPool mempool;
 
     // generate multiple outpoints to spend from the same txid
@@ -680,7 +688,7 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
                });
 
     // make a tx for the incoming block
-    const shared_ptr<CTransaction> block_tx = MakeTx(double_spent_ops); 
+    const shared_ptr<const CTransaction> block_tx = MakeTx(double_spent_ops); 
    
     // make a parent tx for the mempool 
     const auto mempool_entry_parent = MakeMemPoolEntry(double_spent_ops, 1);
@@ -701,14 +709,15 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
                          TxStorage::memory,
                          {});
 
+    const uint256 block_hash;
     vector<shared_ptr<const CTransaction>> vtx;
     mempool.RemoveForBlock({block_tx},
                            mining::CJournalChangeSetPtr{},
-                           uint256{},
+                           block_hash,
                            vtx);
+
     BOOST_CHECK_EQUAL(0, mempool.Size());
 
-    const TxId block_hash;
     test_validator::notifications_type
         expected{{child_txid,
                   MemPoolRemovalReason::CONFLICT,
