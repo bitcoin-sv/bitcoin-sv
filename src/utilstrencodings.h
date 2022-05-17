@@ -121,7 +121,7 @@ template <typename T>
 void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
 {
     std::string rv;
-    writer.ReserveAdditional((itend - itbegin) * 2);
+    writer.ReserveAdditional((itend - itbegin) * (fSpaces ? 3 : 2));
     for (T it = itbegin; it < itend; ++it)
     {
         uint8_t val = uint8_t(*it);

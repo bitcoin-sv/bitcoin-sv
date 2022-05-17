@@ -1534,7 +1534,7 @@ static UniValue sendrawtransaction(const Config &config,
             nMaxRawTxFee);                 // nAbsurdFee
     // Check if transaction is already received through p2p interface,
     // and thus, couldn't be added to the TxIdTracker.
-
+    bool fKnownTxn { !pTxInputData->IsTxIdStored() };
     // Check if txn is present in one of the mempools.
     auto txid_in_mempool = [&]()
     {
@@ -1542,21 +1542,19 @@ static UniValue sendrawtransaction(const Config &config,
             || mempool.getNonFinalPool().exists(txid);
     };
 
-    if (dontCheckFee && (txid_in_mempool() || !pTxInputData->IsTxIdStored()))
+    if (dontCheckFee && txid_in_mempool())
     {
-        CTxPrioritizer txPrioritizer{mempool, txid};
-        LogPrint(BCLog::TXNSRC, "got txn via rpc sendrawtransaction after same tx arrived from relaying: %s txnsrc user=%s\n",
+        LogPrint(BCLog::TXNSRC, "got in-mempool txn to prioritise: %s txnsrc-user=%s\n",
                  txid.ToString(), request.authUser.c_str());
+        CTxPrioritizer txPrioritizer{mempool, txid};
 
         return txid.GetHex();
     }
-    if (!pTxInputData->IsTxIdStored()) {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED,
-                           strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
-    }
-    
-    if (!txid_in_mempool()) 
-    {
+    if (!txid_in_mempool()) {
+        // Mempool Journal ChangeSet
+        CJournalChangeSetPtr changeSet {
+            mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
+        };
         // Prioritise transaction (if it was requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction,
         //   if the prioritised txn was not accepted by the mempool
@@ -1622,9 +1620,20 @@ static UniValue sendrawtransaction(const Config &config,
     // - this txn is final version of timelocked txn and is still being validated
     if (!txinfo.IsNull()){
         g_connman->EnqueueTransaction({ inv, txinfo });
+        LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
+            inv.hash.ToString(), request.authUser.c_str());
+    }
+    if (fKnownTxn) {
+        const auto& p2pOrphans = g_connman->getTxnValidator()->getOrphanTxnsPtr().get();
+        // Remove the tx duplicate if it exists in the p2p orphan pool
+        // (further explained in the batch counterpart of this interface)
+        if (p2pOrphans->checkTxnExists(txid)) {
+            p2pOrphans->eraseTxn(txid);
+            LogPrint(BCLog::TXNSRC, "txn= %s duplicate removed from the p2p orphan pool\n", txid.ToString());
+        }
     }
 
-    LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
+    LogPrint(BCLog::TXNSRC, "Processing completed: txn= %s txnsrc-user=%s\n",
         inv.hash.ToString(), request.authUser.c_str());
 
     return txid.GetHex();
@@ -1905,6 +1914,12 @@ void sendrawtransactions(const Config& config,
     std::vector<TxId> vTxListUnconfirmedAncestors {};
     // A vector of transactions that did not passed validation
     std::vector<RawTxValidator::RawTxValidatorResult> invalidTxs;
+    // Store TxId of transactions pre-existed in the node's internal buffers
+    // (in memory but not in the mempool).
+    // The pre-existed transactions are transactions from the request which were:
+    // (a) enqueued to be processed asynchronously, or
+    // (b) validated asynchronously and detected as p2p orphan txs (they didn't end up in the mempool)
+    std::unordered_set<TxId, std::hash<TxId>> usetP2PEnqueuedTxIds {};
     
     /**
      * Parse an input data
@@ -2003,9 +2018,8 @@ void sendrawtransactions(const Config& config,
 
         // Choose which TransactionSpecificConfig to use (if per transaction is set -> use it, else use per function call tsc or null if not provided)
         std::shared_ptr<TransactionSpecificConfig> transactionConfig = (tsc == nullptr) ? global_tsc : tsc;
-
-        // Create an object with transaction's input data.
-        std::unique_ptr<CTxInputData> pTxInputData =
+        // Add transaction to the vector.
+        const auto& txInputData = vTxInputData.emplace_back(
             std::make_unique<CTxInputData>(
                 g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
                 std::move(tx),                  // a pointer to the tx
@@ -2016,31 +2030,37 @@ void sendrawtransactions(const Config& config,
                 nMaxRawTxFee,                   // nAbsurdFee
                 std::weak_ptr<CNode>(),         // pNode
                 false,                          // fOrphan
-                transactionConfig);             // transaction specific config
-
-        // Check if transaction is already known
-        // - received through p2p interface or present in the mempools
-        if (!pTxInputData->IsTxIdStored()) {
-            if (fTxToPrioritise) {
-                vTxToPrioritise.emplace_back(txid);
-            } else {
-                vKnownTxns.emplace_back(txid);
-            }
-        // Move it to the vector of transactions awaiting to be processed
-        } else {
-            vTxInputData.emplace_back(std::move(pTxInputData));
-            // Check if txn needs to be prioritised
-            if (fTxToPrioritise) {
-                vTxToPrioritise.emplace_back(txid);
-            }
-            // Remember a transaction for which we want to list its unconfirmed ancestors
-            if (listUnconfirmedAncestors)
-            {
-                vTxListUnconfirmedAncestors.emplace_back(txid);
-            }
+                transactionConfig)              // transaction specific config
+        );
+        // Check if txn pre-existed in the node's internal buffers.
+        if (!txInputData->IsTxIdStored()) {
+            usetP2PEnqueuedTxIds.insert(txid);
+        }
+        // Check if txn needs to be prioritised
+        if (fTxToPrioritise) {
+            vTxToPrioritise.emplace_back(txid);
+        }
+        // Remember a transaction for which we want to list its unconfirmed ancestors
+        if (listUnconfirmedAncestors)
+        {
+            vTxListUnconfirmedAncestors.emplace_back(txid);
         }
     }
 
+    /**
+     * 1. Collect invalid and evicted transactions from the request.
+     *
+     * 2. Enqueue INVs.
+     *
+     * Conditions to send an inventory network message for a transaction from the request:
+     * (a) a tx can not be rejected by tx validation
+     * (b) a tx can not be evicted from the mempool while the request is being processed
+     *
+     * The above conditions ensure that a transaction from the request ended up in the mempool
+     * when the batch validation finishes.
+     *
+     * 3. Remove tx duplicates from the p2p orphan pool if any were detected.
+     */
     std::vector<TxId> evictedTxs;
     {
         // Prioritise transactions (if any were requested to prioritise)
@@ -2049,49 +2069,59 @@ void sendrawtransactions(const Config& config,
         CTxPrioritizer txPrioritizer{mempool, std::move(vTxToPrioritise)};
         
         auto resultVec = g_connman->getRawTxValidator()->SubmitMany(vTxInputData);
+        const auto& p2pOrphans = g_connman->getTxnValidator()->getOrphanTxnsPtr().get();
+        auto removeP2POrphanTxDupIfExists = [&p2pOrphans, &usetP2PEnqueuedTxIds](const TxId& txid) {
+            // The below instruction is added to check/remove if a duplicate exists in the p2p orphan pool
+            // (despite the fact that the p2p orphan pool is able to detect and evict expired txs).
+            //
+            // Note: The current split between the synchronous and asynchronous tx validation interface doesn't
+            // allow the synchronous batch processing to interfere into the p2p orphan pool to:
+            // (a) detect and remove a tx duplicate from the p2p orphan pool during the synchronous tx processing, or
+            // (b) detect and reprocess any p2p orphans for which the parent is being added to the mempool by the synchronous request
+            if (usetP2PEnqueuedTxIds.find(txid) != usetP2PEnqueuedTxIds.end() && p2pOrphans->checkTxnExists(txid)) {
+                p2pOrphans->eraseTxn(txid);
+                LogPrint(BCLog::TXNSRC, "txn= %s duplicate removed from the p2p orphan pool\n", txid.ToString());
+            }
+        };
 
         for (auto& resultFuture: resultVec)
         {
             auto result = resultFuture.get();
-            
-            TxMempoolInfo txinfo {};
-            if(mempool.Exists(result.txid))
-            {
-                txinfo = mempool.Info(result.txid);
-            }
-            else if(mempool.getNonFinalPool().exists(result.txid)) 
-            {
-                txinfo = mempool.getNonFinalPool().getInfo(result.txid);
-            }
-            // It is possible that txn was added and removed from the mempool, because:
-            // - a block was mined
-            // - PTV's asynch mode removed txn(s)
-            if (txinfo.GetTx() != nullptr)
-            {
-                CInv inv(MSG_TX, result.txid);
-                g_connman->EnqueueTransaction({ inv, txinfo });
-                LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
-                            inv.hash.ToString(), request.authUser.c_str());
-            }
-            else if (result.state.has_value())
-            {
+
+            if (result.state.has_value()) {
                 invalidTxs.push_back(result);
             }
-            else if (result.evicted)
-            {
+            else if (result.evicted) {
                 evictedTxs.push_back(result.txid);
+                removeP2POrphanTxDupIfExists(result.txid);
+            } else {
+                // At this stage it is possible that the given tx was removed from the mempool, because:
+                // (a) a new block was connected (mined by the node or received from its peer)
+                // (b) the PTV's asynch mode removed the tx to make a room for another tx paying a higher tx fee
+                // We want to minimise the number of false-possitive inv messages so recheck if the tx is still present in the mempool.
+                TxMempoolInfo txinfo {};
+                if(mempool.Exists(result.txid)) {
+                    txinfo = mempool.Info(result.txid);
+                }
+                else if(mempool.getNonFinalPool().exists(result.txid)) {
+                    txinfo = mempool.getNonFinalPool().getInfo(result.txid);
+                }
+                if (txinfo.GetTx() != nullptr) {
+                    CInv inv(MSG_TX, result.txid);
+                    g_connman->EnqueueTransaction({ inv, txinfo });
+                    LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
+                        inv.hash.ToString(), request.authUser.c_str());
+                    removeP2POrphanTxDupIfExists(result.txid);
+                }
             }
         }
     }
-
 
     /**
      * Construct and return a result set, as a json object with rejected txids, which contains:
      *
      * 1. txid of a transaction which was detected as already known:
      *   - exists in the mempool
-     *   - stored in ptv queues
-     *   - stored as an orphan txn received through p2p interface
      * 2. txid of an invalid transaction, including validation state information:
      *   - reject code
      *   - reject reason
@@ -2141,6 +2171,9 @@ void sendrawtransactions(const Config& config,
     {
         httpReq->StopWritingChunks();
     }
+
+    LogPrint(BCLog::TXNSRC, "Processing completed: batch size= %ld, user=%s\n",
+        inputs.size(), request.authUser.c_str());
 }
 
 static UniValue getmerkleproof(const Config& config,

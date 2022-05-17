@@ -47,4 +47,3 @@ void encode_hex_tx(benchmark::State& state)
 }
 BENCHMARK(encode_hex_tx);
 
-

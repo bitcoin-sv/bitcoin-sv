@@ -304,6 +304,24 @@ enum class MemPoolRemovalReason {
     FROZEN_INPUT
 };
 
+inline const enumTableT<MemPoolRemovalReason>& enumTable(MemPoolRemovalReason)
+{
+    static enumTableT<MemPoolRemovalReason> table
+    {
+        {MemPoolRemovalReason::UNKNOWN, "UNKNOWN"},
+        {MemPoolRemovalReason::EXPIRY, "EXPIRY"},
+        {MemPoolRemovalReason::SIZELIMIT, "SIZELIMIT"},
+        {MemPoolRemovalReason::REORG, "REORG"},
+        {MemPoolRemovalReason::BLOCK, "BLOCK"},
+        {MemPoolRemovalReason::CONFLICT, "CONFLICT"},
+        {MemPoolRemovalReason::REPLACED, "REPLACED"},
+        {MemPoolRemovalReason::FROZEN_INPUT, "FROZEN_INPUT"},
+    };
+    return table;
+}
+
+std::ostream& operator<<(std::ostream&, const MemPoolRemovalReason&);
+
 struct DisconnectedBlockTransactions;
 
 struct CTransactionConflictData {
