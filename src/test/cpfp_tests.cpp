@@ -644,6 +644,15 @@ namespace
     
     struct test_validator : CValidationInterface
     {
+        test_validator()
+        {
+            RegisterValidationInterface(this);
+        }
+        ~test_validator()
+        {
+            UnregisterValidationInterface(this);
+        }
+
         void TransactionRemovedFromMempool(
             const uint256& txid,
             MemPoolRemovalReason reason,
@@ -665,7 +674,6 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
     using namespace std;
 
     test_validator validator;
-    RegisterValidationInterface(&validator);
     CTxMemPool mempool;
 
     // generate multiple outpoints to spend from the same txid
