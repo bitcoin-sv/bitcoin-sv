@@ -148,6 +148,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	raii_event_tests.cpp
 	random_tests.cpp
 	reverselock_tests.cpp
+    revokemid_tests.cpp
 	rpc_tests.cpp
 	sanity_tests.cpp
 	scheduler_tests.cpp

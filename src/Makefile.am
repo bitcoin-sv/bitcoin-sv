@@ -159,6 +159,7 @@ BITCOIN_CORE_H = \
   miner_id/miner_info_doc.h \
   miner_id/miner_info_error.h \
   miner_id/miner_info_ref.h \
+  miner_id/revokemid.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -329,6 +330,7 @@ libbitcoin_server_a_SOURCES = \
   miner_id/miner_info_doc.cpp \
   miner_id/miner_info_error.cpp \
   miner_id/miner_info_ref.cpp \
+  miner_id/revokemid.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
