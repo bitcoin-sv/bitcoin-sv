@@ -38,8 +38,8 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
     TransactionListByPosition& index1 { mTransactions.get<1>() };
 
     // For REORGs we need to remember the current start position
-    TransactionListByPosition::const_iterator begin1 {};
-    TransactionListByName::const_iterator begin0 {};
+    TransactionListByPosition::const_iterator begin1 { index1.end() };
+    TransactionListByName::const_iterator begin0 { index0.end() };
     bool isReorg { changeSet.getUpdateReason() == JournalUpdateReason::REORG };
     if(isReorg)
     {
