@@ -22,11 +22,9 @@
 #include "validation.h"
 #include "validationinterface.h"
 #include "txn_validator.h"
-#include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
-#include <config.h>
-
 #include <boost/uuid/random_generator.hpp>
+#include <exception>
 
 using namespace mining;
 
@@ -2108,6 +2106,20 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
     removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
     return stage.size();
+}
+
+int CTxMemPool::RemoveMinerIdTx(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    auto it = mapTx.get<transaction_id>().find(txid);
+    if (it != mapTx.get<transaction_id>().end()) {
+        setEntries stage;
+        stage.insert(it);
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
+        return stage.size();
+    }
+    return 0;
 }
 
 std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const

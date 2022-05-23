@@ -148,6 +148,9 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"echojson", 7, "arg7"},
     {"echojson", 8, "arg8"},
     {"echojson", 9, "arg9"},
+    {"createminerinfotx", 0, "minerinfo"},
+    {"replaceminerinfotx", 0, "minerinfo"},
+    {"setminerinfotxfundingoutpoint", 1, "n"},
 };
 
 class CRPCConvertTable {

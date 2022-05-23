@@ -18,6 +18,7 @@
 #include "tx_mempool_info.h"
 #include "txn_validation_data.h"
 #include "policy/policy.h"
+#include "miner_id/miner_info_tracker.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
@@ -901,6 +902,11 @@ public:
      * than time. Return the number of removed transactions. */
     int Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet);
 
+    /** Remove one transaction from the mempool and assume no children.
+     * This is needed for replacement mineridinfo transactions */
+    int RemoveMinerIdTx(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet);
+
+
     /**
      * Check for conflicts with in-mempool transactions.
      * @param tx A reference to the given txn
@@ -1293,6 +1299,7 @@ public:
 
     /** Load the mempool from disk. */
     bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
+    mining::MinerInfoTxTracker minerInfoTxTracker;
 };
 
 // Group definition in the secondary mempool.

@@ -3269,9 +3269,16 @@ CConnman::GetCompactExtraTxns() const {
 }
 
 /** Enqueue a new transaction for later sending to our peers */
-void CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
+bool CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {
+    {
+        // do not relay minerinfoid transactions
+        std::optional<TxId> const info_txid = mempool.minerInfoTxTracker.current_txid();
+        if (info_txid && *info_txid == txn.getInfo().GetTxId())
+            return false;
+    }
     mTxnPropagator->newTransaction(txn);
+    return true;
 }
 
 /** Remove some transactions from our peers list of new transactions */

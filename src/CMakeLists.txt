@@ -443,6 +443,8 @@ add_library(server
 	miner_id/coinbase_doc.h
 	miner_id/miner_id.cpp
 	miner_id/miner_id.h
+	miner_id/miner_info_tracker.cpp
+	miner_id/miner_info_tracker.h
     miner_id/miner_id_db.cpp
     miner_id/miner_id_db.h
     miner_id/miner_id_db_defaults.h
@@ -503,6 +505,7 @@ add_library(server
 	rpc/mining-fbb.cpp
 	rpc/mining.cpp
 	rpc/mining.h
+	rpc/miner_info.cpp
 	rpc/misc.cpp
 	rpc/misc.h
 	rpc/net.cpp

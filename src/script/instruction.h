@@ -6,6 +6,7 @@
 
 #include "script.h"
 #include "span.h"
+#include "utilstrencodings.h"
 
 #include <iostream>
 
@@ -47,9 +48,14 @@ namespace bsv
     inline constexpr bool operator==(const instruction& a,
                                      const instruction& b) noexcept
     {
-        return a.opcode() == b.opcode() &&
-               a.operand().data() == b.operand().data() &&
-               a.operand().size() == b.operand().size();
+        if (a.opcode() != b.opcode() || a.operand().size() != b.operand().size())
+            return false;
+
+        for (size_t i = 0; i < a.operand().size(); ++i)
+            if (a.operand()[i] != b.operand()[i])
+                return false;
+
+        return true;
     }
 
     inline constexpr bool operator!=(const instruction& a,
@@ -60,8 +66,12 @@ namespace bsv
 
     inline std::ostream& operator<<(std::ostream& os, const instruction& inst)
     {
-        os << inst.opcode() << ' ' << (void*)inst.operand().data() << ' '
-           << inst.operand().size();
+        os << inst.opcode() << ' ';
+        if (inst.operand().size()) {
+            os << HexStr(inst.operand().data(), inst.operand().data() + inst.operand().size()) << ' ' << inst.operand().size();
+        } else {
+            os << "nodata";
+        }
         return os;
     }
 }
