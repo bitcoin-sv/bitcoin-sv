@@ -410,6 +410,11 @@ extern const char *DSDETECTED;
  * Contains an extended message (one which may exceed 4GB in size).
  */
 extern const char *EXTMSG;
+/**
+ * The revokemid message is an early notification that the contained miner ID
+ * should be revoked.
+ */
+extern const char *REVOKEMID;
 
 /**
  * Indicate if the message is used to transmit the content of a block.

@@ -47,6 +47,7 @@ const char *CREATESTREAM = "createstrm";
 const char *STREAMACK = "streamack";
 const char *DSDETECTED = "dsdetected";
 const char *EXTMSG = "extmsg";
+const char *REVOKEMID = "revokemid";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
