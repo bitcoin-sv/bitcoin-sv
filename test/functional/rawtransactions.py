@@ -78,7 +78,13 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         # This will raise an exception since there are missing inputs
         assert_raises_rpc_error(
-            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'])
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex']) # allowhighfees=False, dontcheckfee=False
+        assert_raises_rpc_error(
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'], False, True) # dontcheckfee=True
+        assert_raises_rpc_error(
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'], True, False) # allowhighfees=True
+        assert_raises_rpc_error(
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'], True, True) # allowhighfees=True, dontcheckfee=True
 
         #
         # RAW TX MULTISIG TESTS #

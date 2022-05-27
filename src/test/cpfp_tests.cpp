@@ -11,9 +11,37 @@
 #include "mining/journal_builder.h"
 #include "mining/journal_change_set.h"
 #include "mining/assembler.h"
+#include "validationinterface.h"
 
 #include "test/test_bitcoin.h"
 #include "test/mempool_test_access.h"
+
+bool operator==(const CTransactionConflictData& a, const CTransactionConflictData& b)
+{
+    return *a.conflictedWith == *b.conflictedWith &&
+           *a.blockhash == *b.blockhash;
+}
+
+std::ostream& operator<<(std::ostream& os, const CTransactionConflictData& conflict)
+{
+    os << (conflict.conflictedWith ? conflict.conflictedWith->ToString() : "nullptr");
+    os << ' ' << (conflict.blockhash ? conflict.blockhash->ToString() : "nullptr");
+    return os;
+}
+
+namespace std
+{
+    std::ostream& operator<<(
+        std::ostream& os,
+        const std::tuple<uint256,
+                         MemPoolRemovalReason,
+                         std::optional<CTransactionConflictData>>& x)
+    {
+        os << std::get<0>(x).ToString() << ' ' << std::get<1>(x) << ' '
+           << std::get<2>(x).value();
+        return os;
+    }
+}
 
 namespace{
 
@@ -568,6 +596,139 @@ BOOST_AUTO_TEST_CASE(conflicts)
     BOOST_CHECK(tx4->IsInPrimaryMempool());
     BOOST_CHECK(JournalTester(journal).checkTxnExists(JournalEntry{*tx4}));
     BOOST_CHECK(mempool.GetTransactions().size() == 1);
+}
+
+namespace
+{
+    void generate_outputs(CMutableTransaction& mtx, const size_t nOutputs)
+    {
+        CScript script;
+        script << OP_TRUE;
+        mtx.vout.reserve(mtx.vout.size() + nOutputs);
+        std::generate_n(back_inserter(mtx.vout), nOutputs, [&script]()
+        {
+            return CTxOut{Amount{1}, script};
+        });
+    }
+
+    CMutableTransaction MakeMutableTx(const std::vector<COutPoint>& inputs,
+                                      const size_t nOutputs=0)
+    {
+        CMutableTransaction mtx;
+        std::transform(inputs.begin(),
+                       inputs.end(),
+                       std::back_inserter(mtx.vin),
+                       [](const auto& ip) { return CTxIn{ip}; });
+        generate_outputs(mtx, nOutputs);
+        return mtx;
+    }
+
+    std::unique_ptr<const CTransaction> MakeTx(const std::vector<COutPoint>& inputs,
+                                         const size_t nOutputs=0)
+    {
+        const CMutableTransaction mtx{MakeMutableTx(inputs)};
+        return std::make_unique<const CTransaction>(mtx);
+    }
+    
+    CTxMemPoolEntry MakeMemPoolEntry(const std::vector<COutPoint>& inputs,
+                                     const size_t nOutputs=0)
+    {
+        const CMutableTransaction mtx{MakeMutableTx(inputs, nOutputs)};
+        return CTxMemPoolEntry{std::make_shared<const CTransaction>(mtx),
+                               Amount{},
+                               int64_t(0),
+                               false,
+                               false,
+                               LockPoints()};
+    }
+    
+    struct test_validator : CValidationInterface
+    {
+        test_validator()
+        {
+            RegisterValidationInterface(this);
+        }
+        ~test_validator()
+        {
+            UnregisterValidationInterface(this);
+        }
+
+        void TransactionRemovedFromMempool(
+            const uint256& txid,
+            MemPoolRemovalReason reason,
+            const std::optional<CTransactionConflictData>& conflictedWith) override
+        {
+            notifications_.emplace_back(txid, reason, conflictedWith);
+        }
+
+        using value_type  = std::tuple<uint256,
+                                       MemPoolRemovalReason,
+                                       std::optional<CTransactionConflictData>>;
+        using notifications_type = std::vector<value_type>;
+        notifications_type notifications_;
+    };
+}
+
+BOOST_AUTO_TEST_CASE(double_spend_notifications)
+{
+    using namespace std;
+
+    test_validator validator;
+    CTxMemPool mempool;
+
+    // generate multiple outpoints to spend from the same txid
+    const auto txid = MakeId(1);
+    uint32_t i{};
+    vector<COutPoint> double_spent_ops;
+    constexpr size_t n_double_spent_ops{3};
+    generate_n(back_inserter(double_spent_ops),
+               n_double_spent_ops,
+               [&i, &txid]() {
+                   return COutPoint{txid, ++i};
+               });
+
+    // make a tx for the incoming block
+    const shared_ptr<const CTransaction> block_tx = MakeTx(double_spent_ops); 
+   
+    // make a parent tx for the mempool 
+    const auto mempool_entry_parent = MakeMemPoolEntry(double_spent_ops, 1);
+    const auto parent_tx = mempool_entry_parent.GetSharedTx().get();
+    const auto parent_txid = parent_tx->GetId();
+    mempool.AddUnchecked(parent_txid, 
+                         mempool_entry_parent,
+                         TxStorage::memory,
+                         {});
+
+    // make a child tx for the mempool
+    const std::vector<COutPoint> outpoints{ {parent_tx->GetId(), 0} };
+    const auto mempool_entry_child = MakeMemPoolEntry(outpoints);
+    const auto child_tx = mempool_entry_child.GetSharedTx().get();
+    const auto child_txid = child_tx->GetId();
+    mempool.AddUnchecked(child_txid, 
+                         mempool_entry_child,
+                         TxStorage::memory,
+                         {});
+
+    const uint256 block_hash;
+    vector<shared_ptr<const CTransaction>> vtx;
+    mempool.RemoveForBlock({block_tx},
+                           mining::CJournalChangeSetPtr{},
+                           block_hash,
+                           vtx,
+                           GlobalConfig::GetConfig());
+    BOOST_CHECK_EQUAL(0, mempool.Size());
+
+    test_validator::notifications_type
+        expected{{child_txid,
+                  MemPoolRemovalReason::CONFLICT,
+                  CTransactionConflictData{block_tx.get(), &block_hash}},
+                 {parent_txid,
+                  MemPoolRemovalReason::CONFLICT,
+                  CTransactionConflictData{block_tx.get(), &block_hash}}};
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.begin(),
+                                  expected.end(),
+                                  validator.notifications_.begin(),
+                                  validator.notifications_.end());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
