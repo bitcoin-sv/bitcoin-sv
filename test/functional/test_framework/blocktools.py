@@ -6,11 +6,13 @@
 from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.comptool import TestInstance
 from .mininode import *
-from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160
-from .util import assert_equal, assert_raises_rpc_error, hash256
+from .script import CScript, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160, OP_0
+from .util import assert_equal, assert_raises_rpc_error, hash256, satoshi_round
 from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
 
 from collections import deque
+
+import json
 
 # Create a block (with regtest difficulty)
 
@@ -194,6 +196,193 @@ def make_block(connection, parent_block=None, makeValid=True, last_block_time=0)
     block.height = parent_height + 1
     block.solve()
     return block, block.nTime
+
+# Parameters to describe a miner ID
+class MinerIDParams():
+    def __init__(self, blockHeight, minerId, minerIdPub, revocationKey, revocationKeyPub, prevMinerId=None,
+                 prevMinerIdPub=None, prevRevocationKey=None, prevRevocationKeyPub=None, revocationMessageCurMinerId=None,
+                 revocationMessage=None):
+        self.blockHeight = blockHeight
+        self.minerId = minerId
+        self.minerIdPub = minerIdPub
+        self.revocationKey = revocationKey
+        self.revocationKeyPub = revocationKeyPub
+
+        if prevMinerId:
+            self.prevMinerId = prevMinerId
+        else:
+            self.prevMinerId = minerId
+
+        if prevMinerIdPub:
+            self.prevMinerIdPub = prevMinerIdPub
+        else:
+            self.prevMinerIdPub = minerIdPub
+
+        if prevRevocationKey:
+            self.prevRevocationKey = prevRevocationKey
+        else:
+            self.prevRevocationKey = revocationKey
+
+        if prevRevocationKeyPub:
+            self.prevRevocationKeyPub = prevRevocationKeyPub
+        else:
+            self.prevRevocationKeyPub = revocationKeyPub
+
+        if revocationMessageCurMinerId and revocationMessage and revocationKey:
+            self.revocationMessage = { "compromised_minerId" : bytes_to_hex_str(revocationMessage) }
+            sig1 = create_miner_id_signature(revocationKey, revocationMessage)
+            sig2 = create_miner_id_signature(revocationMessageCurMinerId, revocationMessage)
+            self.revocationMessageSig = { "sig1" : bytes_to_hex_str(sig1), "sig2" : bytes_to_hex_str(sig2) } 
+        else:
+            self.revocationMessageCurMinerId = None
+            self.revocationMessage = None
+
+# Sign a document for miner ID
+def create_miner_id_signature(signing_key, document):
+    digest = sha256(document)
+    return signing_key.sign_digest(digest, sigencode=ecdsa.util.sigencode_der)
+
+# Create a miner-info transaction containing the miner ID document
+def create_miner_info_txn(connection, params, utxo):
+    # Create basic raw transaction from UTXO
+    inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
+    outputs = {}
+    addr = connection.rpc.getnewaddress()
+    outputs[addr] = satoshi_round(utxo['amount'])
+    rawtx = connection.rpc.createrawtransaction(inputs, outputs)
+
+    # Create transaction we can modify
+    minerInfoTx = CTransaction()
+    minerInfoTx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
+
+    # Add miner-info document to output 0 of transaction
+    minerIdPub = bytes_to_hex_str(params.minerIdPub)
+    prevMinerIdPub = bytes_to_hex_str(params.prevMinerIdPub)
+    revocationKeyPub = bytes_to_hex_str(params.revocationKeyPub)
+    prevRevocationKeyPub = bytes_to_hex_str(params.prevRevocationKeyPub)
+    doc = {}
+    doc['version'] = '0.3'
+    doc['height'] = params.blockHeight
+    doc['minerId'] = minerIdPub
+    doc['prevMinerId'] = prevMinerIdPub
+    doc['revocationKey'] = revocationKeyPub
+    doc['prevRevocationKey'] = prevRevocationKeyPub
+
+    dataToSign = hex_str_to_bytes(prevMinerIdPub + minerIdPub)
+    signature = create_miner_id_signature(params.prevMinerId, dataToSign)
+    doc['prevMinerIdSig'] = bytes_to_hex_str(signature)
+
+    dataToSign = hex_str_to_bytes(prevRevocationKeyPub + revocationKeyPub)
+    signature = create_miner_id_signature(params.prevRevocationKey, dataToSign)
+    doc['prevRevocationKeySig'] = bytes_to_hex_str(signature)
+
+    if(params.revocationMessage):
+        doc['revocationMessage'] = params.revocationMessage
+        doc['revocationMessageSig'] = params.revocationMessageSig
+
+    docjson = json.dumps(doc, indent=0)
+    docjson = docjson.replace('\n', '')
+    docjson = docjson.replace(' ','')
+    docjson = docjson.encode('utf8')
+
+    signature = create_miner_id_signature(params.minerId, docjson)
+    minerInfoTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),
+                                               bytearray([0x00]), docjson, signature])))
+    minerInfoTx.vout[0], minerInfoTx.vout[1] = minerInfoTx.vout[1], minerInfoTx.vout[0]
+
+    # Sign transaction
+    signed = connection.rpc.signrawtransaction(ToHex(minerInfoTx))
+
+    # Return CTransaction
+    minerInfoTx.deserialize(BytesIO(hex_str_to_bytes(signed['hex'])))
+    minerInfoTx.calc_sha256()
+    return minerInfoTx
+
+# Calculate modified merkle root for blockbind
+def calc_blockbind_merkle_root(block):
+    # Copy coinbase so we can modify it
+    coinbase = copy.deepcopy(block.vtx[0])
+    coinbase.nVersion = 0x01000000
+    coinbase.vin[0].scriptSig = CScript([bytearray([0,0,0,0,0,0,0,0])])
+    coinbase.vin[0].prevout = COutPoint(0, 0xFFFFFFFF)
+    coinbase.rehash()
+
+    # Build list of transaction hashs
+    hashes = []
+    for tx in block.vtx:
+        tx.calc_sha256()
+        hashes.append(ser_uint256(tx.sha256))
+    hashes[0] = ser_uint256(coinbase.sha256)
+
+    return block.get_merkle_root(hashes)
+
+# Make a V0.3 compliant miner ID coinbase transaction and miner-info transaction
+def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, makeValid=True):
+    # Create miner-info txn and add to block
+    minerInfoTx = create_miner_info_txn(connection, params, utxo)
+    block.vtx.append(minerInfoTx)
+
+    # Get miner-info txn ID
+    txid = minerInfoTx.hash
+    txidbytes = hex_str_to_bytes(txid)[::-1]
+
+    # Create partially populated coinbase
+    coinbaseTx = block.vtx[0]
+    assert_equal(len(coinbaseTx.vout), 1)
+    coinbaseTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), bytearray([0x00]), txidbytes])))
+
+    # If we want an invalid block, screw up the fees
+    if not makeValid:
+        coinbaseTx.vout[1].nValue = 50
+    coinbaseTx.rehash()
+
+    # Calculate blockbind modified merkle root
+    modifiedMerkleRoot = calc_blockbind_merkle_root(block)
+    modifiedMerkleRootBytes = ser_uint256(modifiedMerkleRoot)
+
+    # Get parent block hash
+    parentHash = block.hashPrevBlock
+    parentHashBytes = ser_uint256(parentHash)
+
+    # Sign SHA256(concat(modifiedMerkleRoot, prevBlockHash))
+    concatMerklePrevBlockBytes = modifiedMerkleRootBytes + parentHashBytes
+    signature = create_miner_id_signature(params.minerId, concatMerklePrevBlockBytes)
+
+    # Append blockbind and signature
+    coinbaseTx.vout[1].scriptPubKey += sha256(concatMerklePrevBlockBytes)
+    coinbaseTx.vout[1].scriptPubKey += signature
+    coinbaseTx.rehash()
+
+    # Update block
+    block.hashMerkleRoot = block.calc_merkle_root()
+    block.rehash()
+
+# Make a V0.3 compliant miner ID block
+def make_miner_id_block(connection, params, utxo, parentBlock=None, makeValid=True, lastBlockTime=0, txns=None):
+    if parentBlock is not None:
+        parentHash = parentBlock.sha256
+        parentTime = parentBlock.nTime
+        parentHeight = parentBlock.height
+    else:
+        tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
+        parentHash = int(tip["hash"], 16)
+        parentTime = tip["time"]
+        parentHeight = tip["height"]
+
+    # Create block with temporary coinbase and any passed in txns
+    tmpCoinbase = create_coinbase(params.blockHeight)
+    block = create_block(parentHash, tmpCoinbase, max(lastBlockTime, parentTime) + 1)
+    if txns is not None:
+        block.vtx.extend(txns)
+
+    # Make real coinbase and miner-info txn and put them in the block
+    create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, makeValid=makeValid)
+
+    # Update block with height and solve
+    block.height = parentHeight + 1
+    block.solve()
+    return block
+
 
 def send_by_headers(conn, blocks, do_send_blocks):
     hash_block_map = {b.sha256: b for b in blocks}
