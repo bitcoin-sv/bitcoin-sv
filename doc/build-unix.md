@@ -104,7 +104,7 @@ ZMQ dependencies (provides ZMQ API 4.x):
 
     sudo apt-get install libzmq3-dev
 
-Dependency Build Instructions: Fedora/Centos
+Dependency Build Instructions: Fedora
 --------------------------------------------
 Build requirements:
 
@@ -305,57 +305,6 @@ Revert gcc to original version (optional)
     sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5* 60 \
                              --slave /usr/bin/g++ g++ /usr/bin/g++-5*
     sudo update-alternatives --config gcc
-
-Building on Centos 7
---------------------
-
-Note: to enable gcc-7 run the command `scl enable devtoolset-7 bash`. 
-RUN IT MANUALY because it doesn't work in a script!!!
-
-Note 2: When running bitcoind, it expects boost libreries in /usr/lib64 folder. Make sure that they are located there. See libbost instalation step for details.
-
-
-Install prerequisites
-
-    sudo yum install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel  libdb-devel libdb-cxx-devel -y
-    sudo yum install python3 -y
-    sudo yum install git -y
-    sudo yum install centos-release-scl -y
-    sudo yum install devtoolset-7-gcc* -y
-    sudo scl enable devtoolset-7 bash &
-
-
-Compile and install libboost
-
-    mkdir boost
-    cd boost
-    wget https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.gz
-    tar -xzvf boost_1_70_0.tar.gz
-    cd boost_1_70_0
-    ./bootstrap.sh
-    ./b2
-    sudo ./b2 install --prefix=/opt/boost_1_70
-    sudo echo "/opt/boost_1_70/lib" > /etc/ld.so.conf.d/boost_1_70.conf
-    sudo ldconfig
-
-    cd ../../
-
-
-Clone bitcoin-sv repo
-
-    git clone https://github.com/bitcoin-sv/bitcoin-sv
-
-
-Build bitcoin-sv
-
-    cd bitcoin-sv
-    ./autogen.sh
-    mkdir build
-    cd build
-    scl enable devtoolset-7 bash 
-    ../configure --with-boost=/opt/boost_1_70
-    make
-
 
 Building on FreeBSD
 --------------------
