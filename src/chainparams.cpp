@@ -157,10 +157,8 @@ public:
         // subset of possible options.
         // Bitcoin SV seeder
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "seed.bitcoinsv.io", true));
-        // cascharia.com
-        vSeeds.push_back(CDNSSeedData("cascharia.com", "seed.cascharia.com", true));
-        // satoshisvision.network
         vSeeds.push_back(CDNSSeedData("satoshisvision.network", "seed.satoshisvision.network", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory", "seed.bitcoinseed.directory", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 5);
@@ -303,6 +301,9 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "stn-seed.bitcoinsv.io", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory",
+                                      "stn-seed.bitcoinseed.directory",
+                                      true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -412,8 +413,12 @@ public:
         // nodes with support for servicebits filtering should be at the top
         // Bitcoin SV seeder
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "testnet-seed.bitcoinsv.io", true));
-        vSeeds.push_back(CDNSSeedData("cascharia.com", "testnet-seed.cascharia.com", true));
-        vSeeds.push_back(CDNSSeedData("bitcoincloud.net", "testnet-seed.bitcoincloud.net", true));
+        vSeeds.push_back(CDNSSeedData("bitcoincloud.net",
+                                      "testnet-seed.bitcoincloud.net",
+                                      true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory",
+                                      "testnet-seed.bitcoinseed.directory",
+                                      true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
