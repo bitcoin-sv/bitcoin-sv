@@ -362,7 +362,7 @@ class BitcoinTestFramework():
     #      self.node[0] ---> self.node[1]  ---> ... ---> self.node[n]
     #
     @contextlib.contextmanager
-    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True, p2pConnections=[0]):
+    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True, p2pConnections=[0], cb_class=NodeConnCB):
         if not title:
             title = "None"
         logger.debug("setup %s", title)
@@ -377,7 +377,7 @@ class BitcoinTestFramework():
         connections = []
         connCb = None
         if p2pConnections:
-            connCb = NodeConnCB()  # one mininode connection  to node 0
+            connCb = cb_class()  # one mininode connection  to node 0
         for i in p2pConnections:
             connection = NodeConn(ip, p2p_port(i), self.nodes[i], connCb, strSubVer=strSubVer)
             connections.append(connection)
