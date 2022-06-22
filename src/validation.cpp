@@ -3736,8 +3736,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
 
-    LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms\n",
-             (GetTimeMicros() - nStart) * 0.001);
+    LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms, hash=%s, height=%d\n",
+             (GetTimeMicros() - nStart) * 0.001, pindexDelete->GetBlockHash().ToString(), pindexDelete->GetHeight());
 
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(config.GetChainParams(), state,
