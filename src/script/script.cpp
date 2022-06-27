@@ -156,18 +156,7 @@ bool IsDustReturnScript(const bsv::span<const uint8_t> script)
  */
 bool IsMinerId(const bsv::span<const uint8_t> script)
 {
-    static constexpr std::array<uint8_t, 4> protocol_id{0xac, 0x1e, 0xed, 0x88};
-    return script.size() >= 8 && 
-           script[0] == OP_FALSE &&
-           script[1] == OP_RETURN && 
-           script[2] == protocol_id.size() &&
-           std::equal(protocol_id.begin(), protocol_id.end(), script.begin() + 3) &&
-           script[7] <= OP_PUSHDATA4;
-}
-
-bool IsMinerInfo(const bsv::span<const uint8_t> script)
-{
-    static constexpr std::array<uint8_t, 4> protocol_id{0x60, 0x1d, 0xfa, 0xce};
+    constexpr std::array<uint8_t, 4> protocol_id{0xac, 0x1e, 0xed, 0x88};
     return script.size() >= 8 && 
            script[0] == OP_FALSE &&
            script[1] == OP_RETURN && 

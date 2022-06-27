@@ -308,7 +308,19 @@ bool IsP2SH(bsv::span<const uint8_t>);
 bool IsDSNotification(bsv::span<const uint8_t>);
 bool IsDustReturnScript(bsv::span<const uint8_t> script);
 bool IsMinerId(bsv::span<const uint8_t> script);
-bool IsMinerInfo(bsv::span<const uint8_t> script);
+
+constexpr bool IsMinerInfo(const bsv::span<const uint8_t> script)
+{
+    constexpr std::array<uint8_t, 4> protocol_id{0x60, 0x1d, 0xfa, 0xce};
+    return script.size() >= 7 && 
+           script[0] == OP_FALSE &&
+           script[1] == OP_RETURN && 
+           script[2] == protocol_id.size() &&
+           script[3] == protocol_id[0] &&
+           script[4] == protocol_id[1] &&
+           script[5] == protocol_id[2] &&
+           script[6] == protocol_id[3];
+}
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 
