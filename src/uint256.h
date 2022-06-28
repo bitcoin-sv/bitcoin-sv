@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -26,6 +27,13 @@ protected:
 
 public:
     base_blob() { memset(data, 0, sizeof(data)); }
+    
+    template<typename T>
+    base_blob(T first, T last)
+    {
+        assert(std::distance(first, last) == sizeof(data));
+        std::copy(first, last, &data[0]);
+    }
 
     explicit base_blob(const std::vector<uint8_t> &vch) {
         assert(vch.size() == sizeof(data));
@@ -147,6 +155,10 @@ public:
     uint256(const base_blob<256> &b) : base_blob<256>(b) {}
     explicit uint256(const std::vector<uint8_t> &vch) : base_blob<256>(vch) {}
 
+    template<typename T>
+    uint256(T first, T last):base_blob{first, last}
+    {}
+
     /**
      * A cheap hash function that just returns 64 bits from the result, it can
      * be used when the contents are considered uniformly random. It is not
@@ -155,6 +167,13 @@ public:
      */
     uint64_t GetCheapHash() const { return ReadLE64(data); }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const uint256& i)
+{
+    std::ostream_iterator<int> it{os};
+    std::copy(i.begin(), i.end(), it);
+    return os;
+}
 
 /**
  * Specialise std::hash for uint256.

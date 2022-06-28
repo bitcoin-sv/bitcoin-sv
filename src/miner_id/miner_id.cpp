@@ -567,6 +567,11 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                 minerId = MinerId();
             }
         }
+        else if(IsMinerInfo(script))
+        {
+            
+
+        }
     }
 
     return {};

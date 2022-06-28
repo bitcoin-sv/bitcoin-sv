@@ -49,12 +49,6 @@ namespace
     }
 }
 
-std::ostream& operator<<(std::ostream& str, const uint256& hash)
-{
-    str << hash.ToString();
-    return str;
-}
-
 BOOST_FIXTURE_TEST_SUITE(block_download_tracking_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(TestBlockTracking)

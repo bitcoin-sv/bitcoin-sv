@@ -129,6 +129,10 @@ add_test_to_suite(bitcoin test_bitcoin
     miner_id_db_tests.cpp 
 	miner_tests.cpp
 	minerid_tests.cpp
+	miner_info_tests.cpp
+	miner_info_doc_tests.cpp
+	miner_info_error_tests.cpp
+	miner_info_ref_tests.cpp
 	multisig_tests.cpp
     net_message_maker_tests.cpp
     net_association_tests.cpp

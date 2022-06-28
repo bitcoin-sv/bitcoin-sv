@@ -6,6 +6,8 @@
 #ifndef BITCOIN_PRIMITIVES_BLOCK_H
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
+#include <algorithm>
+
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
@@ -76,7 +78,8 @@ inline bool operator!=(const CBlockHeader& a, const CBlockHeader& b)
     return !(a == b);
 }
 
-class CBlock : public CBlockHeader {
+class CBlock : public CBlockHeader 
+{
 public:
     // network and disk
     std::vector<CTransactionRef> vtx;
@@ -127,7 +130,19 @@ public:
     }
 
     std::string ToString() const;
+
+    auto cbegin() const { return vtx.cbegin(); };
+    auto cend() const { return vtx.cbegin(); };
 };
+
+inline auto find_by_id(const CBlock& block, const uint256& txid)
+{
+    return std::find_if(block.cbegin(),
+                        block.cend(),
+                        [&txid](const auto& tx) {
+                            return tx->GetId() == txid;
+                        });
+}
 
 typedef std::shared_ptr<CBlock> CBlockRef;
 

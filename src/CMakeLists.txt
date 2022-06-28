@@ -392,8 +392,6 @@ add_library(server
 	checkpoints.h
 	checkqueue.h
 	checkqueuepool.h
-	miner_id/coinbase_doc.cpp
-	miner_id/coinbase_doc.h
 	compat/sanity.h
 	cuckoocache.h
 	dbwrapper.cpp
@@ -440,11 +438,21 @@ add_library(server
 	merkletreestore.cpp
 	merkletreestore.h
 	metrics.h
+	miner_id/coinbase_doc.cpp
+	miner_id/coinbase_doc.h
 	miner_id/miner_id.cpp
 	miner_id/miner_id.h
     miner_id/miner_id_db.cpp
     miner_id/miner_id_db.h
     miner_id/miner_id_db_defaults.h
+	miner_id/miner_info.cpp
+	miner_id/miner_info.h
+    miner_id/miner_info_doc.cpp
+    miner_id/miner_info_doc.h
+    miner_id/miner_info_error.cpp
+    miner_id/miner_info_error.h
+    miner_id/miner_info_ref.cpp
+    miner_id/miner_info_ref.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
