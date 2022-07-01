@@ -104,11 +104,12 @@ ZMQ dependencies (provides ZMQ API 4.x):
 
     sudo apt-get install libzmq3-dev
 
-Dependency Build Instructions: Fedora
+Dependency Build Instructions: Fedora/Centos
 --------------------------------------------
 Build requirements:
 
-    sudo dnf install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel boost-devel libdb-devel libdb-cxx-devel
+    sudo dnf install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel boost-devel libdb-devel
+    sudo dnf --enablerepo=powertools install libdb-cxx-devel
 
 Optional:
 
