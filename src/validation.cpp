@@ -3768,6 +3768,7 @@ static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
 static int64_t nTimeRemoveFromMempool = 0;
+static int64_t nTimeMinerId = 0;
 
 struct PerBlockConnectTrace {
     const CBlockIndex *pindex = nullptr;
@@ -3951,7 +3952,12 @@ static bool ConnectTip(
         else {
             // Update miner ID database if required
             if(g_minerIDs) {
+                int64_t nMinerIdStart = GetTimeMicros();
                 g_minerIDs->BlockAdded(blockConnecting, pindexNew->GetHeight());
+                int64_t nThisMinerIdTime = GetTimeMicros() - nMinerIdStart;
+                nTimeMinerId += nThisMinerIdTime;
+                LogPrint(BCLog::BENCH, "    - MinerID total: %.2fms [%.2fs]\n",
+                    nThisMinerIdTime * 0.001, nTimeMinerId * 0.000001);
             }
         }
         nTime3 = GetTimeMicros();
