@@ -423,6 +423,10 @@ extern const char *AUTHCH;
  * The authresp net message delivers the response message to the requestor.
  */
 extern const char *AUTHRESP;
+/**
+ * Contains a dataref transaction.
+ */
+extern const char *DATAREFTX;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -530,6 +534,7 @@ enum GetDataMsg {
     MSG_FILTERED_BLOCK = 3,
     //!< Defined in BIP152
     MSG_CMPCT_BLOCK = 4,
+    MSG_DATAREF_TX = 5
 };
 
 /** inv message data */

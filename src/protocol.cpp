@@ -50,6 +50,7 @@ const char *EXTMSG = "extmsg";
 const char *REVOKEMID = "revokemid";
 const char *AUTHCH = "authch";
 const char *AUTHRESP = "authresp";
+const char *DATAREFTX = "datareftx";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -66,7 +67,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
         // If the message is PROTOCONF, it is limited to LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH.
         return LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH;
     }
-    else if (command == NetMsgType::TX)
+    else if (command == NetMsgType::TX || command == NetMsgType::DATAREFTX)
     {
         // If the message is TX, it is limited to max consensus tx size after Genesis
         // can not use policy limit because of banning rules.
@@ -114,7 +115,8 @@ static const std::string allNetMessageTypes[] = {
     NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
     NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
     NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,  NetMsgType::DSDETECTED,
-    NetMsgType::EXTMSG,       NetMsgType::AUTHCH,     NetMsgType::AUTHRESP
+    NetMsgType::EXTMSG,       NetMsgType::AUTHCH,     NetMsgType::AUTHRESP,
+    NetMsgType::DATAREFTX
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,
@@ -363,6 +365,8 @@ std::string CInv::GetCommand() const {
             return cmd.append(NetMsgType::MERKLEBLOCK);
         case MSG_CMPCT_BLOCK:
             return cmd.append(NetMsgType::CMPCTBLOCK);
+        case MSG_DATAREF_TX:
+            return cmd.append(NetMsgType::DATAREFTX);
         default:
             throw std::out_of_range(
                 strprintf("CInv::GetCommand(): type=%d unknown type", type));
