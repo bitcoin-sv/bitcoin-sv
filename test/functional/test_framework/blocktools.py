@@ -65,6 +65,22 @@ def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
         merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
     return uint256_from_str(merkleRootBytes)
 
+# Calculate merkle root from a branch
+def merkle_root_from_branch(leaf_hash, index, branch):
+    root = ser_uint256(leaf_hash)
+    for node in branch:
+        if node == 0:
+            # Duplicated node
+            root = hash256(root + root)
+        elif index & 1:
+            root = hash256(ser_uint256(node) + root)
+        else:
+            root = hash256(root + ser_uint256(node))
+
+        root = root[::-1]
+        index >>= 1
+    return uint256_from_str(root)
+
 # Create a valid submittable block (and coinbase) from a mining candidate
 def create_block_from_candidate(candidate, get_coinbase):
     block = CBlock()
@@ -201,12 +217,13 @@ def make_block(connection, parent_block=None, makeValid=True, last_block_time=0)
 class MinerIDParams():
     def __init__(self, blockHeight, minerId, minerIdPub, revocationKey, revocationKeyPub, prevMinerId=None,
                  prevMinerIdPub=None, prevRevocationKey=None, prevRevocationKeyPub=None, revocationMessageCurMinerId=None,
-                 revocationMessage=None):
+                 revocationMessage=None, datarefs=None):
         self.blockHeight = blockHeight
         self.minerId = minerId
         self.minerIdPub = minerIdPub
         self.revocationKey = revocationKey
         self.revocationKeyPub = revocationKeyPub
+        self.datarefs = datarefs
 
         if prevMinerId:
             self.prevMinerId = prevMinerId
@@ -241,6 +258,35 @@ class MinerIDParams():
 def create_miner_id_signature(signing_key, document):
     digest = sha256(document)
     return signing_key.sign_digest(digest, sigencode=ecdsa.util.sigencode_der)
+
+# Create dataref transaction
+def create_dataref_txn(connection, dataref_json, utxo):
+    # Create basic raw transaction from UTXO
+    inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
+    outputs = {}
+    addr = connection.rpc.getnewaddress()
+    outputs[addr] = satoshi_round(utxo['amount'])
+    rawtx = connection.rpc.createrawtransaction(inputs, outputs)
+
+    # Create transaction we can modify
+    datarefTx = CTransaction()
+    datarefTx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
+
+    # Add dataref json to output 0 of transaction
+    docjson = json.dumps(dataref_json, indent=0)
+    docjson = docjson.replace('\n', '')
+    docjson = docjson.replace(' ','')
+    docjson = docjson.encode('utf8')
+    datarefTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0xac, 0x1e, 0xed, 0x88]), docjson])))
+    datarefTx.vout[0], datarefTx.vout[1] = datarefTx.vout[1], datarefTx.vout[0]
+
+    # Sign transaction
+    signed = connection.rpc.signrawtransaction(ToHex(datarefTx))
+
+    # Return CTransaction
+    datarefTx.deserialize(BytesIO(hex_str_to_bytes(signed['hex'])))
+    datarefTx.calc_sha256()
+    return datarefTx
 
 # Create a miner-info transaction containing the miner ID document
 def create_miner_info_txn(connection, params, utxo):
@@ -279,6 +325,19 @@ def create_miner_info_txn(connection, params, utxo):
     if(params.revocationMessage):
         doc['revocationMessage'] = params.revocationMessage
         doc['revocationMessageSig'] = params.revocationMessageSig
+
+    if(params.datarefs):
+        extensions = {}
+        dataref_doc = {}
+        dataref_doc['refs'] = []
+        for dataref in params.datarefs:
+            ref_doc = {}
+            ref_doc['brfcIds'] = dataref['brfcIds']
+            ref_doc['txid'] = dataref['txn'].hash
+            ref_doc['vout'] = 0
+            dataref_doc['refs'].append(ref_doc)
+        extensions['dataRefs'] = dataref_doc
+        doc['extensions'] = extensions
 
     docjson = json.dumps(doc, indent=0)
     docjson = docjson.replace('\n', '')

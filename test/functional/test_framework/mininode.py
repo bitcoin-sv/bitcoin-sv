@@ -393,12 +393,14 @@ class CInv():
     TX = 1
     BLOCK = 2
     COMPACT_BLOCK = 4
+    DATAREF_TX = 5
 
     typemap = {
         ERROR: "Error",
         TX: "TX",
         BLOCK: "Block",
-        COMPACT_BLOCK: "CompactBlock"
+        COMPACT_BLOCK: "CompactBlock",
+        DATAREF_TX: "DatarefTx"
     }
 
     def __init__(self, t=ERROR, h=0):
@@ -1896,7 +1898,8 @@ class msg_notfound():
     def __repr__(self):
         return "msg_notfound(inv=%s)" % (repr(self.inv))
 
-# Data for the merkle proof node part of the double-spend detected P2P message
+
+# Data for the merkle proof node part of a merkle proof
 class MerkleProofNode():
     def __init__(self, node=0):
         self.nodeType = 0
@@ -1917,31 +1920,20 @@ class MerkleProofNode():
     def __repr__(self):
         return "MerkleProofNode(type=%i node=%064x)" % (self.nodeType, self.node)
 
-# Data for the merkle proof part of the double-spend detected P2P message
-class DSMerkleProof():
-    def __init__(self, txIndex=0, tx=CTransaction(), merkleRoot=0, proof=None, json_notification=None):
-        if json_notification is None:
-            self.txIndex = txIndex
-            self.tx = tx
-            self.merkleRoot = merkleRoot
-            if proof is None:
-                self.proof = []
-            else:
-                self.proof = proof
-        else:
-            self.txIndex = json_notification["index"]
-            self.tx = FromHex(CTransaction(), json_notification["txOrId"])
-            # Only merkleRoot target type is currently supported
-            assert(json_notification["targetType"] == "merkleRoot")
-            self.merkleRoot = uint256_from_str(hex_str_to_bytes(json_notification["target"])[::-1])
+# Base class for merkle proofs required in P2P messages
+class MerkleProof():
+    def __init__(self, txIndex=0, tx=CTransaction(), merkleRoot=0, proof=None):
+        self.flags = 0
+        self.txIndex = txIndex
+        self.tx = tx
+        self.merkleRoot = merkleRoot
+        if proof is None:
             self.proof = []
-            for node in json_notification["nodes"]:
-                self.proof.append(MerkleProofNode(uint256_from_str(hex_str_to_bytes(node)[::-1])))
+        else:
+            self.proof = proof
 
     def deserialize(self, f):
-        flags = struct.unpack("<B", f.read(1))[0]
-        # Should always be 5
-        assert(flags == 5)
+        self.flags = struct.unpack("<B", f.read(1))[0]
         self.txIndex = deser_compact_size(f)
         # Length of transaction bytes is deserialized as required by the specification, but we don't actually need it to deserialize the transaction
         deser_compact_size(f)
@@ -1953,13 +1945,37 @@ class DSMerkleProof():
     def serialize(self):
         txSerialized = self.tx.serialize()
         r = b"".join((
-            struct.pack("<B", 5),
+            struct.pack("<B", self.flags),
             ser_compact_size(self.txIndex),
             ser_compact_size(len(txSerialized)),
             txSerialized,
             ser_uint256(self.merkleRoot),
             ser_vector(self.proof),))
         return r
+
+    def __repr__(self):
+        return "DSMerkleProof(txIndex=%i tx=%s merkleRoot=%064x proof=%s)" % (self.txIndex, repr(self.tx), self.merkleRoot, repr(self.proof))
+
+# Data for the merkle proof part of the double-spend detected P2P message
+class DSMerkleProof(MerkleProof):
+    def __init__(self, txIndex=0, tx=CTransaction(), merkleRoot=0, proof=None, json_notification=None):
+        super().__init__(txIndex, tx, merkleRoot, proof)
+        self.flags = 5
+
+        if json_notification:
+            self.txIndex = json_notification["index"]
+            self.tx = FromHex(CTransaction(), json_notification["txOrId"])
+            # Only merkleRoot target type is currently supported
+            assert(json_notification["targetType"] == "merkleRoot")
+            self.merkleRoot = uint256_from_str(hex_str_to_bytes(json_notification["target"])[::-1])
+            self.proof = []
+            for node in json_notification["nodes"]:
+                self.proof.append(MerkleProofNode(uint256_from_str(hex_str_to_bytes(node)[::-1])))
+
+    def deserialize(self, f):
+        super().deserialize(f)
+        # Flags should always be 5
+        assert(self.flags == 5)
 
     def __repr__(self):
         return "DSMerkleProof(txIndex=%i tx=%s merkleRoot=%064x proof=%s)" % (self.txIndex, repr(self.tx), self.merkleRoot, repr(self.proof))
@@ -2022,6 +2038,28 @@ class msg_dsdetected():
 
     def __repr__(self):
         return "msg_dsdetected(version=%i blocksDetails=%s)" % (self.version, repr(self.blocksDetails))
+
+
+class msg_datareftx():
+    command = b"datareftx"
+
+    def __init__(self, tx=CTransaction(), proof=TSCMerkleProof()):
+        self.tx = tx
+        self.proof = proof
+
+    def deserialize(self, f):
+        self.tx.deserialize(f)
+        self.proof = TSCMerkleProof()
+        self.proof.deserialize(f)
+
+    def serialize(self):
+        r = b"".join((
+            self.tx.serialize(),
+            self.proof.serialize(),))
+        return r
+
+    def __repr__(self):
+        return "msg_datareftx(tx=%s proof=%s)" % (repr(self.tx), repr(self.proof))
 
 
 class NodeConnCB():
@@ -2142,6 +2180,8 @@ class NodeConnCB():
     def on_sendhdrsen(self, conn, message): pass
 
     def on_tx(self, conn, message): pass
+
+    def on_datareftx(self, conn, message): pass
 
     def on_inv(self, conn, message):
         want = msg_getdata()
@@ -2372,7 +2412,8 @@ class NodeConn(asyncore.dispatcher):
         b"cmpctblock": msg_cmpctblock,
         b"getblocktxn": msg_getblocktxn,
         b"blocktxn": msg_blocktxn,
-        b"notfound": msg_notfound
+        b"notfound": msg_notfound,
+        b"datareftx": msg_datareftx
     }
 
     MAGIC_BYTES = {
