@@ -61,7 +61,7 @@ class JournalingBlockAssembler : public BlockAssembler
     // Result of attempt to add a transaction or group
     struct AddTransactionResult
     {
-        enum class Result { SUCCESS, ERROR, SKIPPED, BLOCKFULL };
+        enum class Result { SUCCESS, ERRORED, SKIPPED, BLOCKFULL };
         Result result { Result::SUCCESS };
         size_t numAdded {0};
     };
