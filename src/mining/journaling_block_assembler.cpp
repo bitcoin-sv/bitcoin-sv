@@ -249,7 +249,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
 
             // We're finished if we've hit an error, reached the end of the journal,
             // or we've added as many transactions this iteration as we're allowed.
-            finished = (res.result == AddTransactionResult::Result::ERROR ||
+            finished = (res.result == AddTransactionResult::Result::ERRORED ||
                         mJournalPos == journalEnd ||
                         txnNum >= maxTxns);
         }
@@ -405,7 +405,7 @@ JournalingBlockAssembler::AddTransactionResult JournalingBlockAssembler::addTran
     if(txn == nullptr)
     {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler found stale wrapper in the journal. need to start over.\n");
-        return { AddTransactionResult::Result::ERROR };
+        return { AddTransactionResult::Result::ERRORED };
     }
 
     // Must check that lock times are still valid

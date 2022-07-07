@@ -295,7 +295,7 @@ struct StringContentsSerializer {
 };
 
 BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
-    char buf[10];
+    char buf[16];
 
     fs::path ph = fs::temp_directory_path() / fs::unique_path();
     CDBWrapper dbw(ph, (1 << 20), true, false, false);

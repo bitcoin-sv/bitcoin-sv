@@ -4,6 +4,8 @@
 
 #include "txn_recent_rejects.h"
 
+#include <mutex>
+
 CTxnRecentRejects::CTxnRecentRejects() {
     // Create a bloom filter
     mpRecentRejects = std::make_unique<CRollingBloomFilter>(120000, 0.000001);

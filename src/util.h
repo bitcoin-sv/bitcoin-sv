@@ -27,6 +27,7 @@
 #include <exception>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <vector>
 
