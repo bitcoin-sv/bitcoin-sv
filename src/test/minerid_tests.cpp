@@ -203,6 +203,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
 {
     SelectParams(CBaseChainParams::MAIN);
 
+    CBlock block{};
+    block.vtx.resize(1);
     CMutableTransaction tx;
     tx.vout.resize(4);
 
@@ -234,18 +236,20 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
     vector<uint8_t> signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1);
 
-    optional<MinerId> minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    optional<MinerId> minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId);
 
-    CoinbaseDocument expected_cd{"0.1",
+    CoinbaseDocument expected_cd{"",
+                                 "0.1",
                                  block_height,
                                  HexStr(prevMinerIdPubKey),
                                  coinbase_doc["prevMinerIdSig"].get_str(),
                                  HexStr(minerIdPubKey),
                                  COutPoint(uint256S(vctxid), 7)};
     const vector<CoinbaseDocument::DataRef> comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1), 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0}};
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     auto actual_cd{minerId.value().GetCoinbaseDocument()};
@@ -254,7 +258,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
     // Wrong signature (with correct size)
     const vector<uint8_t> wrongSig(signature.size(), 'a');
     prepareTransactionOutputStatic(coinbase_doc, wrongSig, tx, 1);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Missing required field "height"
@@ -266,7 +271,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        dataRefs,
                                        NullUniValue,
                                        "0.1");
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Incorrect required field "height"
@@ -280,7 +286,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Missing dataRefs (no optional fields present)
@@ -294,7 +301,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     expected_cd.SetDataRefs(nullopt);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     actual_cd = minerId.value().GetCoinbaseDocument();
@@ -311,7 +319,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1, true);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Invalid prevMinerId signature
@@ -320,7 +329,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
              string(coinbase_doc["prevMinerIdSig"].get_str().size(), 'b')));
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 1);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Even if first MinerId is invalid, we find the second one which is valid
@@ -334,7 +344,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 2);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     actual_cd = minerId.value().GetCoinbaseDocument();
@@ -352,7 +363,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                        "0.1");
     signature = sign(minerIdKey, coinbase_doc);
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 3, true);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     actual_cd = minerId.value().GetCoinbaseDocument();
     BOOST_CHECK_EQUAL(actual_cd, expected_cd);
@@ -361,6 +373,9 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
 BOOST_AUTO_TEST_CASE(staticMinerId_v2)
 {
     SelectParams(CBaseChainParams::MAIN);
+
+    CBlock block {};
+    block.vtx.resize(1);
 
     CMutableTransaction tx;
     tx.vin.resize(1);
@@ -399,11 +414,13 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
     vector<uint8_t> signature = sign(minerIdKey, baseDocument);
     prepareTransactionOutputStatic(baseDocument, signature, tx, 1);
 
+    block.vtx[0] = MakeTransactionRef(tx);
     const optional<MinerId> minerId =
-        FindMinerId(CTransaction(tx), block_height);
+        FindMinerId(block, block_height);
     BOOST_CHECK(minerId);
 
-    CoinbaseDocument expected_cd{"0.2",
+    CoinbaseDocument expected_cd{"",
+                                 "0.2",
                                  block_height,
                                  HexStr(prevMinerIdPubKey),
                                  baseDocument["prevMinerIdSig"].get_str(),
@@ -411,8 +428,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
                                  COutPoint(uint256S(vctxid), 7),
                                  minerContact};
     vector<CoinbaseDocument::DataRef> comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1), 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0}};
     expected_cd.SetDataRefs(comparingDataRefs);
     const auto acutal_cd{minerId.value().GetCoinbaseDocument()};
     BOOST_CHECK_EQUAL(acutal_cd, expected_cd);
@@ -421,6 +438,9 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
 BOOST_AUTO_TEST_CASE(dynamicMinerId)
 {
     SelectParams(CBaseChainParams::MAIN);
+
+    CBlock block{};
+    block.vtx.resize(1);
 
     CMutableTransaction tx;
     tx.vin.resize(1);
@@ -480,16 +500,18 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     dynamicSignature);
 
     // Check with valid dynamic document
-    optional<MinerId> minerId = FindMinerId(CTransaction(tx), block_height);
-    CoinbaseDocument expected_cd{"0.1",
+    block.vtx[0] = MakeTransactionRef(tx);
+    optional<MinerId> minerId = FindMinerId(block, block_height);
+    CoinbaseDocument expected_cd{"",
+                                 "0.1",
                                  block_height,
                                  HexStr(prevMinerIdPubKey),
                                  staticDocument["prevMinerIdSig"].get_str(),
                                  HexStr(minerIdPubKey),
                                  COutPoint(uint256S(vctxid), 7)};
     vector<CoinbaseDocument::DataRef> comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1), 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2), 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0}};
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 
@@ -515,10 +537,11 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     staticSignatureBytes,
                                     dynamicDocument,
                                     dynamicSignature);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid1D), 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, uint256S(txid2D), 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1D)}, 0},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2D)}, 0}};
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 
@@ -526,7 +549,8 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
     vector<uint8_t> wrongSig = vector<uint8_t>(dynamicSignature.size(), 'a');
     prepareTransactionOutputDynamic(
         tx, 1, staticDocument, staticSignatureBytes, dynamicDocument, wrongSig);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Check that dynamic document cannot rewrite required field.
@@ -541,7 +565,8 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     staticSignatureBytes,
                                     dynamicDocument,
                                     dynamicSignature);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 
     // Pass empty dynamic document (but with correct signature) : invalid result
@@ -556,7 +581,8 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     staticSignatureBytes,
                                     dynamicDocument,
                                     dynamicSignature);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 
     // Pass in minerId as an object: invalid result
@@ -573,12 +599,16 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     staticSignatureBytes,
                                     dynamicDocument,
                                     dynamicSignature);
-    minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId == nullopt);
 }
 
 BOOST_AUTO_TEST_CASE(v1_mainet_block_624455)
 {
+    CBlock block {};
+    block.vtx.resize(1);
+
     CMutableTransaction tx;
     tx.vout.resize(1);
 
@@ -604,7 +634,8 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_624455)
     tx.vout[0].scriptPubKey = CScript{v.begin(), v.end()};
 
     constexpr auto block_height{624455};
-    optional<MinerId> minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    optional<MinerId> minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId);
 
     const string minerIdPubKey =
@@ -618,7 +649,8 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_624455)
     const string vcTxId =
         "6584f53e13216d34979098362bda34bd3677058c8b4e0621b24395c576b6baad";
 
-    const CoinbaseDocument expected_cd{"0.1",
+    const CoinbaseDocument expected_cd{"",
+                                       "0.1",
                                        block_height,
                                        prevMinerIdPubKey,
                                        prevMinerIdSignature,
@@ -630,6 +662,9 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_624455)
 
 BOOST_AUTO_TEST_CASE(v1_mainet_block_697014)
 {
+    CBlock block {};
+    block.vtx.resize(1);
+
     CMutableTransaction tx;
     tx.vout.resize(1);
 
@@ -660,7 +695,8 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_697014)
     tx.vout[0].scriptPubKey = CScript{v.begin(), v.end()};
 
     constexpr auto block_height{697014};
-    optional<MinerId> minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    optional<MinerId> minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId);
 
     //    const string minerIdPubKey =
@@ -686,6 +722,9 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_697014)
 
 BOOST_AUTO_TEST_CASE(v2_stn_block_12170)
 {
+    CBlock block {};
+    block.vtx.resize(1);
+
     CMutableTransaction tx;
     tx.vout.resize(1);
 
@@ -724,7 +763,8 @@ BOOST_AUTO_TEST_CASE(v2_stn_block_12170)
     tx.vout[0].scriptPubKey = CScript{v.begin(), v.end()};
 
     constexpr auto block_height{12170};
-    optional<MinerId> minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    optional<MinerId> minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId);
 
     //    const string minerIdPubKey =
@@ -750,6 +790,9 @@ BOOST_AUTO_TEST_CASE(v2_stn_block_12170)
 
 BOOST_AUTO_TEST_CASE(ri)
 {
+    CBlock block {};
+    block.vtx.resize(1);
+
     CMutableTransaction tx;
     tx.vout.resize(1);
 
@@ -776,7 +819,8 @@ BOOST_AUTO_TEST_CASE(ri)
     tx.vout[0].scriptPubKey = CScript{v.begin(), v.end()};
 
     constexpr auto block_height{42};
-    optional<MinerId> minerId = FindMinerId(CTransaction(tx), block_height);
+    block.vtx[0] = MakeTransactionRef(tx);
+    optional<MinerId> minerId = FindMinerId(block, block_height);
     BOOST_CHECK(minerId);
 
     //    const string minerIdPubKey =

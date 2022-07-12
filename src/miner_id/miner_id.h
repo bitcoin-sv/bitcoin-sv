@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -11,6 +12,9 @@
 #include "coinbase_doc.h"
 #include "primitives/transaction.h"
 #include "univalue.h"
+
+class CBlock;
+class miner_info;
 
 /* The MinerId provides a way of cryptographically identifying miners. A MinerId
  is a public key of an ECDSA keypair.
@@ -38,14 +42,14 @@ class MinerId
 {
 public:
     MinerId() = default;
-
-    MinerId(const CoinbaseDocument& coinbaseDocument)
-        : coinbaseDocument_{coinbaseDocument} {};
+    MinerId(const miner_info& minerInfo);
 
     const CoinbaseDocument& GetCoinbaseDocument() const
     {
         return coinbaseDocument_;
     }
+
+    const std::optional<TxId>& GetMinerInfoTx() const { return minerInfoTx_; }
 
     // Parse static coinbase document from coinbaseDocumentData and store it
     // only if it is valid (if method returns true). Parameter tx_out is used
@@ -68,6 +72,7 @@ private:
     CoinbaseDocument coinbaseDocument_;
     std::string staticDocumentJson_;
     std::string signatureStaticDocument_;
+    std::optional<TxId> minerInfoTx_;
 };
 
 /* Scan coinbase transaction outputs for minerId. When first valid miner id
@@ -76,7 +81,7 @@ private:
  * for miner id output. Parameter blockHeight is current block height. It
  * should match with height in parsed miner id.
  */
-std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight);
+std::optional<MinerId> FindMinerId(const CBlock& block, int32_t blockHeight);
 
 bool parseCoinbaseDocument(MinerId&,
                            const std::string_view coinbaseDocumentDataJson,
