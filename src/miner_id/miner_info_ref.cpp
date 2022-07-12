@@ -14,25 +14,21 @@
 
 using namespace std;
 
-block_bind::block_bind(const bsv::span<const uint8_t> mod_merkle_root,
-                       const bsv::span<const uint8_t> prev_block_hash,
+block_bind::block_bind(const bsv::span<const uint8_t> mmr_pbh_hash,
                        const bsv::span<const uint8_t> sig):
-    mod_merkle_root_{mod_merkle_root.begin(), mod_merkle_root.end()},
-    prev_block_hash_{prev_block_hash.begin(), prev_block_hash.end()},
+    mmr_pbh_hash_{mmr_pbh_hash.begin(), mmr_pbh_hash.end()},
     sig_{sig.begin(), sig.end()}
 {}
 
 bool operator==(const block_bind& a, const block_bind& b)
 {
-    return a.mod_merkle_root_ == b.mod_merkle_root_ &&
-           a.prev_block_hash_ == b.prev_block_hash_ &&
+    return a.mmr_pbh_hash_ == b.mmr_pbh_hash_ &&
            std::equal(a.sig_.cbegin(), a.sig_.cend(), b.cbegin_sig());
 }
 
 std::ostream& operator<<(std::ostream& os, const block_bind& bb)
 {
-    os << "\nmodified merkle root: " << bb.mod_merkle_root_
-       << "\nprevious block hash: " << bb.prev_block_hash_;
+    os << "\nmmr_pbh_hash_: " << bb.mmr_pbh_hash_;
 
     ostream_iterator<int> it{os};
     os << "\nsignature: ";
@@ -80,11 +76,10 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     // 7 pushdata 1 (1)
     // 8 protocol-id-version (1)
     // 9 miner-info-txid (32)
-    // 41 modified-merkle-root (32)
-    // 73 prev-block-hash (32)
-    // 105 sig(modified-merkle-root || prev-block-hash) (69-72)
-    // 174-177 end
-    // Total 175-178 
+    // 41 hash(modified-merkle-root || prev-block-hash) (32)
+    // 73 sig(modified-merkle-root || prev-block-hash) (69-72)
+    // 142-145 end
+    // Total 143-146 
 
     bsv::instruction_iterator it{script.last(script.size() - 7)};
     if(!it.valid())
@@ -112,29 +107,20 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     if(!it.valid())
         return miner_info_error::invalid_instruction;
 
-    constexpr uint8_t mm_root_len{32};
-    const auto mm_root{it->operand()};
-    if(mm_root.size() != mm_root_len)
-        return miner_info_error::invalid_mm_root_len; 
+    constexpr uint8_t mmr_pbh_hash_len{32};
+    const auto mmr_pbh_hash{it->operand()};
+    if(mmr_pbh_hash.size() != mmr_pbh_hash_len)
+        return miner_info_error::invalid_mmr_pbh_hash_len; 
    
     ++it;
     if(!it.valid())
         return miner_info_error::invalid_instruction;
     
-    constexpr uint8_t prev_block_hash_len{32};
-    const auto prev_block_hash{it->operand()};
-    if(prev_block_hash.size() != prev_block_hash_len)
-        return miner_info_error::invalid_prev_block_hash_len; 
-    
-    ++it;
-    if(!it.valid())
-        return miner_info_error::invalid_instruction;
-
     const auto sig{it->operand()};
     if(!is_der_signature(sig))
         return miner_info_error::invalid_sig_len;
 
     return miner_info_ref{it_txid->operand(),
-                          block_bind{mm_root, prev_block_hash, sig}};
+                          block_bind{mmr_pbh_hash, sig}};
 }
 

@@ -12,17 +12,14 @@
 
 class block_bind
 {
-    uint256 mod_merkle_root_;
-    uint256 prev_block_hash_;
+    uint256 mmr_pbh_hash_; // hash(mod. Merkle root || previous block hash)
     std::vector<uint8_t> sig_;
 
 public:
-    block_bind(const bsv::span<const uint8_t> mod_merkle_root,
-               const bsv::span<const uint8_t> prev_block_hash,
+    block_bind(const bsv::span<const uint8_t> mmr_pbh_hash_,
                const bsv::span<const uint8_t> sig);
 
-    const uint256& mm_root() const { return mod_merkle_root_; }
-    const uint256& prev_block_hash() const { return prev_block_hash_; }
+    const uint256& mmr_pbh_hash() const { return mmr_pbh_hash_; }
     
     auto cbegin_sig() const { return sig_.cbegin(); }
     auto cend_sig() const { return sig_.cend(); } 

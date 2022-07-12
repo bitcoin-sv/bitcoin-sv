@@ -19,15 +19,12 @@ BOOST_AUTO_TEST_SUITE(miner_info_tests)
 
 BOOST_AUTO_TEST_CASE(block_bind_construction)
 {
-    const vector<uint8_t> modified_merkle_root(32, 2);
-    const vector<uint8_t> prev_block_hash(32, 3);
+    const vector<uint8_t> mmr_pbh_hash(32, 2);
     const vector<uint8_t> sig(70, 4);
 
-    block_bind bb{modified_merkle_root, prev_block_hash, sig};
-    const uint256 expected_mm_root{modified_merkle_root};
-    const uint256 expected_prev_block_hash{prev_block_hash};
-    BOOST_CHECK_EQUAL(expected_mm_root, bb.mm_root());
-    BOOST_CHECK_EQUAL(expected_prev_block_hash, bb.prev_block_hash());
+    block_bind bb{mmr_pbh_hash, sig};
+    const uint256 expected_mm_root{mmr_pbh_hash};
+    BOOST_CHECK_EQUAL(expected_mm_root, bb.mmr_pbh_hash());
 
     BOOST_CHECK_EQUAL_COLLECTIONS(sig.cbegin(),
                                   sig.cend(),
@@ -37,31 +34,26 @@ BOOST_AUTO_TEST_CASE(block_bind_construction)
 
 BOOST_AUTO_TEST_CASE(block_bind_equality)
 {
-    const vector<uint8_t> modified_merkle_root(32, 1);
+    const vector<uint8_t> mmr_pbh_hash(32, 1);
     const vector<uint8_t> prev_block_hash(32, 2);
     const vector<uint8_t> sig(70, 3);
 
-    block_bind a{modified_merkle_root, prev_block_hash, sig};
+    block_bind a{mmr_pbh_hash, sig};
     BOOST_CHECK_EQUAL(a, a);
 
-    block_bind b{modified_merkle_root, prev_block_hash, sig};
+    block_bind b{mmr_pbh_hash, sig};
     BOOST_CHECK_EQUAL(a, b);
     BOOST_CHECK_EQUAL(b, a);
 
-    const vector<uint8_t> modified_merkle_root_2(32, 4);
-    block_bind c{modified_merkle_root_2, prev_block_hash, sig};
+    const vector<uint8_t> mmr_pbh_hash_2(32, 4);
+    block_bind c{mmr_pbh_hash_2, sig};
     BOOST_CHECK_NE(a, c);
     BOOST_CHECK_NE(c, a);
     
-    const vector<uint8_t> prev_block_hash_2(32, 5);
-    block_bind d{modified_merkle_root_2, prev_block_hash_2, sig};
+    const vector<uint8_t> sig_2(70, 5);
+    block_bind d{mmr_pbh_hash, sig_2};
     BOOST_CHECK_NE(a, d);
     BOOST_CHECK_NE(d, a);
-
-    const vector<uint8_t> sig_2(70, 6);
-    block_bind e{modified_merkle_root_2, prev_block_hash_2, sig_2};
-    BOOST_CHECK_NE(a, e);
-    BOOST_CHECK_NE(e, a);
 }
 
 BOOST_AUTO_TEST_CASE(is_hash_256_test)
