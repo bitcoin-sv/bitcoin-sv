@@ -1043,7 +1043,7 @@ void getblockheader(const Config &config, const JSONRPCRequest &request, HTTPReq
     }
 
     jWriter.pushKV("error", nullptr);
-    jWriter.pushKV("id", request.id.write());
+    jWriter.pushKVJSONFormatted("id", request.id.write());
 
     jWriter.writeEndObject();
     jWriter.flush();
