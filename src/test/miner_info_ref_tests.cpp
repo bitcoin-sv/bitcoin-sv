@@ -173,66 +173,20 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_failure_cases)
     }
 }
 
-//BOOST_AUTO_TEST_CASE(cjg)
-//{
-//    namespace ba = boost::algorithm;
-//    /*
-//    00
-//    6a
-//    04
-//    601dface
-//    01
-//    00  version
-//    20  pushdata 
-//    5effcbdb13618e8f1f94b4fce52ffa1f439a98111d2c2d0452695cc0d95cdf58    txid
-//    46  pushdata
-//    30  sig
-//    44
-//    02
-//    20
-//    41a3d6016af1bad07bd09c741a37cad4bb8b7ad44b183278ebdb411774efea1a
-//    02
-//    20
-//    7171912dfbca71001b43d890847f6dc18d2e498a0d22523193dcf30f2be64d9f
-//    20
-//    93791ffae371b948f418e28930807db655522ac3635dab9bb652ac61844086d8
-//    46  pushdata
-//    30  sig
-//    44
-//    02
-//    20
-//    7214b66034de85478518456a6eb93cf4af50180d34d48cb1db03ea2571d637ee
-//    02
-//    20
-//    555d157b08a792b68ef1989891c938d15fe1c2549c6bb918bb2ee1b931810523
-//    */
-//    
-//    const string s{
-//        "006a04601dface0100205effcbdb13618e8f1f94b4fce52ffa1f439a98111d2c2d0452"
-//        "695cc0d95cdf58463044022041a3d6016af1bad07bd09c741a37cad4bb8b7ad44b1832"
-//        "78ebdb411774efea1a02207171912dfbca71001b43d890847f6dc18d2e498a0d225231"
-//        "93dcf30f2be64d9f2093791ffae371b948f418e28930807db655522ac3635dab9bb652"
-//        "ac61844086d846304402207214b66034de85478518456a6eb93cf4af50180d34d48cb1"
-//        "db03ea2571d637ee0220555d157b08a792b68ef1989891c938d15fe1c2549c6bb918bb"
-//        "2ee1b931810523"};
-//    
-//    vector<uint8_t> script;
-//    ba::unhex(s.begin(), s.end(), back_inserter(script));
-//
-//    bsv::instruction_iterator it{script};
-//    for(;;)
-//    {
-//        if(it.valid())
-//            cout << *it << '\n';
-//        else
-//            break;
-//        ++it;
-//    }
-//
-//    const auto status = ParseMinerInfoRef(script); 
-//    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
-//    BOOST_CHECK_EQUAL(miner_info_error::size, get<miner_info_error>(status));
-//}
+BOOST_AUTO_TEST_CASE(parse_miner_info_ref_from_string)
+{
+    namespace ba = boost::algorithm;
+
+    const string s{"006a04601dface0100204fca489317c2d463f14aa49151a440a5b0dffd5"
+                   "f2ca702341233c0c173b25b8d20f16835ad8214544c82cc11d9bc77d219"
+                   "babd935140c7d1dd48d57b0d9d848b54463044022049b5ff8bdcc2005ef"
+                   "63ba2481e7abe24c6de77a757aeb26213c7096201580fec022049b4b6ad"
+                   "95a45a99b6b7c3098848ae3b50e49e567e5a14cbfc07ef3dc8a17374"};
+    vector<uint8_t> script;
+    ba::unhex(s.begin(), s.end(), back_inserter(script));
+    const auto status = ParseMinerInfoRef(script); 
+    BOOST_CHECK(std::holds_alternative<miner_info_ref>(status));
+}
 
 BOOST_AUTO_TEST_SUITE_END()
 

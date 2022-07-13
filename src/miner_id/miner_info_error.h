@@ -10,6 +10,7 @@
 
 enum class miner_info_error
 {
+    miner_info_ref_not_found,
     invalid_instruction,
     script_version_unsupported,
     invalid_txid_len,

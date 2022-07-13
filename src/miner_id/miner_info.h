@@ -41,3 +41,8 @@ public:
 
 class CBlock;
 std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock&);
+
+class miner_info_ref;
+std::variant<miner_info, miner_info_error> ParseMinerInfo(
+    const CBlock& block,
+    const miner_info_ref&);

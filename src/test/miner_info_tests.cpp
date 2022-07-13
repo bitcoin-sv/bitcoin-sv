@@ -10,6 +10,7 @@
 
 #include "miner_id/miner_info.h"
 #include "miner_id/miner_info_ref.h"
+#include "primitives/block.h"
 
 #include "script/script.h"
 
@@ -200,11 +201,49 @@ BOOST_AUTO_TEST_CASE(is_der_signature_test)
     BOOST_CHECK(!is_der_signature(script(73, 0x42)));
 }
 
+BOOST_AUTO_TEST_CASE(parse_miner_info_empty_block)
+{
+    CBlock block;
+    const auto s = ParseMinerInfo(block);
+    BOOST_CHECK_EQUAL(miner_info_error::miner_info_ref_not_found,
+                      get<miner_info_error>(s));
+}
+
+BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_ref_in_block)
+{
+    CBlock block;
+    const auto s = ParseMinerInfo(block);
+    BOOST_CHECK_EQUAL(miner_info_error::miner_info_ref_not_found,
+                      get<miner_info_error>(s));
+}
+
+BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_ref_cjg)
+{
+    CBlock block;
+    CMutableTransaction mtx;
+    CTxOut op;
+    const vector<uint8_t> s{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x1};
+    op.scriptPubKey = CScript(s);
+    //op.scriptPubKey = CScript() << OP_FALSE << OP_RETURN << 0x4 << 0x60 << 0x1d
+    //                            << 0xfa << 0x1 << 0x1;
+
+    mtx.vout.push_back(op);
+    CTransaction tx{mtx};
+    block.vtx.push_back(make_shared<const CTransaction>(tx));
+
+    const auto var_mi_sig = ParseMinerInfo(block);
+    BOOST_CHECK_EQUAL(miner_info_error::miner_info_ref_not_found,
+                      get<miner_info_error>(var_mi_sig));
+}
+
 BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_in_block)
 {
-// todo
-// CBlock block;
-// const auto s = ParseMinerInfo(block);
+    CBlock block;
+    const CTransaction tx;
+    block.vtx.push_back(make_shared<const CTransaction>(tx));
+    const auto var_mi_sig = ParseMinerInfo(block);
+    BOOST_CHECK_EQUAL(miner_info_error::miner_info_ref_not_found,
+                      get<miner_info_error>(var_mi_sig));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

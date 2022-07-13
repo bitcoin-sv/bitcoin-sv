@@ -18,6 +18,7 @@ std::ostream& operator<<(std::ostream& os, const miner_info_error e)
 const enumTableT<miner_info_error>& enumTable(miner_info_error)
 {
     static enumTableT<miner_info_error> table{
+        {miner_info_error::miner_info_ref_not_found, "miner info ref not found"},
         {miner_info_error::script_version_unsupported, "unsupported version"},
         {miner_info_error::invalid_instruction, "invalid instruction"},
         {miner_info_error::invalid_sig_len, "invalid signature length"},

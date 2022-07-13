@@ -7,8 +7,10 @@
 #include <regex>
 #include <variant>
 
-#include "miner_info_ref.h"
+#include "miner_id/miner_info_error.h"
+#include "miner_id/miner_info_ref.h"
 #include "primitives/block.h"
+#include "span.h"
 
 using namespace std;
 
@@ -22,40 +24,57 @@ miner_info::miner_info(const miner_info_doc& mi_doc,
 }
 
 std::variant<miner_info, miner_info_error> ParseMinerInfo(
-    const CBlock& block)
+    const CBlock& block,
+    const miner_info_ref& mi_ref)
 {
-    assert(!block.vtx.empty());
-    assert(!block.vtx[0]->vout.empty());
+    // Find the miner_info-tx
+    const auto it_mi_tx = find_by_id(block, mi_ref.txid());
+    if(it_mi_tx == block.cend())
+        return miner_info_error::txid_not_found;
 
-    const auto coinbase_tx{block.vtx[0]};
-    const auto script = coinbase_tx->vout[0].scriptPubKey;
+    // Find the miner_info_script
+    const CTransaction& mi_tx{**it_mi_tx};
+    const auto it_mi_script =
+        find_if(mi_tx.vout.cbegin(), mi_tx.vout.cend(), [](const CTxOut& op) {
+            bsv::span s{&*op.scriptPubKey.begin(), op.scriptPubKey.size()};
+            return IsMinerInfo(s);
+            // return IsMinerInfo(op.scriptPubKey);
+        });
+    if(it_mi_script == mi_tx.vout.cend())
+        return miner_info_error::doc_output_not_found;
 
-    const auto var_mi_ref = ParseMinerInfoRef(script);
+    // Parse the miner_info script and return the document
+    const auto var_mi_doc_sig = ParseMinerInfoScript(
+        it_mi_script->scriptPubKey);
+    if(holds_alternative<miner_info_error>(var_mi_doc_sig))
+        return get<miner_info_error>(var_mi_doc_sig);
+
+    assert(holds_alternative<mi_doc_sig>(var_mi_doc_sig));
+    const auto doc_sig = get<mi_doc_sig>(var_mi_doc_sig);
+
+    return miner_info{doc_sig.first, doc_sig.second, (*it_mi_tx)->GetId()};
+}
+
+std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock& block)
+{
+    if(block.vtx.empty())
+        return miner_info_error::miner_info_ref_not_found;
+
+    const CTransaction& tx{*block.vtx[0]};
+    const auto it_mi_ref =
+        find_if(tx.vout.cbegin(), tx.vout.cend(), [](const CTxOut& op) {
+            bsv::span s{&*op.scriptPubKey.begin(), op.scriptPubKey.size()};
+            return IsMinerInfo(s);
+//            return IsMinerInfo(op.scriptPubKey);
+        });
+    if(it_mi_ref == tx.vout.cend())
+        return miner_info_error::miner_info_ref_not_found;
+
+    const auto var_mi_ref = ParseMinerInfoRef(it_mi_ref->scriptPubKey);
     if(std::holds_alternative<miner_info_error>(var_mi_ref))
         return std::get<miner_info_error>(var_mi_ref);
 
-    assert(std::holds_alternative<miner_info_ref>(var_mi_ref));
-    const auto minerInfoRef = std::get<miner_info_ref>(var_mi_ref);
-    const auto it = find_by_id(block, minerInfoRef.txid()); 
-    if(it == block.vtx.cend())
-        return miner_info_error::txid_not_found;
-
-    const CTransaction& tx{**it};
-    if(tx.vout.empty())
-        return miner_info_error::doc_output_not_found;
-    
-    const auto mi_script{tx.vout[0].scriptPubKey}; 
-    if(!IsMinerInfo(mi_script))
-        return miner_info_error::doc_output_not_found; 
-
-    const auto var_mi_doc_sig = ParseMinerInfoScript(mi_script);
-    if(holds_alternative<miner_info_error>(var_mi_doc_sig))
-        return get<miner_info_error>(var_mi_doc_sig);
-   
-    assert(holds_alternative<mi_doc_sig>(var_mi_doc_sig)); 
-    const auto doc_sig = get<mi_doc_sig>(var_mi_doc_sig);
-    
-    return miner_info{doc_sig.first, doc_sig.second, (*it)->GetId()};
+    return ParseMinerInfo(block, get<miner_info_ref>(var_mi_ref));
 }
 
 bool is_hash_256(const char* s)
