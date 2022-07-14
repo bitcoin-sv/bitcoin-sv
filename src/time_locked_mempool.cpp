@@ -24,6 +24,11 @@ CTimeLockedMempool::CTimeLockedMempool()
     mUpdatePeriodMins = DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD;
 }
 
+const CTransactionRef& CTimeLockedMempool::NonFinalTxn::GetTx() const
+{
+    return info.GetTx();
+}
+
 // Add or update a time-locked transaction
 void CTimeLockedMempool::addOrUpdateTransaction(
     const TxMempoolInfo& info,

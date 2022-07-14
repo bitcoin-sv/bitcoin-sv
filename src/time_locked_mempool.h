@@ -110,7 +110,7 @@ class CTimeLockedMempool final
             : info{tmi}, updateRate{rate}
         {}
 
-        const CTransactionRef& GetTx() const { return info.GetTx(); }
+        const CTransactionRef& GetTx() const;
 
         TxMempoolInfo info {};
         RateLeakyBucket updateRate {};
