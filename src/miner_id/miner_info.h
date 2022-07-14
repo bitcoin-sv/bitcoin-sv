@@ -25,15 +25,18 @@ bool is_der_signature(const bsv::span<const uint8_t>);
 
 class miner_info
 {
+    std::string_view raw_mi_doc_;
     miner_info_doc mi_doc_;
     std::vector<uint8_t> sig_;
     uint256 txid_;
     
 public:
-    miner_info(const miner_info_doc&, 
+    miner_info(std::string_view raw_mi_doc,
+               const miner_info_doc&, 
                bsv::span<const uint8_t> sig,
                const uint256& txid);
 
+    std::string_view raw_mi_doc() const { return raw_mi_doc_; }
     const miner_info_doc& mi_doc() const { return mi_doc_; }
     const std::vector<uint8_t>& sig() const { return sig_; } 
     const uint256& txid() const { return txid_; }

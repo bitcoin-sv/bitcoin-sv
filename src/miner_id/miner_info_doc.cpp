@@ -256,11 +256,11 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
         return miner_info_error::doc_parse_error_rev_msg_fields;
     else if(revMsg.isObject() && revMsgSig.isObject())
     {
-        const auto status = ParseRevocationMsg(revMsg, revMsgSig);
-        if(std::holds_alternative<miner_info_error>(status))
-            return std::get<miner_info_error>(status);
-        else if(std::holds_alternative<revocation_msg>(status))
-            rev_msg = std::get<revocation_msg>(status);
+        const auto var_revocation_msg = ParseRevocationMsg(revMsg, revMsgSig);
+        if(std::holds_alternative<miner_info_error>(var_revocation_msg))
+            return std::get<miner_info_error>(var_revocation_msg);
+        else if(std::holds_alternative<revocation_msg>(var_revocation_msg))
+            rev_msg = std::get<revocation_msg>(var_revocation_msg);
         else
             assert(false);
     }
@@ -304,9 +304,9 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
         return miner_info_error::invalid_instruction;
 
     const auto doc = bsv::to_sv(it->operand());
-    auto status = ParseMinerInfoDoc(doc);
-    if(holds_alternative<miner_info_error>(status))
-        return get<miner_info_error>(status);
+    const auto var_miner_info_doc = ParseMinerInfoDoc(doc);
+    if(holds_alternative<miner_info_error>(var_miner_info_doc))
+        return get<miner_info_error>(var_miner_info_doc);
     
     ++it;
     if(!it.valid())
@@ -317,7 +317,7 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
 
     bsv::span<const uint8_t> sig{it->operand()};
 
-    return make_pair(get<miner_info_doc>(status), sig);   
+    return make_tuple(doc, get<miner_info_doc>(var_miner_info_doc), sig);   
 }
 
 std::ostream& operator<<(std::ostream& os, miner_info_doc::supported_version v)

@@ -14,12 +14,14 @@
 
 using namespace std;
 
-miner_info::miner_info(const miner_info_doc& mi_doc,
-             bsv::span<const uint8_t> sig,
-             const uint256& txid):
-    mi_doc_{mi_doc},
-    sig_{sig.begin(), sig.end()},
-    txid_{txid} 
+miner_info::miner_info(string_view raw_mi_doc,
+                       const miner_info_doc& mi_doc,
+                       bsv::span<const uint8_t> sig,
+                       const uint256& txid)
+    : raw_mi_doc_{raw_mi_doc},
+      mi_doc_{mi_doc},
+      sig_{sig.begin(), sig.end()},
+      txid_{txid}
 {
 }
 
@@ -49,9 +51,9 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
         return get<miner_info_error>(var_mi_doc_sig);
 
     assert(holds_alternative<mi_doc_sig>(var_mi_doc_sig));
-    const auto doc_sig = get<mi_doc_sig>(var_mi_doc_sig);
+    const auto [raw_mi_doc, mi_doc, sig] = get<mi_doc_sig>(var_mi_doc_sig);
 
-    return miner_info{doc_sig.first, doc_sig.second, (*it_mi_tx)->GetId()};
+    return miner_info{raw_mi_doc, mi_doc, sig, (*it_mi_tx)->GetId()};
 }
 
 std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock& block)

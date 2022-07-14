@@ -209,12 +209,13 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_happy_case)
         
     const auto status = ParseMinerInfoScript(script);
     BOOST_CHECK(std::holds_alternative<mi_doc_sig>(status));
-    BOOST_CHECK_EQUAL(expected, get<mi_doc_sig>(status).first);
-    const auto actual_sig{get<mi_doc_sig>(status).second};
+    const auto [raw_mi_doc, mi_doc, mi_sig] = get<mi_doc_sig>(status);
+    BOOST_CHECK_EQUAL(mi_str, raw_mi_doc);
+    BOOST_CHECK_EQUAL(expected, mi_doc);
     BOOST_CHECK_EQUAL_COLLECTIONS(sig.begin(),
                                   sig.end(),
-                                  actual_sig.begin(),
-                                  actual_sig.end());
+                                  mi_sig.begin(),
+                                  mi_sig.end());
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_ill_formed_json)

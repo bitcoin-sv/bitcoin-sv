@@ -594,6 +594,9 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                                     i);
                     break;
                 }
+                
+                const auto mi = get<miner_info>(var_mi_doc_sig);
+                cout << mi.raw_mi_doc() << '\n';
                 // todo ...
             }
         }

@@ -98,7 +98,7 @@ inline bool operator!=(const miner_info_doc& a, const miner_info_doc& b)
 
 std::string to_json(const miner_info_doc&);
 
-using mi_doc_sig = std::pair<miner_info_doc, bsv::span<const uint8_t>>;
+using mi_doc_sig = std::tuple<std::string_view, miner_info_doc, bsv::span<const uint8_t>>;
 std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
     bsv::span<const uint8_t> script);
 
