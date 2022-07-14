@@ -217,32 +217,105 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_ref_in_block)
                       get<miner_info_error>(s));
 }
 
-BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_ref_cjg)
+BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_ref_error)
 {
     CBlock block;
     CMutableTransaction mtx;
-    CTxOut op;
-    const vector<uint8_t> s{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x1};
-    op.scriptPubKey = CScript(s);
-    //op.scriptPubKey = CScript() << OP_FALSE << OP_RETURN << 0x4 << 0x60 << 0x1d
-    //                            << 0xfa << 0x1 << 0x1;
+    const vector<uint8_t> v{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x1};
 
+    CScript s;
+    s.insert(s.begin(), v.begin(), v.end());
+    CTxOut op;
+    op.scriptPubKey = s;  
     mtx.vout.push_back(op);
+    
     CTransaction tx{mtx};
     block.vtx.push_back(make_shared<const CTransaction>(tx));
 
     const auto var_mi_sig = ParseMinerInfo(block);
-    BOOST_CHECK_EQUAL(miner_info_error::miner_info_ref_not_found,
+    BOOST_CHECK_EQUAL(miner_info_error::script_version_unsupported,
                       get<miner_info_error>(var_mi_sig));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_no_miner_info_in_block)
 {
+    CMutableTransaction mtx;
+    vector<uint8_t> v{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
+    constexpr uint8_t hash_len{32};
+    v.push_back(hash_len);
+    fill_n(back_inserter(v), hash_len, 0x1); // txid
+    v.push_back(hash_len);
+    fill_n(back_inserter(v), hash_len, 0x2); // mmr_pbh_hash
+    constexpr uint8_t sig_len{70};
+    v.push_back(sig_len);
+    fill_n(back_inserter(v), sig_len, 0x3); // sig
+
+    CScript s;
+    s.insert(s.begin(), v.begin(), v.end());
+    CTxOut op;
+    op.scriptPubKey = s;  
+    mtx.vout.push_back(op);
+    
     CBlock block;
-    const CTransaction tx;
+    CTransaction tx{mtx};
     block.vtx.push_back(make_shared<const CTransaction>(tx));
+
     const auto var_mi_sig = ParseMinerInfo(block);
-    BOOST_CHECK_EQUAL(miner_info_error::miner_info_ref_not_found,
+    BOOST_CHECK_EQUAL(miner_info_error::txid_not_found,
+                      get<miner_info_error>(var_mi_sig));
+}
+
+BOOST_AUTO_TEST_CASE(parse_miner_info_invalid_miner_info_doc)
+{
+    constexpr uint8_t hash_len{32};
+    constexpr uint8_t sig_len{70};
+    const vector<uint8_t>
+        preamble{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
+    
+    // miner_info_doc tx 
+    CMutableTransaction mi_doc_mtx;
+    vector<uint8_t> v_mi_doc{preamble};
+
+    const string doc{R"({ })"};
+    v_mi_doc.push_back(doc.size());
+    v_mi_doc.insert(v_mi_doc.end(), doc.begin(), doc.end());
+
+    v_mi_doc.push_back(sig_len);
+    fill_n(back_inserter(v_mi_doc), sig_len, 0x2);
+
+    CScript mi_doc_script;
+    mi_doc_script.insert(mi_doc_script.end(), v_mi_doc.begin(), v_mi_doc.end());
+    CTxOut mi_doc_op;
+    mi_doc_op.scriptPubKey = mi_doc_script;
+    mi_doc_mtx.vout.push_back(mi_doc_op);
+
+    CTransaction mi_doc_tx{mi_doc_mtx};
+    
+    // miner_info_ref tx
+    CMutableTransaction mi_ref_mtx;
+    vector<uint8_t> v_mi_ref{preamble};
+    v_mi_ref.push_back(hash_len);
+    const auto txid{mi_doc_tx.GetId()};
+    v_mi_ref.insert(v_mi_ref.end(), txid.begin(), txid.end()); 
+    v_mi_ref.push_back(hash_len);
+    fill_n(back_inserter(v_mi_ref), hash_len, 0x2); // mmr_pbh_hash
+    v_mi_ref.push_back(sig_len);
+    fill_n(back_inserter(v_mi_ref), sig_len, 0x3);
+
+    CScript mi_ref_script;
+    mi_ref_script.insert(mi_ref_script.end(), v_mi_ref.begin(), v_mi_ref.end());
+    CTxOut mi_ref_op;
+    mi_ref_op.scriptPubKey = mi_ref_script;
+    mi_ref_mtx.vout.push_back(mi_ref_op);
+    
+    CTransaction mi_ref_tx{mi_ref_mtx};
+    
+    CBlock block;
+    block.vtx.push_back(make_shared<const CTransaction>(mi_ref_tx));
+    block.vtx.push_back(make_shared<const CTransaction>(mi_doc_tx));
+
+    const auto var_mi_sig = ParseMinerInfo(block);
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_missing_fields,
                       get<miner_info_error>(var_mi_sig));
 }
 

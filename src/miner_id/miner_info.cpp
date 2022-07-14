@@ -34,12 +34,11 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
 
     // Find the miner_info_script
     const CTransaction& mi_tx{**it_mi_tx};
-    const auto it_mi_script =
-        find_if(mi_tx.vout.cbegin(), mi_tx.vout.cend(), [](const CTxOut& op) {
-            bsv::span s{&*op.scriptPubKey.begin(), op.scriptPubKey.size()};
-            return IsMinerInfo(s);
-            // return IsMinerInfo(op.scriptPubKey);
-        });
+    const auto it_mi_script = find_if(mi_tx.vout.cbegin(),
+                                      mi_tx.vout.cend(),
+                                      [](const CTxOut& op) {
+                                          return IsMinerInfo(op.scriptPubKey);
+                                      });
     if(it_mi_script == mi_tx.vout.cend())
         return miner_info_error::doc_output_not_found;
 
@@ -63,9 +62,7 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock& block)
     const CTransaction& tx{*block.vtx[0]};
     const auto it_mi_ref =
         find_if(tx.vout.cbegin(), tx.vout.cend(), [](const CTxOut& op) {
-            bsv::span s{&*op.scriptPubKey.begin(), op.scriptPubKey.size()};
-            return IsMinerInfo(s);
-//            return IsMinerInfo(op.scriptPubKey);
+            return IsMinerInfo(op.scriptPubKey);
         });
     if(it_mi_ref == tx.vout.cend())
         return miner_info_error::miner_info_ref_not_found;

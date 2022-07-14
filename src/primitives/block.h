@@ -132,7 +132,7 @@ public:
     std::string ToString() const;
 
     auto cbegin() const { return vtx.cbegin(); };
-    auto cend() const { return vtx.cbegin(); };
+    auto cend() const { return vtx.cend(); };
 };
 
 inline auto find_by_id(const CBlock& block, const uint256& txid)
