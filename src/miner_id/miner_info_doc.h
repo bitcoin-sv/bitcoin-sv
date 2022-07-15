@@ -88,7 +88,6 @@ private:
     key_set miner_id_keys_;
     key_set revocation_keys_;
     std::optional<revocation_msg> rev_msg_{std::nullopt};
-    std::optional<UniValue> miner_contact_{std::nullopt};
 };
 
 inline bool operator!=(const miner_info_doc& a, const miner_info_doc& b)

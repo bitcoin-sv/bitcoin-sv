@@ -39,6 +39,7 @@ enum class miner_info_error
     doc_parse_error_rev_msg_sig2_key,
     size
 };
+
 std::ostream& operator<<(std::ostream&, miner_info_error); 
 
 void log_parse_error(miner_info_error,

@@ -28,7 +28,7 @@ bool operator==(const block_bind& a, const block_bind& b)
 
 std::ostream& operator<<(std::ostream& os, const block_bind& bb)
 {
-    os << "\nmmr_pbh_hash_: " << bb.mmr_pbh_hash_;
+    os << "mmr_pbh_hash_: " << bb.mmr_pbh_hash_;
 
     ostream_iterator<int> it{os};
     os << "\nsignature: ";
@@ -58,7 +58,7 @@ bool operator==(const miner_info_ref& a, const miner_info_ref& b)
 std::ostream& operator<<(std::ostream& os, const miner_info_ref& mir)
 {
 
-    os << "txid: " << mir.txid_
+    os << "txid: " << std::hex << mir.txid_
        << '\n' << mir.block_bind_;
 
     return os;

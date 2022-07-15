@@ -177,15 +177,18 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_ref_from_string)
 {
     namespace ba = boost::algorithm;
 
-    const string s{"006a04601dface0100204fca489317c2d463f14aa49151a440a5b0dffd5"
-                   "f2ca702341233c0c173b25b8d20f16835ad8214544c82cc11d9bc77d219"
-                   "babd935140c7d1dd48d57b0d9d848b54463044022049b5ff8bdcc2005ef"
-                   "63ba2481e7abe24c6de77a757aeb26213c7096201580fec022049b4b6ad"
-                   "95a45a99b6b7c3098848ae3b50e49e567e5a14cbfc07ef3dc8a17374"};
+    const string s{"006a04601dface0100208080f4a739c82a55c2f8785c9e6af4ee09ab469"
+                   "df1462cf9d6d7a7ea90007b1520b47723d70ad2c63381f2f479af4cec7c"
+                   "e0af982709244a730d02020096f41c254630440220135d76327725b0a04"
+                   "8d582d5ef5f461fa4e26fa088e85fb7d86ec4807995b50c02202e33f296"
+                   "cfb3767c4dcfb6c1bf8a521531307759f128748431295a4622910c65"};
+
     vector<uint8_t> script;
     ba::unhex(s.begin(), s.end(), back_inserter(script));
     const auto status = ParseMinerInfoRef(script); 
     BOOST_CHECK(std::holds_alternative<miner_info_ref>(status));
+
+//    cout << get<miner_info_ref>(status);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

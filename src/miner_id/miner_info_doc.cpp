@@ -23,7 +23,7 @@ miner_info_doc::miner_info_doc(supported_version version,
       height_{height},
       miner_id_keys_{mi_keys},
       revocation_keys_{revocation_keys},
-      rev_msg_{rev_msg}
+      rev_msg_{std::move(rev_msg)}
 {
 }
 
@@ -34,7 +34,6 @@ bool operator==(const miner_info_doc& a, const miner_info_doc& b)
            a.miner_id_keys_ == b.miner_id_keys_ &&
            a.revocation_keys_ == b.revocation_keys_ &&
            a.rev_msg_ == b.rev_msg_;
-           //a.miner_contact_ == b.miner_contact_;
 }
 
 std::ostream& operator<<(std::ostream& os, const miner_info_doc& mi)
@@ -46,6 +45,7 @@ std::ostream& operator<<(std::ostream& os, const miner_info_doc& mi)
 
     if(mi.rev_msg_)
         os << "\nrevocation_msg: " << mi.rev_msg_.value();
+
     return os;
 }
 
@@ -135,7 +135,8 @@ namespace
 {
     using expected_revocation_msg = std::variant<revocation_msg, miner_info_error>;
 
-    expected_revocation_msg ParseRevocationMsg(const UniValue& id_doc, const UniValue& sig_doc)
+    expected_revocation_msg ParseRevocationMsg(const UniValue& id_doc,
+                                               const UniValue& sig_doc)
     {
         assert(id_doc.isObject());
         assert(sig_doc.isObject());
@@ -267,7 +268,12 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
 
     const key_set miner_id_ks{minerId, prevMinerId, prevMinerIdSig};
     const key_set revocation_ks{revKey, prevRevKey, prevRevKeySig};
-    return miner_info_doc{miner_info_doc::v0_3, height, miner_id_ks, revocation_ks, rev_msg};
+
+    return miner_info_doc{miner_info_doc::v0_3,
+                          height,
+                          miner_id_ks,
+                          revocation_ks,
+                          rev_msg};
 }
 
 std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
