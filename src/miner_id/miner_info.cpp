@@ -7,9 +7,12 @@
 #include <regex>
 #include <variant>
 
+#include "consensus/merkle.h"
+#include "hash.h"
 #include "miner_id/miner_info_error.h"
 #include "miner_id/miner_info_ref.h"
 #include "primitives/block.h"
+#include "pubkey.h"
 #include "span.h"
 
 using namespace std;
@@ -53,7 +56,86 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
     assert(holds_alternative<mi_doc_sig>(var_mi_doc_sig));
     const auto [raw_mi_doc, mi_doc, sig] = get<mi_doc_sig>(var_mi_doc_sig);
 
+    const auto mi_err = verify(block, mi_ref.blockbind(), mi_doc.miner_id().key());
+    if(mi_err != miner_info_error::size)
+        return mi_err;
+
     return miner_info{raw_mi_doc, mi_doc, sig, (*it_mi_tx)->GetId()};
+}
+
+uint256 modified_merkle_root(const CBlock& block)
+{
+    assert(!block.vtx.empty());
+    assert(!block.vtx[0]->vin.empty());
+
+    CMutableTransaction coinbase_tx{*(block.vtx[0])};
+
+    coinbase_tx.nVersion = 0x01000000;
+    
+    coinbase_tx.vin[0].scriptSig = CScript()
+                                << std::vector<uint8_t>{0, 0, 0, 0, 0, 0, 0, 0};
+
+    COutPoint op;
+    coinbase_tx.vin[0].prevout = op;
+
+    // Calculate merkle root for block with modified coinbase txn
+    // TODO this won't scale use spv technique
+    std::vector<uint256> leaves{ coinbase_tx.GetId() };
+    leaves.reserve(block.vtx.size());
+    transform(next(block.vtx.begin()), block.vtx.cend(), back_inserter(leaves),
+              [](const auto& vtx)
+              {
+                  return vtx->GetId();
+              });
+
+    return ComputeMerkleRoot(leaves);
+}
+
+namespace
+{
+    template <typename O>
+    void hash_sha256(const uint256& msg, O o)
+    {
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(msg.begin()), msg.size())
+            .Finalize(o);
+    }
+
+    bool verify(const uint256& msg,
+                const std::string_view pub_key,
+                const bsv::span<const uint8_t> sig)
+    {
+        std::vector<uint8_t> hash(CSHA256::OUTPUT_SIZE);
+        hash_sha256(msg, hash.data());
+
+        const CPubKey pubKey{pub_key.begin(), pub_key.end()};
+        return pubKey.Verify(uint256{hash}, sig);
+    }
+}
+
+miner_info_error verify(const CBlock& block,
+                        const block_bind& bb,
+                        const string& key)
+{
+    const auto mm_root = modified_merkle_root(block);
+    
+    vector<uint8_t> buffer{mm_root.begin(), mm_root.end()};
+    buffer.reserve(mm_root.size() + block.hashPrevBlock.size());
+    buffer.insert(buffer.end(), block.hashPrevBlock.begin(), block.hashPrevBlock.end());
+           
+    uint256 expected_mmr_pbh_hash; 
+    CHash256().Write(buffer.data(), buffer.size())
+              .Finalize(expected_mmr_pbh_hash.begin());
+
+    const auto& mmr_pbh_hash = bb.mmr_pbh_hash();
+    if(mmr_pbh_hash != expected_mmr_pbh_hash)
+        return miner_info_error::block_bind_hash_mismatch; 
+
+    const bsv::span<const uint8_t> sig{bb.data(), bb.size()};
+    if(!verify(mmr_pbh_hash, key, sig))
+        return miner_info_error::block_bind_sig_verification_failed; 
+
+    return miner_info_error::size; // cjg
 }
 
 std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock& block)

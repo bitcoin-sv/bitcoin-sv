@@ -23,6 +23,8 @@ public:
     
     auto cbegin_sig() const { return sig_.cbegin(); }
     auto cend_sig() const { return sig_.cend(); } 
+    auto data() const { return sig_.data(); }
+    auto size() const { return sig_.size(); }
 
     friend bool operator==(const block_bind&, const block_bind&);
     friend std::ostream& operator<<(std::ostream&, const block_bind&);
@@ -32,8 +34,6 @@ inline bool operator!=(const block_bind& a, const block_bind& b)
 {
     return !(a == b);
 }
-
-bool verify(const block_bind&);
 
 class miner_info_ref
 {

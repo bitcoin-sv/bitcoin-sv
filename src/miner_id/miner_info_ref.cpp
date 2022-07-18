@@ -37,12 +37,6 @@ std::ostream& operator<<(std::ostream& os, const block_bind& bb)
     return os;
 }
     
-bool verify(const block_bind& bb)
-{
-    return false;
-}
-
-
 miner_info_ref::miner_info_ref(const bsv::span<const uint8_t> txid,
                                const class block_bind& bb)
     : txid_{txid.begin(), txid.end()},
@@ -119,6 +113,10 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     const auto sig{it->operand()};
     if(!is_der_signature(sig))
         return miner_info_error::invalid_sig_len;
+
+    // check sig
+    
+
 
     return miner_info_ref{it_txid->operand(),
                           block_bind{mmr_pbh_hash, sig}};

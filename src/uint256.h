@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -105,11 +106,9 @@ public:
     std::string ToString() const { return GetHex(); };
 
     uint8_t *begin() { return &data[0]; }
-
     uint8_t *end() { return &data[WIDTH]; }
 
     const uint8_t *begin() const { return &data[0]; }
-
     const uint8_t *end() const { return &data[WIDTH]; }
 
     unsigned int size() const { return sizeof(data); }
@@ -170,8 +169,15 @@ public:
 
 inline std::ostream& operator<<(std::ostream& os, const uint256& i)
 {
-    std::ostream_iterator<int> it{os};
-    std::copy(i.begin(), i.end(), it);
+    using namespace std;
+
+    os << hex << std::setfill('0');
+
+    auto it = make_reverse_iterator(i.end());
+    const auto it_end = make_reverse_iterator(i.begin());
+    for(; it != it_end; ++it)
+        os << setw(2) << static_cast<int>(*it);
+    
     return os;
 }
 

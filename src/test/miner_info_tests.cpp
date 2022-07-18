@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
+#include <boost/algorithm/hex.hpp>
 
 #include "miner_id/miner_info.h"
 #include "miner_id/miner_info_ref.h"
@@ -15,6 +16,8 @@
 #include "script/script.h"
 
 using namespace std;
+    
+namespace ba = boost::algorithm;
 
 BOOST_AUTO_TEST_SUITE(miner_info_tests)
 
@@ -317,6 +320,118 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_invalid_miner_info_doc)
     const auto var_mi_sig = ParseMinerInfo(block);
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_missing_fields,
                       get<miner_info_error>(var_mi_sig));
+}
+
+BOOST_AUTO_TEST_CASE(modified_merkle_root_test)
+{
+    CBlock block;
+
+    CMutableTransaction coinbase_tx;
+    coinbase_tx.vin.push_back(CTxIn{});
+    block.vtx.push_back(make_shared<const CTransaction>(coinbase_tx)); 
+
+    CMutableTransaction mtx;
+    mtx.vin.push_back(CTxIn{});
+    mtx.vout.push_back(CTxOut{});
+    block.vtx.push_back(make_shared<const CTransaction>(mtx)); 
+
+    const uint256 mm_root = modified_merkle_root(block);
+    
+    const string s{"dafb77ab1c5c5a14efedb3ab0d7f9974da29c4e8fda323c51ab47ae62c1f71d0"};
+
+    vector<uint8_t> buffer;
+    buffer.reserve(32);
+    ba::unhex(s.begin(), s.end(), back_inserter(buffer));
+
+    const uint256 expected{buffer.cbegin(), buffer.cend()};
+    BOOST_CHECK_EQUAL(expected, mm_root);
+}
+
+BOOST_AUTO_TEST_CASE(verify_sig_blockbind_mismatch)
+{
+    const vector<uint8_t> txid(32, 0x1);
+
+    const vector<uint8_t> mmr_pbh_hash(32, 0x2); 
+
+    const vector<uint8_t> sig(70, 0x3);
+    const block_bind bb{mmr_pbh_hash, sig};
+
+    const miner_info_ref mi_ref{txid, bb};
+    
+    constexpr int32_t block_height{1234};
+    const string miner_id_key;
+    const string miner_id_prev_key;
+    const string miner_id_key_sig;
+    const key_set& miner_id_ks{miner_id_key,
+                               miner_id_prev_key,
+                               miner_id_key_sig};
+    const string rev_key;
+    const string rev_prev_key;
+    const string rev_key_sig;
+    const key_set &revocation_ks{rev_key, rev_prev_key, rev_key_sig};
+
+    const miner_info_doc mi_doc(miner_info_doc::v0_3,
+                                block_height,
+                                miner_id_ks,
+                                revocation_ks);
+    
+    CBlock block;
+    CMutableTransaction coinbase_tx;
+    coinbase_tx.vin.push_back(CTxIn{});
+    block.vtx.push_back(make_shared<const CTransaction>(coinbase_tx)); 
+
+    CMutableTransaction mtx;
+    mtx.vin.push_back(CTxIn{});
+    mtx.vout.push_back(CTxOut{});
+    block.vtx.push_back(make_shared<const CTransaction>(mtx)); 
+
+    const auto mi_err = verify(block, mi_ref.blockbind(), mi_doc.miner_id().key());
+    BOOST_CHECK_EQUAL(miner_info_error::block_bind_hash_mismatch, mi_err);
+}
+
+BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
+{
+    const vector<uint8_t> txid(32, 0x1);
+
+    const string s{"19ce6a9ea11e9b90fa0836d122b468c7a07076f640ef06cd7fb85eaa6a5a77ad"};
+    vector<uint8_t> mmr_pbh_hash;
+    mmr_pbh_hash.reserve(32);
+    ba::unhex(s.cbegin(), s.cend(), back_inserter(mmr_pbh_hash));
+
+    const vector<uint8_t> sig(70, 0x3);
+    const block_bind bb{mmr_pbh_hash, sig};
+
+    const miner_info_ref mi_ref{txid, bb};
+    
+    constexpr int32_t block_height{1234};
+    const string miner_id_key;
+    const string miner_id_prev_key;
+    const string miner_id_key_sig;
+    const key_set& miner_id_ks{miner_id_key,
+                               miner_id_prev_key,
+                               miner_id_key_sig};
+    const string rev_key;
+    const string rev_prev_key;
+    const string rev_key_sig;
+    const key_set &revocation_ks{rev_key, rev_prev_key, rev_key_sig};
+
+    const miner_info_doc mi_doc(miner_info_doc::v0_3,
+                                block_height,
+                                miner_id_ks,
+                                revocation_ks);
+    
+    CBlock block;
+    CMutableTransaction coinbase_tx;
+    coinbase_tx.vin.push_back(CTxIn{});
+    block.vtx.push_back(make_shared<const CTransaction>(coinbase_tx)); 
+
+    CMutableTransaction mtx;
+    mtx.vin.push_back(CTxIn{});
+    mtx.vout.push_back(CTxOut{});
+    block.vtx.push_back(make_shared<const CTransaction>(mtx)); 
+
+    const auto mi_err = verify(block, mi_ref.blockbind(), mi_doc.miner_id().key());
+    BOOST_CHECK_EQUAL(miner_info_error::block_bind_sig_verification_failed, mi_err);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
