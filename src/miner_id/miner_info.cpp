@@ -125,7 +125,7 @@ miner_info_error verify(const CBlock& block,
     if(!pubKey.Verify(uint256{mmr_pbh_hash}, sig))
         return miner_info_error::block_bind_sig_verification_failed; 
 
-    return miner_info_error::size; // cjg
+    return miner_info_error::size;
 }
 
 std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock& block)

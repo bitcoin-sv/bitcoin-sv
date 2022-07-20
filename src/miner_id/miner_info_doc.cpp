@@ -6,11 +6,13 @@
 
 #include <variant>
 
+#include "crypto/sha256.h"
+
+#include "miner_info.h"
+#include "pubkey.h"
 #include "script/instruction_iterator.h"
 #include "script/script.h"
 #include "span.h"
-
-#include "miner_info.h"
 
 using namespace std;
 
@@ -40,11 +42,11 @@ std::ostream& operator<<(std::ostream& os, const miner_info_doc& mi)
 {
     os << "version: " << mi.version_ 
        << "\nheight: " << mi.height_
-       << "\nminer_id: " << mi.miner_id_keys_ 
-       << "\nrevocation_key: " << mi.revocation_keys_;
+       << "\nminer_id:\n" << mi.miner_id_keys_ 
+       << "\nrevocation_key:\n" << mi.revocation_keys_;
 
     if(mi.rev_msg_)
-        os << "\nrevocation_msg: " << mi.rev_msg_.value();
+        os << "\nrevocation_msg:\n" << mi.rev_msg_.value();
 
     return os;
 }
@@ -133,8 +135,33 @@ std::ostream& operator<<(ostream& os, const revocation_msg& msg)
 
 namespace
 {
-    using expected_revocation_msg = std::variant<revocation_msg, miner_info_error>;
+    bool verify(const uint256& msg, const string& sig, const string& key)
+    {
+        const CPubKey pubKey{ParseHex(key.c_str())};
+        const auto hex_sig = ParseHex(sig);
+        return pubKey.Verify(msg, hex_sig);
+    }
 
+    miner_info_error verify(const revocation_msg& msg,
+                            const string& rev_key,
+                            const string& miner_id_key)
+    {
+        const auto comp_miner_id = ParseHex(msg.compromised_miner_id());
+        uint256 comp_miner_id_hash;
+        CSHA256()
+            .Write(comp_miner_id.data(), comp_miner_id.size())
+            .Finalize(comp_miner_id_hash.begin());
+
+        if(!verify(comp_miner_id_hash, msg.sig_1(), rev_key))
+            return miner_info_error::doc_parse_error_sig1_verification_failed;
+
+        if(!verify(comp_miner_id_hash, msg.sig_2(), miner_id_key))
+            return miner_info_error::doc_parse_error_sig2_verification_failed;
+        
+        return miner_info_error::size; 
+    }
+
+    using expected_revocation_msg = std::variant<revocation_msg, miner_info_error>;
     expected_revocation_msg ParseRevocationMsg(const UniValue& id_doc,
                                                const UniValue& sig_doc)
     {
@@ -249,10 +276,13 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     const auto prevRevKeySig = doc["prevRevocationKeySig"].getValStr();
     if(!is_der_signature(prevRevKeySig))
         return miner_info_error::doc_parse_error_invalid_prev_revocation_key_sig;
+    
+    const key_set miner_id_ks{minerId, prevMinerId, prevMinerIdSig};
+    const key_set revocation_ks{revKey, prevRevKey, prevRevKeySig};
 
     const auto revMsg = doc["revocationMessage"];
     const auto revMsgSig = doc["revocationMessageSig"];
-    std::optional<revocation_msg> rev_msg;
+    std::optional<revocation_msg> revocation_msg;
     if(revMsg.isObject() ^ revMsgSig.isObject())
         return miner_info_error::doc_parse_error_rev_msg_fields;
     else if(revMsg.isObject() && revMsgSig.isObject())
@@ -260,20 +290,23 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
         const auto var_revocation_msg = ParseRevocationMsg(revMsg, revMsgSig);
         if(std::holds_alternative<miner_info_error>(var_revocation_msg))
             return std::get<miner_info_error>(var_revocation_msg);
-        else if(std::holds_alternative<revocation_msg>(var_revocation_msg))
-            rev_msg = std::get<revocation_msg>(var_revocation_msg);
+        else if(std::holds_alternative<::revocation_msg>(var_revocation_msg))
+        {
+            auto rev_msg = std::get<::revocation_msg>(var_revocation_msg);
+            const auto status = verify(rev_msg, revocation_ks.key(), miner_id_ks.key()); 
+            if(status != miner_info_error::size)
+                return status;
+            revocation_msg = rev_msg;
+        }
         else
             assert(false);
     }
-
-    const key_set miner_id_ks{minerId, prevMinerId, prevMinerIdSig};
-    const key_set revocation_ks{revKey, prevRevKey, prevRevKeySig};
 
     return miner_info_doc{miner_info_doc::v0_3,
                           height,
                           miner_id_ks,
                           revocation_ks,
-                          rev_msg};
+                          revocation_msg};
 }
 
 std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(

@@ -35,8 +35,10 @@ enum class miner_info_error
     doc_parse_error_rev_msg_key,
     doc_parse_error_rev_msg_sig1,
     doc_parse_error_rev_msg_sig1_key,
+    doc_parse_error_sig1_verification_failed,
     doc_parse_error_rev_msg_sig2,
     doc_parse_error_rev_msg_sig2_key,
+    doc_parse_error_sig2_verification_failed,
     block_bind_hash_mismatch,
     block_bind_sig_verification_failed,
     size

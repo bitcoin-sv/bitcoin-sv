@@ -164,9 +164,9 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_failure_cases)
         script.push_back(sig_len + sig_len_offset);
         generate_n(back_inserter(script), sig_len + sig_len_offset, [](){ return 0x42; });
 
-        const auto status = ParseMinerInfoScript(script); 
-        BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
-        BOOST_CHECK_EQUAL(expected, get<miner_info_error>(status));
+        const auto var_mi_doc_sig = ParseMinerInfoScript(script); 
+        BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc_sig));
+        BOOST_CHECK_EQUAL(expected, get<miner_info_error>(var_mi_doc_sig));
     }
 }
 
@@ -207,9 +207,9 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_happy_case)
     script.push_back(sig.size());
     script.insert(script.end(), sig.begin(), sig.end()); 
         
-    const auto status = ParseMinerInfoScript(script);
-    BOOST_CHECK(std::holds_alternative<mi_doc_sig>(status));
-    const auto [raw_mi_doc, mi_doc, mi_sig] = get<mi_doc_sig>(status);
+    const auto var_mi_doc_sig = ParseMinerInfoScript(script);
+    BOOST_CHECK(std::holds_alternative<mi_doc_sig>(var_mi_doc_sig));
+    const auto [raw_mi_doc, mi_doc, mi_sig] = get<mi_doc_sig>(var_mi_doc_sig);
     BOOST_CHECK_EQUAL(mi_str, raw_mi_doc);
     BOOST_CHECK_EQUAL(expected, mi_doc);
     BOOST_CHECK_EQUAL_COLLECTIONS(sig.begin(),
@@ -221,10 +221,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_happy_case)
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_ill_formed_json)
 {
     string_view doc{"{"};
-    const auto status = ParseMinerInfoDoc(doc);
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_ill_formed_json,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
                         // name, type, value
@@ -246,10 +246,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_required_fields)
     for(size_t i{}; i < required_fields.size(); ++i)
     {
         const string doc = to_json(next(fields.cbegin()), fields.cend());
-        const auto status = ParseMinerInfoDoc(doc);   
-        BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+        const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+        BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
         BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_missing_fields,
-                          std::get<miner_info_error>(status));
+                          std::get<miner_info_error>(var_mi_doc));
 
         rotate(fields.begin(), next(fields.begin()), fields.end());
     }
@@ -272,10 +272,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_version)
               });
 
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_unsupported_version,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_height)
@@ -294,10 +294,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_height)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_height,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_miner_id)
@@ -316,10 +316,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_miner_id)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_miner_id,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id)
@@ -338,10 +338,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_prev_miner_id,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id_sig)
@@ -360,10 +360,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id_sig)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_prev_miner_id_sig,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_revocation_key)
@@ -382,10 +382,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_revocation_key)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_revocation_key,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key)
@@ -404,10 +404,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_prev_revocation_key,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key_sig)
@@ -426,10 +426,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key_sig)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_error>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK(std::holds_alternative<miner_info_error>(var_mi_doc));
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_invalid_prev_revocation_key_sig,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_only)
@@ -451,9 +451,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_only)
                                 oss.str()));
     
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_fields,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_sig_only)
@@ -472,9 +472,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_sig_only)
                                 R"("sig1" : "42", "sig2" : "42")"));
     
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_fields,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_no_compromised_minerId_field)
@@ -496,9 +496,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_no_compromised_minerId_field)
                                 R"("sig1" : "42", "sig2" : "42")"));
 
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_field,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_key)
@@ -520,9 +520,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_key)
                                 R"("sig1" : "42", "sig2" : "42")"));
 
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_key,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1)
@@ -547,9 +547,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1)
                                 R"("INVALID" : "42", "sig2" : "42")"));
 
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_sig1,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1_key)
@@ -574,9 +574,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1_key)
                                 R"("sig1" : "INVALID", "sig2" : "42")"));
 
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_sig1_key,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2)
@@ -602,9 +602,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2)
                                 oss.str()));
     
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_sig2,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2_key)
@@ -630,9 +630,9 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2_key)
                                 oss.str()));
     
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_sig2_key,
-                      std::get<miner_info_error>(status));
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(revocation_message_construction)
@@ -671,7 +671,7 @@ BOOST_AUTO_TEST_CASE(revocation_message_equality)
     BOOST_CHECK_NE(d, e);
 }
 
-BOOST_AUTO_TEST_CASE(parse_revocation_msg_happy_case)
+BOOST_AUTO_TEST_CASE(parse_revocation_sig_1_verification_fail)
 {
     json_fields_type fields;
     transform(required_fields.cbegin(),
@@ -695,20 +695,64 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_happy_case)
                                 oss.str()));
 
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_doc>(status));
-
-    std::optional<revocation_msg> rev_msg{
-        revocation_msg{compressed_key_2, sig_0, sig_1}};
-    const miner_info_doc expected{miner_info_doc::v0_3,
-                                  h,
-                                  mi_keys,
-                                  rev_keys,
-                                  rev_msg};
-    BOOST_CHECK_EQUAL(expected, std::get<miner_info_doc>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_sig1_verification_failed,
+                      get<miner_info_error>(var_mi_doc));
 }
 
-BOOST_AUTO_TEST_CASE(parse_miner_info_doc_happy_case)
+BOOST_AUTO_TEST_CASE(parse_revocation_sig_2_verification_fail)
+{
+    namespace ba = boost::algorithm;
+
+    const string s{
+        "006a04601dface01004dc2047b2276657273696f6e223a22302e33222c226865696768"
+        "74223a34323433312c22707265764d696e65724964223a223033316164313332383437"
+        "3661376666373930313637373562356363363664303238616636643634376461356338"
+        "3632376531323636653661323039643364316565222c22707265764d696e6572496453"
+        "6967223a22333034343032323036636332636230376337633063316131323836306665"
+        "3139613165323232623239663964643930326365343861616131613564386565616465"
+        "3434386234303230323230373337393965633137646631303264336161363036623463"
+        "3032373930646232336237653239643339663264333861646234346337383936323433"
+        "3334356564222c226d696e65724964223a223033316164313332383437366137666637"
+        "3930313637373562356363363664303238616636643634376461356338363237653132"
+        "3636653661323039643364316565222c22707265765265766f636174696f6e4b657922"
+        "3a22303361306264653733346564363562323963383163373331336432653464336339"
+        "626337313164326463323231383265396461643239653563373266636432636630222c"
+        "227265766f636174696f6e4b6579223a22303264316139636639376130666531666630"
+        "3163373233633336343133306332306561633336393565313338316438353437333238"
+        "39323639336635346230306432222c22707265765265766f636174696f6e4b65795369"
+        "67223a2233303435303232313030613639353837346532373364613737323338303837"
+        "6132386137663939333737343030623863346138643330666365356631356134666539"
+        "6662363038386638303232303164663862353233363930656533633361373231373033"
+        "6566333639366134376238333665393366386463626333626432626463613737613064"
+        "386132646666222c227265766f636174696f6e4d657373616765223a7b22636f6d7072"
+        "6f6d697365645f6d696e65724964223a22303336333331666333653337326663386232"
+        "3264653435653662626535326632376334666134616463313036396263613535343239"
+        "35386139326131393935666138227d2c227265766f636174696f6e4d65737361676553"
+        "6967223a7b2273696731223a2233303434303232303766653632353032376235343566"
+        "6632333838316633626661323039303237396530316331333563323231656137316634"
+        "3732396230653731636637616262313032323036303963333066363561303639376566"
+        "3232313865643964353331643238316535636231373437313136303634306433313238"
+        "65396162346436353230366163222c2273696732223a22333034353032313130306235"
+        "3437303838623061303935396231393239336461303937323966316430613736316534"
+        "3434356134386234646437336263646332356633643264613232323032323036333961"
+        "6232613166363863656566633535343231316230383830333239326439373439383438"
+        "37353932336263303437366662636163316365303432313761227d2c226d696e657243"
+        "6f6e74616374223a7b22656d61696c223a226d696e696e67406d696e696e673033446f"
+        "6d61696e2e636f6d222c226e616d65223a226d696e696e6730332d6f70656e2d6d696e"
+        "6572227d7d473045022100cc5b54c3ac5dc082505c3644aa3567dedcd7a422c72a2e37"
+        "5a017d1202d3b408022003053ad1843b5238fc6c7b7a025ffa697646471f7029495409"
+        "953265ce11f783"};
+
+    vector<uint8_t> script;
+    ba::unhex(s.begin(), s.end(), back_inserter(script));
+
+    const auto var_mi_doc_sig = ParseMinerInfoScript(script);
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_sig2_verification_failed,
+                      get<miner_info_error>(var_mi_doc_sig));
+}
+
+BOOST_AUTO_TEST_CASE(parse_miner_info_doc_without_rev_msg_happy_case)
 {
     json_fields_type fields;
     transform(required_fields.cbegin(),
@@ -719,14 +763,14 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_happy_case)
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto status = ParseMinerInfoDoc(doc);   
-    BOOST_CHECK(std::holds_alternative<miner_info_doc>(status));
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);
+    BOOST_CHECK(std::holds_alternative<miner_info_doc>(var_mi_doc));
     
     const miner_info_doc expected{mi_doc}; 
-    BOOST_CHECK_EQUAL(expected, std::get<miner_info_doc>(status));
+    BOOST_CHECK_EQUAL(expected, std::get<miner_info_doc>(var_mi_doc));
 }
 
-BOOST_AUTO_TEST_CASE(parse_miner_info_script_from_string)
+BOOST_AUTO_TEST_CASE(parse_miner_info_script_with_rev_msg_happy_case)
 {
     namespace ba = boost::algorithm;
 
@@ -776,7 +820,41 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_script_from_string)
     const auto var_mi_doc_sig = ParseMinerInfoScript(script);
     BOOST_CHECK(std::holds_alternative<mi_doc_sig>(var_mi_doc_sig));
     const auto [raw_mi_doc, mi_doc, mi_sig] = get<mi_doc_sig>(var_mi_doc_sig);
-    //cout << mi_doc << endl;
+
+    constexpr int height{42431};
+    const string miner_id{
+        "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
+    const string mi_prev_key{
+        "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
+    const string mi_prev_key_sig{
+        "304402206cc2cb07c7c0c1a12860fe19a1e222b29f9dd902ce48aaa1a5d8eeade448b4"
+        "02022073799ec17df102d3aa606b4c02790db23b7e29d39f2d38adb44c7896243345e"
+        "d"};
+    const key_set mi_keys{miner_id, mi_prev_key, mi_prev_key_sig};
+
+    const string rev_key{
+        "02d1a9cf97a0fe1ff01c723c364130c20eac3695e1381d854732892693f54b00d2"};
+    const string prev_rev_key{
+        "03a0bde734ed65b29c81c7313d2e4d3c9bc711d2dc22182e9dad29e5c72fcd2cf0"};
+    const string rev_prev_key_sig{
+        "3045022100a695874e273da77238087a28a7f99377400b8c4"
+        "a8d30fce5f15a4fe9fb6088f802201df8b523690ee3c3a721"
+        "703ef3696a47b836e93f8dcbc3bd2bdca77a0d8a2dff"};
+    const key_set rev_keys{rev_key, prev_rev_key, rev_prev_key_sig};
+
+    const string comp_miner_id{
+        "036331fc3e372fc8b22de45e6bbe52f27c4fa4adc1069bca5542958a92a1995fa8"};
+    const string sig_1{"304402207fe625027b545ff23881f3bfa2090279e01c135c221ea71"
+                       "f4729b0e71cf7abb10220609c30f65a0697ef2218ed9d531d281e5c"
+                       "b17471160640d3128e9ab4d65206ac"};
+    const string sig_2{"3045022100b547088b0a0959b19293da09729f1d0a761e4445a48b4"
+                       "dd73bcdc25f3d2da2220220639ab2a1f68ceefc554211b08803292d"
+                       "974984875923bc0476fbcac1ce04217a"};
+    std::optional<revocation_msg> rev_msg{
+        revocation_msg{comp_miner_id, sig_1, sig_2}};
+    const miner_info_doc expected{miner_info_doc::v0_3, height, mi_keys, rev_keys,
+                                  rev_msg};
+    BOOST_CHECK_EQUAL(expected, mi_doc);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
