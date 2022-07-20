@@ -328,6 +328,23 @@ BOOST_AUTO_TEST_CASE(modified_merkle_root_test)
 
     CMutableTransaction coinbase_tx;
     coinbase_tx.vin.push_back(CTxIn{});
+    coinbase_tx.vout.push_back(CTxOut{});
+
+    const vector<uint8_t> v{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x1};
+    CScript mi_ref_script;
+    mi_ref_script.insert(mi_ref_script.begin(), v.begin(), v.end());
+
+    const vector<uint8_t> txid(32, 0x1);
+    mi_ref_script.push_back(txid.size());
+    mi_ref_script.insert(mi_ref_script.end(), txid.cbegin(), txid.cend());
+
+    const vector<uint8_t> sig(70, 0x2);
+    mi_ref_script.push_back(sig.size());
+    mi_ref_script.insert(mi_ref_script.end(), sig.cbegin(), sig.cend());
+
+    CTxOut op;
+    op.scriptPubKey = mi_ref_script;  
+    coinbase_tx.vout.push_back(op);
     block.vtx.push_back(make_shared<const CTransaction>(coinbase_tx)); 
 
     CMutableTransaction mtx;
@@ -335,10 +352,9 @@ BOOST_AUTO_TEST_CASE(modified_merkle_root_test)
     mtx.vout.push_back(CTxOut{});
     block.vtx.push_back(make_shared<const CTransaction>(mtx)); 
 
-    const uint256 mm_root = modified_merkle_root(block);
+    const uint256 mm_root = modify_merkle_root(block);
     
-    const string s{"dafb77ab1c5c5a14efedb3ab0d7f9974da29c4e8fda323c51ab47ae62c1f71d0"};
-
+    const string s{"82a6bf5d5af80a62f9e598275f6d6c6e68a0cb15f28fa6e77fc12efb756bc54a"};
     vector<uint8_t> buffer;
     buffer.reserve(32);
     ba::unhex(s.begin(), s.end(), back_inserter(buffer));
@@ -378,6 +394,8 @@ BOOST_AUTO_TEST_CASE(verify_sig_blockbind_mismatch)
     CBlock block;
     CMutableTransaction coinbase_tx;
     coinbase_tx.vin.push_back(CTxIn{});
+    coinbase_tx.vout.push_back(CTxOut{});
+    coinbase_tx.vout.push_back(CTxOut{});
     block.vtx.push_back(make_shared<const CTransaction>(coinbase_tx)); 
 
     CMutableTransaction mtx;
@@ -393,7 +411,8 @@ BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
 {
     const vector<uint8_t> txid(32, 0x1);
 
-    const string s{"19ce6a9ea11e9b90fa0836d122b468c7a07076f640ef06cd7fb85eaa6a5a77ad"};
+    const string s{"b4b1f4a3d6bef5d11d84becf951d0161d2815f4e02772869bfcf047e81fff57c"};
+
     vector<uint8_t> mmr_pbh_hash;
     mmr_pbh_hash.reserve(32);
     ba::unhex(s.cbegin(), s.cend(), back_inserter(mmr_pbh_hash));
@@ -423,6 +442,21 @@ BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
     CBlock block;
     CMutableTransaction coinbase_tx;
     coinbase_tx.vin.push_back(CTxIn{});
+    coinbase_tx.vout.push_back(CTxOut{});
+
+    const vector<uint8_t> v{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x1};
+    CScript mi_ref_script;
+    mi_ref_script.insert(mi_ref_script.begin(), v.begin(), v.end());
+
+    mi_ref_script.push_back(txid.size());
+    mi_ref_script.insert(mi_ref_script.end(), txid.cbegin(), txid.cend());
+
+    mi_ref_script.push_back(sig.size());
+    mi_ref_script.insert(mi_ref_script.end(), sig.cbegin(), sig.cend());
+
+    CTxOut op;
+    op.scriptPubKey = mi_ref_script;  
+    coinbase_tx.vout.push_back(op);
     block.vtx.push_back(make_shared<const CTransaction>(coinbase_tx)); 
 
     CMutableTransaction mtx;

@@ -63,10 +63,11 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
     return miner_info{raw_mi_doc, mi_doc, sig, (*it_mi_tx)->GetId()};
 }
 
-uint256 modified_merkle_root(const CBlock& block)
+uint256 modify_merkle_root(const CBlock& block)
 {
     assert(!block.vtx.empty());
     assert(!block.vtx[0]->vin.empty());
+    assert(block.vtx[0]->vout.size() >= 2);
 
     CMutableTransaction coinbase_tx{*(block.vtx[0])};
 
@@ -77,6 +78,15 @@ uint256 modified_merkle_root(const CBlock& block)
 
     COutPoint op;
     coinbase_tx.vin[0].prevout = op;
+
+    const auto it = find_if(coinbase_tx.vout.begin(),
+                            coinbase_tx.vout.end(),
+                            [](const CTxOut& op) { return IsMinerInfo(op.scriptPubKey); });
+    if(it != coinbase_tx.vout.cend())
+    {
+        constexpr size_t truncate_len{42};
+        it->scriptPubKey.resize(truncate_len);
+    }
 
     // Calculate merkle root for block with modified coinbase txn
     // TODO this won't scale use spv technique
@@ -91,48 +101,28 @@ uint256 modified_merkle_root(const CBlock& block)
     return ComputeMerkleRoot(leaves);
 }
 
-namespace
-{
-    template <typename O>
-    void hash_sha256(const uint256& msg, O o)
-    {
-        CSHA256()
-            .Write(reinterpret_cast<const uint8_t*>(msg.begin()), msg.size())
-            .Finalize(o);
-    }
-
-    bool verify(const uint256& msg,
-                const std::string_view pub_key,
-                const bsv::span<const uint8_t> sig)
-    {
-        std::vector<uint8_t> hash(CSHA256::OUTPUT_SIZE);
-        hash_sha256(msg, hash.data());
-
-        const CPubKey pubKey{pub_key.begin(), pub_key.end()};
-        return pubKey.Verify(uint256{hash}, sig);
-    }
-}
-
 miner_info_error verify(const CBlock& block,
                         const block_bind& bb,
                         const string& key)
 {
-    const auto mm_root = modified_merkle_root(block);
+    const auto mm_root = modify_merkle_root(block);
     
     vector<uint8_t> buffer{mm_root.begin(), mm_root.end()};
     buffer.reserve(mm_root.size() + block.hashPrevBlock.size());
     buffer.insert(buffer.end(), block.hashPrevBlock.begin(), block.hashPrevBlock.end());
            
     uint256 expected_mmr_pbh_hash; 
-    CHash256().Write(buffer.data(), buffer.size())
-              .Finalize(expected_mmr_pbh_hash.begin());
+    CSHA256().Write(buffer.data(), buffer.size())
+             .Finalize(expected_mmr_pbh_hash.begin());
 
     const auto& mmr_pbh_hash = bb.mmr_pbh_hash();
     if(mmr_pbh_hash != expected_mmr_pbh_hash)
         return miner_info_error::block_bind_hash_mismatch; 
 
     const bsv::span<const uint8_t> sig{bb.data(), bb.size()};
-    if(!verify(mmr_pbh_hash, key, sig))
+    
+    const CPubKey pubKey{ParseHex(key.c_str())};
+    if(!pubKey.Verify(uint256{mmr_pbh_hash}, sig))
         return miner_info_error::block_bind_sig_verification_failed; 
 
     return miner_info_error::size; // cjg
