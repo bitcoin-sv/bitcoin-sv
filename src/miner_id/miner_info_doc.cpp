@@ -135,11 +135,11 @@ std::ostream& operator<<(ostream& os, const revocation_msg& msg)
 
 namespace
 {
-    bool verify(const uint256& msg, const string& sig, const string& key)
+    bool verify(const uint256& msg_hash, const string& sig, const string& key)
     {
         const CPubKey pubKey{ParseHex(key.c_str())};
         const auto hex_sig = ParseHex(sig);
-        return pubKey.Verify(msg, hex_sig);
+        return pubKey.Verify(msg_hash, hex_sig);
     }
 
     miner_info_error verify(const revocation_msg& msg,
@@ -159,6 +159,19 @@ namespace
             return miner_info_error::doc_parse_error_sig2_verification_failed;
         
         return miner_info_error::size; 
+    }
+    
+    bool verify(const key_set& ks)
+    {
+        auto hex_msg1 = ParseHex(ks.prev_key());
+        const auto hex_msg2 = ParseHex(ks.key());
+        hex_msg1.insert(hex_msg1.end(), hex_msg2.begin(), hex_msg2.end());
+        uint256 hash;
+        CSHA256()
+            .Write(hex_msg1.data(), hex_msg1.size())
+            .Finalize(hash.begin());
+
+        return verify(hash, ks.prev_key_sig(), ks.prev_key()); 
     }
 
     using expected_revocation_msg = std::variant<revocation_msg, miner_info_error>;
@@ -265,6 +278,10 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     if(!is_der_signature(prevMinerIdSig))
         return miner_info_error::doc_parse_error_invalid_prev_miner_id_sig;
     
+    const key_set miner_id_ks{minerId, prevMinerId, prevMinerIdSig};
+    if(!verify(miner_id_ks))
+        return miner_info_error::doc_parse_error_prev_miner_id_sig_verification_fail;
+    
     const auto revKey = doc["revocationKey"].getValStr();
     if(!is_compressed_key(revKey))
         return miner_info_error::doc_parse_error_invalid_revocation_key;
@@ -276,31 +293,37 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     const auto prevRevKeySig = doc["prevRevocationKeySig"].getValStr();
     if(!is_der_signature(prevRevKeySig))
         return miner_info_error::doc_parse_error_invalid_prev_revocation_key_sig;
-    
-    const key_set miner_id_ks{minerId, prevMinerId, prevMinerIdSig};
-    const key_set revocation_ks{revKey, prevRevKey, prevRevKeySig};
 
+    const key_set revocation_ks{revKey, prevRevKey, prevRevKeySig};
+    if(!verify(revocation_ks))
+        return miner_info_error::doc_parse_error_prev_rev_key_sig_verification_fail;
+    
     const auto revMsg = doc["revocationMessage"];
     const auto revMsgSig = doc["revocationMessageSig"];
     std::optional<revocation_msg> revocation_msg;
-    if(revMsg.isObject() ^ revMsgSig.isObject())
+
+    if(revMsg.isNull() && revMsgSig.isNull())
+        return miner_info_doc{miner_info_doc::v0_3,
+                            height,
+                            miner_id_ks,
+                            revocation_ks,
+                            revocation_msg};
+   
+    if(!revMsg.isObject() || !revMsgSig.isObject())
         return miner_info_error::doc_parse_error_rev_msg_fields;
-    else if(revMsg.isObject() && revMsgSig.isObject())
-    {
-        const auto var_revocation_msg = ParseRevocationMsg(revMsg, revMsgSig);
-        if(std::holds_alternative<miner_info_error>(var_revocation_msg))
-            return std::get<miner_info_error>(var_revocation_msg);
-        else if(std::holds_alternative<::revocation_msg>(var_revocation_msg))
-        {
-            auto rev_msg = std::get<::revocation_msg>(var_revocation_msg);
-            const auto status = verify(rev_msg, revocation_ks.key(), miner_id_ks.key()); 
-            if(status != miner_info_error::size)
-                return status;
-            revocation_msg = rev_msg;
-        }
-        else
-            assert(false);
-    }
+
+    const auto var_revocation_msg = ParseRevocationMsg(revMsg, revMsgSig);
+    if(std::holds_alternative<miner_info_error>(var_revocation_msg))
+        return std::get<miner_info_error>(var_revocation_msg);
+    
+    assert(std::holds_alternative<::revocation_msg>(var_revocation_msg));
+    auto rev_msg = std::get<::revocation_msg>(var_revocation_msg);
+    const auto status = verify(rev_msg,
+                               revocation_ks.key(),
+                               miner_id_ks.prev_key());
+    if(status != miner_info_error::size)
+        return status;
+    revocation_msg = rev_msg;
 
     return miner_info_doc{miner_info_doc::v0_3,
                           height,

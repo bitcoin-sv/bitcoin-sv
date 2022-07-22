@@ -5,6 +5,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <variant>
 
 #include "uint256.h"
 #include "span.h"

@@ -5,7 +5,7 @@
 #include <numeric>
 
 #include <boost/test/unit_test.hpp>
-#include <boost/algorithm/hex.hpp>
+#include "boost/algorithm/hex.hpp"
 
 #include "miner_id/miner_info_doc.h"
 #include "script/instruction_iterator.h"
@@ -22,7 +22,7 @@ namespace
         object
     };
 
-    vector<pair<string, json_value_type>>
+    const vector<pair<string, json_value_type>>
         required_fields{make_pair("version", json_value_type::string),
                         make_pair("height", json_value_type::number),
                         make_pair("minerId", json_value_type::string),
@@ -33,34 +33,74 @@ namespace
                                    json_value_type::string),
                         make_pair("prevRevocationKeySig",
                                    json_value_type::string)};
-
+    
     const string version{"0.3"};
     const string height{"1234"};
+    constexpr int h{1234};
     const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()};
     const string compressed_key_3{[]{ return string{"03"} + string(64, '0');}()};
-    const string sig_0(142, '0');
-    const string sig_1(142, '1');
-    const vector<string> good_values{version,
-                                     height,
-                                     compressed_key_2, // minerId
-                                     compressed_key_3, // prevMinerId
-                                     sig_0,            // prevMinerIdSig
-                                     compressed_key_3, // revocationKey
-                                     compressed_key_2, // prevRevocationKey
-                                     sig_1};           // prevRevocationKeySig
-    
-    vector<pair<string_view, json_value_type>>
-        optional_fields{make_pair("revocationMessage", json_value_type::string)};
-    
-    constexpr int h{1234};
-    const key_set mi_keys{compressed_key_2, compressed_key_3, sig_0};
-    const key_set rev_keys{compressed_key_3, compressed_key_2, sig_1};
-    const miner_info_doc mi_doc{miner_info_doc::v0_3,
-                                h,
-                                mi_keys,
-                                rev_keys};
 
-    template<typename T>
+    const string miner_id{
+        "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
+    const string prev_miner_id{
+        "03f08b8eaa43fd93f650a3f4e270c501d061d4ba39e7e9c2367cc1f41fe7d763a9"};
+    const string prev_miner_id_sig{
+        "304402207e30b01e4a8eae62b9d7d5e35aa6bc4786ead2efa3ffbfee4243652ed71e60"
+        "c302205b95222e9e646ac214ffaa348a6ffd509e84f4172bb4bc89e3ef90d40310e3ee"};
+
+    const string rev_key{
+        "02d1a9cf97a0fe1ff01c723c364130c20eac3695e1381d854732892693f54b00d2"};
+    const string prev_rev_key{
+        "03a0bde734ed65b29c81c7313d2e4d3c9bc711d2dc22182e9dad29e5c72fcd2cf0"};
+    const string prev_rev_key_sig{
+        "3045022100a695874e273da77238087a28a7f99377400b8c4"
+        "a8d30fce5f15a4fe9fb6088f802201df8b523690ee3c3a721"
+        "703ef3696a47b836e93f8dcbc3bd2bdca77a0d8a2dff"};
+    
+    const vector<string> required_values{version,
+                                         height,
+                                         miner_id,
+                                         prev_miner_id,
+                                         prev_miner_id_sig,
+                                         rev_key,
+                                         prev_rev_key,
+                                         prev_rev_key_sig};
+
+    const vector<pair<string, json_value_type>> optional_fields{
+        make_pair("revocationMessage", json_value_type::object),
+        make_pair("revocationMessageSig", json_value_type::object)};
+    
+    const string rev_msg{R"("compromised_minerId") : ")"};
+    const string comp_miner_id{
+        "03f08b8eaa43fd93f650a3f4e270c501d061d4ba39e7e9c2367cc1f41fe7d763a9"};
+    const string sig_1{"3044022065d23509e353b516dbe1cd62e2aa1f2dcfe6d4264a2c0c4"
+                       "e3b91d62976154f3f022004abc96a1c5a60a8658887ac25c9d66181"
+                       "7d0b9ce778ff18a1a4f1ab2eec0ea0"};
+    const string sig_2{"3045022100a26745be5035f154c26850222639e0ed3f8c08d117495"
+                       "bbbaaeb646d9d79d182022077935c701643d42e2405da945c583c53"
+                       "9f5d358496258ea05f0252c630f40fee"};
+    const vector<string>
+        optional_values{[] {
+                            ostringstream oss;
+                            oss << R"("compromised_minerId" : ")"
+                                << comp_miner_id << R"(")";
+                            return oss.str();
+                        }(),
+                        []{
+                            ostringstream oss;
+                            oss << R"("sig1" : ")" << sig_1 << R"(", )"
+                                << R"("sig2" : ")" << sig_2 << R"(")";
+                            return oss.str();
+                        }()};
+
+    const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig};
+    const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig};
+    const miner_info_doc mi_doc{miner_info_doc::v0_3, h, mi_keys, rev_keys};
+
+    const string sig_bad_0(142, '0');
+    const string sig_bad_1(142, '1');
+
+    template <typename T>
     std::string to_json(T first, T last)
     {
         bool first_pass{true};
@@ -97,37 +137,37 @@ namespace
                          });
         doc.append("}");
         return doc;
+        }
+
+        template <typename T, typename U>
+        void concat(const T& src, U& dst)
+        {
+            if(src.size() < OP_PUSHDATA1)
+            {
+                dst.insert(dst.end(), uint8_t(src.size()));
+            }
+            else if(src.size() <= 0xff)
+            {
+                dst.insert(dst.end(), OP_PUSHDATA1);
+                dst.insert(dst.end(), uint8_t(src.size()));
+            }
+            else if(src.size() <= 0xffff)
+            {
+                dst.insert(dst.end(), OP_PUSHDATA2);
+                uint8_t data[2];
+                WriteLE16(data, src.size());
+                dst.insert(dst.end(), data, data + sizeof(data));
+            }
+            else
+            {
+                dst.insert(dst.end(), OP_PUSHDATA4);
+                uint8_t data[4];
+                WriteLE32(data, src.size());
+                dst.insert(dst.end(), data, data + sizeof(data));
+            }
+            dst.insert(dst.end(), src.begin(), src.end());
+        }
     }
-    
-    template<typename T, typename U>
-    void concat(const T& src, U& dst)
-    {
-        if(src.size() < OP_PUSHDATA1)
-        {
-            dst.insert(dst.end(), uint8_t(src.size()));
-        }
-        else if(src.size() <= 0xff)
-        {
-            dst.insert(dst.end(), OP_PUSHDATA1);
-            dst.insert(dst.end(), uint8_t(src.size()));
-        }
-        else if(src.size() <= 0xffff)
-        {
-            dst.insert(dst.end(), OP_PUSHDATA2);
-            uint8_t data[2];
-            WriteLE16(data, src.size());
-            dst.insert(dst.end(), data, data + sizeof(data));
-        }
-        else
-        {
-            dst.insert(dst.end(), OP_PUSHDATA4);
-            uint8_t data[4];
-            WriteLE32(data, src.size());
-            dst.insert(dst.end(), data, data + sizeof(data));
-        }
-        dst.insert(dst.end(), src.begin(), src.end());
-    }
-}
 
 BOOST_AUTO_TEST_SUITE(miner_info_doc_tests)
 
@@ -187,9 +227,6 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_happy_case)
     vector<uint8_t> script{0x0, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
 
     constexpr auto height{1234};
-    const key_set mi_keys{compressed_key_2, compressed_key_3, sig_0};
-    const key_set rev_keys{compressed_key_3, compressed_key_2, sig_1};
-
     const miner_info_doc expected{miner_info_doc::v0_3,
                                   height,
                                   rev_keys,
@@ -236,7 +273,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_required_fields)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -257,7 +294,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_required_fields)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_version)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view bad_version{"0.2"};
     values[0] = bad_version; 
@@ -280,7 +317,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_version)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_height)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view bad_height{"-1"};
     values[1] = bad_height; 
@@ -302,7 +339,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_bad_height)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_miner_id)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view too_short{"bad1"}; 
     values[2] = too_short; 
@@ -324,7 +361,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_miner_id)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view invalid{"bad1"}; 
     values[3] = invalid; 
@@ -346,7 +383,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id_sig)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view invalid{"bad1"}; 
     values[4] = invalid; 
@@ -366,9 +403,31 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id_sig)
                       std::get<miner_info_error>(var_mi_doc));
 }
 
+BOOST_AUTO_TEST_CASE(
+    parse_miner_info_doc__prevMinerIDSig_verification_fail)
+{
+    vector<string> values{required_values};
+
+    values[4] = sig_bad_0; 
+
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_prev_miner_id_sig_verification_fail,
+                      get<miner_info_error>(var_mi_doc));
+}
+
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_revocation_key)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view invalid{"bad1"}; 
     values[5] = invalid; 
@@ -390,7 +449,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_revocation_key)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view invalid{"bad1"}; 
     values[6] = invalid; 
@@ -412,7 +471,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key)
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key_sig)
 {
-    vector<string> values{good_values};
+    vector<string> values{required_values};
  
     constexpr string_view invalid{"bad1"}; 
     values[7] = invalid; 
@@ -432,12 +491,57 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_revocation_key_sig)
                       std::get<miner_info_error>(var_mi_doc));
 }
 
+BOOST_AUTO_TEST_CASE(parse_miner_info_doc_prevRevSig_verification_fail)
+{
+    vector<string> values{required_values};
+
+    values[7] = sig_bad_0; 
+
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_prev_rev_key_sig_verification_fail,
+                      get<miner_info_error>(var_mi_doc));
+}
+
+BOOST_AUTO_TEST_CASE(parse_miner_info_doc_rev_msg_is_not_an_object)
+{
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              required_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+
+    ostringstream oss;
+    oss << R"(INVALID - NOT A JSON OBJECT)";
+
+    fields.push_back(make_tuple("revocationMessage",
+                                json_value_type::string,
+                                oss.str()));
+    
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_fields,
+                      std::get<miner_info_error>(var_mi_doc));
+}
+
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_only)
 {
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -461,7 +565,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_sig_only)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -482,7 +586,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_no_compromised_minerId_field)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -506,7 +610,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_key)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -530,7 +634,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -557,7 +661,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1_key)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -584,7 +688,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -596,7 +700,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2)
                                 json_value_type::object,
                                 oss.str()));
     oss.str("");
-    oss << R"("sig1" : ")" << sig_0 << R"(", "INVALID" : "42")";
+    oss << R"("sig1" : ")" << sig_bad_0 << R"(", "INVALID" : "42")";
     fields.push_back(make_tuple("revocationMessageSig",
                                 json_value_type::object,
                                 oss.str()));
@@ -612,7 +716,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2_key)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
@@ -624,7 +728,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2_key)
                                 json_value_type::object,
                                 oss.str()));
     oss.str("");
-    oss << R"("sig1" : ")" << sig_0 << R"(", "sig2" : "INVALID")";
+    oss << R"("sig1" : ")" << sig_bad_0 << R"(", "sig2" : "INVALID")";
     fields.push_back(make_tuple("revocationMessageSig",
                                 json_value_type::object,
                                 oss.str()));
@@ -676,20 +780,22 @@ BOOST_AUTO_TEST_CASE(parse_revocation_sig_1_verification_fail)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
               });
+    
+    transform(optional_fields.cbegin(),
+              next(optional_fields.cbegin()),
+              optional_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value){
+                  return make_tuple(field.first, field.second, value);
+              });
 
     ostringstream oss;
-    oss << R"("compromised_minerId" : ")" << compressed_key_2 << R"(")";
-    fields.push_back(make_tuple("revocationMessage",
-                                json_value_type::object,
-                                oss.str()));
-
-    oss.str("");
-    oss << R"("sig1" : ")" << sig_0 << R"(", "sig2" : ")" << sig_1 << R"(")";
+    oss << R"("sig1" : ")" << sig_bad_0 << R"(", "sig2" : ")" << sig_bad_1 << R"(")";
     fields.push_back(make_tuple("revocationMessageSig",
                                 json_value_type::object,
                                 oss.str()));
@@ -702,54 +808,33 @@ BOOST_AUTO_TEST_CASE(parse_revocation_sig_1_verification_fail)
 
 BOOST_AUTO_TEST_CASE(parse_revocation_sig_2_verification_fail)
 {
-    namespace ba = boost::algorithm;
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              required_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+    
+    transform(optional_fields.cbegin(),
+              next(optional_fields.cbegin()),
+              optional_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value){
+                  return make_tuple(field.first, field.second, value);
+              });
 
-    const string s{
-        "006a04601dface01004dc2047b2276657273696f6e223a22302e33222c226865696768"
-        "74223a34323433312c22707265764d696e65724964223a223033316164313332383437"
-        "3661376666373930313637373562356363363664303238616636643634376461356338"
-        "3632376531323636653661323039643364316565222c22707265764d696e6572496453"
-        "6967223a22333034343032323036636332636230376337633063316131323836306665"
-        "3139613165323232623239663964643930326365343861616131613564386565616465"
-        "3434386234303230323230373337393965633137646631303264336161363036623463"
-        "3032373930646232336237653239643339663264333861646234346337383936323433"
-        "3334356564222c226d696e65724964223a223033316164313332383437366137666637"
-        "3930313637373562356363363664303238616636643634376461356338363237653132"
-        "3636653661323039643364316565222c22707265765265766f636174696f6e4b657922"
-        "3a22303361306264653733346564363562323963383163373331336432653464336339"
-        "626337313164326463323231383265396461643239653563373266636432636630222c"
-        "227265766f636174696f6e4b6579223a22303264316139636639376130666531666630"
-        "3163373233633336343133306332306561633336393565313338316438353437333238"
-        "39323639336635346230306432222c22707265765265766f636174696f6e4b65795369"
-        "67223a2233303435303232313030613639353837346532373364613737323338303837"
-        "6132386137663939333737343030623863346138643330666365356631356134666539"
-        "6662363038386638303232303164663862353233363930656533633361373231373033"
-        "6566333639366134376238333665393366386463626333626432626463613737613064"
-        "386132646666222c227265766f636174696f6e4d657373616765223a7b22636f6d7072"
-        "6f6d697365645f6d696e65724964223a22303336333331666333653337326663386232"
-        "3264653435653662626535326632376334666134616463313036396263613535343239"
-        "35386139326131393935666138227d2c227265766f636174696f6e4d65737361676553"
-        "6967223a7b2273696731223a2233303434303232303766653632353032376235343566"
-        "6632333838316633626661323039303237396530316331333563323231656137316634"
-        "3732396230653731636637616262313032323036303963333066363561303639376566"
-        "3232313865643964353331643238316535636231373437313136303634306433313238"
-        "65396162346436353230366163222c2273696732223a22333034353032313130306235"
-        "3437303838623061303935396231393239336461303937323966316430613736316534"
-        "3434356134386234646437336263646332356633643264613232323032323036333961"
-        "6232613166363863656566633535343231316230383830333239326439373439383438"
-        "37353932336263303437366662636163316365303432313761227d2c226d696e657243"
-        "6f6e74616374223a7b22656d61696c223a226d696e696e67406d696e696e673033446f"
-        "6d61696e2e636f6d222c226e616d65223a226d696e696e6730332d6f70656e2d6d696e"
-        "6572227d7d473045022100cc5b54c3ac5dc082505c3644aa3567dedcd7a422c72a2e37"
-        "5a017d1202d3b408022003053ad1843b5238fc6c7b7a025ffa697646471f7029495409"
-        "953265ce11f783"};
+    ostringstream oss;
+    oss << R"("sig1" : ")" << sig_1 << R"(", "sig2" : ")" << sig_bad_1 << R"(")";
+    fields.push_back(make_tuple("revocationMessageSig",
+                                json_value_type::object,
+                                oss.str()));
 
-    vector<uint8_t> script;
-    ba::unhex(s.begin(), s.end(), back_inserter(script));
-
-    const auto var_mi_doc_sig = ParseMinerInfoScript(script);
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_sig2_verification_failed,
-                      get<miner_info_error>(var_mi_doc_sig));
+                      get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_without_rev_msg_happy_case)
@@ -757,102 +842,49 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_without_rev_msg_happy_case)
     json_fields_type fields;
     transform(required_fields.cbegin(),
               required_fields.cend(),
-              good_values.cbegin(),
+              required_values.cbegin(),
               back_inserter(fields),
               [](const auto& field, const auto& value) {
                   return make_tuple(field.first, field.second, value);
               });
     const string doc = to_json(fields.cbegin(), fields.cend());
+
     const auto var_mi_doc = ParseMinerInfoDoc(doc);
     BOOST_CHECK(std::holds_alternative<miner_info_doc>(var_mi_doc));
-    
     const miner_info_doc expected{mi_doc}; 
     BOOST_CHECK_EQUAL(expected, std::get<miner_info_doc>(var_mi_doc));
 }
 
-BOOST_AUTO_TEST_CASE(parse_miner_info_script_with_rev_msg_happy_case)
+BOOST_AUTO_TEST_CASE(parse_miner_info_doc_with_rev_msg_happy_case)
 {
-    namespace ba = boost::algorithm;
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              required_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
 
-    const string s{
-        "006a04601dface01004dc2047b2276657273696f6e223a22302e33222c226865696768"
-        "74223a34323433312c22707265764d696e65724964223a223033316164313332383437"
-        "3661376666373930313637373562356363363664303238616636643634376461356338"
-        "3632376531323636653661323039643364316565222c22707265764d696e6572496453"
-        "6967223a22333034343032323036636332636230376337633063316131323836306665"
-        "3139613165323232623239663964643930326365343861616131613564386565616465"
-        "3434386234303230323230373337393965633137646631303264336161363036623463"
-        "3032373930646232336237653239643339663264333861646234346337383936323433"
-        "3334356564222c226d696e65724964223a223033316164313332383437366137666637"
-        "3930313637373562356363363664303238616636643634376461356338363237653132"
-        "3636653661323039643364316565222c22707265765265766f636174696f6e4b657922"
-        "3a22303361306264653733346564363562323963383163373331336432653464336339"
-        "626337313164326463323231383265396461643239653563373266636432636630222c"
-        "227265766f636174696f6e4b6579223a22303264316139636639376130666531666630"
-        "3163373233633336343133306332306561633336393565313338316438353437333238"
-        "39323639336635346230306432222c22707265765265766f636174696f6e4b65795369"
-        "67223a2233303435303232313030613639353837346532373364613737323338303837"
-        "6132386137663939333737343030623863346138643330666365356631356134666539"
-        "6662363038386638303232303164663862353233363930656533633361373231373033"
-        "6566333639366134376238333665393366386463626333626432626463613737613064"
-        "386132646666222c227265766f636174696f6e4d657373616765223a7b22636f6d7072"
-        "6f6d697365645f6d696e65724964223a22303336333331666333653337326663386232"
-        "3264653435653662626535326632376334666134616463313036396263613535343239"
-        "35386139326131393935666138227d2c227265766f636174696f6e4d65737361676553"
-        "6967223a7b2273696731223a2233303434303232303766653632353032376235343566"
-        "6632333838316633626661323039303237396530316331333563323231656137316634"
-        "3732396230653731636637616262313032323036303963333066363561303639376566"
-        "3232313865643964353331643238316535636231373437313136303634306433313238"
-        "65396162346436353230366163222c2273696732223a22333034353032323130306235"
-        "3437303838623061303935396231393239336461303937323966316430613736316534"
-        "3434356134386234646437336263646332356633643264613232323032323036333961"
-        "6232613166363863656566633535343231316230383830333239326439373439383438"
-        "37353932336263303437366662636163316365303432313761227d2c226d696e657243"
-        "6f6e74616374223a7b22656d61696c223a226d696e696e67406d696e696e673033446f"
-        "6d61696e2e636f6d222c226e616d65223a226d696e696e6730332d6f70656e2d6d696e"
-        "6572227d7d473045022100cc5b54c3ac5dc082505c3644aa3567dedcd7a422c72a2e37"
-        "5a017d1202d3b408022003053ad1843b5238fc6c7b7a025ffa697646471f7029495409"
-        "953265ce11f783"};
+    transform(optional_fields.cbegin(),
+              optional_fields.cend(),
+              optional_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value){
+                  return make_tuple(field.first, field.second, value);
+              });
 
-    vector<uint8_t> script;
-    ba::unhex(s.begin(), s.end(), back_inserter(script));
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);
+    BOOST_CHECK(std::holds_alternative<miner_info_doc>(var_mi_doc));
+    const auto& mi_doc = get<miner_info_doc>(var_mi_doc);
 
-    const auto var_mi_doc_sig = ParseMinerInfoScript(script);
-    BOOST_CHECK(std::holds_alternative<mi_doc_sig>(var_mi_doc_sig));
-    const auto [raw_mi_doc, mi_doc, mi_sig] = get<mi_doc_sig>(var_mi_doc_sig);
+    const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig};
+    const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig};
 
-    constexpr int height{42431};
-    const string miner_id{
-        "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
-    const string mi_prev_key{
-        "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
-    const string mi_prev_key_sig{
-        "304402206cc2cb07c7c0c1a12860fe19a1e222b29f9dd902ce48aaa1a5d8eeade448b4"
-        "02022073799ec17df102d3aa606b4c02790db23b7e29d39f2d38adb44c7896243345e"
-        "d"};
-    const key_set mi_keys{miner_id, mi_prev_key, mi_prev_key_sig};
-
-    const string rev_key{
-        "02d1a9cf97a0fe1ff01c723c364130c20eac3695e1381d854732892693f54b00d2"};
-    const string prev_rev_key{
-        "03a0bde734ed65b29c81c7313d2e4d3c9bc711d2dc22182e9dad29e5c72fcd2cf0"};
-    const string rev_prev_key_sig{
-        "3045022100a695874e273da77238087a28a7f99377400b8c4"
-        "a8d30fce5f15a4fe9fb6088f802201df8b523690ee3c3a721"
-        "703ef3696a47b836e93f8dcbc3bd2bdca77a0d8a2dff"};
-    const key_set rev_keys{rev_key, prev_rev_key, rev_prev_key_sig};
-
-    const string comp_miner_id{
-        "036331fc3e372fc8b22de45e6bbe52f27c4fa4adc1069bca5542958a92a1995fa8"};
-    const string sig_1{"304402207fe625027b545ff23881f3bfa2090279e01c135c221ea71"
-                       "f4729b0e71cf7abb10220609c30f65a0697ef2218ed9d531d281e5c"
-                       "b17471160640d3128e9ab4d65206ac"};
-    const string sig_2{"3045022100b547088b0a0959b19293da09729f1d0a761e4445a48b4"
-                       "dd73bcdc25f3d2da2220220639ab2a1f68ceefc554211b08803292d"
-                       "974984875923bc0476fbcac1ce04217a"};
     std::optional<revocation_msg> rev_msg{
         revocation_msg{comp_miner_id, sig_1, sig_2}};
-    const miner_info_doc expected{miner_info_doc::v0_3, height, mi_keys, rev_keys,
+    const miner_info_doc expected{miner_info_doc::v0_3, h, mi_keys, rev_keys,
                                   rev_msg};
     BOOST_CHECK_EQUAL(expected, mi_doc);
 }

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <variant>
 
 #include "univalue.h"
 

@@ -17,7 +17,7 @@ BOOST_AUTO_TEST_SUITE(miner_info_error_tests)
 
 BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
 {
-    const array<string, 31> expected{
+    const array<string, 33> expected{
         "miner info ref not found",
         "invalid instruction",
         "unsupported version",
@@ -35,9 +35,11 @@ BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
         "doc parse error - invalid minerId",
         "doc parse error - invalid prevMinerId",
         "doc parse error - invalid prevMinerId signature",
+        "doc parse error - prevMinerIdSig verification fail",
         "doc parse error - invalid revocationKey",
         "doc parse error - invalid prevRevocationKey",
         "doc parse error - invalid revocationMessageSig",
+        "doc parse error - prevRevocationKeySig verification fail",
         "doc parse error - revocation msg fields",
         "doc parse error - revocation msg field",
         "doc parse error - revocation msg key",

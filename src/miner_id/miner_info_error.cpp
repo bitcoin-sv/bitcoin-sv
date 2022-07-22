@@ -49,6 +49,8 @@ const enumTableT<miner_info_error>& enumTable(miner_info_error)
                "doc parse error - invalid prevMinerId"},
               {miner_info_error::doc_parse_error_invalid_prev_miner_id_sig,
                "doc parse error - invalid prevMinerId signature"},
+              {miner_info_error::doc_parse_error_prev_miner_id_sig_verification_fail,
+               "doc parse error - prevMinerIdSig verification fail"},
               {miner_info_error::doc_parse_error_invalid_revocation_key,
                "doc parse error - invalid revocationKey"},
               {miner_info_error::doc_parse_error_invalid_prev_revocation_key,
@@ -56,6 +58,8 @@ const enumTableT<miner_info_error>& enumTable(miner_info_error)
               {miner_info_error::
                    doc_parse_error_invalid_prev_revocation_key_sig,
                "doc parse error - invalid revocationMessageSig"},
+              {miner_info_error::doc_parse_error_prev_rev_key_sig_verification_fail, 
+               "doc parse error - prevRevocationKeySig verification fail"},
               {miner_info_error::doc_parse_error_rev_msg_fields,
                "doc parse error - revocation msg fields"},
               {miner_info_error::doc_parse_error_rev_msg_field,
