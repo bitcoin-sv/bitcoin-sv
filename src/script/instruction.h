@@ -6,7 +6,6 @@
 
 #include "script.h"
 #include "span.h"
-#include "utilstrencodings.h"
 
 #include <iostream>
 
@@ -43,19 +42,27 @@ namespace bsv
         {
             return operand_;
         }
+
+
+        inline constexpr bool deep_equal(const instruction& other) const noexcept
+        {
+            if (opcode() != other.opcode() || operand().size() != other.operand().size())
+                return false;
+
+            for (size_t i = 0; i < operand().size(); ++i)
+                if (operand()[i] != other.operand()[i])
+                    return false;
+
+            return true;
+        }
     };
 
     inline constexpr bool operator==(const instruction& a,
                                      const instruction& b) noexcept
     {
-        if (a.opcode() != b.opcode() || a.operand().size() != b.operand().size())
-            return false;
-
-        for (size_t i = 0; i < a.operand().size(); ++i)
-            if (a.operand()[i] != b.operand()[i])
-                return false;
-
-        return true;
+        return a.opcode() == b.opcode() &&
+               a.operand().data() == b.operand().data() &&
+               a.operand().size() == b.operand().size();
     }
 
     inline constexpr bool operator!=(const instruction& a,
@@ -66,12 +73,8 @@ namespace bsv
 
     inline std::ostream& operator<<(std::ostream& os, const instruction& inst)
     {
-        os << inst.opcode() << ' ';
-        if (inst.operand().size()) {
-            os << HexStr(inst.operand().data(), inst.operand().data() + inst.operand().size()) << ' ' << inst.operand().size();
-        } else {
-            os << "nodata";
-        }
+        os << inst.opcode() << ' ' << (void*)inst.operand().data() << ' '
+           << inst.operand().size();
         return os;
     }
 }

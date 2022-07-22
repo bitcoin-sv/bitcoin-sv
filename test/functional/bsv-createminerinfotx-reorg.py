@@ -80,12 +80,12 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         with open(datapath + '/minerinfotxfunding.dat', 'a') as f:
             f.write(fundingSeedJson)
 
-    def one_test(self, allKeys, nodenum):
+    def one_test(self, allKeys, nodenum, do_mining=True):
 
         # create the minerinfodoc transaction and ensure it is in the mempool
         # create a dummy transaction to compare behaviour
         node = self.nodes[nodenum]
-        height = node.getblockcount()
+        height = node.getblockcount() + 1
 
         minerinfotx_parameters = {
                 'height': height,
@@ -101,7 +101,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
-
+        wait_until (lambda: txid in node.getrawmempool())
+        if not do_mining:
+            return
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
         block = make_miner_id_block(node, minerInfoTx, height, allKeys.minerIdKeys)
@@ -148,17 +150,19 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # mine minerid blocks and sync
         self.one_test(allKeys0, nodenum=0)
-        self.one_test(allKeys0, nodenum=0)
-        sync_blocks(self.nodes)
-
+        sync_blocks(self.nodes) 
+        self.one_test(allKeys0, nodenum=0, do_mining=True)
         # disconnect and mine independently. 
         # make the second nodes chain the longest
         forkHeight = self.nodes[0].getblockcount()
         disconnect_nodes_bi(self.nodes,0,1)
         self.one_test(allKeys0, 0)
+        self.one_test(allKeys0, 0, do_mining=False)
         self.one_test(allKeys1, 1)
         self.one_test(allKeys1, 1)
         self.one_test(allKeys1, 1)
+        self.one_test(allKeys1, 1)
+        self.one_test(allKeys1, 1, do_mining=False)
         last_block0 = self.nodes[0].getbestblockhash()
         last_block1 = self.nodes[1].getbestblockhash()
         last_height0 = self.nodes[0].getblockcount()

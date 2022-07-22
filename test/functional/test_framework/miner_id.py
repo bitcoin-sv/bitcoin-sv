@@ -89,7 +89,7 @@ class MinerIdKeys:
             vin.scriptSig = CScript([signature + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.publicKeyBytes()])
 
 
-def create_miner_info_scriptPubKey(params):
+def create_miner_info_scriptPubKey(params, json_override_string=None):
 
     # if there are no revocation keys available, then we replace them with the miner keys.
 
@@ -106,7 +106,7 @@ def create_miner_info_scriptPubKey(params):
 
     infoDoc = {}
     infoDoc['version'] = "0.3"
-    infoDoc['height'] = params['height'] + 1 # the height of the block we are building
+    infoDoc['height'] = params['height'] # the height of the block we are building
 
     dataToSign = prev_minerKeys.publicKeyHex() + minerKeys.publicKeyHex()
     infoDoc['prevMinerId'] = prev_minerKeys.publicKeyHex()
@@ -118,24 +118,6 @@ def create_miner_info_scriptPubKey(params):
     infoDoc['prevRevocationKeySig'] = revocationKeys.sign_hexmessage(dataToSign)
     infoDoc['revocationKey'] = prev_revocationKeys.publicKeyHex()
 
-    if not prev_minerKeys:
-        prev_minerKeys = minerKeys
-    if not prev_revocationKeys:
-        prev_revocationKeys = revocationKeys
-
-    infoDoc = {}
-    infoDoc['version'] = "0.3"
-    infoDoc['height'] = params['height'] + 1 # the height of the block we are building
-
-    dataToSign = prev_minerKeys.publicKeyHex() + minerKeys.publicKeyHex()
-    infoDoc['prevMinerId'] = prev_minerKeys.publicKeyHex()
-    infoDoc['prevMinerIdSig'] = prev_minerKeys.sign_hexmessage(dataToSign)
-    infoDoc['minerId'] = minerKeys.publicKeyHex()
-
-    dataToSign = prev_revocationKeys.publicKeyHex() + revocationKeys.publicKeyHex()
-    infoDoc['prevRevocationKey'] = prev_revocationKeys.publicKeyHex()
-    infoDoc['prevRevocationKeySig'] = revocationKeys.sign_hexmessage(dataToSign)
-    infoDoc['revocationKey'] = prev_revocationKeys.publicKeyHex()
 
     if pubCompromisedMinerKeyHex:
         messageSignature1 = revocationKeys.sign_hexmessage(pubCompromisedMinerKeyHex)
@@ -149,7 +131,10 @@ def create_miner_info_scriptPubKey(params):
 
     # Convert dictionary to json string
 
-    infoDocJson = json.dumps(infoDoc, indent=0)
+    if json_override_string != None:
+        infoDocJson = json_override_string 
+    else:
+        infoDocJson = json.dumps(infoDoc, indent=0)
     infoDocJson = infoDocJson.replace('\n', '')
     infoDocJson = infoDocJson.replace(' ','')
     infoDocJson = infoDocJson.encode('utf8')
@@ -163,7 +148,8 @@ def calc_blockbind_merkle_root(block, txidbytes):
     coinbase = copy.deepcopy(block.vtx[0])
     coinbase.nVersion = 0x01000000
 
-    coinbase.vin[0].scriptSig = CScript([bytearray([0, 0, 0, 0, 0, 0, 0, 0])])
+    coinbase.nVersion = 0x00000001
+    coinbase.vin[0].scriptSig = CScript([OP_0, OP_0, OP_0, OP_0, OP_0, OP_0, OP_0, OP_0])
     coinbase.vin[0].prevout = COutPoint()
     coinbase.vin[0].prevout.n = 0xffffffff
     coinbase.vout[0].scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),
@@ -214,6 +200,7 @@ def create_miner_id_coinbase_and_miner_info(minerInfoTx, key, block):
     coinbaseTx.vout.append (CTxOut(0, CScript([OP_FALSE, OP_RETURN])))
 
     coinbaseTx.rehash()
+    coinbaseTx.calc_sha256()
 
     # Update coinbase in block
     block.vtx[0] = coinbaseTx

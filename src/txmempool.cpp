@@ -12,6 +12,7 @@
 #include "frozentxo.h"
 #include "mempooltxdb.h"
 #include "miner_id/miner_id.h"
+#include "miner_id/dataref_index.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "timedata.h"
@@ -2353,12 +2354,22 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
     // we should filter out from the mempool.
     std::optional<MinerId> minerID { FindMinerId(block, height) };
     std::set<TxId> dataRefIds {};
-    if(minerID && minerID->GetCoinbaseDocument().GetDataRefs())
+    if(minerID)
     {
-        // Build set of dataref txids for speedy lookup
-        for(const auto& dataref : minerID->GetCoinbaseDocument().GetDataRefs().value())
+        auto index = g_dataRefIndex->CreateLockingAccess();
+        const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
+        if (minerInfoTxId)
         {
-            dataRefIds.insert(dataref.txid);
+            index.DeleteMinerInfoTxn(*minerInfoTxId);
+        }
+        if(minerID->GetCoinbaseDocument().GetDataRefs())
+        {
+            // Build set of dataref txids for speedy lookup
+            for(const auto& dataref : minerID->GetCoinbaseDocument().GetDataRefs().value())
+            {
+                dataRefIds.insert(dataref.txid);
+                index.DeleteDatarefTxn(dataref.txid);
+            }
         }
     }
 

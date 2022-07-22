@@ -2,7 +2,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "miner_id/miner_info_tracker.h"
-#include "uint256.h"
 #include "util.h"
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -130,7 +129,10 @@ namespace mining {
                 int32_t height;
 
                 while (file >> height >> blockhash >> txid )
-                    entries_[height][blockhash] = txid;
+                {
+                    Key key {height, blockhash};
+                    entries_[key] = txid;
+                }
 
                 file.close();
             }

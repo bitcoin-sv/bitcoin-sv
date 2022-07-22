@@ -4,23 +4,14 @@
 #include "amount.h"
 #include "base58.h"
 #include "config.h"
-#include "core_io.h"
 #include "dstencode.h"
 #include "keystore.h"
-#include "miner_id/miner_info_tracker.h"
-#include "mining/journal_change_set.h"
-#include "primitives/transaction.h"
+#include "miner_id/dataref_index.h"
 #include "rpc/server.h"
 #include "script/instruction_iterator.h"
-#include "script/script.h"
 #include "script/script_num.h"
 #include "script/sign.h"
 #include "txdb.h"
-#include "txmempool.h"
-#include "util.h"
-#include "utilstrencodings.h"
-#include "validation.h"
-#include <array>
 #include <cstdint>
 #include <exception>
 #include <iostream>
@@ -34,7 +25,7 @@ static const fs::path fundingPath = fs::path("miner_id") / "Funding";
 static const std::string fundingKeyFile = ".minerinfotxsigningkey.dat";
 static const std::string fundingSeedFile = "minerinfotxfunding.dat";
 
-static CKey privKeyFromStringBIP32(std::string strkey, bool isCompressed)
+static CKey privKeyFromStringBIP32(std::string const & strkey, bool isCompressed=true)
 {
     // parse the BIP32 key and convert it to ECDSA format.
     CKey key;
@@ -90,19 +81,19 @@ class MinerInfoFunding {
         CKey privKey{};
         CTxDestination destination{};
     public:
-        FundingKey(bool fCompressed, std::string privKey, std::string destination, Config const & config)
-                : privKey(privKeyFromStringBIP32(privKey, true))
+        FundingKey(std::string const & privKey, std::string const & destination, Config const & config)
+                : privKey(privKeyFromStringBIP32(privKey))
                 , destination(DecodeDestination(destination, config.GetChainParams()))
         {
         }
-        CKey const & getPrivKey() const {return privKey;};
-        CTxDestination const & getDestination() const {return destination;};
+        [[nodiscard]] CKey const & getPrivKey() const {return privKey;};
+        [[nodiscard]]CTxDestination const & getDestination() const {return destination;};
     };
     COutPoint fundingSeed; // Funding for the first minerinfo-txn of this miner
     FundingKey fundingKey; // Keys needed to spend the funding seed and also the minerinfo-txns
-    MinerInfoFunding (COutPoint const & fundingSeed, std::string privateKey, std::string destination, Config const & config)
+    MinerInfoFunding (COutPoint const & fundingSeed, std::string const & privateKey, std::string const & destination, Config const & config)
         : fundingSeed{fundingSeed}
-        , fundingKey{FundingKey(true, privateKey, destination, config)}
+        , fundingKey{FundingKey(privateKey, destination, config)}
     {
     }
 public:
@@ -112,7 +103,7 @@ public:
     MinerInfoFunding const & operator = (MinerInfoFunding const &) = delete;
     MinerInfoFunding const & operator = (MinerInfoFunding &&) = delete;
 
-    static const MinerInfoFunding CreateFromFile (Config const & config, const fs::path & path, std::string keyFile, std::string seedFile)
+    static MinerInfoFunding CreateFromFile (Config const & config, const fs::path & path, std::string const & keyFile, std::string const & seedFile)
     {
         // read funding info from json formatted files
         UniValue fundingSeed = ReadFileToUniValue (path, seedFile);
@@ -161,14 +152,14 @@ public:
 
         auto fundingOutPoint = COutPoint {uint256S(sFundingSeedId), fundingSeedIndex};
 
-        return MinerInfoFunding(fundingOutPoint, sPrivKey, sDestination, config);
+        return {fundingOutPoint, sPrivKey, sDestination, config};
     }
 
-    COutPoint FundAndSignMinerInfoTx (const Config &config, CMutableTransaction & mtx, const CTransactionRef previousTx = nullptr)
+    COutPoint FundAndSignMinerInfoTx (const Config &config, CMutableTransaction & mtx, const CTransactionRef & previousTx = nullptr)
     {
         // chose the funding seed for the first minerinfo-txn of this mioner or
         // otherwise the previous minerinfo-txn of this miner
-        auto ChooseFundingOutpoint = [](CTransactionRef previousTx, COutPoint fundingSeed) -> COutPoint {
+        auto ChooseFundingOutpoint = [this](CTransactionRef previousTx) -> COutPoint {
 
             auto IsSpendable = [](COutPoint const & outpoint) {
                 CoinsDBView const tipView{ *pcoinsTip };
@@ -199,7 +190,7 @@ public:
             }
             throw std::runtime_error("Cannot find spendable funding transaction");
         };
-        const COutPoint fundingOutPoint = ChooseFundingOutpoint(previousTx, fundingSeed);
+        const COutPoint fundingOutPoint = ChooseFundingOutpoint(previousTx);
 
         // find the funding transaction outputs
         CoinsDBView const tipView{ *pcoinsTip };
@@ -220,7 +211,7 @@ public:
         CScript const & scriptPubKey = GetScriptForDestination(fundingKey.getDestination()); //p2pkh script
 
         mtx.vout.push_back(CTxOut {Amount{fundingAmount}, scriptPubKey});
-        mtx.vin.push_back(CTxIn{fundingOutPoint, CTxIn::SEQUENCE_FINAL});
+        mtx.vin.emplace_back(fundingOutPoint, CTxIn::SEQUENCE_FINAL);
 
         keystore.AddKeyPubKey(fundingKey.getPrivKey(), fundingKey.getPrivKey().GetPubKey());
         ProduceSignature(config, true, MutableTransactionSignatureCreator(
@@ -243,7 +234,7 @@ std::string CreateReplaceMinerinfotx(const Config &config, const CScript & scrip
 
     auto GetCachedMinerInfoTx = [](int32_t blockHeight, uint256 const & prevBlockHash, bool overridetx, CScript const & scriptPubKey) -> CTransactionRef {
         try {
-            auto const current = mempool.minerInfoTxTracker.current_txid();//minerInfoTxTracker.find(blockHeight, prevBlockHash);
+            auto const current = mempool.minerInfoTxTracker.current_txid();
             if (current) {
                 CTransactionRef tx = mempool.Get(*current);
                 if (!tx)
@@ -283,89 +274,38 @@ std::string CreateReplaceMinerinfotx(const Config &config, const CScript & scrip
 
     // we need to remove the transactions we override
 
-    auto ExtractMinerInfoDoc = [](CScript const & scriptPubKey) -> UniValue {
+    auto ExtractMinerInfoDoc = [](CScript const & scriptPubKey) -> miner_info_doc {
 
-        constexpr std::array<uint8_t, 4> protocolPrefixId {0x60, 0x1d, 0xfa, 0xce};
-        constexpr std::array<uint8_t, 1> protocolIdVersion {0x00};
-        auto const scriptTemplate =  CScript() << OP_FALSE << OP_RETURN << protocolPrefixId << protocolIdVersion;
+        const auto var_doc_sig = ParseMinerInfoScript(scriptPubKey);
+        if(std::holds_alternative<miner_info_error>(var_doc_sig))
+            throw std::runtime_error(strprintf(
+                    "failed to extract miner info document from scriptPubKey: %s",
+                    std::get<miner_info_error>(var_doc_sig)));
 
-        // check if the beginning of the scriptPubKey matches the above script template.
-        bsv::instruction_iterator its = scriptPubKey.begin_instructions();
-        bsv::instruction_iterator itt = scriptTemplate.begin_instructions();
-
-        while (itt != scriptTemplate.end_instructions())
-        {
-            if(!its || *its != *itt)
-                throw std::runtime_error(strprintf(
-                        "failed to extract miner info document from scriptPubKey, expected:[%s] got:[%s]", *itt, *its));
-            ++its; ++itt;
-        }
-
-        UniValue minerInfoJson;
-
-        // check formatting of the minerinfo document
-        try {
-            const std::string_view minerInfoStr = bsv::to_sv(its->operand());
-            minerInfoJson.read(minerInfoStr.data(), minerInfoStr.size());
-            RPCTypeCheckObj(
-                    minerInfoJson,
-                    {
-                            {"version",             UniValueType(UniValue::VSTR )},
-                            {"height",              UniValueType(UniValue::VNUM )},
-                            {"prevMinerId",         UniValueType(UniValue::VSTR )},
-                            {"prevMinerIdSig",      UniValueType(UniValue::VSTR )},
-                            {"minerId",             UniValueType(UniValue::VSTR )},
-                            {"prevRevocationKey",   UniValueType(UniValue::VSTR )},
-                            {"prevRevocationKeySig",UniValueType(UniValue::VSTR )},
-                            {"revocationKey",       UniValueType(UniValue::VSTR )},
-                            {"revocationMessage",   UniValueType(UniValue::VOBJ )},
-                            {"revocationMessageSig",UniValueType(UniValue::VOBJ )},
-                    }, true, false);
-            if (minerInfoJson.exists("revocationMessage"))
-                RPCTypeCheckObj(
-                        minerInfoJson["revocationMessage"],
-                        {
-                                {"compromised_minerId", UniValueType(UniValue::VSTR )},
-                        }, true, false);
-            if (minerInfoJson.exists("revocationMessageSig"))
-                RPCTypeCheckObj(
-                        minerInfoJson["revocationMessageSig"],
-                        {
-                                {"sig1", UniValueType(UniValue::VSTR )},
-                                {"sig2", UniValueType(UniValue::VSTR )},
-                        }, true, false);
-
-        } catch (UniValue const & e) {
-            throw JSONRPCError(RPC_PARSE_ERROR, std::string("Could not read miner info document: ") + e["message"].get_str());
-        } catch (std::exception const & e) {
-            throw std::runtime_error("Could not read miner info document: " + std::string(e.what()));
-        }
-        // return the minerinfo document
-        return minerInfoJson;
+        const auto [sv, doc, sig] = std::get<mi_doc_sig>(var_doc_sig);
+        return doc;
     };
 
-    // find previous funding transaction
-    auto GetPreviousMinerInfoTx = [&config](int32_t blockHeight) -> CTransactionRef {
-        auto SearchForFundingTx = [&blockHeight,&config](int32_t height, TxId const & txid) -> CTransactionRef {
-            CTransactionRef tx;
-            uint256 hashBlock;
-            bool isGenesisEnabled = true;
-            bool allowSlow = true;
-            if (height < blockHeight && GetTransaction(config, txid, tx, allowSlow, hashBlock, isGenesisEnabled))
-                return tx;
-            else
-                return nullptr;
-        };
-
+    auto GetPreviousMinerInfoTx = [](int32_t blockHeight) -> CTransactionRef
+    {
         auto tracker = mempool.minerInfoTxTracker.CreateLockingAccess();
-        return tracker.find_latest<decltype(SearchForFundingTx), CTransactionRef>(SearchForFundingTx);
+
+        // If it is in the dataref index, then it is also in the block chain.
+        // We cannot use GetTransaction because this may be a pruned node.
+        auto dbindex = g_dataRefIndex->CreateLockingAccess();
+        auto txIsInDatarefIndex = [&dbindex](const TxId& txid) -> CTransactionRef
+        {
+            auto tx = dbindex.GetMinerInfoTxn(txid);
+            return tx;
+        };
+        // find our minerinfo funding tx if exists.
+        return tracker.find_previous(blockHeight, txIsInDatarefIndex);
     };
 
     // Extract information from the Miner Info document which is embedded in the data part of the scriptPubKey
-    UniValue const minerInfoJson = ExtractMinerInfoDoc(scriptPubKey);
-    int32_t const docHeight =  minerInfoJson["height"].get_int();
+    miner_info_doc doc = ExtractMinerInfoDoc(scriptPubKey);
 
-    if (docHeight != blockHeight) {
+    if (doc.GetHeight() != blockHeight) {
         throw std::runtime_error("Block height must be the active chain height plus 1");
     }
 
@@ -417,10 +357,10 @@ std::string CreateReplaceMinerinfotx(const Config &config, const CScript & scrip
 
 static UniValue createminerinfotx(const Config &config, const JSONRPCRequest &request)
 {
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
+    if (request.fHelp || request.params.empty() || request.params.size() > 1) {
         throw std::runtime_error(
                 "createminerinfotx \"scriptPubKey\"\n"
-                "\nCreate a transaction with a miner info document and return it's transaction id\n"
+                "\nCreate a transaction with a miner info document and return its transaction id\n"
                 "\nIf such a miner info document exists already, then return it's transaction id instead.\n"
                 "\nArguments:\n"
                 "1. \"scriptPubKey:\" (hex string mandatory) OP_FALSE OP_RETURN 0x601DFACE 0x00 minerinfo  \n"
@@ -446,7 +386,7 @@ static UniValue createminerinfotx(const Config &config, const JSONRPCRequest &re
 
 static UniValue replaceminerinfotx(const Config &config, const JSONRPCRequest &request)
 {
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
+    if (request.fHelp || request.params.empty() || request.params.size() > 1) {
         throw std::runtime_error(
                 "replaceminerinfotx \"scriptPubKey\"\n"
                 "\nCreate or replace a transaction with a miner info document and return it's transaction id\n"
@@ -474,7 +414,7 @@ static UniValue replaceminerinfotx(const Config &config, const JSONRPCRequest &r
 
 static UniValue getminerinfotxid(const Config &config, const JSONRPCRequest &request)
 {
-    if (request.fHelp || request.params.size() > 0) {
+    if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
                 "getminerinfotxid  \n"
                 "\nreturn the minerinfotx for the current block being built.\n"
@@ -486,14 +426,14 @@ static UniValue getminerinfotxid(const Config &config, const JSONRPCRequest &req
 
     std::optional<TxId> const info_txid = mempool.minerInfoTxTracker.current_txid();
     if (info_txid) {
-         return UniValue(info_txid->ToString());
+         return {info_txid->ToString()};
     }
-    return UniValue(UniValue::VNULL);
+    return {UniValue::VNULL};
 }
 
 static UniValue makeminerinfotxsigningkey(const Config &config, const JSONRPCRequest &request)
 {
-    if (request.fHelp || request.params.size() > 0) {
+    if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
                 "makeminerinfotxsigningkey  \n"
                 "\ncreates a private BIP32 Key and stores it in ./miner_id/Funding/.minerinfotxsigningkey.dat\n"
@@ -549,7 +489,7 @@ static UniValue makeminerinfotxsigningkey(const Config &config, const JSONRPCReq
 
 static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPCRequest &request)
 {
-    if (request.fHelp || request.params.size() > 0) {
+    if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
                 "getminerinfotxfundingaddress  \n"
                 "\nExamples:\n" +
@@ -621,6 +561,6 @@ static const CRPCCommand commands[] = {
 // clang-format on
 
 void RegisterMinerIdRPCCommands(CRPCTable &t) {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for (auto& c: commands)
+        t.appendCommand(c.name, &c);
 }

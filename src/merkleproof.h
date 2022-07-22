@@ -124,11 +124,11 @@ public:
             if(mTxn)
             {
                 READWRITECOMPACTSIZE(mTxLen);
-                mTxn->Serialize(s);
+                READWRITE(mTxn);
             }
             else
             {
-                mTxnId.Serialize(s);
+                READWRITE(mTxnId);
             }
         }
 

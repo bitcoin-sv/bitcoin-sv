@@ -24,6 +24,7 @@
 #include "httpserver.h"
 #include "invalid_txn_publisher.h"
 #include "key.h"
+#include "miner_id/dataref_index.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_id_db_defaults.h"
 #include "mining/journaling_block_assembler.h"
@@ -213,6 +214,8 @@ void Shutdown() {
 
     // Flush/destroy miner ID database
     g_minerIDs.reset();
+    // Destroy dataRef index
+    g_dataRefIndex.reset();
 
 #ifdef ENABLE_WALLET
     for (CWalletRef pwallet : vpwallets) {
@@ -3589,7 +3592,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     preloadChainState(threadGroup);
 
-    // Create minerID database if required
+    // Create minerID database  and dataref index if required
     if(config.GetMinerIdEnabled()) {
         try {
             g_minerIDs = std::make_unique<MinerIdDatabase>(config);
@@ -3597,6 +3600,12 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         }
         catch(const std::exception& e) {
             LogPrintf("Error creating miner ID database: %s\n", e.what());
+        }
+        try {
+            g_dataRefIndex = std::make_unique<DataRefTxnDB>(config);
+        }
+        catch(const std::exception& e) {
+            LogPrintf("Error creating dataRef index: %s\n", e.what());
         }
     }
 
