@@ -2682,13 +2682,13 @@ namespace {
 class CBlockHeaderEnriched
 {
 public:
-    CBlockHeader blockHeader;
+    CBlockHeader blockHeader {};
     uint64_t nTx{ 0 };
     bool noMoreHeaders{ false };
     bool hasCoinbaseData{ false };
     using TSCMerkleProof = ::MerkleProof; // Contains Merkle proof in binary TSC format (https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format)
-    TSCMerkleProof coinbaseMerkleProof;
-    std::vector<uint8_t> coinbaseTx;
+    TSCMerkleProof coinbaseMerkleProof {};
+    CTransactionRef coinbaseTx {nullptr};
 
     // Pointer to block index object is only included in object so that it can be used
     // when setting (non-const) data members after construction.
@@ -2706,22 +2706,25 @@ public:
     CBlockHeaderEnriched() = default;
 
     CBlockHeaderEnriched(const CBlockIndex* blockIndex)
-    : blockHeader(blockIndex->GetBlockHeader())
-    , nTx(blockIndex->GetBlockTxCount())
-    , blockIndex(blockIndex)
+    : blockHeader { blockIndex->GetBlockHeader() }
+    , nTx { blockIndex->GetBlockTxCount() }
+    , blockIndex { blockIndex }
     {
     }
 
-    template <typename Stream> void Serialize(Stream& s) const
+    // Serialisation
+    ADD_SERIALIZE_METHODS
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        blockHeader.Serialize(s);
-        WriteCompactSize(s, nTx);
-        s << noMoreHeaders;
-        s << hasCoinbaseData;
-        if (hasCoinbaseData)
+        READWRITE(blockHeader);
+        READWRITECOMPACTSIZE(nTx);
+        READWRITE(noMoreHeaders);
+        READWRITE(hasCoinbaseData);
+        if(hasCoinbaseData)
         {
-            s << coinbaseMerkleProof;
-            s.write((char*)&coinbaseTx[0], coinbaseTx.size());
+            READWRITE(coinbaseMerkleProof);
+            READWRITE(coinbaseTx);
         }
     }
 
@@ -2739,8 +2742,8 @@ public:
     void SetCoinBaseInfo(int serializationVersion, const Config& config, int32_t chainActiveHeight)
     {
         hasCoinbaseData = false;
-        coinbaseTx.clear();
-        coinbaseMerkleProof = TSCMerkleProof();
+        coinbaseTx.reset();
+        coinbaseMerkleProof = {};
         // Default constructor should set these to values we expect here
         assert( coinbaseMerkleProof.Flags() == 0 ); // Always set to 0 because we're providing transaction ID in txOrId, block hash in target, Merkle branch as proof in nodes and there is a single proof
         assert( coinbaseMerkleProof.Index() == 0 ); // Always set to 0, because we're providing proof for coinbase transaction
@@ -2752,9 +2755,7 @@ public:
             {
                 // Read CB txn from disk
                 auto& cbTx = blockReader->ReadTransaction();
-
-                // Serialize CB txn into coinbaseTx using the specified protocol version.
-                CVectorWriter vw(SER_NETWORK, serializationVersion, coinbaseTx, 0, cbTx);
+                coinbaseTx = MakeTransactionRef(std::move(cbTx));
 
                 coinbaseMerkleProof.TxnId( cbTx.GetId() );
                 coinbaseMerkleProof.Target( blockIndex->GetBlockHash() );
@@ -2765,7 +2766,7 @@ public:
             LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase txn failed.");
         }
 
-        if(!coinbaseTx.empty())
+        if(coinbaseTx)
         {
             // Get Merkle proof for CB txn from Merkle tree cache.
             // Note that this can be done without holding cs_main lock.
@@ -2787,7 +2788,7 @@ public:
             else
             {
                 // Delete CB txn if we were unable to get its Merkle proof, since it is not needed.
-                coinbaseTx.clear();
+                coinbaseTx.reset();
             }
         }
     }
