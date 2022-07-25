@@ -98,16 +98,16 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
     def check_hdrsen_message(self, hdrsen, num_of_txs, coinbase_tx, block):
         assert_equal(hdrsen.nTx, num_of_txs)
-        hdrsen.coinBaseTx.rehash()
-        assert_equal(hdrsen.coinBaseTx.hash, coinbase_tx.hash)
-        assert_equal(hdrsen.coinbaseMerkleProof.flags, 0)
-        assert_equal(hdrsen.coinbaseMerkleProof.index, 0)
-        assert_equal(hdrsen.coinbaseMerkleProof.txOrId, coinbase_tx.sha256)
-        assert_equal(hdrsen.coinbaseMerkleProof.target, block.sha256)
-        assert_equal(len(hdrsen.coinbaseMerkleProof.nodes), math.ceil(math.log2(num_of_txs)))
+        hdrsen.coinbaseTxProof.tx.rehash()
+        assert_equal(hdrsen.coinbaseTxProof.tx.hash, coinbase_tx.hash)
+        assert_equal(hdrsen.coinbaseTxProof.proof.flags, 0)
+        assert_equal(hdrsen.coinbaseTxProof.proof.index, 0)
+        assert_equal(hdrsen.coinbaseTxProof.proof.txOrId, coinbase_tx.sha256)
+        assert_equal(hdrsen.coinbaseTxProof.proof.target, block.sha256)
+        assert_equal(len(hdrsen.coinbaseTxProof.proof.nodes), math.ceil(math.log2(num_of_txs)))
     
-        merkleProof = [format(x.value, '064x') for x in hdrsen.coinbaseMerkleProof.nodes]
-        calculatedRootHash = merkle_root_from_merkle_proof(hdrsen.coinBaseTx.sha256, merkleProof)
+        merkleProof = [format(x.value, '064x') for x in hdrsen.coinbaseTxProof.proof.nodes]
+        calculatedRootHash = merkle_root_from_merkle_proof(hdrsen.coinbaseTxProof.tx.sha256, merkleProof)
         assert_equal(calculatedRootHash, hdrsen.hashMerkleRoot)
 
     def run_test(self):

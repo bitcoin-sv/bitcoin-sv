@@ -145,7 +145,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         headerEnriched = self.test.test_nodes[0].last_message.get("hdrsen").headers[0]
         headerEnriched.rehash()
         assert_equal(headerEnriched.hash, bigBlockHash)
-        assert_equal(headerEnriched.hasCoinbaseData, 0)
+        assert(headerEnriched.coinbaseTxProof is None)
 
 if __name__ == '__main__':
     BSVMerkleProofInPrunedBlock().main()

@@ -75,15 +75,15 @@ class SendHdrsEnTest(BitcoinTestFramework):
 
     # Check contents of TSCMerkleProof object in enriched header
     def check_TSCMerkleProof(self, hdren):
-        assert_equal(hdren.coinbaseMerkleProof.flags, 0)
-        assert_equal(hdren.coinbaseMerkleProof.index, 0)
+        assert_equal(hdren.coinbaseTxProof.proof.flags, 0)
+        assert_equal(hdren.coinbaseTxProof.proof.index, 0)
         hdren.rehash()
-        assert_equal(hdren.coinbaseMerkleProof.target, hdren.sha256)
-        hdren.coinBaseTx.rehash()
-        assert_equal(hdren.coinbaseMerkleProof.txOrId, hdren.coinBaseTx.sha256)
+        assert_equal(hdren.coinbaseTxProof.proof.target, hdren.sha256)
+        hdren.coinbaseTxProof.tx.rehash()
+        assert_equal(hdren.coinbaseTxProof.proof.txOrId, hdren.coinbaseTxProof.tx.sha256)
         calculatedRootHash = merkle_root_from_merkle_proof(
-            hdren.coinBaseTx.sha256,
-            [format(x.value, '064x') for x in hdren.coinbaseMerkleProof.nodes] # NOTE: function needs hashes as strings in Merkle proof array
+            hdren.coinbaseTxProof.tx.sha256,
+            [format(x.value, '064x') for x in hdren.coinbaseTxProof.proof.nodes] # NOTE: function needs hashes as strings in Merkle proof array
         )
         assert_equal(calculatedRootHash, hdren.hashMerkleRoot)
 
@@ -146,8 +146,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
         self.check_TSCMerkleProof(h0) # NOTE: Proof is checked first, since method also calculates hashes of block header transaction
         assert_equal(h0.hash, block2.hash) # should contain header of the block that was just generated
         assert_equal(h0.noMoreHeaders, 1)
-        assert_equal(h0.hasCoinbaseData, 1)
-        assert_equal(ToHex(block2.vtx[0]), ToHex(h.headers[0].coinBaseTx)) # Contents of coinbase tx in hdrsen must be the same as in block
+        assert(h0.coinbaseTxProof is not None)
+        assert_equal(ToHex(block2.vtx[0]), ToHex(h.headers[0].coinbaseTxProof.tx)) # Contents of coinbase tx in hdrsen must be the same as in block
 
         # Create and submit block with coinbase transaction whose size is such that resulting hdrsen is just within the limit
         coinbase_tx = create_coinbase(node.getblockcount())
@@ -206,8 +206,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, block5.hash)
         assert_equal(h0.noMoreHeaders, 1)
-        assert_equal(h0.hasCoinbaseData, 1)
-        assert_equal(ToHex(coinbase_tx), ToHex(h0.coinBaseTx))
+        assert(h0.coinbaseTxProof is not None)
+        assert_equal(ToHex(coinbase_tx), ToHex(h0.coinbaseTxProof.tx))
 
         # Mine 2 more blocks to have a chain of 7 blocks
         for i in range(2):
@@ -234,7 +234,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
             hi=h.headers[i]
             self.check_TSCMerkleProof(hi)
             assert_equal(hi.hash, block_hashes[i])
-            assert_equal(hi.hasCoinbaseData, 1) # coinbase data must be available in all headers in hdrsen message
+            assert(hi.coinbaseTxProof is not None) # coinbase data must be available in all headers in hdrsen message
             if i==7:
                 assert_equal(hi.noMoreHeaders, 1) # the last header must indicate that it is a tip
             else:
@@ -275,7 +275,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, last_block_hash)
         assert_equal(h0.noMoreHeaders, 1)
-        assert_equal(h0.hasCoinbaseData, 1)
+        assert(h0.coinbaseTxProof is not None)
 
         # Message sendheaders should override sendhdrsen
         spv_node.send_and_ping( msg_sendheaders() )
