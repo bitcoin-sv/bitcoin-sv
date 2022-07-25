@@ -1997,6 +1997,14 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 5);
     BOOST_CHECK(MinerHasGoodReputation(minerid_db, miner1IdPubKey2));
 
+    // Check if GetMinerCoinbaseDocInfo function returns expected results.
+    const auto& result { GetMinerCoinbaseDocInfo(minerid_db, miner1IdPubKey2) };
+    const CoinbaseDocument& coinbaseDoc { result->first };
+    BOOST_CHECK_EQUAL(coinbaseDoc.GetMinerId(), HexStr(miner1IdPubKey2));
+    BOOST_CHECK_EQUAL(coinbaseDoc.GetPrevMinerId(), HexStr(miner1IdPubKey2));
+    const std::string& minerIdStatus { result->second };
+    BOOST_CHECK_EQUAL(minerIdStatus, "CURRENT");
+
     // Send bad block to void miner 1 reputation
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };

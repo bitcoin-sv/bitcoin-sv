@@ -79,6 +79,11 @@ class MinerIdDatabase final
     [[nodiscard]] bool CheckMinerReputation(const uint256& idHash) const;
 
     /**
+     * Get a miners coinbase document with its state information..
+     */
+    std::optional<std::pair<CoinbaseDocument, std::string>> GetMinerCoinbaseDocInfo(const uint256& idHash) const;
+
+    /**
      * Prune old data from the database
      */
     void Prune();
@@ -415,6 +420,9 @@ void ScheduleMinerIdPeriodicTasks(CScheduler& scheduler, MinerIdDatabase& db);
 // Does the miner identified with the given miner ID have a good reputation?
 [[nodiscard]] bool MinerHasGoodReputation(const MinerIdDatabase& db, const MinerId& id);
 [[nodiscard]] bool MinerHasGoodReputation(const MinerIdDatabase& db, const CPubKey& id);
+
+// Get a miners coinbase document information.
+std::optional<std::pair<CoinbaseDocument, std::string>> GetMinerCoinbaseDocInfo(const MinerIdDatabase& db, const CPubKey& id);
 
 // Global reference to the MinerID database
 extern std::unique_ptr<MinerIdDatabase> g_minerIDs;

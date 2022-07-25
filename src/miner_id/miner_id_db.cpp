@@ -74,6 +74,22 @@ bool MinerHasGoodReputation(const MinerIdDatabase& db, const CPubKey& id)
     return false;
 }
 
+// Get a miners coinbase document information.
+std::optional<std::pair<CoinbaseDocument, std::string>> GetMinerCoinbaseDocInfo(const MinerIdDatabase& db, const CPubKey& id)
+{
+    try
+    {
+        // Get coinbase doc.
+        return db.GetMinerCoinbaseDocInfo(id.GetHash());
+    }
+    catch(const std::exception& e)
+    {
+        LogPrint(BCLog::MINERID, "Miner ID database error getting miner document info: %s\n", e.what());
+    }
+
+    return {};
+}
+
 
 // Constructor
 MinerIdDatabase::MinerIdDatabase(const Config& config)
@@ -297,6 +313,20 @@ bool MinerIdDatabase::CheckMinerReputation(const uint256& idHash) const
     }
 
     return false;
+}
+
+// Get a miners coinbase document with its state information.
+std::optional<std::pair<CoinbaseDocument, std::string>> MinerIdDatabase::GetMinerCoinbaseDocInfo(const uint256& idHash) const
+{
+    std::lock_guard lock {mMtx};
+
+    const auto& minerIdEntry { GetMinerIdFromDatabaseNL(idHash) };
+    if(minerIdEntry)
+    {
+        return { std::make_pair(minerIdEntry->mCoinbaseDoc, enum_cast<std::string>(minerIdEntry->mState)) };
+    }
+
+    return {};
 }
 
 // Dump our contents out in JSON format.
