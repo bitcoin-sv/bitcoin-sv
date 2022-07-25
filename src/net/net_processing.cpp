@@ -27,6 +27,7 @@
 #include "miner_id/dataref_index.h"
 #include "miner_id/datareftx.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_ref.h"
 #include "miner_id/revokemid.h"
 #include "net/block_download_tracker.h"
 #include "net/net.h"
@@ -2704,6 +2705,7 @@ public:
     uint64_t nTx{ 0 };
     bool noMoreHeaders{ false };
     std::optional<TxnAndProof> coinbaseAndProof { std::nullopt };
+    std::optional<TxnAndProof> minerInfoAndProof { std::nullopt };
 
     // Pointer to block index object is only included in object so that it can be used
     // when setting (non-const) data members after construction.
@@ -2736,6 +2738,7 @@ public:
         READWRITECOMPACTSIZE(nTx);
         READWRITE(noMoreHeaders);
         READWRITE(coinbaseAndProof);
+        READWRITE(minerInfoAndProof);
     }
 
     /**
@@ -2769,11 +2772,36 @@ public:
                 // Default constructor should set these to values we expect here
                 assert( coinbaseAndProof->proof.Flags() == 0 ); // Always set to 0 because we're providing transaction ID in txOrId, block hash in target, Merkle branch as proof in nodes and there is a single proof
                 assert( coinbaseAndProof->proof.Index() == 0 ); // Always set to 0, because we're providing proof for coinbase transaction
+
+                // See if this coinbase contains a miner-info reference
+                if(g_dataRefIndex && coinbaseAndProof->txn->vout.size() > 1)
+                {
+                    const bsv::span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
+                    if(IsMinerInfo(script))
+                    {
+                        const auto& mir { ParseMinerInfoRef(script) };
+                        if(std::holds_alternative<miner_info_ref>(mir))
+                        {
+                            const auto& ref { std::get<miner_info_ref>(mir) };
+
+                            // Lookup miner-info txn in the dataref index
+                            const auto& locking { g_dataRefIndex->CreateLockingAccess() };
+                            const auto& minerInfo { locking.GetMinerInfoEntry(ref.txid()) };
+                            if(minerInfo)
+                            {
+                                // Return txn and proof details for the miner-info txn as well
+                                minerInfoAndProof = std::make_optional<TxnAndProof>();
+                                minerInfoAndProof->txn = minerInfo->txn;
+                                minerInfoAndProof->proof = minerInfo->proof;
+                            }
+                        }
+                    }
+                }
             }
         }
         catch(...)
         {
-            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase txn failed.");
+            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.");
         }
 
         if(coinbaseAndProof)

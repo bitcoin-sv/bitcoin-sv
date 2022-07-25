@@ -792,32 +792,36 @@ class CBlockHeaderEnriched(CBlockHeader):
             self.nTx = header.nTx
             self.noMoreHeaders = header.noMoreHeaders
             self.coinbaseTxProof = header.coinbaseTxProof
+            self.minerInfoProof = header.minerInfoProof
 
     def set_null(self):
         super(CBlockHeaderEnriched, self).set_null()
         self.nTx = 0
         self.noMoreHeaders = False
         self.coinbaseTxProof = None
+        self.minerInfoProof = None
 
     def deserialize(self, f):
         super(CBlockHeaderEnriched, self).deserialize(f)
         self.nTx = deser_compact_size(f)
         self.noMoreHeaders = struct.unpack("<b", f.read(1))[0]
         self.coinbaseTxProof = deser_optional(self.TxnAndProof, f)
+        self.minerInfoProof = deser_optional(self.TxnAndProof, f)
 
     def serialize(self):
         r = b"".join((
             super(CBlockHeaderEnriched, self).serialize(),
             ser_compact_size(self.nTx),
             struct.pack("<b", self.noMoreHeaders),
-            ser_optional(self.coinbaseTxProof)
+            ser_optional(self.coinbaseTxProof),
+            ser_optional(self.minerInfoProof)
             ))
         return r
 
     def __repr__(self):
-        return "CBlockHeaderEnriched(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x nTx=%i noMoreHeaders=%i coinbaseTxProof=%s)" \
+        return "CBlockHeaderEnriched(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x nTx=%i noMoreHeaders=%i coinbaseTxProof=%s minerInfoProof=%s)" \
             % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
-               time.ctime(self.nTime), self.nBits, self.nNonce, self.nTx, self.noMoreHeaders, repr(self.coinbaseTxProof))
+               time.ctime(self.nTime), self.nBits, self.nNonce, self.nTx, self.noMoreHeaders, repr(self.coinbaseTxProof), repr(self.minerInfoProof))
 
 class CBlock(CBlockHeader):
 

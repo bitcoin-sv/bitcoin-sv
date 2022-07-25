@@ -152,21 +152,23 @@ class SendHdrsEnTest(BitcoinTestFramework):
         # Create and submit block with coinbase transaction whose size is such that resulting hdrsen is just within the limit
         coinbase_tx = create_coinbase(node.getblockcount())
         # NOTE: 83 is size of coinbase transaction if there was no data after the PUSHDATA4 after OP_RETURN
-        #       151 is size of hdrsen message without transaction:
+        #       152 is size of hdrsen message without transaction:
         #           1 byte for number of headers
-        #           80 byes for header
+        #           80 bytes for header
         #           1 byte for field txn_count
         #           1 byte for field no_more_headers
-        #           1 byte for field has_coinbase_data
+        #           1 byte for indication of following coinbase details
         #           1 byte for coinbase_merkle_proof.flags
         #           1 byte for coinbase_merkle_proof.index
         #           32 bytes for field coinbase_merkle_proof.txOrId
         #           32 bytes for field coinbase_merkle_proof.target
         #           1 byte for number of elements in field coinbase_merkle_proof.nodes
         #           0 bytes for element data in field coinbase_merkle_proof.nodes
-        coinbase_tx.vout.append( CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-83-151)])) )
+        #           1 byte for indication of following miner-info txn details
+        HdrsEnSize = 152
+        coinbase_tx.vout.append( CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-83-HdrsEnSize)])) )
         coinbase_tx.rehash()
-        assert_equal(len(coinbase_tx.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-151) # check that we have created transaction of correct size
+        assert_equal(len(coinbase_tx.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-HdrsEnSize) # check that we have created transaction of correct size
         block3 = self.submit_block(node, coinbase_tx)
 
         # We should receive a 'hdrsen' message whose size is exactly MAX_PROTOCOL_RECV_PAYLOAD_LENGTH
@@ -175,7 +177,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
 
         # Create and submit block with coinbase transaction whose size is such that resulting hdrsen is one byte over the limit
         coinbase_tx = create_coinbase(node.getblockcount())
-        coinbase_tx.vout.append( CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-83-150)] )) )
+        coinbase_tx.vout.append( CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-83-(HdrsEnSize-1))] )) )
         coinbase_tx.rehash()
         block4 = self.submit_block(node, coinbase_tx)
 
