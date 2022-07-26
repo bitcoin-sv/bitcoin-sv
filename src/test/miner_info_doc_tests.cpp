@@ -739,22 +739,28 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2_key)
                       std::get<miner_info_error>(var_mi_doc));
 }
 
+const auto compressed_key_init = [](char c) {
+    string s{"02"};
+    s.insert(s.end(), 64, c);
+    return s;
+};
+
 BOOST_AUTO_TEST_CASE(revocation_message_construction)
 {
-    const string compromised_miner_id{64, '1'};
-    const string sig_1{64, '2'};
-    const string sig_2{64, '3'};
+    const string compromised_miner_id{compressed_key_init('1')};
+    const string sig_1(140, '2');
+    const string sig_2(140, '3');
     const revocation_msg msg{compromised_miner_id, sig_1, sig_2};
     BOOST_CHECK_EQUAL(compromised_miner_id, msg.compromised_miner_id());
     BOOST_CHECK_EQUAL(sig_1, msg.sig_1());
     BOOST_CHECK_EQUAL(sig_2, msg.sig_2());
-}
+    }
 
 BOOST_AUTO_TEST_CASE(revocation_message_equality)
 {
-    const string cmp_miner_id_1{64, '1'};
-    const string sig_1_1{64, '2'};
-    const string sig_2_1{64, '3'};
+    const string cmp_miner_id_1{compressed_key_init('1')};
+    const string sig_1_1(140, '2');
+    const string sig_2_1(140, '3');
     const revocation_msg a{cmp_miner_id_1, sig_1_1, sig_2_1};
     BOOST_CHECK_EQUAL(a, a);
     
@@ -762,15 +768,15 @@ BOOST_AUTO_TEST_CASE(revocation_message_equality)
     BOOST_CHECK_EQUAL(a, b);
     BOOST_CHECK_EQUAL(b, a);
 
-    const string cmp_miner_id_2{64, '4'};
+    const string cmp_miner_id_2(compressed_key_init('4'));
     const revocation_msg c{cmp_miner_id_2, sig_1_1, sig_2_1};
     BOOST_CHECK_NE(a, c);
     
-    const string sig_1_2{64, '5'};
+    const string sig_1_2(140, '5');
     const revocation_msg d{cmp_miner_id_2, sig_1_2, sig_2_1};
     BOOST_CHECK_NE(c, d);
     
-    const string sig_2_2{64, '6'};
+    const string sig_2_2(140, '6');
     const revocation_msg e{cmp_miner_id_2, sig_1_2, sig_2_2};
     BOOST_CHECK_NE(d, e);
 }

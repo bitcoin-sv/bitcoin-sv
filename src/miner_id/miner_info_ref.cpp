@@ -38,7 +38,7 @@ std::ostream& operator<<(std::ostream& os, const block_bind& bb)
 }
     
 miner_info_ref::miner_info_ref(const bsv::span<const uint8_t> txid,
-                               const class block_bind& bb)
+                               const block_bind& bb)
     : txid_{txid.begin(), txid.end()},
       block_bind_(bb)
 {}

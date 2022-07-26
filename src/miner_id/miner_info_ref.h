@@ -39,7 +39,7 @@ inline bool operator!=(const block_bind& a, const block_bind& b)
 class miner_info_ref
 {
     uint256 txid_{};
-    class block_bind block_bind_;
+    block_bind block_bind_;
 
   public:
     miner_info_ref(bsv::span<const uint8_t> txid, const block_bind&);

@@ -112,10 +112,9 @@ revocation_msg::revocation_msg(const string& compromised_miner_id,
       sig_1_{sig_1},
       sig_2_{sig_2}
 {
-    //if(!is_hash_256(compromised_miner_id_))
-    //    cout << compromised_miner_id << "\n";
-
-    //assert(is_hash_256(compromised_miner_id));
+    assert(is_compressed_key(compromised_miner_id));
+    assert(is_der_signature(sig_1));
+    assert(is_der_signature(sig_2));
 }
 
 bool operator==(const revocation_msg& a, const revocation_msg& b)
@@ -174,9 +173,9 @@ namespace
         return verify(hash, ks.prev_key_sig(), ks.prev_key()); 
     }
 
-    using expected_revocation_msg = std::variant<revocation_msg, miner_info_error>;
-    expected_revocation_msg ParseRevocationMsg(const UniValue& id_doc,
-                                               const UniValue& sig_doc)
+    using var_rev_msg = std::variant<revocation_msg, miner_info_error>;
+    var_rev_msg ParseRevocationMsg(const UniValue& id_doc,
+                                   const UniValue& sig_doc)
     {
         assert(id_doc.isObject());
         assert(sig_doc.isObject());
@@ -205,9 +204,7 @@ namespace
         if(!is_der_signature(sig2))
             return miner_info_error::doc_parse_error_rev_msg_sig2_key;
 
-        return revocation_msg{comp_minerId.getValStr(),
-                              sig1_field.getValStr(),
-                              sig2_field.getValStr()};
+        return revocation_msg{key, sig1, sig2};
     }
 }
 
