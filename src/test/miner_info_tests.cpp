@@ -404,7 +404,8 @@ BOOST_AUTO_TEST_CASE(verify_sig_blockbind_mismatch)
     block.vtx.push_back(make_shared<const CTransaction>(mtx)); 
 
     const auto mi_err = verify(block, mi_ref.blockbind(), mi_doc.miner_id().key());
-    BOOST_CHECK_EQUAL(miner_info_error::block_bind_hash_mismatch, mi_err);
+    BOOST_CHECK(mi_err);
+    BOOST_CHECK_EQUAL(miner_info_error::block_bind_hash_mismatch, mi_err.value());
 }
 
 BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
@@ -465,7 +466,8 @@ BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
     block.vtx.push_back(make_shared<const CTransaction>(mtx)); 
 
     const auto mi_err = verify(block, mi_ref.blockbind(), mi_doc.miner_id().key());
-    BOOST_CHECK_EQUAL(miner_info_error::block_bind_sig_verification_failed, mi_err);
+    BOOST_CHECK(mi_err);
+    BOOST_CHECK_EQUAL(miner_info_error::block_bind_sig_verification_failed, mi_err.value());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

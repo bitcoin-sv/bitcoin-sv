@@ -53,5 +53,6 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
 
 uint256 modify_merkle_root(const CBlock&);
 class block_bind;
-miner_info_error verify(const CBlock&, const block_bind&, const std::string& key);
-
+std::optional<miner_info_error> verify(const CBlock&,
+                                       const block_bind&,
+                                       const std::string& key);

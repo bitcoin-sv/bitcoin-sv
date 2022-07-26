@@ -137,14 +137,14 @@ namespace
 {
     bool verify(const uint256& msg_hash, const string& sig, const string& key)
     {
-        const CPubKey pubKey{ParseHex(key.c_str())};
+        const CPubKey pubKey{ParseHex(key)};
         const auto hex_sig = ParseHex(sig);
         return pubKey.Verify(msg_hash, hex_sig);
     }
 
-    miner_info_error verify(const revocation_msg& msg,
-                            const string& rev_key,
-                            const string& miner_id_key)
+    optional<miner_info_error> verify(const revocation_msg& msg,
+                                      const string& rev_key,
+                                      const string& miner_id_key)
     {
         const auto comp_miner_id = ParseHex(msg.compromised_miner_id());
         uint256 comp_miner_id_hash;
@@ -158,7 +158,7 @@ namespace
         if(!verify(comp_miner_id_hash, msg.sig_2(), miner_id_key))
             return miner_info_error::doc_parse_error_sig2_verification_failed;
         
-        return miner_info_error::size; 
+        return nullopt; 
     }
     
     bool verify(const key_set& ks)
@@ -318,11 +318,12 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     
     assert(std::holds_alternative<::revocation_msg>(var_revocation_msg));
     auto rev_msg = std::get<::revocation_msg>(var_revocation_msg);
-    const auto status = verify(rev_msg,
+    const auto mi_err = verify(rev_msg,
                                revocation_ks.key(),
                                miner_id_ks.prev_key());
-    if(status != miner_info_error::size)
-        return status;
+    if(mi_err)
+        return mi_err.value();
+
     revocation_msg = rev_msg;
 
     return miner_info_doc{miner_info_doc::v0_3,

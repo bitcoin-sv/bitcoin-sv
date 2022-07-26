@@ -57,8 +57,8 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
     const auto [raw_mi_doc, mi_doc, sig] = get<mi_doc_sig>(var_mi_doc_sig);
 
     const auto mi_err = verify(block, mi_ref.blockbind(), mi_doc.miner_id().key());
-    if(mi_err != miner_info_error::size)
-        return mi_err;
+    if(mi_err)
+        return mi_err.value();
 
     return miner_info{raw_mi_doc, mi_doc, sig, (*it_mi_tx)->GetId()};
 }
@@ -101,12 +101,12 @@ uint256 modify_merkle_root(const CBlock& block)
     return ComputeMerkleRoot(leaves);
 }
 
-miner_info_error verify(const CBlock& block,
-                        const block_bind& bb,
-                        const string& key)
+std::optional<miner_info_error> verify(const CBlock& block,
+                                       const block_bind& bb,
+                                       const string& key)
 {
     const auto mm_root = modify_merkle_root(block);
-    
+
     vector<uint8_t> buffer{mm_root.begin(), mm_root.end()};
     buffer.reserve(mm_root.size() + block.hashPrevBlock.size());
     buffer.insert(buffer.end(), block.hashPrevBlock.begin(), block.hashPrevBlock.end());
@@ -125,7 +125,7 @@ miner_info_error verify(const CBlock& block,
     if(!pubKey.Verify(uint256{mmr_pbh_hash}, sig))
         return miner_info_error::block_bind_sig_verification_failed; 
 
-    return miner_info_error::size;
+    return nullopt; 
 }
 
 std::variant<miner_info, miner_info_error> ParseMinerInfo(const CBlock& block)
