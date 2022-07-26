@@ -151,8 +151,10 @@ public:
 class uint256 : public base_blob<256> {
 public:
     uint256() {}
-    uint256(const base_blob<256> &b) : base_blob<256>(b) {}
-    explicit uint256(const std::vector<uint8_t> &vch) : base_blob<256>(vch) {}
+    uint256(const base_blob& b) : base_blob(b) {}
+    explicit uint256(const std::vector<uint8_t>& vch)
+        : uint256(vch.begin(), vch.end()) 
+    {}
 
     template<typename T>
     uint256(T first, T last):base_blob{first, last}
@@ -169,15 +171,7 @@ public:
 
 inline std::ostream& operator<<(std::ostream& os, const uint256& i)
 {
-    using namespace std;
-
-    os << hex << std::setfill('0');
-
-    auto it = make_reverse_iterator(i.end());
-    const auto it_end = make_reverse_iterator(i.begin());
-    for(; it != it_end; ++it)
-        os << setw(2) << static_cast<int>(*it);
-    
+    os << i.ToString();
     return os;
 }
 

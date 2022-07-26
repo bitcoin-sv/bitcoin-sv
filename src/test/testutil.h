@@ -13,7 +13,6 @@
 #include <ostream>
 
 #include "fs.h"
-#include "uint256.h"
 
 fs::path GetTempPath();
 

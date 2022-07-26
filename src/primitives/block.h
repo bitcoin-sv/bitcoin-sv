@@ -135,7 +135,7 @@ public:
     auto cend() const { return vtx.cend(); };
 };
 
-inline auto find_by_id(const CBlock& block, const uint256& txid)
+inline auto find_tx_by_id(const CBlock& block, const uint256& txid)
 {
     return std::find_if(block.cbegin(),
                         block.cend(),

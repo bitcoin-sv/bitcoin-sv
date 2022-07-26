@@ -33,7 +33,7 @@ std::variant<miner_info, miner_info_error> ParseMinerInfo(
     const miner_info_ref& mi_ref)
 {
     // Find the miner_info-tx
-    const auto it_mi_tx = find_by_id(block, mi_ref.txid());
+    const auto it_mi_tx = find_tx_by_id(block, mi_ref.txid());
     if(it_mi_tx == block.cend())
         return miner_info_error::txid_not_found;
 
