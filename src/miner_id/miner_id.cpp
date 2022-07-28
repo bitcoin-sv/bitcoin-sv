@@ -13,6 +13,10 @@
 
 #include "hash.h"
 #include "logging.h"
+#include "miner_id/miner_info.h"
+#include "miner_id/miner_info_error.h"
+#include "miner_id/miner_info_ref.h"
+#include "primitives/block.h"
 #include "pubkey.h"
 #include "script/instruction.h"
 #include "script/instruction_iterator.h"
@@ -565,6 +569,35 @@ std::optional<MinerId> FindMinerId(const CTransaction& tx, int32_t blockHeight)
                 // Successful static coinbase doc, but failed dynamic
                 // coinbase doc: let's reset miner id.
                 minerId = MinerId();
+            }
+        }
+        else if(IsMinerInfo(script))
+        {
+            const auto var_mi_ref = ParseMinerInfoRef(script);
+            if(holds_alternative<miner_info_error>(var_mi_ref))
+            {
+                log_parse_error(get<miner_info_error>(var_mi_ref),
+                                tx.GetId().ToString(),
+                                i);
+                break;
+            }
+            else if(holds_alternative<miner_info_ref>(var_mi_ref))
+            {
+                const auto mi_ref = get<miner_info_ref>(var_mi_ref);
+
+                CBlock block; // todo need the real block passed in
+                const auto var_mi_doc_sig = ParseMinerInfo(block, mi_ref);
+                if(holds_alternative<miner_info_error>(var_mi_ref))
+                {
+                    log_parse_error(get<miner_info_error>(var_mi_doc_sig),
+                                    tx.GetId().ToString(),
+                                    i);
+                    break;
+                }
+                
+                const auto mi = get<miner_info>(var_mi_doc_sig);
+                cout << mi.raw_mi_doc() << '\n';
+                // todo ...
             }
         }
     }

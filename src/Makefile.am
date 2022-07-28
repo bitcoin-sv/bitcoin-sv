@@ -155,6 +155,10 @@ BITCOIN_CORE_H = \
   miner_id/miner_id.h \
   miner_id/miner_id_db.h \
   miner_id/miner_id_db_defaults.h \
+  miner_id/miner_info.h \
+  miner_id/miner_info_doc.h \
+  miner_id/miner_info_error.h \
+  miner_id/miner_info_ref.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -321,6 +325,10 @@ libbitcoin_server_a_SOURCES = \
   merkletreestore.cpp \
   miner_id/miner_id.cpp \
   miner_id/miner_id_db.cpp \
+  miner_id/miner_info.cpp \
+  miner_id/miner_info_doc.cpp \
+  miner_id/miner_info_error.cpp \
+  miner_id/miner_info_ref.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
