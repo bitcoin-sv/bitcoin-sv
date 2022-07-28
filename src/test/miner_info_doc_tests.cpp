@@ -2,14 +2,18 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
+#include <boost/test/tools/old/interface.hpp>
 #include <numeric>
 
 #include <boost/test/unit_test.hpp>
+#include <sstream>
 #include "boost/algorithm/hex.hpp"
 
 #include "miner_id/miner_info_doc.h"
+#include "miner_id/miner_info_error.h"
 #include "script/instruction_iterator.h"
 #include "script/opcodes.h"
+#include "uint256.h"
 
 using namespace std;
 
@@ -68,7 +72,8 @@ namespace
 
     const vector<pair<string, json_value_type>> optional_fields{
         make_pair("revocationMessage", json_value_type::object),
-        make_pair("revocationMessageSig", json_value_type::object)};
+        make_pair("revocationMessageSig", json_value_type::object),
+        make_pair("datarefs", json_value_type::object)};
     
     const string rev_msg{R"("compromised_minerId") : ")"};
     const string comp_miner_id{
@@ -79,6 +84,8 @@ namespace
     const string sig_2{"3045022100a26745be5035f154c26850222639e0ed3f8c08d117495"
                        "bbbaaeb646d9d79d182022077935c701643d42e2405da945c583c53"
                        "9f5d358496258ea05f0252c630f40fee"};
+
+    const string refs{""};
     const vector<string>
         optional_values{[] {
                             ostringstream oss;
@@ -91,11 +98,19 @@ namespace
                             oss << R"("sig1" : ")" << sig_1 << R"(", )"
                                 << R"("sig2" : ")" << sig_2 << R"(")";
                             return oss.str();
+                        }(),
+                        []{
+                            return refs;
                         }()};
 
     const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig};
     const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig};
-    const miner_info_doc mi_doc{miner_info_doc::v0_3, h, mi_keys, rev_keys};
+    const vector<data_ref> data_refs;
+    const miner_info_doc mi_doc{miner_info_doc::v0_3,
+                                h,
+                                mi_keys,
+                                rev_keys,
+                                data_refs};
 
     const string sig_bad_0(142, '0');
     const string sig_bad_1(142, '1');
@@ -230,7 +245,8 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_happy_case)
     const miner_info_doc expected{miner_info_doc::v0_3,
                                   height,
                                   rev_keys,
-                                  rev_keys};
+                                  rev_keys,
+                                  vector<data_ref>{}};
     const string mi_str = to_json(expected);
     vector<uint8_t> mi_script;
     transform(mi_str.begin(),
@@ -843,6 +859,125 @@ BOOST_AUTO_TEST_CASE(parse_revocation_sig_2_verification_fail)
                       get<miner_info_error>(var_mi_doc));
 }
 
+BOOST_AUTO_TEST_CASE(parse_datarefs_invalid_json)
+{
+    using mie = miner_info_error;
+
+    // clang-format off
+    const vector<pair<string, miner_info_error>>
+        test_data{
+                  make_pair(R"({ "dataRefs" : "INVALID" })",
+                            mie::doc_parse_error_datarefs_invalid_datarefs_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : "INVALID" } })",
+                            mie::doc_parse_error_datarefs_invalid_refs_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ "INVALID" ] } })",
+                            mie::doc_parse_error_datarefs_invalid_dataref_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ {} ] } })",
+                            mie::doc_parse_error_datarefs_dataref_missing_fields),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : 42 } ] } })",
+                            mie::doc_parse_error_datarefs_dataref_missing_fields),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : 42,
+                                                             "txid" : 42 } ] } })",
+                            mie::doc_parse_error_datarefs_dataref_missing_fields),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : 42,
+                                                             "txid" : 42,
+                                                             "vout" : "INVALID" } ] } })",
+                            mie::doc_parse_error_datarefs_refs_brfcid_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : [ 42 ],
+                                                             "txid" : "",
+                                                             "vout" : 0 } ] } })",
+                            mie::doc_parse_error_datarefs_refs_brfcid_field_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : [ "" ],
+                                                             "txid" : 42,
+                                                             "vout" : 0 } ] } })",
+                            mie::doc_parse_error_datarefs_refs_txid_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : [ "" ],
+                                                             "txid" : "",
+                                                             "vout" : "INVALID" } ] } })",
+                            mie::doc_parse_error_datarefs_refs_vout_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : [ "" ],
+                                                             "txid" : "",
+                                                             "vout" : 0,
+                                                             "compress" : 0 } ] } })",
+                            mie::doc_parse_error_datarefs_refs_compress_type),
+                  make_pair(R"({ "dataRefs" : { "refs" : [ { "brfcIds" : [ "" ],
+                                                             "txid" : "INVALID",
+                                                             "vout" : 0,
+                                                             "compress" : "" } ] } })",
+                            mie::doc_parse_error_datarefs_refs_txid_type)
+                 };
+    // clang-format on
+
+    for(const auto& [ip, expected] : test_data)
+    {
+        const auto var_data_refs = ParseDataRefs(ip);
+        BOOST_CHECK_EQUAL(expected, get<miner_info_error>(var_data_refs));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(parse_datarefs_invalid_datarefs_type)
+{
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              required_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+
+    fields.insert(fields.end(), make_tuple("dataRefs", json_value_type::string, "42"));
+    
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_datarefs_invalid_datarefs_type,
+                      get<miner_info_error>(var_mi_doc));
+}
+
+BOOST_AUTO_TEST_CASE(parse_datarefs_happy_case)
+{
+    ostringstream oss;
+    oss << R"({ "dataRefs" : { "refs" : [ { "brfcIds" : [ "brfcid_1", "brfcid_2" ],
+                                                    "txid" : ")";
+    vector<uint8_t> v(32);
+    iota(v.begin(), v.end(), 0);
+    const uint256 expected_txid{v};
+
+    oss << expected_txid << R"(", )";
+    oss << R"("vout" : 1, "compress" : "gzip" } ] } })";
+
+    const auto var_data_refs = ParseDataRefs(oss.str());
+
+    const vector<string> expected_brfcids{"brfcid_1", "brfcid_2"};
+    const vector<data_ref> expected{
+        data_ref{expected_brfcids, expected_txid, 1, "gzip"}};
+    const auto actual = get<::data_refs>(var_data_refs);
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.cbegin(),
+                                  expected.cend(),
+                                  actual.cbegin(),
+                                  actual.cend());
+}
+
+BOOST_AUTO_TEST_CASE(parse_datarefs_invalid_datarefs_refs_type)
+{
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              required_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+
+    fields.insert(fields.end(), 
+                  make_tuple("dataRefs", json_value_type::object, R"("refs" : 42)"));
+    
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_datarefs_invalid_refs_type,
+                      get<miner_info_error>(var_mi_doc));
+}
+
 BOOST_AUTO_TEST_CASE(parse_miner_info_doc_without_rev_msg_happy_case)
 {
     json_fields_type fields;
@@ -891,8 +1026,48 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_with_rev_msg_happy_case)
     std::optional<revocation_msg> rev_msg{
         revocation_msg{comp_miner_id, sig_1, sig_2}};
     const miner_info_doc expected{miner_info_doc::v0_3, h, mi_keys, rev_keys,
+                                  vector<data_ref>{},
                                   rev_msg};
     BOOST_CHECK_EQUAL(expected, mi_doc);
+}
+
+BOOST_AUTO_TEST_CASE(parse_miner_info_doc_with_datarefs_happy_case)
+{
+    json_fields_type fields;
+    transform(required_fields.cbegin(),
+              required_fields.cend(),
+              required_values.cbegin(),
+              back_inserter(fields),
+              [](const auto& field, const auto& value) {
+                  return make_tuple(field.first, field.second, value);
+              });
+
+    ostringstream oss;
+    oss << R"("refs" : [ { "brfcIds" : [ "brfcid_1", "brfcid_2" ],
+                                                    "txid" : ")";
+    vector<uint8_t> v(32);
+    iota(v.begin(), v.end(), 0);
+    const uint256 expected_txid{v};
+
+    oss << expected_txid << R"(", )";
+    oss << R"("vout" : 1, "compress" : "gzip" } ] )";
+
+    fields.push_back(make_tuple("dataRefs", json_value_type::object, oss.str()));
+    const string doc = to_json(fields.cbegin(), fields.cend());
+    const auto var_mi_doc = ParseMinerInfoDoc(doc);
+    BOOST_CHECK(std::holds_alternative<miner_info_doc>(var_mi_doc));
+    const auto& mi_doc = get<miner_info_doc>(var_mi_doc);
+
+    const auto& data_refs = mi_doc.data_refs();
+    BOOST_CHECK_EQUAL(1, data_refs.size());
+
+    const vector<string> expected_brfcids{"brfcid_1", "brfcid_2"};
+    const vector<data_ref> expected{
+        data_ref{expected_brfcids, expected_txid, 1, "gzip"}};
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.cbegin(),
+                                  expected.cend(),
+                                  data_refs.cbegin(),
+                                  data_refs.cend());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -59,6 +59,30 @@ inline bool operator!=(const revocation_msg& a, const revocation_msg& b)
     return !(a == b);
 }
 
+class data_ref
+{
+    std::vector<std::string> brfc_ids_;
+    uint256 txid_;
+    int32_t vout_;
+    std::string compress_;
+
+    friend bool operator==(const data_ref&, const data_ref&);
+    friend std::ostream& operator<<(std::ostream&, const data_ref&);
+
+public:
+    data_ref(const std::vector<std::string>& brfcids,
+             const uint256& txid,
+             int32_t vout,
+             const std::string& compress = "");
+
+    const std::vector<std::string> brfc_ids() const { return brfc_ids_; }
+    const uint256& txid() const { return txid_; }
+    int32_t vout() const { return vout_; }
+    const std::string& compress() { return compress_; }
+};
+
+inline bool operator!=(const data_ref& a, const data_ref& b){ return !(a == b); }
+
 class miner_info_doc
 {
 public:
@@ -72,6 +96,7 @@ public:
                    int32_t height,
                    const key_set& miner_id,
                    const key_set& revocation,
+                   std::vector<data_ref>, 
                    std::optional<revocation_msg> = std::nullopt);
 
     supported_version version() const { return version_; }
@@ -82,6 +107,8 @@ public:
 
     const std::optional<revocation_msg>& revocation_message() const { return rev_msg_; }
 
+    const std::vector<data_ref> data_refs() const { return data_refs_; }
+
     friend bool operator==(const miner_info_doc&, const miner_info_doc&);
     friend std::ostream& operator<<(std::ostream&, const miner_info_doc&);
 
@@ -91,6 +118,7 @@ private:
     key_set miner_id_keys_;
     key_set revocation_keys_;
     std::optional<revocation_msg> rev_msg_{std::nullopt};
+    std::vector<data_ref> data_refs_;
 };
 
 inline bool operator!=(const miner_info_doc& a, const miner_info_doc& b)
@@ -106,3 +134,6 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
 
 std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     std::string_view miner_info_doc);
+
+using data_refs = std::vector<data_ref>;
+std::variant<data_refs, miner_info_error> ParseDataRefs(std::string_view sv);
