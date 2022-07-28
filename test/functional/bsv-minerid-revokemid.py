@@ -45,7 +45,7 @@ class RovokeMid(BitcoinTestFramework):
             }
             self.minerIdKeys.append(key)
 
-        # And a single revocation key
+        # And a revocation key
         minerIdRevocationKey = BIP32Key.fromEntropy(os.urandom(16))
         self.minerIdRevocationPubKey = minerIdRevocationKey.PublicKey()
         self.minerIdRevocationSigningKey = ecdsa.SigningKey.from_string(minerIdRevocationKey.PrivateKey(), curve=self.curve)

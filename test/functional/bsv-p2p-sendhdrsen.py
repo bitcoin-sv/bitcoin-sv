@@ -4,14 +4,16 @@
 """
 Check P2P message sendhdrsen
 """
-from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_merkle_proof
+from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_branch, MinerIDParams, make_miner_id_block
 from test_framework.mininode import COIN, CBlock, CInv, CTxOut, FromHex, mininode_lock, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, msg_gethdrsen, msg_sendhdrsen, msg_sendheaders, NetworkThread, NodeConn, NodeConnCB, ToHex
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than, p2p_port, wait_until, sync_blocks
+
+from bip32utils import BIP32Key
+import ecdsa
 import time
-
-
+import os
 
 class SPVNode(NodeConnCB):
     def __init__(self):
@@ -52,6 +54,17 @@ class SendHdrsEnTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.extra_args = [['-genesisactivationheight=1']]*2 # Genesis must be activated so that we can send large transactions
+        self.curve = ecdsa.SECP256k1
+
+        # Setup miner ID key
+        minerIdKey = BIP32Key.fromEntropy(os.urandom(16))
+        self.minerIdPubKey = minerIdKey.PublicKey()
+        self.minerIdSigningKey = ecdsa.SigningKey.from_string(minerIdKey.PrivateKey(), curve=self.curve)
+
+        # And a revocation key
+        minerIdRevocationKey = BIP32Key.fromEntropy(os.urandom(16))
+        self.minerIdRevocationPubKey = minerIdRevocationKey.PublicKey()
+        self.minerIdRevocationSigningKey = ecdsa.SigningKey.from_string(minerIdRevocationKey.PrivateKey(), curve=self.curve)
 
     def generate_block(self, node):
         block_hashes = node.generate(1)
@@ -75,17 +88,19 @@ class SendHdrsEnTest(BitcoinTestFramework):
 
     # Check contents of TSCMerkleProof object in enriched header
     def check_TSCMerkleProof(self, hdren):
-        assert_equal(hdren.coinbaseTxProof.proof.flags, 0)
-        assert_equal(hdren.coinbaseTxProof.proof.index, 0)
+        def check(txproof, expectedHash, expectedMerkleRoot):
+            assert(txproof)
+            assert_equal(txproof.proof.flags, 0)
+            assert_equal(txproof.proof.target, expectedHash)
+            txproof.tx.rehash()
+            assert_equal(txproof.proof.txOrId, txproof.tx.sha256)
+            calculatedRootHash = merkle_root_from_branch(txproof.proof.txOrId, txproof.proof.index, [x.value for x in txproof.proof.nodes])
+            assert_equal(calculatedRootHash, expectedMerkleRoot)
+
         hdren.rehash()
-        assert_equal(hdren.coinbaseTxProof.proof.target, hdren.sha256)
-        hdren.coinbaseTxProof.tx.rehash()
-        assert_equal(hdren.coinbaseTxProof.proof.txOrId, hdren.coinbaseTxProof.tx.sha256)
-        calculatedRootHash = merkle_root_from_merkle_proof(
-            hdren.coinbaseTxProof.tx.sha256,
-            [format(x.value, '064x') for x in hdren.coinbaseTxProof.proof.nodes] # NOTE: function needs hashes as strings in Merkle proof array
-        )
-        assert_equal(calculatedRootHash, hdren.hashMerkleRoot)
+        check(hdren.coinbaseTxProof, hdren.sha256, hdren.hashMerkleRoot)
+        if hdren.minerInfoProof:
+            check(hdren.minerInfoProof, hdren.sha256, hdren.hashMerkleRoot)
 
     def run_test(self):
         self.log.info("Checking block announcements using sendhdrsen message")
@@ -143,6 +158,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1) # should contain only one header
         h0=h.headers[0]
+        assert(h0.coinbaseTxProof)
+        assert(not h0.minerInfoProof)
         self.check_TSCMerkleProof(h0) # NOTE: Proof is checked first, since method also calculates hashes of block header transaction
         assert_equal(h0.hash, block2.hash) # should contain header of the block that was just generated
         assert_equal(h0.noMoreHeaders, 1)
@@ -191,25 +208,37 @@ class SendHdrsEnTest(BitcoinTestFramework):
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1)
         h0=h.headers[0]
+        assert(h0.coinbaseTxProof)
+        assert(not h0.minerInfoProof)
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, block4.hash)
         assert_equal(len(h.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH+1)
 
         # Create and mine a block with several transactions so that Merkle proof in hdrsen message is not empty
         txs = []
-        for i in range(50):
+        for i in range(49):
             txs.append( create_transaction(funding_tx, i, CScript(), 1*COIN) )
-        coinbase_tx = create_coinbase(node.getblockcount())
-        block5 = self.submit_block(node, coinbase_tx, txs)
+        # Also make this block a miner ID enabled one containing a miner-info txn
+        minerIdParams = MinerIDParams(blockHeight = node.getblockcount() + 1,
+                                      minerId = self.minerIdSigningKey,
+                                      minerIdPub = self.minerIdPubKey,
+                                      revocationKey = self.minerIdRevocationSigningKey,
+                                      revocationKeyPub = self.minerIdRevocationPubKey)
+        block5 = make_miner_id_block(node, minerIdParams, { "txid" : funding_tx.hash, "vout" : 49, "amount" : 1.0 }, txns=txs)
+        coinbase_tx = block5.vtx[0]
+        miner_info_tx = block5.vtx[1 + len(txs)]
+        node.submitblock(ToHex(block5))
 
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1)
         h0=h.headers[0]
+        assert(h0.coinbaseTxProof)
+        assert(h0.minerInfoProof)
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, block5.hash)
         assert_equal(h0.noMoreHeaders, 1)
-        assert(h0.coinbaseTxProof is not None)
         assert_equal(ToHex(coinbase_tx), ToHex(h0.coinbaseTxProof.tx))
+        assert_equal(ToHex(miner_info_tx), ToHex(h0.minerInfoProof.tx))
 
         # Mine 2 more blocks to have a chain of 7 blocks
         for i in range(2):
@@ -218,6 +247,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
             assert_equal(len(h.headers), 1)
             h0=h.headers[0]
             self.check_TSCMerkleProof(h0)
+            assert(h0.coinbaseTxProof)
+            assert(not h0.minerInfoProof)
             assert_equal(h0.hash, block.hash)
             assert_equal(h0.noMoreHeaders, 1)
 
@@ -234,6 +265,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
         assert_equal(len(h.headers), 8)
         for i in range(8):
             hi=h.headers[i]
+            assert(hi.coinbaseTxProof)
+            assert(not hi.minerInfoProof)
             self.check_TSCMerkleProof(hi)
             assert_equal(hi.hash, block_hashes[i])
             assert(hi.coinbaseTxProof is not None) # coinbase data must be available in all headers in hdrsen message
@@ -261,6 +294,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
         assert_equal(len(h.headers), 9)
         for i in range(9):
             hi=h.headers[i]
+            assert(hi.coinbaseTxProof)
+            assert(not hi.minerInfoProof)
             self.check_TSCMerkleProof(hi)
             assert_equal(hi.hash, block_hashes[i])
             if i==8:
@@ -274,6 +309,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1)
         h0=h.headers[0]
+        assert(h0.coinbaseTxProof)
+        assert(not h0.minerInfoProof)
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, last_block_hash)
         assert_equal(h0.noMoreHeaders, 1)
