@@ -159,10 +159,12 @@ void GlobalConfig::Reset()
     data->dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
 
     // MinerID
+    data->minerIdEnabled = MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED;
     data->minerIdCacheSize = MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE;
     data->numMinerIdsToKeep = MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP;
     data->minerIdReputationM = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
     data->minerIdReputationN = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N;
+    data->minerIdReputationMScale = MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR;
 
     data->mDisableBIP30Checks = std::nullopt;
 
@@ -1828,6 +1830,16 @@ bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
 }
 
 // MinerID
+bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* err)
+{
+    data->minerIdEnabled = enabled;
+    return true;
+}
+bool GlobalConfig::GetMinerIdEnabled() const
+{
+    return data->minerIdEnabled;
+}
+
 bool GlobalConfig::SetMinerIdCacheSize(int64_t size, std::string* err)
 {
     if(size < 0 || static_cast<uint64_t>(size) > MinerIdDatabaseDefaults::MAX_CACHE_SIZE)
@@ -1923,6 +1935,25 @@ uint32_t GlobalConfig::GetMinerIdReputationN() const
 bool GlobalConfig::GetDisableBIP30Checks() const
 {
     return data->mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
+}
+
+bool GlobalConfig::SetMinerIdReputationMScale(double num, std::string* err)
+{
+    if(num < 1)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M scale factor must be >= 1.";
+        }
+        return false;
+    }
+
+    data->minerIdReputationMScale = num;
+    return true;
+}
+double GlobalConfig::GetMinerIdReputationMScale() const
+{
+    return data->minerIdReputationMScale;
 }
 
 #if ENABLE_ZMQ

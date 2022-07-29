@@ -127,6 +127,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	merkletreefile_readwrite_tests.cpp
     mining_group_builder_tests.cpp
     miner_id_db_tests.cpp 
+    miner_id_db_tests3.cpp 
 	miner_tests.cpp
 	minerid_tests.cpp
 	miner_info_tests.cpp

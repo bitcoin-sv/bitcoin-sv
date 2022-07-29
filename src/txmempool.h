@@ -1157,10 +1157,11 @@ public:
      * into disconnectpool need to have their descendants removed from mempool, too
      */
     void AddToDisconnectPoolUpToLimit(
-        const mining::CJournalChangeSetPtr &changeSet,
-        DisconnectedBlockTransactions *disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet,
+        DisconnectedBlockTransactions* disconnectpool,
         uint64_t maxDisconnectedTxPoolSize,
-        const std::vector<CTransactionRef> &vtx);
+        const CBlock& block,
+        int32_t height);
 
 private:
     // A non-locking version of CheckMempool
@@ -1424,50 +1425,75 @@ struct DisconnectedBlockTransactions {
     ~DisconnectedBlockTransactions();
 
 private:
-    indexed_disconnected_transactions queuedTx;
-    uint64_t cachedInnerUsage = 0;
+    std::set<TxId> filteredTx {};
+    indexed_disconnected_transactions queuedTx {};
+    uint64_t cachedInnerUsage {0};
 
     friend class CTxMemPool;
 public:
     // Estimate the overhead of queuedTx to be 6 pointers + an allocation, as
     // no exact formula for boost::multi_index_contained is implemented.
-    size_t DynamicMemoryUsage() const {
-        return memusage::MallocUsage(sizeof(CTransactionRef) +
-                                     6 * sizeof(void *)) *
-                   queuedTx.size() +
-               cachedInnerUsage;
+    size_t DynamicMemoryUsage() const
+    {
+        return memusage::MallocUsage(
+            sizeof(CTransactionRef) +
+            6 * sizeof(void*)) * queuedTx.size() +
+            cachedInnerUsage;
     }
 
-    void addTransaction(const CTransactionRef &tx) {
+    void addTransaction(const CTransactionRef& tx, bool filter)
+    {
         queuedTx.insert(tx);
         cachedInnerUsage += RecursiveDynamicUsage(tx);
+        if(filter)
+        {
+            filteredTx.insert(tx->GetId());
+        }
+    }
+
+    bool isFiltered(const TxId& txid) const
+    {
+        return (filteredTx.count(txid) > 0);
     }
 
     // Remove entries based on txid_index, and update memory usage.
-    void removeForBlock(const std::vector<CTransactionRef> &vtx) {
+    void removeForBlock(const std::vector<CTransactionRef>& vtx)
+    {
         // Short-circuit in the common case of a block being added to the tip
-        if (queuedTx.empty()) {
+        if(queuedTx.empty() && filteredTx.empty())
+        {
             return;
         }
-        for (auto const &tx : vtx) {
-            auto it = queuedTx.find(tx->GetHash());
-            if (it != queuedTx.end()) {
-                cachedInnerUsage -= RecursiveDynamicUsage(*it);
-                queuedTx.erase(it);
+        for(auto const& tx : vtx)
+        {
+            auto txit { queuedTx.find(tx->GetHash()) };
+            if(txit != queuedTx.end())
+            {
+                cachedInnerUsage -= RecursiveDynamicUsage(*txit);
+                queuedTx.erase(txit);
             }
+
+            // Remove from filtered set (if it exists)
+            filteredTx.erase(tx->GetId());
         }
     }
 
     // Remove an entry by insertion_order index, and update memory usage.
     void removeEntry(indexed_disconnected_transactions::index<
-                     insertion_order>::type::iterator entry) {
+                     insertion_order>::type::iterator entry)
+    {
+        // Remove from filtered set (if it exists)
+        filteredTx.erase((*entry)->GetId());
+
         cachedInnerUsage -= RecursiveDynamicUsage(*entry);
         queuedTx.get<insertion_order>().erase(entry);
     }
 
-    void clear() {
+    void clear()
+    {
         cachedInnerUsage = 0;
         queuedTx.clear();
+        filteredTx.clear();
     }
 };
 

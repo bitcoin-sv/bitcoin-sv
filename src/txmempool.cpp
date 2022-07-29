@@ -11,6 +11,7 @@
 #include "consensus/validation.h"
 #include "frozentxo.h"
 #include "mempooltxdb.h"
+#include "miner_id/miner_id.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "timedata.h"
@@ -2210,11 +2211,13 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
              it != disconnectpool.queuedTx.get<insertion_order>().rend();
              ++it)
         {
-            if ((*it)->IsCoinBase()) {
+            // Filter out coinbase and special miner ID txns
+            if(disconnectpool.isFiltered((*it)->GetId())) {
                 // If the transaction doesn't make it in to the mempool, remove any
                 // transactions that depend on it (which would now be orphans).
                 removeRecursiveNL(**it, changeSet, noConflict, MemPoolRemovalReason::REORG);
-            } else {
+            }
+            else {
                 vTxInputData.emplace_back(
                     std::make_shared<CTxInputData>(
                         TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
@@ -2328,18 +2331,50 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
 }
 
 void CTxMemPool::AddToDisconnectPoolUpToLimit(
-    const mining::CJournalChangeSetPtr &changeSet,
-    DisconnectedBlockTransactions *disconnectpool,
+    const mining::CJournalChangeSetPtr& changeSet,
+    DisconnectedBlockTransactions* disconnectpool,
     uint64_t maxDisconnectedTxPoolSize,
-    const std::vector<CTransactionRef> &vtx) {
-    for (const auto &tx : boost::adaptors::reverse(vtx)) {
-        disconnectpool->addTransaction(tx);
+    const CBlock& block,
+    int32_t height)
+{
+    // If this is a miner ID enabled block, there may be txns contained in it
+    // we should filter out from the mempool.
+    std::optional<MinerId> minerID { FindMinerId(block, height) };
+    std::set<TxId> dataRefIds {};
+    if(minerID && minerID->GetCoinbaseDocument().GetDataRefs())
+    {
+        // Build set of dataref txids for speedy lookup
+        for(const auto& dataref : minerID->GetCoinbaseDocument().GetDataRefs().value())
+        {
+            dataRefIds.insert(dataref.txid);
+        }
     }
+
+    for(const auto& tx : boost::adaptors::reverse(block.vtx))
+    {
+        bool filter {false};
+        if(minerID)
+        {
+            const auto& txid { tx->GetId() };
+            // Filter miner ID miner-info and dataref txns
+            const auto& minerInfoTx { minerID->GetMinerInfoTx() };
+            if(minerInfoTx)
+            {
+                filter |= (minerInfoTx == txid);
+            }
+            filter |= (dataRefIds.count(txid) > 0);
+        }
+
+        // Also filter coinbase txns
+        disconnectpool->addTransaction(tx, filter || tx->IsCoinBase());
+    }
+
     // FIXME: SVDEV-460 add only upto limit and drop the rest. Figure out all this reversal and what to drop
 
     std::unique_lock lock{ smtx };
 
-    while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
+    while(disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize)
+    {
         // Drop the earliest entry, and remove its children from the
         // mempool.
         auto it = disconnectpool->queuedTx.get<insertion_order>().begin();

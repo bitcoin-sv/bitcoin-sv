@@ -158,10 +158,12 @@ public:
     virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
     // MinerID
+    virtual bool GetMinerIdEnabled() const = 0;
     virtual uint64_t GetMinerIdCacheSize() const = 0;
     virtual uint64_t GetMinerIdsNumToKeep() const = 0;
     virtual uint32_t GetMinerIdReputationM() const = 0;
     virtual uint32_t GetMinerIdReputationN() const = 0;
+    virtual double GetMinerIdReputationMScale() const = 0;
 
     // Detect selfish mining
     virtual bool GetDetectSelfishMining() const = 0;
@@ -315,10 +317,12 @@ public:
 
 
     // MinerID
+    virtual bool SetMinerIdEnabled(bool enabled, std::string* err) = 0;
     virtual bool SetMinerIdCacheSize(int64_t size, std::string* err) = 0;
     virtual bool SetMinerIdsNumToKeep(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationM(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationN(int64_t num, std::string* err) = 0;
+    virtual bool SetMinerIdReputationMScale(double num, std::string* err) = 0;
 
     // Detect selfish mining
     virtual void SetDetectSelfishMining(bool detectSelfishMining) = 0;
@@ -615,6 +619,8 @@ public:
 
 
     // MinerID
+    bool SetMinerIdEnabled(bool enabled, std::string* err) override;
+    bool GetMinerIdEnabled() const override;
     bool SetMinerIdCacheSize(int64_t size, std::string* err) override;
     uint64_t GetMinerIdCacheSize() const override;
     bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override;
@@ -623,6 +629,8 @@ public:
     uint32_t GetMinerIdReputationM() const override;
     bool SetMinerIdReputationN(int64_t num, std::string* err) override;
     uint32_t GetMinerIdReputationN() const override;
+    bool SetMinerIdReputationMScale(double num, std::string* err) override;
+    double GetMinerIdReputationMScale() const override;
 
     // Detect selfish mining
     bool GetDetectSelfishMining() const override;
@@ -787,10 +795,12 @@ private:
         int64_t safeModeMinHeightDifference;
 
         // MinerID
+        bool minerIdEnabled;
         uint64_t minerIdCacheSize;
         uint64_t numMinerIdsToKeep;
         uint32_t minerIdReputationM;
         uint32_t minerIdReputationN;
+        double minerIdReputationMScale;
 
         std::optional<bool> mDisableBIP30Checks;
 
@@ -1273,6 +1283,8 @@ public:
     uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override { return DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE; }
 
     // MinerID
+    bool SetMinerIdEnabled(bool enabled, std::string* err) override { return true; }
+    bool GetMinerIdEnabled() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED; }
     bool SetMinerIdCacheSize(int64_t size, std::string* err) override { return true; }
     uint64_t GetMinerIdCacheSize() const override { return MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE; }
     bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override { return true; }
@@ -1281,6 +1293,8 @@ public:
     uint32_t GetMinerIdReputationM() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M; }
     bool SetMinerIdReputationN(int64_t num, std::string* err) override { return true; }
     uint32_t GetMinerIdReputationN() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N; }
+    bool SetMinerIdReputationMScale(double num, std::string* err) override { return true; }
+    double GetMinerIdReputationMScale() const override { return MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

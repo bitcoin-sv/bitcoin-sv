@@ -114,6 +114,7 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
         obj.push_back(Pair("balance", ValueFromAmount(pwallet->GetBalance())));
     }
 #endif
+    obj.push_back(Pair("initcomplete", GetAppInitCompleted()));
     obj.push_back(Pair("blocks", (int)(tip ? tip->GetHeight() : -1)));
     obj.push_back(Pair("timeoffset", GetTimeOffset()));
     if (g_connman) {

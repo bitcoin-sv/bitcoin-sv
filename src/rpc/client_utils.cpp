@@ -135,6 +135,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"addToConsensusBlacklist", 0, "funds"},
     {"removeFromPolicyBlacklist", 0, "funds"},
     {"clearBlacklists", 0, "removeAllEntries"},
+    {"rebuildminerids", 0, "fullrebuild"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},

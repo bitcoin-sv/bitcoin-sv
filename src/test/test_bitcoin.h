@@ -14,6 +14,8 @@
 #include "txmempool.h"
 #include "mining/factory.h"
 
+#include "test/testutil.h"
+
 #include <boost/thread.hpp>
 
 // install boost test formatters for the popular durations

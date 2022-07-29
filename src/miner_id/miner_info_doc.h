@@ -80,6 +80,8 @@ public:
     const key_set& miner_id() const { return miner_id_keys_; }
     const key_set& revocation_keys() const { return revocation_keys_; }
 
+    const std::optional<revocation_msg>& revocation_message() const { return rev_msg_; }
+
     friend bool operator==(const miner_info_doc&, const miner_info_doc&);
     friend std::ostream& operator<<(std::ostream&, const miner_info_doc&);
 

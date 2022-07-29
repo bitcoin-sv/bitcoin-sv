@@ -1064,6 +1064,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB).",
             DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
 
+    strUsage += HelpMessageOpt(
+        "-softconsensusfreezeduration",
+        strprintf("Set for how many blocks a block that contains transaction spending "
+                  "consensus frozen TXO will remain frozen before it auto unfreezes "
+                  "due to the amount of child blocks that were mined after it "
+                  "(default: %u; note: 0 - soft consensus freeze duration is "
+                  "disabled and block is frozen indefinitely).",
+                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -1430,8 +1439,25 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY));
 
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookurl=<url>",
+        "URL of a webhook to notify on receipt of a double-spend detected P2P message from another node. For example: "
+        "http://127.0.0.1/dsdetected/webhook");
+    strUsage += HelpMessageOpt(
+        "-dsdetectedwebhookmaxtxnsize=<n>",
+        strprintf(_("Maximum size of transaction to forward to the double-spend detected webhook. For double-spent transactions "
+                    "above this size only the transaction ID will be reported to the webhook (default: %uMB). "
+                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
+
     /** MinerID */
     strUsage += HelpMessageGroup(_("Miner ID database options:"));
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-minerid",
+            strprintf(_("Eanable the building and use of the miner ID database (default: %d)"),
+                MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED));
+    }
     strUsage += HelpMessageOpt(
         "-mineridcachesize=<n>",
         strprintf(_("Cache size to use for the miner ID database (default: %uMB, maximum: %uMB). "
@@ -1455,30 +1481,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. "
             "This parameter sets the N value for that test. (default: %u, maximum %u)"),
             MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N));
-    
-    // DSDectected
     strUsage += HelpMessageOpt(
-        "-dsdetectedwebhookurl=<url>",
-        "URL of a webhook to notify on receipt of a double-spend detected P2P message from another node. For example: "
-        "http://127.0.0.1/dsdetected/webhook");
-    strUsage += HelpMessageOpt(
-        "-dsdetectedwebhookmaxtxnsize=<n>",
-        strprintf(_("Maximum size of transaction to forward to the double-spend detected webhook. For double-spent transactions "
-                    "above this size only the transaction ID will be reported to the webhook (default: %uMB). "
-                    "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-            DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
+        "-mineridreputation_mscale=<n>",
+        strprintf(_("Miners who lose their good reputation can in some circumstances recover that reputation, "
+            "but at the cost of a temporarily increased M of N block target. This parameter determines how "
+            "much to scale the base M value in such cases. (default: %f)"),
+            MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR));
 
-    strUsage += HelpMessageOpt(
-        "-softconsensusfreezeduration",
-        strprintf("Set for how many blocks a block that contains transaction spending "
-                  "consensus frozen TXO will remain frozen before it auto unfreezes "
-                  "due to the amount of child blocks that were mined after it "
-                  "(default: %u; note: 0 - soft consensus freeze duration is "
-                  "disabled and block is frozen indefinitely).",
-                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
-
-
-    /** Double-Spend detection/reporting */
+    /** Safe mode */
     strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
 
     strUsage += HelpMessageOpt(
@@ -2595,6 +2605,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // MinerID parameters
+    if(std::string err; !config.SetMinerIdEnabled(
+        gArgs.GetBoolArg("-minerid", MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED), &err))
+    {
+        return InitError(err);
+    }
     if(std::string err; !config.SetMinerIdCacheSize(
         gArgs.GetArgAsBytes("-mineridcachesize", MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE), &err))
     {
@@ -2612,6 +2627,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
     if(std::string err; !config.SetMinerIdReputationN(
         gArgs.GetArg("-mineridreputation_n", MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationMScale(
+        gArgs.GetDoubleArg("-mineridreputation_mscale", MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR), &err))
     {
         return InitError(err);
     }
@@ -3553,13 +3573,15 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     preloadChainState(threadGroup);
 
-    // Create minerID database
-    try {
-        g_minerIDs = std::make_unique<MinerIdDatabase>(config);
-        ScheduleMinerIdPeriodicTasks(scheduler, *g_minerIDs);
-    }
-    catch(const std::exception& e) {
-        LogPrintf("Error creating miner ID database: %s\n", e.what());
+    // Create minerID database if required
+    if(config.GetMinerIdEnabled()) {
+        try {
+            g_minerIDs = std::make_unique<MinerIdDatabase>(config);
+            ScheduleMinerIdPeriodicTasks(scheduler, *g_minerIDs);
+        }
+        catch(const std::exception& e) {
+            LogPrintf("Error creating miner ID database: %s\n", e.what());
+        }
     }
 
     // Step 11: start node
@@ -3621,3 +3643,11 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     return !shutdownToken.IsCanceled();
 }
+
+// Get/set AppInit finished flag
+std::atomic_bool& GetAppInitCompleted()
+{
+    static std::atomic_bool appInitCompleted {false};
+    return appInitCompleted;
+}
+

@@ -21,6 +21,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -153,6 +154,7 @@ enum {
 #define READWRITE(obj) (::SerReadWrite(s, (obj), ser_action))
 #define READWRITECOMPACTSIZE(obj) (::SerReadWriteCompactSize(s, (obj), ser_action))
 #define READWRITEMANY(...) (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
+#define READWRITEENUM(e) (::SerReadWriteEnum(s, (e), ser_action))
 
 /**
  * Implement three methods for serializable objects. These are actually wrappers
@@ -614,6 +616,14 @@ template <typename Stream, typename T>
 void Unserialize(Stream &os, std::unique_ptr<const T> &p);
 
 /**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream &os, const std::optional<T> &o);
+template <typename Stream, typename T>
+void Unserialize(Stream &is, std::optional<T> &o);
+
+/**
  * If none of the specialized versions above matched, default to calling member
  * function.
  */
@@ -936,6 +946,33 @@ void Unserialize(Stream &is, boost::uuids::uuid &v) {
 }
 
 /**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream& os, const std::optional<T>& o) {
+    if(o.has_value()) {
+        Serialize(os, true);
+        Serialize(os, *o);
+    }
+    else {
+        Serialize(os, false);
+    }
+}
+template <typename Stream, typename T>
+void Unserialize(Stream& is, std::optional<T>& o) {
+    bool hasValue {};
+    Unserialize(is, hasValue);
+    if(hasValue) {
+        T obj {};
+        Unserialize(is, obj);
+        o = std::move(obj);
+    }
+    else {
+        o = std::nullopt;
+    }
+}
+
+/**
  * Support for ADD_SERIALIZE_METHODS and READWRITE macro
  */
 struct CSerActionSerialize {
@@ -969,6 +1006,23 @@ inline void SerReadWriteCompactSize(Stream &s, const uint64_t &obj,
 template <typename Stream>
 inline void SerReadWriteCompactSize(Stream &s, uint64_t &obj, CSerActionUnserialize ser_action) {
     obj = ::ReadCompactSize(s);
+}
+
+/**
+ * Support for READWRITEENUM macro
+ */
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, const E& e, CSerActionSerialize) {
+    typename std::underlying_type_t<E> val { static_cast<decltype(val)>(e) };
+    ::Serialize(s, val);
+}
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
+    typename std::underlying_type_t<E> val {};
+    ::Unserialize(s, val);
+    e = static_cast<E>(val);
 }
 
 /**

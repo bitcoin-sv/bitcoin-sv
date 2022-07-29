@@ -45,7 +45,8 @@ BOOST_AUTO_TEST_CASE(user_defined_constructor_equality)
     const COutPoint op;
     const optional<UniValue> miner_contact;
 
-    CoinbaseDocument a{version,
+    CoinbaseDocument a{"",
+                       version,
                        height,
                        prev_miner_id,
                        prev_miner_id_sig,
@@ -78,26 +79,26 @@ BOOST_AUTO_TEST_CASE(inequality)
     const COutPoint op;
     const optional<UniValue> contact;
 
-    CoinbaseDocument a{v, h, prev_id, prev_id_sig, id, op, contact};
-    CoinbaseDocument b{"", h, prev_id, prev_id_sig, id, op, contact};
+    CoinbaseDocument a{"", v, h, prev_id, prev_id_sig, id, op, contact};
+    CoinbaseDocument b{"", "", h, prev_id, prev_id_sig, id, op, contact};
     BOOST_CHECK_NE(a, b);
     BOOST_CHECK(a != b); // check op!= is defined
-    CoinbaseDocument c{v, 0, prev_id, prev_id_sig, id, op, contact};
+    CoinbaseDocument c{"", v, 0, prev_id, prev_id_sig, id, op, contact};
     BOOST_CHECK_NE(a, c);
-    CoinbaseDocument d{v, h, "", prev_id_sig, id, op, contact};
+    CoinbaseDocument d{"", v, h, "", prev_id_sig, id, op, contact};
     BOOST_CHECK_NE(a, d);
-    CoinbaseDocument e{v, h, prev_id, "", id, op, contact};
+    CoinbaseDocument e{"", v, h, prev_id, "", id, op, contact};
     BOOST_CHECK_NE(a, e);
-    CoinbaseDocument f{v, h, prev_id, prev_id_sig, "", op, contact};
+    CoinbaseDocument f{"", v, h, prev_id, prev_id_sig, "", op, contact};
     BOOST_CHECK_NE(a, f);
 
     const vector<uint8_t> tmp{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
                               0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
                               0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
                               0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf};
-    const uint256 txid{tmp};
+    const TxId txid{uint256{tmp}};
     const COutPoint op2{txid, 0};
-    CoinbaseDocument g{v, h, prev_id, prev_id_sig, id, op2, contact};
+    CoinbaseDocument g{"", v, h, prev_id, prev_id_sig, id, op2, contact};
     BOOST_CHECK_NE(a, g);
 
     // test datarefs
@@ -110,7 +111,7 @@ BOOST_AUTO_TEST_CASE(inequality)
     cd_dr0.SetDataRefs(datarefs_0);
 
     CoinbaseDocument::DataRef dr1{{"id1", "id2"}, txid, 0};
-    const uint256 txid2{tmp};
+    const TxId txid2{uint256{tmp}};
     CoinbaseDocument::DataRef dr2{{"id3", "id4"}, txid2, 0};
 
     vector<CoinbaseDocument::DataRef> datarefs_1{dr1};

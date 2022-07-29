@@ -12,6 +12,32 @@
 
 using namespace std;
 
+CoinbaseDocument::CoinbaseDocument(std::string_view rawJSON, const miner_info_doc& minerInfoDoc)
+: mRawJSON { rawJSON },
+  mVersion { "0.3" },
+  mHeight { minerInfoDoc.GetHeight() },
+  mPrevMinerId { minerInfoDoc.miner_id().prev_key() },
+  mPrevMinerIdSig { minerInfoDoc.miner_id().prev_key_sig() },
+  mMinerId { minerInfoDoc.miner_id().key() },
+  mPrevRevocationKey { minerInfoDoc.revocation_keys().prev_key() },
+  mRevocationKey { minerInfoDoc.revocation_keys().key() }
+{
+    const auto& revocationMsg { minerInfoDoc.revocation_message() };
+    if(revocationMsg)
+    {
+        mRevocationMessage = { revocationMsg->compromised_miner_id() };
+    }
+
+    // Parse out minerContact
+    UniValue doc { UniValue::VOBJ };
+    doc.read(mRawJSON);
+    const auto& contact { doc["minerContact"] };
+    if(contact.isObject())
+    {
+        mMinerContact = contact;
+    }
+}
+
 bool operator==(const CoinbaseDocument::DataRef& a,
                 const CoinbaseDocument::DataRef& b)
 {
@@ -20,6 +46,14 @@ bool operator==(const CoinbaseDocument::DataRef& a,
            std::equal(a.brfcIds.begin(), a.brfcIds.end(), b.brfcIds.begin()) &&
            a.txid == b.txid &&
            a.vout == b.vout;
+    // clang-format on
+}
+
+bool operator==(const CoinbaseDocument::RevocationMessage& a,
+                const CoinbaseDocument::RevocationMessage& b)
+{
+    // clang-format off
+    return a.mCompromisedId == b.mCompromisedId;
     // clang-format on
 }
 
@@ -32,6 +66,11 @@ bool operator==(const CoinbaseDocument& a, const CoinbaseDocument& b)
            a.mPrevMinerIdSig == b.mPrevMinerIdSig && 
            a.mMinerId == b.mMinerId &&
            a.mVctx == b.mVctx &&
+           a.mPrevRevocationKey == b.mPrevRevocationKey &&
+           a.mRevocationKey == b.mRevocationKey &&
+           ((!a.mRevocationMessage && !b.mRevocationMessage) ||
+            ((a.mRevocationMessage && b.mRevocationMessage) &&
+             (a.mRevocationMessage.value() == b.mRevocationMessage.value()))) &&
            ((!a.mDataRefs && !b.mDataRefs) ||
             ((a.mDataRefs && b.mDataRefs) &&
              (a.mDataRefs.value() == b.mDataRefs.value()))) &&
@@ -55,6 +94,16 @@ std::ostream& operator<<(std::ostream& os,
     return os;
 }
 
+std::ostream& operator<<(std::ostream& os,
+                         const CoinbaseDocument::RevocationMessage& msg)
+{
+    // clang-format off
+    os << "compromised_minerId: " << msg.mCompromisedId;
+    // clang-format on
+
+    return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const CoinbaseDocument& doc)
 {
     // clang-format off
@@ -63,8 +112,13 @@ std::ostream& operator<<(std::ostream& os, const CoinbaseDocument& doc)
        << "\nprev_miner_id: " << doc.mPrevMinerId
        << "\nprev_miner_sig: " << doc.mPrevMinerIdSig
        << "\nminer_id: " << doc.mMinerId
+       << "\nprev_revocation_key: " << doc.mPrevRevocationKey
+       << "\nrevocation_key: " << doc.mRevocationKey
        << "\noutpoint: " << doc.mVctx;
     // clang-format on
+
+    if(doc.mRevocationMessage)
+        os << "\nrevocation_message: " << doc.mRevocationMessage.value();
 
     if(doc.mMinerContact)
         os << "\nminer_contact: " << doc.mMinerContact->write();

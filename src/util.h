@@ -29,6 +29,7 @@
 #include <numeric>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <boost/signals2/signal.hpp>
@@ -164,6 +165,15 @@ public:
      * @return command-line argument or default value
      */
     int64_t GetArg(const std::string &strArg, int64_t nDefault);
+
+    /**
+     * Return double argument or default value.
+     *
+     * @param strArg Argument to get (e.g. "-foo")
+     * @param default (e.g. 2.5)
+     * @return command-line argument or default value
+     */
+    double GetDoubleArg(const std::string &strArg, double dDefault);
 
     /**
      * Return integer argument or default value in bytes. It's used only for byte sized arguments.

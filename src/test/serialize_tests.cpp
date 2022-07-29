@@ -533,4 +533,34 @@ BOOST_AUTO_TEST_CASE(map_set_serialise) {
     }
 }
 
+BOOST_AUTO_TEST_CASE(optional_serialise) {
+    {
+        std::optional<std::string> testOpt { "TestString" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testOpt;
+
+        // Deserialise
+        decltype(testOpt) decoded {};
+        ss >> decoded;
+        BOOST_CHECK_EQUAL(testOpt, decoded);
+    }
+
+    {
+        std::optional<std::string> testOpt { std::nullopt };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testOpt;
+
+        // Deserialise
+        decltype(testOpt) decoded {};
+        ss >> decoded;
+        BOOST_CHECK_EQUAL(testOpt, decoded);
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

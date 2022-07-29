@@ -103,6 +103,7 @@ BITCOIN_TESTS =\
   test/merkletreefile_readwrite_tests.cpp \
   test/mining_group_builder_tests.cpp \
   test/miner_id_db_tests.cpp \
+  test/miner_id_db_tests3.cpp \
   test/miner_info_tests.cpp \
   test/miner_info_doc_tests.cpp \
   test/miner_info_error_tests.cpp \

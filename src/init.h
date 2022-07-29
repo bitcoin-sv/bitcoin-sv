@@ -6,6 +6,7 @@
 #ifndef BITCOIN_INIT_H
 #define BITCOIN_INIT_H
 
+#include <atomic>
 #include <string>
 
 #include "sync.h"
@@ -41,6 +42,9 @@ void Shutdown();
 void InitLogging();
 //! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
+
+// Get/set AppInit finished flag
+std::atomic_bool& GetAppInitCompleted();
 
 /** Initialize bitcoin core: Basic context setup.
  *  @note This can be done before daemonization.
