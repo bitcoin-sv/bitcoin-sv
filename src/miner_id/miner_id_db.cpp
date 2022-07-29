@@ -8,6 +8,7 @@
 #include "config.h"
 #include "logging.h"
 #include "miner_id/miner_id.h"
+#include "miner_id/revokemid.h"
 #include "scheduler.h"
 #include "univalue.h"
 
@@ -217,6 +218,51 @@ void MinerIdDatabase::InvalidBlock(const CBlock& block, int32_t height)
     catch(const std::exception& e)
     {
         LogPrint(BCLog::MINERID, "Miner ID database error processing invalid block: %s\n", e.what());
+    }
+}
+
+// Process a revokemid P2P message
+void MinerIdDatabase::ProcessRevokemidMessage(const RevokeMid& msg)
+{
+    LogPrint(BCLog::MINERID, "Processing revokemid message from miner ID %s\n", HexStr(msg.GetMinerId()));
+
+    // Verify message signatures
+    if(msg.VerifySignatures())
+    {
+        std::lock_guard lock {mMtx};
+
+        // Lookup ID this message is from
+        const auto& minerIdEntry { GetMinerIdFromDatabaseNL(msg.GetMinerId().GetHash()) };
+        if(minerIdEntry)
+        {
+            // Check revocation key from message is current
+            if(minerIdEntry->mCoinbaseDoc.GetRevocationKey() != msg.GetRevocationKey())
+            {
+                throw std::runtime_error("Revokemid for miner ID " + HexStr(msg.GetMinerId()) +
+                    " contains wrong revocation key " + HexStr(msg.GetRevocationKey()));
+            }
+
+            // Revoke IDs back to the one given in the revocation message
+            for(auto& minerId : GetMinerIdsForMinerNL(minerIdEntry->mUUId))
+            {
+                minerId.mState = MinerIdEntry::State::REVOKED;
+                UpdateMinerIdInDatabaseNL(minerId.mPubKey.GetHash(), minerId);
+                UpdateRecentBlocksToRemoveMinerIdNL(minerId.mPubKey.GetHash());
+
+                if(minerId.mPubKey == msg.GetRevocationMessage())
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            throw std::runtime_error("Revokemid contains unknown miner ID " + HexStr(msg.GetMinerId()));
+        }
+    }
+    else
+    {
+        throw std::runtime_error("Revokemid signature verification failed");
     }
 }
 
@@ -882,53 +928,54 @@ std::pair<MinerIdDatabase::MinerUUId, uint256> MinerIdDatabase::ProcessRevocatio
     {
         const auto& prevMinerIdEntry { GetMinerIdFromDatabaseNL(prevIdHash) };
         MinerUUId minerUUId { prevMinerIdEntry->mUUId };
+        auto minerEntry { GetMinerUUIdFromDatabaseNL(minerUUId) };
 
-        // Skip key revocation steps if this is a duplicate notification
-        if(! duplicate)
+        // We're doing a partial revocation, so revoke all IDs starting from the latest
+        // current ID back to the one in the revocation message.
+        std::optional<MinerIdEntry> lastRevokedId { std::nullopt };
+        for(auto& minerId : GetMinerIdsForMinerNL(minerUUId))
         {
-            auto minerEntry { GetMinerUUIdFromDatabaseNL(minerUUId) };
+            lastRevokedId = minerId;
 
-            // We're doing a partial revocation, so revoke all IDs starting from the latest
-            // current ID back to the one in the revocation message.
-            std::optional<MinerIdEntry> lastRevokedId { std::nullopt };
-            for(auto minerId : GetMinerIdsForMinerNL(minerUUId))
+            // Revoke this ID and remove any blocks from the revoked ID from the recent blocks list,
+            // unless this is a duplicate, in which case we've already done so and doing it again
+            // will result in us incorerctly revoking the miner's new ID
+            if(! duplicate)
             {
-                // Revoke this ID and remove any blocks from the revoked ID from the recent blocks list
                 minerId.mState = MinerIdEntry::State::REVOKED;
                 UpdateMinerIdInDatabaseNL(minerId.mPubKey.GetHash(), minerId);
                 UpdateRecentBlocksToRemoveMinerIdNL(minerId.mPubKey.GetHash());
-                lastRevokedId = minerId;
-
-                // If this revoked ID is one that caused us to void the miner's reputation,
-                // then restore their reputation but increase their target M.
-                if(minerEntry->mReputation.mVoid && minerEntry->mReputation.mVoidingId.value() == minerId.mPubKey)
-                {
-                    minerEntry->mReputation.mVoid = false;
-                    minerEntry->mReputation.mVoidingId = std::nullopt;
-                    minerEntry->mReputation.mM *= mConfig.GetMinerIdReputationMScale();
-                    UpdateMinerUUIdInDatabaseNL(minerUUId, *minerEntry);
-
-                    LogPrint(BCLog::MINERID, "Restored reputation for miner %s and set them a new target M %d\n",
-                        boost::uuids::to_string(minerUUId), minerEntry->mReputation.mM);
-                }
-
-                if(HexStr(minerId.mPubKey) == revocationMessage.mCompromisedId)
-                {
-                    break;
-                }
             }
 
-            // If we have the last revoked ID's previous ID available, update it to point to the new
-            // next ID we're about to create.
-            if(lastRevokedId)
+            // If this revoked ID is one that caused us to void the miner's reputation,
+            // then restore their reputation but increase their target M.
+            if(minerEntry->mReputation.mVoid && minerEntry->mReputation.mVoidingId.value() == minerId.mPubKey)
             {
-                const uint256& newIdPrevIdHash { lastRevokedId->mPrevMinerId.GetHash()  };
-                auto newIdPrevMinerIdEntry { GetMinerIdFromDatabaseNL(newIdPrevIdHash) };
-                if(newIdPrevMinerIdEntry)
-                {
-                    newIdPrevMinerIdEntry->mNextMinerId = curMinerId;
-                    UpdateMinerIdInDatabaseNL(newIdPrevMinerIdEntry->mPubKey.GetHash(), newIdPrevMinerIdEntry.value());
-                }
+                minerEntry->mReputation.mVoid = false;
+                minerEntry->mReputation.mVoidingId = std::nullopt;
+                minerEntry->mReputation.mM *= mConfig.GetMinerIdReputationMScale();
+                UpdateMinerUUIdInDatabaseNL(minerUUId, *minerEntry);
+
+                LogPrint(BCLog::MINERID, "Restored reputation for miner %s and set them a new target M %d\n",
+                    boost::uuids::to_string(minerUUId), minerEntry->mReputation.mM);
+            }
+
+            if(HexStr(minerId.mPubKey) == revocationMessage.mCompromisedId)
+            {
+                break;
+            }
+        }
+
+        // If we have the last revoked ID's previous ID available, update it to point to the new
+        // next ID we're about to create.
+        if(lastRevokedId)
+        {
+            const uint256& newIdPrevIdHash { lastRevokedId->mPrevMinerId.GetHash()  };
+            auto newIdPrevMinerIdEntry { GetMinerIdFromDatabaseNL(newIdPrevIdHash) };
+            if(newIdPrevMinerIdEntry)
+            {
+                newIdPrevMinerIdEntry->mNextMinerId = curMinerId;
+                UpdateMinerIdInDatabaseNL(newIdPrevMinerIdEntry->mPubKey.GetHash(), newIdPrevMinerIdEntry.value());
             }
         }
 

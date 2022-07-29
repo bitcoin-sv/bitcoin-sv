@@ -453,6 +453,8 @@ add_library(server
     miner_id/miner_info_error.h
     miner_id/miner_info_ref.cpp
     miner_id/miner_info_ref.h
+    miner_id/revokemid.cpp
+    miner_id/revokemid.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp

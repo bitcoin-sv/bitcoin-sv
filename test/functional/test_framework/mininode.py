@@ -28,6 +28,7 @@ from collections import defaultdict
 import copy
 import hashlib
 from contextlib import contextmanager
+import ecdsa
 from io import BytesIO
 import logging
 import random
@@ -1279,6 +1280,55 @@ class msg_streamack():
     def __repr__(self):
         return "msg_streamack(assocID=%s stream_type=%i)" % (str(self.assocID), self.stream_type)
 
+class msg_revokemid():
+    command = b"revokemid"
+
+    def __init__(self, revocationKey=None, revocationPubKey=None, minerIdKey=None, minerIdPubKey=None, idToRevoke=None):
+        self.revocationPubKey = None
+        self.minerIdKey = None
+        self.idToRevoke = None
+        self.sig1 = None
+        self.sig2 = None
+
+        if(revocationKey and revocationPubKey and minerIdKey and minerIdPubKey and idToRevoke):
+            self.revocationPubKey = revocationPubKey
+            self.minerIdPubKey = minerIdPubKey
+            self.idToRevoke = idToRevoke
+
+            # Produce revocation message signatures
+            hashRevocationMessage = sha256(self.idToRevoke)
+            self.sig1 = revocationKey.sign_digest(hashRevocationMessage, sigencode=ecdsa.util.sigencode_der)
+            self.sig2 = minerIdKey.sign_digest(hashRevocationMessage, sigencode=ecdsa.util.sigencode_der)
+
+    def deserialize(self, f):
+        version = struct.unpack("<i", f.read(4))[0]
+        if(version != 0):
+            raise ValueError("Bad version {0} in revokemid msg".format(version))
+        self.revocationPubKey = f.read(33)
+        self.minerIdPubKey = f.read(33)
+        self.idToRevoke = f.read(33)
+
+        revocationMessage = deser_string(f)
+        sig1Len = revocationMessage[0]
+        self.sig1 = revocationMessage[1:sig1Len]
+        sig2Len = revocationMessage[1+sig1Len]
+        self.sig2 = revocationMessage[1+sig1Len+1:]
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<i", 0)   # version
+        r += self.revocationPubKey
+        r += self.minerIdPubKey
+        r += self.idToRevoke
+
+        revocationMessageSig = b""
+        revocationMessageSig += struct.pack("B", len(self.sig1))
+        revocationMessageSig += self.sig1
+        revocationMessageSig += struct.pack("B", len(self.sig2))
+        revocationMessageSig += self.sig2
+        r += ser_string(revocationMessageSig)
+
+        return r
 
 class msg_protoconf():
     command = b"protoconf"
@@ -2049,6 +2099,8 @@ class NodeConnCB():
 
     def on_streamack(self, conn, message): pass
 
+    def on_revokemid(self, conn, message): pass
+
     def on_protoconf(self, conn, message): pass
 
     def on_version(self, conn, message):
@@ -2228,6 +2280,7 @@ class NodeConn(asyncore.dispatcher):
         b"verack": msg_verack,
         b"createstrm": msg_createstream,
         b"streamack": msg_streamack,
+        b"revokemid": msg_revokemid,
         b"addr": msg_addr,
         b"alert": msg_alert,
         b"inv": msg_inv,

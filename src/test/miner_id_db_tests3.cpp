@@ -7,6 +7,7 @@
 #include "consensus/merkle.h"
 #include "miner_id/miner_id.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/revokemid.h"
 #include "pow.h"
 #include "rpc/mining.h"
 #include "script/instruction_iterator.h"
@@ -762,6 +763,21 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 };
 using UnitTestAccess = MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>;
 
+// RevokeMid class inspection
+template<>
+struct RevokeMid::UnitTestAccess<miner_id_tests3_id>
+{
+    static void MakeBadRevokeKeySig(RevokeMid& msg)
+    {
+        msg.mEncodedRevocationMessageSig[msg.mEncodedRevocationMessageSig.size() - 5] += 1;
+
+        // Serialise/deserialise to put bad signature in msg object
+        CDataStream ss { SER_NETWORK, 0 };
+        ss << msg;
+        ss >> msg;
+    }
+};
+using RMIDUnitTestAccess = RevokeMid::UnitTestAccess<miner_id_tests3_id>;
 
 BOOST_AUTO_TEST_SUITE(miner_id_db3)
 
@@ -1835,6 +1851,120 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationPruned, SetupMinerIDChain)
         }
     }
     BOOST_CHECK_EQUAL(currentCount, 1);
+}
+
+// Test partial revocation via a revokemid message
+BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
+{
+    // Create global miner ID database into which updates will be applied
+    MakeGlobalMinerIdDb makedb {};
+    MinerIdDatabase& minerid_db { *g_minerIDs };
+    UnitTestAccess::WaitForSync(minerid_db);
+
+    // Check initial state
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2);
+
+    // Perform another ID rotation for miner 1 so we have 3 IDs for them. Key3 will be one
+    // we didn't authorise, so indicates to us that key2 was compromised.
+    CKey key3 {};
+    key3.MakeNewKey(true);
+    UniValue baseDocument { CreateValidCoinbaseDocument(
+        miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
+    CreateAndProcessBlock({}, baseDocument, key3);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3);
+    {
+        // Check state of all miner 1's IDs
+        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+    }
+
+    // Send a revokemid message with the wrong revocation key
+    CKey badRevocationKey {};
+    badRevocationKey.MakeNewKey(true);
+    RevokeMid revokemidMsg { badRevocationKey, miner1IdKey2, miner1IdPubKey2 };
+    BOOST_CHECK_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg), std::runtime_error);
+    {
+        // No change to the state of miner 1's IDs
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3);
+        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+    }
+
+    // Send a revokemid message with a bad signature
+    revokemidMsg = { miner1V3Fields.revocationKey, miner1IdKey2, miner1IdPubKey2 };
+    RMIDUnitTestAccess::MakeBadRevokeKeySig(revokemidMsg);
+    BOOST_CHECK_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg), std::runtime_error);
+    {
+        // No change to the state of miner 1's IDs
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3);
+        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+    }
+
+    // Perform a partial revocation of key2 (and key3) via a revokemid msg
+    revokemidMsg = { miner1V3Fields.revocationKey, miner1IdKey2, miner1IdPubKey2 };
+    BOOST_CHECK_NO_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg));
+    {
+        // Check revocation state of miner 1's IDs
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3);
+        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
+        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+    }
+
+    // Check we can't now use revoked ID
+    baseDocument = CreateValidCoinbaseDocument(
+        key3, chainActive.Height() + 1, HexStr(key3.GetPubKey()), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields);
+    CreateAndProcessBlock({}, baseDocument, key3);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3);
+
+    // Put revocation in a block on chain as well, that also rotates to new ID key4
+    CKey key4 {};
+    key4.MakeNewKey(true);
+    miner1V3Fields.revocationMessage = CoinbaseDocument::RevocationMessage { miner1IdPubKey2 };
+    miner1V3Fields.revocationCurrentMinerIdKey = miner1IdKey2;
+    baseDocument = CreateValidCoinbaseDocument(
+        miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key4.GetPubKey()), "Miner1", {}, miner1V3Fields);
+    CreateAndProcessBlock({}, baseDocument, key4);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4);
+    {
+        // Check state of all miner 1's IDs
+        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
+        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
+        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), key4.GetPubKey().GetHash().ToString());
+    }
 }
 
 // Test a miner can recover their reputation after revoking a compromised ID

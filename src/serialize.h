@@ -506,7 +506,15 @@ template <typename I> CVarInt<I> WrapVarInt(I &n) {
  */
 
 /**
- *  string
+ * std::array
+ */
+template<typename Stream, typename T, size_t N>
+void Serialize(Stream& os, const std::array<T, N>& arr);
+template<typename Stream, typename T, size_t N>
+void Unserialize(Stream& is, std::array<T, N>& arr);
+
+/**
+ * string
  */
 template <typename Stream, typename C>
 void Serialize(Stream &os, const std::basic_string<C> &str);
@@ -635,6 +643,18 @@ inline void Serialize(Stream &os, const T &a) {
 template <typename Stream, typename T>
 inline void Unserialize(Stream &is, T &a) {
     a.Unserialize(is);
+}
+
+/**
+ * std::array
+ */
+template<typename Stream, typename T, size_t N>
+void Serialize(Stream& os, const std::array<T, N>& arr) {
+    ::Serialize(os, CFlatData(const_cast<T*>(arr.data()), const_cast<T*>(arr.data() + arr.size())));
+}
+template<typename Stream, typename T, size_t N>
+void Unserialize(Stream& is, std::array<T, N>& arr) {
+    ::Unserialize(is, REF(CFlatData(arr.data(), arr.data() + arr.size())));
 }
 
 /**

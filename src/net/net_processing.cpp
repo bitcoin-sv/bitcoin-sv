@@ -24,6 +24,8 @@
 #include "merkleblock.h"
 #include "merkleproof.h"
 #include "merkletreestore.h"
+#include "miner_id/miner_id_db.h"
+#include "miner_id/revokemid.h"
 #include "net/block_download_tracker.h"
 #include "net/net.h"
 #include "net/netbase.h"
@@ -3783,6 +3785,56 @@ static bool ValidateForkHeight(const DSDetected& msg, const int64_t max_fork_dis
 }
 
 /**
+* Proces revokemid message.
+*/
+static void ProcessRevokeMidMessage(const CNodePtr& pfrom,
+                                    CDataStream& vRecv,
+                                    CConnman& connman,
+                                    const CNetMsgMaker& msgMaker)
+{
+    if(g_minerIDs)
+    {
+        try
+        {
+            // Deserialise and check signatures
+            RevokeMid msg {};
+            vRecv >> msg;
+
+            // Check for duplicate message
+            constexpr size_t cacheSize { 1000 };
+            static limited_cache msgCache { cacheSize }; 
+            const std::hash<RevokeMid> hasher {};
+            const auto hash { hasher(msg) };
+            if(msgCache.contains(hash))
+            {
+                LogPrint(BCLog::NETMSG, "Ignoring duplicate revokemid message from peer=%d\n", pfrom->id);
+                return;
+            }
+            msgCache.insert(hash);
+
+            // Pass to miner ID database for processing
+            g_minerIDs->ProcessRevokemidMessage(msg);
+
+            // Relay to our peers
+            connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
+            {
+                // No point echoing back to the sender
+                if(!IsSamePeer(*pfrom, *to))
+                {
+                    connman.PushMessage(to, msgMaker.Make(NetMsgType::REVOKEMID, msg));
+                }
+            });
+        }
+        catch(const std::exception& e)
+        {
+            LogPrint(BCLog::NETMSG | BCLog::MINERID,
+                "Error processing revokemid message from peer=%d: %s\n", pfrom->id, e.what());
+            Misbehaving(pfrom, 10, "Invalid revokemid message");
+        }
+    }
+}
+
+/**
 * Process double-spend detected message.
 */
 static void ProcessDoubleSpendMessage(const Config& config,
@@ -4065,6 +4117,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (strCommand == NetMsgType::PROTOCONF) {
         return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand, config);
+    }
+
+    else if (strCommand == NetMsgType::REVOKEMID) {
+        ProcessRevokeMidMessage(pfrom, vRecv, connman, msgMaker);
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {
