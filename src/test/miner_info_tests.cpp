@@ -330,7 +330,7 @@ BOOST_AUTO_TEST_CASE(modified_merkle_root_test)
     coinbase_tx.vin.push_back(CTxIn{});
     coinbase_tx.vout.push_back(CTxOut{});
 
-    const vector<uint8_t> v{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x1};
+    const vector<uint8_t> v{OP_FALSE, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
     CScript mi_ref_script;
     mi_ref_script.insert(mi_ref_script.begin(), v.begin(), v.end());
 
@@ -354,7 +354,7 @@ BOOST_AUTO_TEST_CASE(modified_merkle_root_test)
 
     const uint256 mm_root = modify_merkle_root(block);
     
-    const string s{"82a6bf5d5af80a62f9e598275f6d6c6e68a0cb15f28fa6e77fc12efb756bc54a"};
+    const string s{"1bb3aa8a509aa5a5d8bf32acb14c94d49dffb3da3dc9483c9cce5be4e9533b1c"};
     vector<uint8_t> buffer;
     buffer.reserve(32);
     ba::unhex(s.begin(), s.end(), back_inserter(buffer));
@@ -412,8 +412,7 @@ BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
 {
     const vector<uint8_t> txid(32, 0x1);
 
-    const string s{"b4b1f4a3d6bef5d11d84becf951d0161d2815f4e02772869bfcf047e81fff57c"};
-
+    const string s{"d134cf2121d6556d6be0b697c77f819f2477da04a4c0bb65860d382fa2f5784a"};
     vector<uint8_t> mmr_pbh_hash;
     mmr_pbh_hash.reserve(32);
     ba::unhex(s.cbegin(), s.cend(), back_inserter(mmr_pbh_hash));
@@ -471,3 +470,4 @@ BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+

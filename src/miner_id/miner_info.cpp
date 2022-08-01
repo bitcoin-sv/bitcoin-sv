@@ -71,33 +71,29 @@ uint256 modify_merkle_root(const CBlock& block)
 
     CMutableTransaction coinbase_tx{*(block.vtx[0])};
 
-    coinbase_tx.nVersion = 0x01000000;
-    
-    coinbase_tx.vin[0].scriptSig = CScript()
-                                << std::vector<uint8_t>{0, 0, 0, 0, 0, 0, 0, 0};
+    coinbase_tx.nVersion = 0x00000001;
+    vector<uint8_t> v(8, 0);
+    coinbase_tx.vin[0].scriptSig = CScript{v.cbegin(), v.cend()};
 
     COutPoint op;
     coinbase_tx.vin[0].prevout = op;
-
     const auto it = find_if(coinbase_tx.vout.begin(),
                             coinbase_tx.vout.end(),
-                            [](const CTxOut& op) { return IsMinerInfo(op.scriptPubKey); });
+                            [](const CTxOut& op) {
+                                return IsMinerInfo(op.scriptPubKey);
+                            });
     if(it != coinbase_tx.vout.cend())
     {
         constexpr size_t truncate_len{42};
         it->scriptPubKey.resize(truncate_len);
     }
 
-    // Calculate merkle root for block with modified coinbase txn
-    // TODO this won't scale use spv technique
-    std::vector<uint256> leaves{ coinbase_tx.GetId() };
+    std::vector<uint256> leaves{coinbase_tx.GetId()};
     leaves.reserve(block.vtx.size());
-    transform(next(block.vtx.begin()), block.vtx.cend(), back_inserter(leaves),
-              [](const auto& vtx)
-              {
-                  return vtx->GetId();
-              });
-
+    transform(next(block.vtx.begin()),
+              block.vtx.cend(),
+              back_inserter(leaves),
+              [](const auto& vtx) { return vtx->GetId(); });
     return ComputeMerkleRoot(leaves);
 }
 
@@ -110,7 +106,7 @@ std::optional<miner_info_error> verify(const CBlock& block,
     vector<uint8_t> buffer{mm_root.begin(), mm_root.end()};
     buffer.reserve(mm_root.size() + block.hashPrevBlock.size());
     buffer.insert(buffer.end(), block.hashPrevBlock.begin(), block.hashPrevBlock.end());
-           
+
     uint256 expected_mmr_pbh_hash; 
     CSHA256().Write(buffer.data(), buffer.size())
              .Finalize(expected_mmr_pbh_hash.begin());
