@@ -267,8 +267,9 @@ namespace
     {
         // Modify coinbase txn to replace input scriptSig and output scriptPubKey
         CMutableTransaction coinbase { origCoinbase };
-        coinbase.nVersion = 0x01000000;
-        coinbase.vin[0].scriptSig = CScript() << std::vector<uint8_t> { 0, 0, 0, 0, 0, 0, 0, 0 };
+        coinbase.nVersion = 0x00000001;
+        std::array<uint8_t, 8> v {};    // 0 initialised
+        coinbase.vin[0].scriptSig = CScript { v.cbegin(), v.cend() };
         coinbase.vin[0].prevout = { uint256{}, 0xFFFFFFFF };
 
         // Calculate merkle root for block with modified coinbase txn
