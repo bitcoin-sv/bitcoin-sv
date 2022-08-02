@@ -302,8 +302,8 @@ def create_miner_info_txn(connection, params, utxo):
 def calc_blockbind_merkle_root(block):
     # Copy coinbase so we can modify it
     coinbase = copy.deepcopy(block.vtx[0])
-    coinbase.nVersion = 0x01000000
-    coinbase.vin[0].scriptSig = CScript([bytearray([0,0,0,0,0,0,0,0])])
+    coinbase.nVersion = 0x00000001
+    coinbase.vin[0].scriptSig = CScript([OP_0, OP_0, OP_0, OP_0, OP_0, OP_0, OP_0, OP_0])
     coinbase.vin[0].prevout = COutPoint(0, 0xFFFFFFFF)
     coinbase.rehash()
 
