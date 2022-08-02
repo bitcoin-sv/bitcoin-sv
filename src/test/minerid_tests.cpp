@@ -248,8 +248,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
                                  HexStr(minerIdPubKey),
                                  COutPoint(uint256S(vctxid), 7)};
     const vector<CoinbaseDocument::DataRef> comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0, ""},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0, ""}};
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     auto actual_cd{minerId.value().GetCoinbaseDocument()};
@@ -428,8 +428,8 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
                                  COutPoint(uint256S(vctxid), 7),
                                  minerContact};
     vector<CoinbaseDocument::DataRef> comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0, ""},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0, ""}};
     expected_cd.SetDataRefs(comparingDataRefs);
     const auto acutal_cd{minerId.value().GetCoinbaseDocument()};
     BOOST_CHECK_EQUAL(acutal_cd, expected_cd);
@@ -510,8 +510,8 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                  HexStr(minerIdPubKey),
                                  COutPoint(uint256S(vctxid), 7)};
     vector<CoinbaseDocument::DataRef> comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0, ""},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0, ""}};
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 
@@ -540,8 +540,8 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
     block.vtx[0] = MakeTransactionRef(tx);
     minerId = FindMinerId(block, block_height);
     comparingDataRefs = {
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1D)}, 0},
-        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2D)}, 0}};
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1D)}, 0, ""},
+        CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2D)}, 0, ""}};
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 

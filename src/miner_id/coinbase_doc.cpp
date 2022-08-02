@@ -7,6 +7,7 @@
 #include "logging.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
+#include <iterator>
 #include <ostream>
 #include <sstream>
 
@@ -35,6 +36,26 @@ CoinbaseDocument::CoinbaseDocument(std::string_view rawJSON, const miner_info_do
     if(contact.isObject())
     {
         mMinerContact = contact;
+    }
+
+    // dataRefs
+    const auto data_refs = minerInfoDoc.data_refs();
+    if(!data_refs.empty())
+    {
+        vector<DataRef> v;
+        transform(data_refs.cbegin(),
+                  data_refs.cend(),
+                  back_inserter(v),
+                  [](const auto& ref) {
+                      DataRef d;
+                      d.txid = TxId{ref.txid()};
+                      d.vout = ref.vout();
+                      d.brfcIds = ref.brfc_ids();
+                      d.compress = ref.compress();
+                      return d;
+                  });
+
+        mDataRefs = v;
     }
 }
 

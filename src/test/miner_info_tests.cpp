@@ -386,10 +386,12 @@ BOOST_AUTO_TEST_CASE(verify_sig_blockbind_mismatch)
     const string rev_key_sig;
     const key_set &revocation_ks{rev_key, rev_prev_key, rev_key_sig};
 
+    vector<data_ref> data_refs;
     const miner_info_doc mi_doc(miner_info_doc::v0_3,
                                 block_height,
                                 miner_id_ks,
-                                revocation_ks);
+                                revocation_ks,
+                                data_refs);
     
     CBlock block;
     CMutableTransaction coinbase_tx;
@@ -434,10 +436,12 @@ BOOST_AUTO_TEST_CASE(verify_sig_verification_fail)
     const string rev_key_sig;
     const key_set &revocation_ks{rev_key, rev_prev_key, rev_key_sig};
 
+    const vector<data_ref> data_refs;
     const miner_info_doc mi_doc(miner_info_doc::v0_3,
                                 block_height,
                                 miner_id_ks,
-                                revocation_ks);
+                                revocation_ks,
+                                data_refs);
     
     CBlock block;
     CMutableTransaction coinbase_tx;

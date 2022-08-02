@@ -177,8 +177,8 @@ namespace
 
                     // Use datarefs in this miners coinbase doc
                     std::vector<CoinbaseDocument::DataRef> datarefs {
-                        { {dataRefTxnBrfcIds[0]}, dataRefTxns[0]->GetId(), 0 },
-                        { {dataRefTxnBrfcIds[1]}, dataRefTxns[1]->GetId(), 0 }
+                        { {dataRefTxnBrfcIds[0]}, dataRefTxns[0]->GetId(), 0, ""},
+                        { {dataRefTxnBrfcIds[1]}, dataRefTxns[1]->GetId(), 0, ""}
                     };
 
                     // Miner 2 uses dataref

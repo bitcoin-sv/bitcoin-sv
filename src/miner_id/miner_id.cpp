@@ -68,10 +68,16 @@ namespace
                     }
                     brfcIds.push_back(refs[i]["brfcIds"][brfcIdx].get_str());
                 }
+                    
+                string compress;
+                if(refs[i].exists("compress") && refs[i]["compress"].isStr())
+                    compress = refs[i]["compress"].get_str();
+               
                 dataRefs.push_back(CoinbaseDocument::DataRef{
                     brfcIds,
                     TxId { uint256S(refs[i]["txid"].get_str()) },
-                    refs[i]["vout"].get_int()});
+                    refs[i]["vout"].get_int(),
+                    compress});
             }
             else
             {

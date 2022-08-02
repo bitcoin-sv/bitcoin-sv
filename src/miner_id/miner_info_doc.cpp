@@ -8,11 +8,14 @@
 
 #include "crypto/sha256.h"
 
+#include "miner_id/miner_info_error.h"
 #include "miner_info.h"
 #include "pubkey.h"
 #include "script/instruction_iterator.h"
 #include "script/script.h"
 #include "span.h"
+#include "uint256.h"
+#include "univalue.h"
 
 using namespace std;
 
@@ -20,12 +23,14 @@ miner_info_doc::miner_info_doc(supported_version version,
                                int32_t height,
                                const key_set& mi_keys,
                                const key_set& revocation_keys,
+                               vector<data_ref> data_refs,
                                std::optional<revocation_msg> rev_msg)
     : version_(version),
       height_{height},
       miner_id_keys_{mi_keys},
       revocation_keys_{revocation_keys},
-      rev_msg_{std::move(rev_msg)}
+      rev_msg_{std::move(rev_msg)},
+      data_refs_{std::move(data_refs)}
 {
 }
 
@@ -172,13 +177,34 @@ namespace
 
         return verify(hash, ks.prev_key_sig(), ks.prev_key()); 
     }
+    
+    bool all_null(const UniValue& uv)
+    {
+        return uv.isNull();
+    }
+    
+    template<typename... Ts>
+    bool all_null(const UniValue& uv, const Ts&... ts) 
+    {
+        return all_null(uv) && all_null(ts...);
+    }
+
+    bool all_object(const UniValue& uv)
+    {
+        return uv.isObject();
+    }
+   
+    template<typename... Ts>
+    bool all_object(const UniValue& uv, const Ts&... ts)
+    {
+        return all_object(uv) && all_object(ts...);
+    }
 
     using var_rev_msg = std::variant<revocation_msg, miner_info_error>;
     var_rev_msg ParseRevocationMsg(const UniValue& id_doc,
                                    const UniValue& sig_doc)
     {
-        assert(id_doc.isObject());
-        assert(sig_doc.isObject());
+        assert(all_object(id_doc, sig_doc));
         
         const auto comp_minerId = id_doc["compromised_minerId"];
         if(!comp_minerId.isStr())
@@ -205,6 +231,79 @@ namespace
             return miner_info_error::doc_parse_error_rev_msg_sig2_key;
 
         return revocation_msg{key, sig1, sig2};
+    }
+
+    std::variant<data_refs, miner_info_error>  parse_data_refs(const UniValue& uv)
+    {
+        using mie = miner_info_error;
+
+        vector<data_ref> v_data_refs;
+
+        if(!uv.exists("dataRefs"))
+            return v_data_refs;
+
+        // If dataRefs are present, they have to have the correct structure.
+        const auto& data_refs{uv["dataRefs"]};
+
+        if(!data_refs.isObject())
+            return mie::doc_parse_error_datarefs_invalid_datarefs_type;
+
+        if(!data_refs.exists("refs") || !data_refs["refs"].isArray())
+        {
+            return mie::doc_parse_error_datarefs_invalid_refs_type;
+        }
+
+        const UniValue refs = data_refs["refs"].get_array();
+
+        for(size_t i = 0; i < refs.size(); i++)
+        {
+            const auto& ref{refs[i]};
+
+            if(!ref.isObject())
+                return mie::doc_parse_error_datarefs_invalid_dataref_type;
+
+            if(!ref.exists("brfcIds") || !ref.exists("txid") ||
+               !ref.exists("vout"))
+                return mie::doc_parse_error_datarefs_dataref_missing_fields;
+
+            if(!ref["brfcIds"].isArray())
+                return mie::doc_parse_error_datarefs_refs_brfcid_type;
+
+            std::vector<std::string> brfcIds;
+            for(size_t brfcIdx = 0; brfcIdx < ref["brfcIds"].size(); brfcIdx++)
+            {
+                if(!ref["brfcIds"][brfcIdx].isStr())
+                    return mie::doc_parse_error_datarefs_refs_brfcid_field_type;
+
+                brfcIds.push_back(ref["brfcIds"][brfcIdx].get_str());
+            }
+
+            if(!ref["txid"].isStr())
+                return mie::doc_parse_error_datarefs_refs_txid_type;
+
+            if(!ref["vout"].isNum())
+                return mie::doc_parse_error_datarefs_refs_vout_type;
+
+            string compress;
+            if(ref.exists("compress"))
+            {
+                if(!ref["compress"].isStr())
+                    return mie::doc_parse_error_datarefs_refs_compress_type;
+
+                compress = ref["compress"].get_str();
+            }
+
+            const string txid{ref["txid"].get_str()};
+            if(!is_hash_256(txid))
+                return mie::doc_parse_error_datarefs_refs_txid_type;
+
+            const uint256 txidx{uint256S(txid)};
+            v_data_refs.push_back(data_ref{brfcIds,
+                                           txidx,
+                                           ref["vout"].get_int(),
+                                           compress});
+        }
+        return v_data_refs;
     }
 }
 
@@ -299,36 +398,40 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     const auto revMsgSig = doc["revocationMessageSig"];
     std::optional<revocation_msg> revocation_msg;
 
-    if(revMsg.isNull() && revMsgSig.isNull())
-        return miner_info_doc{miner_info_doc::v0_3,
-                            height,
-                            miner_id_ks,
-                            revocation_ks,
-                            revocation_msg};
-   
-    if(!revMsg.isObject() || !revMsgSig.isObject())
+    if(!(all_null(revMsg, revMsgSig) || all_object(revMsg, revMsgSig)))
         return miner_info_error::doc_parse_error_rev_msg_fields;
 
-    const auto var_revocation_msg = ParseRevocationMsg(revMsg, revMsgSig);
-    if(std::holds_alternative<miner_info_error>(var_revocation_msg))
-        return std::get<miner_info_error>(var_revocation_msg);
-    
-    assert(std::holds_alternative<::revocation_msg>(var_revocation_msg));
-    auto rev_msg = std::get<::revocation_msg>(var_revocation_msg);
-    const auto mi_err = verify(rev_msg,
-                               revocation_ks.key(),
-                               miner_id_ks.prev_key());
-    if(mi_err)
-        return mi_err.value();
+    if(all_object(revMsg, revMsgSig))
+    {
+        const auto var_revocation_msg = ParseRevocationMsg(revMsg, revMsgSig);
+        if(std::holds_alternative<miner_info_error>(var_revocation_msg))
+            return std::get<miner_info_error>(var_revocation_msg);
 
-    revocation_msg = rev_msg;
+        assert(std::holds_alternative<::revocation_msg>(var_revocation_msg));
+        auto rev_msg = std::get<::revocation_msg>(var_revocation_msg);
+        const auto mi_err = verify(rev_msg,
+                                   revocation_ks.key(),
+                                   miner_id_ks.prev_key());
+        if(mi_err)
+            return mi_err.value();
+
+        revocation_msg = rev_msg;
+    }
+
+    const auto var_data_refs = parse_data_refs(doc);
+    if(holds_alternative<miner_info_error>(var_data_refs))
+        return get<miner_info_error>(var_data_refs);
+
+    assert(holds_alternative<data_refs>(var_data_refs));
 
     return miner_info_doc{miner_info_doc::v0_3,
                           height,
                           miner_id_ks,
                           revocation_ks,
+                          get<data_refs>(var_data_refs),
                           revocation_msg};
 }
+
 
 std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
     const bsv::span<const uint8_t> script)
@@ -390,6 +493,47 @@ std::ostream& operator<<(std::ostream& os, miner_info_doc::supported_version v)
     default:
         assert(false);
     }
+    return os;
+}
+
+std::variant<data_refs, miner_info_error> ParseDataRefs(const std::string_view sv)
+{
+    UniValue uv;
+    if(!uv.read(sv.data(), sv.size()))
+        return miner_info_error::doc_parse_error_ill_formed_json;
+    
+    return parse_data_refs(uv); 
+}
+    
+data_ref::data_ref(const std::vector<std::string>& brfc_ids, 
+                   const uint256& txid,
+                   int32_t vout,
+                   const std::string& compress):
+    brfc_ids_{brfc_ids.cbegin(), brfc_ids.cend()},
+    txid_{txid},
+    vout_{vout},
+    compress_{compress}
+{
+}
+
+bool operator==(const data_ref& a, const data_ref& b)
+{
+    return a.brfc_ids_ == b.brfc_ids_ &&
+           a.txid_ == b.txid_ &&
+           a.vout_ == b.vout_ &&
+           a.compress_ == b.compress_;
+}
+
+std::ostream& operator<<(std::ostream& os, const data_ref& ref)
+{
+    os << "brfcids: ";
+
+    ostream_iterator<string> it{os, ", "};
+    copy(ref.brfc_ids_.cbegin(), ref.brfc_ids_.cend(), it); 
+
+    os << "\ntxid: " << ref.txid_
+       << "\nvout: " << ref.vout_
+       << "\ncompress: " << ref.compress_;
     return os;
 }
 

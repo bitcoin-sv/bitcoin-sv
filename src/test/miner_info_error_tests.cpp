@@ -17,7 +17,7 @@ BOOST_AUTO_TEST_SUITE(miner_info_error_tests)
 
 BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
 {
-    const array<string, 33> expected{
+    const array<string, 43> expected{
         "miner info ref not found",
         "invalid instruction",
         "unsupported version",
@@ -49,6 +49,16 @@ BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
         "doc parse error - revocation msg sig2 field missing",
         "doc parse error - revocation msg sig2 invalid value",
         "doc parse error - revocation msg sig2 verification failed",
+        "doc parse error - invalid dataRefs object",
+        "doc parse error - invalid dataRefs refs object",
+        "doc parse error - invalid dataRefs dataref type",
+        "doc parse error - invalid dataRefs dataref missing fields",
+        "doc parse error - dataRefs invalid ref field name",
+        "doc parse error - dataRefs refs brfcids type",
+        "doc parse error - dataRefs refs brfcids field type",
+        "doc parse error - dataRefs refs txid type",
+        "doc parse error - dataRefs refs vout type",
+        "doc parse error - dataRefs refs compress type",
         "block bind - hash mismatch",
         "block bind - signature verification failed"
     };
