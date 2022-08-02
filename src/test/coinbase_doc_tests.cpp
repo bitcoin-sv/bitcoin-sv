@@ -110,9 +110,9 @@ BOOST_AUTO_TEST_CASE(inequality)
     vector<CoinbaseDocument::DataRef> datarefs_0;
     cd_dr0.SetDataRefs(datarefs_0);
 
-    CoinbaseDocument::DataRef dr1{{"id1", "id2"}, txid, 0};
+    CoinbaseDocument::DataRef dr1{{"id1", "id2"}, txid, 0, ""};
     const TxId txid2{uint256{tmp}};
-    CoinbaseDocument::DataRef dr2{{"id3", "id4"}, txid2, 0};
+    CoinbaseDocument::DataRef dr2{{"id3", "id4"}, txid2, 0, ""};
 
     vector<CoinbaseDocument::DataRef> datarefs_1{dr1};
     vector<CoinbaseDocument::DataRef> datarefs_11{dr1, dr1};

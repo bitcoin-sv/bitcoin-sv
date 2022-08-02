@@ -43,11 +43,13 @@ public:
             READWRITE(brfcIds);
             READWRITE(txid);
             READWRITE(vout);
+            READWRITE(compress);
         }
 
         std::vector<std::string> brfcIds;
         TxId txid;
         int32_t vout;
+        std::string compress;
     };
 
     struct RevocationMessage

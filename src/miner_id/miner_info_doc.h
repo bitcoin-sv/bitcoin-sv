@@ -78,7 +78,7 @@ public:
     const std::vector<std::string> brfc_ids() const { return brfc_ids_; }
     const uint256& txid() const { return txid_; }
     int32_t vout() const { return vout_; }
-    const std::string& compress() { return compress_; }
+    const std::string& compress() const { return compress_; }
 };
 
 inline bool operator!=(const data_ref& a, const data_ref& b){ return !(a == b); }

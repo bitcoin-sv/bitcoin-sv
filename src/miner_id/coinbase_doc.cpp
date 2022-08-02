@@ -51,6 +51,7 @@ CoinbaseDocument::CoinbaseDocument(std::string_view rawJSON, const miner_info_do
                       d.txid = TxId{ref.txid()};
                       d.vout = ref.vout();
                       d.brfcIds = ref.brfc_ids();
+                      d.compress = ref.compress();
                       return d;
                   });
 
