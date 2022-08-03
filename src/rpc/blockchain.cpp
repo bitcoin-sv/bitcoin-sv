@@ -19,6 +19,8 @@
 #include "hash.h"
 #include "merkletreestore.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/revokemid.h"
+#include "netmessagemaker.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/http_protocol.h"
@@ -3728,6 +3730,101 @@ UniValue rebuildminerids(const Config& config, const JSONRPCRequest& request)
     return true;
 }
 
+UniValue revokeminerid(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
+        throw std::runtime_error(
+                "revokeminerid \"input\"\n"
+                "\nRevoke minerId public key specified in the request and send out the P2P revokemid message to our peers.\n"
+                "\nArguments:\n"
+                "1. \"input\" (a json-object, mandatory) The payload which defines and certifies minerId to be revoked.\n"
+                "  {\n"
+                "    \"revocationKey\": xxxx,          (hex-string, mandatory) The current compressed revocationKey public key\n"
+                "    \"minerId\": xxxx,                (hex-string, mandatory) The current compressed minerId public key\n"
+                "    \"revocationMessage\": {          (object, mandatory)\n"
+                "      \"compromised_minerId\": xxxx,  (hex-string, mandatory) The compromised minerId public key to be revoked\n"
+                "      },\n"
+                "    \"revocationMessageSig\": {       (object, mandatory)\n"
+                "      \"sig1\": xxxx,                 (hex-string) The signature created by the revocationKey private key\n"
+                "      \"sig2\": xxxx,                 (hex-string) The signature created by the current minerId private key\n"
+                "      },\n"
+                "  }\n"
+                "\nResult:\n"
+                "NullUniValue\n"
+                "\nExamples:\n" +
+                HelpExampleCli("revokeminerid", "\"input\"") +
+                HelpExampleRpc("revokeminerid", "\"input\""));
+    }
+    RPCTypeCheck(request.params, {UniValue::VOBJ});
+    UniValue input = request.params[0].get_obj();
+    if (input.empty()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter: An empty json object");
+    }
+
+    RPCTypeCheckObj(
+        input,
+        {
+            {"revocationKey", UniValueType(UniValue::VSTR)},
+            {"minerId", UniValueType(UniValue::VSTR)},
+            {"revocationMessage", UniValueType(UniValue::VOBJ)},
+            {"revocationMessageSig", UniValueType(UniValue::VOBJ)}
+        },
+        false, true);
+    const CPubKey revocationKey { ParseHex(input["revocationKey"].get_str()) };
+    if (!revocationKey.IsValid()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid revocationKey key!");
+    }
+    const CPubKey minerId { ParseHex(input["minerId"].get_str()) };
+    if (!minerId.IsValid()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid minerId key!");
+    }
+
+    UniValue revMsg = input["revocationMessage"].get_obj();
+    RPCTypeCheckObj(
+        revMsg,
+        {
+            {"compromised_minerId", UniValueType(UniValue::VSTR)}
+        },
+        false, true);
+    const CPubKey compromisedMinerId { ParseHex(revMsg["compromised_minerId"].get_str()) };
+    if (!compromisedMinerId.IsValid()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid compromised_minerId key!");
+    }
+
+    UniValue revMsgSig = input["revocationMessageSig"].get_obj();
+    RPCTypeCheckObj(
+        revMsgSig,
+        {
+            {"sig1", UniValueType(UniValue::VSTR)},
+            {"sig2", UniValueType(UniValue::VSTR)}
+        },
+        false, true);
+
+    uint8_t hash_sha256[CSHA256::OUTPUT_SIZE] {};
+    CSHA256()
+        .Write(reinterpret_cast<const uint8_t*>(compromisedMinerId.begin()), compromisedMinerId.size())
+        .Finalize(hash_sha256);
+    const uint256 hash { std::vector<uint8_t> {std::begin(hash_sha256), std::end(hash_sha256)} };
+    const std::vector<uint8_t> sig1 { ParseHex(revMsgSig["sig1"].get_str()) };
+    if (!revocationKey.Verify(hash, sig1)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sig1 signature!");
+    }
+    const std::vector<uint8_t> sig2 { ParseHex(revMsgSig["sig2"].get_str()) };
+    if (!minerId.Verify(hash, sig2)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sig2 signature!");
+    }
+
+    const RevokeMid revokeMid {revocationKey, minerId, compromisedMinerId, sig1, sig2};
+    // Pass to miner ID database for processing
+    g_minerIDs->ProcessRevokemidMessage(revokeMid);
+    // Relay to our peers
+    g_connman->ForEachNode([&revokeMid](const CNodePtr& to) {
+        const CNetMsgMaker msgMaker(to->GetSendVersion());
+        g_connman->PushMessage(to, msgMaker.Make(NetMsgType::REVOKEMID, revokeMid));
+    });
+    return NullUniValue;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -3759,6 +3856,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "checkjournal",           checkjournal,           true,  {} },
     { "blockchain",         "rebuildjournal",         rebuildjournal,         true,  {} },
     { "blockchain",         "rebuildminerids",        rebuildminerids,        true,  {"fullrebuild"} },
+    { "blockchain",         "revokeminerid",          revokeminerid,          true,  {"input"} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
