@@ -95,12 +95,13 @@ namespace bsv
             instruction_ = instruction;
         }
 
-        constexpr bool valid() const noexcept { return valid_; }
+        constexpr explicit operator bool() const { return valid_; }
+
         const uint8_t* data() const { return span_.data(); }
 
         constexpr instruction_iterator& operator++() noexcept
         {
-            if(!valid())
+            if(!valid_)
             {
                 // advance to end of script range
                 span_ = span_.last(0);

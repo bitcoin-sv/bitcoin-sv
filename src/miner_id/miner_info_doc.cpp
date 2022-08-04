@@ -451,7 +451,7 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
 
     // miner_info_ref starts at 7th byte of the output message
     bsv::instruction_iterator it{script.last(script.size() - 7)};
-    if(!it.valid())
+    if(!it)
         return miner_info_error::invalid_instruction;
 
     const auto operand{it->operand()};
@@ -462,8 +462,7 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
     if(version != 0)
         return miner_info_error::script_version_unsupported;
     
-    ++it;
-    if(!it.valid())
+    if(!++it)
         return miner_info_error::invalid_instruction;
 
     const auto doc = bsv::to_sv(it->operand());
@@ -471,8 +470,7 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
     if(holds_alternative<miner_info_error>(var_miner_info_doc))
         return get<miner_info_error>(var_miner_info_doc);
     
-    ++it;
-    if(!it.valid())
+    if(!++it)
         return miner_info_error::invalid_instruction; 
     
     if(!is_der_signature(it->operand()))
