@@ -17,7 +17,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
 {
     sigOpCountError = false;
     uint64_t n = 0;
-    bsv::instruction last_instruction{OP_INVALIDOPCODE};
+    bsv::instruction last_instruction;
     const auto it_end{end_instructions()};
     for(auto it{begin_instructions()}; it != it_end; ++it)
     {

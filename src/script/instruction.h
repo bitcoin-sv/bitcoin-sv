@@ -28,8 +28,6 @@ namespace bsv
 
     public:
         constexpr instruction() = default; 
-        constexpr instruction(opcodetype opcode) noexcept : opcode_{opcode} {}
-
         constexpr instruction(opcodetype opcode,
                               int8_t offset,
                               const uint8_t* p,
