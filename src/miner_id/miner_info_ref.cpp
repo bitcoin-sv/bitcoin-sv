@@ -76,7 +76,7 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     // Total 143-146 
 
     bsv::instruction_iterator it{script.last(script.size() - 7)};
-    if(!it.valid())
+    if(!it)
         return miner_info_error::invalid_instruction;
 
     const auto operand{it->operand()};
@@ -87,8 +87,7 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     if(version != 0)
         return miner_info_error::script_version_unsupported;
 
-    ++it;
-    if(!it.valid())
+    if(!++it)
         return miner_info_error::invalid_instruction;
 
     constexpr uint8_t txid_len{32};
@@ -97,8 +96,7 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
  
     const auto it_txid{it};
     
-    ++it;
-    if(!it.valid())
+    if(!++it)
         return miner_info_error::invalid_instruction;
 
     constexpr uint8_t mmr_pbh_hash_len{32};
@@ -106,8 +104,7 @@ std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     if(mmr_pbh_hash.size() != mmr_pbh_hash_len)
         return miner_info_error::invalid_mmr_pbh_hash_len; 
    
-    ++it;
-    if(!it.valid())
+    if(!++it)
         return miner_info_error::invalid_instruction;
     
     const auto sig{it->operand()};

@@ -477,7 +477,7 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
     // MinerId coinbase documents starts at 7th byte of the output message
     bsv::instruction_iterator it{script.last(script.size() - 7)};
 
-    if(!it.valid())
+    if(!it)
     {
         LogPrint(
             BCLog::MINERID,
@@ -498,8 +498,7 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
     }
     const std::string_view static_cd{to_sv(it->operand())};
 
-    ++it;
-    if(!it.valid())
+    if(!++it)
     {
         LogPrint(
             BCLog::MINERID,
@@ -528,16 +527,14 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
     {
         // Static document of MinerId is successful. Check
         // dynamic MinerId.
-        ++it;
-
-        if(!it.valid())
+        if(!++it)
         {
             // Dynamic miner id is empty. We found first
             // successful miner id - we can stop looking.
             return minerId;
         }
 
-        if(!it.valid())
+        if(!it)
         {
             LogPrint(BCLog::MINERID,
                      "Failed to extract data for dynamic document of "
@@ -549,8 +546,7 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
         }
         const string_view dynamic_cd{to_sv(it->operand())};
 
-        ++it;
-        if(!it.valid())
+        if(!++it)
         {
             LogPrint(BCLog::MINERID,
                      "Failed to extract signature of dynamic document "
