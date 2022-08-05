@@ -42,19 +42,18 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
     def setup_network(self):
         self.add_nodes(self.num_nodes)
 
-    def make_revokeminerid_input(self):
-        compromisedMinerId = self.minerIdKeys[0]["public"]
+    def make_revokeminerid_input(self, revocationKeyPublicKey, minerIdPublicKey, compromisedMinerId, revocationKeyPrivateKey, minerIdPrivateKey):
         hashCompromisedMinerId = sha256(compromisedMinerId)
         # Make revoke minerId rpc input.
         inputDoc = {
-            "revocationKey": bytes_to_hex_str(self.minerIdRevocationPubKey),
-            "minerId": bytes_to_hex_str(self.minerIdKeys[0]["public"]),
+            "revocationKey": bytes_to_hex_str(revocationKeyPublicKey),
+            "minerId": bytes_to_hex_str(minerIdPublicKey),
             "revocationMessage": {
-                "compromised_minerId": bytes_to_hex_str(self.minerIdKeys[0]["public"])
+                "compromised_minerId": bytes_to_hex_str(compromisedMinerId)
             },
             "revocationMessageSig": {
-                "sig1": bytes_to_hex_str(self.minerIdRevocationSigningKey.sign_digest(hashCompromisedMinerId, sigencode=ecdsa.util.sigencode_der)),
-                "sig2": bytes_to_hex_str(self.minerIdKeys[0]["signing"].sign_digest(hashCompromisedMinerId, sigencode=ecdsa.util.sigencode_der))
+                "sig1": bytes_to_hex_str(revocationKeyPrivateKey.sign_digest(hashCompromisedMinerId, sigencode=ecdsa.util.sigencode_der)),
+                "sig2": bytes_to_hex_str(minerIdPrivateKey.sign_digest(hashCompromisedMinerId, sigencode=ecdsa.util.sigencode_der))
             }
         }
         return inputDoc
@@ -130,6 +129,21 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
                         "sig2": "1"
                     }
                 })
+        #
+        # getmineridinfo checks.
+        #
+        assert_raises_rpc_error(
+            -8, "Invalid minerid key!", conn.rpc.getmineridinfo, "1")
+        # Test a non-existing key.
+        randombip32key = BIP32Key.fromEntropy(os.urandom(16))
+        assert(len(conn.rpc.getmineridinfo(bytes_to_hex_str(randombip32key.PublicKey()))) == 0)
+
+    def check_getmineridinfo_result(self, actual, expected):
+        assert(actual["minerId"] == expected["minerId"])
+        assert(actual["minerIdState"] == expected["minerIdState"])
+        assert(actual["prevMinerId"] == expected["prevMinerId"])
+        assert(actual["revocationKey"] == expected["revocationKey"])
+        assert(actual["prevRevocationKey"] == expected["prevRevocationKey"])
 
     def run_test(self):
 
@@ -172,16 +186,46 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
 
             self.sync_all()
 
-            assert(self.nodes[0].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'CURRENT')
-            assert(self.nodes[1].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'CURRENT')
-            assert(self.nodes[2].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'CURRENT')
+            currentMinerId = self.minerIdKeys[2]["public"]
+            # The expected result for all nodes.
+            expectedResult = {
+                "minerId": bytes_to_hex_str(currentMinerId),
+                "minerIdState": 'CURRENT',
+                "prevMinerId": bytes_to_hex_str(self.minerIdKeys[1]["public"]),
+                "revocationKey": bytes_to_hex_str(self.minerIdRevocationPubKey),
+                "prevRevocationKey": bytes_to_hex_str(self.minerIdRevocationPubKey)
+            }
+            # Check node0's Miner ID DB state for the requested key.
+            self.check_getmineridinfo_result(
+                self.nodes[0].getmineridinfo(bytes_to_hex_str(currentMinerId)),
+                expectedResult)
+            # Check node1's Miner ID DB state for the requested key.
+            self.check_getmineridinfo_result(
+                self.nodes[1].getmineridinfo(bytes_to_hex_str(currentMinerId)),
+                expectedResult)
+            # Check node2's Miner ID DB state for the requested key.
+            self.check_getmineridinfo_result(
+                self.nodes[2].getmineridinfo(bytes_to_hex_str(currentMinerId)),
+                expectedResult)
 
-            self.nodes[0].revokeminerid(self.make_revokeminerid_input())
+            # The current minerId becomes compromised.
+            compromisedMinerId = currentMinerId
 
-            wait_until(lambda: self.nodes[0].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'REVOKED')
-            wait_until(lambda: self.nodes[1].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'REVOKED')
-            wait_until(lambda: self.nodes[2].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'REVOKED')
-    
+            # Call revokeminerid rpc.
+            self.nodes[0].revokeminerid(
+                self.make_revokeminerid_input(
+                    self.minerIdRevocationPubKey,
+                    self.minerIdKeys[2]["public"],
+                    compromisedMinerId,
+                    self.minerIdRevocationSigningKey,
+                    self.minerIdKeys[2]["signing"]))
+
+            # Check revoked minerId.
+            revokedMinerId = bytes_to_hex_str(compromisedMinerId)
+            wait_until(lambda: self.nodes[0].getmineridinfo(revokedMinerId)['minerIdState'] == 'REVOKED')
+            wait_until(lambda: self.nodes[1].getmineridinfo(revokedMinerId)['minerIdState'] == 'REVOKED')
+            wait_until(lambda: self.nodes[2].getmineridinfo(revokedMinerId)['minerIdState'] == 'REVOKED')
+ 
             self.test_invalid_input(p2p_0)
 
 if __name__ == '__main__':

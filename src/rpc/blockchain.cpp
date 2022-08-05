@@ -3825,6 +3825,50 @@ UniValue revokeminerid(const Config& config, const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+static UniValue getmineridinfo(const Config &config, const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
+        throw std::runtime_error(
+                "getmineridinfo \"minerId\"\n"
+                "\nReturn miner ID information.\n"
+                "\nArguments:\n"
+                "1. \"minerid:\" (hex string mandatory) The requested minerId public key to be checked in the Miner ID DB.\n"
+                "\nResult:\n"
+                "{                           (json object)\n"
+                "    \"minerId\": xxxx,             (string) This miner ID\n"
+                "    \"minerIdState\": xxxx,        (string) Whether this miner ID is CURRENT, ROTATED or REVOKED\n"
+                "    \"prevMinerId\": xxxx,         (string) The previous miner ID seen for this miner\n"
+                "    \"revocationKey\": xxxx,       (string) The current revocation key public key used by this miner\n"
+                "    \"prevRevocationKey\": xxxx,   (string) The previous revocation key public key used by this miner\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getmineridinfo", "\"xxxx...\"") +
+                HelpExampleRpc("getmineridinfo", "\"xxxx...\""));
+    }
+    if(!g_minerIDs) {
+        throw std::runtime_error("Miner ID database unavailable");
+    }
+    // Read rpc parameters
+    RPCTypeCheck(request.params,{UniValue::VSTR}, false);
+    const CPubKey& reqMinerId { ParseHex(request.params[0].get_str()) };
+    if (!reqMinerId.IsValid()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid minerid key!");
+    }
+
+    const auto& coinbaseDocInfo { GetMinerCoinbaseDocInfo(*g_minerIDs, reqMinerId) };
+    UniValue ret(UniValue::VOBJ);
+    if (coinbaseDocInfo) {
+        const std::pair<CoinbaseDocument, std::string>& obj { *coinbaseDocInfo };
+        const CoinbaseDocument& coinbaseDoc { obj.first };
+        const std::string& minerIdState { obj.second };
+        ret.push_back(Pair("minerId", coinbaseDoc.GetMinerId()));
+        ret.push_back(Pair("minerIdState", minerIdState));
+        ret.push_back(Pair("prevMinerId", coinbaseDoc.GetPrevMinerId()));
+        ret.push_back(Pair("revocationKey", HexStr(coinbaseDoc.GetRevocationKey())));
+        ret.push_back(Pair("prevRevocationKey", HexStr(coinbaseDoc.GetPrevRevocationKey())));
+    }
+    return ret;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -3857,6 +3901,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "rebuildjournal",         rebuildjournal,         true,  {} },
     { "blockchain",         "rebuildminerids",        rebuildminerids,        true,  {"fullrebuild"} },
     { "blockchain",         "revokeminerid",          revokeminerid,          true,  {"input"} },
+    { "blockchain",         "getmineridinfo",         getmineridinfo,         true,  {"minerid"} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
