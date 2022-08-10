@@ -18,7 +18,7 @@ namespace rpc::client
 struct WebhookClientDefaults
 {
     // Default and maximum number of threads for asynchronous submission
-    static constexpr size_t DEFAULT_NUM_THREADS { 2 };
+    static constexpr size_t DEFAULT_NUM_THREADS { 4 };
     static constexpr size_t MAX_NUM_THREADS { 16 };
 
     // Default port for webhook notifications
