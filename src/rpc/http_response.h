@@ -4,6 +4,7 @@
 #pragma once
 
 #include <streams.h>
+#include <univalue.h>
 #include <version.h>
 
 #include <string>
@@ -60,6 +61,24 @@ class StringHTTPResponse : public HTTPResponse
 
   private:
     std::string mBody {};
+};
+
+/**
+ * A JSON formatted HTTP response
+ */
+class JSONHTTPResponse : public HTTPResponse
+{
+  public:
+    JSONHTTPResponse() = default;
+    JSONHTTPResponse(const std::vector<std::string>& expectedHeaders) : HTTPResponse{expectedHeaders} {}
+
+    const UniValue& GetBody() const { return mBody; }
+
+    void SetBody(const unsigned char* body, size_t size) override;
+    bool IsEmpty() const override { return mBody.empty(); }
+
+  private:
+    UniValue mBody {};
 };
 
 /**
