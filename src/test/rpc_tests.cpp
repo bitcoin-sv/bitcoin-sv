@@ -724,6 +724,22 @@ BOOST_AUTO_TEST_CASE(client_config_bitcoind)
     );
 }
 
+// Create client config for miner ID generator
+BOOST_AUTO_TEST_CASE(client_config_minerid_generator)
+{
+    using namespace rpc::client;
+    GlobalConfig::GetModifiableGlobalConfig().SetMinerIdGeneratorURL("http://127.0.0.1:8080", nullptr);
+    const Config& config { GlobalConfig::GetConfig() };
+
+    BOOST_CHECK_NO_THROW(
+        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(config) };
+        BOOST_CHECK_EQUAL(clientConfig.GetServerIP(), "127.0.0.1");
+        BOOST_CHECK_EQUAL(clientConfig.GetServerPort(), 8080);
+        BOOST_CHECK_EQUAL(clientConfig.GetServerHTTPHost(), "127.0.0.1");
+        BOOST_CHECK_EQUAL(clientConfig.GetEndpoint(), "");
+    );
+}
+
 // HTTP request creation
 BOOST_AUTO_TEST_CASE(http_requests)
 {
@@ -791,6 +807,22 @@ BOOST_AUTO_TEST_CASE(http_requests)
         BOOST_CHECK_EQUAL(rpcRequest.GetContentsSize(), strContents.size());
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
         BOOST_CHECK_EQUAL(rpcRequest.GetHeaders().size(), 0);
+    }
+
+    {
+        // REST request to a miner ID generator
+        GlobalConfig::GetModifiableGlobalConfig().SetMinerIdGeneratorURL("http://127.0.0.1:8080", nullptr);
+        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(GlobalConfig::GetConfig()) };
+
+        const std::string alias { "MyAlias" };
+        const uint256 hash { GetRandHash() };
+        std::stringstream endpoint {};
+        endpoint << "/minerid/" << alias << "/pksign/" << hash.ToString();
+
+        auto rpcRequest {  rpc::client::HTTPRequest::CreateMinerIdGeneratorSigningRequest(clientConfig, alias, hash.ToString()) };
+        BOOST_CHECK(rpcRequest.GetCommand() == RequestCmdType::GET);
+        BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), endpoint.str());
+        BOOST_CHECK_EQUAL(rpcRequest.GetContents().size(), 0);
     }
 }
 

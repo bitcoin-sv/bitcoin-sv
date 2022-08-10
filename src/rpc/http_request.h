@@ -102,6 +102,11 @@ class HTTPRequest
         return request;
     }
 
+    // Factory method to make a signing request to a miner ID generator
+    static HTTPRequest CreateMinerIdGeneratorSigningRequest(const RPCClientConfig& config,
+                                                            const std::string& alias,
+                                                            const std::string& hash);
+
   private:
 
     // Helper method to encode URI components

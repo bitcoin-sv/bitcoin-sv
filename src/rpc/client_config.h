@@ -32,6 +32,7 @@ class RPCClientConfig
                                                         unsigned protocolVersion);
     static RPCClientConfig CreateForSafeModeWebhook(const Config& config);
     static RPCClientConfig CreateForDoubleSpendDetectedWebhook(const Config& config);
+    static RPCClientConfig CreateForMinerIdGenerator(const Config& config);
 
     // Accessors
     const std::string& GetServerIP() const { return mServerIP; }

@@ -144,5 +144,19 @@ RPCClientConfig RPCClientConfig::CreateForDoubleSpendDetectedWebhook(const Confi
     return clientConfig;
 }
 
+RPCClientConfig RPCClientConfig::CreateForMinerIdGenerator(const Config& config)
+{
+    RPCClientConfig clientConfig {};
+
+    // Set IP/port
+    clientConfig.mServerIP = config.GetMinerIdGeneratorAddress();
+    clientConfig.mServerPort = config.GetMinerIdGeneratorPort();
+
+    // Set endpoint
+    clientConfig.mEndpoint = config.GetMinerIdGeneratorPath();
+
+    return clientConfig;
+}
+
 } // namespace rpc::client
 
