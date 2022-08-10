@@ -613,6 +613,14 @@ BOOST_AUTO_TEST_CASE(minerid_config)
     BOOST_CHECK_EQUAL(config.GetMinerIdReputationMScale(), 2 * MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR);
     BOOST_CHECK(config.SetMinerIdReputationMScale(1, &err));
     BOOST_CHECK(!config.SetMinerIdReputationMScale(-1, &err));
+
+    BOOST_CHECK(config.SetMinerIdGeneratorURL("http://127.0.0.1:8080", &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorPath(), "");
+
+    BOOST_CHECK(config.SetMinerIdGeneratorAlias("OurAlias", &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorAlias(), "OurAlias");
 }
 
 BOOST_AUTO_TEST_CASE(disable_BIP30)
