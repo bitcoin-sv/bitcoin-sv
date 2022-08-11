@@ -89,7 +89,7 @@ class MinerIdKeys:
             vin.scriptSig = CScript([signature + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.publicKeyBytes()])
 
 
-def create_miner_info_scriptPubKey(params, json_override_string=None):
+def create_miner_info_scriptPubKey(params, datarefs=None, json_override_string=None):
 
     # if there are no revocation keys available, then we replace them with the miner keys.
 
@@ -118,6 +118,9 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
     infoDoc['prevRevocationKeySig'] = revocationKeys.sign_hexmessage(dataToSign)
     infoDoc['revocationKey'] = prev_revocationKeys.publicKeyHex()
 
+    if datarefs:
+        refs = {'refs': datarefs}
+        infoDoc['dataRefs'] = refs
 
     if pubCompromisedMinerKeyHex:
         messageSignature1 = revocationKeys.sign_hexmessage(pubCompromisedMinerKeyHex)
@@ -141,6 +144,20 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
     infoDocJsonSig = minerKeys.sign_strmessage_bytes(infoDocJson)
 
     return CScript([OP_0, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),bytearray([0x00]), infoDocJson, infoDocJsonSig])
+
+
+def create_dataref (brfcIds, txid, vout, compress=None):
+
+    dataref = {
+        'brfcIds': brfcIds,
+        'txid': txid,
+        'vout': vout
+    }
+    if compress:
+        dataref['compress'] = compress
+
+    return dataref
+
 
 # temporary function will take it from blocktools in the future
 def calc_blockbind_merkle_root(block, txidbytes):
@@ -207,7 +224,7 @@ def create_miner_id_coinbase_and_miner_info(minerInfoTx, key, block):
     block.hashMerkleRoot = block.calc_merkle_root()
     block.rehash()
 
-def make_miner_id_block(connection, minerInfoTx, blockHeight, key, parentBlock=None, lastBlockTime=0, txns=None):
+def make_miner_id_block(connection, datarefTxns, minerInfoTx, blockHeight, key, parentBlock=None, lastBlockTime=0, txns=None):
     if parentBlock is not None:
         parentHash = parentBlock.sha256
         parentTime = parentBlock.nTime
@@ -225,6 +242,9 @@ def make_miner_id_block(connection, minerInfoTx, blockHeight, key, parentBlock=N
         block.vtx.extend(txns)
 
     # Make real coinbase and miner-info txn and put them in the block
+    if datarefTxns:
+        for datarefTxn in datarefTxns:
+            block.vtx.append(datarefTxn)
     create_miner_id_coinbase_and_miner_info(minerInfoTx, key, block)
 
     # Update block with height and solve

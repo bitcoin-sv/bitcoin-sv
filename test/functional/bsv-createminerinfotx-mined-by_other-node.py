@@ -4,7 +4,7 @@
 
 from test_framework.miner_id import create_miner_info_scriptPubKey, MinerIdKeys, make_miner_id_block
 from test_framework.test_framework import BitcoinTestFramework, sync_blocks
-from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, sync_blocks, disconnect_nodes_bi, connect_nodes_bi, sync_mempools
+from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, sync_blocks, disconnect_nodes_bi, connect_nodes_bi, sync_mempools, connect_nodes_mesh, disconnect_nodes, connect_nodes
 from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG
 from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex
 from test_framework.blocktools import create_block, create_coinbase
@@ -14,9 +14,9 @@ from time import sleep
 import json
 
 '''
-Test two nodes mining with different minerid's and forking.
-Both nodes need to be able to continue creating minerinfo transactions.
-After a reorg they still should be able to continue mining further minerinfo transactions.
+This test checks a condition, where a valid minerinfo transactions becomes invalid in the
+role of a minerinfo transaction. This transaction is still a valid transaction and must
+still be considered as a valid member of the funding chain created by the minerinfo transactions.
 '''
 class AllKeys:
     last_seed_number = 1
@@ -31,11 +31,16 @@ class AllKeys:
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 2
+        self.num_nodes = 3
         self.setup_clean_chain = True
         self.miner_names = ["miner name 0","miner name 1"]
         args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003']
-        self.extra_args = [args, args]
+        self.extra_args = [args, args, args]
+
+    def setup_network(self):
+        self.setup_nodes()
+        connect_nodes_mesh(self.nodes)
+        self.sync_all()
 
     def make_block_with_coinbase(self, conn_rpc):
         tip = conn_rpc.getblock(conn_rpc.getbestblockhash())
@@ -79,7 +84,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         with open(datapath + '/minerinfotxfunding.dat', 'a') as f:
             f.write(fundingSeedJson)
 
-    def one_test(self, allKeys, nodenum, do_mining=True):
+    def one_test(self, allKeys, nodenum):
 
         # create the minerinfodoc transaction and ensure it is in the mempool
         # create a dummy transaction to compare behaviour
@@ -100,9 +105,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
-        wait_until (lambda: txid in node.getrawmempool())
-        if not do_mining:
-            return
+
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
         block = make_miner_id_block(node, None, minerInfoTx, height, allKeys.minerIdKeys)
@@ -117,13 +120,12 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         block = node.getblock(bhash)
         assert(txid in block['tx'])
 
+        return minerInfoTx, txid
+
     def run_test(self):
         # create bip32 keys
         allKeys0 = AllKeys()
         allKeys1 = AllKeys()
-
-        disconnect_nodes_bi(self.nodes, 0, 1)
-        connect_nodes_bi(self.nodes, 0, 1)
 
         # store funding keys and funding txid
         block0, coinbase_tx0 = self.make_block_with_coinbase(self.nodes[0])
@@ -146,70 +148,53 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.nodes[1].generate(1)
         self.sync_all()
 
+        # Disconnect node 1 from the other 2
+        disconnect_nodes(self.nodes[0], 1)
+        disconnect_nodes(self.nodes[1], 2)
 
-        # mine minerid blocks and sync
-        self.one_test(allKeys0, nodenum=0)
-        sync_blocks(self.nodes) 
-        self.one_test(allKeys0, nodenum=0, do_mining=True)
-        # disconnect and mine independently. 
-        # make the second nodes chain the longest
+        # mine minerid block on node0 and sync with node2
         forkHeight = self.nodes[0].getblockcount()
-        disconnect_nodes_bi(self.nodes,0,1)
-        self.one_test(allKeys0, 0)
-        self.one_test(allKeys0, 0, do_mining=False)
-        self.one_test(allKeys1, 1)
-        self.one_test(allKeys1, 1)
-        self.one_test(allKeys1, 1)
-        self.one_test(allKeys1, 1)
-        self.one_test(allKeys1, 1, do_mining=False)
-        last_block0 = self.nodes[0].getbestblockhash()
-        last_block1 = self.nodes[1].getbestblockhash()
-        last_height0 = self.nodes[0].getblockcount()
-        last_height1 = self.nodes[1].getblockcount()
+        minerinfotx_saved, txid_saved = self.one_test(allKeys0, nodenum=0)
+        sync_blocks([self.nodes[0], self.nodes[2]])
 
-        assert(last_block0 != last_block1)
-        assert(last_height0 != last_height1)
+        assert(self.nodes[0].getblockcount() == forkHeight + 1)
+        assert(self.nodes[1].getblockcount() == forkHeight)
+        assert(self.nodes[2].getblockcount() == forkHeight + 1)
 
-        # connect nodes. All nodes should now mine on the longer chain
-        # mined by the second node
-        connect_nodes_bi(self.nodes,0,1)
-        sync_blocks(self.nodes)
-        
-        # no change for the second node which has the longer chain
-        assert(last_block1 == self.nodes[1].getbestblockhash())
-        assert(last_height1 == self.nodes[1].getblockcount())
+        # make the second nodes chain the longest
+        minerinfotx, _ = self.one_test(allKeys1, 1)
+        minerinfotx, _ = self.one_test(allKeys1, 1)
 
-        # but first node has now reorged to the first node
-        last_block0 = self.nodes[0].getbestblockhash()
-        last_height0 = self.nodes[0].getblockcount()
+        assert(self.nodes[0].getblockcount() == forkHeight + 1)
+        assert(self.nodes[1].getblockcount() == forkHeight + 2)
+        assert(self.nodes[2].getblockcount() == forkHeight + 1)
 
-        assert(last_height0 == last_height1)
-        assert(last_block0 == last_block1)
-
-        # mine on the new chain. After syncing all blocks should share the same tip
-        self.one_test(allKeys0, 0)
-        self.one_test(allKeys0, 0)
+        # reconnect nodes and force reorg for nodes 0 and 2
+        connect_nodes(self.nodes, 0, 1)
+        connect_nodes(self.nodes, 1, 2)
         sync_blocks(self.nodes)
 
-        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        assert(self.nodes[0].getblockcount() == forkHeight + 2)
+        assert(self.nodes[1].getblockcount() == forkHeight + 2)
+        assert(self.nodes[2].getblockcount() == forkHeight + 2)
 
-        # but we invalidate the longer chain and continue on the first one
-        blockHash = self.nodes[1].getblockhash(forkHeight + 1)
-        self.nodes[0].invalidateblock(blockHash)
-        self.nodes[1].invalidateblock(blockHash)
-        sync_blocks(self.nodes)
-        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        # Manually insert miner-info txn from node0's lost block into node2's mempool
+        self.nodes[2].sendrawtransaction(ToHex(minerinfotx_saved), True, True)
+        assert(txid_saved in self.nodes[2].getrawmempool())
 
-        self.one_test(allKeys0, 0)
-        sync_blocks(self.nodes)
-        self.one_test(allKeys0, 0)
-        sync_blocks(self.nodes)
-        self.one_test(allKeys0, 0)
+        # Mine the miner-info txn
+        self.nodes[2].generate(1)
+        assert(txid_saved not in self.nodes[2].getrawmempool())
         sync_blocks(self.nodes)
 
-        self.one_test(allKeys1, 1)
+        assert(self.nodes[0].getblockcount() == forkHeight + 3)
+        assert(self.nodes[1].getblockcount() == forkHeight + 3)
+        assert(self.nodes[2].getblockcount() == forkHeight + 3)
+
+        # Check node 0 can still fund another miner-info txn
+        minerinfotx, _ = self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)
-        self.one_test(allKeys1, 1)
+        minerinfotx, _ = self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)
 
 if __name__ == '__main__':

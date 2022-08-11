@@ -5,24 +5,31 @@
 #define MINER_ID_TRACKER_H
 
 #include "primitives/transaction.h"
+#include "logging.h"
 #include <mutex>
 #include <map>
+#include <utility>
 #include <functional>
 
 namespace mining {
 
 
 /**
- * This data structure trackes minerinfo-txns that this node has created. The idea of this structure is
- * a stack that grows when blocks are added and shrinks when blocks are removed (during a reorg for e.g.)
- * But we cannot add the minerinfo-txn to the tracker when adding a block during a reorg because at that point
- * the node cannot tell appart the transactions it created and transactions comming from other nodes.
- * Consequently we have to store all abandoned chains too and cannot use a stack.
- * The storage key for our minerinfo-txns are pairs of height and blockhash sorted in that order.
- * We store all minerinfo-txns by height and blockhash, the second part of the key serving disambiguation.
+ * This data structure tracks minerinnfo txns and dataref txns that this node has created.
+ * Dataref and minerinfo txns build a funding chain and this class helps finding a spendable fund in this chain.
+ * There may be more than one dataref transactions per block and the last one is the corresponding minerinfo txn
+ * if it exists.
+ * Transaction in blocks and in the mempool are tracked separately and separate mutexes are used for such access.
  */
 
-class MinerInfoTxTracker {
+class DatarefTracker {
+    struct FundingNode {
+        COutPoint outPoint;
+        COutPoint previous;
+    };
+    struct DatarefVector {
+        std::vector<FundingNode> funds;
+    };
     struct Key
     {
         int32_t height{-1};
@@ -38,56 +45,81 @@ class MinerInfoTxTracker {
                     std::tie(other.height, other.blockhash);
         }
     };
-    // This data is persistent
-    std::map<Key,TxId> entries_;
+    int32_t keep_for_reorg{1001};
+    std::map<Key,DatarefVector> entries_;
     mutable std::mutex mtx_;
 
-    // This member tracks the mempool until the transaction moves
+    // Member current_ tracks the mempool until the transaction moves
     // into the block. Note that member current_ uses its own mutex.
-    std::optional<TxId> current_;
+    DatarefVector current_;
     mutable std::mutex mtx_for_current_;
 
-    bool store_minerinfo_txid (int32_t height, uint256 const &blockHash, TxId const &txid);
-    bool load_minerinfo_txid ();
+    bool store_minerinfo_fund (int32_t height, const uint256& blockhash, const FundingNode& fundingNode, size_t idx);
+    bool load_minerinfo_funds ();
 
 public:
     class LockingAccess {
-        friend class MinerInfoTxTracker;
+        friend class DatarefTracker;
 
         std::lock_guard<std::mutex> lock_;
-        MinerInfoTxTracker &data_;
+        DatarefTracker &data_;
 
-        explicit LockingAccess(MinerInfoTxTracker &data) : lock_{data.mtx_}, data_{data} {
+        explicit LockingAccess(DatarefTracker &data) : lock_{data.mtx_}, data_{data} {
             if (data_.entries_.empty())
-                data_.load_minerinfo_txid ();
+                data_.load_minerinfo_funds ();
         }
 
     public:
 
         /**
          * Reverse search transaction because the found transaction will most likely be at the end.
-         * @height, we are searching for a previous transaction in the funding chain, hence one that
-         * is below height.
+         * @height, skip everything at or above height
          * @get_transaction, This function must find the transaction via the txid if it is in the
-         * active chain.
+         * active chain. GetTransaction will not do because this could be a pruning node.
          */
-        CTransactionRef find_previous(int32_t height, std::function<CTransactionRef(TxId)> get_transaction) const {
-            for (auto i = data_.entries_.crbegin(); i != data_.entries_.crend(); ++i)
-            {
-                if (i->first.height < height)
-                {
-                    CTransactionRef tx = get_transaction(i->second);
-                    if (tx)
-                        return tx;
+        std::optional<std::pair<COutPoint, COutPoint>> find_fund(int32_t height, std::function<bool(const COutPoint&, const COutPoint&)> get_transaction) const {
+            for (auto i = data_.entries_.crbegin(); i != data_.entries_.crend(); ++i) {
+                if (i->first.height < height) {
+                    for (auto j = i->second.funds.crbegin(); j != i->second.funds.crend(); ++j) {
+                        const FundingNode& node = *j;
+                        if(get_transaction(node.outPoint, node.previous))
+                            return {{node.outPoint, node.previous}};
+                    }
                 }
             }
-            return nullptr;
+            return std::nullopt;
         }
 
-        bool insert_minerinfo_txid(int32_t height, uint256 const &blockHash, TxId const &txid) {
-            auto key = Key{.height=height,.blockhash=blockHash};
-            data_.entries_[key] = txid;
-            return data_.store_minerinfo_txid (height, blockHash, txid);
+        bool move_current_to_store(int32_t height, uint256 const &blockHash) {
+            try {
+                // copy temporary txns in "current" to store
+                auto key = Key{.height=height,.blockhash=blockHash};
+                DatarefVector & entries = data_.entries_[key];
+                size_t counter{0};
+
+                for (const auto& outputs: data_.current_.funds) {
+                    entries.funds.push_back(outputs);
+                    if(data_.store_minerinfo_fund (height, blockHash, outputs, counter))
+                        ++counter;
+                }
+                // clear temporary txns in "current" to store
+                data_.current_.funds.clear();
+
+                // Todo: purge old entries.
+                size_t to_prune = std::count_if(
+                        data_.entries_.begin(),
+                        data_.entries_.end(),
+                        [height, p=data_.keep_for_reorg](const auto& element) {return element.first.height < height - p;});
+                for (size_t i = 0; i < to_prune; ++i)
+                    data_.entries_.erase(data_.entries_.begin());
+            } catch (const std::exception &e) {
+                LogPrintf(strprintf("could not store minerinfo tracking information: %s\n", e.what()));
+                return false;
+            } catch (...) {
+                LogPrintf("could not store minerinfo tracking information\n");
+                return false;
+            }
+            return true;
         }
     };
 
@@ -95,19 +127,39 @@ public:
         return LockingAccess{*this};
     }
 
-    std::optional<TxId> current_txid() const {
+    std::optional<COutPoint> get_current_funds_back() const {
         std::lock_guard lock (mtx_for_current_);
-        return current_;
+        if (!current_.funds.empty())
+            return current_.funds.back().outPoint;
+        else
+            return std::nullopt;
     }
 
-    void set_current_txid(TxId const &txid) {
+    std::vector<TxId> get_current_funds() const {
         std::lock_guard lock (mtx_for_current_);
-        current_ = txid;
+        //return current_.funds;
+        std::vector<TxId> v;
+        for (const auto& outputs: current_.funds)
+            v.push_back(outputs.outPoint.GetTxId());
+        return v;
     }
 
-    void clear_current_txid() {
+    void append_to_current_funds(const COutPoint& outp, const COutPoint& prev_outp) {
         std::lock_guard lock (mtx_for_current_);
-        current_ = std::nullopt;
+        current_.funds.push_back({outp, prev_outp});
+    }
+
+    void clear_current_funds() {
+        std::lock_guard lock (mtx_for_current_);
+        current_.funds.clear();
+    }
+
+    bool pop_back_from_current_funds () {
+        std::lock_guard lock (mtx_for_current_);
+        if (current_.funds.empty())
+            return false;
+        current_.funds.pop_back();
+        return true;
     }
 };
 

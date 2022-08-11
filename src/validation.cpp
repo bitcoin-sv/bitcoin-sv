@@ -4386,16 +4386,17 @@ static bool ActivateBestChainStep(
             if (pindexOldTip) {
                 // If this block was from someone else, then we have to remove our own
                 // minerinfo transactions from the mempool
-                std::optional<TxId> const info_txid = mempool.minerInfoTxTracker.current_txid();
-                if (info_txid) {
-                    LogPrint(BCLog::MINERID, "minerinfotx tracker, scheduled removal of minerinfo txn %s because of new block\n", info_txid->ToString());
-                    mempool.minerInfoTxTracker.clear_current_txid();
-                    mempool.RemoveMinerIdTx(*info_txid, changeSet);
+                std::vector<TxId> datarefs = mempool.datarefTracker.get_current_funds();
+
+                if (!datarefs.empty()) {
+                    LogPrint(BCLog::MINERID,
+                             "minerinfotx tracker, scheduled removal of minerinfo and dataref txns. Total removed: %ld\n",
+                             datarefs.size());
+                    mempool.datarefTracker.clear_current_funds();
+                    mempool.RemoveTxAndDescendants(datarefs.front(), changeSet);
                 }
             }
         } catch(...) {
-            // We will continue because invalid mineridinfo transactions do not cause harm to the
-            // rest of the transactions and there is nothing we can do about this other than logging.
             LogPrintf("Exception caught while removing mineridinfo-tx from mempool\n");
         }
 

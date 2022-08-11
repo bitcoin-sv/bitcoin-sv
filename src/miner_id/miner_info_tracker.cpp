@@ -15,7 +15,7 @@ namespace mining {
      */
     static std::string minerinfotxstore (int32_t height)
     {
-        return strprintf("minerinfotxtore-%06d.dat", height);
+        return strprintf("minerinfotxstore-%06d.dat", height);
     };
 
     /*
@@ -25,7 +25,7 @@ namespace mining {
     static std::optional<int> parsestorefile (std::string n)  {
 
         int res = 0;
-        std::string t = "minerinfotxtore-######.dat";
+        std::string t = "minerinfotxstore-######.dat";
 
         if (t.size() != n.size())
             return std::nullopt;
@@ -70,7 +70,7 @@ namespace mining {
     /*
      * Store minerinfo txn-ids in chunks spanning periods of 1000 blocks
      */
-    bool MinerInfoTxTracker::store_minerinfo_txid (int32_t height, uint256 const &blockhash, TxId const &txid)
+    bool DatarefTracker::store_minerinfo_fund (int32_t height, const uint256& blockhash, const FundingNode& fundingNode, size_t idx)
     {
         try
         {
@@ -84,16 +84,23 @@ namespace mining {
             if (!file.is_open())
                 throw std::runtime_error("Cannot open and truncate funding data file: " + filepath.string());
 
-            file << height << ' ' << blockhash << ' ' << txid << std::endl;
+            file
+                << height << ' '
+                << blockhash << ' '
+                << fundingNode.outPoint.GetTxId() << ' '
+                << fundingNode.outPoint.GetN() << ' '
+                << fundingNode.previous.GetTxId() << ' '
+                << fundingNode.previous.GetN() << ' '
+                << idx << std::endl;
         }
         catch (std::exception const & e)
         {
-            LogPrintf(strprintf("Error while storing funding information: %s",e.what()));
+            LogPrintf(strprintf("Error while storing funding information: %s\n",e.what()));
             return false;
         }
         catch (...)
         {
-            LogPrintf("Error while storing funding information");
+            LogPrintf("Error while storing funding information\n");
             return false;
         }
         return true;
@@ -102,8 +109,9 @@ namespace mining {
     /*
      * Load funding information from file.
      */
-    bool MinerInfoTxTracker::load_minerinfo_txid ()
+    bool DatarefTracker::load_minerinfo_funds ()
     {
+        static size_t count_logs = 0;
         try
         {
             auto dir = (GetDataDir() / fundingPath);
@@ -123,15 +131,27 @@ namespace mining {
                 fs::ifstream file;
                 file.open(dir / filename, std::ios::binary | std::ios::out);
                 if (!file.is_open())
-                    throw std::runtime_error(strprintf("Cannot open funding data file: %s", (dir / filename).string()));
-                TxId txid;
-                uint256 blockhash;
+                    return true;  //nothing stored yet, this is not an error
                 int32_t height;
+                uint256 blockhash;
+                TxId txid;
+                uint32_t n;
+                TxId prev_txid;
+                uint32_t prev_n;
 
-                while (file >> height >> blockhash >> txid )
+                size_t idx;
+
+                while (file >> height >> blockhash >> txid >> n >> prev_txid >>  prev_n >> idx)
                 {
                     Key key {height, blockhash};
-                    entries_[key] = txid;
+                    DatarefVector & v = entries_[key];
+                    if (v.funds.size() <= idx)
+                        v.funds.resize(idx+1);
+
+                    COutPoint outPoint {txid, n};
+                    COutPoint previous {prev_txid, prev_n};
+
+                    v.funds[idx] = FundingNode{outPoint,previous};
                 }
 
                 file.close();
@@ -139,12 +159,19 @@ namespace mining {
         }
         catch (std::exception const & e)
         {
-            LogPrintf(strprintf("Error while loading funding information: %s",e.what()));
+            if (++count_logs < 3)
+                LogPrint(BCLog::MINERID, strprintf(
+				"Warning - Unable to load funding information for miner ID; node will be unable " 
+				"to mine blocks containing a miner ID unless you setup a funding seed as described in the documentation: %s\n",
+				e.what()));
             return false;
         }
         catch (...)
         {
-            LogPrintf("Error while loading funding information");
+            if (++count_logs < 3)
+                LogPrint(BCLog::MINERID,
+				"Warning - Unable to load funding information for miner ID; node will be unable "
+				"to mine blocks containing a miner ID unless you setup a funding seed as described in the documentation\n");
             return false;
         }
         return true;

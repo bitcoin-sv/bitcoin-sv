@@ -2,11 +2,11 @@
 # Copyright (c) 2022 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.miner_id import create_miner_info_scriptPubKey, MinerIdKeys, make_miner_id_block
+from test_framework.miner_id import create_miner_info_scriptPubKey, MinerIdKeys, make_miner_id_block, create_dataref
 from test_framework.test_framework import BitcoinTestFramework, sync_blocks
-from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, sync_blocks, disconnect_nodes_bi, connect_nodes_bi, sync_mempools
-from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG
-from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex
+from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, sync_blocks, disconnect_nodes_bi, connect_nodes_bi, hashToHex
+from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG, OP_FALSE, OP_RETURN
+from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex, COIN
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.address import key_to_p2pkh
 from pathlib import Path
@@ -14,9 +14,9 @@ from time import sleep
 import json
 
 '''
-Test two nodes mining with different minerid's and forking.
-Both nodes need to be able to continue creating minerinfo transactions.
-After a reorg they still should be able to continue mining further minerinfo transactions.
+Create and send a dataref transaction with two scripts to the node.
+Send a minerinfo transaction referencing said dataref transaction in the miner info doc.
+Check reorg conditions. This test reorgs 1000 blocks deep.
 '''
 class AllKeys:
     last_seed_number = 1
@@ -34,7 +34,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.miner_names = ["miner name 0","miner name 1"]
-        args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003']
+        args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-txindex=1']
         self.extra_args = [args, args]
 
     def make_block_with_coinbase(self, conn_rpc):
@@ -59,6 +59,54 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [txid])
         return tx
 
+    def create_dataref_txn (self, node):
+
+        brfcDataA = {
+            '62b21572ca46': {'mydata':'hello world1'},
+            'a224052ad433': {'mydata':'hello world2'}}
+        brfcDataB = {
+            '77721572ca46': {'mydata':'byby world1'},
+            '8884052ad433': {'mydata':'byby world2'}}
+        brfcDataC = {
+            'AAAA1572ca46': {'mydata':'byby world1'},
+            'AAAA052ad433': {'mydata':'byby world2'}}
+        brfcDataD = {
+            'BBBB1572ca46': {'mydata':'byby world1'},
+            'BBBB052ad433': {'mydata':'byby world2'}}
+
+        brfcDatas = [brfcDataA, brfcDataB, brfcDataC, brfcDataD]
+        def datarefToScript (data):
+            brfcDataJson = json.dumps(data, indent=0)
+            brfcDataJson = brfcDataJson.replace('\n', '')
+            brfcDataJson = brfcDataJson.replace(' ', '')
+            brfcDataJson = brfcDataJson.encode('utf8')
+            return brfcDataJson
+
+        scriptPubKeys = []
+        for b in brfcDatas:
+            script = CScript([OP_FALSE, OP_RETURN, bytearray([0xAC, 0x1E, 0xED, 0x99]),datarefToScript(b)])
+            scriptPubKeys.append (bytes_to_hex_str(script))
+
+        txid = node.createdatareftx(scriptPubKeys)
+        wait_until(lambda: txid in node.getrawmempool())
+
+        dataRefs = []
+        for b in brfcDatas:
+            dataRefs.append(create_dataref(list(b.keys()), txid, vout=0))
+
+        return dataRefs
+
+    def second_spends_first (self, node, txid1, txid2):
+        tx1 = FromHex(CTransaction(), node.getrawtransaction(txid1))
+        tx2 = FromHex(CTransaction(), node.getrawtransaction(txid2))
+        tx1.rehash()
+        tx2.rehash()
+
+        for x in tx2.vin:
+            if hashToHex(x.prevout.hash) == tx1.hash:
+                return True
+        return False
+
     def store_funding_info(self, nodenum, keys, txId, index):
         datapath = self.options.tmpdir + "/node{}/regtest/miner_id/Funding".format(nodenum)
         Path(datapath).mkdir(parents=True, exist_ok=True)
@@ -79,7 +127,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         with open(datapath + '/minerinfotxfunding.dat', 'a') as f:
             f.write(fundingSeedJson)
 
-    def one_test(self, allKeys, nodenum, do_mining=True):
+    def one_test(self, allKeys, nodenum, do_mining=True, datarefs=None):
 
         # create the minerinfodoc transaction and ensure it is in the mempool
         # create a dummy transaction to compare behaviour
@@ -97,15 +145,25 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 'prev_revocationKeys': None,
                 'pubCompromisedMinerKeyHex': None }
 
-
-        scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
+        scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters, datarefs=datarefs)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
         wait_until (lambda: txid in node.getrawmempool())
+
+        if datarefs:
+            wait_until(lambda: datarefs[0]['txid'] in node.getrawmempool())
+
         if not do_mining:
             return
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
-        block = make_miner_id_block(node, None, minerInfoTx, height, allKeys.minerIdKeys)
+        datarefTxns = {}
+        if datarefs:
+            for dataref in datarefs:
+                datarefTxn = FromHex(CTransaction(), node.getrawtransaction(dataref['txid']))
+                datarefTxn.rehash()
+                datarefTxns[datarefTxn.hash] = datarefTxn
+
+        block = make_miner_id_block(node, list(datarefTxns.values()), minerInfoTx, height, allKeys.minerIdKeys)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
         wait_until (lambda: block_count + 1 == node.getblockcount())
@@ -116,6 +174,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         bhash = node.getbestblockhash()
         block = node.getblock(bhash)
         assert(txid in block['tx'])
+        return txid
 
     def run_test(self):
         # create bip32 keys
@@ -146,7 +205,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.nodes[1].generate(1)
         self.sync_all()
 
-
         # mine minerid blocks and sync
         self.one_test(allKeys0, nodenum=0)
         sync_blocks(self.nodes) 
@@ -155,10 +213,22 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # make the second nodes chain the longest
         forkHeight = self.nodes[0].getblockcount()
         disconnect_nodes_bi(self.nodes,0,1)
-        self.one_test(allKeys0, 0)
+
+        # create a minerinfo txn with a dataref and prove that
+        # the minerinfo txn spends the dataref transaction
+        datarefs = self.create_dataref_txn (self.nodes[0])
+        minerinfo_tx = self.one_test(allKeys0, 0, datarefs=datarefs)
+        dataref_tx = datarefs[0]['txid']
+        assert(self.second_spends_first(self.nodes[0], dataref_tx, minerinfo_tx))
+
+        # create more minerinfo txns
         self.one_test(allKeys0, 0, do_mining=False)
-        self.one_test(allKeys1, 1)
-        self.one_test(allKeys1, 1)
+
+        for _ in range(1000):
+            self.one_test(allKeys1, 1)
+        for _ in range(100):
+            self.one_test(allKeys0, 0)
+
         self.one_test(allKeys1, 1)
         self.one_test(allKeys1, 1)
         self.one_test(allKeys1, 1, do_mining=False)
@@ -179,7 +249,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert(last_block1 == self.nodes[1].getbestblockhash())
         assert(last_height1 == self.nodes[1].getblockcount())
 
-        # but first node has now reorged to the first node
+        # but first node has now reorged to the second node
         last_block0 = self.nodes[0].getbestblockhash()
         last_height0 = self.nodes[0].getblockcount()
 
@@ -194,23 +264,18 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # but we invalidate the longer chain and continue on the first one
+        # we have to disconnect and connect again to force sync
         blockHash = self.nodes[1].getblockhash(forkHeight + 1)
         self.nodes[0].invalidateblock(blockHash)
         self.nodes[1].invalidateblock(blockHash)
+        disconnect_nodes_bi(self.nodes, 0, 1)
+        connect_nodes_bi(self.nodes, 0, 1)
         sync_blocks(self.nodes)
         assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         self.one_test(allKeys0, 0)
-        sync_blocks(self.nodes)
         self.one_test(allKeys0, 0)
-        sync_blocks(self.nodes)
         self.one_test(allKeys0, 0)
-        sync_blocks(self.nodes)
-
-        self.one_test(allKeys1, 1)
-        sync_blocks(self.nodes)
-        self.one_test(allKeys1, 1)
-        sync_blocks(self.nodes)
 
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

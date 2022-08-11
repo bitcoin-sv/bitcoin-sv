@@ -14,10 +14,14 @@ from time import sleep
 import json
 
 '''
-Create a miner info doc and send it to the node via the createminerinfotx rpc function.
-Create a chain of mineridinfo-txns where each such transaction funds the next.
-Retive a transaction-id via getminerinfotxid rpc function.
-Also tested calling createminerinfotx rpc twice in sequence.
+- Create a miner info doc and send it to the node via the createminerinfotx rpc function.
+- Create a chain of mineridinfo-txns where each such transaction funds the next.
+- Retive a transaction-id via getminerinfotxid rpc function.
+- Calling createminerinfotx rpc twice in sequence.
+- Invalidate a minerinof-txn in the mempool by accepting a block from another miner.
+- Call createminerinfotx with bad minerid document syntax.
+- Stop/Restart nodes and check if the further minerinfo transactions can be created which
+  proves the funding chain was persisted
 '''
 class AllKeys:
     def __init__(self):
@@ -121,7 +125,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             jsonOverrideWithBadSyntax = None
 
 
-        scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters, jsonOverrideWithBadSyntax)
+        scriptPubKey = create_miner_info_scriptPubKey (
+            params=minerinfotx_parameters,
+            json_override_string=jsonOverrideWithBadSyntax)
 
         txid = None
         try:
@@ -161,7 +167,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
-        block = make_miner_id_block(self.nodes[0], minerInfoTx, height, allKeys.minerIdKeys)
+        block = make_miner_id_block(self.nodes[0], None, minerInfoTx, height, allKeys.minerIdKeys)
         block_count = self.nodes[0].getblockcount()
 
         # node1 pushes a block just before we want to submit ours.
