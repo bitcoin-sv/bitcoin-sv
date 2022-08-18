@@ -16,9 +16,10 @@ import json
 import ecdsa
 from pathlib import Path
 from bip32utils import BIP32Key, BIP32_HARDEN
-from .mininode import sha256, hex_str_to_bytes, bytes_to_hex_str, ser_uint256, COutPoint, ToHex
+from io import BytesIO
+from .mininode import sha256, hex_str_to_bytes, bytes_to_hex_str, ser_uint256, COutPoint, ToHex, CTransaction
 from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_TRUE, OP_RETURN, CTxOut
-from .util import hashToHex
+from .util import hashToHex, satoshi_round, assert_equal
 from .blocktools import create_coinbase, create_block
 import copy
 
@@ -47,8 +48,6 @@ class MinerIdKeys:
     def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
     def publicKeyBytes(self): return self._publicKey
     def publicKeyHex(self): return bytes_to_hex_str(self._publicKey)
-    def signingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
-    def signingKeyHex(self): return bytes_to_hex_str(self._signingKey.to_string())
 
     def store_keys(self, tmpdir, nodenum):
         datapath = tmpdir + "/node{}/regtest".format(nodenum)
@@ -76,7 +75,6 @@ class MinerIdKeys:
         signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
         return signedMessage
 
-
     def sign_tx_BIP143_with_forkid (self, tx_to_sign, txns_to_spend):
         # txns_to_send is a dictionary of txid, tx pairs
         for i, vin in enumerate(tx_to_sign.vin):
@@ -89,16 +87,14 @@ class MinerIdKeys:
             vin.scriptSig = CScript([signature + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.publicKeyBytes()])
 
 
-def create_miner_info_scriptPubKey(params, datarefs=None, json_override_string=None):
+def create_miner_info_scriptPubKey(params, json_override_string=None):
+    minerKeys = params.get('minerKeys')
+    prev_minerKeys = params.get('prev_minerKeys')
+    revocationKeys = params.get('revocationKeys')
+    prev_revocationKeys = params.get('prev_revocationKeys')
+    pubCompromisedMinerKeyHex = params.get('pubCompromisedMinerKeyHex')
 
-    # if there are no revocation keys available, then we replace them with the miner keys.
-
-    minerKeys = params['minerKeys']
-    revocationKeys = params['revocationKeys']
-    prev_minerKeys = params['prev_minerKeys']
-    prev_revocationKeys = params['prev_revocationKeys']
-    pubCompromisedMinerKeyHex = params['pubCompromisedMinerKeyHex']
-
+    # if there are no previous keys available, then we replace them with the current keys.
     if not prev_minerKeys:
         prev_minerKeys = minerKeys
     if not prev_revocationKeys:
@@ -118,26 +114,24 @@ def create_miner_info_scriptPubKey(params, datarefs=None, json_override_string=N
     infoDoc['prevRevocationKeySig'] = revocationKeys.sign_hexmessage(dataToSign)
     infoDoc['revocationKey'] = prev_revocationKeys.publicKeyHex()
 
-
     if pubCompromisedMinerKeyHex:
         messageSignature1 = revocationKeys.sign_hexmessage(pubCompromisedMinerKeyHex)
-        messageSignature2 = minerKeys.sign_hexmessage(pubCompromisedMinerKeyHex)
+        messageSignature2 = prev_minerKeys.sign_hexmessage(pubCompromisedMinerKeyHex)
         infoDoc['revocationMessage'] = {"compromised_minerId": pubCompromisedMinerKeyHex}
-        infoDoc['revocationMessageSig'] = {"sig1":messageSignature1, "sig2": messageSignature2}
+        infoDoc['revocationMessageSig'] = {"sig1": messageSignature1, "sig2": messageSignature2}
 
+    extensions = {}
+    if all(p in params for p in ['publicIP', 'publicPort']):
+        extensions['PublicIP'] = params['publicIP']
+        extensions['PublicPort'] = params['publicPort']
+    datarefs = params.get('datarefs')
     if datarefs:
         refs = {'refs': datarefs}
-        infoDoc['extensions'] = {
-                'PublicIP':params['publicIP'],
-                'PublicPort': params['publicPort'],
-                'dataRefs': refs}
-    else:
-        infoDoc['extensions'] = {
-                'PublicIP':params['publicIP'],
-                'PublicPort': params['publicPort']}
+        extensions['dataRefs'] = refs
+    if extensions:
+        infoDoc['extensions'] = extensions
 
     # Convert dictionary to json string
-
     if json_override_string != None:
         infoDocJson = json_override_string 
     else:
@@ -148,6 +142,61 @@ def create_miner_info_scriptPubKey(params, datarefs=None, json_override_string=N
     infoDocJsonSig = minerKeys.sign_strmessage_bytes(infoDocJson)
 
     return CScript([OP_0, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),bytearray([0x00]), infoDocJson, infoDocJsonSig])
+
+
+# Create a miner-info transaction containing the miner ID document
+def create_miner_info_txn(connection, params, utxo):
+    # Create basic raw transaction from UTXO
+    inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
+    outputs = {}
+    addr = connection.rpc.getnewaddress()
+    outputs[addr] = satoshi_round(utxo['amount'])
+    rawtx = connection.rpc.createrawtransaction(inputs, outputs)
+
+    # Create transaction we can modify
+    minerInfoTx = CTransaction()
+    minerInfoTx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
+
+    # Create miner-info document and add to output 0 of transaction
+    minerInfoTx.vout.append(CTxOut(0, create_miner_info_scriptPubKey(params)))
+    minerInfoTx.vout[0], minerInfoTx.vout[1] = minerInfoTx.vout[1], minerInfoTx.vout[0]
+
+    # Sign transaction
+    signed = connection.rpc.signrawtransaction(ToHex(minerInfoTx))
+
+    # Return CTransaction
+    minerInfoTx.deserialize(BytesIO(hex_str_to_bytes(signed['hex'])))
+    minerInfoTx.rehash()
+    return minerInfoTx
+
+# Create dataref transaction
+def create_dataref_txn(connection, dataref_json, utxo):
+    # Create basic raw transaction from UTXO
+    inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
+    outputs = {}
+    addr = connection.rpc.getnewaddress()
+    outputs[addr] = satoshi_round(utxo['amount'])
+    rawtx = connection.rpc.createrawtransaction(inputs, outputs)
+
+    # Create transaction we can modify
+    datarefTx = CTransaction()
+    datarefTx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
+
+    # Add dataref json to output 0 of transaction
+    docjson = json.dumps(dataref_json, indent=0)
+    docjson = docjson.replace('\n', '')
+    docjson = docjson.replace(' ','')
+    docjson = docjson.encode('utf8')
+    datarefTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), docjson])))
+    datarefTx.vout[0], datarefTx.vout[1] = datarefTx.vout[1], datarefTx.vout[0]
+
+    # Sign transaction
+    signed = connection.rpc.signrawtransaction(ToHex(datarefTx))
+
+    # Return CTransaction
+    datarefTx.deserialize(BytesIO(hex_str_to_bytes(signed['hex'])))
+    datarefTx.calc_sha256()
+    return datarefTx
 
 
 def create_dataref (brfcIds, txid, vout, compress=None):
@@ -163,24 +212,14 @@ def create_dataref (brfcIds, txid, vout, compress=None):
     return dataref
 
 
-# temporary function will take it from blocktools in the future
-def calc_blockbind_merkle_root(block, txidbytes):
+# Calculate modified merkle root for blockbind
+def calc_blockbind_merkle_root(block):
     # Copy coinbase so we can modify it
     coinbase = copy.deepcopy(block.vtx[0])
-    coinbase.nVersion = 0x01000000
-
     coinbase.nVersion = 0x00000001
     coinbase.vin[0].scriptSig = CScript([OP_0, OP_0, OP_0, OP_0, OP_0, OP_0, OP_0, OP_0])
-    coinbase.vin[0].prevout = COutPoint()
-    coinbase.vin[0].prevout.n = 0xffffffff
-    coinbase.vout[0].scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),
-                                               bytearray([0x00]), txidbytes])
-
-    assert(len(coinbase.vout) == 1)
-    coinbase.vout.append (CTxOut(0, CScript([OP_FALSE, OP_RETURN])))
-
+    coinbase.vin[0].prevout = COutPoint(0, 0xFFFFFFFF)
     coinbase.rehash()
-    coinbase.calc_sha256()
 
     # Build list of transaction hashs
     hashes = []
@@ -191,17 +230,33 @@ def calc_blockbind_merkle_root(block, txidbytes):
 
     return block.get_merkle_root(hashes)
 
-def create_miner_id_coinbase_and_miner_info(minerInfoTx, key, block):
+# Make a V0.3 compliant miner ID coinbase transaction and miner-info transaction
+def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, minerInfoTx, makeValid):
+    # Create miner-info txn if one not provided
+    if not minerInfoTx:
+        minerInfoTx = create_miner_info_txn(connection, params, utxo)
+    else:
+        minerInfoTx.rehash()
+
     # Add miner-info txn to block
     block.vtx.append(minerInfoTx)
 
     # Get miner-info txn ID
-    minerInfoTx.rehash()
     txid = minerInfoTx.hash
     txidbytes = hex_str_to_bytes(txid)[::-1]
 
+    # Create partially populated coinbase
+    coinbaseTx = block.vtx[0]
+    assert_equal(len(coinbaseTx.vout), 1)
+    coinbaseTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), bytearray([0x00]), txidbytes])))
+
+    # If we want an invalid block, screw up the fees
+    if not makeValid:
+        coinbaseTx.vout[1].nValue = 50
+    coinbaseTx.rehash()
+
     # Calculate blockbind modified merkle root
-    modifiedMerkleRoot = calc_blockbind_merkle_root(block, txidbytes)
+    modifiedMerkleRoot = calc_blockbind_merkle_root(block)
     modifiedMerkleRootBytes = ser_uint256(modifiedMerkleRoot)
 
     # Get parent block hash
@@ -210,25 +265,20 @@ def create_miner_id_coinbase_and_miner_info(minerInfoTx, key, block):
 
     # Sign concat(modifiedMerkleRoot, prevBlockHash)
     concatMerklePrevBlockBytes = modifiedMerkleRootBytes + parentHashBytes
+    key = params['minerKeys']
     signature = key.sign_strmessage_bytes(concatMerklePrevBlockBytes)
 
-    # Create coinbase containing miner-info reference fields
-    coinbaseTx = block.vtx[0]
-    coinbaseTx.nVersion = 0x01000000
-    coinbaseTx.vout[0].scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),
-                                               bytearray([0x00]), txidbytes, sha256(concatMerklePrevBlockBytes), signature])
-    assert(len(coinbaseTx.vout) == 1)
-    coinbaseTx.vout.append (CTxOut(0, CScript([OP_FALSE, OP_RETURN])))
-
+    # Append blockbind and signature
+    coinbaseTx.vout[1].scriptPubKey += sha256(concatMerklePrevBlockBytes)
+    coinbaseTx.vout[1].scriptPubKey += signature
     coinbaseTx.rehash()
-    coinbaseTx.calc_sha256()
 
-    # Update coinbase in block
-    block.vtx[0] = coinbaseTx
+    # Update block
     block.hashMerkleRoot = block.calc_merkle_root()
     block.rehash()
 
-def make_miner_id_block(connection, datarefTxns, minerInfoTx, blockHeight, key, parentBlock=None, lastBlockTime=0, txns=None):
+# Make a V0.3 compliant miner ID block
+def make_miner_id_block(connection, params, utxo=None, datarefTxns=None, minerInfoTx=None, parentBlock=None, makeValid=True, lastBlockTime=0, txns=None):
     if parentBlock is not None:
         parentHash = parentBlock.sha256
         parentTime = parentBlock.nTime
@@ -240,7 +290,7 @@ def make_miner_id_block(connection, datarefTxns, minerInfoTx, blockHeight, key, 
         parentHeight = tip["height"]
 
     # Create block with temporary coinbase and any passed in txns
-    tmpCoinbase = create_coinbase(blockHeight)
+    tmpCoinbase = create_coinbase(params['height'])
     block = create_block(parentHash, tmpCoinbase, max(lastBlockTime, parentTime) + 1)
     if txns is not None:
         block.vtx.extend(txns)
@@ -249,9 +299,10 @@ def make_miner_id_block(connection, datarefTxns, minerInfoTx, blockHeight, key, 
     if datarefTxns:
         for datarefTxn in datarefTxns:
             block.vtx.append(datarefTxn)
-    create_miner_id_coinbase_and_miner_info(minerInfoTx, key, block)
+    create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, minerInfoTx, makeValid)
 
     # Update block with height and solve
     block.height = parentHeight + 1
     block.solve()
     return block
+
