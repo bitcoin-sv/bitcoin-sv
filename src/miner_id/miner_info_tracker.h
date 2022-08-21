@@ -7,7 +7,7 @@
 #include "coins.h"
 #include "logging.h"
 #include "primitives/transaction.h"
-
+#include "pubkey.h"
 #include <mutex>
 #include <map>
 #include <utility>
@@ -43,6 +43,8 @@ class BlockDatarefTracker
 {
     std::vector<COutPoint> funds_;
     mutable std::mutex mtx_;
+    mutable std::mutex mtx_minerid_;
+    std::optional<CPubKey> minerId_;
 
 public:
     std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>>
@@ -51,6 +53,8 @@ public:
                   get_spendable_coin) const;
 
     void store_funds(const std::vector<COutPoint>&);
+    void set_current_minerid(const CPubKey& minerId);
+    std::optional<CPubKey> get_current_minerid() const;
 
     friend bool move_and_store(MempoolDatarefTracker&, BlockDatarefTracker&);
 

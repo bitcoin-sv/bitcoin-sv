@@ -6,6 +6,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
+#include "miner_id/miner_info_tracker.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
@@ -860,9 +861,11 @@ static UniValue getauthconninfo(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
 
     UniValue obj(UniValue::VOBJ);
-    const CPubKey& pubKey {g_connman->GetAuthConnPubKey()};
-    obj.push_back(Pair("pubkey", HexStr(ToByteVector(pubKey)).c_str()));
-    obj.push_back(Pair("compressed", pubKey.IsCompressed()));
+    std::optional<CPubKey> pubKey = g_BlockDatarefTracker->get_current_minerid();
+    std::string pubKeyHex = pubKey ? HexStr(ToByteVector(*pubKey)).c_str() : std::string(66, '0');
+    bool isCompressed = pubKey ? pubKey->IsCompressed() : true;
+    obj.push_back(Pair("pubkey", pubKeyHex));
+    obj.push_back(Pair("compressed", isCompressed));
     return obj;
 }
 

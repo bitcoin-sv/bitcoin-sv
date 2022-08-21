@@ -48,6 +48,8 @@ class MinerIdKeys:
     def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
     def publicKeyBytes(self): return self._publicKey
     def publicKeyHex(self): return bytes_to_hex_str(self._publicKey)
+    def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
+    def signingKeyHex(self): return bytes_to_hex_str(self._signingKey.to_string())
 
     def store_keys(self, tmpdir, nodenum):
         datapath = tmpdir + "/node{}/regtest".format(nodenum)
@@ -266,7 +268,11 @@ def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, min
     # Sign concat(modifiedMerkleRoot, prevBlockHash)
     concatMerklePrevBlockBytes = modifiedMerkleRootBytes + parentHashBytes
     key = params['minerKeys']
-    signature = key.sign_strmessage_bytes(concatMerklePrevBlockBytes)
+    if callable(key):  # hack for testing with MinerID Generator
+        signature = key(concatMerklePrevBlockBytes)
+        signature = hex_str_to_bytes(signature)
+    else:
+        signature = key.sign_strmessage_bytes(concatMerklePrevBlockBytes)
 
     # Append blockbind and signature
     coinbaseTx.vout[1].scriptPubKey += sha256(concatMerklePrevBlockBytes)

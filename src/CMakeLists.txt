@@ -475,7 +475,6 @@ add_library(server
 	mining/journaling_block_assembler.h
 	net/association.cpp
 	net/association_id.cpp
-	net/authconn.cpp
 	net/block_download_tracker.cpp
 	net/block_download_tracker.h
 	net/net.cpp

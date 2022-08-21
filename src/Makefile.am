@@ -350,7 +350,6 @@ libbitcoin_server_a_SOURCES = \
   mining/journaling_block_assembler.cpp \
   net/association.cpp \
   net/association_id.cpp \
-  net/authconn.cpp \
   net/block_download_tracker.cpp \
   net/net.cpp \
   net/net_message.cpp \
