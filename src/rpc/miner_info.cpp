@@ -62,6 +62,7 @@ auto ReadFileToUniValue (fs::path const & path, std::string filename) -> UniValu
 };
 
 std::optional<CoinWithScript> GetSpendableCoin (COutPoint const & outpoint) {
+    LOCK(cs_main);
     CoinsDBView const tipView{ *pcoinsTip };
     CCoinsViewMemPool const mempoolView {tipView, mempool};
     CCoinsViewCache const view{mempoolView};
