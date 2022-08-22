@@ -118,9 +118,6 @@ def create_miner_info_scriptPubKey(params, datarefs=None, json_override_string=N
     infoDoc['prevRevocationKeySig'] = revocationKeys.sign_hexmessage(dataToSign)
     infoDoc['revocationKey'] = prev_revocationKeys.publicKeyHex()
 
-    if datarefs:
-        refs = {'refs': datarefs}
-        infoDoc['dataRefs'] = refs
 
     if pubCompromisedMinerKeyHex:
         messageSignature1 = revocationKeys.sign_hexmessage(pubCompromisedMinerKeyHex)
@@ -128,9 +125,16 @@ def create_miner_info_scriptPubKey(params, datarefs=None, json_override_string=N
         infoDoc['revocationMessage'] = {"compromised_minerId": pubCompromisedMinerKeyHex}
         infoDoc['revocationMessageSig'] = {"sig1":messageSignature1, "sig2": messageSignature2}
 
-    infoDoc['extensions'] = {
-            'PublicIP':params['publicIP'], 
-            'PublicPort': params['publicPort']}
+    if datarefs:
+        refs = {'refs': datarefs}
+        infoDoc['extensions'] = {
+                'PublicIP':params['publicIP'],
+                'PublicPort': params['publicPort'],
+                'dataRefs': refs}
+    else:
+        infoDoc['extensions'] = {
+                'PublicIP':params['publicIP'],
+                'PublicPort': params['publicPort']}
 
     # Convert dictionary to json string
 
