@@ -418,11 +418,15 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
         revocation_msg = rev_msg;
     }
 
-    const auto var_data_refs = parse_data_refs(doc);
-    if(holds_alternative<miner_info_error>(var_data_refs))
-        return get<miner_info_error>(var_data_refs);
+    std::variant<data_refs, miner_info_error> var_data_refs;
 
-    assert(holds_alternative<data_refs>(var_data_refs));
+    const auto extensions = doc["extensions"];
+    if(!extensions.isNull() && extensions.isObject())
+    {
+        var_data_refs = parse_data_refs(extensions);
+        if(holds_alternative<miner_info_error>(var_data_refs))
+            return get<miner_info_error>(var_data_refs);
+    }
 
     return miner_info_doc{miner_info_doc::v0_3,
                           height,
