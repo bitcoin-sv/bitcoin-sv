@@ -364,6 +364,8 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     {
         auto ExtractMinerInfoDoc = [](CScript const & scriptPubKey) -> miner_info_doc {
 
+            if (!IsMinerInfo(scriptPubKey))
+                throw std::runtime_error ("Calling ParseMinerInfoScript on ill formed script.");
             const auto var_doc_sig = ParseMinerInfoScript(scriptPubKey);
             if(std::holds_alternative<miner_info_error>(var_doc_sig))
                 throw std::runtime_error(strprintf(
