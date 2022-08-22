@@ -165,6 +165,10 @@ void GlobalConfig::Reset()
     data->minerIdReputationM = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
     data->minerIdReputationN = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N;
     data->minerIdReputationMScale = MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR;
+    data->minerIdGeneratorAddress = "";
+    data->minerIdGeneratorPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    data->minerIdGeneratorPath = "";
+    data->minerIdGeneratorAlias = "";
 
     data->mDisableBIP30Checks = std::nullopt;
 
@@ -1829,6 +1833,11 @@ bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
     return true;
 }
 
+bool GlobalConfig::GetDisableBIP30Checks() const
+{
+    return data->mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
+}
+
 // MinerID
 bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* err)
 {
@@ -1932,11 +1941,6 @@ uint32_t GlobalConfig::GetMinerIdReputationN() const
     return data->minerIdReputationN;
 }
 
-bool GlobalConfig::GetDisableBIP30Checks() const
-{
-    return data->mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
-}
-
 bool GlobalConfig::SetMinerIdReputationMScale(double num, std::string* err)
 {
     if(num < 1)
@@ -1954,6 +1958,63 @@ bool GlobalConfig::SetMinerIdReputationMScale(double num, std::string* err)
 double GlobalConfig::GetMinerIdReputationMScale() const
 {
     return data->minerIdReputationMScale;
+}
+
+bool GlobalConfig::SetMinerIdGeneratorURL(const std::string& url, std::string* err)
+{
+    try
+    {   
+        int port { rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT };
+        std::string host {};
+        std::string protocol {};
+        std::string endpoint {};
+        SplitURL(url, protocol, host, port, endpoint);
+
+        // Check for any protocol other than http
+        if(protocol != "http")
+        {   
+            if(err)
+            {   
+                *err = "Unsupported protocol in miner ID generator URL";
+            }
+            return false;
+        }
+
+        data->minerIdGeneratorAddress = host;
+        data->minerIdGeneratorPort = port;
+        data->minerIdGeneratorPath = endpoint;
+    }
+    catch(const std::exception&)
+    {   
+        if(err)
+        {   
+            *err = "Badly formatted miner ID generator URL";
+        }
+        return false;
+    }
+    return true;
+}
+std::string GlobalConfig::GetMinerIdGeneratorAddress() const
+{
+    return data->minerIdGeneratorAddress;
+}
+int16_t GlobalConfig::GetMinerIdGeneratorPort() const
+{
+    return data->minerIdGeneratorPort;
+}
+std::string GlobalConfig::GetMinerIdGeneratorPath() const
+{
+    return data->minerIdGeneratorPath;
+}
+
+bool GlobalConfig::SetMinerIdGeneratorAlias(const std::string& alias, std::string* err)
+{
+    data->minerIdGeneratorAlias = alias;
+    return true;
+}
+std::string GlobalConfig::GetMinerIdGeneratorAlias() const
+{
+    return data->minerIdGeneratorAlias;
 }
 
 #if ENABLE_ZMQ

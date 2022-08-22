@@ -1451,11 +1451,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
 
     /** MinerID */
-    strUsage += HelpMessageGroup(_("Miner ID database options:"));
+    strUsage += HelpMessageGroup(_("Miner ID database / authenticated connection options:"));
     if(showDebug) {
         strUsage += HelpMessageOpt(
             "-minerid",
-            strprintf(_("Eanable the building and use of the miner ID database (default: %d)"),
+            strprintf(_("Enable the building and use of the miner ID database (default: %d)"),
                 MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED));
     }
     strUsage += HelpMessageOpt(
@@ -1487,6 +1487,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "but at the cost of a temporarily increased M of N block target. This parameter determines how "
             "much to scale the base M value in such cases. (default: %f)"),
             MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR));
+    strUsage += HelpMessageOpt("-mineridgeneratorurl=<url>",
+        "URL for communicating with the miner ID generator. Required to setup authenticated connections. "
+        "For example: http://127.0.0.1:9002");
+    strUsage += HelpMessageOpt("-mineridgeneratoralias=<string>",
+        "Alias used to identify our current miner ID in the generator. Required to setup authenticated connections.");
 
     /** Safe mode */
     strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
@@ -2632,6 +2637,17 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
     if(std::string err; !config.SetMinerIdReputationMScale(
         gArgs.GetDoubleArg("-mineridreputation_mscale", MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR), &err))
+    {
+        return InitError(err);
+    }
+    if(gArgs.IsArgSet("-mineridgeneratorurl"))
+    {
+        if(std::string err; !config.SetMinerIdGeneratorURL(gArgs.GetArg("-mineridgeneratorurl", ""), &err))
+        {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetMinerIdGeneratorAlias(gArgs.GetArg("-mineridgeneratoralias", ""), &err))
     {
         return InitError(err);
     }

@@ -164,6 +164,10 @@ public:
     virtual uint32_t GetMinerIdReputationM() const = 0;
     virtual uint32_t GetMinerIdReputationN() const = 0;
     virtual double GetMinerIdReputationMScale() const = 0;
+    virtual std::string GetMinerIdGeneratorAddress() const = 0;
+    virtual int16_t GetMinerIdGeneratorPort() const = 0;
+    virtual std::string GetMinerIdGeneratorPath() const = 0;
+    virtual std::string GetMinerIdGeneratorAlias() const = 0;
 
     // Detect selfish mining
     virtual bool GetDetectSelfishMining() const = 0;
@@ -323,6 +327,8 @@ public:
     virtual bool SetMinerIdReputationM(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationN(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationMScale(double num, std::string* err) = 0;
+    virtual bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) = 0;
+    virtual bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) = 0;
 
     // Detect selfish mining
     virtual void SetDetectSelfishMining(bool detectSelfishMining) = 0;
@@ -631,6 +637,12 @@ public:
     uint32_t GetMinerIdReputationN() const override;
     bool SetMinerIdReputationMScale(double num, std::string* err) override;
     double GetMinerIdReputationMScale() const override;
+    std::string GetMinerIdGeneratorAddress() const override;
+    int16_t GetMinerIdGeneratorPort() const override;
+    std::string GetMinerIdGeneratorPath() const override;
+    std::string GetMinerIdGeneratorAlias() const override;
+    bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) override;
+    bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) override;
 
     // Detect selfish mining
     bool GetDetectSelfishMining() const override;
@@ -801,6 +813,10 @@ private:
         uint32_t minerIdReputationM;
         uint32_t minerIdReputationN;
         double minerIdReputationMScale;
+        std::string minerIdGeneratorAddress;
+        int16_t minerIdGeneratorPort;
+        std::string minerIdGeneratorPath;
+        std::string minerIdGeneratorAlias;
 
         std::optional<bool> mDisableBIP30Checks;
 
@@ -1295,6 +1311,12 @@ public:
     uint32_t GetMinerIdReputationN() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N; }
     bool SetMinerIdReputationMScale(double num, std::string* err) override { return true; }
     double GetMinerIdReputationMScale() const override { return MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR; }
+    std::string GetMinerIdGeneratorAddress() const override { return ""; }
+    int16_t GetMinerIdGeneratorPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetMinerIdGeneratorPath() const override { return ""; }
+    std::string GetMinerIdGeneratorAlias() const override { return ""; }
+    bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) override { return true; }
+    bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) override { return true; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

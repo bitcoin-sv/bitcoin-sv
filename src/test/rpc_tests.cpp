@@ -724,6 +724,22 @@ BOOST_AUTO_TEST_CASE(client_config_bitcoind)
     );
 }
 
+// Create client config for miner ID generator
+BOOST_AUTO_TEST_CASE(client_config_minerid_generator)
+{
+    using namespace rpc::client;
+    GlobalConfig::GetModifiableGlobalConfig().SetMinerIdGeneratorURL("http://127.0.0.1:8080", nullptr);
+    const Config& config { GlobalConfig::GetConfig() };
+
+    BOOST_CHECK_NO_THROW(
+        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(config) };
+        BOOST_CHECK_EQUAL(clientConfig.GetServerIP(), "127.0.0.1");
+        BOOST_CHECK_EQUAL(clientConfig.GetServerPort(), 8080);
+        BOOST_CHECK_EQUAL(clientConfig.GetServerHTTPHost(), "127.0.0.1");
+        BOOST_CHECK_EQUAL(clientConfig.GetEndpoint(), "");
+    );
+}
+
 // HTTP request creation
 BOOST_AUTO_TEST_CASE(http_requests)
 {
@@ -791,6 +807,68 @@ BOOST_AUTO_TEST_CASE(http_requests)
         BOOST_CHECK_EQUAL(rpcRequest.GetContentsSize(), strContents.size());
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
         BOOST_CHECK_EQUAL(rpcRequest.GetHeaders().size(), 0);
+    }
+
+    {
+        // REST request to a miner ID generator
+        GlobalConfig::GetModifiableGlobalConfig().SetMinerIdGeneratorURL("http://127.0.0.1:8080", nullptr);
+        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(GlobalConfig::GetConfig()) };
+
+        const std::string alias { "MyAlias" };
+        const uint256 hash { GetRandHash() };
+        std::stringstream endpoint {};
+        endpoint << "/minerid/" << alias << "/pksign/" << hash.ToString();
+
+        auto rpcRequest {  rpc::client::HTTPRequest::CreateMinerIdGeneratorSigningRequest(clientConfig, alias, hash.ToString()) };
+        BOOST_CHECK(rpcRequest.GetCommand() == RequestCmdType::GET);
+        BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), endpoint.str());
+        BOOST_CHECK_EQUAL(rpcRequest.GetContents().size(), 0);
+    }
+}
+
+// HTTP response creation
+BOOST_AUTO_TEST_CASE(http_responses)
+{
+    // BinaryHTTPResponse
+    {
+        // Any serialisable object will do here
+        uint256 randuint { GetRandHash() };
+        CDataStream ss { SER_NETWORK, PROTOCOL_VERSION };
+        ss << randuint;
+
+        rpc::client::BinaryHTTPResponse response {};
+        BOOST_CHECK(response.IsEmpty());
+        response.SetBody(reinterpret_cast<const unsigned char*>(ss.data()), ss.size());
+        BOOST_CHECK(! response.IsEmpty());
+
+        uint256 deserialised {};
+        response >> deserialised;
+        BOOST_CHECK_EQUAL(randuint, deserialised);
+    }
+
+    // StringHTTPResponse
+    {
+        rpc::client::StringHTTPResponse response {};
+        BOOST_CHECK(response.IsEmpty());
+
+        std::string body { "Some string response" };
+        response.SetBody(reinterpret_cast<const unsigned char*>(body.c_str()), body.size());
+        BOOST_CHECK(! response.IsEmpty());
+        BOOST_CHECK_EQUAL(body, response.GetBody());
+    }
+
+    // JSONHTTPResponse
+    {
+        rpc::client::JSONHTTPResponse response {};
+        BOOST_CHECK(response.IsEmpty());
+
+        std::string body { "{ \"field1\": \"value1\", \"field2\": \"value2\" }" };
+        response.SetBody(reinterpret_cast<const unsigned char*>(body.c_str()), body.size());
+        BOOST_CHECK(! response.IsEmpty());
+
+        UniValue jsonval { response.GetBody() };
+        BOOST_CHECK_EQUAL(jsonval["field1"].get_str(), "value1");
+        BOOST_CHECK_EQUAL(jsonval["field2"].get_str(), "value2");
     }
 }
 
