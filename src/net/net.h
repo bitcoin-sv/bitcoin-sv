@@ -19,6 +19,7 @@
 #include "invalid_txn_publisher.h"
 #include "limitedmap.h"
 #include "net/association.h"
+#include "net/authconn.h"
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
@@ -467,6 +468,10 @@ public:
     /* Get extra txns for block reconstruction */
     std::vector<std::pair<uint256, CTransactionRef>> GetCompactExtraTxns() const;
 
+    // AuthConn functions
+    bool SignAuthConnMsgHash(const uint256 &hash, std::vector<uint8_t> &vchSign, uint32_t randv=0) const;
+    const CPubKey& GetAuthConnPubKey() const;
+
     // Addrman functions
     size_t GetAddressCount() const;
     void SetServices(const CService &addr, ServiceFlags nServices);
@@ -697,6 +702,9 @@ private:
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
 
+    // Creates keys used to authenticate connections.
+    authconn::AuthConnKeys authConnKeys {authconn::AuthConnKeys::PrivKeyStoredFormat::BIP32};
+
     /** Additional streams we want to open to peers */
     std::list<NodeConnectInfo> mPendingStreams {};
     mutable CCriticalSection cs_mPendingStreams {};
@@ -881,6 +889,7 @@ public:
     bool fClient {false};
     const bool fInbound {false};
     std::atomic_bool fSuccessfullyConnected {false};
+    std::atomic_bool fAuthConnEstablished {false};
     std::atomic_bool fDisconnect {false};
     // We use fRelayTxes for two purposes -
     // a) it allows us to not relay tx invs before receiving the peer's version
@@ -909,6 +918,9 @@ public:
     std::atomic_bool fGetAddr {false};
     int64_t nNextAddrSend {0};
     int64_t nNextLocalAddrSend {0};
+
+    CCriticalSection cs_authconn {};
+    authconn::AuthConnData authConnData;
 
     // Simple struct to store details of txns we are going to ask this peer for
     struct TxnAskFor

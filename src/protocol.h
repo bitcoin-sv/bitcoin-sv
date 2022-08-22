@@ -415,6 +415,14 @@ extern const char *EXTMSG;
  * should be revoked.
  */
 extern const char *REVOKEMID;
+/**
+ * The authch net message is for delivering the challenge message to the other party.
+ */
+extern const char *AUTHCH;
+/**
+ * The authresp net message delivers the response message to the requestor.
+ */
+extern const char *AUTHRESP;
 
 /**
  * Indicate if the message is used to transmit the content of a block.

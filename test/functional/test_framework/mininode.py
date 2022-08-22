@@ -285,6 +285,16 @@ def ser_varint_vector(l):
         r += ser_varint(v)
     return r
 
+def deser_byte_array(s):
+    b = bytearray()
+    b.extend(s[1:])
+    return b
+
+def ser_byte_array(s):
+    return b"".join((
+            struct.pack("<B", 0),
+            s.bytes,
+    ))
 
 # Deserialize from a hex string representation (eg from RPC)
 
@@ -1350,6 +1360,58 @@ class msg_protoconf():
     def __repr__(self):
         return "msg_protoconf(protoconf=%s)" % (repr(self.protoconf))
 
+class msg_authch():
+    command = b"authch"
+
+    def __init__(self):
+        self.nVersion = 0
+        self.nMsgLen = 0
+        self.msg = 0
+
+    def deserialize(self, f):
+        self.nVersion = struct.unpack("<I", f.read(4))[0]
+        self.nMsgLen = struct.unpack("<I", f.read(4))[0]
+        self.msg = deser_uint256(f)
+
+    def serialize(self):
+        return b"".join((
+            struct.pack("<I", self.nVersion),
+            struct.pack("<I", self.nMsgLen),
+            ser_uint256(self.msg),
+        ))
+
+    def __repr__(self):
+        return "msg_authch(nVersion=%d nMsgLen=%d msg=%064x)" % (self.nVersion, self.nMsgLen, self.msg)
+
+class msg_authresp():
+    command = b"authresp"
+
+    def __init__(self):
+        self.nPubKeyLen = 0
+        self.pubKey = None
+        self.nClientNonce = 0
+        self.nSignLen = 0
+        slef.sign = None
+
+    def deserialize(self, f):
+        self.nPubKeyLen = struct.unpack("<I", f.read(4))[0]
+        self.pubKey = deser_byte_array(deser_string(f))
+        self.nClientNonce = struct.unpack("<Q", f.read(8))[0]
+        self.nSignLen = struct.unpack("<I", f.read(4))[0]
+        self.sign = deser_byte_array(deser_string(f))
+
+    def serialize(self):
+        return b"".join((
+            struct.pack("<I", self.nPubKeyLen),
+            ser_uint8_vector(self.PubKey),
+            struct.pack("<Q", self.nClientNonce),
+            struct.pack("<I", self.nSignLen),
+            ser_uint8_vector(self.sign),
+        ))
+
+    def __repr__(self):
+        return "msg_authresp(nPubKeyLen=%d pubKey=%s nClientNonce=%08x nSignLen=%d sign=%s)" % (self.nPubKeyLen, str(self.pubKey), self.nClientNonce, self.nSignLen, str(self.sign))
+
 class msg_addr():
     command = b"addr"
 
@@ -2112,6 +2174,10 @@ class NodeConnCB():
             conn.ver_recv = conn.ver_send
         conn.nServices = message.nServices
 
+    def on_authch(self, conn, message): pass
+
+    def on_authresp(self, conn, message): pass
+
     def on_notfound(self, conn, message): pass
 
     def send_protoconf(self, conn):
@@ -2281,6 +2347,8 @@ class NodeConn(asyncore.dispatcher):
         b"createstrm": msg_createstream,
         b"streamack": msg_streamack,
         b"revokemid": msg_revokemid,
+        b"authch": msg_authch,
+        b"authresp": msg_authresp,
         b"addr": msg_addr,
         b"alert": msg_alert,
         b"inv": msg_inv,
