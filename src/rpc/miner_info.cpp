@@ -221,11 +221,13 @@ public:
                     if (!fundingOutPoint)
                         fundingOutPoint = fundingSeed;
 
-                    while (!GetSpendableCoin(*fundingOutPoint).has_value()) {
+		    while (fundingOutPoint && !GetSpendableCoin(*fundingOutPoint).has_value()) {
                         auto tracker = mempool.datarefTracker.CreateLockingAccess();
                         auto outpoints = tracker.find_fund(std::numeric_limits<int32_t>::max(), findSpender);
                         if (outpoints)
                             fundingOutPoint = outpoints->first;
+                        else
+                            fundingOutPoint = std::nullopt;
                     }
                 }
             }
