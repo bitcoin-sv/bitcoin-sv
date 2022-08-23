@@ -196,18 +196,20 @@ public:
                 if (fund) {
                     fundingOutPoint = fund;
                 } else {
-                    auto tracker = mempool.datarefTracker.CreateLockingAccess();
                     // If it is in the dataref index, then it is also in the block chain.
                     // We cannot use GetTransaction because this may be a pruned node.
-                    auto dbindex = g_dataRefIndex->CreateLockingAccess();
-                    auto txIsInDatarefIndex = [&dbindex](const COutPoint& outp, const COutPoint& prev_outp) -> bool {
-                        return dbindex.GetMinerInfoTxn(outp.GetTxId()) != nullptr;
-                    };
+                    {
+                        auto tracker = mempool.datarefTracker.CreateLockingAccess();
+                        auto dbindex = g_dataRefIndex->CreateLockingAccess();
+                        auto txIsInDatarefIndex = [&dbindex](const COutPoint& outp, const COutPoint& prev_outp) -> bool {
+                            return dbindex.GetMinerInfoTxn(outp.GetTxId()) != nullptr;
+                        };
 
-                    // find our minerinfo funding tx if exists.
-                    auto outputs = tracker.find_fund(blockheight, txIsInDatarefIndex);
-                    if (outputs)
-                        fundingOutPoint = outputs->first;
+                        // find our minerinfo funding tx if exists.
+                        auto outputs = tracker.find_fund(blockheight, txIsInDatarefIndex);
+                        if (outputs)
+                            fundingOutPoint = outputs->first;
+                    }
 
                     auto findSpender = [&fundingOutPoint] (const COutPoint& outp, const COutPoint& prev_outp) -> bool {
                         if (prev_outp == *fundingOutPoint)
@@ -220,6 +222,7 @@ public:
                         fundingOutPoint = fundingSeed;
 
                     while (!GetSpendableCoin(*fundingOutPoint).has_value()) {
+                        auto tracker = mempool.datarefTracker.CreateLockingAccess();
                         auto outpoints = tracker.find_fund(std::numeric_limits<int32_t>::max(), findSpender);
                         if (outpoints)
                             fundingOutPoint = outpoints->first;

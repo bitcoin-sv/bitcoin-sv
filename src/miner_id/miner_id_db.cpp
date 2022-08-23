@@ -797,10 +797,10 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
 
                 // add to funding tracker
                 // The last fund in the trackers mempool list is the minerinfo txn
-                auto tracker = mempool.datarefTracker.CreateLockingAccess();
                 const auto infotx = mempool.datarefTracker.get_current_funds_back();
                 if (infotx && infotx->GetTxId() == *minerInfoTxId)
                 {
+                    auto tracker = mempool.datarefTracker.CreateLockingAccess();
                     tracker.move_current_to_store(height, blockhash);
                     LogPrint(BCLog::MINERID, "minerinfotx tracker and potential parents, added minerinfo txn %s to block %s\n", infotx->ToString(), blockhash.ToString());
                 }
