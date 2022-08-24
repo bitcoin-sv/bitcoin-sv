@@ -25,13 +25,13 @@ static const fs::path fundingPath = fs::path("miner_id") / "Funding";
 static const std::string fundingKeyFile = ".minerinfotxsigningkey.dat";
 static const std::string fundingSeedFile = "minerinfotxfunding.dat";
 
-static CKey privKeyFromStringBIP32(std::string const & strkey, bool isCompressed=true)
+static CKey privKeyFromStringBIP32(std::string const & strkey)
 {
     // parse the BIP32 key and convert it to ECDSA format.
     CKey key;
     CBitcoinExtKey bip32ExtPrivKey {strkey};
     CExtKey newKey = bip32ExtPrivKey.GetKey();
-    key.Set(newKey.key.begin(), newKey.key.end(), isCompressed);
+    key.Set(newKey.key.begin(), newKey.key.end(), true);
     return key;
 }
 
@@ -110,74 +110,11 @@ class DatarefFunding {
     };
     COutPoint fundingSeed; // Funding for the first minerinfo-txn of this miner
     FundingKey fundingKey; // Keys needed to spend the funding seed and also the minerinfo-txns
-    DatarefFunding (COutPoint const & fundingSeed, std::string const & privateKey, std::string const & destination, Config const & config)
-        : fundingSeed{fundingSeed}
-        , fundingKey{FundingKey(privateKey, destination, config)}
-    {
-    }
 public:
-    DatarefFunding () = delete;
-    DatarefFunding (DatarefFunding const &) = delete;
-    DatarefFunding (DatarefFunding &&) = delete;
-    DatarefFunding const & operator = (DatarefFunding const &) = delete;
-    DatarefFunding const & operator = (DatarefFunding &&) = delete;
-
-    static DatarefFunding CreateFromFile (Config const & config, const fs::path & path, std::string const & keyFile, std::string const & seedFile)
+    DatarefFunding (COutPoint const & fundingSeed, std::string const & privateKey, std::string const & destination, Config const & config)
+            : fundingSeed{fundingSeed}
+            , fundingKey{FundingKey(privateKey, destination, config)}
     {
-        try {
-            // read funding info from json formatted files
-            UniValue fundingSeed = ReadFileToUniValue (path, seedFile);
-            UniValue fundingKey = ReadFileToUniValue (path, keyFile);
-
-            RPCTypeCheckObj(
-                    fundingKey,
-                    {
-                            {"fundingKey", UniValueType(UniValue::VOBJ )},
-                    }, false, false);
-            RPCTypeCheckObj(
-                    fundingKey["fundingKey"],
-                    {
-                            {"privateBIP32", UniValueType(UniValue::VSTR )},
-                    }, false, false);
-
-
-            // check file format
-            RPCTypeCheckObj(
-                    fundingSeed,
-                    {
-                            {"fundingDestination", UniValueType(UniValue::VOBJ )},
-                            {"firstFundingOutpoint", UniValueType(UniValue::VOBJ )},
-                    }, false, false);
-            RPCTypeCheckObj(
-                    fundingSeed["fundingDestination"],
-                    {
-                            {"addressBase58", UniValueType(UniValue::VSTR )}
-                    }, false, false);
-            RPCTypeCheckObj(
-                    fundingSeed["firstFundingOutpoint"],
-                    {
-                            {"txid", UniValueType(UniValue::VSTR )},
-                            {"n", UniValueType(UniValue::VNUM )},
-                    }, false, false);
-
-            // Create and return the DatarefFunding object
-            UniValue const keys = fundingKey["fundingKey"];
-            UniValue const destination = fundingSeed["fundingDestination"];
-            UniValue const outpoint = fundingSeed["firstFundingOutpoint"];
-
-            std::string const sPrivKey = keys["privateBIP32"].get_str();
-            std::string const sDestination = destination["addressBase58"].get_str();
-            std::string const sFundingSeedId = outpoint["txid"].get_str();
-            uint32_t fundingSeedIndex = outpoint["n"].get_int();
-
-            auto fundingOutPoint = COutPoint {uint256S(sFundingSeedId), fundingSeedIndex};
-            return {fundingOutPoint, sPrivKey, sDestination, config};
-
-        } catch (UniValue const & e) {
-            throw std::runtime_error("Could not fund minerinfo transaction: " + e["message"].get_str());
-        } catch (std::exception const & e) {
-            throw std::runtime_error("Could not fund minerinfo transaction: " + std::string(e.what()));
-        }
     }
 
     std::pair<COutPoint, COutPoint> FundAndSignMinerInfoTx (const Config &config, CMutableTransaction & mtx, int32_t blockheight)
@@ -267,6 +204,64 @@ public:
     }
 };
 
+static DatarefFunding CreateFromFile (Config const & config, const fs::path & path, std::string const & keyFile, std::string const & seedFile)
+{
+    try {
+        // read funding info from json formatted files
+        UniValue fundingSeed = ReadFileToUniValue (path, seedFile);
+        UniValue fundingKey = ReadFileToUniValue (path, keyFile);
+
+        RPCTypeCheckObj(
+                fundingKey,
+                {
+                        {"fundingKey", UniValueType(UniValue::VOBJ )},
+                }, false, false);
+        RPCTypeCheckObj(
+                fundingKey["fundingKey"],
+                {
+                        {"privateBIP32", UniValueType(UniValue::VSTR )},
+                }, false, false);
+
+
+        // check file format
+        RPCTypeCheckObj(
+                fundingSeed,
+                {
+                        {"fundingDestination", UniValueType(UniValue::VOBJ )},
+                        {"firstFundingOutpoint", UniValueType(UniValue::VOBJ )},
+                }, false, false);
+        RPCTypeCheckObj(
+                fundingSeed["fundingDestination"],
+                {
+                        {"addressBase58", UniValueType(UniValue::VSTR )}
+                }, false, false);
+        RPCTypeCheckObj(
+                fundingSeed["firstFundingOutpoint"],
+                {
+                        {"txid", UniValueType(UniValue::VSTR )},
+                        {"n", UniValueType(UniValue::VNUM )},
+                }, false, false);
+
+        // Create and return the DatarefFunding object
+        UniValue const keys = fundingKey["fundingKey"];
+        UniValue const destination = fundingSeed["fundingDestination"];
+        UniValue const outpoint = fundingSeed["firstFundingOutpoint"];
+
+        std::string const sPrivKey = keys["privateBIP32"].get_str();
+        std::string const sDestination = destination["addressBase58"].get_str();
+        std::string const sFundingSeedId = outpoint["txid"].get_str();
+        uint32_t fundingSeedIndex = outpoint["n"].get_int();
+
+        auto fundingOutPoint = COutPoint {uint256S(sFundingSeedId), fundingSeedIndex};
+        return {fundingOutPoint, sPrivKey, sDestination, config};
+
+    } catch (UniValue const & e) {
+        throw std::runtime_error(strprintf("Could not fund minerinfo transaction: %s", e["message"].get_str()));
+    } catch (std::exception const & e) {
+        throw std::runtime_error(strprintf("Could not fund minerinfo transaction: %s", e.what()));
+    }
+}
+
 
 std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& scriptPubKeys)
 {
@@ -281,7 +276,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     for (const CScript& script: scriptPubKeys)
         mtx.vout.push_back(CTxOut{Amount{0}, script});
 
-    auto funding = DatarefFunding::CreateFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
+    auto funding = CreateFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
     auto [newFund, prevFund] = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
@@ -299,7 +294,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     if (r.exists("error")) {
         if (!r["error"].isNull()) {
             mempool.datarefTracker.pop_back_from_current_funds();
-            throw JSONRPCError(RPC_TRANSACTION_ERROR, "Could not create minerinfo transaction. " + r["error"]["message"].get_str());
+            throw std::runtime_error(strprintf("Could not create minerinfo transaction. %s", r["error"]["message"].get_str()));
         }
     }
 
@@ -309,7 +304,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
         throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
     }
 
-    const std::string txid_as_string = txid.ToString();
+    std::string txid_as_string = txid.ToString();
     LogPrint(BCLog::MINERID, "A mineridinfo-txn %s has been created at height %d\n", txid_as_string, blockHeight);
     return txid_as_string;
 }
@@ -351,9 +346,9 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
                 return nullptr;
             }
         } catch (std::exception const & e) {
-            throw JSONRPCError(RPC_DATABASE_ERROR, "rpc CreateReplaceMinerinfotx - minerinfo tx tracking error: " + std::string(e.what()));
+            throw std::runtime_error(strprintf("rpc CreateReplaceMinerinfotx - minerinfo tx tracking error: %s", e.what()));
         } catch (...) {
-            throw JSONRPCError(RPC_DATABASE_ERROR, "rpc CreateReplaceMinerinfotx - unknown minerinfo tx tracking error");
+            throw std::runtime_error("rpc CreateReplaceMinerinfotx - unknown minerinfo tx tracking error");
         }
         return nullptr;
     };
@@ -393,7 +388,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     CMutableTransaction mtx;
     mtx.vout.push_back(CTxOut{Amount{0}, scriptPubKey});
 
-    auto funding = DatarefFunding::CreateFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
+    auto funding = CreateFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
     auto [newFund, prevFund] = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
@@ -413,7 +408,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     if (r.exists("error")) {
         if (!r["error"].isNull()) {
             mempool.datarefTracker.pop_back_from_current_funds();
-            throw JSONRPCError(RPC_TRANSACTION_ERROR, "Could not create minerinfo transaction. " + r["error"]["message"].get_str());
+            throw std::runtime_error(strprintf("Could not create minerinfo transaction. %s", r["error"]["message"].get_str()));
         }
     }
 
@@ -423,7 +418,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
         throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
     }
 
-    const std::string txid_as_string = txid.ToString();
+    std::string txid_as_string = txid.ToString();
     LogPrint(BCLog::MINERID, "A mineridinfo-txn %s has been created at height %d\n", txid_as_string, blockHeight);
     return txid_as_string;
 }
@@ -503,7 +498,7 @@ static UniValue createdatareftx(const Config &config, const JSONRPCRequest &requ
     RPCTypeCheck(request.params,{UniValue::VARR}, false);
 
     for (const auto& script: request.params[0].get_array().getValues()) {
-        std::string const scriptPubKeyHex = script.get_str();
+        const std::string& scriptPubKeyHex = script.get_str();
         std::vector<uint8_t> script_binary = ParseHex(scriptPubKeyHex);
         const auto scriptPubKey = CScript {script_binary.begin(), script_binary.end()};
         scriptPubKeys.push_back(scriptPubKey);
