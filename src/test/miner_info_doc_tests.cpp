@@ -929,7 +929,7 @@ BOOST_AUTO_TEST_CASE(parse_datarefs_invalid_datarefs_type)
     fields.insert(fields.end(), make_tuple("dataRefs", json_value_type::string, "42"));
     
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseDataRefs(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_datarefs_invalid_datarefs_type,
                       get<miner_info_error>(var_mi_doc));
 }
@@ -973,7 +973,7 @@ BOOST_AUTO_TEST_CASE(parse_datarefs_invalid_datarefs_refs_type)
                   make_tuple("dataRefs", json_value_type::object, R"("refs" : 42)"));
     
     const string doc = to_json(fields.cbegin(), fields.cend());
-    const auto var_mi_doc = ParseMinerInfoDoc(doc);   
+    const auto var_mi_doc = ParseDataRefs(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_datarefs_invalid_refs_type,
                       get<miner_info_error>(var_mi_doc));
 }
@@ -1043,17 +1043,18 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_with_datarefs_happy_case)
               });
 
     ostringstream oss;
-    oss << R"("refs" : [ { "brfcIds" : [ "brfcid_1", "brfcid_2" ],
+    oss << R"("dataRefs" : { "refs" : [ { "brfcIds" : [ "brfcid_1", "brfcid_2" ],
                                                     "txid" : ")";
     vector<uint8_t> v(32);
     iota(v.begin(), v.end(), 0);
     const uint256 expected_txid{v};
 
     oss << expected_txid << R"(", )";
-    oss << R"("vout" : 1, "compress" : "gzip" } ] )";
+    oss << R"("vout" : 1, "compress" : "gzip" } ] } )";
 
-    fields.push_back(make_tuple("dataRefs", json_value_type::object, oss.str()));
+    fields.push_back(make_tuple("extensions", json_value_type::object, oss.str()));
     const string doc = to_json(fields.cbegin(), fields.cend());
+
     const auto var_mi_doc = ParseMinerInfoDoc(doc);
     BOOST_CHECK(std::holds_alternative<miner_info_doc>(var_mi_doc));
     const auto& mi_doc = get<miner_info_doc>(var_mi_doc);

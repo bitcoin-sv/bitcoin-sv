@@ -228,7 +228,9 @@ namespace
                 dataRefsArray.push_back(dataRefJson);
             }
             dataRefsJson.push_back(Pair("refs", dataRefsArray));
-            document.push_back(Pair("dataRefs", dataRefsJson));
+            UniValue extensions = {UniValue::VOBJ};
+            extensions.push_back(Pair("dataRefs", dataRefsJson));
+            document.push_back(Pair("extensions", extensions));
         }
 
         return document;
