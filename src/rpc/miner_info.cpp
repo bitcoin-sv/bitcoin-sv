@@ -133,12 +133,12 @@ public:
                     fundingKey,
                     {
                             {"fundingKey", UniValueType(UniValue::VOBJ )},
-                    }, false, true);
+                    }, false, false);
             RPCTypeCheckObj(
                     fundingKey["fundingKey"],
                     {
                             {"privateBIP32", UniValueType(UniValue::VSTR )},
-                    }, false, true);
+                    }, false, false);
 
 
             // check file format
@@ -147,18 +147,18 @@ public:
                     {
                             {"fundingDestination", UniValueType(UniValue::VOBJ )},
                             {"firstFundingOutpoint", UniValueType(UniValue::VOBJ )},
-                    }, false, true);
+                    }, false, false);
             RPCTypeCheckObj(
                     fundingSeed["fundingDestination"],
                     {
                             {"addressBase58", UniValueType(UniValue::VSTR )}
-                    }, false, true);
+                    }, false, false);
             RPCTypeCheckObj(
                     fundingSeed["firstFundingOutpoint"],
                     {
                             {"txid", UniValueType(UniValue::VSTR )},
                             {"n", UniValueType(UniValue::VNUM )},
-                    }, false, true);
+                    }, false, false);
 
             // Create and return the DatarefFunding object
             UniValue const keys = fundingKey["fundingKey"];
@@ -615,12 +615,12 @@ static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPC
             destination,
             {
                     {"fundingDestination", UniValueType(UniValue::VOBJ )},
-            }, false, true);
+            }, false, false);
     RPCTypeCheckObj(
             destination["fundingDestination"],
             {
                     {"addressBase58", UniValueType(UniValue::VSTR )},
-            }, false, true);
+            }, false, false);
 
     return destination["fundingDestination"]["addressBase58"].get_str();
 }
