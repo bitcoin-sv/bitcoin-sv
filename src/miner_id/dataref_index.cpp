@@ -14,7 +14,7 @@ DataRefTxnDB::DataRefTxnDB(const Config& config)
 {
 }
 
-void DataRefTxnDB::LockingAccess::ExtractMinerInfoTxnFromBlock (
+void DataRefTxnDB::ExtractMinerInfoTxnFromBlock (
         CBlock const & block,
         TxId const & txid,
         std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> const & getMerkleProof)
@@ -23,17 +23,17 @@ void DataRefTxnDB::LockingAccess::ExtractMinerInfoTxnFromBlock (
     for (auto const & tx: block.vtx) {
         if (tx->GetId() == txid) {
             auto proof = getMerkleProof(tx->GetId(), blockhash);
-            if (proof)
-            {
+            if (proof) {
                 DBMinerInfo entry {tx, blockhash, std::move(*proof)};
-                data_.db_.AddEntry(entry, tx->GetId());
+                std::lock_guard lock{mtx_};
+                db_.AddEntry(entry, tx->GetId());
                 break;
             }
         }
     }
 }
 
-void DataRefTxnDB::LockingAccess::ExtractDatarefTxnsFromBlock (
+void DataRefTxnDB::ExtractDatarefTxnsFromBlock (
         CBlock const & block,
         std::vector<CoinbaseDocument::DataRef> const & datarefs,
         std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> const & getMerkleProof)
@@ -45,6 +45,7 @@ void DataRefTxnDB::LockingAccess::ExtractDatarefTxnsFromBlock (
     };
 
     std::vector<TxId> datarefids; // list of datarefs including minerid
+    datarefids.reserve(datarefids.size());
     for (auto const & dataref: datarefs)
         datarefids.push_back(dataref.txid);
 
@@ -53,10 +54,10 @@ void DataRefTxnDB::LockingAccess::ExtractDatarefTxnsFromBlock (
     for (auto const & tx: block.vtx) {
         if (vtx_in_sorted_vector (tx->GetId(), datarefids)) {
             auto proof = getMerkleProof(tx->GetId(), blockhash);
-            if(proof)
-            {
+            if(proof) {
                 DBDataref entry {tx, blockhash, std::move(*proof)};
-                data_.db_.AddEntry(entry, tx->GetId());
+                std::lock_guard lock{mtx_};
+                db_.AddEntry(entry, tx->GetId());
             }
         }
     }

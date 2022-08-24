@@ -794,8 +794,7 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
             if (minerInfoTxId)
             {
                 // add to dataref index
-                auto dbindex = g_dataRefIndex->CreateLockingAccess();
-                dbindex.ExtractMinerInfoTxnFromBlock (block, *minerInfoTxId, GetMerkleProof);
+                g_dataRefIndex->ExtractMinerInfoTxnFromBlock (block, *minerInfoTxId, GetMerkleProof);
 
                 // add to funding tracker
                 auto tracker = mempool.minerInfoTxTracker.CreateLockingAccess();
@@ -811,8 +810,7 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
             // Add datarefs to the dataref index
             if (auto datarefs = cbDoc.GetDataRefs(); datarefs && !datarefs->empty())
             {
-                auto index = g_dataRefIndex->CreateLockingAccess();
-                index.ExtractDatarefTxnsFromBlock (block, *datarefs, GetMerkleProof);
+                g_dataRefIndex->ExtractDatarefTxnsFromBlock (block, *datarefs, GetMerkleProof);
             }
 
             // Check revocation keys

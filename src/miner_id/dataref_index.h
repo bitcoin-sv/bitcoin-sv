@@ -19,15 +19,11 @@ class DataRefTxnDB {
     mutable std::mutex mtx_{};
 public:
 
+    using DBMinerInfo = miner::detail::DataDB::DBMinerInfo;
+    using DBDataref = miner::detail::DataDB::DBDataref;
+
     explicit DataRefTxnDB(const Config& config);
     ~DataRefTxnDB() = default;
-
-    // Forbid copying/moving
-    DataRefTxnDB(const DataRefTxnDB&) = delete;
-    DataRefTxnDB(DataRefTxnDB&&) = delete;
-    DataRefTxnDB& operator=(const DataRefTxnDB&) = delete;
-    DataRefTxnDB& operator=(DataRefTxnDB&&) = delete;
-
 
     class LockingAccess {
 
@@ -40,17 +36,6 @@ public:
 
     public:
         template<typename T> struct UnitTestAccess;
-
-        using DBMinerInfo = miner::detail::DataDB::DBMinerInfo;
-        using DBDataref = miner::detail::DataDB::DBDataref;
-
-        void ExtractMinerInfoTxnFromBlock (CBlock const & block,
-                                           TxId const & txid,
-                                           std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> const & getMerkleProof);
-
-        void ExtractDatarefTxnsFromBlock (CBlock const & block,
-                                          std::vector<CoinbaseDocument::DataRef> const & datarefs,
-                                          std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> const & getMerkleProof);
 
         [[nodiscard]] UniValue DumpDataRefTxnsJSON() const;
         [[nodiscard]] UniValue DumpMinerInfoTxnsJSON() const;
@@ -75,6 +60,17 @@ public:
     auto CreateLockingAccess () {
         return LockingAccess(*this);
     }
+
+    // Below functions lock and unlock for themselves, Calling these two functions
+    // in the scope of a Locking Access will create a dead lock.
+    void ExtractMinerInfoTxnFromBlock (CBlock const & block,
+                                       TxId const & txid,
+                                       std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> const & getMerkleProof);
+
+    void ExtractDatarefTxnsFromBlock (CBlock const & block,
+                                      std::vector<CoinbaseDocument::DataRef> const & datarefs,
+                                      std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> const & getMerkleProof);
+
 };
 
 extern std::unique_ptr<DataRefTxnDB> g_dataRefIndex;
