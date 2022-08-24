@@ -15,6 +15,9 @@
 
 #include "script/script.h"
 
+#include "random.h"
+#include "key.h"
+
 using namespace std;
     
 namespace ba = boost::algorithm;
@@ -157,52 +160,77 @@ BOOST_AUTO_TEST_CASE(is_compressed_key_test)
 
 BOOST_AUTO_TEST_CASE(is_der_signature_test)
 {
-    BOOST_CHECK(!is_der_signature(string(136, '0')));
-    BOOST_CHECK(!is_der_signature(string(137, '0')));
-    BOOST_CHECK(is_der_signature(string(138, '0')));
-    BOOST_CHECK(!is_der_signature(string(139, '0')));
-    BOOST_CHECK(is_der_signature(string(140, '0')));
-    BOOST_CHECK(!is_der_signature(string(141, '0')));
-    BOOST_CHECK(is_der_signature(string(142, '0')));
-    BOOST_CHECK(!is_der_signature(string(143, '0')));
-    BOOST_CHECK(is_der_signature(string(144, '0')));
-    BOOST_CHECK(!is_der_signature(string(145, '0')));
-    BOOST_CHECK(!is_der_signature(string(146, '0')));
+    const string preamble{"304002"};
+    // check lengths
+    BOOST_CHECK(!is_der_signature(preamble + string(120, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(121, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(122, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(123, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(124, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(125, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(126, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(127, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(128, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(129, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(130, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(131, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(133, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(134, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(135, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(136, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(137, '0')));
+    BOOST_CHECK( is_der_signature(preamble + string(138, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(139, '0')));
+    BOOST_CHECK(!is_der_signature(preamble + string(140, '0')));
     
-    BOOST_CHECK(is_der_signature(string(142, '1')));
-    BOOST_CHECK(is_der_signature(string(142, '2')));
-    BOOST_CHECK(is_der_signature(string(142, '3')));
-    BOOST_CHECK(is_der_signature(string(142, '4')));
-    BOOST_CHECK(is_der_signature(string(142, '5')));
-    BOOST_CHECK(is_der_signature(string(142, '6')));
-    BOOST_CHECK(is_der_signature(string(142, '7')));
-    BOOST_CHECK(is_der_signature(string(142, '8')));
-    BOOST_CHECK(is_der_signature(string(142, '9')));
-    BOOST_CHECK(is_der_signature(string(142, 'a')));
-    BOOST_CHECK(is_der_signature(string(142, 'b')));
-    BOOST_CHECK(is_der_signature(string(142, 'c')));
-    BOOST_CHECK(is_der_signature(string(142, 'd')));
-    BOOST_CHECK(is_der_signature(string(142, 'e')));
-    BOOST_CHECK(is_der_signature(string(142, 'f')));
-    BOOST_CHECK(is_der_signature(string(142, 'A')));
-    BOOST_CHECK(is_der_signature(string(142, 'B')));
-    BOOST_CHECK(is_der_signature(string(142, 'C')));
-    BOOST_CHECK(is_der_signature(string(142, 'D')));
-    BOOST_CHECK(is_der_signature(string(142, 'E')));
-    BOOST_CHECK(is_der_signature(string(142, 'F')));
+    // check incorrect preamble
+    BOOST_CHECK(!is_der_signature("204002" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("404002" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("314002" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("303002" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("305002" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("304902" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("304012" + string(132, '0')));
+    BOOST_CHECK(!is_der_signature("304003" + string(132, '0')));
 
+    // check accepts 0-9a-fA-F only
+    BOOST_CHECK( is_der_signature(preamble + string(132, '1')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '2')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '3')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '4')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '5')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '6')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '7')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '8')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, '9')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'a')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'b')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'c')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'd')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'e')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'f')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'A')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'B')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'C')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'D')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'E')));
+    BOOST_CHECK( is_der_signature(preamble + string(132, 'F')));
+    BOOST_CHECK(!is_der_signature(preamble + string(132, 'h')));
+    BOOST_CHECK(!is_der_signature(preamble + string(132, 'H')));
 
-    using script = vector<uint8_t>;
-    BOOST_CHECK(!is_der_signature(script{}));
-    BOOST_CHECK(!is_der_signature(script{0x42}));
-
-    BOOST_CHECK(!is_der_signature(script(68, 0x42)));
-    BOOST_CHECK(is_der_signature(script(69, 0x42)));
-    BOOST_CHECK(is_der_signature(script(70, 0x42)));
-    BOOST_CHECK(is_der_signature(script(71, 0x42)));
-    BOOST_CHECK(is_der_signature(script(72, 0x42)));
-    BOOST_CHECK(!is_der_signature(script(73, 0x42)));
+    RandomInit();
+    CKey key {};
+    std::vector<uint8_t> sig {};
+    for(int i = 0; i < 1'000; ++i)
+    {
+        key.MakeNewKey(true);
+        uint256 hash { GetRandHash() };
+        assert(key.Sign(hash, sig));
+        BOOST_CHECK(is_der_signature(HexStr(sig)));
+    }
 }
+
 
 BOOST_AUTO_TEST_CASE(parse_miner_info_empty_block)
 {

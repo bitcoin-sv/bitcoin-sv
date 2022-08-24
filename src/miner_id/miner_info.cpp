@@ -168,9 +168,12 @@ bool is_compressed_key(const std::string& s)
 
 bool is_der_signature(const char* s)
 {
-    // todo? starts with 0x30, len 0x45-0x47, type code 0x2 
-    // r/s values can be less than 32 bytes?!
-    static const std::regex rgx{"([0-9a-fA-F]{2}){69,72}"};
+    // Note: r/s values can be less than 32 bytes - accept 64-72 total
+    // 0x30      "Compound object" (the tuple of (R,S) values)
+    // 0x4[0-8]  length 64-72
+    // 0x02      R-value type "Integer"
+    // ([0-9a-fA-F]{2}){61,69}  Remaining hex characters (61-69 pairs)
+    static const std::regex rgx{"304[0-8]02([0-9a-fA-F]{2}){61,69}"};
     return regex_match(s, rgx);
 }
 
