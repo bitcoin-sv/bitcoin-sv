@@ -135,6 +135,14 @@ public:
             return std::nullopt;
     }
 
+    std::optional<COutPoint> get_current_funds_front() const {
+        std::lock_guard lock (mtx_for_current_);
+        if (!current_.funds.empty())
+            return current_.funds.front().outPoint;
+        else
+            return std::nullopt;
+    }
+
     std::vector<TxId> get_current_funds() const {
         std::lock_guard lock (mtx_for_current_);
         //return current_.funds;

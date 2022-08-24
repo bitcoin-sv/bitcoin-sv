@@ -83,6 +83,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         txid = node.createdatareftx(scriptPubKeys)
         wait_until(lambda: txid in node.getrawmempool())
+        txid_test = node.getdatareftxid()
+        assert(txid_test == txid)
 
         dataRefs = []
         for b in brfcDatas:

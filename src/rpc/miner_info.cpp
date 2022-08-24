@@ -661,6 +661,34 @@ static UniValue setminerinfotxfundingoutpoint(const Config &config, const JSONRP
 }
 
 
+static UniValue getdatareftxid(const Config &config, const JSONRPCRequest &request)
+{
+    if (request.fHelp || !request.params.empty()) {
+        throw std::runtime_error(
+                "getdatareftxid  \n"
+                "\nreturn the datarefid for the current block being built.\n"
+                "\nResult: a hex encoded transaction id\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getdatareftxid","") +
+                HelpExampleRpc("getdatareftxid",""));
+    }
+
+    std::lock_guard lock{mut};
+
+    std::optional<COutPoint> p = mempool.datarefTracker.get_current_funds_front();
+
+    if (p) {
+        if (!(currentMinerInfoTx && p->GetTxId() == currentMinerInfoTx->txid)) {
+            CTransactionRef tx = mempool.Get(p->GetTxId());
+            if (tx)
+                return {p->GetTxId().ToString()};
+        }
+    }
+
+    return {UniValue::VNULL};
+}
+
+
 } // namespace mining
 
 // clang-format off
@@ -671,6 +699,7 @@ static const CRPCCommand commands[] = {
     {"generating", "createdatareftx",                    mining::createdatareftx,                    true, {"minerinfo"}},
     {"generating", "replaceminerinfotx",                 mining::replaceminerinfotx,                 true, {"minerinfo"}},
     {"generating", "getminerinfotxid",                   mining::getminerinfotxid,                   true, {"minerinfo"}},
+    {"generating", "getdatareftxid",                     mining::getdatareftxid,                     true, {"minerinfo"}},
     {"generating", "makeminerinfotxsigningkey",          mining::makeminerinfotxsigningkey,          true, {"minerinfo"}},
     {"generating", "getminerinfotxfundingaddress",       mining::getminerinfotxfundingaddress,       true, {"minerinfo"}},
     {"generating", "setminerinfotxfundingoutpoint",      mining::setminerinfotxfundingoutpoint,      true, {"minerinfo"}},
