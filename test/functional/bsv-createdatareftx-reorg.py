@@ -113,7 +113,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
         fundingSeed['fundingDestination'] = {'addressBase58': destination, }
-        fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
+        #fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
         fundingSeedJson = json.dumps(fundingSeed, indent=3)
@@ -122,6 +122,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             f.write(fundingKeyJson)
         with open(datapath + '/minerinfotxfunding.dat', 'a') as f:
             f.write(fundingSeedJson)
+
+        self.nodes[nodenum].setminerinfotxfundingoutpoint(txId, index)
 
     def one_test(self, allKeys, nodenum, do_mining=True, datarefs=None):
 
@@ -203,6 +205,15 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # mine minerid blocks and sync
         self.one_test(allKeys0, nodenum=0)
+        self.one_test(allKeys0, nodenum=0)
+        self.one_test(allKeys0, nodenum=0)
+        self.one_test(allKeys0, nodenum=0)
+        sync_blocks(self.nodes)
+
+        self.one_test(allKeys1, nodenum=1)
+        self.one_test(allKeys1, nodenum=1)
+        self.one_test(allKeys1, nodenum=1)
+        self.one_test(allKeys1, nodenum=1)
         sync_blocks(self.nodes) 
         self.one_test(allKeys0, nodenum=0, do_mining=True)
         # disconnect and mine independently. 
@@ -268,6 +279,14 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0)
+
+        sync_blocks(self.nodes)
+
+        self.one_test(allKeys1, 1)
+        self.one_test(allKeys1, 1)
+        self.one_test(allKeys1, 1)
+
+        sync_blocks(self.nodes)
 
 if __name__ == '__main__':
     CreateMinerInfoTest().main()
