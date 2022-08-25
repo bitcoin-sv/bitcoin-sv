@@ -204,7 +204,7 @@ public:
     }
 };
 
-static DatarefFunding CreateFromFile (Config const & config, const fs::path & path, std::string const & keyFile, std::string const & seedFile)
+static DatarefFunding CreateDatarefFundingFromFile (Config const & config, const fs::path & path, std::string const & keyFile, std::string const & seedFile)
 {
     try {
         // read funding info from json formatted files
@@ -276,7 +276,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     for (const CScript& script: scriptPubKeys)
         mtx.vout.push_back(CTxOut{Amount{0}, script});
 
-    auto funding = CreateFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
+    auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
     auto [newFund, prevFund] = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
@@ -288,8 +288,8 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
 
     mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
     UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
-    LogPrint(BCLog::MINERID, "minerinfotx tracker, sent minerinfo txn %s to mempool at height %d. New funding outpoint: %s\n",
-             txid.ToString(), blockHeight, newFund.ToString());
+    LogPrint(BCLog::MINERID, "minerinfotx tracker, sent dataref txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
+             txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
 
     if (r.exists("error")) {
         if (!r["error"].isNull()) {
@@ -305,7 +305,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     }
 
     std::string txid_as_string = txid.ToString();
-    LogPrint(BCLog::MINERID, "A mineridinfo-txn %s has been created at height %d\n", txid_as_string, blockHeight);
+    LogPrint(BCLog::MINERID, "A dataref-txn %s has been created at height %d\n", txid_as_string, blockHeight);
     return txid_as_string;
 }
 
@@ -388,7 +388,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     CMutableTransaction mtx;
     mtx.vout.push_back(CTxOut{Amount{0}, scriptPubKey});
 
-    auto funding = CreateFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
+    auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
     auto [newFund, prevFund] = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
@@ -401,8 +401,8 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     currentMinerInfoTx = {newFund.GetTxId(), blockHeight};
     mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
     UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
-    LogPrint(BCLog::MINERID, "minerinfotx tracker, sent minerinfo txn %s to mempool at height %d. New funding outpoint: %s\n",
-             txid.ToString(), blockHeight, newFund.ToString());
+    LogPrint(BCLog::MINERID, "minerinfotx tracker, sent minerinfo txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
+             txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
 
 
     if (r.exists("error")) {
