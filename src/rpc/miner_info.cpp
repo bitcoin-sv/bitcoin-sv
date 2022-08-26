@@ -120,11 +120,13 @@ public:
     std::pair<COutPoint, COutPoint> FundAndSignMinerInfoTx (const Config &config, CMutableTransaction & mtx, int32_t blockheight)
     {
         try {
-        // A potential new funding seed has preceedence.
+            // A potential new funding seed has preceedence.
             std::optional<COutPoint> fundingOutPoint
-                = GetSpendableCoin(fundingSeed).has_value()
-                ? fundingSeed
-                : std::optional<COutPoint>{};
+                = mempool.IsSpent(fundingSeed)
+                  ? std::optional<COutPoint>{}
+                  : (GetSpendableCoin(fundingSeed).has_value()
+                     ? fundingSeed
+                     : std::optional<COutPoint>{});
 
             if (!fundingOutPoint) {
 
@@ -158,7 +160,7 @@ public:
                     if (!fundingOutPoint)
                         fundingOutPoint = fundingSeed;
 
-		    while (fundingOutPoint && !GetSpendableCoin(*fundingOutPoint).has_value()) {
+                    while (fundingOutPoint && !GetSpendableCoin(*fundingOutPoint).has_value()) {
                         auto tracker = mempool.datarefTracker.CreateLockingAccess();
                         auto outpoints = tracker.find_fund(std::numeric_limits<int32_t>::max(), findSpender);
                         if (outpoints)
