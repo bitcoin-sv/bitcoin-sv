@@ -4396,7 +4396,7 @@ static bool ActivateBestChainStep(
                              "minerinfotx tracker, scheduled removal of minerinfo and dataref txns. Total removed: %ld\n",
                              datarefs.size());
                     mempool.datarefTracker.clear_current_funds();
-                    mempool.RemoveTxAndDescendants(datarefs.front(), changeSet);
+                    mempool.RemoveTxnsAndDescendants(datarefs, changeSet);
                 }
             }
         } catch(...) {

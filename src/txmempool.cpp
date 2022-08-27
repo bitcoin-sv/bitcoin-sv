@@ -2124,6 +2124,25 @@ int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournal
     return 0;
 }
 
+int CTxMemPool::RemoveTxnsAndDescendants(const std::vector<TxId>& txids, const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    setEntries stage;
+    for (const TxId& txid: txids) {
+        auto it = mapTx.get<transaction_id>().find(txid);
+        if (it != mapTx.get<transaction_id>().end()) {
+            stage.insert(it);
+            GetDescendantsNL(it, stage);
+        }
+    }
+    if (!stage.empty()) {
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
+        return stage.size();
+    }
+    return 0;
+}
+
 std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
 {
     std::shared_lock lock{smtx};

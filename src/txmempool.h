@@ -905,6 +905,7 @@ public:
     /** Remove one transaction from the mempool and assume no children.
      * This is needed for replacement mineridinfo transactions */
     int RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet);
+    int RemoveTxnsAndDescendants(const std::vector<TxId>& txid, const mining::CJournalChangeSetPtr& changeSet);
 
 
     /**
