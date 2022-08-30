@@ -25,6 +25,29 @@ static const fs::path fundingPath = fs::path("miner_id") / "Funding";
 static const std::string fundingKeyFile = ".minerinfotxsigningkey.dat";
 static const std::string fundingSeedFile = "minerinfotxfunding.dat";
 
+
+
+template<typename InitFunc, typename ExitFunc>
+struct MinerInfoClass_ScopeExit {
+	InitFunc initFunc;
+	ExitFunc exitFunc;
+	bool success = false;
+    MinerInfoClass_ScopeExit (InitFunc initFunc, ExitFunc exitFunc)
+	    : initFunc(initFunc)
+	    , exitFunc(exitFunc)
+    {
+        initFunc();
+    }
+
+    void good() {
+        success = true;
+    }
+    ~MinerInfoClass_ScopeExit () {
+        if (!success)
+            exitFunc();
+    }
+};
+
 static CKey privKeyFromStringBIP32(std::string const & strkey)
 {
     // parse the BIP32 key and convert it to ECDSA format.
@@ -288,22 +311,31 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     minerinfotx_args.push_back(UniValue(true)); // do not check, we want to allow no fees
     TxId const txid =  mtx.GetId();
 
-    mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
-    UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
-    LogPrint(BCLog::MINERID, "minerinfotx tracker, sent dataref txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
-             txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
-
-    if (r.exists("error")) {
-        if (!r["error"].isNull()) {
+    auto initFunc = [&newFund, &prevFund]() {
+    	mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
+    };
+    auto exitFunc = []() {
             mempool.datarefTracker.pop_back_from_current_funds();
-            throw std::runtime_error(strprintf("Could not create minerinfo transaction. %s", r["error"]["message"].get_str()));
-        }
-    }
+    };
 
-    // check that no new block has been added to the tip in the meantime.
-    int32_t blockHeight2 = chainActive.Height() + 1;
-    if (blockHeight != blockHeight2) {
-        throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
+    {
+	MinerInfoClass_ScopeExit raii(initFunc, exitFunc);
+        UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
+        LogPrint(BCLog::MINERID, "minerinfotx tracker, sent dataref txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
+                 txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
+
+        if (r.exists("error")) {
+            if (!r["error"].isNull()) {
+                throw std::runtime_error(strprintf("Could not create minerinfo transaction. %s", r["error"]["message"].get_str()));
+            }
+        }
+
+        // check that no new block has been added to the tip in the meantime.
+        int32_t blockHeight2 = chainActive.Height() + 1;
+        if (blockHeight != blockHeight2) {
+            throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
+        }
+	raii.good();
     }
 
     std::string txid_as_string = txid.ToString();
@@ -401,23 +433,32 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     TxId const txid =  mtx.GetId();
 
     currentMinerInfoTx = {newFund.GetTxId(), blockHeight};
-    mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
-    UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
-    LogPrint(BCLog::MINERID, "minerinfotx tracker, sent minerinfo txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
+    auto initFunc = [&newFund, &prevFund]() {
+    	mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
+    };
+    auto exitFunc = []() {
+        mempool.datarefTracker.pop_back_from_current_funds();
+    };
+
+    {
+	MinerInfoClass_ScopeExit raii(initFunc, exitFunc);
+        UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
+        LogPrint(BCLog::MINERID, "minerinfotx tracker, sent minerinfo txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
              txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
 
 
-    if (r.exists("error")) {
-        if (!r["error"].isNull()) {
-            mempool.datarefTracker.pop_back_from_current_funds();
-            throw std::runtime_error(strprintf("Could not create minerinfo transaction. %s", r["error"]["message"].get_str()));
+        if (r.exists("error")) {
+            if (!r["error"].isNull()) {
+                throw std::runtime_error(strprintf("Could not create minerinfo transaction. %s", r["error"]["message"].get_str()));
+            }
         }
-    }
 
-    // check that no new block has been added to the tip in the meantime.
-    int32_t blockHeight2 = chainActive.Height() + 1;
-    if (blockHeight != blockHeight2) {
-        throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
+        // check that no new block has been added to the tip in the meantime.
+        int32_t blockHeight2 = chainActive.Height() + 1;
+        if (blockHeight != blockHeight2) {
+            throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
+        }
+	raii.good();
     }
 
     std::string txid_as_string = txid.ToString();
