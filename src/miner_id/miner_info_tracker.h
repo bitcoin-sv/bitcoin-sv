@@ -97,13 +97,18 @@ public:
                 DatarefVector & entries = data_.entries_[key];
                 size_t counter{0};
 
-                for (const auto& outputs: data_.current_.funds) {
+                std::vector<FundingNode> tmp;
+                {
+                    std::lock_guard lock(data_.mtx_for_current_);
+                    tmp = data_.current_.funds;
+                    data_.current_.funds.clear();
+                }
+                for (const auto& outputs: tmp) {
                     entries.funds.push_back(outputs);
                     if(data_.store_minerinfo_fund (height, blockHash, outputs, counter))
                         ++counter;
                 }
                 // clear temporary txns in "current" to store
-                data_.current_.funds.clear();
 
                 // Todo: purge old entries.
                 size_t to_prune = std::count_if(
