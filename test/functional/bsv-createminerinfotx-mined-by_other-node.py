@@ -108,7 +108,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
-        block = make_miner_id_block(node, None, minerInfoTx, height, allKeys.minerIdKeys)
+        block = make_miner_id_block(node, minerinfotx_parameters, minerInfoTx=minerInfoTx)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
         wait_until (lambda: block_count + 1 == node.getblockcount())

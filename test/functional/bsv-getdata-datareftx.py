@@ -4,7 +4,8 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import msg_block, msg_getdata, CInv, CTransaction, NodeConnCB
-from test_framework.blocktools import MinerIDParams, make_miner_id_block, create_dataref_txn, merkle_root_from_branch
+from test_framework.blocktools import merkle_root_from_branch
+from test_framework.miner_id import MinerIdKeys, make_miner_id_block, create_dataref_txn, create_dataref
 from test_framework.util import create_confirmed_utxos, wait_until, assert_equal
 from test_framework.comptool import mininode_lock
 from decimal import Decimal
@@ -58,16 +59,10 @@ class GetdataDataref(BitcoinTestFramework):
         self.curve = ecdsa.SECP256k1
 
         # Setup miner ID keys
-        bip32key = BIP32Key.fromEntropy(os.urandom(16))
-        self.minerIdKey = {
-            "public" : bip32key.PublicKey(),
-            "signing" : ecdsa.SigningKey.from_string(bip32key.PrivateKey(), curve=self.curve)
-        }
+        self.minerIdKey = MinerIdKeys("01")
 
         # And a single revocation key
-        minerIdRevocationKey = BIP32Key.fromEntropy(os.urandom(16))
-        self.minerIdRevocationPubKey = minerIdRevocationKey.PublicKey()
-        self.minerIdRevocationSigningKey = ecdsa.SigningKey.from_string(minerIdRevocationKey.PrivateKey(), curve=self.curve)
+        self.minerIdRevocationKey = MinerIdKeys("10")
 
     def setup_network(self):
         self.add_nodes(self.num_nodes)
@@ -102,25 +97,17 @@ class GetdataDataref(BitcoinTestFramework):
             dataref3 = create_dataref_txn(conn, dataref3_json, utxos.pop())
 
             # Reference just 2 of the datarefs in the miner-info document
-            datarefs = [
-                {
-                    'brfcIds' : ['id1'],
-                    'txn' : dataref1
-                },
-                {
-                    'brfcIds' : ['id2'],
-                    'txn' : dataref2
-                }
-            ]
+            datarefs = [ create_dataref(['id1'], dataref1.hash, 0),
+                         create_dataref(['id2'], dataref2.hash, 0) ]
 
             # Send a miner ID block containing dataref txns
-            minerIdParams = MinerIDParams(blockHeight = self.nodes[0].getblockcount() + 1,
-                                          minerId = self.minerIdKey["signing"],
-                                          minerIdPub = self.minerIdKey["public"],
-                                          revocationKey = self.minerIdRevocationSigningKey,
-                                          revocationKeyPub = self.minerIdRevocationPubKey,
-                                          datarefs = datarefs)
-            block = make_miner_id_block(conn, minerIdParams, utxos.pop(), txns=[dataref1, dataref2, dataref3])
+            minerIdParams = {
+                'height': self.nodes[0].getblockcount() + 1,
+                'minerKeys': self.minerIdKey,
+                'revocationKeys': self.minerIdRevocationKey,
+                'datarefs': datarefs
+            }
+            block = make_miner_id_block(conn, minerIdParams, utxo=utxos.pop(), txns=[dataref1, dataref2, dataref3])
             conn.send_message(msg_block(block))
             wait_until(lambda: self.nodes[0].getbestblockhash() == block.hash)
 

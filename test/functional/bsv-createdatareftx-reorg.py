@@ -141,9 +141,10 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 'revocationKeys': allKeys.revocationKeys,
                 'prev_minerKeys': None,
                 'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
+                'pubCompromisedMinerKeyHex': None,
+                'datarefs': datarefs }
 
-        scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters, datarefs=datarefs)
+        scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
         wait_until (lambda: txid in node.getrawmempool())
 
@@ -161,7 +162,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 datarefTxn.rehash()
                 datarefTxns[datarefTxn.hash] = datarefTxn
 
-        block = make_miner_id_block(node, list(datarefTxns.values()), minerInfoTx, height, allKeys.minerIdKeys)
+        block = make_miner_id_block(node, minerinfotx_parameters, datarefTxns=list(datarefTxns.values()), minerInfoTx=minerInfoTx)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
         wait_until (lambda: block_count + 1 == node.getblockcount())

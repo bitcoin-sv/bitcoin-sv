@@ -4,7 +4,8 @@
 """
 Check P2P message sendhdrsen
 """
-from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_branch, MinerIDParams, make_miner_id_block
+from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_branch
+from test_framework.miner_id import MinerIdKeys, make_miner_id_block, create_dataref_txn
 from test_framework.mininode import COIN, CBlock, CInv, CTxOut, FromHex, mininode_lock, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, msg_gethdrsen, msg_sendhdrsen, msg_sendheaders, NetworkThread, NodeConn, NodeConnCB, ToHex
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
@@ -56,15 +57,9 @@ class SendHdrsEnTest(BitcoinTestFramework):
         self.extra_args = [['-genesisactivationheight=1']]*2 # Genesis must be activated so that we can send large transactions
         self.curve = ecdsa.SECP256k1
 
-        # Setup miner ID key
-        minerIdKey = BIP32Key.fromEntropy(os.urandom(16))
-        self.minerIdPubKey = minerIdKey.PublicKey()
-        self.minerIdSigningKey = ecdsa.SigningKey.from_string(minerIdKey.PrivateKey(), curve=self.curve)
-
-        # And a revocation key
-        minerIdRevocationKey = BIP32Key.fromEntropy(os.urandom(16))
-        self.minerIdRevocationPubKey = minerIdRevocationKey.PublicKey()
-        self.minerIdRevocationSigningKey = ecdsa.SigningKey.from_string(minerIdRevocationKey.PrivateKey(), curve=self.curve)
+        # Setup miner ID keys and a single revocation key
+        self.minerIdKey = MinerIdKeys("01")
+        self.minerIdRevocationKey = MinerIdKeys("10")
 
     def generate_block(self, node):
         block_hashes = node.generate(1)
@@ -219,12 +214,12 @@ class SendHdrsEnTest(BitcoinTestFramework):
         for i in range(49):
             txs.append( create_transaction(funding_tx, i, CScript(), 1*COIN) )
         # Also make this block a miner ID enabled one containing a miner-info txn
-        minerIdParams = MinerIDParams(blockHeight = node.getblockcount() + 1,
-                                      minerId = self.minerIdSigningKey,
-                                      minerIdPub = self.minerIdPubKey,
-                                      revocationKey = self.minerIdRevocationSigningKey,
-                                      revocationKeyPub = self.minerIdRevocationPubKey)
-        block5 = make_miner_id_block(node, minerIdParams, { "txid" : funding_tx.hash, "vout" : 49, "amount" : 1.0 }, txns=txs)
+        minerIdParams = {
+            'height': self.nodes[0].getblockcount() + 1,
+            'minerKeys': self.minerIdKey,
+            'revocationKeys': self.minerIdRevocationKey
+        }
+        block5 = make_miner_id_block(node, minerIdParams, utxo={ "txid" : funding_tx.hash, "vout" : 49, "amount" : 1.0 }, txns=txs)
         coinbase_tx = block5.vtx[0]
         miner_info_tx = block5.vtx[1 + len(txs)]
         node.submitblock(ToHex(block5))
