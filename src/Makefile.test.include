@@ -64,6 +64,7 @@ BITCOIN_TESTS =\
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
   test/dataref_index_tests.cpp \
+  test/datareftx_tests.cpp \
   test/dsattempt_tests.cpp \
   test/dsdetected_tests.cpp \
   test/dstxn_serialiser_tests.cpp \

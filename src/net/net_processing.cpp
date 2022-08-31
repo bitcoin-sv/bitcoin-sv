@@ -24,6 +24,8 @@
 #include "merkleblock.h"
 #include "merkleproof.h"
 #include "merkletreestore.h"
+#include "miner_id/dataref_index.h"
+#include "miner_id/datareftx.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/revokemid.h"
 #include "net/block_download_tracker.h"
@@ -1366,6 +1368,30 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     }
                 }
                 if (!push) {
+                    vNotFound.push_back(inv);
+                }
+            }
+            else if(inv.type == MSG_DATAREF_TX) {
+                bool found {false};
+                if(g_dataRefIndex) {
+                    // Lookup up inv.hash in the dataref index
+                    try {
+                        const auto& dataref { g_dataRefIndex->CreateLockingAccess().GetDataRefEntry(inv.hash) };
+                        if(dataref) {
+                            // Push datareftx msg back to requester
+                            DataRefTx datareftx { dataref->txn, dataref->proof };
+                            CSerializedNetMsg msg { msgMaker.Make(NetMsgType::DATAREFTX, datareftx) };
+                            connman.PushMessage(pfrom, std::move(msg));
+                            found = true;
+                        }
+                    }
+                    catch(const std::exception& e) {
+                        LogPrint(BCLog::NETMSG, "Couldn't fetch dataref from index: %s\n", e.what());
+                    }
+                }
+
+                if(!found) {
+                    // Return not found
                     vNotFound.push_back(inv);
                 }
             }

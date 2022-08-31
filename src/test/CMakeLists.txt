@@ -90,6 +90,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	cscript_tests.cpp
 	cuckoocache_tests.cpp
     dataref_index_tests.cpp
+    datareftx_tests.cpp
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
     dsattempt_tests.cpp
