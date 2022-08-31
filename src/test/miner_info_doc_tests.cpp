@@ -112,9 +112,18 @@ namespace
                                 rev_keys,
                                 data_refs};
 
-    const string sig_bad_0(142, '0');
-    const string sig_bad_1(142, '1');
+    const string sig_bad_0{[] {
+        string s{"304502"};
+        s.insert(s.end(), 136, '0');
+        return s;
+    }()};
 
+    const string sig_bad_1{[] {
+        string s{"304502"};
+        s.insert(s.end(), 136, '1');
+        return s;
+    }()};
+    
     template <typename T>
     std::string to_json(T first, T last)
     {
@@ -152,37 +161,37 @@ namespace
                          });
         doc.append("}");
         return doc;
-        }
-
-        template <typename T, typename U>
-        void concat(const T& src, U& dst)
-        {
-            if(src.size() < OP_PUSHDATA1)
-            {
-                dst.insert(dst.end(), uint8_t(src.size()));
-            }
-            else if(src.size() <= 0xff)
-            {
-                dst.insert(dst.end(), OP_PUSHDATA1);
-                dst.insert(dst.end(), uint8_t(src.size()));
-            }
-            else if(src.size() <= 0xffff)
-            {
-                dst.insert(dst.end(), OP_PUSHDATA2);
-                uint8_t data[2];
-                WriteLE16(data, src.size());
-                dst.insert(dst.end(), data, data + sizeof(data));
-            }
-            else
-            {
-                dst.insert(dst.end(), OP_PUSHDATA4);
-                uint8_t data[4];
-                WriteLE32(data, src.size());
-                dst.insert(dst.end(), data, data + sizeof(data));
-            }
-            dst.insert(dst.end(), src.begin(), src.end());
-        }
     }
+
+    template <typename T, typename U>
+    void concat(const T& src, U& dst)
+    {
+        if(src.size() < OP_PUSHDATA1)
+        {
+            dst.insert(dst.end(), uint8_t(src.size()));
+        }
+        else if(src.size() <= 0xff)
+        {
+            dst.insert(dst.end(), OP_PUSHDATA1);
+            dst.insert(dst.end(), uint8_t(src.size()));
+        }
+        else if(src.size() <= 0xffff)
+        {
+            dst.insert(dst.end(), OP_PUSHDATA2);
+            uint8_t data[2];
+            WriteLE16(data, src.size());
+            dst.insert(dst.end(), data, data + sizeof(data));
+        }
+        else
+        {
+            dst.insert(dst.end(), OP_PUSHDATA4);
+            uint8_t data[4];
+            WriteLE32(data, src.size());
+            dst.insert(dst.end(), data, data + sizeof(data));
+        }
+        dst.insert(dst.end(), src.begin(), src.end());
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(miner_info_doc_tests)
 
@@ -764,20 +773,16 @@ const auto compressed_key_init = [](char c) {
 BOOST_AUTO_TEST_CASE(revocation_message_construction)
 {
     const string compromised_miner_id{compressed_key_init('1')};
-    const string sig_1(140, '2');
-    const string sig_2(140, '3');
-    const revocation_msg msg{compromised_miner_id, sig_1, sig_2};
+    const revocation_msg msg{compromised_miner_id, sig_bad_0, sig_bad_1};
     BOOST_CHECK_EQUAL(compromised_miner_id, msg.compromised_miner_id());
-    BOOST_CHECK_EQUAL(sig_1, msg.sig_1());
-    BOOST_CHECK_EQUAL(sig_2, msg.sig_2());
-    }
+    BOOST_CHECK_EQUAL(sig_bad_0, msg.sig_1());
+    BOOST_CHECK_EQUAL(sig_bad_1, msg.sig_2());
+}
 
 BOOST_AUTO_TEST_CASE(revocation_message_equality)
 {
     const string cmp_miner_id_1{compressed_key_init('1')};
-    const string sig_1_1(140, '2');
-    const string sig_2_1(140, '3');
-    const revocation_msg a{cmp_miner_id_1, sig_1_1, sig_2_1};
+    const revocation_msg a{cmp_miner_id_1, sig_bad_0, sig_bad_1};
     BOOST_CHECK_EQUAL(a, a);
     
     const revocation_msg b{a};
@@ -785,16 +790,14 @@ BOOST_AUTO_TEST_CASE(revocation_message_equality)
     BOOST_CHECK_EQUAL(b, a);
 
     const string cmp_miner_id_2(compressed_key_init('4'));
-    const revocation_msg c{cmp_miner_id_2, sig_1_1, sig_2_1};
+    const revocation_msg c{cmp_miner_id_2, sig_bad_0, sig_bad_1};
     BOOST_CHECK_NE(a, c);
     
-    const string sig_1_2(140, '5');
-    const revocation_msg d{cmp_miner_id_2, sig_1_2, sig_2_1};
-    BOOST_CHECK_NE(c, d);
+    const revocation_msg d{cmp_miner_id_1, sig_bad_1, sig_bad_1};
+    BOOST_CHECK_NE(a, d);
     
-    const string sig_2_2(140, '6');
-    const revocation_msg e{cmp_miner_id_2, sig_1_2, sig_2_2};
-    BOOST_CHECK_NE(d, e);
+    const revocation_msg e{cmp_miner_id_1, sig_bad_0, sig_bad_0};
+    BOOST_CHECK_NE(a, e);
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_sig_1_verification_fail)
