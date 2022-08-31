@@ -791,19 +791,18 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
 
             // Add minerinfo to dataref index and to funds tracking
             const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
-            if (minerInfoTxId)
-            {
+            if (minerInfoTxId) {
                 // add to dataref index
                 g_dataRefIndex->ExtractMinerInfoTxnFromBlock (block, *minerInfoTxId, GetMerkleProof);
 
                 // add to funding tracker
-                auto tracker = mempool.minerInfoTxTracker.CreateLockingAccess();
-                auto const current = mempool.minerInfoTxTracker.current_txid();
-                if (current && *current == *minerInfoTxId)
-                {   // add to funds tracker
-                    mempool.minerInfoTxTracker.clear_current_txid();
-                    tracker.insert_minerinfo_txid(height, blockhash, *current);
-                    LogPrint(BCLog::MINERID, "minerinfotx tracker, added minerinfo txn %s to block %s\n", current->ToString(), blockhash.ToString());
+                // The last fund in the trackers mempool list is the minerinfo txn
+                const auto infotx = mempool.datarefTracker.get_current_funds_back();
+                if (infotx && infotx->GetTxId() == *minerInfoTxId)
+                {
+                    auto tracker = mempool.datarefTracker.CreateLockingAccess();
+                    tracker.move_current_to_store(height, blockhash);
+                    LogPrint(BCLog::MINERID, "minerinfotx tracker and potential parents, added minerinfo txn %s to block %s\n", infotx->ToString(), blockhash.ToString());
                 }
             }
 

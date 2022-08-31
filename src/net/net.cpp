@@ -3273,9 +3273,11 @@ bool CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {
     {
         // do not relay minerinfoid transactions
-        std::optional<TxId> const info_txid = mempool.minerInfoTxTracker.current_txid();
-        if (info_txid && *info_txid == txn.getInfo().GetTxId())
-            return false;
+        std::vector<TxId> txids = mempool.datarefTracker.get_current_funds();
+
+        for (const auto& d: txids)
+            if (d == txn.getInfo().GetTxId())
+                return false;
     }
     mTxnPropagator->newTransaction(txn);
     return true;

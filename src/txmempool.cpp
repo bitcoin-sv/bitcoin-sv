@@ -2109,13 +2109,33 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     return stage.size();
 }
 
-int CTxMemPool::RemoveMinerIdTx(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet)
+int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet)
 {
     std::unique_lock lock{smtx};
     auto it = mapTx.get<transaction_id>().find(txid);
     if (it != mapTx.get<transaction_id>().end()) {
         setEntries stage;
         stage.insert(it);
+        GetDescendantsNL(it, stage);
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
+        return stage.size();
+    }
+    return 0;
+}
+
+int CTxMemPool::RemoveTxnsAndDescendants(const std::vector<TxId>& txids, const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    setEntries stage;
+    for (const TxId& txid: txids) {
+        auto it = mapTx.get<transaction_id>().find(txid);
+        if (it != mapTx.get<transaction_id>().end()) {
+            stage.insert(it);
+            GetDescendantsNL(it, stage);
+        }
+    }
+    if (!stage.empty()) {
         CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
         removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
         return stage.size();
@@ -2358,8 +2378,8 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
     {
         auto index = g_dataRefIndex->CreateLockingAccess();
         const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
-        if (minerInfoTxId)
-        {
+        if (minerInfoTxId) {
+            // will do nothing if it is not in the database
             index.DeleteMinerInfoTxn(*minerInfoTxId);
         }
         if(minerID->GetCoinbaseDocument().GetDataRefs())

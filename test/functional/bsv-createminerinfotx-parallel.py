@@ -18,7 +18,7 @@ import json
 Create a miner info doc and send it to the node via the createminerinfotx rpc function.
 Create a chain of mineridinfo-txns where each such transaction funds the next.
 Retive a transaction-id via getminerinfotxid rpc function.
-Also tested calling createminerinfotx rpc twice in sequence.
+Run these checks on another node in parallel using the same minerID.
 '''
 class AllKeys:
     def __init__(self):
@@ -135,8 +135,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
-        block = make_miner_id_block(self.nodes[0], minerInfoTx, height, allKeys.minerIdKeys)
-        block_x = make_miner_id_block(self.nodes[1], minerInfoTx, height, allKeys.minerIdKeys)
+        block = make_miner_id_block(self.nodes[0], None, minerInfoTx, height, allKeys.minerIdKeys)
+        block_x = make_miner_id_block(self.nodes[1], None, minerInfoTx, height, allKeys.minerIdKeys)
         block_count = self.nodes[0].getblockcount()
         block_count_x = self.nodes[1].getblockcount()
 

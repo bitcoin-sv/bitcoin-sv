@@ -904,7 +904,8 @@ public:
 
     /** Remove one transaction from the mempool and assume no children.
      * This is needed for replacement mineridinfo transactions */
-    int RemoveMinerIdTx(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet);
+    int RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet);
+    int RemoveTxnsAndDescendants(const std::vector<TxId>& txid, const mining::CJournalChangeSetPtr& changeSet);
 
 
     /**
@@ -1299,7 +1300,7 @@ public:
 
     /** Load the mempool from disk. */
     bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
-    mining::MinerInfoTxTracker minerInfoTxTracker;
+    mining::DatarefTracker datarefTracker;
 };
 
 // Group definition in the secondary mempool.
