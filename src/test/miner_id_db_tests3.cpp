@@ -487,7 +487,7 @@ namespace
                 txn.vin[0].prevout = COutPoint { fundTxn->GetId(), 0 };
                 txn.vout.resize(1);
                 txn.vout[0].nValue = Amount{0};
-                txn.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << MinerIDProtocolPrefix
+                txn.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << MinerInfoProtocolPrefix
                                                      << std::vector<uint8_t> { dataRefJson.begin(), dataRefJson.end() };
 
                 // Sign
