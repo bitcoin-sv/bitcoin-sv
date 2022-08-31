@@ -13,6 +13,7 @@
 #include "span.h"
 #include "opcodes.h"
 
+#include <array>
 #include <cassert>
 #include <climits>
 #include <cstdint>
@@ -20,7 +21,22 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
+
+template<typename>
+inline constexpr size_t get_element_count = 0;
+
+template<typename T, size_t N>
+inline constexpr size_t get_element_count<std::array<T, N>> = N;
+
+// bsv::span has no fixed sizes yet
+//template<typename T, size_t N>
+//inline constexpr size_t get_element_count<bsv::span<T, N>> = N;
+
+template<typename T, size_t N>
+inline constexpr size_t get_element_count<T[N]> = N;
+
 
 // Maximum number of bytes pushable to the stack -- replaced with DEFAULT_STACK_MEMORY_USAGE after Genesis
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520;
@@ -93,9 +109,19 @@ public:
         return *this;
     }
 
+
+    // enable left-shift operator only for CScriptNum, vectors and arrays.
+    // disallow for other types of arrays like CScript itslf for e.g.
+    // Also disable std::span because a disallowd array type could hide behind it.
     CScript &operator<<(const CScriptNum &);
 
-    CScript &operator<<(const std::vector<uint8_t> &b) {
+    template <typename T, typename = typename std::enable_if<
+                            std::is_same<T, std::vector<uint8_t>>::value ||
+                            std::is_same<T, std::vector<const uint8_t>>::value ||
+                            std::is_same<T, std::array<uint8_t, get_element_count<T>>>::value ||
+                            std::is_same<T, std::array<const uint8_t, get_element_count<T>>>::value
+                            >::type>
+    CScript &operator << (const T &b) {
         if (b.size() < OP_PUSHDATA1) {
             insert(end(), uint8_t(b.size()));
         } else if (b.size() <= 0xff) {
@@ -116,14 +142,10 @@ public:
         return *this;
     }
 
-    CScript &operator<<(const CScript &b) {
-        // I'm not sure if this should push the script or concatenate scripts.
-        // If there's ever a use for pushing a script onto a script, delete this
-        // member fn.
-        assert(!"Warning: Pushing a CScript onto a CScript with << is probably "
-                "not intended, use + to concatenate!");
-        return *this;
-    }
+    // I'm not sure if this should push the script or concatenate scripts. If there's ever
+    // a use for pushing a script onto a script, then remove this 'deleted' member function and add
+    // the specific type into the enable_if list or create a dedicated overload.
+    CScript &operator<<(const CScript &b) = delete;
 
     bsv::instruction_iterator begin_instructions() const;
     bsv::instruction_iterator end_instructions() const;

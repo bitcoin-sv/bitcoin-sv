@@ -754,6 +754,23 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, int32_t height)
 
     try
     {
+        // check for a minerinfo transaction. We will use it for our funding
+        // chain even if it is not referenced by the coinbase document.
+        auto const current = mempool.minerInfoTxTracker.current_txid();
+        if (current)
+        {
+            for (CTransactionRef const & tx: block.vtx)
+            {
+                if (tx && *current == tx->GetId())
+                {
+                    auto tracker = mempool.minerInfoTxTracker.CreateLockingAccess();
+                    mempool.minerInfoTxTracker.clear_current_txid();
+                    tracker.insert_minerinfo_txid(height, blockhash, *current);
+                    LogPrint(BCLog::MINERID, "minerinfotx tracker, added minerinfo txn %s to block %s\n", current->ToString(), blockhash.ToString());
+                }
+            }
+        }
+
         // Look for a miner ID in the coinbase
         std::optional<MinerId> minerID { FindMinerId(block, height) };
         if(minerID)

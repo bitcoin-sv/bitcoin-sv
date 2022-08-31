@@ -326,7 +326,7 @@ public:
     const StreamPolicyFactory& GetStreamPolicyFactory() const { return mStreamPolicyFactory; }
 
     /** Enqueue a new transaction for later sending to our peers */
-    void EnqueueTransaction(const CTxnSendingDetails& txn);
+    bool EnqueueTransaction(const CTxnSendingDetails& txn);
     /** Remove some transactions from our peers list of new transactions */
     void DequeueTransactions(const std::vector<CTransactionRef>& txns);
 

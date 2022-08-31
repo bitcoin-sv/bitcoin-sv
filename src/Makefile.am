@@ -160,6 +160,7 @@ BITCOIN_CORE_H = \
   miner_id/miner_info_error.h \
   miner_id/miner_info_ref.h \
   miner_id/revokemid.h \
+  miner_id/miner_info_tracker.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -332,6 +333,7 @@ libbitcoin_server_a_SOURCES = \
   miner_id/miner_info_error.cpp \
   miner_id/miner_info_ref.cpp \
   miner_id/revokemid.cpp \
+  miner_id/miner_info_tracker.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
@@ -365,6 +367,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/blockchain.cpp \
   rpc/frozentxo_rpc.cpp \
   rpc/mining.cpp \
+  rpc/miner_info.cpp \
   rpc/mining-fbb.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
