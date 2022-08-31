@@ -22,6 +22,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 
 class CBlock;
+class CBlockIndex;
 class Config;
 class CScheduler;
 class MinerId;
@@ -53,7 +54,7 @@ class MinerIdDatabase final
      * A new block has been added to the tip.
      * Check for a miner ID coinbase document and update the database accordingly.
      */
-    void BlockAdded(const CBlock& block, int32_t height);
+    void BlockAdded(const CBlock& block, CBlockIndex const * pindex);
 
     /**
      * A block has been removed from the tip.
@@ -305,7 +306,7 @@ class MinerIdDatabase final
     [[nodiscard]] std::optional<MinerIdEntry> GetMinerIdForBlockNL(const CBlock& block, int32_t height) const;
 
     // Update miner ID details from coinbase for newly added block
-    void BlockAddedNL(const CBlock& block, int32_t height);
+    void BlockAddedNL(const CBlock& block, CBlockIndex const * pindex);
 
     // Process a miner ID from a brand new miner
     MinerUUId ProcessNewMinerNL(const uint256& minerIdHash,

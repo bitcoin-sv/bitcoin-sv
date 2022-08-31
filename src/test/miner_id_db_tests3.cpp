@@ -5,6 +5,8 @@
 #include "blockstreams.h"
 #include "config.h"
 #include "consensus/merkle.h"
+#include "merkletreestore.h"
+#include "miner_id/dataref_index.h"
 #include "miner_id/miner_id.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/revokemid.h"
@@ -332,6 +334,11 @@ namespace
     {
         SetupMinerIDChain() : TestChain100Setup{}
         {
+	    // Create dataref index
+            int64_t nMerkleTreeIndexDBCache = 10; // MB
+            g_dataRefIndex = std::make_unique<DataRefTxnDB>(GlobalConfig::GetConfig());
+            pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), 4);
+
             // Setup ID keys
             miner1IdKey1.MakeNewKey(true);
             miner1IdPubKey1 = miner1IdKey1.GetPubKey();

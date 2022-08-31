@@ -7,8 +7,11 @@
 #include "blockstreams.h"
 #include "config.h"
 #include "logging.h"
+#include "merkleproof.h"
+#include "merkletreestore.h"
 #include "miner_id/miner_id.h"
 #include "miner_id/revokemid.h"
+#include "miner_id/dataref_index.h"
 #include "scheduler.h"
 #include "univalue.h"
 
@@ -158,7 +161,7 @@ MinerIdDatabase::~MinerIdDatabase()
 }
 
 // A new block has been added to the tip
-void MinerIdDatabase::BlockAdded(const CBlock& block, int32_t height)
+void MinerIdDatabase::BlockAdded(const CBlock& block, CBlockIndex const * pindex)
 {
     try
     {
@@ -167,7 +170,7 @@ void MinerIdDatabase::BlockAdded(const CBlock& block, int32_t height)
         // If we've finished syncing
         if(mDBState.mSynced)
         {
-            BlockAddedNL(block, height);
+            BlockAddedNL(block, pindex);
         }
     }
     catch(const std::exception& e)
@@ -430,7 +433,7 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
             if(pindex->ReadBlockFromDisk(block, mConfig))
             {
                 // Process block
-                BlockAddedNL(block, pindex->GetHeight());
+                BlockAddedNL(block, pindex);
             }
         }
 
@@ -744,9 +747,30 @@ MinerIdDatabase::MinerUUIdMap MinerIdDatabase::GetAllMinerUUIdsNL() const
 }
 
 // Update miner ID details from coinbase for newly added block
-void MinerIdDatabase::BlockAddedNL(const CBlock& block, int32_t height)
+void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pindex)
 {
     const uint256& blockhash { block.GetHash() };
+    const int32_t height = pindex->GetHeight();
+
+    std::function<std::optional<MerkleProof>(TxId const &, uint256 const &)> GetMerkleProof =
+        [this, &block, pindex, height](TxId const & txid, uint256 const & blockHash) -> std::optional<MerkleProof>
+        {
+            CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(mConfig, *pindex, height);
+            if (!merkleTree)
+            {
+                LogPrint(BCLog::MINERID, strprintf("Can't read block from disk for blockhash%s", block.GetHash() ));
+                return std::nullopt;
+            }
+            CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(txid, true);
+            if (proof.merkleTreeHashes.empty())
+            {
+                LogPrint(BCLog::MINERID, strprintf("Transaction(s) not found in provided block with hash %s", block.GetHash()));
+                return std::nullopt;
+            }
+
+            return {{proof, txid, blockHash}};
+        };
+
 
     // Somewhere to remember miner UUID and miner ID for this block
     MinerUUId minerUUId { boost::uuids::nil_uuid() };
@@ -754,23 +778,6 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, int32_t height)
 
     try
     {
-        // check for a minerinfo transaction. We will use it for our funding
-        // chain even if it is not referenced by the coinbase document.
-        auto const current = mempool.minerInfoTxTracker.current_txid();
-        if (current)
-        {
-            for (CTransactionRef const & tx: block.vtx)
-            {
-                if (tx && *current == tx->GetId())
-                {
-                    auto tracker = mempool.minerInfoTxTracker.CreateLockingAccess();
-                    mempool.minerInfoTxTracker.clear_current_txid();
-                    tracker.insert_minerinfo_txid(height, blockhash, *current);
-                    LogPrint(BCLog::MINERID, "minerinfotx tracker, added minerinfo txn %s to block %s\n", current->ToString(), blockhash.ToString());
-                }
-            }
-        }
-
         // Look for a miner ID in the coinbase
         std::optional<MinerId> minerID { FindMinerId(block, height) };
         if(minerID)
@@ -781,6 +788,30 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, int32_t height)
             const CoinbaseDocument& cbDoc { minerID->GetCoinbaseDocument() };
             const CPubKey& curMinerId { cbDoc.GetMinerIdAsKey() };
             const CPubKey& prevMinerId { cbDoc.GetPrevMinerIdAsKey() };
+
+            // Add minerinfo to dataref index and to funds tracking
+            const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
+            if (minerInfoTxId)
+            {
+                // add to dataref index
+                g_dataRefIndex->ExtractMinerInfoTxnFromBlock (block, *minerInfoTxId, GetMerkleProof);
+
+                // add to funding tracker
+                auto tracker = mempool.minerInfoTxTracker.CreateLockingAccess();
+                auto const current = mempool.minerInfoTxTracker.current_txid();
+                if (current && *current == *minerInfoTxId)
+                {   // add to funds tracker
+                    mempool.minerInfoTxTracker.clear_current_txid();
+                    tracker.insert_minerinfo_txid(height, blockhash, *current);
+                    LogPrint(BCLog::MINERID, "minerinfotx tracker, added minerinfo txn %s to block %s\n", current->ToString(), blockhash.ToString());
+                }
+            }
+
+            // Add datarefs to the dataref index
+            if (auto datarefs = cbDoc.GetDataRefs(); datarefs && !datarefs->empty())
+            {
+                g_dataRefIndex->ExtractDatarefTxnsFromBlock (block, *datarefs, GetMerkleProof);
+            }
 
             // Check revocation keys
             CheckRevocationKeysNL(prevMinerId, cbDoc);

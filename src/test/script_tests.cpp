@@ -2294,22 +2294,6 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
     BOOST_CHECK(CTxOut(Amount(0), opReturn).IsDust(true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
 }
 
-BOOST_AUTO_TEST_CASE(txout_IsDust_with_arraydata) {
-
-    std::array<uint8_t, 100> data;
-    for (size_t i = 0; i < 100; ++i)
-        data[i] = 3;
-
-    CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN << data;
-    CScript opReturn = CScript() << OP_RETURN << data;
-
-    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(false));
-    BOOST_CHECK(!CTxOut(Amount(1), opReturn).IsDust(false));
-
-    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(true));
-    BOOST_CHECK(CTxOut(Amount(0), opReturn).IsDust(true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
-}
-
 BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {
 
     static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};

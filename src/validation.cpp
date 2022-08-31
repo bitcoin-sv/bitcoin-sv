@@ -3953,7 +3953,7 @@ static bool ConnectTip(
             // Update miner ID database if required
             if(g_minerIDs) {
                 int64_t nMinerIdStart = GetTimeMicros();
-                g_minerIDs->BlockAdded(blockConnecting, pindexNew->GetHeight());
+                g_minerIDs->BlockAdded(blockConnecting, pindexNew);
                 int64_t nThisMinerIdTime = GetTimeMicros() - nMinerIdStart;
                 nTimeMinerId += nThisMinerIdTime;
                 LogPrint(BCLog::BENCH, "    - MinerID total: %.2fms [%.2fs]\n",

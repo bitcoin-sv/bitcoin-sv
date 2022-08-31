@@ -441,6 +441,9 @@ add_library(server
 	metrics.h
 	miner_id/coinbase_doc.cpp
 	miner_id/coinbase_doc.h
+    miner_id/dataref_index.cpp
+    miner_id/dataref_index.h
+    miner_id/dataref_index_detail.h
 	miner_id/miner_id.cpp
 	miner_id/miner_id.h
 	miner_id/miner_info_tracker.cpp

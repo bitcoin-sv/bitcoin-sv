@@ -5,6 +5,8 @@
 #include "blockstreams.h"
 #include "config.h"
 #include "consensus/merkle.h"
+#include "merkletreestore.h"
+#include "miner_id/dataref_index.h"
 #include "miner_id/miner_id.h"
 #include "miner_id/miner_id_db.h"
 #include "pow.h"
@@ -133,6 +135,12 @@ namespace
     {
         SetupMinerIDChain() : TestChain100Setup{}
         {
+            // Create dataref index
+            int64_t nMerkleTreeIndexDBCache = 10; // MB
+            g_dataRefIndex = std::make_unique<DataRefTxnDB>(GlobalConfig::GetConfig());
+            pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), 4);
+
+
             // Setup keys
             miner1IdKey1.MakeNewKey(true);
             miner1IdPubKey1 = miner1IdKey1.GetPubKey();
@@ -145,6 +153,7 @@ namespace
 
             // Mine another block so we have 2 coinbase to spend
             CreateAndProcessBlock();
+
 
             // Generate a block chain with 2 miners
             int32_t startingHeight { chainActive.Height() };
@@ -198,6 +207,11 @@ namespace
             std::vector<uint8_t> signature { CreateSignatureStaticCoinbaseDocument(miner3IdKey1, baseDocument) };
             CBlock forkBlock { CreateAndProcessBlock(chainActive.Tip()->GetPrev()->GetBlockHash(), baseDocument, signature) };
             forkBlockId = forkBlock.GetHash();
+        }
+
+        ~SetupMinerIDChain()
+        {
+            g_dataRefIndex.reset();
         }
 
         // Add a couple of datarefs to the mempool so they get mined in the next block

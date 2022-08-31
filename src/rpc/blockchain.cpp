@@ -18,6 +18,7 @@
 #include "core_io.h"
 #include "hash.h"
 #include "merkletreestore.h"
+#include "miner_id/dataref_index.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/revokemid.h"
 #include "netmessagemaker.h"
@@ -3869,6 +3870,70 @@ static UniValue getmineridinfo(const Config &config, const JSONRPCRequest &reque
     return ret;
 }
 
+UniValue datarefindexdump(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw std::runtime_error(
+            "datarefindexdump\n"
+
+            "\nReturns details for all currently stored dataRef transactions"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"txid\": xxxx,        (string) ID of this dataRef transaction\n"
+            "    \"blockid\": xxxx,     (string) Hash of the block this dataRef transaction was seen and referenced in\n"
+            "  }\n"
+            "[\n"
+            "\nExamples:\n" +
+            HelpExampleCli("datarefindexdump", "") +
+            HelpExampleRpc("datarefindexdump", ""));
+    }
+
+    // Check we have the dataref index database to dump
+    if(g_dataRefIndex)
+    {
+        auto data_access = g_dataRefIndex->CreateLockingAccess();
+        return data_access.DumpDataRefTxnsJSON();
+    }
+    else
+    {
+        throw std::runtime_error("DataRef transaction database unavailable");
+    }
+}
+
+UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+    {
+        throw std::runtime_error(
+            "datareftxndelete \"txid\"\n"
+
+            "\nDelete the specified dataRef transaction from the dataRef index.\n"
+            "\nArguments:\n"
+            "1. \"txid\"   (string, required) The ID of the dataRef transaction to delete from the index.\n"
+            "\nResult:\n"
+            "\nExamples:\n" +
+            HelpExampleCli("datareftxndelete", "") +
+            HelpExampleRpc("datareftxndelete", ""));
+    }
+
+    // Check we have the dataref index database
+    if(g_dataRefIndex)
+    {
+        const std::string strTxId { request.params[0].get_str() };
+        const uint256 txid { uint256S(strTxId) };
+        auto data_access = g_dataRefIndex->CreateLockingAccess();
+        data_access.DeleteDatarefTxn(txid);
+    }
+    else
+    {
+        throw std::runtime_error("DataRef transaction database unavailable");
+    }
+
+    return NullUniValue;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -3918,6 +3983,8 @@ static const CRPCCommand commands[] = {
     { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
     { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} },
     { "hidden",             "dumpminerids",           dumpminerids,            true,  {} },
+    { "hidden",             "datarefindexdump",       datarefindexdump,        true,  {} },
+    { "hidden",             "datareftxndelete",       datareftxndelete,        true,  {"txid"} },
 };
 // clang-format on
 
