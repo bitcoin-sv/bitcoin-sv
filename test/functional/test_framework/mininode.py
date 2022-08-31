@@ -296,6 +296,24 @@ def ser_byte_array(s):
             s.bytes,
     ))
 
+def deser_optional(typename, f):
+    hasVal = struct.unpack("<b", f.read(1))[0]
+    if(hasVal):
+        val = typename()
+        val.deserialize(f)
+        return val
+    else:
+        return None
+
+def ser_optional(o):
+    r = b"";
+    if(o):
+        r += struct.pack("<b", 1)
+        r += o.serialize()
+    else:
+        r += struct.pack("<b", 0)
+    return r
+
 # Deserialize from a hex string representation (eg from RPC)
 
 
@@ -739,6 +757,33 @@ class TSCMerkleProof():
 
 class CBlockHeaderEnriched(CBlockHeader):
 
+    class TxnAndProof():
+        def __init__(self, txnproof=None):
+            if txnproof is None:
+                self.set_null()
+            else:
+                self.tx = txnproof.tx
+                self.proof = txnproof.proof
+
+        def set_null(self):
+            self.tx = None
+            self.proof = None
+
+        def deserialize(self, f):
+            self.tx = CTransaction()
+            self.tx.deserialize(f)
+            self.proof = TSCMerkleProof()
+            self.proof.deserialize(f)
+
+        def serialize(self):
+            r = b""
+            r += self.tx.serialize()
+            r += self.proof.serialize()
+            return r
+
+        def __repr__(self):
+            return "TxnAndProof(tx=%s proof=%s)" % (repr(self.tx), repr(self.proof))
+
     def __init__(self, header=None):
         super(CBlockHeaderEnriched, self).__init__(header)
         if header is None:
@@ -746,45 +791,37 @@ class CBlockHeaderEnriched(CBlockHeader):
         else:
             self.nTx = header.nTx
             self.noMoreHeaders = header.noMoreHeaders
-            self.hasCoinbaseData = header.hasCoinbaseData
-            self.coinbaseMerkleProof = header.coinbaseMerkleProof
-            self.coinBaseTx = header.coinBaseTx
+            self.coinbaseTxProof = header.coinbaseTxProof
+            self.minerInfoProof = header.minerInfoProof
 
     def set_null(self):
         super(CBlockHeaderEnriched, self).set_null()
         self.nTx = 0
         self.noMoreHeaders = False
-        self.hasCoinbaseData = False
-        self.coinbaseMerkleProof = None
-        self.coinBaseTx = None
+        self.coinbaseTxProof = None
+        self.minerInfoProof = None
 
     def deserialize(self, f):
         super(CBlockHeaderEnriched, self).deserialize(f)
         self.nTx = deser_compact_size(f)
         self.noMoreHeaders = struct.unpack("<b", f.read(1))[0]
-        self.hasCoinbaseData = struct.unpack("<b", f.read(1))[0]
-        if self.hasCoinbaseData == True:
-            self.coinbaseMerkleProof = TSCMerkleProof()
-            self.coinbaseMerkleProof.deserialize(f)
-            self.coinBaseTx = CTransaction()
-            self.coinBaseTx.deserialize(f)
+        self.coinbaseTxProof = deser_optional(self.TxnAndProof, f)
+        self.minerInfoProof = deser_optional(self.TxnAndProof, f)
 
     def serialize(self):
         r = b"".join((
             super(CBlockHeaderEnriched, self).serialize(),
             ser_compact_size(self.nTx),
             struct.pack("<b", self.noMoreHeaders),
-            struct.pack("<b", self.hasCoinbaseData)
+            ser_optional(self.coinbaseTxProof),
+            ser_optional(self.minerInfoProof)
             ))
-        if self.hasCoinbaseData:
-            r += self.coinbaseMerkleProof.serialize()
-            r += self.coinBaseTx.serialize()
         return r
 
     def __repr__(self):
-        return "CBlockHeaderEnriched(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x nTx=%i noMoreHeaders=%i hasCoinbaseData=%i coinbaseMerkleProof=%s coinBaseTx=%s)" \
+        return "CBlockHeaderEnriched(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x nTx=%i noMoreHeaders=%i coinbaseTxProof=%s minerInfoProof=%s)" \
             % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
-               time.ctime(self.nTime), self.nBits, self.nNonce, self.nTx, self.noMoreHeaders, self.hasCoinbaseData, repr(self.coinbaseMerkleProof), repr(self.coinBaseTx))
+               time.ctime(self.nTime), self.nBits, self.nNonce, self.nTx, self.noMoreHeaders, repr(self.coinbaseTxProof), repr(self.minerInfoProof))
 
 class CBlock(CBlockHeader):
 

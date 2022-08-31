@@ -27,6 +27,7 @@
 #include "miner_id/dataref_index.h"
 #include "miner_id/datareftx.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_ref.h"
 #include "miner_id/revokemid.h"
 #include "net/block_download_tracker.h"
 #include "net/net.h"
@@ -2681,14 +2682,30 @@ namespace {
  */
 class CBlockHeaderEnriched
 {
+    struct TxnAndProof
+    {
+        // Contains Merkle proof in binary TSC format (https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format)
+        using TSCMerkleProof = ::MerkleProof;
+
+        // Serialisation
+        ADD_SERIALIZE_METHODS
+        template <typename Stream, typename Operation>
+        inline void SerializationOp(Stream& s, Operation ser_action)
+        {
+            READWRITE(txn);
+            READWRITE(proof);
+        }
+
+        CTransactionRef txn {nullptr};
+        TSCMerkleProof proof {};
+    };
+
 public:
-    CBlockHeader blockHeader;
+    CBlockHeader blockHeader {};
     uint64_t nTx{ 0 };
     bool noMoreHeaders{ false };
-    bool hasCoinbaseData{ false };
-    using TSCMerkleProof = ::MerkleProof; // Contains Merkle proof in binary TSC format (https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format)
-    TSCMerkleProof coinbaseMerkleProof;
-    std::vector<uint8_t> coinbaseTx;
+    std::optional<TxnAndProof> coinbaseAndProof { std::nullopt };
+    std::optional<TxnAndProof> minerInfoAndProof { std::nullopt };
 
     // Pointer to block index object is only included in object so that it can be used
     // when setting (non-const) data members after construction.
@@ -2706,23 +2723,22 @@ public:
     CBlockHeaderEnriched() = default;
 
     CBlockHeaderEnriched(const CBlockIndex* blockIndex)
-    : blockHeader(blockIndex->GetBlockHeader())
-    , nTx(blockIndex->GetBlockTxCount())
-    , blockIndex(blockIndex)
+    : blockHeader { blockIndex->GetBlockHeader() }
+    , nTx { blockIndex->GetBlockTxCount() }
+    , blockIndex { blockIndex }
     {
     }
 
-    template <typename Stream> void Serialize(Stream& s) const
+    // Serialisation
+    ADD_SERIALIZE_METHODS
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        blockHeader.Serialize(s);
-        WriteCompactSize(s, nTx);
-        s << noMoreHeaders;
-        s << hasCoinbaseData;
-        if (hasCoinbaseData)
-        {
-            s << coinbaseMerkleProof;
-            s.write((char*)&coinbaseTx[0], coinbaseTx.size());
-        }
+        READWRITE(blockHeader);
+        READWRITECOMPACTSIZE(nTx);
+        READWRITE(noMoreHeaders);
+        READWRITE(coinbaseAndProof);
+        READWRITE(minerInfoAndProof);
     }
 
     /**
@@ -2738,34 +2754,57 @@ public:
      */
     void SetCoinBaseInfo(int serializationVersion, const Config& config, int32_t chainActiveHeight)
     {
-        hasCoinbaseData = false;
-        coinbaseTx.clear();
-        coinbaseMerkleProof = TSCMerkleProof();
-        // Default constructor should set these to values we expect here
-        assert( coinbaseMerkleProof.Flags() == 0 ); // Always set to 0 because we're providing transaction ID in txOrId, block hash in target, Merkle branch as proof in nodes and there is a single proof
-        assert( coinbaseMerkleProof.Index() == 0 ); // Always set to 0, because we're providing proof for coinbase transaction
-
+        coinbaseAndProof.reset();
         try
         {
             auto blockReader = blockIndex->GetDiskBlockStreamReader();
             if(blockReader)
             {
                 // Read CB txn from disk
-                auto& cbTx = blockReader->ReadTransaction();
+                CTransaction cbTx { blockReader->ReadTransaction() };
+                coinbaseAndProof = std::make_optional<TxnAndProof>();
 
-                // Serialize CB txn into coinbaseTx using the specified protocol version.
-                CVectorWriter vw(SER_NETWORK, serializationVersion, coinbaseTx, 0, cbTx);
+                coinbaseAndProof->proof.TxnId(cbTx.GetId());
+                coinbaseAndProof->proof.Target(blockIndex->GetBlockHash());
 
-                coinbaseMerkleProof.TxnId( cbTx.GetId() );
-                coinbaseMerkleProof.Target( blockIndex->GetBlockHash() );
+                coinbaseAndProof->txn = MakeTransactionRef(std::move(cbTx));
+
+                // Default constructor should set these to values we expect here
+                assert( coinbaseAndProof->proof.Flags() == 0 ); // Always set to 0 because we're providing transaction ID in txOrId, block hash in target, Merkle branch as proof in nodes and there is a single proof
+                assert( coinbaseAndProof->proof.Index() == 0 ); // Always set to 0, because we're providing proof for coinbase transaction
+
+                // See if this coinbase contains a miner-info reference
+                if(g_dataRefIndex && coinbaseAndProof->txn->vout.size() > 1)
+                {
+                    const bsv::span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
+                    if(IsMinerInfo(script))
+                    {
+                        const auto& mir { ParseMinerInfoRef(script) };
+                        if(std::holds_alternative<miner_info_ref>(mir))
+                        {
+                            const auto& ref { std::get<miner_info_ref>(mir) };
+
+                            // Lookup miner-info txn in the dataref index
+                            const auto& locking { g_dataRefIndex->CreateLockingAccess() };
+                            const auto& minerInfo { locking.GetMinerInfoEntry(ref.txid()) };
+                            if(minerInfo)
+                            {
+                                // Return txn and proof details for the miner-info txn as well
+                                minerInfoAndProof = std::make_optional<TxnAndProof>();
+                                minerInfoAndProof->txn = minerInfo->txn;
+                                minerInfoAndProof->proof = minerInfo->proof;
+                            }
+                        }
+                    }
+                }
             }
         }
         catch(...)
         {
-            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase txn failed.");
+            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.");
         }
 
-        if(!coinbaseTx.empty())
+        if(coinbaseAndProof)
         {
             // Get Merkle proof for CB txn from Merkle tree cache.
             // Note that this can be done without holding cs_main lock.
@@ -2773,21 +2812,18 @@ public:
             {
                 auto merkleTreeHashes = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
 
-                TSCMerkleProof::nodes_type nodes;
-                for(auto& h: merkleTreeHashes)
+                TxnAndProof::TSCMerkleProof::nodes_type nodes;
+                for(const auto& h: merkleTreeHashes)
                 {
                     nodes.emplace_back(h);
                     assert( nodes.back().mType ==0 ); // Type of node in Merkle proof is always 0 because we're providing hash in value field
                 }
-                coinbaseMerkleProof.Nodes( std::move(nodes) );
-
-                // If we were able to get both CB txn and its Merkle proof, we can return coinbase data.
-                hasCoinbaseData = true;
+                coinbaseAndProof->proof.Nodes( std::move(nodes) );
             }
             else
             {
                 // Delete CB txn if we were unable to get its Merkle proof, since it is not needed.
-                coinbaseTx.clear();
+                coinbaseAndProof.reset();
             }
         }
     }
