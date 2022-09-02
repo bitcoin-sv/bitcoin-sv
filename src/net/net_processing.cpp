@@ -29,6 +29,7 @@
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_info_ref.h"
 #include "miner_id/revokemid.h"
+#include "net/authconn.h"
 #include "net/block_download_tracker.h"
 #include "net/net.h"
 #include "net/netbase.h"
@@ -2012,10 +2013,10 @@ static bool ProcessAuthChMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         // Send the authresp message.
         connman.
             PushMessage(pfrom,
-                msgMaker.Make(NetMsgType::AUTHRESP, SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES, vPubKey, nClientNonce, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES, vSign));
+                msgMaker.Make(NetMsgType::AUTHRESP, vPubKey, nClientNonce, vSign));
         // Add a log message.
         LogPrint(BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
-            SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES, HexStr(vPubKey).c_str(), nClientNonce, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES, HexStr(vSign).c_str(), pfrom->id);
+            vPubKey.size(), HexStr(vPubKey).c_str(), nClientNonce, vSign.size(), HexStr(vSign).c_str(), pfrom->id);
     } catch(std::exception& e) {
         LogPrint(BCLog::NETCONN, "peer=%d Failed to process authch: (%s); disconnecting\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, msgMaker
@@ -2037,35 +2038,32 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& str
         return true;
     }
     using namespace authconn;
-    uint32_t nPubKeyLen {0};
     std::vector<uint8_t> vPubKey {};
     uint64_t nClientNonce {0};
-    uint32_t nSignLen {0};
     std::vector<uint8_t> vSign {};
 
     try {
         // Read data from the message.
-        vRecv >> nPubKeyLen;
-        if (SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES != nPubKeyLen) {
-            throw std::runtime_error("Incorrect nPubKeyLen="+std::to_string(nPubKeyLen));
-        }
         vRecv >> LIMITED_BYTE_VEC(vPubKey, SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES);
-        if (vPubKey.size() != nPubKeyLen) {
-            throw std::runtime_error("Incorrect vPubKey.size()="+std::to_string(vPubKey.size()));
-        }
+        if(SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES != vPubKey.size())
+            throw std::runtime_error("Incorrect nPubKeyLen="+std::to_string(vPubKey.size()));
+
         vRecv >> nClientNonce;
-        vRecv >> nSignLen;
-        if (SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES != nSignLen) {
-            throw std::runtime_error("Incorrect nSignLen=" + std::to_string(nSignLen));
-        }
+
         vRecv >> LIMITED_BYTE_VEC(vSign, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES);
-        size_t vSignSize {vSign.size()};
-        if (!(SECP256K1_DER_SIGN_MIN_SIZE_IN_BYTES <= vSignSize && vSignSize <= nSignLen)) {
-            throw std::runtime_error("Incorrect vSign.size()="+std::to_string(vSignSize));
-        }
+        const size_t vSignSize {vSign.size()};
+        if (!(SECP256K1_DER_SIGN_MIN_SIZE_IN_BYTES <= vSignSize &&
+              vSignSize <= SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES))
+            throw std::runtime_error("Incorrect vSign.size()=" +
+                                     std::to_string(vSignSize));
+
         // Add a log message.
-        LogPrint(BCLog::NETCONN, "Got authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), from peer=%d\n",
-            nPubKeyLen, HexStr(vPubKey).c_str(), nClientNonce, nSignLen, HexStr(vSign).c_str(), pfrom->id);
+        LogPrint(BCLog::NETCONN,
+                 "Got authresp message (nPubKeyLen: %d, vPubKey: %s, "
+                 "nClientNonce: %d, nSignLen: %d, vSign: %s), from peer=%d\n",
+                 vPubKey.size(), HexStr(vPubKey).c_str(), nClientNonce,
+                 vSignSize, HexStr(vSign).c_str(), pfrom->id);
+
         /**
          * Verify signature.
          *
