@@ -42,19 +42,6 @@ namespace bsv
         {
             return operand_;
         }
-
-
-        inline constexpr bool deep_equal(const instruction& other) const noexcept
-        {
-            if (opcode() != other.opcode() || operand().size() != other.operand().size())
-                return false;
-
-            for (size_t i = 0; i < operand().size(); ++i)
-                if (operand()[i] != other.operand()[i])
-                    return false;
-
-            return true;
-        }
     };
 
     inline constexpr bool operator==(const instruction& a,

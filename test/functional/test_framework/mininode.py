@@ -1430,13 +1430,13 @@ class msg_authresp():
         self.pubKey = None
         self.nClientNonce = 0
         self.nSignLen = 0
-        slef.sign = None
+        self.sign = None
 
     def deserialize(self, f):
-        self.nPubKeyLen = struct.unpack("<I", f.read(4))[0]
+        self.nPubKeyLen = struct.unpack("<I", f.read(1))[0]
         self.pubKey = deser_byte_array(deser_string(f))
         self.nClientNonce = struct.unpack("<Q", f.read(8))[0]
-        self.nSignLen = struct.unpack("<I", f.read(4))[0]
+        self.nSignLen = struct.unpack("<I", f.read(1))[0]
         self.sign = deser_byte_array(deser_string(f))
 
     def serialize(self):
