@@ -26,7 +26,7 @@ class NetTest(BitcoinTestFramework):
 
     def run_test(self):
         self._test_connection_count()
-        self._test_authconnestablished()
+        self._test_authconn_not_established()
         self._test_getauthconninfo()
         self._test_getnettotals()
         self._test_getnetworkinginfo()
@@ -36,7 +36,7 @@ class NetTest(BitcoinTestFramework):
         # connect_nodes_bi connects each node to the other
         wait_until(lambda: self.nodes[0].getconnectioncount() == 2, timeout=5)
 
-    def _test_authconnestablished(self):
+    def _test_authconn_not_established(self):
         peer_info = self.nodes[0].getpeerinfo()
         assert_equal(len(peer_info), 2)
         assert_equal([peer['authconn'] for peer in peer_info], [False, False])

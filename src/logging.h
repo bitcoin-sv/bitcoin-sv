@@ -80,6 +80,7 @@ private:
     std::atomic<typename std::underlying_type<LogFlags>::type> logCategories{0};
 
     std::string LogTimestampStr(const std::string &str);
+    int log(const char*);
 
 public:
     bool fPrintToConsole = false;
