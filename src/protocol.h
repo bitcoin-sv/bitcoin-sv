@@ -59,7 +59,7 @@ static const unsigned int DEFAULT_RECV_INV_QUEUE_FACTOR = 3;
 /**
  * Maximal and minimal factors of full size inventory messages allowed to be stored.
  */
-static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 10;
+static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 100;
 static const unsigned int MIN_RECV_INV_QUEUE_FACTOR = 1;
 
 /**
