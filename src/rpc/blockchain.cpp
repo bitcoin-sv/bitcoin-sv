@@ -1277,18 +1277,14 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                                        CBlockIndex& blockIndex, const std::string& rpcReqId,
                                        bool processedInBatch, const RetFormat& rf)
 {
-    auto stream = blockIndex.StreamSyncBlockFromDisk();
-    if (!stream) 
-    {
-        // Block not found on disk. This could be because we have the block
-        // header in our index but don't have the block (for example if a
-        // non-whitelisted node sends us an unrequested long chain of valid
-        // blocks, we add the headers to our index, but don't accept the block).
-        throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
-    }
-
     CDiskBlockMetaData metadata = blockIndex.GetDiskBlockMetaData();
     bool hasDiskBlockMetaData = !metadata.diskDataHash.IsNull();
+    
+    std::pair<bool, std::string> range_header = req.GetHeader("Range");
+    bool hasRangeHeader = range_header.first;
+
+    uint64_t offset;
+    uint64_t content_length;
 
     switch (rf)
     {
@@ -1296,7 +1292,49 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         {
             if (hasDiskBlockMetaData)
             {
-                req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+                if (hasRangeHeader)
+                {
+                    try
+                    {
+                        std::string s = range_header.second;
+                        std::string delimiter = "-";
+                        std::string rs_s = s.substr(0, s.find(delimiter));
+                        s.erase(0, s.find(delimiter) + delimiter.length());
+                        std::string re_s = s;
+
+                        uint64_t rs = std::stoi(rs_s);
+                        uint64_t re = std::stoi(re_s);
+
+                        if (rs > re)
+                        {
+                            throw block_parse_error("Invalid Range parameter, start > end");
+                        }
+                        if (rs >= metadata.diskDataSize)
+                        {
+                            throw block_parse_error("Invalid Range parameter, start >= data_size");
+                        }
+
+                        offset = rs;
+
+                        uint64_t remain = metadata.diskDataSize - offset;
+                        content_length = std::min(remain, re - rs + 1);
+
+                        req.WriteHeader("Content-Length", std::to_string(content_length));
+                        req.WriteHeader("Content-Range", "bytes " + std::to_string(offset) + "-" + 
+                            std::to_string(content_length - 1) + "/" + std::to_string(metadata.diskDataSize));
+                    }
+                    catch (...) {
+                        throw block_parse_error("Invalid Range parameter.");
+                    }
+                }
+                else
+                {
+                    req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+                }
+            }
+            if (hasRangeHeader)
+            {
+                throw block_parse_error("Block meta data not found.");
             }
             req.WriteHeader("Content-Type", "application/octet-stream");
             break;
@@ -1332,6 +1370,24 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
     if (!rpcReqId.empty())
     {
         req.WriteReplyChunk("{\"result\": \"");
+    }
+
+    std::unique_ptr<CForwardReadonlyStream> stream;
+    if (hasRangeHeader)
+    {
+        stream = blockIndex.StreamSyncPartialBlockFromDisk(offset, content_length);
+    }
+    else
+    {
+        stream = blockIndex.StreamSyncBlockFromDisk();
+    }
+    if (!stream) 
+    {
+        // Block not found on disk. This could be because we have the block
+        // header in our index but don't have the block (for example if a
+        // non-whitelisted node sends us an unrequested long chain of valid
+        // blocks, we add the headers to our index, but don't accept the block).
+        throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
     }
 
     CHash256 hasher;
