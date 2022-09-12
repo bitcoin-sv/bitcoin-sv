@@ -2,180 +2,266 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "miner_id/miner_info_tracker.h"
+#include "primitives/transaction.h"
 #include "util.h"
+#include <algorithm>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <iterator>
+#include <memory>
+#include <mutex>
 
-namespace mining {
+std::unique_ptr<mining::BlockDatarefTracker> g_BlockDatarefTracker;
+std::unique_ptr<mining::MempoolDatarefTracker> g_MempoolDatarefTracker;
 
-    static const fs::path fundingPath = fs::path("miner_id") / "Funding";
+static const fs::path fundingPath = fs::path("miner_id") / "Funding";
 
-    /*
-     * Creates filename with counter
-     */
-    static std::string minerinfotxstore (int32_t height)
+/*
+ * Creates filename with counter
+ */
+static std::string storage_filename_with_date ()
+{
+    auto t = std::chrono::system_clock::now();
+    auto tt = std::chrono::system_clock::to_time_t(t);
+
+    std::stringstream ss;
+    ss << std::put_time(std::gmtime(&tt), "minerinfotxstore-%Y-%m-%d.dat");
+    return ss.str();
+};
+/*
+ * Store minerinfo txn-ids in chunks spanning periods of 1000 blocks
+ */
+static bool store_minerinfo_fund_NL(const std::vector<COutPoint>& funds)
+{
+    try
     {
-        return strprintf("minerinfotxstore-%06d.dat", height);
-    };
+        auto dir = (GetDataDir() / fundingPath);
+        auto filepath = dir / storage_filename_with_date();
 
-    /*
-     * Compares a file name to a template and extracts the counter
-     * if the template matches
-     */
-    static std::optional<int> parsestorefile (std::string n)  {
+        if(!fs::exists(dir))
+            fs::create_directory(dir);
+        fs::ofstream file;
+        file.open(filepath.string(),
+                  std::ios::out | std::ios::binary | std::ios::app);
+        if(!file.is_open())
+            throw std::runtime_error(
+                "Cannot open and truncate funding data file: " +
+                filepath.string());
 
-        int res = 0;
-        std::string t = "minerinfotxstore-######.dat";
+        for(const auto& fund : funds)
+            file << fund.GetTxId() << ' ' << fund.GetN() << std::endl;
+    }
+    catch(std::exception const& e)
+    {
+        LogPrintf(strprintf("Error while storing funding information: %s\n",
+                            e.what()));
+        return false;
+    }
+    catch(...)
+    {
+        LogPrintf("Error while storing funding information\n");
+        return false;
+    }
+    return true;
+}
 
-        if (t.size() != n.size())
-            return std::nullopt;
 
-        for (size_t i = 0; i < t.size(); ++i)
+void mining::BlockDatarefTracker::store_funds(const std::vector<COutPoint>& ops)
+{
+    std::lock_guard lock{mtx_};
+    funds_.insert(funds_.end(), ops.cbegin(), ops.cend());
+    store_minerinfo_fund_NL(ops);
+}
+
+bool mining::move_and_store(MempoolDatarefTracker& mempool_tracker,
+                            BlockDatarefTracker& block_tracker)
+{
+    try
+    {
+        std::scoped_lock lock{mempool_tracker.mtx_, block_tracker.mtx_};
+        const std::vector<COutPoint> funds{std::move(mempool_tracker.funds_)};
+        block_tracker.funds_.insert(block_tracker.funds_.end(),
+                                    funds.begin(),
+                                    funds.end());
+        store_minerinfo_fund_NL(funds);
+    }
+    catch(const std::exception& e)
+    {
+        LogPrintf(strprintf("could not store minerinfo tracking information: %s\n",
+                            e.what()));
+        return false;
+    }
+    catch(...)
+    {
+        LogPrintf("could not store minerinfo tracking information\n");
+        return false;
+    }
+    return true;
+}
+
+std::optional<COutPoint> mining::MempoolDatarefTracker::funds_back() const
+{
+    std::lock_guard lock{mtx_};
+    if(funds_.empty())
+        return std::nullopt;
+
+    return funds_.back();
+}
+
+std::optional<COutPoint> mining::MempoolDatarefTracker::funds_front() const
+{
+    std::lock_guard lock{mtx_};
+    if(funds_.empty())
+        return std::nullopt;
+
+    return funds_.front();
+}
+
+std::vector<COutPoint> mining::MempoolDatarefTracker::funds() const
+{
+    std::lock_guard lock{mtx_};
+    return funds_;
+}
+
+void mining::MempoolDatarefTracker::funds_replace(std::vector<COutPoint> other)
+{
+    std::lock_guard lock{mtx_};
+    funds_ = std::move(other);
+}
+
+void mining::MempoolDatarefTracker::funds_append(const COutPoint& outp)
+{
+    std::lock_guard lock{mtx_};
+    funds_.push_back({outp});
+}
+
+void mining::MempoolDatarefTracker::funds_clear()
+{
+    std::lock_guard lock{mtx_};
+    funds_.clear();
+}
+
+bool mining::MempoolDatarefTracker::funds_pop_back()
+{
+    std::lock_guard lock{mtx_};
+    if(funds_.empty())
+        return false;
+    funds_.pop_back();
+    return true;
+}
+
+bool mining::MempoolDatarefTracker::contains(const TxId& txid) const
+{
+    std::lock_guard lock{mtx_};
+    return std::find_if(funds_.cbegin(), funds_.cend(), [&txid](const auto& x) {
+               return x.GetTxId() == txid;
+           }) != funds_.cend();
+}
+
+/*
+ * Compares a file name to a template and extracts the counter
+ * if the template matches
+ */
+static std::optional<int> parsestorefile (std::string n)  {
+
+    int res = 0;
+    std::string t = "minerinfotxstore-####-##-##.dat";
+
+    if (t.size() != n.size())
+        return std::nullopt;
+
+    for (size_t i = 0; i < t.size(); ++i)
+    {
+        if (t[i] == '#')
         {
-            if (t[i] == '#')
-            {
-                if (n[i] < '0' || n[i] > '9')
-                    return std::nullopt;
-                res *= 10;
-                res += (n[i] - '0');
-            }
-            else if (n[i] != t[i])
-            {
+            if (n[i] < '0' || n[i] > '9')
                 return std::nullopt;
-            }
-            else
-            {
-                continue;
-            }
+            res *= 10;
+            res += (n[i] - '0');
         }
-        return res;
-    };
-
-    static std::istream & operator >> (std::istream & stream, uint256 & hash)
-    {
-        std::string s;
-        stream >> s;
-        hash = uint256S(s);
-        return stream;
+        else if (n[i] != t[i])
+        {
+            return std::nullopt;
+        }
+        else
+        {
+            continue;
+        }
     }
+    return res;
+};
 
-    static std::istream & operator >> (std::istream & stream, TxId & txid)
+std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>>
+mining::BlockDatarefTracker::find_fund(
+        int32_t height,
+        std::function<std::optional<CoinWithScript>(const COutPoint&)>
+            get_spendable_coin) const
+{
+    std::lock_guard lock(mtx_);
+    for(auto i = funds_.crbegin(); i != funds_.crend(); ++i)
     {
-        uint256 hash;
-        stream >> hash;
-        txid = TxId(hash);
-        return stream;
+        const COutPoint& fund = *i;
+        std::optional<CoinWithScript> coin = get_spendable_coin(fund);
+        if(coin.has_value())
+            return {{fund, std::move(coin)}};
     }
+    return std::nullopt;
+}
 
-    /*
-     * Store minerinfo txn-ids in chunks spanning periods of 1000 blocks
-     */
-    bool DatarefTracker::store_minerinfo_fund (int32_t height, const uint256& blockhash, const FundingNode& fundingNode, size_t idx)
+/*
+ * Load funding information from dir.
+ */
+std::unique_ptr<mining::BlockDatarefTracker> mining::make_from_dir(
+    const boost::filesystem::path& dir)
+{
+    using namespace std;
+
+    auto tracker = make_unique<BlockDatarefTracker>();
+    try
     {
-        try
+        vector<string> files;
+        for(auto const& entry : fs::directory_iterator{dir})
         {
-            auto dir = (GetDataDir() / fundingPath);
-            auto filepath = dir / minerinfotxstore(height / 1000);
+            string file = entry.path().filename().string();
+            auto n = parsestorefile(file);
+            if(n)
+                files.push_back(file);
+        }
 
-            if (!fs::exists(dir))
-                fs::create_directory(dir);
-            fs::ofstream file;
-            file.open(filepath.string(), std::ios::out | std::ios::binary | std::ios::app);
-            if (!file.is_open())
-                throw std::runtime_error("Cannot open and truncate funding data file: " + filepath.string());
-
-            file
-                << height << ' '
-                << blockhash << ' '
-                << fundingNode.outPoint.GetTxId() << ' '
-                << fundingNode.outPoint.GetN() << ' '
-                << fundingNode.previous.GetTxId() << ' '
-                << fundingNode.previous.GetN() << ' '
-                << idx << std::endl;
-        }
-        catch (std::exception const & e)
+        sort(files.begin(), files.end());
+        for(string filename : files)
         {
-            LogPrintf(strprintf("Error while storing funding information: %s\n",e.what()));
-            return false;
-        }
-        catch (...)
-        {
-            LogPrintf("Error while storing funding information\n");
-            return false;
-        }
-        return true;
+            fs::ifstream file(dir / filename, ios::binary | ios::out);
+            TxId txid;
+            uint32_t n;
+            while(file >> txid >> n)
+                tracker->funds_.push_back(COutPoint{txid, n}); }
+        return tracker;
     }
-
-    /*
-     * Load funding information from file.
-     */
-    bool DatarefTracker::load_minerinfo_funds ()
+    catch(exception const& e)
     {
-        static size_t count_logs = 0;
-        try
-        {
-            auto dir = (GetDataDir() / fundingPath);
-
-            std::vector<std::string> files;
-            for (auto const& entry : fs::directory_iterator{dir})
-            {
-                std::string file = entry.path().filename().string();
-                auto n = parsestorefile(file);
-                if (n)
-                    files.push_back(file);
-            }
-
-            std::sort(files.begin(), files.end());
-            for (std::string filename: files)
-            {
-                fs::ifstream file;
-                file.open(dir / filename, std::ios::binary | std::ios::out);
-                if (!file.is_open())
-                    return true;  //nothing stored yet, this is not an error
-                int32_t height;
-                uint256 blockhash;
-                TxId txid;
-                uint32_t n;
-                TxId prev_txid;
-                uint32_t prev_n;
-
-                size_t idx;
-
-                while (file >> height >> blockhash >> txid >> n >> prev_txid >>  prev_n >> idx)
-                {
-                    Key key {height, blockhash};
-                    DatarefVector & v = entries_[key];
-                    if (v.funds.size() <= idx)
-                        v.funds.resize(idx+1);
-
-                    COutPoint outPoint {txid, n};
-                    COutPoint previous {prev_txid, prev_n};
-
-                    v.funds[idx] = FundingNode{outPoint,previous};
-                }
-
-                file.close();
-            }
-        }
-        catch (std::exception const & e)
-        {
-            if (++count_logs < 3)
-                LogPrint(BCLog::MINERID, strprintf(
-				"Warning - Unable to load funding information for miner ID; node will be unable " 
-				"to mine blocks containing a miner ID unless you setup a funding seed as described in the documentation: %s\n",
-				e.what()));
-            return false;
-        }
-        catch (...)
-        {
-            if (++count_logs < 3)
-                LogPrint(BCLog::MINERID,
-				"Warning - Unable to load funding information for miner ID; node will be unable "
-				"to mine blocks containing a miner ID unless you setup a funding seed as described in the documentation\n");
-            return false;
-        }
-        return true;
+        LogPrint(BCLog::MINERID,
+                 strprintf("Warning - Unable to load funding information "
+                           "for miner ID; node will be unable "
+                           "to mine blocks containing a miner ID unless "
+                           "you setup a funding seed as described in the "
+                           "documentation: %s\n",
+                           e.what()));
     }
+    catch(...)
+    {
+        LogPrint(BCLog::MINERID,
+                 "Warning - Unable to load funding information for miner "
+                 "ID; node will be unable "
+                 "to mine blocks containing a miner ID unless you setup a "
+                 "funding seed as described in the documentation\n");
+    }
+    return tracker;
+}
 
-} // namespace mining
+std::unique_ptr<mining::BlockDatarefTracker> mining::make_from_dir()
+{
+    const auto dir = (GetDataDir() / fundingPath);
+    return make_from_dir(dir); 
+}
 

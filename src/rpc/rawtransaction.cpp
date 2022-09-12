@@ -1619,9 +1619,9 @@ static UniValue sendrawtransaction(const Config &config,
     // - the Validator's asynch mode removed the txn (and triggered reject msg)
     // - this txn is final version of timelocked txn and is still being validated
     if (!txinfo.IsNull()){
-        g_connman->EnqueueTransaction({ inv, txinfo });
-        LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
-            inv.hash.ToString(), request.authUser.c_str());
+        if (g_connman->EnqueueTransaction({ inv, txinfo }))
+            LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
+                inv.hash.ToString(), request.authUser.c_str());
     }
     if (fKnownTxn) {
         const auto& p2pOrphans = g_connman->getTxnValidator()->getOrphanTxnsPtr().get();
@@ -2108,9 +2108,9 @@ void sendrawtransactions(const Config& config,
                 }
                 if (txinfo.GetTx() != nullptr) {
                     CInv inv(MSG_TX, result.txid);
-                    g_connman->EnqueueTransaction({ inv, txinfo });
-                    LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
-                        inv.hash.ToString(), request.authUser.c_str());
+                    if (g_connman->EnqueueTransaction({ inv, txinfo }))
+                        LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
+                            inv.hash.ToString(), request.authUser.c_str());
                     removeP2POrphanTxDupIfExists(result.txid);
                 }
             }

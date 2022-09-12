@@ -25,6 +25,7 @@
 #include "invalid_txn_publisher.h"
 #include "key.h"
 #include "miner_id/dataref_index.h"
+#include "miner_id/miner_info_tracker.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_id_db_defaults.h"
 #include "mining/journaling_block_assembler.h"
@@ -3080,6 +3081,9 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     InitSignatureCache();
     InitScriptExecutionCache();
+
+    g_MempoolDatarefTracker = std::make_unique<mining::MempoolDatarefTracker>();
+    g_BlockDatarefTracker = mining::make_from_dir();
 
     LogPrintf("Using %u threads for script verification\n",
               config.GetPerBlockScriptValidatorThreadsCount());

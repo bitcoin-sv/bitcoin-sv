@@ -12,9 +12,7 @@
 #include "fs.h"
 #include "key.h"
 #include "logging.h"
-#include "consensus/merkle.h"
-#include "merkletreestore.h"
-#include "miner_id/dataref_index.h"
+#include "miner_id/miner_info_tracker.h"
 #include "mining/factory.h"
 #include "mining/journal_builder.h"
 #include "net/net_processing.h"
@@ -79,6 +77,11 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     mempool.getNonFinalPool().loadConfig();
     CTxMemPoolTestAccess{mempool}.InitInMemoryMempoolTxDB();
     mempool.ResumeSanityCheck();
+    if (!g_MempoolDatarefTracker)
+        g_MempoolDatarefTracker = std::make_unique<mining::MempoolDatarefTracker>();
+    if (!g_BlockDatarefTracker)
+        g_BlockDatarefTracker = std::make_unique<mining::BlockDatarefTracker>();
+
 }
 
 BasicTestingSetup::~BasicTestingSetup() {

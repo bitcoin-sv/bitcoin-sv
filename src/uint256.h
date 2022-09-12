@@ -213,6 +213,14 @@ inline uint256 uint256S(const std::string &str) {
     return rv;
 }
 
+inline std::istream& operator>>(std::istream& stream, uint256& hash)
+{
+    std::string s;
+    stream >> s;
+    hash = uint256S(s);
+    return stream;
+}
+
 inline uint160 uint160S(const char *str) {
     uint160 rv;
     rv.SetHex(str);

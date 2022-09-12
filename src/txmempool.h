@@ -18,7 +18,6 @@
 #include "tx_mempool_info.h"
 #include "txn_validation_data.h"
 #include "policy/policy.h"
-#include "miner_id/miner_info_tracker.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
@@ -902,10 +901,11 @@ public:
      * than time. Return the number of removed transactions. */
     int Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet);
 
-    /** Remove one transaction from the mempool and assume no children.
-     * This is needed for replacement mineridinfo transactions */
+    /** Remove transactions from the mempool when discarding minerid/dataref transactions for
+     * blocks after the next block.
+     * This is  needed for replacement mineridinfo transactions and for removing minerid/dataref txns during reorg*/
     int RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet);
-    int RemoveTxnsAndDescendants(const std::vector<TxId>& txid, const mining::CJournalChangeSetPtr& changeSet);
+    std::vector<TxId> RemoveTxnsAndDescendants(const std::vector<TxId>& txid, const mining::CJournalChangeSetPtr& changeSet);
 
 
     /**
@@ -1300,7 +1300,6 @@ public:
 
     /** Load the mempool from disk. */
     bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
-    mining::DatarefTracker datarefTracker;
 };
 
 // Group definition in the secondary mempool.

@@ -10,6 +10,7 @@
 #include "merkleproof.h"
 #include "merkletreestore.h"
 #include "miner_id/miner_id.h"
+#include "miner_id/miner_info_tracker.h"
 #include "miner_id/revokemid.h"
 #include "miner_id/dataref_index.h"
 #include "scheduler.h"
@@ -797,11 +798,10 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
 
                 // add to funding tracker
                 // The last fund in the trackers mempool list is the minerinfo txn
-                const auto infotx = mempool.datarefTracker.get_current_funds_back();
+                const auto infotx = g_MempoolDatarefTracker->funds_back();
                 if (infotx && infotx->GetTxId() == *minerInfoTxId)
                 {
-                    auto tracker = mempool.datarefTracker.CreateLockingAccess();
-                    tracker.move_current_to_store(height, blockhash);
+                    move_and_store(*g_MempoolDatarefTracker, *g_BlockDatarefTracker);
                     LogPrint(BCLog::MINERID, "minerinfotx tracker and potential parents, added minerinfo txn %s to block %s\n", infotx->ToString(), blockhash.ToString());
                 }
             }
