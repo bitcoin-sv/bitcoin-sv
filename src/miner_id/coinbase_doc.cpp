@@ -214,3 +214,4 @@ std::string to_json(const CoinbaseDocument& doc)
     to_json(oss, doc);
     return oss.str();
 }
+

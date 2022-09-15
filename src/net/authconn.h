@@ -32,39 +32,4 @@ struct AuthConnData
 {
     uint256 msgHash {}; /** the authch challenge msg */
 };
-
-/**
- * This class controls an access to the authentication private/public key-pair.
- */
-class AuthConnKeys
-{
-    CKey privKey {};
-    CPubKey pubKey {};
-
-    void makeKeys(bool fCompressed) {
-        privKey.MakeNewKey(fCompressed);
-        pubKey = privKey.GetPubKey();
-    }
-    void setPrivKeyFromData(const std::vector<uint8_t>& vchKey, bool fCompressed=true) {
-		privKey.Set(vchKey.begin(), vchKey.end(), fCompressed);
-		pubKey = privKey.GetPubKey();
-    }
-
-  public:
-    // The private key, defined in the data file, can be expressed as a BIP32 or ECDSA key
-    // (the public key is stored as a ECDSA key in the data file).
-    enum class PrivKeyStoredFormat { ECDSA, BIP32 };
-
-  public:
-    AuthConnKeys(PrivKeyStoredFormat keyStoredFormat, bool fCompressed=true);
-	// Get public key.
-    const CPubKey& getPubKey() const {
-        return pubKey;
-    }
-    // Create a DER-serialized signature.
-	bool Sign(const uint256 &hash, std::vector<uint8_t> &vchSign, uint32_t randv=0) const {
-        return privKey.Sign(hash, vchSign, randv);
-	}
-};
-
 } // namespace authconn

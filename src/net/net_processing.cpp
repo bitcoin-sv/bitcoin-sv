@@ -28,6 +28,7 @@
 #include "miner_id/datareftx.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_info_ref.h"
+#include "miner_id/miner_info_tracker.h"
 #include "miner_id/revokemid.h"
 #include "net/authconn.h"
 #include "net/block_download_tracker.h"
@@ -1939,7 +1940,7 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 /**
 * Process authch message.
 */
-static bool ProcessAuthChMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
+static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
     const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
 {
     // Skip the message if the AuthConn has already been established.
@@ -1993,20 +1994,52 @@ static bool ProcessAuthChMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
             .Write(msg.begin(), msg.size()) // (a)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
             .Finalize(hash.begin());
+
+        // Get the current MinerID from this node
+        std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
+
+        if (!pubKeyOpt) {
+            LogPrint(BCLog::MINERID, "Ignoring authch messages until this node has mined a block containing a miner_info document");
+            return true;
+        }
+        CPubKey pubKey = pubKeyOpt.value();
+
         // Create the DER-encoded signature of the expected minimal size.
+        // For this purpose send a request to the MinerID Generator which knows the private keys.
         std::vector<uint8_t> vSign {};
-        do {
+        {
             vSign.clear();
-            uint32_t randv {0};
-            GetRandBytes((uint8_t *)&randv, sizeof(randv));
-            if (!connman.SignAuthConnMsgHash(hash, vSign, randv)) {
-                throw std::runtime_error("Signature creation has failed.");
+            using namespace rpc::client;
+            if (!g_pWebhookClient) {
+                // we log unconditionally because we already checked that we do have a minerid.
+                LogPrintf("No authentication client for minerid authentication instantiated");
+                // we return true because we still want to connect, but unauthenticated instead.
+                return true;
+            } else {
+                LogPrint(BCLog::MINERID, "sending signature request to MinerID Generator\n");
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config) };
+                using HTTPRequest = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateMinerIdGeneratorSigningRequest(
+                        rpcConfig,
+                        config.GetMinerIdGeneratorAlias(),
+                        HexStr(hash))) };
+                auto response { std::make_shared<JSONHTTPResponse>() };
+                auto fut = g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+                fut.wait();
+                auto futResponse = fut.get();
+                const JSONHTTPResponse* r = dynamic_cast<JSONHTTPResponse*> (futResponse.get());
+                if (!r)
+                    throw std::runtime_error("Signature creation has not returned from the MinerID Generator.");
+                const UniValue& uv = r->GetBody();
+                if (!uv.isObject())
+                    throw std::runtime_error("Signature creation from MinerID Generator has wrong type. Should be string.");
+                std::string signedHex = uv["signature"].get_str();
+                vSign = ParseHex(signedHex);
             }
-        } while (!(vSign.size() >= SECP256K1_DER_SIGN_MIN_SIZE_IN_BYTES));
+        }
         // Check if the signature is correct before sending it.
-        CPubKey pubKey { connman.GetAuthConnPubKey() };
         if (!pubKey.Verify(hash, vSign)) {
-            throw std::runtime_error("Signature verification has failed.");
+            throw std::runtime_error("Could not create authresp message as the MinerID Generator created signature failed to verify.");
         }
         // Get the public key as a byte's vector.
         std::vector<uint8_t> vPubKey { ToByteVector(pubKey) };
@@ -2021,7 +2054,7 @@ static bool ProcessAuthChMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         LogPrint(BCLog::NETCONN, "peer=%d Failed to process authch: (%s); disconnecting\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, msgMaker
             .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
-        pfrom->fDisconnect = true;
+	    // We still connect if authentication failed.
         return false;
     }
     return true;
@@ -2080,6 +2113,33 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& str
         if (!recvPubKey.IsValid()) {
             throw std::runtime_error("Invalid public key data");
         }
+
+        // check if the address is the one advertised in the minerid document
+        if (g_minerIDs) {
+            auto ipMatchesMineridDocument = [](const CPubKey& minerid, const std::string& socket_addr) {
+                auto docinfo = GetMinerCoinbaseDocInfo(*g_minerIDs, minerid);
+                if (docinfo) {
+                    UniValue uv;
+                    uv.read(docinfo->first.GetRawJSON());
+                    if (uv.exists("extensions")) {
+                        UniValue ex = uv["extensions"];
+                        if (ex.isObject() && ex.exists("PublicIP")) {
+                            UniValue pk = ex["PublicIP"];
+                            if (pk.isStr() && pk.get_str() == socket_addr) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            };
+
+            const Association& assoc = pfrom->GetAssociation();
+            const std::string addr = assoc.GetPeerAddr().ToStringIP();
+            if (!ipMatchesMineridDocument(recvPubKey, addr))
+                throw std::runtime_error("Public ip address does not match the one advertised in the miner info document.");
+        }
+
         // Does the miner identified with the given miner ID have a good reputation?
         // 1. true (if all listed conditions are met):
         //    - the public key is present and marked as a valid key in the MinerID DB
@@ -2100,13 +2160,13 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& str
             .Finalize(hash.begin());
         // Execute verification.
         if (!recvPubKey.Verify(hash, vSign)) {
-            throw std::runtime_error("Signature verification has failed.");
+            throw std::runtime_error("authresp message signature failed to verify.");
         }
     } catch(std::exception& e) {
         LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s); disconnecting\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
             .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
-        pfrom->fDisconnect = true;
+	    // We still connect if authentication failed.
         return false;
     }
 
@@ -4262,7 +4322,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::AUTHCH) {
-        return ProcessAuthChMessage(pfrom, msgMaker, strCommand, vRecv, connman);
+        return ProcessAuthChMessage(config, pfrom, msgMaker, strCommand, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::AUTHRESP) {

@@ -468,10 +468,6 @@ public:
     /* Get extra txns for block reconstruction */
     std::vector<std::pair<uint256, CTransactionRef>> GetCompactExtraTxns() const;
 
-    // AuthConn functions
-    bool SignAuthConnMsgHash(const uint256 &hash, std::vector<uint8_t> &vchSign, uint32_t randv=0) const;
-    const CPubKey& GetAuthConnPubKey() const;
-
     // Addrman functions
     size_t GetAddressCount() const;
     void SetServices(const CService &addr, ServiceFlags nServices);
@@ -701,9 +697,6 @@ private:
     std::list<CNodePtr> vNodesDisconnected;
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
-
-    // Creates keys used to authenticate connections.
-    authconn::AuthConnKeys authConnKeys {authconn::AuthConnKeys::PrivKeyStoredFormat::BIP32};
 
     /** Additional streams we want to open to peers */
     std::list<NodeConnectInfo> mPendingStreams {};

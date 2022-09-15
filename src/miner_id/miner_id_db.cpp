@@ -802,6 +802,7 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
                 if (infotx && infotx->GetTxId() == *minerInfoTxId)
                 {
                     move_and_store(*g_MempoolDatarefTracker, *g_BlockDatarefTracker);
+                    g_BlockDatarefTracker->set_current_minerid(curMinerId);
                     LogPrint(BCLog::MINERID, "minerinfotx tracker and potential parents, added minerinfo txn %s to block %s\n", infotx->ToString(), blockhash.ToString());
                 }
             }

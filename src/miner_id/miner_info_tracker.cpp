@@ -65,13 +65,22 @@ static bool store_minerinfo_fund_NL(const std::vector<COutPoint>& funds)
     return true;
 }
 
-
 void mining::BlockDatarefTracker::store_funds(const std::vector<COutPoint>& ops)
 {
     std::lock_guard lock{mtx_};
     funds_.insert(funds_.end(), ops.cbegin(), ops.cend());
     store_minerinfo_fund_NL(ops);
 }
+
+void mining::BlockDatarefTracker::set_current_minerid(const CPubKey& minerId) {
+    std::lock_guard lock (mtx_minerid_);
+    minerId_ = minerId;
+};
+
+std::optional<CPubKey> mining::BlockDatarefTracker::get_current_minerid() const {
+    std::lock_guard lock (mtx_minerid_);
+    return minerId_;
+};
 
 bool mining::move_and_store(MempoolDatarefTracker& mempool_tracker,
                             BlockDatarefTracker& block_tracker)
