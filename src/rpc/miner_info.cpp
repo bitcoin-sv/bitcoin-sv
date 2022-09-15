@@ -305,7 +305,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
         mtx.vout.push_back(CTxOut{Amount{0}, script});
 
     auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
-    auto [newFund, prevFund] = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
+    auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
     UniValue minerinfotx_args(UniValue::VARR);
@@ -314,8 +314,8 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     minerinfotx_args.push_back(UniValue(true)); // do not check, we want to allow no fees
     TxId const txid =  mtx.GetId();
 
-    auto initFunc = [&newFund, &prevFund]() {
-    	mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
+    auto initFunc = [&newfund_and_previous]() {
+    	mempool.datarefTracker.append_to_current_funds(newfund_and_previous.first, newfund_and_previous.second);
     };
     auto exitFunc = []() {
             mempool.datarefTracker.pop_back_from_current_funds();
@@ -325,7 +325,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
 	MinerInfoClass_ScopeExit raii(initFunc, exitFunc);
         UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
         LogPrint(BCLog::MINERID, "minerinfotx tracker, sent dataref txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
-                 txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
+                 txid.ToString(), blockHeight, newfund_and_previous.second.ToString(), newfund_and_previous.first.ToString());
 
         if (r.exists("error")) {
             if (!r["error"].isNull()) {
@@ -426,7 +426,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     mtx.vout.push_back(CTxOut{Amount{0}, scriptPubKey});
 
     auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
-    auto [newFund, prevFund] = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
+    auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
     UniValue minerinfotx_args(UniValue::VARR);
@@ -435,9 +435,9 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     minerinfotx_args.push_back(UniValue(true)); // do not check, we want to allow no fees
     TxId const txid =  mtx.GetId();
 
-    currentMinerInfoTx = {newFund.GetTxId(), blockHeight};
-    auto initFunc = [&newFund, &prevFund]() {
-    	mempool.datarefTracker.append_to_current_funds(newFund, prevFund);
+    currentMinerInfoTx = {newfund_and_previous.first.GetTxId(), blockHeight};
+    auto initFunc = [&newfund_and_previous]() {
+    	mempool.datarefTracker.append_to_current_funds(newfund_and_previous.first, newfund_and_previous.second);
     };
     auto exitFunc = []() {
         mempool.datarefTracker.pop_back_from_current_funds();
@@ -447,7 +447,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
 	MinerInfoClass_ScopeExit raii(initFunc, exitFunc);
         UniValue const r = CallRPC("sendrawtransaction", minerinfotx_args);
         LogPrint(BCLog::MINERID, "minerinfotx tracker, sent minerinfo txn %s to mempool at height %d. Spending %s, New funding outpoint: %s\n",
-             txid.ToString(), blockHeight, prevFund.ToString(), newFund.ToString());
+             txid.ToString(), blockHeight, newfund_and_previous.second.ToString(), newfund_and_previous.first.ToString());
 
 
         if (r.exists("error")) {
