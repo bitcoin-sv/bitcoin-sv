@@ -31,6 +31,7 @@
 #include "invalid_txn_publisher.h"
 #include "metrics.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_tracker.h"
 #include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -4389,14 +4390,34 @@ static bool ActivateBestChainStep(
             if (pindexOldTip) {
                 // If this block was from someone else, then we have to remove our own
                 // minerinfo transactions from the mempool
-                std::vector<TxId> datarefs = mempool.datarefTracker.get_current_funds();
+                std::vector<COutPoint> funds = g_MempoolDatarefTracker->funds();
+                std::vector<TxId> datarefs;
+                std::transform(
+                        funds.cbegin(),
+                        funds.cend(),
+                        std::back_inserter(datarefs),
+                        [](const COutPoint& p) {return p.GetTxId();});
 
                 if (!datarefs.empty()) {
                     LogPrint(BCLog::MINERID,
                              "minerinfotx tracker, scheduled removal of minerinfo and dataref txns. Total removed: %ld\n",
                              datarefs.size());
-                    mempool.datarefTracker.clear_current_funds();
-                    mempool.RemoveTxnsAndDescendants(datarefs, changeSet);
+                    std::vector<TxId> toRemove = mempool.RemoveTxnsAndDescendants(datarefs, changeSet);
+                    if (toRemove.size() != funds.size()) {
+                        // if we mined them by error (calling bitcoin-cli generate for e.g.), then we have to
+                        // store them as potential funds
+                        for (const TxId& txid: toRemove) {
+                            const auto it = std::find_if(
+                                    funds.cbegin(),
+                                    funds.cend(),
+                                    [&txid](const COutPoint& p){return txid == p.GetTxId();});
+                            if (it != funds.end())
+                                funds.erase(it);
+                        }
+                        g_MempoolDatarefTracker->funds_replace(std::move(funds));
+                        move_and_store(*g_MempoolDatarefTracker, *g_BlockDatarefTracker);
+                    }
+                    g_MempoolDatarefTracker->funds_clear();
                 }
             }
         } catch(...) {

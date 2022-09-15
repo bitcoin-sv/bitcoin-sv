@@ -8,6 +8,7 @@
 #include "keystore.h"
 #include "miner_id/dataref_index.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_tracker.h"
 #include "miner_id/revokemid.h"
 #include "netmessagemaker.h"
 #include "rpc/server.h"
@@ -147,61 +148,41 @@ public:
     {
         try {
             // A potential new funding seed has preceedence.
-            std::optional<COutPoint> fundingOutPoint
-                = mempool.IsSpent(fundingSeed)
-                  ? std::optional<COutPoint>{}
-                  : (GetSpendableCoin(fundingSeed).has_value()
-                     ? fundingSeed
-                     : std::optional<COutPoint>{});
+            std::optional<COutPoint> fundingOutPoint;
+            std::optional<CoinWithScript> coin;
+            if (!mempool.IsSpent(fundingSeed))
+                coin = GetSpendableCoin(fundingSeed);
+            if (coin.has_value())
+                fundingOutPoint = fundingSeed;
 
             if (!fundingOutPoint) {
 
-                // first we check if we have something to spend in the mempool tracking
-                std::optional<COutPoint> fund = mempool.datarefTracker.get_current_funds_back();
+                // First we check if we have something to spend in the mempool tracking.
+                // Funding transactions, that have been re-mined via a reorg will not have been relayed, hence,
+                // we know the funding transaction is either tracked in the mempool, or in a block, but never
+                // untracked in the mempool
+
+                std::optional<COutPoint> fund = g_MempoolDatarefTracker->funds_back();
                 if (fund) {
                     fundingOutPoint = fund;
+                    coin = GetSpendableCoin(fundingOutPoint.value());
                 } else {
-                    // If it is in the dataref index, then it is also in the block chain.
-                    // We cannot use GetTransaction because this may be a pruned node.
-                    {
-                        auto tracker = mempool.datarefTracker.CreateLockingAccess();
-                        auto dbindex = g_dataRefIndex->CreateLockingAccess();
-                        auto txIsInDatarefIndex = [&dbindex](const COutPoint& outp, const COutPoint& prev_outp) -> bool {
-                            return dbindex.GetMinerInfoTxn(outp.GetTxId()) != nullptr;
-                        };
-
-                        // find our minerinfo funding tx if exists.
-                        auto outputs = tracker.find_fund(blockheight, txIsInDatarefIndex);
-                        if (outputs)
-                            fundingOutPoint = outputs->first;
-                    }
-
-                    auto findSpender = [&fundingOutPoint] (const COutPoint& outp, const COutPoint& prev_outp) -> bool {
-                        if (prev_outp == *fundingOutPoint)
-                            return true;
-                        else
-                            return false;
+                    auto hasSpendableFunds = [] (const COutPoint& outp) -> std::optional<CoinWithScript> {
+                        return GetSpendableCoin(outp);
                     };
 
-                    if (!fundingOutPoint)
-                        fundingOutPoint = fundingSeed;
-
-                    while (fundingOutPoint && !GetSpendableCoin(*fundingOutPoint).has_value()) {
-                        auto tracker = mempool.datarefTracker.CreateLockingAccess();
-                        auto outpoints = tracker.find_fund(std::numeric_limits<int32_t>::max(), findSpender);
-                        if (outpoints)
-                            fundingOutPoint = outpoints->first;
-                        else
-                            fundingOutPoint = std::nullopt;
+                    // find our minerinfo/dataref funding tx if exists.
+                    std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>> output =
+                            g_BlockDatarefTracker->find_fund(blockheight, hasSpendableFunds);
+                    if (output && output->second.has_value() ) {
+                        fundingOutPoint = output->first;
+                        coin = std::move(output->second);
                     }
                 }
             }
 
             if (!fundingOutPoint)
                 throw std::runtime_error("Cannot find spendable funding transaction");
-
-            // find the funding transaction outputs
-            const auto& coin = GetSpendableCoin(*fundingOutPoint);
             if (!coin)
                 throw std::runtime_error("Cannot find funding UTXO's");
 
@@ -315,10 +296,10 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     TxId const txid =  mtx.GetId();
 
     auto initFunc = [&newfund_and_previous]() {
-    	mempool.datarefTracker.append_to_current_funds(newfund_and_previous.first, newfund_and_previous.second);
+        g_MempoolDatarefTracker->funds_append(newfund_and_previous.first);
     };
     auto exitFunc = []() {
-            mempool.datarefTracker.pop_back_from_current_funds();
+        g_MempoolDatarefTracker->funds_pop_back();
     };
 
     {
@@ -336,7 +317,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
         // check that no new block has been added to the tip in the meantime.
         int32_t blockHeight2 = chainActive.Height() + 1;
         if (blockHeight != blockHeight2) {
-            throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
+            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a dataref-tx %s was created. Currrent height: %ld", txid.ToString(), chainActive.Height()));
         }
 	raii.good();
     }
@@ -379,7 +360,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
                 mempool.RemoveTxAndDescendants(toRemove, changeSet);
                 changeSet->apply();
                 currentMinerInfoTx = std::nullopt;
-                mempool.datarefTracker.pop_back_from_current_funds();
+                g_MempoolDatarefTracker->funds_pop_back();
                 return nullptr;
             }
         } catch (std::exception const & e) {
@@ -437,10 +418,10 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
 
     currentMinerInfoTx = {newfund_and_previous.first.GetTxId(), blockHeight};
     auto initFunc = [&newfund_and_previous]() {
-    	mempool.datarefTracker.append_to_current_funds(newfund_and_previous.first, newfund_and_previous.second);
+        g_MempoolDatarefTracker->funds_append(newfund_and_previous.first);
     };
     auto exitFunc = []() {
-        mempool.datarefTracker.pop_back_from_current_funds();
+        g_MempoolDatarefTracker->funds_pop_back();
     };
 
     {
@@ -459,7 +440,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
         // check that no new block has been added to the tip in the meantime.
         int32_t blockHeight2 = chainActive.Height() + 1;
         if (blockHeight != blockHeight2) {
-            throw std::runtime_error("A block was added to the tip while a mineridinfo-tx was created. Currrent height: " + std::to_string(blockHeight2));
+            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a minerinfo-tx %s was created. Currrent height: %ld", txid.ToString(), chainActive.Height()));
         }
 	raii.good();
     }
@@ -998,7 +979,7 @@ static UniValue getdatareftxid(const Config &config, const JSONRPCRequest &reque
 
     std::lock_guard lock{mut};
 
-    std::optional<COutPoint> p = mempool.datarefTracker.get_current_funds_front();
+    std::optional<COutPoint> p = g_MempoolDatarefTracker->funds_front();
 
     if (p) {
         if (!(currentMinerInfoTx && p->GetTxId() == currentMinerInfoTx->txid)) {

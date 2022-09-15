@@ -36,6 +36,21 @@ std::string CTxOut::ToString() const {
                      HexStr(scriptPubKey).substr(0, 30));
 }
 
+std::istream & operator>>(std::istream & stream, TxId& txid)
+{
+    uint256 hash;
+    stream >> hash;
+    txid = TxId(hash);
+    return stream;
+}
+
+std::istream& operator>>(std::istream& is, COutPoint& op)
+{
+    is >> op.txid;
+    is >> op.n;
+    return is;
+}
+
 std::ostream& operator<<(std::ostream& os, const COutPoint& op)
 {
     os << "txid: " << op.txid.ToString() << "\nn: " << op.n;

@@ -33,6 +33,8 @@ struct TxId : public uint256 {
     TxId& operator=(const TxId& b) = default;
 };
 
+std::istream & operator>>(std::istream&, TxId&);
+
 /**
  * A TxHash is the double sha256 hash of the full transaction data.
  */
@@ -81,9 +83,11 @@ public:
 
     std::string ToString() const;
 
+    friend std::istream& operator>>(std::istream&, COutPoint&);
     friend std::ostream& operator<<(std::ostream&, const COutPoint&);
 };
 
+std::istream& operator>>(std::istream&, COutPoint&);
 std::ostream& operator<<(std::ostream&, const COutPoint&);
 
 /**

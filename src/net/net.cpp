@@ -17,6 +17,7 @@
 #include "crypto/common.h"
 #include "crypto/sha256.h"
 #include "hash.h"
+#include "miner_id/miner_info_tracker.h"
 #include "net/netbase.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
@@ -3271,14 +3272,10 @@ CConnman::GetCompactExtraTxns() const {
 /** Enqueue a new transaction for later sending to our peers */
 bool CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {
-    {
-        // do not relay minerinfoid transactions
-        std::vector<TxId> txids = mempool.datarefTracker.get_current_funds();
+    // do not relay minerinfoid transactions
+    if(g_MempoolDatarefTracker->contains(txn.getInfo().GetTxId()))
+        return false;
 
-        for (const auto& d: txids)
-            if (d == txn.getInfo().GetTxId())
-                return false;
-    }
     mTxnPropagator->newTransaction(txn);
     return true;
 }
