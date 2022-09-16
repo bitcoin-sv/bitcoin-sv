@@ -2820,7 +2820,7 @@ public:
             {
                 // Read CB txn from disk
                 CTransaction cbTx { blockReader->ReadTransaction() };
-                coinbaseAndProof = std::nullopt;
+                coinbaseAndProof = std::make_optional<TxnAndProof>(TxnAndProof{});
 
                 coinbaseAndProof->proof.TxnId(cbTx.GetId());
                 coinbaseAndProof->proof.Target(blockIndex->GetBlockHash());
@@ -2848,7 +2848,7 @@ public:
                             if(minerInfo)
                             {
                                 // Return txn and proof details for the miner-info txn as well
-                                minerInfoAndProof = std::nullopt;
+                                minerInfoAndProof = std::make_optional<TxnAndProof>(TxnAndProof{});
                                 minerInfoAndProof->txn = minerInfo->txn;
                                 minerInfoAndProof->proof = minerInfo->proof;
                             }
