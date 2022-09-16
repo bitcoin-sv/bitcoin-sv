@@ -26,6 +26,7 @@
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <exception>
+#include <mutex>
 
 using namespace mining;
 
@@ -2480,10 +2481,9 @@ CTxMemPool::GetMemPoolChildrenNL(txiter entry) const {
     return it->second.children;
 }
 
-CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
-
-
-    std::shared_lock lock{smtx};
+CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const 
+{
+    std::lock_guard lock{smtx};
     if (blockSinceLastRollingFeeBump && rollingMinimumFeeRate != 0) {
         int64_t time = GetTime();
         if (time > lastRollingFeeUpdate + 10) {
