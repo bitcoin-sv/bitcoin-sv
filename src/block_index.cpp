@@ -415,6 +415,25 @@ std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk() c
             CStreamVersionAndType{SER_NETWORK, PROTOCOL_VERSION});
 }
 
+std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncPartialBlockFromDisk(uint64_t offset, uint64_t length) const
+{
+    std::lock_guard lock { GetMutex() };
+    CDiskBlockPos p = GetBlockPosNL();
+
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(CDiskBlockPos(p.File(), p.Pos() + offset)) };
+
+    if (!file)
+    {
+        return {}; // could not open a stream
+    }
+
+    return
+        std::make_unique<CSyncFixedSizeStream<CFileReader>>(
+            length,
+            CFileReader{std::move(file)});
+
+}
+
 
 std::string to_string(const enum BlockValidity& bv)
 {
