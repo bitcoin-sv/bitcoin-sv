@@ -37,6 +37,15 @@ def http_get_call(host, port, path, response_object=0):
 
     return conn.getresponse().read().decode('utf-8')
 
+def http_get_call_with_headers(host, port, path, headers, response_object=0):
+    conn = http.client.HTTPConnection(host, port)
+    conn.request('GET', path, None, headers)
+
+    if response_object:
+        return conn.getresponse()
+
+    return conn.getresponse().read().decode('utf-8')
+
 # allows simple http post calls with a request body
 
 
@@ -251,6 +260,13 @@ class RESTTest (BitcoinTestFramework):
         assert_equal(response.status, 200)
         assert_greater_than(int(response.getheader('content-length')), 80)
         response_str = response.read()
+
+        # get binary block with range
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': '10-29'}, True)
+        assert_equal(response_str[10:30], response.read())
+        assert_equal(response.status, 200)
+        assert_equal(int(response.getheader('content-length')), 20)
 
         # compare with block header
         response_header = http_get_call(
