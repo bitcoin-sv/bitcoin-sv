@@ -1643,7 +1643,6 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
 
     int64_t nTime;
     CAddress addrMe;
-    CAddress addrFrom;
     uint64_t nNonce = 1;
     uint64_t nServiceInt;
     ServiceFlags nServices;
@@ -1697,7 +1696,9 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             return false;
         }
 
-        if(!vRecv.empty()) {
+        if(!vRecv.empty()) 
+        {
+            CAddress addrFrom;
             vRecv >> addrFrom >> nNonce;
         }
         if(!vRecv.empty()) {
