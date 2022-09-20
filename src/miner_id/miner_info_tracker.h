@@ -21,6 +21,10 @@ namespace mining {
  * Tracks all transactions that this node has created as minerinfo or dataref transactions at some point.
  * This memory is not deleted by reorgs.
  */
+class MempoolDatarefTracker;
+class BlockDatarefTracker;
+bool move_and_store(MempoolDatarefTracker& mempool_tracker, BlockDatarefTracker& block_tracker);
+
 class MempoolDatarefTracker
 {
     std::vector<COutPoint> funds_;
