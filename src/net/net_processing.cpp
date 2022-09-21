@@ -1878,7 +1878,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
 }
 
 /**
-* Prcess version ack message.
+* Process version ack message.
 */
 static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
     CConnman& connman)
@@ -1896,24 +1896,24 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
-        // Create and send the authch network message.
-        uint256 rndMsgHash { GetRandHash() };
-        {
-            LOCK(pfrom->cs_authconn);
-            pfrom->authConnData.msgHash = rndMsgHash;
-        }
-        using namespace authconn;
-        connman.
-            PushMessage(pfrom, msgMaker.Make(NetMsgType::AUTHCH, AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash));
-        // Add a log message.
-        LogPrint(BCLog::NETCONN, "Sent authch message (version: %d, nMsgLen: %d, msg: %s), to peer=%d\n",
-            AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash.ToString(), pfrom->id);
     }
     else {
         LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->cleanSubVer, pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
     }
+    // Create and send the authch network message.
+    uint256 rndMsgHash { GetRandHash() };
+    {
+            LOCK(pfrom->cs_authconn);
+            pfrom->authConnData.msgHash = rndMsgHash;
+    }
+    using namespace authconn;
+    connman.
+        PushMessage(pfrom, msgMaker.Make(NetMsgType::AUTHCH, AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash));
+    // Add a log message.
+    LogPrint(BCLog::NETCONN, "Sent authch message (version: %d, nMsgLen: %d, msg: %s), to peer=%d\n",
+       AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash.ToString(), pfrom->id);
 
     if(pfrom->nVersion >= SENDHEADERS_VERSION) {
         // Tell our peer we prefer to receive headers rather than inv's
@@ -1964,20 +1964,7 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
         if (AUTHCH_V1 != nVersion) {
             throw std::runtime_error("Unsupported authch message version= "+ std::to_string(AUTHCH_V1));
         }
-        // If the inbound connection is detected then it means that our node is the Connection Acceptor.
-        if (pfrom->fInbound) {
-            uint256 rndMsgHash { GetRandHash() };
-            {
-                LOCK(pfrom->cs_authconn);
-                pfrom->authConnData.msgHash = rndMsgHash;
-            }
-            // Send our authch message to the Connection Initiator.
-            connman.
-                PushMessage(pfrom, msgMaker.Make(NetMsgType::AUTHCH, AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash));
-            // Add a log message.
-            LogPrint(BCLog::NETCONN, "Sent authch message (version: %d, nMsgLen: %d, msg: %s), to peer=%d\n",
-                AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash.ToString(), pfrom->id);
-        }
+
         /**
          * Create signature.
          *
