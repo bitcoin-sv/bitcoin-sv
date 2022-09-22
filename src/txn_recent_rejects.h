@@ -9,6 +9,7 @@
 
 #include <shared_mutex>
 #include <vector>
+#include <mutex>
 
 class CTxnRecentRejects;
 using TxnRecentRejectsSPtr = std::shared_ptr<CTxnRecentRejects>;
