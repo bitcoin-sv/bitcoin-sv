@@ -1177,10 +1177,7 @@ CTxnValResult TxnValidation(
     if (auto conflictsWith = pool.CheckTxConflicts(ptx, isFinal); !conflictsWith.empty()) {
         state.SetMempoolConflictDetected( std::move(conflictsWith) );
         // Disable replacement feature for good
-        std::stringstream ss;
-        for (const auto& txref: conflictsWith)
-            ss << ' ' << txref->GetId();
-        state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict " + ss.str());
+        state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
         return Result{state, pTxInputData};
     }
 
