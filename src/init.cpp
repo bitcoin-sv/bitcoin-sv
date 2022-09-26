@@ -2698,6 +2698,17 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError("-minminingtxfee is mandatory");
     }
 
+    if(gArgs.IsArgSet("-rollingminfeeratehalflife"))
+    {
+        const auto halflife = gArgs.GetArg(
+            "-rollingminfeeratehalflife", CTxMemPool::MAX_ROLLING_FEE_HALFLIFE);
+
+        if(!mempool.SetRollingMinFee(halflife))
+            LogPrintf("Warning: configuration parameter -rollingminfeeratehalflife out-of-range %i - %i\n",
+                      CTxMemPool::MIN_ROLLING_FEE_HALFLIFE,
+                      CTxMemPool::MAX_ROLLING_FEE_HALFLIFE);
+    }
+
     if (gArgs.IsArgSet("-mindebugrejectionfee")) {
         if (chainparams.NetworkIDString() != "main") {
             Amount n(0);

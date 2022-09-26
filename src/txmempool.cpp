@@ -2481,13 +2481,22 @@ CTxMemPool::GetMemPoolChildrenNL(txiter entry) const {
     return it->second.children;
 }
 
+bool CTxMemPool::SetRollingMinFee(int64_t fee)
+{ 
+    if(fee < MIN_ROLLING_FEE_HALFLIFE || fee > MAX_ROLLING_FEE_HALFLIFE)
+        return false;
+
+    halflife_ = fee;
+    return true;
+}
+
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const 
 {
     std::lock_guard lock{smtx};
     if (blockSinceLastRollingFeeBump && rollingMinimumFeeRate != 0) {
         int64_t time = GetTime();
         if (time > lastRollingFeeUpdate + 10) {
-            double halflife = ROLLING_FEE_HALFLIFE;
+            double halflife = halflife_;
             if (DynamicMemoryUsageNL() < sizelimit / 4) {
                 halflife /= 4;
             } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
