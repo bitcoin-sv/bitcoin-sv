@@ -317,7 +317,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
         // check that no new block has been added to the tip in the meantime.
         int32_t blockHeight2 = chainActive.Height() + 1;
         if (blockHeight != blockHeight2) {
-            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a dataref-tx %s was created. Currrent height: %ld", txid.ToString(), chainActive.Height()));
+            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a dataref-tx %s was created. Currrent height: %ld\n", txid.ToString(), chainActive.Height()));
         }
 	raii.good();
     }
@@ -440,7 +440,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
         // check that no new block has been added to the tip in the meantime.
         int32_t blockHeight2 = chainActive.Height() + 1;
         if (blockHeight != blockHeight2) {
-            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a minerinfo-tx %s was created. Currrent height: %ld", txid.ToString(), chainActive.Height()));
+            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a minerinfo-tx %s was created. Currrent height: %ld\n", txid.ToString(), chainActive.Height()));
         }
 	raii.good();
     }

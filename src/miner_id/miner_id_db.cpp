@@ -759,13 +759,13 @@ void MinerIdDatabase::BlockAddedNL(const CBlock& block, CBlockIndex const * pind
             CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(mConfig, *pindex, height);
             if (!merkleTree)
             {
-                LogPrint(BCLog::MINERID, strprintf("Can't read block from disk for blockhash%s", block.GetHash() ));
+                LogPrint(BCLog::MINERID, strprintf("Can't read block from disk for blockhash%s\n", block.GetHash() ));
                 return std::nullopt;
             }
             CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(txid, true);
             if (proof.merkleTreeHashes.empty())
             {
-                LogPrint(BCLog::MINERID, strprintf("Transaction(s) not found in provided block with hash %s", block.GetHash()));
+                LogPrint(BCLog::MINERID, strprintf("Transaction(s) not found in provided block with hash %s\n", block.GetHash()));
                 return std::nullopt;
             }
 

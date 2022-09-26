@@ -51,7 +51,7 @@ bool CInvalidTxnFileSink::ParseFilename(const std::string& fname, std::string& t
         ordNum1 = std::stoi(match.str(2));
         return true;
     }
-    LogPrintf("Problematic filename: %s", fname);
+    LogPrintf("Problematic filename: %s\n", fname);
     return false;
 }
 
@@ -97,7 +97,7 @@ bool CInvalidTxnFileSink::RemoveFile(const std::string fname, int64_t fsize)
     boost::filesystem::remove(directory / fname, ec);
     if (ec)
     {
-        LogPrintf("Failed to delete a file: %s, error: %s", fname, ec.message());
+        LogPrintf("Failed to delete a file: %s, error: %s\n", fname, ec.message());
         return false;
     }
 
@@ -178,7 +178,7 @@ void CInvalidTxnFileSink::Publish(const InvalidTxnInfo& invalidTxnInfo)
         }
         else
         {
-            LogPrintf("Could not make enough room! Transaction not saved!");
+            LogPrintf("Could not make enough room! Transaction not saved!\n");
         }
     }
 }

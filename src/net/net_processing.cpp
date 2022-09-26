@@ -1432,7 +1432,7 @@ inline static void SendBlockTransactions(const CBlock &block,
     for (size_t i = 0; i < req.indices.size(); i++) {
         if (req.indices[i] >= block.vtx.size()) {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
             return;
         }
         resp.txn[i] = block.vtx[req.indices[i]];
@@ -1987,7 +1987,7 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
         std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
 
         if (!pubKeyOpt) {
-            LogPrint(BCLog::MINERID, "Ignoring authch messages until this node has mined a block containing a miner_info document");
+            LogPrint(BCLog::MINERID, "Ignoring authch messages until this node has mined a block containing a miner_info document\n");
             return true;
         }
         CPubKey pubKey = pubKeyOpt.value();
@@ -2000,7 +2000,7 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
             using namespace rpc::client;
             if (!g_pWebhookClient) {
                 // we log unconditionally because we already checked that we do have a minerid.
-                LogPrintf("No authentication client for minerid authentication instantiated");
+                LogPrintf("No authentication client for minerid authentication instantiated\n");
                 // we return true because we still want to connect, but unauthenticated instead.
                 return true;
             } else {
@@ -2548,7 +2548,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
 
     auto index = mapBlockIndex.Get(req.blockhash);
     if(!index) {
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
 
@@ -2561,7 +2561,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         // might maliciously send lots of getblocktxn requests to trigger
         // expensive disk reads, because it will require the peer to
         // actually receive all the data read from disk over the network.
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep",
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n",
                  pfrom->id, MAX_BLOCKTXN_DEPTH);
         CInv inv;
         inv.type = MSG_BLOCK;
@@ -2575,7 +2575,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     auto block_stream_reader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
     if (!block_stream_reader)
     {
-        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
     // Number of transactions in block
@@ -2590,7 +2590,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         if (txn_idx >= num_txn_in_block)
         {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
             return;
         }
 
@@ -2847,7 +2847,7 @@ public:
         }
         catch(...)
         {
-            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.");
+            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.\n");
         }
 
         if(coinbaseAndProof)

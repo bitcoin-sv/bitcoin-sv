@@ -1684,7 +1684,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
         if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
-            LogPrintf("Failed to connect best block");
+            LogPrintf("Failed to connect best block\n");
             StartShutdown();
         }
 
@@ -2997,7 +2997,7 @@ void preloadChainStateThreadFunction()
     }
 
 #else
-    LogPrintf("Preload is not supported on this platform!");
+    LogPrintf("Preload is not supported on this platform!\n");
     return;
 #endif
 }
@@ -3447,7 +3447,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                     gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) >
                         MIN_BLOCKS_TO_KEEP) {
                     LogPrintf("Prune: pruned datadir may not have more than %d "
-                              "blocks; only checking available blocks",
+                              "blocks; only checking available blocks\n",
                               MIN_BLOCKS_TO_KEEP);
                 }
 
