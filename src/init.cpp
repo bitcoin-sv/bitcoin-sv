@@ -163,11 +163,13 @@ void Shutdown() {
 
 
     // Remove all datarefs and minerinfo txns from the mempool
-    std::vector<COutPoint> funds = g_MempoolDatarefTracker->funds();
-    std::vector<TxId> datarefs;
-    std::transform(funds.cbegin(), funds.cend(), std::back_inserter(datarefs), [](const COutPoint& p) {return p.GetTxId();});
-    if (!datarefs.empty())
-        mempool.RemoveTxnsAndDescendants(datarefs, nullptr);
+    if (g_MempoolDatarefTracker) {
+        std::vector<COutPoint> funds = g_MempoolDatarefTracker->funds();
+        std::vector<TxId> datarefs;
+        std::transform(funds.cbegin(), funds.cend(), std::back_inserter(datarefs), [](const COutPoint& p) {return p.GetTxId();});
+        if (!datarefs.empty())
+            mempool.RemoveTxnsAndDescendants(datarefs, nullptr);
+    }
 
     /// Note: Shutdown() must be able to handle cases in which AppInit2() failed
     /// part of the way, for example if the data directory was found to be
