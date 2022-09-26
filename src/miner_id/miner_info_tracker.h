@@ -56,7 +56,6 @@ public:
               std::function<std::optional<CoinWithScript>(const COutPoint&)>
                   get_spendable_coin) const;
 
-    void store_funds(const std::vector<COutPoint>&);
     void set_current_minerid(const CPubKey& minerId);
     std::optional<CPubKey> get_current_minerid() const;
 
