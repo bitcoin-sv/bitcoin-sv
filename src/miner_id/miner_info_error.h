@@ -53,6 +53,9 @@ enum class miner_info_error
     doc_parse_error_datarefs_refs_compress_type,
     block_bind_hash_mismatch,
     block_bind_sig_verification_failed,
+    brfcid_invalid_length,
+    brfcid_invalid_content,
+    brfcid_invalid_value_type,
     size
 };
 

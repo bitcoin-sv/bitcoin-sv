@@ -17,7 +17,7 @@ BOOST_AUTO_TEST_SUITE(miner_info_error_tests)
 
 BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
 {
-    const array<string, 43> expected{
+    const array<string, 46> expected{
         "miner info ref not found",
         "invalid instruction",
         "unsupported version",
@@ -60,7 +60,10 @@ BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
         "doc parse error - dataRefs refs vout type",
         "doc parse error - dataRefs refs compress type",
         "block bind - hash mismatch",
-        "block bind - signature verification failed"
+        "block bind - signature verification failed",
+        "brfcid invalid length",
+        "brfcid invalid content",
+        "brfcid invalid value type"
     };
 
     const int size = static_cast<int>(miner_info_error::size);
