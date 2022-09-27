@@ -45,6 +45,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.TEST_call_replace_twice = 4
         self.TEST_other_invalidates_minerinfotx = 5
         self.TEST_call_create_with_bad_json_synatx = 6
+        self.TEST_call_stop_start = 7
 
     def make_block_with_coinbase(self, conn_rpc):
         tip = conn_rpc.getblock(conn_rpc.getbestblockhash())
@@ -132,6 +133,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         txid = None
         try:
             txid = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
+            wait_until(lambda: txid in self.nodes[0].getrawmempool(), timeout=10)
+            if test_case == self.TEST_call_stop_start:
+                self.stop_nodes()
+                self.start_nodes()
+                disconnect_nodes_bi(self.nodes, 0, 1)
+                connect_nodes_bi(self.nodes, 0, 1)
+                sleep(4)
+                assert(txid not in self.nodes[0].getrawmempool())
+                txid = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
+
         except Exception as e:
             if test_case != self.TEST_call_create_with_bad_json_synatx:
                 raise e
@@ -220,7 +231,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_replace)
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_create_with_bad_json_synatx)
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_create_twice)
+        self.one_test(allKeys, fundingSeedTx, self.TEST_call_stop_start)
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_create_twice)
         self.one_test(allKeys, fundingSeedTx, self.TEST_other_invalidates_minerinfotx)
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
