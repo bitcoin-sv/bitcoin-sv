@@ -28,6 +28,7 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/uuid/uuid.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -479,7 +480,7 @@ private:
     // FIXME: DEPRECATED - ultimately this will be changed or removed
     indexed_transaction_set mapTx;
 
-    static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
+    int64_t halflife_{MAX_ROLLING_FEE_HALFLIFE};
 
     using txiter = indexed_transaction_set::index<transaction_id>::type::const_iterator;
 
@@ -618,6 +619,12 @@ public:
     /** Create a new CTxMemPool. */
     CTxMemPool();
     ~CTxMemPool();
+
+    constexpr static int MIN_ROLLING_FEE_HALFLIFE = 60 * 30;
+    constexpr static int MAX_ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
+
+    int64_t GetRollingMinFee() const { return halflife_; }
+    bool SetRollingMinFee(int64_t fee);
 
     /**
      * If sanity-checking is turned on, check makes sure the pool is consistent
