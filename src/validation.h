@@ -307,7 +307,7 @@ static const int64_t SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = 1000;
 /**
  * Forks shorter than SAFE_MODE_MIN_FORK_LENGTH will not trigger safe mode
  */
-static const int64_t SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = 3;
+static const int64_t SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = 6;
 
 /**
  * Forks whose proof-of-work difference to the current tip  (<active chain pow> - <fork tip pow>),
