@@ -242,7 +242,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                     }
                     catch(...)
                     {
-                        LogPrint(BCLog::RPC, "/rest/headers/extended: Reading of coinbase txn failed.");
+                        LogPrint(BCLog::RPC, "/rest/headers/extended: Reading of coinbase txn failed.\n");
                     }
 
                     std::optional<std::vector<uint256>> coinbaseMerkleProof;

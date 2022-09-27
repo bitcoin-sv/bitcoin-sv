@@ -178,7 +178,7 @@ class DataDB
         {
             std::optional<Entry> entry { LookupEntry<Entry>(key) };
             if (!entry) {
-                LogPrint(BCLog::MINERID, strprintf("Failed to remove non existant dataRef/minerinfo transaction with ID %s from DB", key));
+                LogPrint(BCLog::MINERID, strprintf("Failed to remove non existant dataRef/minerinfo transaction with ID %s from DB\n", key));
                 return 0;
             }
 
@@ -198,7 +198,7 @@ class DataDB
         if(mDBWrapper->WriteBatch(batch, true))
             mDiskUsage -= diskUsageRemoved;
         else
-            LogPrintf(strprintf("Failed to remove dataRef/minerinfo transaction with ID %s from DB", key));
+            LogPrintf(strprintf("Failed to remove dataRef/minerinfo transaction with ID %s from DB\n", key));
     }
 
 
