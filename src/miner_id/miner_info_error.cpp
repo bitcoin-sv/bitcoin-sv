@@ -101,7 +101,14 @@ const enumTableT<miner_info_error>& enumTable(miner_info_error)
               {miner_info_error::block_bind_hash_mismatch, 
                "block bind - hash mismatch"}, 
               {miner_info_error::block_bind_sig_verification_failed,
-               "block bind - signature verification failed"}};
+               "block bind - signature verification failed"},
+              {miner_info_error::brfcid_invalid_length,
+               "brfcid invalid length"},
+              {miner_info_error::brfcid_invalid_content,
+               "brfcid invalid content"},
+              {miner_info_error::brfcid_invalid_value_type,
+               "brfcid invalid value type"},
+    };
     return table;
 }
 

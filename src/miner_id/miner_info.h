@@ -56,3 +56,7 @@ class block_bind;
 std::optional<miner_info_error> verify(const CBlock&,
                                        const block_bind&,
                                        const std::string& key);
+
+std::variant<bool, miner_info_error> VerifyDataScript(const bsv::span<const uint8_t>);
+std::variant<bool, miner_info_error> VerifyDataObject(const std::string_view json);
+

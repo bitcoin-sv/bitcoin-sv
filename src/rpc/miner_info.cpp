@@ -8,11 +8,14 @@
 #include "keystore.h"
 #include "miner_id/dataref_index.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_error.h"
 #include "miner_id/miner_info_tracker.h"
 #include "miner_id/revokemid.h"
+#include "miner_id/miner_info.h"
 #include "netmessagemaker.h"
 #include "rpc/server.h"
 #include "script/instruction_iterator.h"
+#include "script/script.h"
 #include "script/script_num.h"
 #include "script/sign.h"
 #include "txdb.h"
@@ -21,6 +24,7 @@
 #include <iostream>
 #include <memory>
 #include <univalue.h>
+#include <variant>
 #include <vector>
 
 namespace mining {
@@ -282,8 +286,20 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
 
     // create and fund minerinfo txn
     CMutableTransaction mtx;
-    for (const CScript& script: scriptPubKeys)
+    for(const CScript& script: scriptPubKeys)
+    {
+        if(!IsMinerInfo(script))
+            throw std::runtime_error("invalid miner info script");
+
+        const auto var_data_obj = VerifyDataScript(script);
+        if(std::holds_alternative<miner_info_error>(var_data_obj))
+        {
+            const auto err{std::get<miner_info_error>(var_data_obj)};
+            throw std::runtime_error(enum_cast<std::string>(err));
+        }
+
         mtx.vout.push_back(CTxOut{Amount{0}, script});
+    }        
 
     auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
     auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
