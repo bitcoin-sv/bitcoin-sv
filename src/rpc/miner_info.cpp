@@ -968,8 +968,7 @@ UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
     // Check we have the dataref index database
     if(g_dataRefIndex)
     {
-        const std::string strTxId { request.params[0].get_str() };
-        const uint256 txid { uint256S(strTxId) };
+        const uint256 txid = ParseHashV(request.params[0], "txid");
         auto data_access = g_dataRefIndex->CreateLockingAccess();
         data_access.DeleteDatarefTxn(txid);
     }
