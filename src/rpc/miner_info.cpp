@@ -961,8 +961,8 @@ UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
             "1. \"txid\"   (string, required) The ID of the dataRef transaction to delete from the index.\n"
             "\nResult:\n"
             "\nExamples:\n" +
-            HelpExampleCli("datareftxndelete", "") +
-            HelpExampleRpc("datareftxndelete", ""));
+            HelpExampleCli("datareftxndelete", "\"mytxid\"") +
+            HelpExampleRpc("datareftxndelete", "\"mytxid\""));
     }
 
     // Check we have the dataref index database
