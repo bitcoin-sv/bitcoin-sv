@@ -81,12 +81,12 @@ class DataDB
         static constexpr char DB_STORAGE_TYPE = STORAGE_TYPE;
 
         DBTxInfo(CTransactionRef txn, uint256 blockid, MerkleProof proof)
-                : txn{std::move(txn)}, blockId{std::move(blockid)}, proof{std::move(proof)}
+                : txn{std::move(txn)}, blockId{blockid}, proof{std::move(proof)}
         {}
 
         explicit DBTxInfo(Readable && r)
                 : txn { MakeTransactionRef(std::move(r.txnm)) },
-                  blockId { std::move(r.blockId) },
+                  blockId { r.blockId },
                   proof (std::move(r.proof) )
         {}
 

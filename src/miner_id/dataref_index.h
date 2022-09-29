@@ -23,7 +23,6 @@ public:
     using DBDataref = miner::detail::DataDB::DBDataref;
 
     explicit DataRefTxnDB(const Config& config);
-    ~DataRefTxnDB() = default;
 
     class LockingAccess {
 
