@@ -57,27 +57,27 @@ class DataDB
     static constexpr char DB_MINERINFO_TXN {'I'};
     // Prefix to store disk usage
     static constexpr char DB_DISK_USAGE {'D'};
+        
+    struct Readable
+    {
+        CMutableTransaction txnm {};
+        uint256 blockId {};
+        MerkleProof proof {};
+
+        ADD_SERIALIZE_METHODS
+        template <typename Stream, typename Operation>
+        inline void SerializationOp(Stream& s, Operation ser_action)
+        {
+            READWRITE(txnm);
+            READWRITE(blockId);
+            READWRITE(proof);
+        }
+    };
 
     template<char STORAGE_TYPE>
     struct DBTxInfo
     {
         // Datatype for reading from the database
-        struct Readable
-        {
-            CMutableTransaction txnm {};
-            uint256 blockId {};
-            MerkleProof proof {};
-
-            ADD_SERIALIZE_METHODS
-            template <typename Stream, typename Operation>
-            inline void SerializationOp(Stream& s, Operation ser_action)
-            {
-                READWRITE(txnm);
-                READWRITE(blockId);
-                READWRITE(proof);
-            }
-        };
-
         static constexpr char DB_STORAGE_TYPE = STORAGE_TYPE;
 
         DBTxInfo(CTransactionRef txn, uint256 blockid, MerkleProof proof)
@@ -150,7 +150,7 @@ class DataDB
 
         if(mDBWrapper->Exists(dbkey))
         {
-            typename Entry::Readable dbentryread {};
+            Readable dbentryread {};
             if(mDBWrapper->Read(dbkey, dbentryread))
                 return { Entry{std::move(dbentryread)} };
         }
@@ -206,9 +206,9 @@ class DataDB
      * Fetch dataref/minerinfo txn details for all minerinfo txns
      */
     template <typename Entry>
-    std::vector<typename Entry::Readable> GetAllEntries() const
+    std::vector<Readable> GetAllEntries() const
     {
-        std::vector<typename Entry::Readable> result {};
+        std::vector<Readable> result {};
         std::unique_ptr<CDBIterator> iter { mDBWrapper->NewIterator() };
         iter->SeekToFirst();
 
@@ -219,7 +219,7 @@ class DataDB
             if(iter->GetKey(key))
             {
                 // Fetch entry for this key
-                typename Entry::Readable dbentryread {};
+                Readable dbentryread {};
                 if(mDBWrapper->Read(key, dbentryread))
                     result.push_back(std::move(dbentryread));
             }
