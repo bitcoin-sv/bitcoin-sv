@@ -57,36 +57,36 @@ class DataDB
     static constexpr char DB_MINERINFO_TXN {'I'};
     // Prefix to store disk usage
     static constexpr char DB_DISK_USAGE {'D'};
+        
+    struct Readable
+    {
+        CMutableTransaction txnm {};
+        uint256 blockId {};
+        MerkleProof proof {};
+
+        ADD_SERIALIZE_METHODS
+        template <typename Stream, typename Operation>
+        inline void SerializationOp(Stream& s, Operation ser_action)
+        {
+            READWRITE(txnm);
+            READWRITE(blockId);
+            READWRITE(proof);
+        }
+    };
 
     template<char STORAGE_TYPE>
     struct DBTxInfo
     {
         // Datatype for reading from the database
-        struct Readable
-        {
-            CMutableTransaction txnm {};
-            uint256 blockId {};
-            MerkleProof proof {};
-
-            ADD_SERIALIZE_METHODS
-            template <typename Stream, typename Operation>
-            inline void SerializationOp(Stream& s, Operation ser_action)
-            {
-                READWRITE(txnm);
-                READWRITE(blockId);
-                READWRITE(proof);
-            }
-        };
-
         static constexpr char DB_STORAGE_TYPE = STORAGE_TYPE;
 
         DBTxInfo(CTransactionRef txn, uint256 blockid, MerkleProof proof)
-                : txn{std::move(txn)}, blockId{std::move(blockid)}, proof{std::move(proof)}
+                : txn{std::move(txn)}, blockId{blockid}, proof{std::move(proof)}
         {}
 
         explicit DBTxInfo(Readable && r)
                 : txn { MakeTransactionRef(std::move(r.txnm)) },
-                  blockId { std::move(r.blockId) },
+                  blockId { r.blockId },
                   proof (std::move(r.proof) )
         {}
 
@@ -150,7 +150,7 @@ class DataDB
 
         if(mDBWrapper->Exists(dbkey))
         {
-            typename Entry::Readable dbentryread {};
+            Readable dbentryread {};
             if(mDBWrapper->Read(dbkey, dbentryread))
                 return { Entry{std::move(dbentryread)} };
         }
@@ -205,27 +205,40 @@ class DataDB
     /**
      * Fetch dataref/minerinfo txn details for all minerinfo txns
      */
-    template <typename Entry>
-    std::vector<typename Entry::Readable> GetAllEntries() const
+    std::vector<Readable> GetAllEntries(const char storage_type) const
     {
-        std::vector<typename Entry::Readable> result {};
+        std::vector<Readable> result {};
         std::unique_ptr<CDBIterator> iter { mDBWrapper->NewIterator() };
         iter->SeekToFirst();
 
         for(; iter->Valid(); iter->Next())
         {
             // Fetch next key of the correct type
-            auto key { std::make_pair(Entry::DB_STORAGE_TYPE, uint256{}) };
+            auto key { std::make_pair(storage_type, uint256{}) };
             if(iter->GetKey(key))
             {
                 // Fetch entry for this key
-                typename Entry::Readable dbentryread {};
-                if(mDBWrapper->Read(key, dbentryread))
-                    result.push_back(std::move(dbentryread));
+                key.first = storage_type;
+                if(mDBWrapper->Exists(key))
+                {
+                    Readable dbentryread{};
+                    if(mDBWrapper->Read(key, dbentryread))
+                        result.push_back(std::move(dbentryread));
+                }
             }
         }
 
         return result;
+    }
+
+    std::vector<Readable> GetAllMinerInfoEntries()
+    {
+        return GetAllEntries(miner::detail::DataDB::DB_MINERINFO_TXN);
+    }
+
+    std::vector<Readable> GetAllDatarefEntries()
+    {
+        return GetAllEntries(miner::detail::DataDB::DB_DATAREF_TXN);
     }
 
     // Keep reference to the config

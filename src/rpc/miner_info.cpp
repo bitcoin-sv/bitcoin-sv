@@ -961,15 +961,14 @@ UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
             "1. \"txid\"   (string, required) The ID of the dataRef transaction to delete from the index.\n"
             "\nResult:\n"
             "\nExamples:\n" +
-            HelpExampleCli("datareftxndelete", "") +
-            HelpExampleRpc("datareftxndelete", ""));
+            HelpExampleCli("datareftxndelete", "\"mytxid\"") +
+            HelpExampleRpc("datareftxndelete", "\"mytxid\""));
     }
 
     // Check we have the dataref index database
     if(g_dataRefIndex)
     {
-        const std::string strTxId { request.params[0].get_str() };
-        const uint256 txid { uint256S(strTxId) };
+        const uint256 txid = ParseHashV(request.params[0], "txid");
         auto data_access = g_dataRefIndex->CreateLockingAccess();
         data_access.DeleteDatarefTxn(txid);
     }

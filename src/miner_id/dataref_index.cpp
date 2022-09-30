@@ -68,7 +68,7 @@ UniValue DataRefTxnDB::LockingAccess::DumpDataRefTxnsJSON() const
     UniValue result { UniValue::VARR };
 
     // Dump transaction details
-    for(const auto& txn : data_.db_.GetAllEntries<DBDataref>())
+    for(const auto& txn : data_.db_.GetAllDatarefEntries())
     {
         UniValue txnJson { UniValue::VOBJ };
         txnJson.pushKV("txid", txn.txnm.GetId().ToString());
@@ -92,7 +92,7 @@ UniValue DataRefTxnDB::LockingAccess::DumpMinerInfoTxnsJSON() const
     UniValue result { UniValue::VARR };
 
     // Dump transaction details
-    for(const auto& txn : data_.db_.GetAllEntries<DBMinerInfo>())
+    for(const auto& txn : data_.db_.GetAllMinerInfoEntries())
     {
         UniValue txnJson { UniValue::VOBJ };
         txnJson.pushKV("txid", txn.txnm.GetId().ToString());
