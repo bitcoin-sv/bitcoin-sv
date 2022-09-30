@@ -640,6 +640,7 @@ static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPC
     if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
                 "getminerinfotxfundingaddress  \n"
+                "Get the address that will fund the miner info transaction.\n"
                 "\nExamples:\n" +
                 HelpExampleCli("getminerinfotxfundingaddress","") +
                 HelpExampleRpc("getminerinfotxfundingaddress",""));
