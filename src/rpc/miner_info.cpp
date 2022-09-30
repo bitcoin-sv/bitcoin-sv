@@ -533,8 +533,8 @@ static UniValue createdatareftx(const Config &config, const JSONRPCRequest &requ
                 "1. \"scriptPubKey...:\" (array of hex strings)\n"
                 "\nResult: a hex encoded transaction id\n"
                 "\nExamples:\n" +
-                HelpExampleCli("createdatareftx", "\"006a04601dface01004dba027b22 ...\"") +
-                HelpExampleRpc("createdatareftx", "\"006a04601dface01004dba027b22 ...\""));
+                HelpExampleCli("createdatareftx", R"([\"006a04601dface01004dba027b22...\", ...])") +
+                HelpExampleRpc("createdatareftx", R"([\"006a04601dface01004dba027b22...\", ...])"));
     }
 
     std::vector<CScript> scriptPubKeys;
@@ -640,6 +640,7 @@ static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPC
     if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
                 "getminerinfotxfundingaddress  \n"
+                "Get the address that will fund the miner info transaction.\n"
                 "\nExamples:\n" +
                 HelpExampleCli("getminerinfotxfundingaddress","") +
                 HelpExampleRpc("getminerinfotxfundingaddress",""));
@@ -668,13 +669,13 @@ static UniValue setminerinfotxfundingoutpoint(const Config &config, const JSONRP
     if (request.fHelp || request.params.size() != 2) {
         throw std::runtime_error(
                 "setminerinfotxfundingoutpoint \"txid\" \"n\"\n"
-                "\nsend the output used to fund the minerinfo transactions\n"
+                "\nConfigure the node to use the miner-info funding outpoint\n"
                 "\nArguments:\n"
                 "1. \"txid:\" (hex string mandatory) a transaction that can be spend using the \n"
                 "key created by rpc function makeminerinfotxspendingkey\n"
                 "2. \"n:\" (int) the output to spend \n"
                 "\nExamples:\n" +
-                HelpExampleCli("setminerinfotxfundingoutpoint", "\"txid\", n") +
+                HelpExampleCli("setminerinfotxfundingoutpoint", "\"txid\" n") +
                 HelpExampleRpc("setminerinfotxfundingoutpoint", "\"txid\", n"));
     }
 
