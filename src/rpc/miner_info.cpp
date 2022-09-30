@@ -533,8 +533,8 @@ static UniValue createdatareftx(const Config &config, const JSONRPCRequest &requ
                 "1. \"scriptPubKey...:\" (array of hex strings)\n"
                 "\nResult: a hex encoded transaction id\n"
                 "\nExamples:\n" +
-                HelpExampleCli("createdatareftx", "\"006a04601dface01004dba027b22 ...\"") +
-                HelpExampleRpc("createdatareftx", "\"006a04601dface01004dba027b22 ...\""));
+                HelpExampleCli("createdatareftx", R"([\"006a04601dface01004dba027b22...\", ...])") +
+                HelpExampleRpc("createdatareftx", R"([\"006a04601dface01004dba027b22...\", ...])"));
     }
 
     std::vector<CScript> scriptPubKeys;
