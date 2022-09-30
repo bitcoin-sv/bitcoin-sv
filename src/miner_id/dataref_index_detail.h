@@ -218,9 +218,13 @@ class DataDB
             if(iter->GetKey(key))
             {
                 // Fetch entry for this key
-                Readable dbentryread {};
-                if(mDBWrapper->Read(key, dbentryread))
-                    result.push_back(std::move(dbentryread));
+                key.first = storage_type;
+                if(mDBWrapper->Exists(key))
+                {
+                    Readable dbentryread{};
+                    if(mDBWrapper->Read(key, dbentryread))
+                        result.push_back(std::move(dbentryread));
+                }
             }
         }
 
