@@ -36,6 +36,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.miner_names = ["miner name 0","miner name 1"]
         args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-txindex=1']
         self.extra_args = [args, args]
+        self.single_dataref_txid = None
+        self.single_minerinfo_txid = None
 
     def make_block_with_coinbase(self, conn_rpc):
         tip = conn_rpc.getblock(conn_rpc.getbestblockhash())
@@ -84,6 +86,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         txid = node.createdatareftx(scriptPubKeys)
         wait_until(lambda: txid in node.getrawmempool())
         txid_test = node.getdatareftxid()
+        self.single_dataref_txid = txid
         assert(txid_test == txid)
 
         dataRefs = []
@@ -146,6 +149,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
+        if not self.single_minerinfo_txid:
+            self.single_minerinfo_txid = txid
+
         wait_until (lambda: txid in node.getrawmempool())
 
         if datarefs:
@@ -155,6 +161,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             return
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
+
         datarefTxns = {}
         if datarefs:
             for dataref in datarefs:
@@ -288,6 +295,35 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.one_test(allKeys1, 1)
 
         sync_blocks(self.nodes)
+
+        # check existence of dataref transaction
+        dataref_txid = self.single_dataref_txid
+        dataref_dump = self.nodes[0].datarefindexdump()
+        dataref_txids = [x['txid'] for x in dataref_dump]
+        assert(dataref_txid in dataref_txids)
+
+        # check that miner info txns are not in the dataref dump
+        minerinfo_txid = self.single_minerinfo_txid
+        raw = self.nodes[0].getrawtransaction(minerinfo_txid, 1)
+        assert(raw['txid'] == minerinfo_txid)
+        minerinfo_dump = self.nodes[0].datarefindexdump()
+        minerinfo_txids = [x['txid'] for x in minerinfo_dump]
+        assert(minerinfo_txid not in minerinfo_txids)
+
+        # check persistence of dataref transaction
+        self.stop_nodes()
+        self.start_nodes()
+        dataref_txid = self.single_dataref_txid
+        dataref_dump = self.nodes[0].datarefindexdump()
+        dataref_txids = [x['txid'] for x in dataref_dump]
+        assert(dataref_txid in dataref_txids)
+
+        # check deletion of dataref transaction
+        dataref_txid = self.single_dataref_txid
+        self.nodes[0].datareftxndelete(dataref_txid)
+        dataref_dump = self.nodes[0].datarefindexdump()
+        dataref_txids = [x['txid'] for x in dataref_dump]
+        assert(dataref_txid not in dataref_txids)
 
 if __name__ == '__main__':
     CreateMinerInfoTest().main()
