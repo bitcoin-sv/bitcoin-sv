@@ -19,6 +19,7 @@ public:
     CSerializedNetMsg Make(int nFlags, CSerializedNetMsg::PayloadType payloadType, std::string sCommand,
                            Args &&... args) const {
         std::vector<uint8_t> data;
+        data.reserve(ser_size(args...));
         CVectorWriter{SER_NETWORK, nFlags | nVersion, data, 0,
                       std::forward<Args>(args)...};
         return {std::move(sCommand), payloadType, std::move(data)};
