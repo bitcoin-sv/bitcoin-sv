@@ -2036,10 +2036,10 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
             PushMessage(pfrom,
                 msgMaker.Make(NetMsgType::AUTHRESP, vPubKey, nClientNonce, vSign));
         // Add a log message.
-        LogPrint(BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
             vPubKey.size(), HexStr(vPubKey).c_str(), nClientNonce, vSign.size(), HexStr(vSign).c_str(), pfrom->id);
     } catch(std::exception& e) {
-        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authch: (%s); disconnecting\n", pfrom->id, e.what());
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "peer=%d Failed to process authch: (%s)\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, msgMaker
             .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
 	    // We still connect if authentication failed.
