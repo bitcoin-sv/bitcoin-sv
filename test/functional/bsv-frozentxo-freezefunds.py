@@ -175,9 +175,38 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
         result = self.nodes[0].clearBlacklists({ "removeAllEntries" : False, "expirationHeightDelta": 0 })
         assert_equal(result["numRemovedEntries"], 0)
 
+        self.log.info("Unfreezing all frozen funds except policy frozen ones")
+        result = self.nodes[0].clearBlacklists({ "removeAllEntries" : True,  "keepExistingPolicyEntries": True })
+        assert_equal(result["numRemovedEntries"], 4) # 4 consensus + 0 policy
+
+        result = self.nodes[0].queryBlacklist()
+        assert_equal(result["funds"], [{'txOut': {'txId': 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', 'vout': 0}, 'blacklist': ['policy']}]) # one policy frozen fund should remain
+
+        self.log.info("Freezing fund on consensus level...")
+        result = self.nodes[0].addToConsensusBlacklist({
+            "funds": [
+            {
+                "txOut" : {
+                    "txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "vout" : 0
+                },
+                "enforceAtHeight": [{"start": 0}],
+                "policyExpiresWithConsensus": False
+            },
+            {
+                "txOut" : {
+                    "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "vout" : 0
+                },
+                "enforceAtHeight": [{"start": 0}],
+                "policyExpiresWithConsensus": False
+            }]
+        });
+        assert_equal(result["notProcessed"], [])
+
         self.log.info("Unfreezing all frozen funds")
         result = self.nodes[0].clearBlacklists({ "removeAllEntries" : True })
-        assert_equal(result["numRemovedEntries"], 5) # 4 consensus + 1 policy
+        assert_equal(result["numRemovedEntries"], 3) # 2 consensus + 1 policy
 
         result = self.nodes[0].queryBlacklist()
         assert_equal(result["funds"], []) # there should be no frozen funds

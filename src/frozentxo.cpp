@@ -35,7 +35,7 @@ CFrozenTXOCheck::CFrozenTXOCheck( const CBlockIndex& blockIndex )
     mBlockIndex = &blockIndex;
 }
 
-bool CFrozenTXOCheck::Check(const COutPoint& outpoint, TxGetter& txGetter)
+bool CFrozenTXOCheck::Check(const COutPoint& outpoint, TxGetter& txGetter) const
 {
     if(IsCheckOnBlock() && mBlockIndex->IsInExplicitSoftConsensusFreeze())
     {
@@ -99,26 +99,92 @@ bool CFrozenTXOCheck::Check(const COutPoint& outpoint, TxGetter& txGetter)
     return false;
 }
 
-bool CFrozenTXOCheck::Check(const COutPoint& outpoint, const CTransaction& tx, std::int64_t receivedTime)
+namespace {
+struct TxGetterRef : CFrozenTXOCheck::TxGetter
 {
-    struct TxGetterRef : TxGetter
+    TxGetterRef(const CTransaction& tx, std::int64_t receivedTime)
+    : txData(tx, receivedTime)
+    {}
+
+    TxData GetTxData() override
     {
-        TxGetterRef(const CTransaction& tx, std::int64_t receivedTime)
-        : txData(tx, receivedTime)
-        {}
+        return txData;
+    }
 
-        TxData GetTxData() override
-        {
-            return txData;
-        }
+    TxData txData;
+};
+}
 
-        TxData txData;
-    } txGetter(tx, receivedTime);
-
+bool CFrozenTXOCheck::Check(const COutPoint& outpoint, const CTransaction& tx, std::int64_t receivedTime) const
+{
+    TxGetterRef txGetter(tx, receivedTime);
     return Check(outpoint, txGetter);
 }
 
 std::int32_t CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop()
 {
     return CFrozenTXODB::Instance().Get_max_FrozenTXOData_enforceAtHeight_stop();
+}
+
+
+bool CFrozenTXOCheck::IsConfiscationTx(const CTransaction& tx)
+{
+    return CFrozenTXODB::IsConfiscationTx(tx);
+}
+
+bool CFrozenTXOCheck::ValidateConfiscationTxContents(const CTransaction& confiscation_tx)
+{
+    return CFrozenTXODB::ValidateConfiscationTxContents(confiscation_tx);
+}
+
+bool CFrozenTXOCheck::CheckConfiscationTxWhitelisted(const TxId& txid, TxGetter& txGetter) const
+{
+    auto whitelistedTxData = CFrozenTXODB::WhitelistedTxData::Create_Uninitialized();
+    bool isWhitelisted = CFrozenTXODB::Instance().IsTxWhitelisted(txid, whitelistedTxData);
+    if(isWhitelisted && this->nHeight >= whitelistedTxData.enforceAtHeight)
+    {
+        // Confiscation transaction is whitelisted and can be spent at specified height
+        return true;
+    }
+
+    // Confiscation transaction is not whitelisted or cannot be spent at specified height
+    // Add log entry to blacklist log file.
+    auto txData = txGetter.GetTxData();
+    CFrozenTXOLogger::LogEntry_Rejected entry{
+        (mReceivedTime ? mReceivedTime : txData.receivedTime),
+        CFrozenTXODB::FrozenTXOData::Blacklist::Consensus,
+        txData.tx,
+        mSource,
+        COutPoint{},
+        mPreviousActiveBlockHash
+    };
+    std::optional<std::int32_t> whitelistEnforceAtHeight;
+    if(isWhitelisted)
+    {
+        whitelistEnforceAtHeight = whitelistedTxData.enforceAtHeight;
+    }
+    if(IsCheckOnBlock())
+    {
+        CFrozenTXOLogger::Instance().LogRejectedBlockCTNotWhitelisted(entry, whitelistEnforceAtHeight, mBlockIndex->GetBlockHash(), disableEnforcingConfiscationTransactionChecks);
+        if(disableEnforcingConfiscationTransactionChecks)
+        {
+            return true;
+        }
+    }
+    else
+    {
+        CFrozenTXOLogger::Instance().LogRejectedTransactionCTNotWhitelisted(entry, whitelistEnforceAtHeight);
+    }
+    return false;
+}
+
+bool CFrozenTXOCheck::CheckConfiscationTxWhitelisted(const CTransaction& tx, std::int64_t receivedTime) const
+{
+    TxGetterRef txGetter(tx, receivedTime);
+    return CheckConfiscationTxWhitelisted(tx.GetId(), txGetter);
+}
+
+std::int32_t CFrozenTXOCheck::Get_max_WhitelistedTxData_enforceAtHeight()
+{
+    return CFrozenTXODB::Instance().Get_max_WhitelistedTxData_enforceAtHeight();
 }

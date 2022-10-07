@@ -40,7 +40,8 @@ std::optional<CoinImpl> CCoinsViewCache::GetCoin(const COutPoint &outpoint, bool
                     coinFromCache->GetTxOut().nValue,
                     coinFromCache->GetScriptSize(),
                     coinFromCache->GetHeight(),
-                    coinFromCache->IsCoinBase()};
+                    coinFromCache->IsCoinBase(),
+                    coinFromCache->IsConfiscation()};
         }
     }
 
@@ -62,7 +63,8 @@ std::optional<CoinImpl> CCoinsViewCache::GetCoin(const COutPoint &outpoint, bool
                     coinFromView->GetTxOut().nValue,
                     coinFromView->GetScriptSize(),
                     coinFromView->GetHeight(),
-                    coinFromView->IsCoinBase()});
+                    coinFromView->IsCoinBase(),
+                    coinFromView->IsConfiscation()});
         }
         else
         {
@@ -98,7 +100,7 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
     mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
 }
 
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, int32_t genesisActivationHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, bool fConfiscation, int32_t nHeight, int32_t genesisActivationHeight,
               bool check) {
     bool fCoinbase = tx.IsCoinBase();
     const TxId txid = tx.GetId();
@@ -108,7 +110,7 @@ void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, i
         // Always set the possible_overwrite flag to AddCoin for coinbase txn,
         // in order to correctly deal with the pre-BIP30 occurrences of
         // duplicate coinbase transactions.
-        cache.AddCoin(outpoint, CoinWithScript::MakeOwning(CTxOut{tx.vout[i]}, nHeight, fCoinbase),
+        cache.AddCoin(outpoint, CoinWithScript::MakeOwning(CTxOut{tx.vout[i]}, nHeight, fCoinbase, fConfiscation),
                       overwrite, genesisActivationHeight);
     }
 }

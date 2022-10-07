@@ -98,6 +98,8 @@ public:
     virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
+    virtual bool GetEnableAssumeWhitelistedBlockDepth() const = 0;
+    virtual int32_t GetAssumeWhitelistedBlockDepth() const = 0;
 
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
@@ -243,6 +245,8 @@ public:
     virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+    virtual void SetEnableAssumeWhitelistedBlockDepth(bool enabled) = 0;
+    virtual bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) = 0;
 
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
@@ -532,6 +536,11 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    void SetEnableAssumeWhitelistedBlockDepth(bool enabled) override;
+    bool GetEnableAssumeWhitelistedBlockDepth() const override;
+    bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) override;
+    int32_t GetAssumeWhitelistedBlockDepth() const override;
+
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
     uint64_t GetBlockStallingMinDownloadSpeed() const override;
@@ -748,6 +757,8 @@ private:
         bool mIsSetPromiscuousMempoolFlags;
 
         std::set<uint256> mInvalidBlocks;
+        bool enableAssumeWhitelistedBlockDepth;
+        int32_t assumeWhitelistedBlockDepth;
 
         std::set<std::string> mBannedUAClients{DEFAULT_CLIENTUA_BAN_PATTERNS};
         std::set<std::string> mAllowedUAClients;
@@ -1235,6 +1246,11 @@ public:
 
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
+
+    void SetEnableAssumeWhitelistedBlockDepth(bool enabled) override {}
+    bool GetEnableAssumeWhitelistedBlockDepth() const override { return DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH; }
+    bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) override { return true; }
+    int32_t GetAssumeWhitelistedBlockDepth() const override { return DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH; }
 
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }

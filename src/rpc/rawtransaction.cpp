@@ -1063,7 +1063,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false, false), true, genesisActivationHeight);
             }
 
             // If redeemScript given and not using the local wallet (private

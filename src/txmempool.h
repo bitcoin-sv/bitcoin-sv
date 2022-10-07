@@ -169,8 +169,8 @@ private:
 
     //!< Chain height when entering the mempool
     int32_t entryHeight;
-    //!< keep track of transactions that spend a coinbase
-    bool spendsCoinbase;
+    //!< keep track of transactions that spend a coinbase or confiscation
+    bool spendsCoinbaseOrConfiscation;
     // index of insertion to mempool, entry with smaller index is inserted before the one with larger
     uint64_t insertionIndex;
     // ancestors count
@@ -180,7 +180,7 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime,
                     int32_t _entryHeight,
-                    bool spendsCoinbase, LockPoints lp);
+                    bool spendsCoinbaseOrConfiscation, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
@@ -205,7 +205,7 @@ public:
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    bool GetSpendsCoinbase() const { return spendsCoinbase; }
+    bool GetSpendsCoinbaseOrConfiscation() const { return spendsCoinbaseOrConfiscation; }
 
     bool IsCPFPGroupMember() const { return group != nullptr; }
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
@@ -302,7 +302,9 @@ enum class MemPoolRemovalReason {
     //! Removed for replacement
     REPLACED,
     //! Removed because input was frozen
-    FROZEN_INPUT
+    FROZEN_INPUT,
+    //! Removed because it is no longer whitelisted
+    NOT_WHITELISTED
 };
 
 inline const enumTableT<MemPoolRemovalReason>& enumTable(MemPoolRemovalReason)
@@ -317,6 +319,7 @@ inline const enumTableT<MemPoolRemovalReason>& enumTable(MemPoolRemovalReason)
         {MemPoolRemovalReason::CONFLICT, "CONFLICT"},
         {MemPoolRemovalReason::REPLACED, "REPLACED"},
         {MemPoolRemovalReason::FROZEN_INPUT, "FROZEN_INPUT"},
+        {MemPoolRemovalReason::NOT_WHITELISTED, "NOT_WHITELISTED"},
     };
     return table;
 }
@@ -728,6 +731,7 @@ private:
 
 
     void RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet);
+    void RemoveInvalidCTXsNL(const mining::CJournalChangeSetPtr& changeSet);
 
 public:
     void RemoveForBlock(
@@ -758,6 +762,11 @@ public:
 
 
     void RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Remove all confiscation transactions that are no longer valid (i.e. not whitelisted).
+     */
+    void RemoveInvalidCTXs(const mining::CJournalChangeSetPtr& changeSet);
 
     void Clear();
 

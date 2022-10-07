@@ -97,6 +97,10 @@ static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 500 * O
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR = 0;
 /** Default percentage of total mempool size (ram+disk) to use as max limit for CPFP transactions */
 static const unsigned int DEFAULT_MEMPOOL_MAX_PERCENT_CPFP = 10;
+/** Default value for whether 'assume whitelisted block depth' policy is enabled. */
+static const bool DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH = false;
+/** Default minimal depth of block under tip at which confiscation transaction is assumed to be whitelisted if 'assume whitelisted block depth' policy is enabled. */
+static const int32_t DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH = 6;
 
 /**
  * Min feerate for defining dust. Historically this has been the same as the

@@ -135,6 +135,8 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"addToConsensusBlacklist", 0, "funds"},
     {"removeFromPolicyBlacklist", 0, "funds"},
     {"clearBlacklists", 0, "removeAllEntries"},
+    {"addToConfiscationTxidWhitelist", 0, "txs"},
+    {"queryConfiscationTxidWhitelist", 0, "verbose"},
     {"rebuildminerids", 0, "fullrebuild"},
     {"revokeminerid", 0, "input"},
     // Echo with conversion (For testing only)

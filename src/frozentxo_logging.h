@@ -120,6 +120,27 @@ public:
      * @param le Common log entry data
      */
     void LogRejectedTransaction(const LogEntry_Rejected& le);
+
+    /**
+     * Add log entry to indicate that a whole block was rejected because it included a confiscation transaction,
+     * which was not whitelisted or not valid at this height.
+     *
+     * @param le Common log entry data. Member frozenTXO is not applicable and is omitted from log entry.
+     * @param whitelistEnforceAtHeight If this does not contain a value, transaction was not whitelisted at all.
+     *                                 If it does, transaction was whitelisted, but is only valid from this height on.
+     * @param rejectedBlockHash Hash of the block that was rejected
+     * @param onlyWarning If true, log entry contains text with warning without mentioning that the block was rejected.
+     */
+    void LogRejectedBlockCTNotWhitelisted(const LogEntry_Rejected& le, std::optional<std::int32_t> whitelistEnforceAtHeight, const uint256& rejectedBlockHash, bool onlyWarning);
+
+    /**
+     * Add log entry to indicate that a confiscation transaction was rejected because it was not whitelisted
+     * or not valid at this height.
+     *
+     * @param le Common log entry data
+     * @param whitelistEnforceAtHeight Same as in LogRejectedBlockCTNotWhitelisted() method.
+     */
+    void LogRejectedTransactionCTNotWhitelisted(const LogEntry_Rejected& le, std::optional<std::int32_t> whitelistEnforceAtHeight);
 };
 
 
