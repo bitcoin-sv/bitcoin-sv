@@ -1243,32 +1243,20 @@ void CTxMemPool::RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet)
     setEntries spendingFrozenTXOs;
     for(const auto& spentTXO: mapNextTx.get<by_prevout>())
     {
-        struct TxGetterMP : CFrozenTXOCheck::TxGetter
-        {
-            TxGetterMP(const CTxMemPoolEntry& mpe)
-            : mpe(mpe)
-            {}
-
-            TxData GetTxData() override
-            {
-                txRef = mpe.GetSharedTx();
-                return TxData(*txRef, mpe.GetTime());
-            }
-
-            const CTxMemPoolEntry& mpe;
-            CTransactionRef txRef;
-        } txGetter(*spentTXO.spentBy);
-
-        if(!frozenTXOCheck.Check(spentTXO.outpoint, txGetter))
+        std::uint8_t effectiveBlacklist;
+        if(!frozenTXOCheck.Check(spentTXO.outpoint, effectiveBlacklist))
         {
             // Is this input spent by confiscation transaction?
             // NOTE: This is inefficient because we're loading every tx to memory and we're doing
             //       it more than once for txs with several inputs. But since there will not be
             //       many transactions in mempool that spend frozen TXOs, this is not an issue.
-            const bool isConfiscationTx = CFrozenTXOCheck::IsConfiscationTx(*spentTXO.spentBy->GetSharedTx());
+            auto ptx = spentTXO.spentBy->GetSharedTx();
+            const bool isConfiscationTx = CFrozenTXOCheck::IsConfiscationTx(*ptx);
             if(!isConfiscationTx)
             {
                 // For normal transaction input must not be frozen.
+                frozenTXOCheck.LogAttemptToSpendFrozenTXO(spentTXO.outpoint, *ptx, effectiveBlacklist, spentTXO.spentBy->GetTime());
+
                 // Store iterator to this tx and all its descendants
                 GetDescendantsNL(spentTXO.spentBy, spendingFrozenTXOs);
             }

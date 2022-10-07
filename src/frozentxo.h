@@ -38,47 +38,36 @@ public:
     CFrozenTXOCheck( const CBlockIndex& blockIndex );
 
     /**
-     * Helper base class used by Check() method
-     */
-    struct TxGetter
-    {
-        struct TxData
-        {
-            TxData(const CTransaction& tx, std::int64_t receivedTime)
-            : tx(tx)
-            , receivedTime(receivedTime)
-            {}
-
-            const CTransaction& tx;
-            const std::int64_t receivedTime;
-        };
-
-        virtual TxData GetTxData() = 0;
-        virtual ~TxGetter() = default;
-    };
-
-    /**
-     * Check whether output is frozen and if yes, log that a transaction was trying to spend it.
+     * Check whether output is frozen and if yes, set value of effectiveBlacklist argument.
      *
      * Returns true if check passes and false if the output is frozen.
      *
      * @param outpoint This TXO is checked if it is frozen.
-     * @param txGetter Object used to obtain reference to transaction trying to spend a frozen output.
-     *                 For performance reasons, GetTxData() method is called only if it was determined that
-     *                 the output is frozen.
-     *                 Reference TxData::tx returned by call to GetTxData() must be valid until the next
-     *                 call to GetTxData() or until Check() method returns.
-     *                 Value TxData::receivedTime is the time when the tx was received and is used only
-     *                 in case mReceivedTime is set to 0.
+     * @param effectiveBlacklist Blacklist on which TXO was frozen. Only set if TXO is frozen, otherwise this value is left unchanged.
+     *                           If set, value is intended to be passed to LogAttemptToSpendFrozenTXO() member function.
      *
      * NOTE: Function is a no-op if mBlockIndex->IsInExplicitSoftConsensusFreeze() returns true.
      */
-    bool Check(const COutPoint& outpoint, TxGetter& txGetter) const;
+    bool Check(const COutPoint& outpoint, std::uint8_t& effectiveBlacklist) const;
 
     /**
-     * Same as above, except that transaction reference and the time it was received are provided directly.
+     * Same as above and if output is frozen, log that a transaction was trying to spend it.
+     *
+     * @param outpoint This TXO is checked if it is frozen.
+     * @param tx Transaction trying to spend TXO 'outpoint'
+     * @param receivedTime Time when the tx was received. If mReceivedTime!=0, this value is ignored and mReceivedTime is use instead.
      */
     bool Check(const COutPoint& outpoint, const CTransaction& tx, std::int64_t receivedTime = 0) const;
+
+    /**
+     * Add an entry to blacklist log file that a transaction was trying to spend a frozen output.
+     *
+     * @param outpoint Frozen TXO
+     * @param tx Transaction trying to spend TXO 'outpoint'
+     * @param effectiveBlacklist Blacklist on which TXO was frozen as returned by Check() member function
+     * @param receivedTime Time when the tx was received. If mReceivedTime!=0, this value is ignored and mReceivedTime is use instead.
+     */
+    void LogAttemptToSpendFrozenTXO(const COutPoint& outpoint, const CTransaction& tx, std::uint8_t effectiveBlacklist, std::int64_t receivedTime) const;
 
     bool IsCheckOnBlock() const { return mBlockIndex != nullptr; }
 
@@ -99,19 +88,14 @@ public:
     static bool ValidateConfiscationTxContents(const CTransaction& confiscation_tx);
 
     /**
-     * Check whether confiscation transaction with specified id is whitelisted and can be spent at height nHeight.
+     * Check whether confiscation transaction tx is whitelisted and can be spent at height nHeight.
      *
      * Adds a log entry if not.
      *
-     * @param txid Id of a confiscation transaction
-     * @param txGetter Same as in Check() method.
+     * @param tx Confiscation transaction
+     * @param receivedTime Time when the tx was received. If mReceivedTime!=0, this value is ignored and mReceivedTime is use instead.
      *
      * @return true iff transaction is whitelisted and can be spent at height nHeight.
-     */
-    bool CheckConfiscationTxWhitelisted(const TxId& txid, TxGetter& txGetter) const;
-
-    /**
-     * Same as above, except that transaction reference and the time it was received are provided directly and txid is obtained from tx.
      */
     bool CheckConfiscationTxWhitelisted(const CTransaction& tx, std::int64_t receivedTime = 0) const;
 
