@@ -456,7 +456,8 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
             break;
         }
 
-        LOCK(cs_main);
+        // Take cs_main without using the LOCK macro so that we can manually unlock it later
+        boost::unique_lock<CCriticalSection> csMainLock { cs_main };
         std::lock_guard lock {mMtx};
 
         const CBlockIndex* tip { chainActive.Tip() };
@@ -478,6 +479,7 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
 
             // Process first block; will set initial best block in state
             const CBlockIndex* pindex { chainActive[startHeight] };
+            csMainLock.unlock();
             ReadAndProcessBlock(pindex);
         }
         else if(tip->GetBlockHash() == mDBState.mBestBlock)
@@ -494,6 +496,7 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
 
             // Process next block after our current best to move towards tip
             bestblock = chainActive.Next(bestblock);
+            csMainLock.unlock();
             ReadAndProcessBlock(bestblock);
         }
         else
