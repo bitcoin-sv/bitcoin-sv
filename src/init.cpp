@@ -2887,34 +2887,30 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         config.SetAllowClientUA(std::move(validUAClients));
     }
 
-    // Configure maximum disk space that can be taken by Merkle Tree data files.
     {
-        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", MIN_DISK_SPACE_FOR_MERKLETREE_FILES);
+        int64_t maxBlockEstimate = std::min(config.GetMaxBlockSize(), config.GetMaxMempool());
         std::string err;
-        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
-        {
-            return InitError(err);
-        }
-    }
 
-    // Configure preferred size of a single Merkle Tree data file.
-    {
-        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE);
-        std::string err;
+        // Configure preferred size of a single Merkle Tree data file.
+        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeFileSize(maxBlockEstimate));
         if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
-        {
             return InitError(err);
-        }
-    }
 
-    // Configure size of Merkle Trees memory cache.
-    {
-        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE);
-        std::string err;
+        // Configure size of Merkle Trees memory cache.
+        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculateMaxMerkleTreeMemoryCacheSize(maxBlockEstimate));
         if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
+            return InitError(err);
+
+        // Configure maximum disk space that can be taken by Merkle Tree data files.
+        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", CalculateMinDiskSpaceForMerkleFiles(maxBlockEstimate));
+        if (maxMerkleTreeDiskspaceArg < merkleTreeFileSizeArg || maxMerkleTreeDiskspaceArg < maxMerkleTreeMemCacheSizeArg)
         {
+            err = "-maxmerkletreediskspace cannot be less than -maxmerkletreememcachesize or -preferredmerkletreefilesize";
             return InitError(err);
         }
+
+        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
+            return InitError(err);
     }
 
     const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);

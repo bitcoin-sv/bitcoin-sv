@@ -1102,15 +1102,6 @@ bool GlobalConfig::SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* 
         return false;
     }
     uint64_t setMaxDiskSpace = static_cast<uint64_t>(maxDiskSpace);
-    if (setMaxDiskSpace < MIN_DISK_SPACE_FOR_MERKLETREE_FILES)
-    {
-        if (err)
-        {
-            *err = _("Maximum disk space used by merkle tree files cannot be below the minimum of ") + 
-                std::to_string(MIN_DISK_SPACE_FOR_MERKLETREE_FILES / ONE_MEBIBYTE) + _(" MiB.");
-        }
-        return false;
-    }
     data->maxMerkleTreeDiskSpace = setMaxDiskSpace;
     return true;
 }
