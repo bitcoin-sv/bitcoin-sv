@@ -4489,9 +4489,13 @@ static bool ActivateBestChainStep(
                         [](const COutPoint& p) {return p.GetTxId();});
 
                 if (!datarefs.empty()) {
+
+                    std::stringstream ss;
+                    for (const auto& txid: datarefs)
+                        ss << ' ' << txid.ToString();
                     LogPrint(BCLog::MINERID,
-                             "minerinfotx tracker, scheduled removal of minerinfo and dataref txns. Total removed: %ld\n",
-                             datarefs.size());
+                             "minerinfotx tracker, remove minerinfo and dataref txns:%s\n", ss.str());
+
                     std::vector<TxId> toRemove = mempool.RemoveTxnsAndDescendants(datarefs, changeSet);
                     if (toRemove.size() != funds.size()) {
                         // if we mined them by error (calling bitcoin-cli generate for e.g.), then we have to

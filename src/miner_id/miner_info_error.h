@@ -59,11 +59,12 @@ enum class miner_info_error
     size
 };
 
-std::ostream& operator<<(std::ostream&, miner_info_error); 
+std::ostream& operator<<(std::ostream&, miner_info_error);
 
-void log_parse_error(miner_info_error,
+void log_parse_error(miner_info_error error,
                      const std::string& txid,
-                     size_t index);
+                     size_t n,
+                     const std::string& additional_info = "");
 
 const enumTableT<miner_info_error>& enumTable(miner_info_error);
 

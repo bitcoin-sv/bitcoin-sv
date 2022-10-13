@@ -114,12 +114,13 @@ const enumTableT<miner_info_error>& enumTable(miner_info_error)
 
 void log_parse_error(const miner_info_error error,
                      const string& txid,
-                     const size_t n)
+                     const size_t n,
+                     const std::string& additional_info)
 {
     LogPrint(BCLog::MINERID,
-             "Invalid MinerInfo: %s, txid: %s and output index: %d.\n",
+             "Invalid MinerInfo: %s, coinbase txid: %s and output index: %d. %s\n",
              enum_cast<std::string>(error),
              txid,
-             n);
+             n,
+             additional_info);
 }
-
