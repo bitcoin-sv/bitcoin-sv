@@ -426,6 +426,8 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
     // Lambda to read and process a new block
     auto ReadAndProcessBlock = [this](const CBlockIndex* pindex)
     {
+        int64_t startTime { GetTimeMillis() };
+
         // Check block has a file associated with it (it might have been pruned)
         if(pindex->GetFileNumber() && pindex->GetFileNumber().value() >= 0)
         {
@@ -440,10 +442,14 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
 
         // Ensure we always update our best block
         SetBestBlockNL(pindex->GetBlockHash());
+
+        // Return how long we spent in here
+        return GetTimeMillis() - startTime;
     };
 
     const auto future { mPromise.get_future() };
     int64_t startTime { GetTimeMillis() };
+    int64_t sleepTime {0};
 
     while(true)
     {
@@ -456,7 +462,17 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
             break;
         }
 
-        LOCK(cs_main);
+        // Give other threads a better chance of running by sleeping ourselves
+        if(sleepTime)
+        {
+            // Limit sleep to max of 5 seconds
+            constexpr int64_t MAX_SLEEP_MILLIS { 5 * 1000 };
+            sleepTime = std::min(sleepTime, MAX_SLEEP_MILLIS);
+            std::this_thread::sleep_for(std::chrono::milliseconds { sleepTime });
+        }
+
+        // Take cs_main without using the LOCK macro so that we can manually unlock it later
+        boost::unique_lock<CCriticalSection> csMainLock { cs_main };
         std::lock_guard lock {mMtx};
 
         const CBlockIndex* tip { chainActive.Tip() };
@@ -478,7 +494,8 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
 
             // Process first block; will set initial best block in state
             const CBlockIndex* pindex { chainActive[startHeight] };
-            ReadAndProcessBlock(pindex);
+            csMainLock.unlock();
+            sleepTime = ReadAndProcessBlock(pindex);
         }
         else if(tip->GetBlockHash() == mDBState.mBestBlock)
         {
@@ -494,7 +511,8 @@ void MinerIdDatabase::UpdateToTip(bool syncFromGenesis)
 
             // Process next block after our current best to move towards tip
             bestblock = chainActive.Next(bestblock);
-            ReadAndProcessBlock(bestblock);
+            csMainLock.unlock();
+            sleepTime = ReadAndProcessBlock(bestblock);
         }
         else
         {
