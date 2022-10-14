@@ -1425,24 +1425,6 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
     }
 }
 
-inline static void SendBlockTransactions(const CBlock &block,
-                                         const BlockTransactionsRequest &req,
-                                         const CNodePtr& pfrom, CConnman &connman) {
-    BlockTransactions resp(req);
-    for (size_t i = 0; i < req.indices.size(); i++) {
-        if (req.indices[i] >= block.vtx.size()) {
-            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
-            return;
-        }
-        resp.txn[i] = block.vtx[req.indices[i]];
-    }
-
-    const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    connman.PushMessage(pfrom,
-                        msgMaker.Make(NetMsgType::BLOCKTXN, resp));
-}
-
 /**
 * Process reject messages.
 */
@@ -2554,6 +2536,135 @@ static void ProcessGetBlocksMessage(
     }
 }
  
+namespace
+{
+
+// Interface for classes to fetch BlockTxn transactions
+class BlockTransactionReader
+{
+  public:
+    virtual ~BlockTransactionReader() = default;
+
+    virtual size_t GetNumTxnsInBlock() const = 0;
+
+    // Return transaction at index from block. Subsequent calls
+    // must be for indexes higher than the previous call.
+    virtual CTransactionRef GetTransactionIndex(size_t index) = 0;
+};
+
+// Fetch BlockTxn transactions from a block file
+class DiskBlockTransactionReader : public BlockTransactionReader
+{
+  public:
+    DiskBlockTransactionReader(std::unique_ptr<CBlockStreamReader<CFileReader>> reader)
+        : BlockTransactionReader{}, mReader{std::move(reader)},
+          mNumTxnsInBlock{mReader->GetRemainingTransactionsCount()}
+    {}
+
+    size_t GetNumTxnsInBlock() const override { return mNumTxnsInBlock; }
+
+    CTransactionRef GetTransactionIndex(size_t index) override
+    {
+        if(index >= mNumTxnsInBlock)
+        {
+            throw std::runtime_error("Index out-of-bounds");
+        }
+
+        // Transaction indexes in request are assumed to be sorted in ascending order without duplicates.
+        // This must always be true since indexes are differentially encoded in getblocktxn P2P message.
+        assert(index >= mNumTxnsRead);
+
+        // Read from block stream until we get to the transaction with requested index.
+        for(; mNumTxnsRead <= index; ++mNumTxnsRead)
+        {
+            assert(! mReader->EndOfStream()); // We should never get pass the end of stream since we checked transaction index above.
+            auto* tx_ptr = mReader->ReadTransaction_NoThrow();
+            (void)tx_ptr; // not used except for assert
+            assert(tx_ptr); // Reading block should not fail
+        }
+
+        // CBlockStreamReader object now holds transaction with requested index.
+        // Take ownership of transaction object and store transaction reference in the response.
+        return mReader->GetLastTransactionRef();
+    }
+
+  private:
+
+    std::unique_ptr<CBlockStreamReader<CFileReader>> mReader {nullptr};
+    size_t mNumTxnsInBlock {0};
+    size_t mNumTxnsRead {0};
+};
+
+// Fetch BlockTxn transactions from the cached latest block
+class CachedBlockTransactionReader : public BlockTransactionReader
+{
+  public:
+    CachedBlockTransactionReader(const CBlock& block)
+        : BlockTransactionReader{}, mBlock{block}
+    {}
+
+    size_t GetNumTxnsInBlock() const override { return mBlock.vtx.size(); }
+
+    CTransactionRef GetTransactionIndex(size_t index) override
+    {
+        if(index >= mBlock.vtx.size())
+        {
+            throw std::runtime_error("Index out-of-bounds");
+        }
+
+        return mBlock.vtx[index];
+    }
+
+  private:
+
+    const CBlock& mBlock;
+};
+
+void SendBlockTransactions(const Config& config,
+                           const CNodePtr& pfrom,
+                           const CChainParams& chainparams,
+                           const std::atomic<bool>& interruptMsgProc,
+                           const BlockTransactionsRequest& req,
+                           std::unique_ptr<BlockTransactionReader>& reader,
+                           CConnman& connman)
+{
+    // If the peer wants more than the configured % of txns in the original block, just stream them the whole thing
+    size_t numTxnsRequested { req.indices.size() };
+    size_t numTxnsInBlock { reader->GetNumTxnsInBlock() };
+    double percentRequested { (static_cast<double>(numTxnsRequested) / numTxnsInBlock) * 100 };
+    unsigned maxPercent { config.GetBlockTxnMaxPercent() };
+    if(percentRequested > maxPercent)
+    {
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn wanting %f%% of txns "
+            "which is more than the configured max of %d%%. Responding with full block\n",
+            pfrom->id, percentRequested, maxPercent);
+        CInv inv { MSG_BLOCK, req.blockhash };
+        pfrom->vRecvGetData.push_back(inv);
+        ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
+        return;
+    }
+
+    BlockTransactions resp {req};
+    for(size_t i = 0; i < req.indices.size(); i++)
+    {
+        try
+        {
+            resp.txn[i] = reader->GetTransactionIndex(req.indices[i]);
+        }
+        catch(const std::exception&)
+        {
+            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
+            return;
+        }
+    }
+
+    const CNetMsgMaker msgMaker { pfrom->GetSendVersion() };
+    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
+}
+
+}
+
 /**
 * Process getblocktxn message.
 */
@@ -2564,20 +2675,23 @@ static void ProcessGetBlockTxnMessage(const Config& config,
                                       CDataStream& vRecv,
                                       CConnman& connman)
 {
-    BlockTransactionsRequest req;
+    BlockTransactionsRequest req {};
     vRecv >> req;
 
-    std::shared_ptr<const CBlock> recent_block =
-        mostRecentBlock.GetBlockIfMatch(req.blockhash);
-    if(recent_block) {
-        SendBlockTransactions(*recent_block, req, pfrom, connman);
+    // See if we can serve this request from the last received cached block
+    std::shared_ptr<const CBlock> recent_block { mostRecentBlock.GetBlockIfMatch(req.blockhash) };
+    if(recent_block)
+    {
+        std::unique_ptr<BlockTransactionReader> blockReader { std::make_unique<CachedBlockTransactionReader>(*recent_block) };
+        SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, blockReader, connman);
         return;
     }
 
     LOCK(cs_main);
 
     auto index = mapBlockIndex.Get(req.blockhash);
-    if(!index) {
+    if(!index)
+    {
         LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
@@ -2591,60 +2705,23 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         // might maliciously send lots of getblocktxn requests to trigger
         // expensive disk reads, because it will require the peer to
         // actually receive all the data read from disk over the network.
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n",
-                 pfrom->id, MAX_BLOCKTXN_DEPTH);
-        CInv inv;
-        inv.type = MSG_BLOCK;
-        inv.hash = req.blockhash;
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n", pfrom->id, MAX_BLOCKTXN_DEPTH);
+        CInv inv { MSG_BLOCK, req.blockhash };
         pfrom->vRecvGetData.push_back(inv);
         ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
         return;
     }
 
     // Create stream reader object that will be used to read block from disk.
-    auto block_stream_reader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
-    if (!block_stream_reader)
+    auto blockStreamReader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
+    if(!blockStreamReader)
     {
         LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
-    // Number of transactions in block
-    const std::size_t num_txn_in_block { block_stream_reader->GetRemainingTransactionsCount() };
 
-    BlockTransactions resp(req);
-
-    std::size_t num_txn_read=0; // Number of transactions that were already read from block stream
-    for(std::size_t i=0; i<req.indices.size(); ++i)
-    {
-        const std::size_t txn_idx { req.indices[i] };
-        if (txn_idx >= num_txn_in_block)
-        {
-            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
-            return;
-        }
-
-        // Transaction indexes in request are assumed to be sorted in ascending order without duplicates.
-        // This must always be true since indexes are differentially encoded in getblocktxn P2P message.
-        assert(txn_idx>=num_txn_read);
-
-        // Read from block stream until we get to the transaction with requested index.
-        for(; num_txn_read<=txn_idx; ++num_txn_read)
-        {
-            assert(!block_stream_reader->EndOfStream()); // We should never get pass the end of stream since we checked transaction index above.
-            auto* tx_ptr = block_stream_reader->ReadTransaction_NoThrow();
-            (void)tx_ptr; // not used except for assert
-            assert(tx_ptr); // Reading block should not fail
-        }
-
-        // CBlockStreamReader object now holds transaction with requested index.
-        // Take ownership of transaction object and store transaction reference in the response.
-        resp.txn[i] = block_stream_reader->GetLastTransactionRef();
-    }
-
-    const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    connman.PushMessage(pfrom,
-        msgMaker.Make(NetMsgType::BLOCKTXN, std::move(resp)));
+    std::unique_ptr<BlockTransactionReader> blockReader { std::make_unique<DiskBlockTransactionReader>(std::move(blockStreamReader)) };
+    SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, blockReader, connman);
 }
 
 
