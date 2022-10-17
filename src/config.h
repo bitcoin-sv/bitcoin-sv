@@ -115,6 +115,7 @@ public:
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
     virtual int64_t GetStreamSendRateLimit() const = 0;
     virtual unsigned int GetBanScoreThreshold() const = 0;
+    virtual unsigned int GetBlockTxnMaxPercent() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -262,6 +263,7 @@ public:
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
     virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
+    virtual bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -566,6 +568,8 @@ public:
     int64_t GetStreamSendRateLimit() const override;
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override;
     unsigned int GetBanScoreThreshold() const override;
+    bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override;
+    unsigned int GetBlockTxnMaxPercent() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -788,6 +792,7 @@ private:
         unsigned int maxProtocolSendPayloadLength;
         unsigned int recvInvQueueFactor;
         unsigned int banScoreThreshold;
+        unsigned int blockTxnMaxPercent;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1277,6 +1282,8 @@ public:
     int64_t GetStreamSendRateLimit() const override { return Stream::DEFAULT_SEND_RATE_LIMIT; }
     bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override { return true; }
     unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
+    bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override { return true; }
+    unsigned int GetBlockTxnMaxPercent() const override { return DEFAULT_BLOCK_TXN_MAX_PERCENT; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }
