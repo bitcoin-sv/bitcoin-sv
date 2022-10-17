@@ -100,7 +100,7 @@ class CompactBlocksTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 2
-        self.extra_args = [[], ["-txindex"]]
+        self.extra_args = [["-maxblocktxnpercent=100"], ["-txindex", "-maxblocktxnpercent=100"]]
         self.utxos = []
 
     def build_block_on_tip(self, node):
