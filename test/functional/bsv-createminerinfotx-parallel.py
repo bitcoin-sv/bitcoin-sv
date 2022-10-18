@@ -15,10 +15,12 @@ from time import sleep
 import json
 
 '''
-Create a miner info doc and send it to the node via the createminerinfotx rpc function.
-Create a chain of mineridinfo-txns where each such transaction funds the next.
-Retive a transaction-id via getminerinfotxid rpc function.
-Run these checks on another node in parallel using the same minerID.
+Create miner info transactions in two nodes in parallel using the same minerid but
+independent funding chains.
+Stop node1 and continue mining on node2.
+Reconnect and continue mining on both nodes
+The two funding seeds are the two outputs of a coinbase signed with different keys
+to ensure the funding chains are different
 '''
 class AllKeys:
     def __init__(self):
@@ -27,7 +29,8 @@ class AllKeys:
         self.prev_minerIdKeys = MinerIdKeys("03")
         self.prev_revocationKeys = MinerIdKeys("04")
         self.compromisedKeys = MinerIdKeys("06")
-        self.fundingKeys = MinerIdKeys("10")
+        self.fundingKey0 = MinerIdKeys("10")
+        self.fundingKey1 = MinerIdKeys("11")
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -43,7 +46,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.extra_args = [args,args]
 
         self.TEST_call_create = 1
-        self.TEST_call_create_twice = 2
         self.TEST_call_replace = 3
 
     def make_block_with_coinbase(self, conn_rpc):
@@ -58,25 +60,26 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         tx = CTransaction()
         tx.vin.append(CTxIn(COutPoint(coinbase_tx.sha256, 0), b"", 0xffffffff))
 
-        scriptPubKey = CScript([OP_DUP, OP_HASH160, hash160(keys.publicKeyBytes()), OP_EQUALVERIFY, OP_CHECKSIG])
+        scriptPubKey0 = CScript([OP_DUP, OP_HASH160, hash160(keys[0].publicKeyBytes()), OP_EQUALVERIFY, OP_CHECKSIG])
+        scriptPubKey1 = CScript([OP_DUP, OP_HASH160, hash160(keys[1].publicKeyBytes()), OP_EQUALVERIFY, OP_CHECKSIG])
         amount2 = int(amount / 2)
-        tx.vout.append(CTxOut(amount2, scriptPubKey))
-        tx.vout.append(CTxOut(amount2, scriptPubKey))
+        tx.vout.append(CTxOut(amount2, scriptPubKey0))
+        tx.vout.append(CTxOut(amount2, scriptPubKey1))
 
         tx.rehash()
         txid = node.sendrawtransaction(ToHex(tx), False, True)
         assert_equal(node.getrawmempool(), [txid])
         return tx
 
-    def store_funding_info(self, nodenum, keys, txId, index):
+    def store_funding_info(self, nodenum, key, txId, index):
         datapath = self.options.tmpdir + "/node{}/regtest/miner_id/Funding".format(nodenum)
         Path(datapath).mkdir(parents=True, exist_ok=True)
 
-        destination = key_to_p2pkh(keys.publicKeyBytes())
+        destination = key_to_p2pkh(key.publicKeyBytes())
 
         fundingKey = {}
         fundingSeed = {}
-        fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
+        fundingKey['fundingKey'] = {'privateBIP32': key.privateKey()}
         fundingSeed['fundingDestination'] = {'addressBase58': destination, }
         fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
@@ -88,13 +91,12 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         with open(datapath + '/minerinfotxfunding.dat', 'w') as f:
             f.write(fundingSeedJson)
 
-    def one_test(self, allKeys, fundingSeedTx, test_case):
+    def one_test(self, allKeys, winner, oneNodeOnly=False):
         # create the minerinfodoc transaction and ensure it is in the mempool
-        # create a dummy transaction to compare behaviour
-        height = self.nodes[0].getblockcount() + 1
+        height = self.nodes[winner].getblockcount() + 1
         minerinfotx_parameters = {
                 'height': height,
-                'name': self.miner_names[0],
+                'name': self.miner_names[winner],
                 'publicIP': '127.0.0.1',
                 'publicPort': '8333',
                 'minerKeys': allKeys.minerIdKeys,
@@ -104,64 +106,30 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 'pubCompromisedMinerKeyHex': None }
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
-        txid = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
-        txid_x = self.nodes[1].createminerinfotx(bytes_to_hex_str(scriptPubKey))
-
-        if test_case == self.TEST_call_create_twice:
-            txid_twice = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
-            txid_twice_x = self.nodes[1].createminerinfotx(bytes_to_hex_str(scriptPubKey))
-            assert(txid == txid_twice)
-            assert(txid_x == txid_twice_x)
-            assert(txid == txid_x)
-
-        if test_case == self.TEST_call_replace:
-            minerinfotx_parameters['publicPort'] = '8334' # vary the port to get a different txid
-            scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
-            txid_twice = self.nodes[0].replaceminerinfotx(bytes_to_hex_str(scriptPubKey))
-            txid_twice_x = self.nodes[1].replaceminerinfotx(bytes_to_hex_str(scriptPubKey))
-            assert(txid != txid_twice)
-            assert(txid_x != txid_twice_x)
-            txid = txid_twice
-            txid_x = txid_twice_x
-
-        # ensure the minerinfotx was not relayed to the connected node
-        wait_until(lambda: txid in self.nodes[0].getrawmempool(), timeout=10)
-        wait_until(lambda: txid_x in self.nodes[1].getrawmempool(), timeout=10)
-        sleep(0.3) # to give time for relaying
-        tx0 = self.nodes[0].getminerinfotxid()
-        tx1 = self.nodes[1].getminerinfotxid()
-        assert(tx0 == txid)
-        assert(tx1 == txid_x)
+        txid = self.nodes[winner].createminerinfotx(bytes_to_hex_str(scriptPubKey))
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
-        minerInfoTx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
-        block = make_miner_id_block(self.nodes[0], minerinfotx_parameters, minerInfoTx=minerInfoTx)
-        block_x = make_miner_id_block(self.nodes[1], minerinfotx_parameters, minerInfoTx=minerInfoTx)
-        block_count = self.nodes[0].getblockcount()
-        block_count_x = self.nodes[1].getblockcount()
+        minerInfoTx = FromHex(CTransaction(), self.nodes[winner].getrawtransaction(txid))
+        block = make_miner_id_block(self.nodes[winner], minerinfotx_parameters, minerInfoTx=minerInfoTx)
+        block_count = self.nodes[winner].getblockcount()
 
-        self.nodes[0].submitblock(ToHex(block))
-        self.nodes[1].submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == self.nodes[0].getblockcount())
-        wait_until (lambda: block_count + 1 == self.nodes[1].getblockcount())
+        self.nodes[winner].submitblock(ToHex(block))
+        wait_until (lambda: block_count + 1 == self.nodes[winner].getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in self.nodes[0].getrawmempool())
-        bhash = self.nodes[0].getbestblockhash()
-        block = self.nodes[0].getblock(bhash)
+        assert(txid not in self.nodes[winner].getrawmempool())
+        bhash = self.nodes[winner].getbestblockhash()
+        block = self.nodes[winner].getblock(bhash)
         assert(txid in block['tx'])
-
-        assert(txid not in self.nodes[1].getrawmempool())
-        bhash = self.nodes[1].getbestblockhash()
-        block = self.nodes[1].getblock(bhash)
-        assert(txid in block['tx'])
-
-        tx0 = self.nodes[0].getminerinfotxid()
-        tx1 = self.nodes[1].getminerinfotxid()
-        assert(tx0 == None)
-        assert(tx1 == None)
-        assert(tx1 == tx0)
+        if not oneNodeOnly:
+            if winner == 0:
+                looser = 1
+            else:
+                looser = 0
+            self.sync_all()
+            assert(len(self.nodes[looser].getrawmempool()) == 0)
+            assert(bhash == self.nodes[looser].getbestblockhash())
 
 
     def run_test(self):
@@ -173,26 +141,40 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.nodes[0].submitblock(ToHex(block))
         self.nodes[0].generate(101)
         self.sync_all()
-        fundingSeedTx = self.create_funding_seed(self.nodes[0], allKeys.fundingKeys, coinbase_tx)
-        self.store_funding_info(0, allKeys.fundingKeys, fundingSeedTx.hash, index=0)
-        self.store_funding_info(1, allKeys.fundingKeys, fundingSeedTx.hash, index=0)
+
+        fundingSeedTx = self.create_funding_seed(self.nodes[0], [allKeys.fundingKey0, allKeys.fundingKey1], coinbase_tx)
+
+        self.store_funding_info(nodenum=0, key=allKeys.fundingKey0, txId=fundingSeedTx.hash, index=0)
         self.nodes[0].generate(1)
         self.sync_all()
 
-        # repeate test just to be sure
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_replace)
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_create_twice)
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_create_twice)
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
+        self.store_funding_info(nodenum=1, key=allKeys.fundingKey1, txId=fundingSeedTx.hash, index=1)
+        self.nodes[1].generate(1)
+        self.sync_all()
+
+        self.one_test(allKeys, winner=1)
+        self.one_test(allKeys, winner=0)
+        self.one_test(allKeys, winner=0)
+        self.one_test(allKeys, winner=1)
+        self.one_test(allKeys, winner=0)
+        self.one_test(allKeys, winner=1)
+        self.one_test(allKeys, winner=0)
 
         # test persistence of funding information
 
-        self.stop_nodes()
-        self.start_nodes(self.extra_args)
+        self.stop_node(1)
+        self.one_test(allKeys, winner=0, oneNodeOnly=True)
+        self.one_test(allKeys, winner=0, oneNodeOnly=True)
+        self.one_test(allKeys, winner=0, oneNodeOnly=True)
+
+        self.start_node(1, self.extra_args[1])
         disconnect_nodes_bi(self.nodes, 0, 1)
         connect_nodes_bi(self.nodes, 0, 1)
-        self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
+        self.sync_all()
+        self.one_test(allKeys, winner=0)
+        self.one_test(allKeys, winner=1)
+        self.one_test(allKeys, winner=0)
+        self.one_test(allKeys, winner=1)
 
 
 if __name__ == '__main__':
