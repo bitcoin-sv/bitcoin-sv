@@ -1010,8 +1010,14 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     }
 }
 
-static bool rejectIfMaxDownloadExceeded(uint64_t maxSendQueuesBytes, CSerializedNetMsg &msg, bool isMostRecentBlock, const CNodePtr& pfrom, CConnman &connman) {
-
+static bool rejectIfMaxDownloadExceeded(
+    const Config& config,
+    const CSerializedNetMsg& msg,
+    bool isMostRecentBlock,
+    const CNodePtr& pfrom,
+    CConnman& connman)
+{
+    uint64_t maxSendQueuesBytes { config.GetMaxSendQueuesBytes() };
     size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
     if (totalSize > maxSendQueuesBytes) {
 
@@ -1044,7 +1050,7 @@ static bool rejectIfMaxDownloadExceeded(uint64_t maxSendQueuesBytes, CSerialized
 }
 
 static bool SendCompactBlock(
-    uint64_t maxSendQueuesBytes,
+    const Config& config,
     bool isMostRecentBlock,
     const CNodePtr& node,
     CConnman& connman,
@@ -1053,7 +1059,7 @@ static bool SendCompactBlock(
 {
     CSerializedNetMsg compactBlockMsg =
         msgMaker.Make(NetMsgType::CMPCTBLOCK, cmpctblock);
-    if (rejectIfMaxDownloadExceeded(maxSendQueuesBytes, compactBlockMsg, isMostRecentBlock, node, connman)) {
+    if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, node, connman)) {
         return false;
     }
     connman.PushMessage(node, std::move(compactBlockMsg));
@@ -1062,7 +1068,7 @@ static bool SendCompactBlock(
 }
 
 static void SendBlock(
-    uint64_t maxSendQueuesBytes,
+    const Config& config,
     bool isMostRecentBlock,
     const CNodePtr& pfrom,
     CBlockIndex::BlockStreamAndMetaData data,
@@ -1075,7 +1081,7 @@ static void SendBlock(
             std::move(data.stream)
         };
 
-    if (rejectIfMaxDownloadExceeded(maxSendQueuesBytes, blockMsg, isMostRecentBlock, pfrom, connman)) {
+    if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
         return;
     }
 
@@ -1132,9 +1138,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
     std::vector<CInv> vNotFound;
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    // maxSendQueuesBytes is stored here to keep the same value throughout the whole execution even if 
-    // it is changed via RPC calls and to avoid locking/unlocking mutex too many times.
-    uint64_t maxSendQueuesBytes = config.GetMaxSendQueuesBytes();
+
     LOCK(cs_main);
 
     while (it != pfrom->vRecvGetData.end()) {
@@ -1236,7 +1240,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         if (data.stream)
                         {
                             SendBlock(
-                                maxSendQueuesBytes,
+                                config,
                                 isMostRecentBlock,
                                 pfrom,
                                 std::move(data),
@@ -1257,7 +1261,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             }
                             if (sendMerkleBlock) {
                                 CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
-                                if (rejectIfMaxDownloadExceeded(maxSendQueuesBytes, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
+                                if (rejectIfMaxDownloadExceeded(config, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
                                     break;
                                 }
                                 connman.PushMessage(pfrom, std::move(merkleBlockMsg));
@@ -1299,7 +1303,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             if (reader)
                             {
                                 bool sent = SendCompactBlock(
-                                    maxSendQueuesBytes,
+                                    config,
                                     isMostRecentBlock,
                                     pfrom,
                                     connman,
@@ -1317,7 +1321,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             if (data.stream)
                             {
                                 SendBlock(
-                                    maxSendQueuesBytes,
+                                    config,
                                     isMostRecentBlock,
                                     pfrom,
                                     std::move(data),
@@ -2625,23 +2629,27 @@ void SendBlockTransactions(const Config& config,
                            const CChainParams& chainparams,
                            const std::atomic<bool>& interruptMsgProc,
                            const BlockTransactionsRequest& req,
-                           std::unique_ptr<BlockTransactionReader>& reader,
+                           BlockTransactionReader& reader,
+                           bool mostRecentBlock,
                            CConnman& connman)
 {
     // If the peer wants more than the configured % of txns in the original block, just stream them the whole thing
     size_t numTxnsRequested { req.indices.size() };
-    size_t numTxnsInBlock { reader->GetNumTxnsInBlock() };
-    double percentRequested { (static_cast<double>(numTxnsRequested) / numTxnsInBlock) * 100 };
-    unsigned maxPercent { config.GetBlockTxnMaxPercent() };
-    if(percentRequested > maxPercent)
+    size_t numTxnsInBlock { reader.GetNumTxnsInBlock() };
+    if(numTxnsInBlock > 0)
     {
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn wanting %f%% of txns "
-            "which is more than the configured max of %d%%. Responding with full block\n",
-            pfrom->id, percentRequested, maxPercent);
-        CInv inv { MSG_BLOCK, req.blockhash };
-        pfrom->vRecvGetData.push_back(inv);
-        ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
-        return;
+        double percentRequested { (static_cast<double>(numTxnsRequested) / numTxnsInBlock) * 100 };
+        unsigned maxPercent { config.GetBlockTxnMaxPercent() };
+        if(percentRequested > maxPercent)
+        {
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn wanting %f%% of txns "
+                "which is more than the configured max of %d%%. Responding with full block\n",
+                pfrom->id, percentRequested, maxPercent);
+            CInv inv { MSG_BLOCK, req.blockhash };
+            pfrom->vRecvGetData.push_back(inv);
+            ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
+            return;
+        }
     }
 
     BlockTransactions resp {req};
@@ -2649,7 +2657,7 @@ void SendBlockTransactions(const Config& config,
     {
         try
         {
-            resp.txn[i] = reader->GetTransactionIndex(req.indices[i]);
+            resp.txn[i] = reader.GetTransactionIndex(req.indices[i]);
         }
         catch(const std::exception&)
         {
@@ -2660,7 +2668,11 @@ void SendBlockTransactions(const Config& config,
     }
 
     const CNetMsgMaker msgMaker { pfrom->GetSendVersion() };
-    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
+    CSerializedNetMsg msg { msgMaker.Make(NetMsgType::BLOCKTXN, resp) };
+    if(! rejectIfMaxDownloadExceeded(config, msg, mostRecentBlock, pfrom, connman))
+    {
+        connman.PushMessage(pfrom, std::move(msg));
+    }
 }
 
 }
@@ -2683,7 +2695,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     if(recent_block)
     {
         std::unique_ptr<BlockTransactionReader> blockReader { std::make_unique<CachedBlockTransactionReader>(*recent_block) };
-        SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, blockReader, connman);
+        SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, *blockReader, true, connman);
         return;
     }
 
@@ -2721,7 +2733,8 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     }
 
     std::unique_ptr<BlockTransactionReader> blockReader { std::make_unique<DiskBlockTransactionReader>(std::move(blockStreamReader)) };
-    SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, blockReader, connman);
+    bool isTip { req.blockhash == chainActive.Tip()->GetBlockHash() };
+    SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, *blockReader, isTip, connman);
 }
 
 
@@ -5021,7 +5034,7 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
                     assert(!"cannot load block from disk");
                 }
                 SendCompactBlock(
-                    config.GetMaxSendQueuesBytes(),
+                    config,
                     true,
                     pto,
                     connman,
