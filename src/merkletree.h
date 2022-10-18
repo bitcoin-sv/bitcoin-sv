@@ -61,22 +61,17 @@ class CBlockStreamReader;
  *     Size of a merkle tree in bytes (64MB for a 4GB block containing one million txns)
  */
 
-uint64_t constexpr CalculatePreferredMerkleTreeFileSize (uint64_t maxBlockSize)
+uint64_t constexpr CalculatePreferredMerkleTreeSize (uint64_t maxBlockSize)
 {
-    constexpr uint64_t avgTxnSize = 4000;
+    constexpr uint64_t avgTxnSize = 4'000;
     return (maxBlockSize / avgTxnSize)
                     * sizeof(uint256) // size of txid, i.e. 32 byte
                     * 2;
 }
 
-uint64_t constexpr CalculateMaxMerkleTreeMemoryCacheSize (uint64_t maxBlockSize)
-{
-    return CalculatePreferredMerkleTreeFileSize(maxBlockSize);
-}
-
 uint64_t constexpr CalculateMinDiskSpaceForMerkleFiles (uint64_t maxBlockSize)
 {
-    return 288 * CalculatePreferredMerkleTreeFileSize(maxBlockSize)
+    return 288 * CalculatePreferredMerkleTreeSize(maxBlockSize)
            / 20; // assuming average block size to be 5% of maximum block size
 }
 

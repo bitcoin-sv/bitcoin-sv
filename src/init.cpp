@@ -2892,12 +2892,12 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         std::string err;
 
         // Configure preferred size of a single Merkle Tree data file.
-        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeFileSize(maxBlockEstimate));
+        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
             return InitError(err);
 
         // Configure size of Merkle Trees memory cache.
-        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculateMaxMerkleTreeMemoryCacheSize(maxBlockEstimate));
+        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
             return InitError(err);
 
