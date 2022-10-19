@@ -543,19 +543,19 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
-        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        MIN_DISK_SPACE_FOR_MERKLETREE_FILES));
+        "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculateMinDiskSpaceForMerkleFiles(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-preferredmerkletreefilesize", strprintf(_("Preferred size of a single datafile containing "
         "merkle trees. When size is reached, new datafile is created. If preferred size is less than "
         "size of a single merkle tree, it will still be stored, meaning datafile size can be larger than "
-        "preferred size. (default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE));
+        "preferred size. (default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculatePreferredMerkleTreeSize(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxmerkletreememcachesize", strprintf(_("Maximum merkle trees memory cache size in bytes. For "
         "faster responses, requested merkle trees are stored into a memory cache. "
-        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE));
+        "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculatePreferredMerkleTreeSize(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
