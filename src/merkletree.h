@@ -47,6 +47,34 @@ class CFileReader;
 template<typename Reader>
 class CBlockStreamReader;
 
+/** Some estmates:
+ * 4000B:
+ *     Average transaction size in bytes in a big block > 4GB
+ *     i.e. on average we expect a 4GB block to have one million transactions
+ * 5%:
+ *     Average block size in percent of maximum block size
+ *
+ * 32:
+ *     Exact size of transaction id
+ *
+ * 2 * 32 * nbtransactions:
+ *     Size of a merkle tree in bytes (64MB for a 4GB block containing one million txns)
+ */
+
+uint64_t constexpr CalculatePreferredMerkleTreeSize (uint64_t maxBlockSize)
+{
+    constexpr uint64_t avgTxnSize = 4'000;
+    return (maxBlockSize / avgTxnSize)
+                    * sizeof(uint256) // size of txid, i.e. 32 byte
+                    * 2;
+}
+
+uint64_t constexpr CalculateMinDiskSpaceForMerkleFiles (uint64_t maxBlockSize)
+{
+    return 288 * CalculatePreferredMerkleTreeSize(maxBlockSize)
+           / 20; // assuming average block size to be 5% of maximum block size
+}
+
 /** The default preferred size of a Merkle Tree datafile (mrk????????.dat) */
 static constexpr uint64_t DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE{ 32 * ONE_MEBIBYTE }; // 32 MiB
 
