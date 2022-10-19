@@ -210,7 +210,7 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
     mSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
 
     // Track send queue length
-    mSendMsgQueueSize += nTotalSize;
+    mSendMsgQueueSize.AddBytesQueued(nTotalSize);
 
     // Combine short messages and their header into a single item in the queue.
     // This helps to reduce the number of TCP segments sent and so reduces wastage.
@@ -226,15 +226,21 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
         }
 
         // Queue combined header & data
-        mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
+        auto combinedStream { std::make_unique<CVectorStream>(std::move(serialisedHeader)) };
+        mSendMsgQueueSize.AddMemoryUsed(combinedStream->GetEstimatedMaxMemoryUsage());
+        mSendMsgQueue.push_back(std::move(combinedStream));
     }
     else
     {
         // Queue header and payload separately
-        mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
+        auto headerStream { std::make_unique<CVectorStream>(std::move(serialisedHeader)) };
+        mSendMsgQueueSize.AddMemoryUsed(headerStream->GetEstimatedMaxMemoryUsage());
+        mSendMsgQueue.push_back(std::move(headerStream));
         if(nPayloadLength)
-        {   
-            mSendMsgQueue.push_back(msg.MoveData());
+        {
+            auto payloadStream { msg.MoveData() };
+            mSendMsgQueueSize.AddMemoryUsed(payloadStream->GetEstimatedMaxMemoryUsage());
+            mSendMsgQueue.push_back(std::move(payloadStream));
         }
     }
 
@@ -278,6 +284,7 @@ void Stream::CopyStats(StreamStats& stats) const
         LOCK(cs_mSendMsgQueue);
         stats.nSendBytes = mTotalBytesSent;
         stats.nSendSize = mSendMsgQueueSize.getSendQueueBytes();
+        stats.nSendMemory = mSendMsgQueueSize.getSendQueueMemory();
         stats.mapSendBytesPerMsgCmd = mSendBytesPerMsgCmd;
     }
 
@@ -343,6 +350,11 @@ uint64_t Stream::GetSendQueueSize() const
     LOCK(cs_mSendMsgQueue);
     return mSendMsgQueueSize.getSendQueueBytes();
 }
+uint64_t Stream::GetSendQeueMemoryUsage() const
+{
+    LOCK(cs_mSendMsgQueue);
+    return mSendMsgQueueSize.getSendQueueMemory();
+}
 
 void Stream::SetOwningNode(CNode* newNode)
 {
@@ -399,9 +411,13 @@ uint64_t Stream::SocketSendData()
     {   
         auto sent = SendMessage(*data, nSendBufferMaxSize);
         nSentSize += sent.sentSize;
-        mSendMsgQueueSize -= sent.sentSize;
+        mSendMsgQueueSize.SubBytesQueued(sent.sentSize);
 
-        if(sent.sendComplete == false)
+        if(sent.sendComplete)
+        {
+            mSendMsgQueueSize.SubMemoryUsed(data->GetEstimatedMaxMemoryUsage());
+        }
+        else
         {   
             break;
         }
@@ -415,6 +431,7 @@ uint64_t Stream::SocketSendData()
     {   
         assert(!mSendChunk);
         assert(mSendMsgQueueSize.getSendQueueBytes() == 0);
+        assert(mSendMsgQueueSize.getSendQueueMemory() == 0);
     }
 
     return nSentSize;

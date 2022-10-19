@@ -296,6 +296,11 @@ void Association::CopyStats(AssociationStats& stats) const
             return tot + s.nSendSize;
         }
     );
+    stats.nSendMemory = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
+        [](const uint64_t& tot, const StreamStats& s) {
+            return tot + s.nSendMemory;
+        }
+    );
     stats.nRecvSize = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
         [](const uint64_t& tot, const StreamStats& s) {
             return tot + s.nRecvSize;
@@ -415,6 +420,17 @@ uint64_t Association::GetTotalSendQueueSize() const
     return std::accumulate(mStreams.begin(), mStreams.end(), 0,
         [](const uint64_t& tot, const auto& stream) {
             return tot + stream.second->GetSendQueueSize();
+        }
+    );
+}
+
+uint64_t Association::GetTotalSendQueueMemoryUsage() const
+{
+    // Get total of all stream send queue memory usage
+    LOCK(cs_mStreams);
+    return std::accumulate(mStreams.begin(), mStreams.end(), 0,
+        [](const uint64_t& tot, const auto& stream) {
+            return tot + stream.second->GetSendQeueMemoryUsage();
         }
     );
 }

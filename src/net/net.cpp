@@ -87,7 +87,6 @@ bool fRelayTxes = true;
 CCriticalSection cs_mapLocalHost;
 std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
-std::atomic_size_t CSendQueueBytes::nTotalSendQueuesBytes = 0;
 
 CCriticalSection cs_invQueries;
 std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;

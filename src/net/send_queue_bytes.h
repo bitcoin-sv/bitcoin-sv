@@ -11,31 +11,49 @@ private:
     // nSendQueueBytes holds data of how many bytes are currently in queue for specific node
     size_t nSendQueueBytes = 0;
     // nTotalSendQueuesBytes holds data of how many bytes are currently in all queues across the network (all nodes)
-    static std::atomic_size_t nTotalSendQueuesBytes;
+    inline static std::atomic_size_t nTotalSendQueuesBytes = 0;
+
+    // Holds estimate of how many bytes are currently taken up in memory by queue for specific node
+    size_t nSendQueueMemory = 0;
+    // Holds estimate of how many bytes are currently taken up in memory by queues across all nodes
+    inline static std::atomic_size_t nTotalSendQueuesMemory = 0;
 
 public:
     ~CSendQueueBytes() {
         nTotalSendQueuesBytes -= nSendQueueBytes;
+        nTotalSendQueuesMemory -= nSendQueueMemory;
     }
 
-    size_t operator-= (size_t nBytes) {
-        nSendQueueBytes -= nBytes;
-        nTotalSendQueuesBytes -= nBytes;
-        return nSendQueueBytes;
-    }
-
-     size_t operator+= (size_t nBytes) {
+    void AddBytesQueued(size_t nBytes) {
         nSendQueueBytes += nBytes;
         nTotalSendQueuesBytes += nBytes;
-        return nSendQueueBytes;
+    }
+    void SubBytesQueued(size_t nBytes) {
+        nSendQueueBytes -= nBytes;
+        nTotalSendQueuesBytes -= nBytes;
+    }
+
+    void AddMemoryUsed(size_t nBytes) {
+        nSendQueueMemory += nBytes;
+        nTotalSendQueuesMemory += nBytes;
+    }
+    void SubMemoryUsed(size_t nBytes) {
+        nSendQueueMemory -= nBytes;
+        nTotalSendQueuesMemory -= nBytes;
     }
 
     size_t getSendQueueBytes() const {
         return nSendQueueBytes;
     }
-
     static size_t getTotalSendQueuesBytes() {
         return nTotalSendQueuesBytes;
+    }
+
+    size_t getSendQueueMemory() const {
+        return nSendQueueMemory;
+    }
+    static size_t getTotalSendQueuesMemory() {
+        return nTotalSendQueuesMemory;
     }
 };
 

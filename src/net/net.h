@@ -266,6 +266,12 @@ public:
     const uint256& Hash() const {return mHash;}
     size_t Size() const {return mSize;}
 
+    size_t GetEstimatedMemoryUsage() const
+    {
+        size_t dataUsage { mData? mData->GetEstimatedMaxMemoryUsage() : 0 };
+        return sizeof(*this) + dataUsage;
+    }
+
 private:
     std::string mCommand {};
     PayloadType mPayloadType { PayloadType::UNKNOWN };

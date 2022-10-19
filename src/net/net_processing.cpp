@@ -1018,7 +1018,7 @@ static bool rejectIfMaxDownloadExceeded(
     CConnman& connman)
 {
     uint64_t maxSendQueuesBytes { config.GetMaxSendQueuesBytes() };
-    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesMemory() + msg.GetEstimatedMemoryUsage() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
     if (totalSize > maxSendQueuesBytes) {
 
         if (!isMostRecentBlock) {
