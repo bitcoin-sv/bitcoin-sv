@@ -1986,10 +1986,40 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
         // Get the current MinerID from this node
         std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
 
-        if (!pubKeyOpt) {
-            LogPrint(BCLog::MINERID, "Ignoring authch messages until this node has mined a block containing a miner_info document\n");
+        try {
+            using namespace rpc::client;
+            if (g_pWebhookClient) {
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
+                using HTTPRequest = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateGetMinerIdRequest(
+                                        rpcConfig,
+                                        config.GetMinerIdGeneratorAlias())) };
+                auto response { std::make_shared<StringHTTPResponse>() };
+                auto fut = g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+                fut.wait();
+                auto futResponse = fut.get();
+                const StringHTTPResponse* r = dynamic_cast<StringHTTPResponse*> (futResponse.get());
+                if (!r)
+                    throw std::runtime_error("Could not get the miner-id from the MinerID Generator.");
+
+                pubKeyOpt = CPubKey(ParseHex(r->GetBody()));
+                if (!pubKeyOpt)
+                    throw std::runtime_error("Could not get the miner-id from the MinerID Generator.");
+
+                auto docinfo = GetMinerCoinbaseDocInfo(*g_minerIDs, *pubKeyOpt);
+                if (!docinfo)
+                    throw std::runtime_error("Miner-id from MinerID Generator is not in the minerid database.");
+
+                g_BlockDatarefTracker->set_current_minerid(*pubKeyOpt);
+            }
+            if (!pubKeyOpt) {
+                throw std::runtime_error ("Ignoring authch messages until this node has mined a block containing a miner_info document\n");
+            }
+        } catch (const std::exception& e) {
+            LogPrint(BCLog::MINERID, strprintf("Ignoring authch messages until this node has mined a block containing a miner_info document. %s\n", e.what()));
             return true;
         }
+
         CPubKey pubKey = pubKeyOpt.value();
 
         // Create the DER-encoded signature of the expected minimal size.
@@ -2005,7 +2035,7 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
                 return true;
             } else {
                 LogPrint(BCLog::MINERID, "sending signature request to MinerID Generator\n");
-                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config) };
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
                 using HTTPRequest = rpc::client::HTTPRequest;
                 auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateMinerIdGeneratorSigningRequest(
                         rpcConfig,
@@ -2019,8 +2049,8 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
                 if (!r)
                     throw std::runtime_error("Signature creation has not returned from the MinerID Generator.");
                 const UniValue& uv = r->GetBody();
-                if (!uv.isObject())
-                    throw std::runtime_error("Signature creation from MinerID Generator has wrong type. Should be string.");
+                if (!uv.isObject() || !uv.exists("signature"))
+                    throw std::runtime_error("JSON error, object containing a string with key name \"signature\" expected");
                 std::string signedHex = uv["signature"].get_str();
                 vSign = ParseHex(signedHex);
             }

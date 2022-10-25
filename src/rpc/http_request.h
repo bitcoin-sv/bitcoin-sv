@@ -107,6 +107,10 @@ class HTTPRequest
                                                             const std::string& alias,
                                                             const std::string& hash);
 
+    // Factory method to make a get-minerid request to a miner ID generator
+    static HTTPRequest CreateGetMinerIdRequest(const RPCClientConfig& config,
+                                                     const std::string& alias);
+
   private:
 
     // Helper method to encode URI components

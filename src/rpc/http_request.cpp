@@ -64,5 +64,15 @@ HTTPRequest HTTPRequest::CreateMinerIdGeneratorSigningRequest(const RPCClientCon
     return { endpoint, RequestCmdType::GET };
 }
 
+// Create a request to get the current minerid from the generator
+HTTPRequest HTTPRequest::CreateGetMinerIdRequest(const RPCClientConfig& config, const std::string& alias)
+{
+    // Format endpoint
+    std::string endpoint { config.GetEndpoint() + "/minerid/" + alias};
+
+    // Create request
+    return { endpoint, RequestCmdType::GET };
+}
+
 }
 
