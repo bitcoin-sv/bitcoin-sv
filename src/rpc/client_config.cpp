@@ -144,7 +144,7 @@ RPCClientConfig RPCClientConfig::CreateForDoubleSpendDetectedWebhook(const Confi
     return clientConfig;
 }
 
-RPCClientConfig RPCClientConfig::CreateForMinerIdGenerator(const Config& config)
+RPCClientConfig RPCClientConfig::CreateForMinerIdGenerator(const Config& config, int timeout)
 {
     RPCClientConfig clientConfig {};
 
@@ -154,6 +154,10 @@ RPCClientConfig RPCClientConfig::CreateForMinerIdGenerator(const Config& config)
 
     // Set endpoint
     clientConfig.mEndpoint = config.GetMinerIdGeneratorPath();
+
+    // Some http endpoints are not disruptive if they fail but very disruptive if they stall.
+    // We should set timeout to a low value for those cases.
+    clientConfig.mConnectionTimeout = timeout;
 
     return clientConfig;
 }
