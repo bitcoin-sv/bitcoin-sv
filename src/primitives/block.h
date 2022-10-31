@@ -144,6 +144,8 @@ inline auto find_tx_by_id(const CBlock& block, const uint256& txid)
                         });
 }
 
+size_t ser_size(const CBlock&);
+
 typedef std::shared_ptr<CBlock> CBlockRef;
 
 /**

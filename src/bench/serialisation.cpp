@@ -13,6 +13,7 @@
 #include "primitives/transaction.h"
 #include "rpc/jsonwriter.h"
 #include "rpc/text_writer.h"
+#include "serialize.h"
 #include "streams.h"
 #include "utilstrencodings.h"
 #include "version.h"
@@ -121,8 +122,31 @@ static void ser_msgmaker(benchmark::State& state)
     {
         const auto version{42};
         CNetMsgMaker mm{version};
-        mm.Make(NetMsgType::BLOCKTXN, move(btxs));
+        mm.Make(NetMsgType::BLOCKTXN, btxs);
     }
 }
 BENCHMARK(ser_msgmaker);
 
+static void ser_btxs_getsersize_test(benchmark::State& state)
+{
+    using namespace std;
+        
+    while(state.KeepRunning())
+    {
+        auto x = GetSerializeSize(btxs, SER_NETWORK, PROTOCOL_VERSION);
+        asm volatile(""::"g"(&x):"memory");
+    }
+}
+BENCHMARK(ser_btxs_getsersize_test);
+
+static void ser_btxs_size_test(benchmark::State& state)
+{
+    using namespace std;
+
+    while(state.KeepRunning())
+    {
+        auto x = ser_size(btxs);
+        asm volatile(""::"g"(&x):"memory");
+    }
+}
+BENCHMARK(ser_btxs_size_test);
