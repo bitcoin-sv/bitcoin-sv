@@ -1925,7 +1925,7 @@ void CTxMemPool::prioritiseTransactionNL(
         TrackEntryModified(it);
 
         // Ensure CPFP groups maintain correct average fee calculations across the group
-        auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::UNKNOWN); // TODO: add new update reason (PRIORITY?)
+        auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::PRIORITISATION);
         setEntriesTopoSorted entries {it};
 
         if(it->IsInPrimaryMempool())

@@ -96,14 +96,15 @@ const enumTableT<JournalUpdateReason>& mining::enumTable(JournalUpdateReason)
 {
     static enumTableT<JournalUpdateReason> table
     {   
-        { JournalUpdateReason::UNKNOWN,     "UNKNOWN" },
-        { JournalUpdateReason::NEW_TXN,     "NEW_TXN" },
-        { JournalUpdateReason::REMOVE_TXN,  "REMOVE_TXN" },
-        { JournalUpdateReason::REPLACE_TXN, "REPLACE_TXN" },
-        { JournalUpdateReason::NEW_BLOCK,   "NEW_BLOCK" },
-        { JournalUpdateReason::REORG,       "REORG" },
-        { JournalUpdateReason::INIT,        "INIT" },
-        { JournalUpdateReason::RESET,       "RESET" }
+        { JournalUpdateReason::UNKNOWN,        "UNKNOWN" },
+        { JournalUpdateReason::NEW_TXN,        "NEW_TXN" },
+        { JournalUpdateReason::REMOVE_TXN,     "REMOVE_TXN" },
+        { JournalUpdateReason::REPLACE_TXN,    "REPLACE_TXN" },
+        { JournalUpdateReason::NEW_BLOCK,      "NEW_BLOCK" },
+        { JournalUpdateReason::REORG,          "REORG" },
+        { JournalUpdateReason::INIT,           "INIT" },
+        { JournalUpdateReason::RESET,          "RESET" },
+        { JournalUpdateReason::PRIORITISATION, "PRIORITISATION" }
     };
     return table;
 }
