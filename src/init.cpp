@@ -2694,8 +2694,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                                           gArgs.GetArg("-minminingtxfee", "")));
         }
         mempool.SetBlockMinTxFee(CFeeRate(n));
-    } else {
-        return InitError("-minminingtxfee is mandatory");
     }
 
     if (gArgs.IsArgSet("-mindebugrejectionfee")) {
