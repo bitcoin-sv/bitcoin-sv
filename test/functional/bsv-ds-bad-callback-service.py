@@ -204,7 +204,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
             self.conn = httplib.HTTPConnection(self.callback_service)
 
             self.node0 = p2p_connections[0]
-            tx_hash = self.check_ds_enabled_error_msg(utxo[5], "Missing x-bsv-dsnt header in response from endpoint")
+            tx_hash = self.check_ds_enabled_error_msg(utxo[5], "Missing x-bsv-dsnt header in response from endpoint 127.0.0.1")
 
             self.check_tx_not_received(tx_hash)
 

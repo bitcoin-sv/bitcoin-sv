@@ -6,10 +6,12 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
+#include "miner_id/miner_info_tracker.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "protocol.h"
+#include "pubkey.h"
 #include "sync.h"
 #include "timedata.h"
 #include "txn_propagator.h"
@@ -74,9 +76,9 @@ static UniValue getpeerinfo(const Config &config,
             "[\n"
             "  {\n"
             "    \"id\": n,                   (numeric) Peer index\n"
-            "    \"addr\":\"host:port\",      (string) The ip address and port "
+            "    \"addr\":\"host:port\",        (string) The ip address and port "
             "of the peer\n"
-            "    \"addrlocal\":\"ip:port\",   (string) local address\n"
+            "    \"addrlocal\":\"ip:port\",     (string) local address (only available if peer local address is routable)\n"
             "    \"services\":\"xxxxxxxxxxxxxxxx\",   (string) The services "
             "offered\n"
             "    \"relaytxes\":true|false,    (boolean) Whether peer has asked "
@@ -109,6 +111,8 @@ static UniValue getpeerinfo(const Config &config,
             "       }\n"
             "       ...\n"
             "    ],\n"
+            "    \"authconn\": true|false,    (boolean) The authenticated connection is established (true) or "
+            "the public connection is in use (false)\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -129,7 +133,7 @@ static UniValue getpeerinfo(const Config &config,
             "due to addnode and is using an addnode slot\n"
             "    \"startingheight\": n,       (numeric) The starting height "
             "(block) of the peer\n"
-            "    \"txninvsize\": n,           (numeric) The number of queued transaction inventory msgs we have for this peer\n "
+            "    \"txninvsize\": n,           (numeric) The number of queued transaction inventory msgs we have for this peer\n"
             "    \"banscore\": n,             (numeric) The ban score\n"
             "    \"synced_headers\": n,       (numeric) The last header we "
             "have in common with this peer\n"
@@ -211,6 +215,7 @@ static UniValue getpeerinfo(const Config &config,
         }
         obj.push_back(Pair("streams", streams));
 
+        obj.push_back(Pair("authconn", stats.fAuthConnEstablished));
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
@@ -835,6 +840,35 @@ static UniValue settxnpropagationfreq(const Config &config, const JSONRPCRequest
     return g_connman->getTransactionPropagator()->getRunFrequency().count();
 }
 
+static UniValue getauthconninfo(const Config &config,
+                                const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getauthconninfo\n"
+            "\nReturns authconn data used by the node.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"pubkey\": \"xxxxxxx\"      (hexstring) The authconn public key used to verify signatures\n"
+            "  \"compressed\": true|false,  (boolean),  Whether the authconn public key is compressed or not\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getauthconninfo", "") +
+            HelpExampleRpc("getauthconninfo", ""));
+
+    if (!g_connman)
+        throw JSONRPCError(
+            RPC_CLIENT_P2P_DISABLED,
+            "Error: Peer-to-peer functionality missing or disabled");
+
+    UniValue obj(UniValue::VOBJ);
+    std::optional<CPubKey> pubKey = g_BlockDatarefTracker->get_current_minerid();
+    std::string pubKeyHex = pubKey ? HexStr(ToByteVector(*pubKey)).c_str() : std::string(66, '0');
+    bool isCompressed = pubKey ? pubKey->IsCompressed() : true;
+    obj.push_back(Pair("pubkey", pubKeyHex));
+    obj.push_back(Pair("compressed", isCompressed));
+    return obj;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
@@ -852,6 +886,7 @@ static const CRPCCommand commands[] = {
     { "network",            "clearbanned",            clearbanned,            true,  {} },
     { "network",            "setnetworkactive",       setnetworkactive,       true,  {"state"} },
     { "network",            "settxnpropagationfreq",  settxnpropagationfreq,  true,  {"freq"} },
+    { "network",            "getauthconninfo",        getauthconninfo,        true,  {} },
 };
 // clang-format on
 

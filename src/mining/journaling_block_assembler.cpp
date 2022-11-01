@@ -29,27 +29,40 @@ namespace
     {
         return gArgs.GetBoolArg("-jbafillafternewblock", JournalingBlockAssembler::DEFAULT_NEW_BLOCK_FILL);
     }
+    unsigned GetThrottleThreshold()
+    {
+        int64_t threshold { gArgs.GetArg("-jbathrottlethreshold", JournalingBlockAssembler::DEFAULT_THROTTLE_THRESHOLD) };
+        if(threshold <= 0 || threshold > 100)
+        {
+            threshold = JournalingBlockAssembler::DEFAULT_THROTTLE_THRESHOLD;
+        }
+        return static_cast<unsigned>(threshold);
+    }
+    unsigned GetRunFrequency()
+    {
+        return static_cast<unsigned>(gArgs.GetArg("-jbarunfrequency", JournalingBlockAssembler::DEFAULT_RUN_FREQUENCY_MILLIS));
+    }
 }
 
 // Construction
 JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
-: BlockAssembler{config}, mMaxSlotTransactions{GetMaxTxnBatch()}, mNewBlockFill{GetFillAfterNewBlock()}
+: BlockAssembler{config}, mRunFrequency{GetRunFrequency()}, mMaxSlotTransactions{GetMaxTxnBatch()},
+  mNewBlockFill{GetFillAfterNewBlock()}, mThrottlingThreshold{GetThrottleThreshold()}
 {
     // Create a new starting block
     newBlock();
     // Initialise our starting position
-    mState.mJournalPos = CJournal::ReadLock{mJournal}.begin();
+    mJournalPos = CJournal::ReadLock{mJournal}.begin();
 
     // Launch our main worker thread
-    future_ = std::async(std::launch::async,
-                         &JournalingBlockAssembler::threadBlockUpdate, this);
+    mFuture = std::async(std::launch::async, &JournalingBlockAssembler::threadBlockUpdate, this);
 }
 
 // Destruction
 JournalingBlockAssembler::~JournalingBlockAssembler()
 {
-    promise_.set_value(); // Tell worker to finish
-    future_.wait();       // Wait for worker to finish
+    mPromise.set_value(); // Tell worker to finish
+    mFuture.wait();       // Wait for worker to finish
 }
 
 
@@ -98,7 +111,6 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
         }
     }
 
-
     BlockStats blockStats {
         block->vtx.size() - 1,
         GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION) };
@@ -132,7 +144,7 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
     try
     {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread starting\n");
-        const auto future{promise_.get_future()};
+        const auto future { mPromise.get_future() };
         while(true)
         {
             // Run every few seconds or until stopping
@@ -144,7 +156,9 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
                 updateBlock(chainActive.Tip(), mMaxSlotTransactions);
             }
             else if(status == std::future_status::ready)
+            {
                 break;
+            }
         }
 
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread stopping\n");
@@ -174,7 +188,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         CJournal::ReadLock journalLock { mJournal };
 
         // Does our journal or iterator need replacing?
-        while(!mJournal->getCurrent() || !mState.mJournalPos.valid())
+        while(!mJournal->getCurrent() || !mJournalPos.valid())
         {
             // Release old lock, update journal/block, take new lock
             journalLock = CJournal::ReadLock {};
@@ -182,17 +196,23 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
             journalLock = CJournal::ReadLock { mJournal };
 
             // Reset our position to the start of the journal
-            mState.mJournalPos = journalLock.begin();
+            mJournalPos = journalLock.begin();
         }
 
         // Reposition our journal index incase we were previously at the end and now
         // some new additions have arrived.
-        mState.mJournalPos.reset();
+        mJournalPos.reset();
+
+        // If we're throttling then only update once / second
+        if(mEnteredThrottling && mLastUpdateTime >= GetTime())
+        {
+            return;
+        }
 
         // Read and process transactions from the journal until either we've done as many
         // as we allow this go or we reach the end of the journal.
-        CJournal::Index journalEnd {journalLock.end()};
-        bool finished { mState.mJournalPos == journalEnd };
+        CJournal::Index journalEnd { journalLock.end() };
+        bool finished { mJournalPos == journalEnd };
         // ComputeMaxGeneratedBlockSize depends on two values (GetMaxGeneratedBlockSize and GetMaxBlockSize) 
         // each of which can be updated independently (two RPC functions). 
         // To properly solve this, we should replace two RPC functions 
@@ -201,29 +221,37 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         // this is also unlikely to be a problem in practice.
         // maxBlockSizeComputed is stored here to keep the same value throughout
         // the whole execution and to avoid locking/unlocking mutex too many times.
-        uint64_t maxBlockSizeComputed = ComputeMaxGeneratedBlockSize(pindex);
+        uint64_t maxBlockSizeComputed { ComputeMaxGeneratedBlockSize(pindex) };
+        uint64_t throttleLimit { (maxBlockSizeComputed / 100) * mThrottlingThreshold};
         while(!finished)
         {
             // Try to add another txn or a whole group of txns to the block
-            // mMaxTransactions is an internal limit used to reduce lock contention
-            // When we're adding a group we may add more transactions and that's OK
-            size_t nAdded = addTransactionOrGroup(pindex, journalEnd, maxBlockSizeComputed);
-            if(nAdded)
-            {
-                txnNum += nAdded;
+            AddTransactionResult res { addTransactionOrGroup(pindex, journalEnd, maxBlockSizeComputed) };
 
-                // Set updated flag
+            // If we're above the throttling threshold then only add max 1 txn (or group) / sec
+            if(mState.mBlockSize >= throttleLimit)
+            {
+                if(!mEnteredThrottling)
+                {
+                    // Log when we start throttling
+                    LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler started throttling\n");
+                }
+                mEnteredThrottling = true;
+                maxTxns = static_cast<uint64_t>(GetTime() - mLastUpdateTime);
+            }
+
+            if(res.result == AddTransactionResult::Result::SUCCESS)
+            {
+                txnNum += res.numAdded;
+                mLastUpdateTime = GetTime();
                 mRecentlyUpdated = true;
+            }
 
-                // We're finished if we've reached the end of the journal, or we've added
-                // as many transactions this iteration as we're allowed.
-                finished = (mState.mJournalPos == journalEnd  || txnNum >= maxTxns);
-            }
-            else
-            {
-                // We're also finished once we can't add any more transactions.
-                finished = true;
-            }
+            // We're finished if we've hit an error, reached the end of the journal,
+            // or we've added as many transactions this iteration as we're allowed.
+            finished = (res.result == AddTransactionResult::Result::ERRORED ||
+                        mJournalPos == journalEnd ||
+                        txnNum >= maxTxns);
         }
     }
     catch(std::exception& e)
@@ -267,30 +295,73 @@ void JournalingBlockAssembler::newBlock()
 
     // Set updated flag
     mRecentlyUpdated = true;
+
+    // Reset entered throttling flag
+    mEnteredThrottling = false;
+
+    // Clear any old managed groups
+    mGroupBuilder.Clear();
 }
 
-size_t JournalingBlockAssembler::addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd, uint64_t maxBlockSizeComputed)
+JournalingBlockAssembler::AddTransactionResult JournalingBlockAssembler::addTransactionOrGroup(
+    const CBlockIndex* pindex,
+    const CJournal::Index& journalEnd,
+    uint64_t maxBlockSizeComputed)
 {
-    auto& groupId { mState.mJournalPos.at().getGroupId() };
-    if (!groupId)
+    // Create checkpoint in case we need to rollback
+    GroupCheckpoint checkpoint { *this };
+
+    // Deal with any transaction grouping requirements
+    std::optional<TxnGroupID> groupID { std::nullopt };
+    const auto& cpfpGroup { mJournalPos.at().getGroupId() };
+    if(cpfpGroup)
     {
-        return addTransaction(pindex, maxBlockSizeComputed);
+        // Add all CPFP group members to the same txn group
+        while(mJournalPos != journalEnd && cpfpGroup == mJournalPos.at().getGroupId())
+        {
+            const CJournalEntry& entry { mJournalPos.at() };
+            groupID = mGroupBuilder.AddTxn(entry, groupID);
+            ++mJournalPos;
+        }
     }
     else
     {
-        GroupCheckpoint checkpoint {*this};
-        size_t nAddedTotal {0};
-        while (mState.mJournalPos != journalEnd && groupId == mState.mJournalPos.at().getGroupId()) {
-            size_t nAdded = addTransaction(pindex, maxBlockSizeComputed);
-            if (!nAdded) {
-                checkpoint.rollback();
-                return 0;
-            }
-            nAddedTotal += nAdded;
-        }
-        checkpoint.commit();
-        return nAddedTotal;
+        // Handle single txn
+        groupID = mGroupBuilder.AddTxn(mJournalPos.at());
+        ++mJournalPos;
     }
+
+    // If we're currently throttling, then we need at least 1 of the txns
+    // from this group we're about to add to be non-selfish.
+    if(mEnteredThrottling)
+    {
+        if(mGroupBuilder.GetGroup(groupID.value()).IsSelfish(mConfig))
+        {
+            // All txns are selfish in this group, skip it
+            return { AddTransactionResult::Result::SKIPPED };
+        }
+    }
+
+    // Try to add all txns from the group we have ended up with
+    size_t numAdded {0};
+    for(const auto& txn : mGroupBuilder.GetGroup(groupID.value()))
+    {
+        AddTransactionResult res { addTransaction(pindex, maxBlockSizeComputed, txn) };
+        if(! (res.result == AddTransactionResult::Result::SUCCESS))
+        {
+            // Couldn't add this txn from the group, so rollback entire group
+            checkpoint.rollback();
+            return res;
+        }
+        ++numAdded;
+    }
+
+    // Commit group
+    checkpoint.commit();
+    mGroupBuilder.RemoveGroup(groupID.value());
+
+    // Return success with number of txns added
+    return { AddTransactionResult::Result::SUCCESS, numAdded };
 }
 
 JournalingBlockAssembler::GroupCheckpoint::GroupCheckpoint(JournalingBlockAssembler& assembler)
@@ -303,7 +374,8 @@ JournalingBlockAssembler::GroupCheckpoint::GroupCheckpoint(JournalingBlockAssemb
 
 void JournalingBlockAssembler::GroupCheckpoint::rollback()
 {
-    if (!mShouldRollback) {
+    if(!mShouldRollback)
+    {
         return;
     }
     mShouldRollback = false;
@@ -314,24 +386,26 @@ void JournalingBlockAssembler::GroupCheckpoint::rollback()
 
 // Test whether we can add another transaction to the next block, and if
 // so do it - Caller holds mutex
-size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex, uint64_t maxBlockSizeComputed)
+JournalingBlockAssembler::AddTransactionResult JournalingBlockAssembler::addTransaction(
+    const CBlockIndex* pindex,
+    uint64_t maxBlockSizeComputed,
+    const CJournalEntry& entry)
 {
-    const CJournalEntry& entry { mState.mJournalPos.at() };
-
     // Check for block being full
     uint64_t txnSize { entry.getTxnSize() };
     uint64_t blockSizeWithTx { mState.mBlockSize + txnSize };
     if(blockSizeWithTx >= maxBlockSizeComputed)
     {
-        return 0;
+        return { AddTransactionResult::Result::BLOCKFULL };
     }
 
     // FIXME: We may read the transaction from disk and then throw
     //        it away if the contextual check fails.
     const auto txn = entry.getTxn()->GetTx();
-    if (txn == nullptr) {
+    if(txn == nullptr)
+    {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler found stale wrapper in the journal. need to start over.\n");
-        return 0;
+        return { AddTransactionResult::Result::ERRORED };
     }
 
     // Must check that lock times are still valid
@@ -340,7 +414,8 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex, uint6
         CValidationState state {};
         if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->GetHeight() + 1, mLockTimeCutoff, false))
         {
-            return 0;
+            // Can try skipping this txn
+            return { AddTransactionResult::Result::SKIPPED };
         }
     }
 
@@ -352,9 +427,6 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex, uint6
     mState.mBlockSize = blockSizeWithTx;
     mState.mBlockFees += entry.getFee();
 
-    // Move to the next item in the journal
-    ++mState.mJournalPos;
-
-    return 1;
+    return { AddTransactionResult::Result::SUCCESS, 1 };
 }
 

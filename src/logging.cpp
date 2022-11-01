@@ -89,6 +89,7 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::NETMSGALL, "netmsgall"},
     {BCLog::NET, "net"},
     {BCLog::DOUBLESPEND, "doublespend"},
+    {BCLog::MINERID, "minerid"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };
@@ -162,7 +163,16 @@ std::string BCLog::Logger::LogTimestampStr(const std::string& str)
     return ss.str();
 }
 
-int BCLog::Logger::LogPrintStr(const std::string &str) {
+int BCLog::Logger::LogPrintStr(const std::string &str) 
+{
+    return log(str.c_str());
+}
+
+// Uses const char* as str type so that log entries from all nodes can be traced during 
+// functional tests. e.g.
+// bpftrace -e 'u:/root/sv/src/bitcoind:*Logger*log* { printf("%d %s\n", pid, str(arg1)) }'
+int BCLog::Logger::log(const char* str) {
+
     // Returns total number of characters written.
     int ret = 0;
 

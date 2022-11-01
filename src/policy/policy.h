@@ -9,6 +9,7 @@
 #include "consensus/consensus.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
+#include "util.h"
 
 #include <optional>
 #include <string>
@@ -96,6 +97,10 @@ static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 500 * O
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR = 0;
 /** Default percentage of total mempool size (ram+disk) to use as max limit for CPFP transactions */
 static const unsigned int DEFAULT_MEMPOOL_MAX_PERCENT_CPFP = 10;
+/** Default value for whether 'assume whitelisted block depth' policy is enabled. */
+static const bool DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH = false;
+/** Default minimal depth of block under tip at which confiscation transaction is assumed to be whitelisted if 'assume whitelisted block depth' policy is enabled. */
+static const int32_t DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH = 6;
 
 /**
  * Min feerate for defining dust. Historically this has been the same as the
@@ -149,6 +154,15 @@ static const uint64_t DEFAULT_COINS_PROVIDER_CACHE_SIZE = ONE_GIGABYTE;
 
 static const std::set<std::string> DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"};
 
+/* Default min time difference in sec between the last block and last mempool
+* transaction for the block to be classified as selfishly mined */
+static constexpr int64_t DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH = 60;
+/** 
+* Percentage threshold of number of txs in mempool 
+* that are not included in received block for 
+* the block to be classified as selfishly mined */
+static constexpr uint64_t DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT = 10;
+
 /**
  * Standard script verification flags that standard transactions will comply
  * with. However scripts violating these flags may still be present in valid
@@ -190,7 +204,7 @@ inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
 
 /** Consolidation transactions are free */
 bool IsDustReturnTxn (const CTransaction &tx);
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
+AnnotatedType<bool> IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
 
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
 

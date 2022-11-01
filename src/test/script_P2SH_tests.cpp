@@ -445,7 +445,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         GetScriptForDestination(CScriptID(twentySigops));
     txFrom.vout[6].nValue = Amount(6000);
 
-    AddCoins(coins, CTransaction(txFrom), 10, 0);
+    AddCoins(coins, CTransaction(txFrom), false, 10, 0);
 
     CMutableTransaction txTo;
     txTo.vout.resize(1);

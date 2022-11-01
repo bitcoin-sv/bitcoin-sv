@@ -64,10 +64,10 @@ class PTVRPCTests(ComparisonTestFramework):
             txchains += self.get_chained_transactions(spend[x], chain_length)
         return txchains
 
-    # Test an attempt to resubmit transactions (via rpc interface) which are already known
-    # - received earlier via p2p interface and not processed yet
-    # - use sendrawtransaction rpc interface (a single txn submit) to submit duplicates
-    def run_scenario1(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
+    # Test processing of duplicates submitted through rpc interface:
+    # (a) the node receives the set of transactions via p2p interface and holds them in the PTV queues
+    # (b) the sendrawtransaction rpc interface is used to submit and process each duplicate
+    def run_scenario1(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30, pausedp2p=False):
         # Create tx chains.
         txchains = self.get_txchains_n(num_of_chains, chain_length, spend)
         # Send txns, one by one, through p2p interface.
@@ -77,29 +77,83 @@ class PTVRPCTests(ComparisonTestFramework):
         # - this scenario relies on ptv delayed processing
         # - ptv is required to be paused
         wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == num_of_chains * chain_length, timeout=timeout)
-        # No transactions should be in the mempool.
+        # The mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
-        # Resubmit txns through rpc interface
-        # - there should be num_of_chains*chain_length txns detected as known transactions
-        #   - due to the fact that all were already received via p2p interface
+        # The orphan pool must be empty.
+        assert_equal(conn.rpc.getorphaninfo()["size"], 0)
+        # Process each transaction resubmitted through rpc interface - even though it's present in the PTV queues.
         for tx in range(len(txchains)):
-            assert_raises_rpc_error(
-                -26, "txn-already-known", conn.rpc.sendrawtransaction, ToHex(txchains[tx]), allowhighfees, dontcheckfee)
-        # No transactions should be in the mempool.
-        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+            conn.rpc.sendrawtransaction(ToHex(txchains[tx]), allowhighfees, dontcheckfee)
+        # At this stage there should be 'num_of_chains*chain_length' txns in the mempool.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchains))
+        if pausedp2p:
+            # Check that paused P2P txs are still queued.
+            assert_equal(conn.rpc.getblockchainactivity()["transactions"], num_of_chains * chain_length)
 
         return txchains
 
+    # Test processing of duplicates submitted through rpc interface:
+    # (a) the node receives the set of transactions via p2p interface, processes and detects them as orphans
+    # (b) the sendrawtransaction rpc interface is used to submit and process each duplicate
+    def run_scenario1_1(self, conn, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
+        # Create tx chain.
+        txchain = self.get_txchains_n(1, chain_length, spend)
+        # Send chained transactions - one by one - through p2p interface (except the parent!).
+        for tx in txchain[1:]:
+            conn.send_message(msg_tx(tx))
+        # The orphan pool must contain 'chain_length-1' orphan transactions.
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        assert_equal(conn.rpc.getblockchainactivity()["transactions"], 0)
+        # The mempool must be empty.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+        # Process each transaction resubmitted through rpc interface - even though it's present in the PTV queues.
+        for tx in range(len(txchain)):
+            conn.rpc.sendrawtransaction(ToHex(txchain[tx]), allowhighfees, dontcheckfee)
+        # At this stage there should be 'chain_length' txns in the mempool.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchain))
+        # The p2p orphan pool must be empty.
+        assert_equal(conn.rpc.getorphaninfo()["size"], 0)
+
+        return txchain
+
+    # Test processing of duplicates submitted through rpc interface:
+    # (a) the node receives the set of transactions via p2p interface, processes and detects them as orphans
+    # (b) the sendrawtransaction rpc interface is used to submit and process each duplicated orphan
+    # (c) the parent tx from the chain is not submitted to the node
+    def run_scenario1_2(self, conn, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
+        # Create tx chain.
+        txchain = self.get_txchains_n(1, chain_length, spend)
+        # Send chained transactions - one by one - through p2p interface (except the parent!).
+        for tx in txchain[1:]:
+            conn.send_message(msg_tx(tx))
+        # The orphan pool must contain 'chain_length-1' orphan transactions.
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        assert_equal(conn.rpc.getblockchainactivity()["transactions"], 0)
+        # The mempool must be empty.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+        # Process each transaction resubmitted through rpc interface - even though it's present in the PTV queues.
+        # The parent tx from the chain is skipped.
+        for tx in txchain[1:]:
+            assert_raises_rpc_error(
+                    -25, "Missing inputs", conn.rpc.sendrawtransaction, ToHex(tx), allowhighfees, dontcheckfee)
+        # At this stage the mempool must be empty.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+        # The p2p orphan pool must contain 'chain_length-1' transactions.
+        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length-1)
+
+        return txchain
+
+
     # An extension to the scenario1.
     # - submit txns through p2p interface
-    # - resubmit transactions (via rpc interface) which are already known
+    # - resubmit duplicates via rpc interface
     # - create a new block
     # - use invalidateblock to re-org back
     # - create a new block
     # - check if txns are present in the new block
-    def run_scenario2(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=60):
+    def run_scenario2(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=60, pausedp2p=False):
         # Create tx chains.
-        txchains = self.run_scenario1(conn, num_of_chains, chain_length, spend, allowhighfees, dontcheckfee, timeout)
+        txchains = self.run_scenario1(conn, num_of_chains, chain_length, spend, allowhighfees, dontcheckfee, timeout, pausedp2p)
         wait_for_ptv_completion(conn, len(txchains), timeout=timeout)
         # Check if txchains txns are in the mempool.
         self.check_mempool(conn.rpc, set(txchains), timeout=60)
@@ -155,8 +209,8 @@ class PTVRPCTests(ComparisonTestFramework):
         self.stop_node(0)
 
         # Scenario 1 (TS1).
-        # This test case checks if resubmited transactions (through sendrawtransaction interface) are rejected,
-        # at the early stage of processing (before txn validation is executed).
+        # This test case checks if resubmitted transactions (through synchronous sendrawtransaction interface) are processed.
+        # We don't want to reject duplicates at the early stage of processing (before asynchronous txn validation is executed).
         # - 1K txs used
         # - 1K txns are sent first through the p2p interface (and not processed as ptv is paused)
         # - allowhighfees=False (default)
@@ -167,13 +221,63 @@ class PTVRPCTests(ComparisonTestFramework):
         chain_length = 100
         # Node's config
         args = ['-txnvalidationasynchrunfreq=10000',
+                '-maxstdtxnsperthreadratio=0', # Do not take any std txs for processing (from the ptv queues).
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc.'.format(num_of_chains, chain_length),
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario1(conn, num_of_chains, chain_length, out)
+            self.run_scenario1(conn, num_of_chains, chain_length, out, pausedp2p=True)
+        # dontcheckfee=True
+        with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc (dontcheckfee=True).'.format(num_of_chains, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario1(conn, num_of_chains, chain_length, out, dontcheckfee=True, pausedp2p=True)
+
+        # Scenario 1_1 (TS1_1).
+        # It's an extension to TS1. The RPC interface is used to resubmit and process duplicates (the entire tx chain).
+        # - 100 chained txs used
+        # - allowhighfees=False (default)
+        # - dontcheckfee=False (default)
+        #
+        # Test case config
+        chain_length = 100
+        # Node's config
+        args = ['-limitancestorcount=100',
+                '-checkmempool=0',
+                '-persistmempool=0']
+        with self.run_node_with_connections('TS1_1: {} chain of length {}. Test duplicates resubmitted via rpc.'.format(1, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario1_1(conn, chain_length, out)
+        # dontcheckfee=True
+        with self.run_node_with_connections('TS1_1: {} chain of length {}. Test duplicates resubmitted via rpc (dontcheckfee=True).'.format(1, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario1_1(conn, chain_length, out, dontcheckfee=True)
+
+        # Scenario 1_2 (TS1_2).
+        # It's an extension to TS1. The RPC interface is used to resubmit and process orphans (tests 'Missing inputs' error code).
+        # - 100 chained txs used
+        # - allowhighfees=False (default)
+        # - dontcheckfee=False (default)
+        #
+        # Test case config
+        chain_length = 100
+        # Node's config
+        args = ['-limitancestorcount=100',
+                '-checkmempool=0',
+                '-persistmempool=0']
+        with self.run_node_with_connections('TS1_2: {} chain of length {}. Test orphans resubmitted via rpc.'.format(1, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario1_2(conn, chain_length, out)
+        # dontcheckfee=True
+        with self.run_node_with_connections('TS1_2: {} chain of length {}. Test orphans resubmitted via rpc.'.format(1, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario1_2(conn, chain_length, out, dontcheckfee=True)
 
         # Scenario 2 (TS2).
         # It's an extension to TS1. Resubmit duplicates, then create a new block and check if it is a valid block.

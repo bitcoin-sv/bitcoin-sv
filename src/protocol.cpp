@@ -21,8 +21,10 @@ const char *GETDATA = "getdata";
 const char *MERKLEBLOCK = "merkleblock";
 const char *GETBLOCKS = "getblocks";
 const char *GETHEADERS = "getheaders";
+const char* GETHDRSEN = "gethdrsen";
 const char *TX = "tx";
 const char *HEADERS = "headers";
+const char* HDRSEN = "hdrsen";
 const char *BLOCK = "block";
 const char *GETADDR = "getaddr";
 const char *MEMPOOL = "mempool";
@@ -34,6 +36,7 @@ const char *FILTERADD = "filteradd";
 const char *FILTERCLEAR = "filterclear";
 const char *REJECT = "reject";
 const char *SENDHEADERS = "sendheaders";
+const char *SENDHDRSEN = "sendhdrsen";
 const char *FEEFILTER = "feefilter";
 const char *SENDCMPCT = "sendcmpct";
 const char *CMPCTBLOCK = "cmpctblock";
@@ -44,11 +47,17 @@ const char *CREATESTREAM = "createstrm";
 const char *STREAMACK = "streamack";
 const char *DSDETECTED = "dsdetected";
 const char *EXTMSG = "extmsg";
+const char *REVOKEMID = "revokemid";
+const char *AUTHCH = "authch";
+const char *AUTHRESP = "authresp";
+const char *DATAREFTX = "datareftx";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
            strCommand == NetMsgType::CMPCTBLOCK ||
-           strCommand == NetMsgType::BLOCKTXN;
+           strCommand == NetMsgType::BLOCKTXN ||
+           strCommand == NetMsgType::HDRSEN; // We treat this message as block like because we don't want the
+                                             // message to be bigger than max block size we are willing to accept
 }
 
 uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
@@ -58,7 +67,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
         // If the message is PROTOCONF, it is limited to LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH.
         return LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH;
     }
-    else if (command == NetMsgType::TX)
+    else if (command == NetMsgType::TX || command == NetMsgType::DATAREFTX)
     {
         // If the message is TX, it is limited to max consensus tx size after Genesis
         // can not use policy limit because of banning rules.
@@ -98,15 +107,16 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
 static const std::string allNetMessageTypes[] = {
     NetMsgType::VERSION,      NetMsgType::VERACK,     NetMsgType::ADDR,
     NetMsgType::INV,          NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
-    NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::TX,
-    NetMsgType::HEADERS,      NetMsgType::BLOCK,      NetMsgType::GETADDR,
+    NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::GETHDRSEN,   NetMsgType::TX,
+    NetMsgType::HEADERS,      NetMsgType::HDRSEN,     NetMsgType::BLOCK,       NetMsgType::GETADDR,
     NetMsgType::MEMPOOL,      NetMsgType::PING,       NetMsgType::PONG,
     NetMsgType::NOTFOUND,     NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
-    NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
+    NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS, NetMsgType::SENDHDRSEN,
     NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
     NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
     NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,  NetMsgType::DSDETECTED,
-    NetMsgType::EXTMSG
+    NetMsgType::EXTMSG,       NetMsgType::AUTHCH,     NetMsgType::AUTHRESP,
+    NetMsgType::DATAREFTX
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,
@@ -135,7 +145,6 @@ static bool CheckCommandFormat(const char* cmd)
     }
 
     return true;
-
 }
 
 CExtendedMessageHeader::CExtendedMessageHeader(const char* pszCommand, uint64_t nPayloadLengthIn)
@@ -356,6 +365,8 @@ std::string CInv::GetCommand() const {
             return cmd.append(NetMsgType::MERKLEBLOCK);
         case MSG_CMPCT_BLOCK:
             return cmd.append(NetMsgType::CMPCTBLOCK);
+        case MSG_DATAREF_TX:
+            return cmd.append(NetMsgType::DATAREFTX);
         default:
             throw std::out_of_range(
                 strprintf("CInv::GetCommand(): type=%d unknown type", type));

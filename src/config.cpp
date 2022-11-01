@@ -48,7 +48,6 @@ void GlobalConfig::Reset()
 {
     data->feePerKB = CFeeRate {};
     data->dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
-    data->blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
     data->preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     data->factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
 
@@ -118,6 +117,8 @@ void GlobalConfig::Reset()
 
     data->invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     data->invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+    data->enableAssumeWhitelistedBlockDepth = DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH;
+    data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
     // Block download
     data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
@@ -142,7 +143,6 @@ void GlobalConfig::Reset()
     data->webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
 
     // Double-Spend parameters
-
     data->dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
     data->dsEndpointFastTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
     data->dsEndpointSlowTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT;
@@ -159,6 +159,18 @@ void GlobalConfig::Reset()
     data->dsDetectedWebhookPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
     data->dsDetectedWebhookPath = "";
     data->dsDetectedWebhookMaxTxnSize = DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE;
+
+    // MinerID
+    data->minerIdEnabled = MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED;
+    data->minerIdCacheSize = MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE;
+    data->numMinerIdsToKeep = MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP;
+    data->minerIdReputationM = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
+    data->minerIdReputationN = MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N;
+    data->minerIdReputationMScale = MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR;
+    data->minerIdGeneratorAddress = "";
+    data->minerIdGeneratorPort = rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
+    data->minerIdGeneratorPath = "";
+    data->minerIdGeneratorAlias = "";
 
     data->mDisableBIP30Checks = std::nullopt;
 
@@ -178,6 +190,11 @@ void GlobalConfig::Reset()
     data->safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
     data->safeModeMinForkLength = SAFE_MODE_DEFAULT_MIN_FORK_LENGTH;
     data->safeModeMinHeightDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
+
+    // Detect selfish mining
+    data->minBlockMempoolTimeDifferenceSelfish = DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
+    data->mDetectSelfishMining = DEFAULT_DETECT_SELFISH_MINING;
+    data->mSelfishTxThreshold = DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -1085,15 +1102,6 @@ bool GlobalConfig::SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* 
         return false;
     }
     uint64_t setMaxDiskSpace = static_cast<uint64_t>(maxDiskSpace);
-    if (setMaxDiskSpace < MIN_DISK_SPACE_FOR_MERKLETREE_FILES)
-    {
-        if (err)
-        {
-            *err = _("Maximum disk space used by merkle tree files cannot be below the minimum of ") + 
-                std::to_string(MIN_DISK_SPACE_FOR_MERKLETREE_FILES / ONE_MEBIBYTE) + _(" MiB.");
-        }
-        return false;
-    }
     data->maxMerkleTreeDiskSpace = setMaxDiskSpace;
     return true;
 }
@@ -1188,6 +1196,38 @@ bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::s
 InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
 {
     return data->invalidTxFileSinkEvictionPolicy;
+}
+
+void GlobalConfig::SetEnableAssumeWhitelistedBlockDepth(bool enabled)
+{
+    data->enableAssumeWhitelistedBlockDepth = enabled;
+}
+
+bool GlobalConfig::GetEnableAssumeWhitelistedBlockDepth() const
+{
+    return data->enableAssumeWhitelistedBlockDepth;
+}
+
+bool GlobalConfig::SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err)
+{
+    // Note that every value is logically correct (e.g. -1 means one block above current tip).
+    // Here we just check for non-sensical values.
+    if(depth<0 || depth>INT32_MAX)
+    {
+        if(err)
+        {
+            *err = "Invalid value ("+std::to_string(depth)+") for 'assume whitelisted block depth' policy";
+        }
+        return false;
+    }
+
+    data->assumeWhitelistedBlockDepth = depth;
+    return true;
+}
+
+int32_t GlobalConfig::GetAssumeWhitelistedBlockDepth() const
+{
+    return data->assumeWhitelistedBlockDepth;
 }
 
 // Safe mode activation
@@ -1823,6 +1863,185 @@ bool GlobalConfig::GetDisableBIP30Checks() const
     return data->mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
 }
 
+// MinerID
+bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* err)
+{
+    data->minerIdEnabled = enabled;
+    return true;
+}
+bool GlobalConfig::GetMinerIdEnabled() const
+{
+    return data->minerIdEnabled;
+}
+
+bool GlobalConfig::SetMinerIdCacheSize(int64_t size, std::string* err)
+{
+    if(size < 0 || static_cast<uint64_t>(size) > MinerIdDatabaseDefaults::MAX_CACHE_SIZE)
+    {
+        if(err)
+        {
+            *err = "Miner ID database cache size must be >= 0 and <= " + std::to_string(MinerIdDatabaseDefaults::MAX_CACHE_SIZE);
+        }
+        return false;
+    }
+
+    data->minerIdCacheSize = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetMinerIdCacheSize() const
+{
+    return data->minerIdCacheSize;
+}
+
+bool GlobalConfig::SetMinerIdsNumToKeep(int64_t num, std::string* err)
+{
+    if(num < 2)
+    {
+        if(err)
+        {
+            *err = "Number of miner IDs to keep must be >= 2.";
+        }
+        return false;
+    }
+
+    data->numMinerIdsToKeep = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetMinerIdsNumToKeep() const
+{
+    return data->numMinerIdsToKeep;
+}
+
+bool GlobalConfig::SetMinerIdReputationM(int64_t num, std::string* err)
+{
+    if(num < 1 || static_cast<uint32_t>(num) > MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_M)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M must be > 0 and <= " + std::to_string(MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_M) + ".";
+        }
+        return false;
+    }
+    else if(static_cast<uint32_t>(num) > GetMinerIdReputationN())
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M must be <= the value of miner ID reputation N.";
+        }
+        return false;
+    }
+
+    data->minerIdReputationM = static_cast<uint32_t>(num);
+    return true;
+}
+uint32_t GlobalConfig::GetMinerIdReputationM() const
+{
+    return data->minerIdReputationM;
+}
+
+bool GlobalConfig::SetMinerIdReputationN(int64_t num, std::string* err)
+{
+    if(num < 1 || static_cast<uint32_t>(num) > MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation N must be > 0 and <= " + std::to_string(MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N) + ".";
+        }
+        return false;
+    }
+    else if(static_cast<uint32_t>(num) < GetMinerIdReputationM())
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation N must be >= the value of miner ID reputation M.";
+        }
+        return false;
+    }
+
+    data->minerIdReputationN = static_cast<uint32_t>(num);
+    return true;
+}
+uint32_t GlobalConfig::GetMinerIdReputationN() const
+{
+    return data->minerIdReputationN;
+}
+
+bool GlobalConfig::SetMinerIdReputationMScale(double num, std::string* err)
+{
+    if(num < 1)
+    {
+        if(err)
+        {
+            *err = "Miner ID reputation M scale factor must be >= 1.";
+        }
+        return false;
+    }
+
+    data->minerIdReputationMScale = num;
+    return true;
+}
+double GlobalConfig::GetMinerIdReputationMScale() const
+{
+    return data->minerIdReputationMScale;
+}
+
+bool GlobalConfig::SetMinerIdGeneratorURL(const std::string& url, std::string* err)
+{
+    try
+    {   
+        int port { rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT };
+        std::string host {};
+        std::string protocol {};
+        std::string endpoint {};
+        SplitURL(url, protocol, host, port, endpoint);
+
+        // Check for any protocol other than http
+        if(protocol != "http")
+        {   
+            if(err)
+            {   
+                *err = "Unsupported protocol in miner ID generator URL";
+            }
+            return false;
+        }
+
+        data->minerIdGeneratorAddress = host;
+        data->minerIdGeneratorPort = port;
+        data->minerIdGeneratorPath = endpoint;
+    }
+    catch(const std::exception&)
+    {   
+        if(err)
+        {   
+            *err = "Badly formatted miner ID generator URL";
+        }
+        return false;
+    }
+    return true;
+}
+std::string GlobalConfig::GetMinerIdGeneratorAddress() const
+{
+    return data->minerIdGeneratorAddress;
+}
+int16_t GlobalConfig::GetMinerIdGeneratorPort() const
+{
+    return data->minerIdGeneratorPort;
+}
+std::string GlobalConfig::GetMinerIdGeneratorPath() const
+{
+    return data->minerIdGeneratorPath;
+}
+
+bool GlobalConfig::SetMinerIdGeneratorAlias(const std::string& alias, std::string* err)
+{
+    data->minerIdGeneratorAlias = alias;
+    return true;
+}
+std::string GlobalConfig::GetMinerIdGeneratorAlias() const
+{
+    return data->minerIdGeneratorAlias;
+}
+
 #if ENABLE_ZMQ
 bool GlobalConfig::SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err)
 {
@@ -1992,14 +2211,6 @@ bool GlobalConfig::SetDustLimitFactor(int64_t factor, std::string* err) {
 
 int64_t GlobalConfig::GetDustLimitFactor() const {
     return data->dustLimitFactor;
-}
-
-void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {
-    data->blockMinFeePerKB = fee;
-}
-
-CFeeRate GlobalConfig::GetBlockMinFeePerKB() const {
-    return data->blockMinFeePerKB;
 }
 
 bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
@@ -2252,6 +2463,49 @@ bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::s
 std::int32_t GlobalConfig::GetSoftConsensusFreezeDuration() const
 {
     return data->mSoftConsensusFreezeDuration;
+}
+
+bool GlobalConfig::GetDetectSelfishMining() const
+{
+    return data->mDetectSelfishMining;
+}
+
+void GlobalConfig::SetDetectSelfishMining(bool detectSelfishMining)
+{
+    data->mDetectSelfishMining = detectSelfishMining;
+}
+
+int64_t GlobalConfig::GetMinBlockMempoolTimeDifferenceSelfish() const
+{
+    return data->minBlockMempoolTimeDifferenceSelfish;
+}
+
+bool GlobalConfig::SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err) {
+    if (LessThanZero(minBlockMempoolTimeDiffIn, err, "Value for min block - mempool tx time difference must not be less than 0"))
+    {
+        return false;
+    }
+    data->minBlockMempoolTimeDifferenceSelfish = minBlockMempoolTimeDiffIn;
+    return true;
+}
+
+uint64_t GlobalConfig::GetSelfishTxThreshold() const
+{
+    return data->mSelfishTxThreshold;
+}
+
+bool GlobalConfig::SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err)
+{
+    if (selfishTxPercentThreshold > 100)
+    {
+        if (err)
+        {
+            *err = "Selfish tx percentage threshold must be between 0 and 100.";
+        }
+        return false;
+    }
+    data->mSelfishTxThreshold = selfishTxPercentThreshold;
+    return true;
 }
 
 std::shared_ptr<GlobalConfig::GlobalConfigData> GlobalConfig::getGlobalConfigData() const

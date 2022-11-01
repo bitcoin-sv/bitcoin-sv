@@ -6,10 +6,13 @@
 #include "txmempool.h"
 #include "txmempoolevictioncandidates.h"
 #include "clientversion.h"
+#include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "frozentxo.h"
 #include "mempooltxdb.h"
+#include "miner_id/miner_id.h"
+#include "miner_id/dataref_index.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "timedata.h"
@@ -20,11 +23,10 @@
 #include "validation.h"
 #include "validationinterface.h"
 #include "txn_validator.h"
-#include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
-#include <config.h>
-
 #include <boost/uuid/random_generator.hpp>
+#include <exception>
+#include <mutex>
 
 using namespace mining;
 
@@ -47,7 +49,7 @@ using namespace mining;
             CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
             if (ptx) {
                 if (outpoint.GetN() < ptx->vout.size()) {
-                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false, CFrozenTXOCheck::IsConfiscationTx(*ptx));
                 }
                 return {};
             }
@@ -116,7 +118,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
                                  int32_t _entryHeight,
-                                 bool _spendsCoinbase,
+                                 bool _spendsCoinbaseOrConfiscation,
                                  LockPoints lp)
     : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
@@ -126,7 +128,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
       feeDelta{Amount{0}},
       lockPoints{lp},
       entryHeight{_entryHeight},
-      spendsCoinbase{_spendsCoinbase}
+      spendsCoinbaseOrConfiscation{_spendsCoinbaseOrConfiscation}
 {}
 
 // CPFP group, if any that this transaction belongs to.
@@ -415,7 +417,7 @@ SecondaryMempoolEntryData CTxMemPool::CalculateSecondaryMempoolData(txiter entry
     return groupingData;
 }
 
-void CTxMemPool::SetGroupingData(CTxMemPool::txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData)
+void CTxMemPool::SetGroupingDataNL(CTxMemPool::txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData)
 {
     // NOTE: We use modify() here because it returns a mutable reference to
     //       the entry in the index, whereas dereferencing the iterator
@@ -441,18 +443,18 @@ CTxMemPool::ResultOfUpdateEntryGroupingDataNL CTxMemPool::UpdateEntryGroupingDat
             return ResultOfUpdateEntryGroupingDataNL::NOTHING;
         }
 
-        SetGroupingData(entryIt, groupingData);
+        SetGroupingDataNL(entryIt, groupingData);
         return ResultOfUpdateEntryGroupingDataNL::GROUPING_DATA_MODIFIED;
     }
     else
     {
         if(groupingData.ancestorsCount == 0)
         {
-            SetGroupingData(entryIt, std::nullopt);
+            SetGroupingDataNL(entryIt, std::nullopt);
             return ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE;
         }
 
-        SetGroupingData(entryIt, groupingData);
+        SetGroupingDataNL(entryIt, groupingData);
         return ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_GROUP_PAYING_TX;
     }
 }
@@ -562,7 +564,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
         if(data.ancestorsCount == 0)
         {
             // accept it to primary mempool as standalone tx
-            SetGroupingData(entry, std::nullopt);
+            SetGroupingDataNL(entry, std::nullopt);
             changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
             secondaryMempoolStats.Remove(entry);
         }
@@ -576,7 +578,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
     }
     else
     {
-        SetGroupingData(entry, data);
+        SetGroupingDataNL(entry, data);
     }
 }
 
@@ -637,12 +639,12 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
             // update grouping data, this marks them as secondary mempool tx
             if(putDummyGroupingData)
             {
-                SetGroupingData(entry, SecondaryMempoolEntryData());
+                SetGroupingDataNL(entry, SecondaryMempoolEntryData());
             }
             else
             {
                 SecondaryMempoolEntryData groupingData = CalculateSecondaryMempoolData(entry);
-                SetGroupingData(entry, groupingData);
+                SetGroupingDataNL(entry, groupingData);
             }
             TrackEntryModified(entry);
         }
@@ -774,7 +776,7 @@ void CTxMemPool::AddUncheckedNL(
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
     // set dummy data that it looks like it is in the secondary mempool
-    SetGroupingData(newit, SecondaryMempoolEntryData());
+    SetGroupingDataNL(newit, SecondaryMempoolEntryData());
     // now see if it can be accepted to primary mempool
     // this will set correct groupin data if it stays in the secondary mempool
     secondaryMempoolStats.Add(newit);
@@ -888,22 +890,6 @@ void CTxMemPool::GetDescendantsNL(txiter entryit,
     }
 }
 
-void CTxMemPool::RemoveRecursive(
-    const CTransaction &origTx,
-    const CJournalChangeSetPtr& changeSet,
-    MemPoolRemovalReason reason) {
-
-    {
-        std::unique_lock lock{smtx};
-        // Remove transaction from memory pool.
-        removeRecursiveNL(
-            origTx,
-            changeSet,
-            noConflict,
-            reason);
-    }
-}
-
 void CTxMemPool::removeRecursiveNL(
     const CTransaction& origTx,
     const CJournalChangeSetPtr& changeSet,
@@ -938,7 +924,7 @@ void CTxMemPool::removeRecursiveNL(
     removeStagedNL(setAllRemoves, nonNullChangeSet.Get(), conflictedWith, reason);
 }
 
-void CTxMemPool::RemoveForReorg(
+void CTxMemPool::RemoveForReorgNL(
     const Config &config,
     const CoinsDB& coinsTip,
     const CJournalChangeSetPtr& changeSet,
@@ -949,7 +935,6 @@ void CTxMemPool::RemoveForReorg(
     const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
-    std::unique_lock lock{smtx};
     setEntries txToRemove;
     for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
         const auto tx = it->GetSharedTx();
@@ -979,7 +964,7 @@ void CTxMemPool::RemoveForReorg(
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.
             txToRemove.insert(it);
-        } else if (it->GetSpendsCoinbase()) {
+        } else if (it->GetSpendsCoinbaseOrConfiscation()) {
             for (const auto& prevout: GetOutpointsSpentByNL(it)) {
                 txiter it2 = mapTx.find(prevout.GetTxId());
                 if (it2 != mapTx.end()) {
@@ -995,7 +980,10 @@ void CTxMemPool::RemoveForReorg(
                 if (!coin.has_value() || coin->IsSpent() ||
                     (coin->IsCoinBase() &&
                      nMemPoolHeight - coin->GetHeight() <
-                         COINBASE_MATURITY)) {
+                         COINBASE_MATURITY) ||
+                    (coin->IsConfiscation() &&
+                     nMemPoolHeight - coin->GetHeight() <
+                         CONFISCATION_MATURITY)) {
                     txToRemove.insert(it);
                     break;
                 }
@@ -1018,13 +1006,17 @@ void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     const CJournalChangeSetPtr& changeSet,
     const uint256& blockhash,
-    std::vector<CTransactionRef>& txNew) {
+    std::vector<CTransactionRef>& txNew,
+    const Config& config) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
     std::unique_lock lock{smtx};
 
     evictionTracker.reset();
+
+    int64_t last_block_tx_time = 0;
+    CFeeRate minBlockFeeRate{Amount{std::numeric_limits<int64_t>::max()}};
 
     setEntries toRemove; // entries which should be removed
     setEntriesTopoSorted childrenOfToRemove; // we must collect all transaction which parents we have removed to update its ancestorCount
@@ -1040,6 +1032,18 @@ void CTxMemPool::RemoveForBlock(
         if(found != mapTx.end()) 
         {
             toRemove.insert(found);
+
+            // get block's latest transaction time
+            int64_t foundTxTime = (&*found)->GetTime();
+            if (foundTxTime > last_block_tx_time) {
+                last_block_tx_time = foundTxTime;
+            }
+            // get block's lowest transaction fee rate
+            CFeeRate foundTxFeeRate{(&*found)->GetFee(), (&*found)->GetTxSize()};
+            if (foundTxFeeRate < minBlockFeeRate) {
+                minBlockFeeRate = foundTxFeeRate;
+            }
+
             for(auto child: GetMemPoolChildrenNL(found))
             {
                 // we are iterating block transactions backwards (we will always first visit child than its parent) 
@@ -1096,6 +1100,14 @@ void CTxMemPool::RemoveForBlock(
         }
     }
 
+    if (config.GetDetectSelfishMining() && !mapTx.empty())
+    {
+        if (CheckSelfishNL(toRemove, last_block_tx_time, minBlockFeeRate, config))
+        {
+            LogPrint(BCLog::MEMPOOL, "Selfish mining detected.\n");
+        }
+    }
+
     // remove affected groups from primary mempool
     // we are ignoring members of "toRemove" (we will remove them in the removeUncheckedNL), so that "removedFromPrimary" can not contain transactions that will be removed
     auto removedFromPrimary = RemoveFromPrimaryMempoolNL(std::move(childrenOfToRemoveGroupMembers), nonNullChangeSet.Get(), true, &toRemove);
@@ -1139,9 +1151,87 @@ void CTxMemPool::RemoveForBlock(
     blockSinceLastRollingFeeBump = true;
 }
 
+bool CTxMemPool::CheckSelfishNL(const setEntries& block_entries, int64_t last_block_tx_time, 
+                                const CFeeRate& minBlockFeeRate, const Config& config) 
+{
+    auto last = mapTx.get<entry_time>().end();
+    last--;
+
+    int64_t last_mempool_tx_time = (&*last)->GetTime();
+    // If time difference between the last transaction that was included in the
+    // block and the last transaction that was left in the mempool is smaller
+    // than threshold, block is not considered selfish.
+    if (last_mempool_tx_time - last_block_tx_time < config.GetMinBlockMempoolTimeDifferenceSelfish()) 
+    {
+        return false;
+    }
+
+    // Value from -blockmintxfee parameter
+    Amount blockMinTxFee{mempool.GetBlockMinTxFee().GetFeePerK()};
+    uint64_t aboveBlockTxFeeCount = 0;
+    // If received block is not empty check if there are txs in mempool that doesn't exists in received block
+    if (!block_entries.empty())
+    {
+        // Measure duration of for loop of mempool Txs
+        int64_t forLoopOfMempoolTxsDuration = GetTimeMicros();
+        std::vector<const CTxMemPoolEntry*> entries;
+        // Loop backwards through mempool only to tx's time > last_block_tx_time
+        for ( ; last != mapTx.get<entry_time>().begin() && last->GetTime()>last_block_tx_time; --last) 
+        {
+            if (block_entries.find(mapTx.project<transaction_id>(last)) != block_entries.end()) 
+            {
+                continue;
+            }
+            entries.push_back(&*last);
+        }
+        forLoopOfMempoolTxsDuration = GetTimeMicros() - forLoopOfMempoolTxsDuration;
+        LogPrint(BCLog::BENCH, "    - CheckSelfishNL() : for loop of mempool's %u Txs completed in %.2fms \n", (unsigned int)mapTx.size(), forLoopOfMempoolTxsDuration * 0.001);
+
+        // Measure duration of for loop of block Txs
+        int64_t count_ifDurationOfBlockTxs = GetTimeMicros();
+        // Take higher value between the init value and received block tx fee
+        Amount maxBlockFeeRate {std::max(blockMinTxFee, minBlockFeeRate.GetFeePerK())};
+        aboveBlockTxFeeCount = std::count_if(entries.begin(), entries.end(), [&maxBlockFeeRate](const auto& ent)
+            {
+                // If fee rate one of the entries is above the max(BlockMinFeePerKB, minBlockFeeRate), then it should be in block
+                // It was not included in block --> sth is wrong
+                return CFeeRate{ent->GetFee(), ent->GetTxSize()}.GetFeePerK() >= maxBlockFeeRate;
+            });
+
+        count_ifDurationOfBlockTxs = GetTimeMicros() - count_ifDurationOfBlockTxs;
+        LogPrint(BCLog::BENCH, "    - CheckSelfishNL() : count_if of block's %u Txs completed in %.2fms \n", (unsigned int)entries.size(), count_ifDurationOfBlockTxs * 0.001);
+        LogPrint(BCLog::MEMPOOL, "%u/%u transactions in mempool were not included in block. %u/%u have a fee above the block's fee rate.\n",
+            (unsigned int)entries.size(), (unsigned int)mapTx.size(), aboveBlockTxFeeCount, (unsigned int)entries.size());
+    } 
+    else
+    {
+        // If the transactions of the received block do not exist in the mempool or block is empty,
+        // check if txs in mempool have sufficient fee rate to be in block
+        aboveBlockTxFeeCount = std::count_if(mapTx.begin(), mapTx.end(), [&blockMinTxFee](const auto& tx)
+                {
+                    return CFeeRate{tx.GetFee(), tx.GetTxSize()}.GetFeePerK() >= blockMinTxFee;
+                });
+        LogPrint(BCLog::MEMPOOL, "%u/%u transactions have a fee above the config blockmintxfee value."
+            " Block was either empty or none of its transactions are in our mempool.\n ", 
+            aboveBlockTxFeeCount, (unsigned int)mapTx.size());
+    }
+
+    // Check if percentage of txs in mempool that are not included in block is above TH
+    if (aboveBlockTxFeeCount > 0 && (aboveBlockTxFeeCount*100 / mapTx.size()) >= config.GetSelfishTxThreshold())
+    {
+        return true;
+    }
+    return false;
+}
+
 void CTxMemPool::RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet)
 {
     std::unique_lock lock{smtx};
+    RemoveFrozenNL( changeSet );
+}
+
+void CTxMemPool::RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet)
+{
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
     CFrozenTXOCheck frozenTXOCheck{
@@ -1153,26 +1243,26 @@ void CTxMemPool::RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet)
     setEntries spendingFrozenTXOs;
     for(const auto& spentTXO: mapNextTx.get<by_prevout>())
     {
-        struct TxGetterMP : CFrozenTXOCheck::TxGetter
+        std::uint8_t effectiveBlacklist;
+        if(!frozenTXOCheck.Check(spentTXO.outpoint, effectiveBlacklist))
         {
-            TxGetterMP(const CTxMemPoolEntry& mpe)
-            : mpe(mpe)
-            {}
-
-            TxData GetTxData() override
+            // Is this input spent by confiscation transaction?
+            // NOTE: This is inefficient because we're loading every tx to memory and we're doing
+            //       it more than once for txs with several inputs. But since there will not be
+            //       many transactions in mempool that spend frozen TXOs, this is not an issue.
+            auto ptx = spentTXO.spentBy->GetSharedTx();
+            const bool isConfiscationTx = CFrozenTXOCheck::IsConfiscationTx(*ptx);
+            if(!isConfiscationTx)
             {
-                txRef = mpe.GetSharedTx();
-                return TxData(*txRef, mpe.GetTime());
+                // For normal transaction input must not be frozen.
+                frozenTXOCheck.LogAttemptToSpendFrozenTXO(spentTXO.outpoint, *ptx, effectiveBlacklist, spentTXO.spentBy->GetTime());
+
+                // Store iterator to this tx and all its descendants
+                GetDescendantsNL(spentTXO.spentBy, spendingFrozenTXOs);
             }
-
-            const CTxMemPoolEntry& mpe;
-            CTransactionRef txRef;
-        } txGetter(*spentTXO.spentBy);
-
-        if(!frozenTXOCheck.Check(spentTXO.outpoint, txGetter))
-        {
-            // Store iterator to this tx and all its descendants
-            GetDescendantsNL(spentTXO.spentBy, spendingFrozenTXOs);
+            // For confiscation transaction all inputs must be frozen, but this is implicitly guaranteed if
+            // confiscation transaction is whitelisted, which will be checked elsewhere. Consequently, here we
+            // do not need to check that every confiscation transaction in mempool only spends frozen inputs.
         }
     }
 
@@ -1180,6 +1270,54 @@ void CTxMemPool::RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet)
     {
         removeStagedNL(spendingFrozenTXOs, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::FROZEN_INPUT);
 
+        mFrozenTxnUpdatedAt = nTransactionsUpdated.load();
+    }
+}
+
+void CTxMemPool::RemoveInvalidCTXs(const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    RemoveInvalidCTXsNL( changeSet );
+}
+
+void CTxMemPool::RemoveInvalidCTXsNL(const mining::CJournalChangeSetPtr& changeSet)
+{
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        "mempool",
+        chainActive.Tip()->GetBlockHash()};
+
+    // Find confiscation transactions in mempool that are now no longer valid. Possible reasons:
+    //  - confiscation transaction is no longer valid because mempool height is <enforceAtHeight
+    //  - confiscation transaction is no longer whitelisted
+    setEntries nonWhitelistedConfiscationTxs;
+    for (txiter it = mapTx.begin(); it != mapTx.end(); it++)
+    {
+        const CTransactionRef tx = it->GetSharedTx();
+        if(!CFrozenTXOCheck::IsConfiscationTx(*tx))
+        {
+            // Not a confiscation transaction
+            continue;
+        }
+
+        // Confiscation transaction must still be whitelisted at mempool height
+        if(!frozenTXOCheck.CheckConfiscationTxWhitelisted(*tx, it->GetTime()))
+        {
+            GetDescendantsNL(it, nonWhitelistedConfiscationTxs);
+        }
+
+        // NOTE: It is assumed that confiscation transaction is otherwise valid (i.e. correct contents) otherwise it would not be in mempool.
+        //       Since confiscation transaction is whitelisted, it is also guaranteed that all of its inputs are confiscated and therefore
+        //       consensus frozen at all heights so we do not need to check this.
+    }
+
+    if(!nonWhitelistedConfiscationTxs.empty())
+    {
+        removeStagedNL(nonWhitelistedConfiscationTxs, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::NOT_WHITELISTED);
+
+        // We can use same mempool modification flag as for frozen transactions, because semantics are similar for confiscation transactions
         mFrozenTxnUpdatedAt = nTransactionsUpdated.load();
     }
 }
@@ -1734,7 +1872,7 @@ void CTxMemPool::PrioritiseTransaction(
         std::unique_lock lock{smtx};
         prioritiseTransactionNL(hash, nFeeDelta);
     }
-    LogPrintf("PrioritiseTransaction: %s fee += %d\n", strHash, FormatMoney(nFeeDelta));
+    LogPrint(BCLog::MEMPOOL, "PrioritiseTransaction: %s fee += %d\n", strHash, FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::PrioritiseTransaction(
@@ -1751,7 +1889,7 @@ void CTxMemPool::PrioritiseTransaction(
         }
     }
     for(const TxId& txid: vTxToPrioritise) {
-        LogPrintf("PrioritiseTransaction: %s fee += %d\n",
+        LogPrint(BCLog::MEMPOOL, "PrioritiseTransaction: %s fee += %d\n",
             txid.ToString(),
             FormatMoney(nFeeDelta));
     }
@@ -1901,7 +2039,7 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
     CTransactionRef ptx = GetCachedTransactionRef(outpoint);
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
-            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false, CFrozenTXOCheck::IsConfiscationTx(*ptx));
         }
         return {};
     }
@@ -2023,6 +2161,41 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     return stage.size();
 }
 
+int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    auto it = mapTx.get<transaction_id>().find(txid);
+    if (it != mapTx.get<transaction_id>().end()) {
+        setEntries stage;
+        stage.insert(it);
+        GetDescendantsNL(it, stage);
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
+        return stage.size();
+    }
+    return 0;
+}
+
+std::vector<TxId> CTxMemPool::RemoveTxnsAndDescendants(const std::vector<TxId>& txids, const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    setEntries stage;
+    std::vector<TxId> stagedIds;
+    for (const TxId& txid: txids) {
+        auto it = mapTx.get<transaction_id>().find(txid);
+        if (it != mapTx.get<transaction_id>().end()) {
+            stage.insert(it);
+            stagedIds.push_back(it->GetTxId());
+            GetDescendantsNL(it, stage);
+        }
+    }
+    if (!stage.empty()) {
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
+    }
+    return stagedIds;
+}
+
 std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
 {
     std::shared_lock lock{smtx};
@@ -2100,80 +2273,52 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet)
 {
+    // NOTE: cs_main lock is needed because this function is not completely thread safe.
+    //       smtx is released for tx validation which causes a gap of mempool stability.
+    //.      During that time other functions that are using mempool with intent to add
+    //.      new transactions to it must not run (they would cause mempool invariance break)
+    //.      and that is guaranteed by abusing cs_main lock.
     AssertLockHeld(cs_main);
     TxInputDataSPtrVec vTxInputData {};
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
-
-    // disconnectpool's insertion_order index sorts the entries from oldest to
-    // newest, but the oldest entry will be the last tx from the latest mined
-    // block that was disconnected.
-    // Iterate disconnectpool in reverse, so that we add transactions back to
-    // the mempool starting with the earliest transaction that had been
-    // previously seen in a block.
-    auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
-    while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        if ((*it)->IsCoinBase()) {
-            // If the transaction doesn't make it in to the mempool, remove any
-            // transactions that depend on it (which would now be orphans).
-            RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
-        } else {
-
-            // We could receive transaction during the reorg (after the block is disconnected but before a new is connected) 
-            // because the PTV and PBV are running at the same time. 
-
-            // If we receive the same transaction that was in the disconnected block, we will remove transaction received in the mempool
-            if (auto duplicateIt = mapTx.find((*it)->GetId()); duplicateIt != mapTx.end()) {
-
-                // To be on the safe side, we should disband a group if the duplicate transaction is part of it,
-                if (duplicateIt->IsCPFPGroupMember())
-                {
-                    setEntriesTopoSorted duplicateTS;
-                    duplicateTS.insert(duplicateIt);
-                    RemoveFromPrimaryMempoolNL(duplicateTS, nonNullChangeSet.Get());
-                }
-                
-                // It is safe to remove this tx, as it for sure, at this point, does not have a parent inside mempool.
-                // If it had a parent it would be a duplicate also and it would be already removed (we are checking for duplicates in topo-order)
-                // If it has a child it could be: duplicate (will be handled later in this loop), double-spend (will be handled by following for-loop),
-                // or normal transaction (will be added to mempool in ResubmitEntriesToMempoolNL later on)
-                setEntries duplicate;
-                duplicate.insert(duplicateIt);
-                removeUncheckedNL(duplicate, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::REORG);
-            }
-
-            // If we receive transaction that spends the same output as a transaction in the disconnected block we will remove tx from the mempool
-            // together with its descedants, keeping transaction from the disconnected block
-            for (const CTxIn &txin : (*it)->vin) 
-            {
-                auto doubleSpend = mapNextTx.find(txin.prevout);
-                if (doubleSpend != mapNextTx.end())
-                {
-                    setEntries conflictedWithDescendants;
-                    GetDescendantsNL(mapTx.find(doubleSpend->spentBy->GetTxId()), conflictedWithDescendants);
-                    removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::REORG);
-                }
-            }
-
-            vTxInputData.emplace_back(
-                std::make_shared<CTxInputData>(
-                    TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
-                    *it,              // a pointer to the tx
-                    TxSource::reorg,  // tx source
-                    TxValidationPriority::normal,  // tx validation priority
-                    TxStorage::memory, // tx storage
-                    GetTime()));        // nAcceptTime
-        }
-        ++it;
-    }
-
-    disconnectpool.queuedTx.clear();
-
-    // Clear the mempool, but save the current index, mapNextTx, entries and the
-    // transaction database, since we'll re-add the entries later.
     ResubmitContext resubmitContext;
+
     {
         std::unique_lock lock{smtx};
+
+        // disconnectpool's insertion_order index sorts the entries from oldest to
+        // newest, but the oldest entry will be the last tx from the latest mined
+        // block that was disconnected.
+        // Iterate disconnectpool in reverse, so that we add transactions back to
+        // the mempool starting with the earliest transaction that had been
+        // previously seen in a block.
+        for (auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
+             it != disconnectpool.queuedTx.get<insertion_order>().rend();
+             ++it)
+        {
+            // Filter out coinbase and special miner ID txns
+            if(disconnectpool.isFiltered((*it)->GetId())) {
+                // If the transaction doesn't make it in to the mempool, remove any
+                // transactions that depend on it (which would now be orphans).
+                removeRecursiveNL(**it, changeSet, noConflict, MemPoolRemovalReason::REORG);
+            }
+            else {
+                vTxInputData.emplace_back(
+                    std::make_shared<CTxInputData>(
+                        TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
+                        *it,              // a pointer to the tx
+                        TxSource::reorg,  // tx source
+                        TxValidationPriority::normal,  // tx validation priority
+                        TxStorage::memory, // tx storage
+                        GetTime()));        // nAcceptTime
+            }
+        }
+
+        disconnectpool.queuedTx.clear();
+
+        // Clear the mempool, but save the current index, mapNextTx, entries and the
+        // transaction database, since we'll re-add the entries later.
         resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
     }
 
@@ -2196,30 +2341,40 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
                 removeRecursiveNL(*tx, changeSet, noConflict, MemPoolRemovalReason::REORG);
             }
         }
-    }
 
-    // We also need to remove any now-immature transactions
-    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
-    const CBlockIndex& tip = *chainActive.Tip();
-    RemoveForReorg(
-            config,
-            *pcoinsTip,
-            changeSet,
-            tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+        // We also need to remove any now-immature transactions
+        LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
+        const CBlockIndex& tip = *chainActive.Tip();
+        RemoveForReorgNL(
+                config,
+                *pcoinsTip,
+                changeSet,
+                tip,
+                StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
 
-    if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
-    {
-        // Remove any transactions from mempool that spend TXOs, which were previously not considered policy frozen, but now are.
-        // Note that this can only happen if all of the following is true:
-        //   - TXO is consensus frozen up to (and not including) height H with policyExpiresWithConsensus=true.
-        //   - Transaction spending this TXO was added to mempool when mempool height was H or above.
-        //   - Active chain was reorged back so that mempool height is now below H.
-        // NOTE: To avoid re-checking whole mempool every time, we only do this if it is theoretically possible that mempool could
-        //       contain such transactions. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
-        //       is below or at current mempool height, there is simply no such TXO and we can safely skip the expensive re-check.
-        LogPrint(BCLog::MEMPOOL, "Removing any transactions that spend TXOs, which were previously not considered policy frozen, but now are because the mempool height has become lower.\n");
-        RemoveFrozen(changeSet);
+        if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
+        {
+            // Remove any transactions from mempool that spend TXOs, which were previously not considered policy frozen, but now are.
+            // Note that this can only happen if all of the following is true:
+            //   - TXO is consensus frozen up to (and not including) height H with policyExpiresWithConsensus=true.
+            //   - Transaction spending this TXO was added to mempool when mempool height was H or above.
+            //   - Active chain was reorged back so that mempool height is now below H.
+            // NOTE: To avoid re-checking whole mempool every time, we only do this if it is theoretically possible that mempool could
+            //       contain such transactions. Specifically, if maximum height, at which any consensus frozen TXO is un-frozen,
+            //       is below or at current mempool height, there is simply no such TXO and we can safely skip the expensive re-check.
+            LogPrint(BCLog::MEMPOOL, "Removing any transactions that spend TXOs, which were previously not considered policy frozen, but now are because the mempool height has become lower.\n");
+            RemoveFrozenNL(changeSet);
+        }
+
+        if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_WhitelistedTxData_enforceAtHeight())
+        {
+            // Remove any confiscation transactions that are now no longer valid.
+            // Here we use the same trick as in the case of regular transaction spending frozen TXO to avoid
+            // unneeded scans. If maximum enforceAtHeight of all confiscation transactions is at or below current
+            // mempool height, it is not possible that a confiscation transaction in mempool has become invalid.
+            LogPrint(BCLog::MEMPOOL, "Removing any confiscation transactions, which were previously valid, but are now not because the mempool height has become lower.\n");
+            RemoveInvalidCTXsNL(changeSet);
+        }
     }
 
     // Check mempool & journal
@@ -2235,27 +2390,34 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
     const CJournalChangeSetPtr& changeSet)
 {
     AssertLockHeld(cs_main);
-    // disconnectpool's insertion_order index sorts the entries from oldest to
-    // newest, but the oldest entry will be the last tx from the latest mined
-    // block that was disconnected.
-    // Iterate disconnectpool in reverse, so that we add transactions back to
-    // the mempool starting with the earliest transaction that had been
-    // previously seen in a block.
-    auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
-    while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
-        ++it;
-    }
-    disconnectpool.queuedTx.clear();
-    // We also need to remove any now-immature transactions
-    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
-    const CBlockIndex& tip = *chainActive.Tip();
-    RemoveForReorg(
+
+    {
+        std::unique_lock lock {smtx};
+
+        // disconnectpool's insertion_order index sorts the entries from oldest to
+        // newest, but the oldest entry will be the last tx from the latest mined
+        // block that was disconnected.
+        // Iterate disconnectpool in reverse, so that we add transactions back to
+        // the mempool starting with the earliest transaction that had been
+        // previously seen in a block.
+        auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
+        while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+            removeRecursiveNL(**it, changeSet, noConflict, MemPoolRemovalReason::REORG);
+            ++it;
+        }
+
+        disconnectpool.queuedTx.clear();
+        // We also need to remove any now-immature transactions
+        LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
+
+        const CBlockIndex& tip = *chainActive.Tip();
+        RemoveForReorgNL(
             config,
             *pcoinsTip,
             changeSet,
             tip,
             StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+    }
 
     // Check mempool & journal
     CheckMempool(*pcoinsTip, changeSet);
@@ -2265,20 +2427,64 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
 }
 
 void CTxMemPool::AddToDisconnectPoolUpToLimit(
-    const mining::CJournalChangeSetPtr &changeSet,
-    DisconnectedBlockTransactions *disconnectpool,
+    const mining::CJournalChangeSetPtr& changeSet,
+    DisconnectedBlockTransactions* disconnectpool,
     uint64_t maxDisconnectedTxPoolSize,
-    const std::vector<CTransactionRef> &vtx) {
-    for (const auto &tx : boost::adaptors::reverse(vtx)) {
-        disconnectpool->addTransaction(tx);
+    const CBlock& block,
+    int32_t height)
+{
+    // If this is a miner ID enabled block, there may be txns contained in it
+    // we should filter out from the mempool.
+    std::optional<MinerId> minerID { FindMinerId(block, height) };
+    std::set<TxId> dataRefIds {};
+    if(minerID)
+    {
+        auto index = g_dataRefIndex->CreateLockingAccess();
+        const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
+        if (minerInfoTxId) {
+            // will do nothing if it is not in the database
+            index.DeleteMinerInfoTxn(*minerInfoTxId);
+        }
+        if(minerID->GetCoinbaseDocument().GetDataRefs())
+        {
+            // Build set of dataref txids for speedy lookup
+            for(const auto& dataref : minerID->GetCoinbaseDocument().GetDataRefs().value())
+            {
+                dataRefIds.insert(dataref.txid);
+                index.DeleteDatarefTxn(dataref.txid);
+            }
+        }
     }
+
+    for(const auto& tx : boost::adaptors::reverse(block.vtx))
+    {
+        bool filter {false};
+        if(minerID)
+        {
+            const auto& txid { tx->GetId() };
+            // Filter miner ID miner-info and dataref txns
+            const auto& minerInfoTx { minerID->GetMinerInfoTx() };
+            if(minerInfoTx)
+            {
+                filter |= (minerInfoTx == txid);
+            }
+            filter |= (dataRefIds.count(txid) > 0);
+        }
+
+        // Also filter coinbase txns
+        disconnectpool->addTransaction(tx, filter || tx->IsCoinBase());
+    }
+
     // FIXME: SVDEV-460 add only upto limit and drop the rest. Figure out all this reversal and what to drop
 
-    while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
+    std::unique_lock lock{ smtx };
+
+    while(disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize)
+    {
         // Drop the earliest entry, and remove its children from the
         // mempool.
         auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
-        RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        removeRecursiveNL(**it, changeSet, noConflict, MemPoolRemovalReason::REORG);
         disconnectpool->removeEntry(it);
     }
 }
@@ -2336,14 +2542,22 @@ CTxMemPool::GetMemPoolChildrenNL(txiter entry) const {
     return it->second.children;
 }
 
-CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
+bool CTxMemPool::SetRollingMinFee(int64_t fee)
+{ 
+    if(fee < MIN_ROLLING_FEE_HALFLIFE || fee > MAX_ROLLING_FEE_HALFLIFE)
+        return false;
 
+    halflife_ = fee;
+    return true;
+}
 
-    std::shared_lock lock{smtx};
+CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const 
+{
+    std::lock_guard lock{smtx};
     if (blockSinceLastRollingFeeBump && rollingMinimumFeeRate != 0) {
         int64_t time = GetTime();
         if (time > lastRollingFeeUpdate + 10) {
-            double halflife = ROLLING_FEE_HALFLIFE;
+            double halflife = halflife_;
             if (DynamicMemoryUsageNL() < sizelimit / 4) {
                 halflife /= 4;
             } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
@@ -2692,7 +2906,6 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
     return Snapshot(std::move(contents), std::move(relevantTxIds));
 }
 
-
 std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
 {
     std::shared_lock lock{smtx};
@@ -2916,10 +3129,8 @@ bool CTxMemPool::LoadMempool(const Config &config,
                 PrioritiseTransaction(txid, txid.ToString(), Amount{nFeeDelta});
             }
             if (nTime + nExpiryTimeout > nNow) {
-                // Mempool Journal ChangeSet
-                CJournalChangeSetPtr changeSet {
-                    getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
-                };
+                // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+                CJournalChangeSetPtr changeSet {nullptr};
                 const auto txStorage = (txFromMemory ? TxStorage::memory : TxStorage::txdb);
                 const CValidationState state {
                     // Execute txn validation synchronously.
@@ -3063,3 +3274,10 @@ DisconnectedBlockTransactions::~DisconnectedBlockTransactions()
             " Some transactions will be dropped from mempool.\n");
     }
 }
+
+std::ostream& operator<<(std::ostream& os, const MemPoolRemovalReason& reason)
+{
+    os << enum_cast<std::string>(reason);
+    return os;
+}
+

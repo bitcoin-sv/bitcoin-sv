@@ -42,7 +42,7 @@ CThreadPool<QueueAdaptor>::~CThreadPool()
 {
     {
         // Wake everyone up
-        std::unique_lock<std::mutex> lock { mQueueMtx };
+        std::lock_guard<std::mutex> lock { mQueueMtx };
         mRunning = false;
         mQueueCondVar.notify_all();
     }
@@ -53,6 +53,14 @@ CThreadPool<QueueAdaptor>::~CThreadPool()
         thread->join();
     }
     mThreads.clear();
+}
+
+// Query number of queued tasks
+template<typename QueueAdaptor>
+size_t CThreadPool<QueueAdaptor>::getTaskDepth() const
+{
+    std::lock_guard<std::mutex> lock { mQueueMtx };
+    return mQueue.size();
 }
 
 // The worker threads
@@ -93,7 +101,7 @@ void CThreadPool<QueueAdaptor>::worker(size_t n, ThreadPriority thrPriority)
 template<typename QueueAdaptor>
 void CThreadPool<QueueAdaptor>::submit(CTask&& task)
 {
-    std::unique_lock<std::mutex> lock { mQueueMtx };
+    std::lock_guard<std::mutex> lock { mQueueMtx };
 
     if(!mRunning)
     {   
@@ -109,7 +117,7 @@ void CThreadPool<QueueAdaptor>::submit(CTask&& task)
 template<typename QueueAdaptor>
 void CThreadPool<QueueAdaptor>::pause()
 {
-    std::unique_lock<std::mutex> lock { mQueueMtx };
+    std::lock_guard<std::mutex> lock { mQueueMtx };
     mPaused = true;
 }
 
@@ -117,7 +125,7 @@ void CThreadPool<QueueAdaptor>::pause()
 template<typename QueueAdaptor>
 void CThreadPool<QueueAdaptor>::run()
 {
-    std::unique_lock<std::mutex> lock { mQueueMtx };
+    std::lock_guard<std::mutex> lock { mQueueMtx };
     mPaused = false;
 
     // On un-pause, continue processing
@@ -128,7 +136,7 @@ void CThreadPool<QueueAdaptor>::run()
 template<typename QueueAdaptor>
 bool CThreadPool<QueueAdaptor>::paused() const
 {
-    std::unique_lock<std::mutex> lock { mQueueMtx };
+    std::lock_guard<std::mutex> lock { mQueueMtx };
     return mPaused;
 }
 

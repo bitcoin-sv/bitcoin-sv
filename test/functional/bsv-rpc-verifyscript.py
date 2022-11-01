@@ -285,8 +285,8 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         self.verifyscript_check(node, ["skipped", "skipped"], [{"tx": ToHex(tx1), "n": 0}, {"tx": ToHex(tx1), "n": 0}], True, 0)  # everything must be skipped if timeout is 0
         self.verifyscript_check(node, ["skipped", "skipped"], [{"tx": ToHex(tx1), "n": 0}, {"tx": ToHex(tx1), "n": 0}], False, 0)
 
-        # Restart the node to allow unlimited script size and large numbers
-        self.restart_node(0, self.extra_args[0] + ["-maxscriptsizepolicy=0", "-maxscriptnumlengthpolicy=250000"])
+        # Restart the node to allow unlimited script size, large numbers and larger than default but still too low value for maxstdtxvalidationduration needed to completely verify a complex script.
+        self.restart_node(0, self.extra_args[0] + ["-maxstdtxvalidationduration=100", "-maxnonstdtxvalidationduration=101", "-maxscriptsizepolicy=0", "-maxscriptnumlengthpolicy=250000"])
 
         # Create, send and mine transaction with large anyone-can-spend lock script
         tx6 = create_tx(tx_test, 2, 1*COIN)
@@ -311,7 +311,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         self.verifyscript_check(node, ["ok", "timeout", "ok"], [{"tx": ToHex(tx1), "n": 0}, {"tx": ToHex(tx7), "n": 0}, {"tx": ToHex(tx1), "n": 0}], False, 2000)
 
         # Restart the node with larger value for maxstdtxvalidationduration so that its
-        # default value does not limit maximum execution time of single script.
+        # value does not limit maximum execution time of single script.
         self.restart_node(0, self.extra_args[0] + ["-maxstdtxvalidationduration=2000", "-maxnonstdtxvalidationduration=2001", "-maxscriptsizepolicy=0", "-maxscriptnumlengthpolicy=250000"])
 
         # Verification of all three scripts should now succeed if total timeout is large enough ...

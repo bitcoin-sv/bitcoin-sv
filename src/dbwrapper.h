@@ -10,7 +10,6 @@
 #include "serialize.h"
 #include "streams.h"
 #include "util.h"
-#include "utilstrencodings.h"
 #include "version.h"
 
 #include <leveldb/db.h>

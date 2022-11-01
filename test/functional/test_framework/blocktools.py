@@ -6,7 +6,7 @@
 from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.comptool import TestInstance
 from .mininode import *
-from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160
+from .script import CScript, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160, OP_0
 from .util import assert_equal, assert_raises_rpc_error, hash256
 from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
 
@@ -62,6 +62,22 @@ def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
         merkleRootBytes = hash256(merkleRootBytes + mpBytes)
         merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
     return uint256_from_str(merkleRootBytes)
+
+# Calculate merkle root from a branch
+def merkle_root_from_branch(leaf_hash, index, branch):
+    root = ser_uint256(leaf_hash)
+    for node in branch:
+        if node == 0:
+            # Duplicated node
+            root = hash256(root + root)
+        elif index & 1:
+            root = hash256(ser_uint256(node) + root)
+        else:
+            root = hash256(root + ser_uint256(node))
+
+        root = root[::-1]
+        index >>= 1
+    return uint256_from_str(root)
 
 # Create a valid submittable block (and coinbase) from a mining candidate
 def create_block_from_candidate(candidate, get_coinbase):
@@ -334,7 +350,7 @@ class ChainManager():
     def set_tip(self, number):
         self.tip = self.blocks[number]
 
-    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False):
+    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
         if self.tip == None:
             base_block_hash = self._genesis_hash
             block_time = int(time.time()) + 1
@@ -490,6 +506,9 @@ class ChainManager():
         if extra_sigops >  0:
             raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
+        if version != None:
+            block.nVersion = version
+            
         # Do PoW, which is cheap on regnet
         if do_solve_block:
             block.solve()

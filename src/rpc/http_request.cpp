@@ -52,5 +52,27 @@ HTTPRequest HTTPRequest::CreateDSEndpointQueryRequest(const RPCClientConfig& con
     return { endpoint, RequestCmdType::GET };
 }
 
+// Create a signing request to miner ID generator
+HTTPRequest HTTPRequest::CreateMinerIdGeneratorSigningRequest(const RPCClientConfig& config,
+                                                              const std::string& alias,
+                                                              const std::string& hash)
+{
+    // Format endpoint
+    std::string endpoint { config.GetEndpoint() + "/minerid/" + alias + "/pksign/" + hash };
+
+    // Create request
+    return { endpoint, RequestCmdType::GET };
+}
+
+// Create a request to get the current minerid from the generator
+HTTPRequest HTTPRequest::CreateGetMinerIdRequest(const RPCClientConfig& config, const std::string& alias)
+{
+    // Format endpoint
+    std::string endpoint { config.GetEndpoint() + "/minerid/" + alias};
+
+    // Create request
+    return { endpoint, RequestCmdType::GET };
+}
+
 }
 

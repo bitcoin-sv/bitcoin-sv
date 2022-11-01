@@ -12,6 +12,8 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -26,6 +28,13 @@ protected:
 
 public:
     base_blob() { memset(data, 0, sizeof(data)); }
+    
+    template<typename T>
+    base_blob(T first, T last)
+    {
+        assert(std::distance(first, last) == sizeof(data));
+        std::copy(first, last, &data[0]);
+    }
 
     explicit base_blob(const std::vector<uint8_t> &vch) {
         assert(vch.size() == sizeof(data));
@@ -97,11 +106,9 @@ public:
     std::string ToString() const { return GetHex(); };
 
     uint8_t *begin() { return &data[0]; }
-
     uint8_t *end() { return &data[WIDTH]; }
 
     const uint8_t *begin() const { return &data[0]; }
-
     const uint8_t *end() const { return &data[WIDTH]; }
 
     unsigned int size() const { return sizeof(data); }
@@ -144,8 +151,14 @@ public:
 class uint256 : public base_blob<256> {
 public:
     uint256() {}
-    uint256(const base_blob<256> &b) : base_blob<256>(b) {}
-    explicit uint256(const std::vector<uint8_t> &vch) : base_blob<256>(vch) {}
+    uint256(const base_blob& b) : base_blob(b) {}
+    explicit uint256(const std::vector<uint8_t>& vch)
+        : uint256(vch.begin(), vch.end()) 
+    {}
+
+    template<typename T>
+    uint256(T first, T last):base_blob{first, last}
+    {}
 
     /**
      * A cheap hash function that just returns 64 bits from the result, it can
@@ -155,6 +168,12 @@ public:
      */
     uint64_t GetCheapHash() const { return ReadLE64(data); }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const uint256& i)
+{
+    os << i.ToString();
+    return os;
+}
 
 /**
  * Specialise std::hash for uint256.
@@ -192,6 +211,14 @@ inline uint256 uint256S(const std::string &str) {
     uint256 rv;
     rv.SetHex(str);
     return rv;
+}
+
+inline std::istream& operator>>(std::istream& stream, uint256& hash)
+{
+    std::string s;
+    stream >> s;
+    hash = uint256S(s);
+    return stream;
 }
 
 inline uint160 uint160S(const char *str) {

@@ -635,13 +635,15 @@ void getblocktemplate(const Config& config,
         // expires-immediately template to stop miners?
     }
 
-    // Update block
+    static std::mutex localMutex;
+    std::lock_guard lock{ localMutex };
+
+    // Update block - these static variables are protected by locked localMutex
     static CBlockIndex *pindexPrev;
     static int64_t nStart;
-    static std::shared_ptr<CBlockTemplate> pblocktemplate;
+    static std::unique_ptr<CBlockTemplate> pblocktemplate;
 
     const CBlockIndex* tip;
-    std::shared_ptr<CBlockTemplate> currentTemplate;
 
     {
         LOCK(cs_main);
@@ -669,12 +671,10 @@ void getblocktemplate(const Config& config,
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
             }
         }
-        
-        currentTemplate = pblocktemplate;
     }
 
     // pointer for convenience
-    CBlockRef blockRef = currentTemplate->GetBlockRef();
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock *pblock = blockRef.get();
 
     // Update nTime
@@ -736,7 +736,7 @@ void getblocktemplate(const Config& config,
             jWriter.writeEndArray();
 
             unsigned int index_in_template = i - 1;
-            jWriter.pushKV("fee", currentTemplate->vTxFees[index_in_template].GetSatoshis());
+            jWriter.pushKV("fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis());
 
             jWriter.writeEndObject();
         }

@@ -52,6 +52,7 @@ enum LogFlags : uint32_t {
     NETMSGALL = NETMSG | NETMSGVERB,
     NET = NETCONN | NETMSGALL,
     DOUBLESPEND = (1 << 25),
+    MINERID = (1 << 26),
     ALL = ~uint32_t(0),
 };
 
@@ -79,6 +80,7 @@ private:
     std::atomic<typename std::underlying_type<LogFlags>::type> logCategories{0};
 
     std::string LogTimestampStr(const std::string &str);
+    int log(const char*);
 
 public:
     bool fPrintToConsole = false;

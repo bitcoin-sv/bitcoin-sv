@@ -96,6 +96,10 @@ static const uint64_t DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT = 25;
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
+/** Default for -mempoolnonfinalmaxreplacementrate, max update rate for non-final transactions (by default in txns/hour) */
+static const unsigned int DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE = 7200;
+/** Default for number of minutes over which non-final update rate is calculated */
+static const unsigned int DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD = 60;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 
@@ -212,6 +216,9 @@ constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
 
 constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
 
+/** Default for -detectselfishmining. */
+static const bool DEFAULT_DETECT_SELFISH_MINING = false;
+
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
@@ -300,7 +307,7 @@ static const int64_t SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = 1000;
 /**
  * Forks shorter than SAFE_MODE_MIN_FORK_LENGTH will not trigger safe mode
  */
-static const int64_t SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = 3;
+static const int64_t SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = 6;
 
 /**
  * Forks whose proof-of-work difference to the current tip  (<active chain pow> - <fork tip pow>),
@@ -922,7 +929,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
 bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
+bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t blockHeight = -1);
 
 namespace Consensus {
 

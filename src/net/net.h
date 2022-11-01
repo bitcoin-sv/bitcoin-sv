@@ -19,6 +19,7 @@
 #include "invalid_txn_publisher.h"
 #include "limitedmap.h"
 #include "net/association.h"
+#include "net/authconn.h"
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
@@ -63,6 +64,7 @@ class CScheduler;
 class CTxIdTracker;
 class CTxnPropagator;
 class CTxnValidator;
+class RawTxValidator;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -295,7 +297,6 @@ public:
         uint64_t seed0,
         uint64_t seed1,
         std::chrono::milliseconds debugP2PTheadStallsThreshold);
-    ~CConnman();
     bool Start(CScheduler &scheduler, std::string &strNodeError,
                Options options);
     void Stop();
@@ -325,7 +326,7 @@ public:
     const StreamPolicyFactory& GetStreamPolicyFactory() const { return mStreamPolicyFactory; }
 
     /** Enqueue a new transaction for later sending to our peers */
-    void EnqueueTransaction(const CTxnSendingDetails& txn);
+    bool EnqueueTransaction(const CTxnSendingDetails& txn);
     /** Remove some transactions from our peers list of new transactions */
     void DequeueTransactions(const std::vector<CTransactionRef>& txns);
 
@@ -440,6 +441,8 @@ public:
     const TxIdTrackerSPtr& GetTxIdTracker();
     /** Get a handle to our transaction validator */
     const std::shared_ptr<CTxnValidator>& getTxnValidator();
+    /** Get a handle to raw transaction validator */
+    const std::shared_ptr<RawTxValidator>& getRawTxValidator();
     /** Get a handle to invalid tx publisher*/
     CInvalidTxnPublisher& getInvalidTxnPublisher();
     /** Enqueue a new transaction for validation */
@@ -739,6 +742,9 @@ private:
     std::shared_ptr<CTxnValidator> mTxnValidator {};
     CThreadPool<CDualQueueAdaptor> mValidatorThreadPool;
 
+    /** Batching */
+    std::shared_ptr<RawTxValidator> mRawTxnValidator {};
+
     /** Double-spend attempt processor */
     DSAttemptHandler mDSHandler;
 
@@ -876,6 +882,7 @@ public:
     bool fClient {false};
     const bool fInbound {false};
     std::atomic_bool fSuccessfullyConnected {false};
+    std::atomic_bool fAuthConnEstablished {false};
     std::atomic_bool fDisconnect {false};
     // We use fRelayTxes for two purposes -
     // a) it allows us to not relay tx invs before receiving the peer's version
@@ -904,6 +911,9 @@ public:
     std::atomic_bool fGetAddr {false};
     int64_t nNextAddrSend {0};
     int64_t nNextLocalAddrSend {0};
+
+    CCriticalSection cs_authconn {};
+    authconn::AuthConnData authConnData;
 
     // Simple struct to store details of txns we are going to ask this peer for
     struct TxnAskFor
@@ -934,9 +944,6 @@ public:
 
     // Inventory based relay.
     CRollingBloomFilter filterInventoryKnown { 50000, 0.000001 };
-    // Set of transaction ids we still have to announce. They are sorted by the
-    // mempool before relay, so the order is not important.
-    std::set<uint256> setInventoryTxToSend {};
     // List of block ids we still have announce. There is no final sorting
     // before sending, as they are always sent immediately and in the order
     // requested.
@@ -979,6 +986,8 @@ public:
     uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};
     /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
     bool protoconfReceived {false};
+    /** Maximum size for data that is allowed to be sent to the client */
+    uint32_t maxRecvPayloadLength {0};
 
     /** Constructor for producing CNode shared pointer instances */
     template<typename ... Args>
@@ -1097,13 +1106,9 @@ public:
         filterInventoryKnown.insert(inv.hash);
     }
 
-    void PushInventory(const CInv &inv) {
-        LOCK(cs_inventory);
-        if (inv.type == MSG_TX) {
-            if (!filterInventoryKnown.contains(inv.hash)) {
-                setInventoryTxToSend.insert(inv.hash);
-            }
-        } else if (inv.type == MSG_BLOCK) {
+    void PushBlockInventory(const CInv &inv) {
+        if (inv.type == MSG_BLOCK) {
+            LOCK(cs_inventory);
             vInventoryBlockToSend.push_back(inv.hash);
         }
     }

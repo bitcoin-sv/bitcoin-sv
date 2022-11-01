@@ -9,6 +9,8 @@
 #define BITCOIN_TEST_TESTUTIL_H
 
 #include <chrono>
+#include <optional>
+#include <ostream>
 
 #include "fs.h"
 
@@ -30,6 +32,17 @@ bool wait_for(T callback, std::chrono::milliseconds duration)
     }
 
     return false;
+}
+
+namespace std
+{
+    // Serialisation for std::optional
+    template<typename T>
+    ostream& operator<<(ostream& os, const optional<T>& o)
+    {
+        os << (o ? o.value() : "nullopt");
+        return os;
+    }
 }
 
 #endif // BITCOIN_TEST_TESTUTIL_H

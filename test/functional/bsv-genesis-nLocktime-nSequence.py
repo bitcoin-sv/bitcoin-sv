@@ -82,11 +82,14 @@ Genesis height is 600.
 
 26. Check that post-genesis we will not accept a block containing a non-final transaction
 
+27. Check that updates to non-final transactions above the configured maximum rate are
+    rejected.
+
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, p2p_port, wait_until
+from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
 from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_getdata, msg_tx, CInv, mininode_lock
 import time, copy
@@ -136,7 +139,9 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         self.genesisactivationheight = 600 
         self.extra_args = [['-debug', '-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1', '-checknonfinalfreq=100',
-                            '-mempoolexpirynonfinal=1', '-maxgenesisgracefulperiod=0']] * self.num_nodes
+                            '-mempoolexpirynonfinal=1', '-maxgenesisgracefulperiod=0',
+                            '-mempoolnonfinalmaxreplacementrate=5',
+                            '-mempoolnonfinalmaxreplacementrateperiod=1']] * self.num_nodes
         self.start_time = int(time.time())
 
     def init_network(self):
@@ -398,7 +403,8 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         block(5, spend=out[20])
         spend_tx11 = self.create_transaction(out[21].tx, out[21].n, CScript(), 100000, CScript([OP_TRUE]))
         spend_tx12 = self.create_transaction(out[22].tx, out[22].n, CScript(), 100000, CScript([OP_TRUE]))
-        self.chain.update_block(5, [spend_tx11, spend_tx12])
+        spend_tx13 = self.create_transaction(out[23].tx, out[23].n, CScript(), 100000, CScript([OP_TRUE]))
+        self.chain.update_block(5, [spend_tx11, spend_tx12, spend_tx13])
         yield self.accepted()
 
         # Send txn time-locked for the current block height so that it can be immediately mined
@@ -469,6 +475,34 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         non_final_tx = self.create_locked_transaction(out[32].tx, out[32].n, CScript(), 1, CScript([OP_TRUE]), currentHeight + 1, 0x01)
         self.chain.update_block(13, [non_final_tx])
         yield self.rejected(RejectResult(16, b'bad-txns-nonfinal'))
+
+        # Send non-final txn that we will use to test rate limiting of updates to it
+        currentHeight = self.nodes[0].getblockcount()
+        tx8 = self.create_locked_transaction(spend_tx13, 0, CScript(), 1000, CScript([OP_TRUE]), currentHeight + 1, 0x01)
+        yield TestInstance([[tx8, DiscardResult()]])
+        nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
+        assert(tx8.hash in nonfinalmempool)
+        # Send updates within the permitted rate
+        for i in range(5):
+            tx8.vin[0].nSequence += 1
+            tx8.rehash()
+            yield TestInstance([[tx8, DiscardResult()]])
+        nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
+        assert(tx8.hash in nonfinalmempool)
+        # Send another update to take us above the permitted rate
+        tx8.vin[0].nSequence += 1
+        tx8.rehash()
+        yield TestInstance([[tx8, RejectResult(69, b'non-final-txn-replacement-rate')]])
+        nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
+        assert(tx8.hash not in nonfinalmempool)
+        assert(not check_for_log_msg(self, "Non-final txn that exceeds replacement rate made it to validation", "/node0"))
+        # Wait and retry, should now be accepted
+        time.sleep(12)
+        tx8.vin[0].nSequence += 1
+        tx8.rehash()
+        yield TestInstance([[tx8, DiscardResult()]])
+        nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
+        assert(tx8.hash in nonfinalmempool)
 
 if __name__ == '__main__':
     BSVGenesis_Restore_nLockTime_nSequence().main()

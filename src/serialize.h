@@ -21,8 +21,11 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -151,6 +154,7 @@ enum {
 #define READWRITE(obj) (::SerReadWrite(s, (obj), ser_action))
 #define READWRITECOMPACTSIZE(obj) (::SerReadWriteCompactSize(s, (obj), ser_action))
 #define READWRITEMANY(...) (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
+#define READWRITEENUM(e) (::SerReadWriteEnum(s, (e), ser_action))
 
 /**
  * Implement three methods for serializable objects. These are actually wrappers
@@ -502,7 +506,15 @@ template <typename I> CVarInt<I> WrapVarInt(I &n) {
  */
 
 /**
- *  string
+ * std::array
+ */
+template<typename Stream, typename T, size_t N>
+void Serialize(Stream& os, const std::array<T, N>& arr);
+template<typename Stream, typename T, size_t N>
+void Unserialize(Stream& is, std::array<T, N>& arr);
+
+/**
+ * string
  */
 template <typename Stream, typename C>
 void Serialize(Stream &os, const std::basic_string<C> &str);
@@ -564,12 +576,28 @@ template <typename Stream, typename K, typename T, typename Pred, typename A>
 void Unserialize(Stream &is, std::map<K, T, Pred, A> &m);
 
 /**
+ * unordered_map
+ */
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_map<K, T, Pred, A> &m);
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_map<K, T, Pred, A> &m);
+
+/**
  * set
  */
 template <typename Stream, typename K, typename Pred, typename A>
 void Serialize(Stream &os, const std::set<K, Pred, A> &m);
 template <typename Stream, typename K, typename Pred, typename A>
 void Unserialize(Stream &is, std::set<K, Pred, A> &m);
+
+/**
+ * unordered_set
+ */
+template <typename Stream, typename K, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_set<K, Pred, A> &m);
+template <typename Stream, typename K, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_set<K, Pred, A> &m);
 
 /**
  * shared_ptr
@@ -596,6 +624,14 @@ template <typename Stream, typename T>
 void Unserialize(Stream &os, std::unique_ptr<const T> &p);
 
 /**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream &os, const std::optional<T> &o);
+template <typename Stream, typename T>
+void Unserialize(Stream &is, std::optional<T> &o);
+
+/**
  * If none of the specialized versions above matched, default to calling member
  * function.
  */
@@ -607,6 +643,18 @@ inline void Serialize(Stream &os, const T &a) {
 template <typename Stream, typename T>
 inline void Unserialize(Stream &is, T &a) {
     a.Unserialize(is);
+}
+
+/**
+ * std::array
+ */
+template<typename Stream, typename T, size_t N>
+void Serialize(Stream& os, const std::array<T, N>& arr) {
+    ::Serialize(os, CFlatData(const_cast<T*>(arr.data()), const_cast<T*>(arr.data() + arr.size())));
+}
+template<typename Stream, typename T, size_t N>
+void Unserialize(Stream& is, std::array<T, N>& arr) {
+    ::Unserialize(is, REF(CFlatData(arr.data(), arr.data() + arr.size())));
 }
 
 /**
@@ -804,6 +852,28 @@ void Unserialize(Stream &is, std::map<K, T, Pred, A> &m) {
 }
 
 /**
+ * unordered_map
+ */
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_map<K, T, Pred, A> &m) {
+    WriteCompactSize(os, m.size());
+    for (const auto& p : m) {
+        Serialize(os, p);
+    }
+}
+
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_map<K, T, Pred, A> &m) {
+    m.clear();
+    size_t nSize = ReadCompactSize(is);
+    for (size_t i = 0; i < nSize; i++) {
+        std::pair<K, T> item;
+        Unserialize(is, item);
+        m.insert(item);
+    }
+}
+
+/**
  * set
  */
 template <typename Stream, typename K, typename Pred, typename A>
@@ -823,6 +893,28 @@ void Unserialize(Stream &is, std::set<K, Pred, A> &m) {
         K key;
         Unserialize(is, key);
         it = m.insert(it, key);
+    }
+}
+
+/**
+ * unordered_set
+ */
+template <typename Stream, typename K, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_set<K, Pred, A> &m) {
+    WriteCompactSize(os, m.size());
+    for (const K &i : m) {
+        Serialize(os, i);
+    }
+}
+
+template <typename Stream, typename K, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_set<K, Pred, A> &m) {
+    m.clear();
+    size_t nSize = ReadCompactSize(is);
+    for (size_t i = 0; i < nSize; i++) {
+        K key;
+        Unserialize(is, key);
+        m.insert(key);
     }
 }
 
@@ -874,6 +966,33 @@ void Unserialize(Stream &is, boost::uuids::uuid &v) {
 }
 
 /**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream& os, const std::optional<T>& o) {
+    if(o.has_value()) {
+        Serialize(os, true);
+        Serialize(os, *o);
+    }
+    else {
+        Serialize(os, false);
+    }
+}
+template <typename Stream, typename T>
+void Unserialize(Stream& is, std::optional<T>& o) {
+    bool hasValue {};
+    Unserialize(is, hasValue);
+    if(hasValue) {
+        T obj {};
+        Unserialize(is, obj);
+        o = std::move(obj);
+    }
+    else {
+        o = std::nullopt;
+    }
+}
+
+/**
  * Support for ADD_SERIALIZE_METHODS and READWRITE macro
  */
 struct CSerActionSerialize {
@@ -907,6 +1026,23 @@ inline void SerReadWriteCompactSize(Stream &s, const uint64_t &obj,
 template <typename Stream>
 inline void SerReadWriteCompactSize(Stream &s, uint64_t &obj, CSerActionUnserialize ser_action) {
     obj = ::ReadCompactSize(s);
+}
+
+/**
+ * Support for READWRITEENUM macro
+ */
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, const E& e, CSerActionSerialize) {
+    typename std::underlying_type_t<E> val { static_cast<decltype(val)>(e) };
+    ::Serialize(s, val);
+}
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
+    typename std::underlying_type_t<E> val {};
+    ::Unserialize(s, val);
+    e = static_cast<E>(val);
 }
 
 /**

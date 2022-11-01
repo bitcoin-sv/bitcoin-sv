@@ -139,8 +139,9 @@ BOOST_AUTO_TEST_CASE(RequestResponse)
     using namespace rpc::client;
     using HTTPRequest = rpc::client::HTTPRequest;
 
-    // Configure webhook address
+    // Configure webhook address and number of threads
     GlobalConfig::GetModifiableGlobalConfig().SetSafeModeWebhookURL("http://127.0.0.1:8888/");
+    GlobalConfig::GetModifiableGlobalConfig().SetWebhookClientNumThreads(2, nullptr);
 
     // Create webhook client
     WebhookClient webhooks { GlobalConfig::GetConfig() };
@@ -161,8 +162,9 @@ BOOST_AUTO_TEST_CASE(ErrorResponseRetry)
     using namespace rpc::client;
     using HTTPRequest = rpc::client::HTTPRequest;
 
-    // Configure webhook address
+    // Configure webhook address and number of threads
     GlobalConfig::GetModifiableGlobalConfig().SetSafeModeWebhookURL("http://127.0.0.1:8888/");
+    GlobalConfig::GetModifiableGlobalConfig().SetWebhookClientNumThreads(2, nullptr);
 
     // Create webhook client
     WebhookClient webhooks { GlobalConfig::GetConfig() };

@@ -29,7 +29,9 @@ from .util import (
     assert_equal,
     check_json_precision,
     connect_nodes_bi,
+    connect_nodes,
     disconnect_nodes_bi,
+    disconnect_nodes,
     initialize_datadir,
     log_filename,
     p2p_port,
@@ -280,6 +282,7 @@ class BitcoinTestFramework():
 
         node.start(self.runNodesWithRequiredParams, extra_args, stderr)
         node.wait_for_rpc_connection()
+        wait_until(lambda: node.rpc.getinfo()["initcomplete"])
 
         if self.options.coveragedir is not None:
             coverage.write_all_rpc_commands(self.options.coveragedir, node.rpc)
@@ -295,6 +298,7 @@ class BitcoinTestFramework():
                 node.start(self.runNodesWithRequiredParams, extra_args[i])
             for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
+                wait_until(lambda: node.rpc.getinfo()["initcomplete"])
                 if(self.options.waitforpid):
                     print('Node {} started, pid is {}'.format(i, node.process.pid))
                     print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))
@@ -347,6 +351,60 @@ class BitcoinTestFramework():
         # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
         thr.join()
         self.stop_node(node_index)
+        logger.debug("finished %s", title)
+
+
+    # this method creates following network graph
+    #
+    #      NodeConnCB
+    #          |
+    #          v
+    #      self.node[0] ---> self.node[1]  ---> ... ---> self.node[n]
+    #
+    @contextlib.contextmanager
+    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True, p2pConnections=[0], cb_class=NodeConnCB):
+        if not title:
+            title = "None"
+        logger.debug("setup %s", title)
+
+        if not args:
+            args = [[]] * self.num_nodes
+        else:
+            assert(len(args) == self.num_nodes)
+
+        self.start_nodes(args)
+
+        connections = []
+        connCb = None
+        if p2pConnections:
+            connCb = cb_class()  # one mininode connection  to node 0
+        for i in p2pConnections:
+            connection = NodeConn(ip, p2p_port(i), self.nodes[i], connCb, strSubVer=strSubVer)
+            connections.append(connection)
+            connCb.add_connection(connection)
+
+        thr = NetworkThread()
+        thr.start()
+        if wait_for_verack and connCb:
+            connCb.wait_for_verack()
+
+        logger.debug("before %s", title)
+
+        for i in range(self.num_nodes - 1):
+            connect_nodes(self.nodes, i, i + 1)
+
+        yield tuple(connections)
+        logger.debug("after %s", title)
+
+        for i in range(self.num_nodes - 1):
+            disconnect_nodes(self.nodes[i], i + 1)
+
+        for connection in connections:
+            connection.close()
+        del connections
+        # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        self.stop_nodes()
         logger.debug("finished %s", title)
 
     # This method runs and stops bitcoind node with index 'node_index'.

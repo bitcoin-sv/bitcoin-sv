@@ -11,6 +11,7 @@
 #include "serialize.h"
 #include "uint256.h"
 #include <optional>
+#include <ostream>
 
 struct TxId;
 /**
@@ -31,6 +32,8 @@ struct TxId : public uint256 {
     TxId(const TxId& b) = default;
     TxId& operator=(const TxId& b) = default;
 };
+
+std::istream & operator>>(std::istream&, TxId&);
 
 /**
  * A TxHash is the double sha256 hash of the full transaction data.
@@ -79,7 +82,13 @@ public:
     }
 
     std::string ToString() const;
+
+    friend std::istream& operator>>(std::istream&, COutPoint&);
+    friend std::ostream& operator<<(std::ostream&, const COutPoint&);
 };
+
+std::istream& operator>>(std::istream&, COutPoint&);
+std::ostream& operator<<(std::ostream&, const COutPoint&);
 
 /**
  * An input of a transaction. It contains the location of the previous
@@ -96,27 +105,27 @@ public:
      * Setting nSequence to this value for every input in a transaction disables
      * nLockTime.
      */
-    static const uint32_t SEQUENCE_FINAL = 0xffffffff;
+    static inline constexpr uint32_t SEQUENCE_FINAL = 0xffffffff;
 
     /* Below flags apply in the context of BIP 68*/
     /**
      * If this flag set, CTxIn::nSequence is NOT interpreted as a relative
      * lock-time.
      */
-    static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
+    static inline constexpr uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
 
     /**
      * If CTxIn::nSequence encodes a relative lock-time and this flag is set,
      * the relative lock-time has units of 512 seconds, otherwise it specifies
      * blocks with a granularity of 1.
      */
-    static const uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22);
+    static inline constexpr uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22);
 
     /**
      * If CTxIn::nSequence encodes a relative lock-time, this mask is applied to
      * extract that lock-time from the sequence field.
      */
-    static const uint32_t SEQUENCE_LOCKTIME_MASK = 0x0000ffff;
+    static inline constexpr uint32_t SEQUENCE_LOCKTIME_MASK = 0x0000ffff;
 
     /**
      * In order to use the same number of bits to encode roughly the same
@@ -126,7 +135,7 @@ public:
      * seconds is performed by multiplying by 512 = 2^9, or equivalently
      * shifting up by 9 bits.
      */
-    static const int SEQUENCE_LOCKTIME_GRANULARITY = 9;
+    static inline constexpr int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
     CTxIn() { nSequence = SEQUENCE_FINAL; }
 

@@ -93,7 +93,7 @@ void DSDetected::BlockDetails::Validate(const MerkleProof& mp)
         throw runtime_error("Unsupported DSDetected merkle proof type");
 }
 
-// Convert to JSON suitable for sending to a remote webhoo
+// Convert to JSON suitable for sending to a remote webhook
 UniValue DSDetected::ToJSON(const Config& config) const
 {
     UniValue document{UniValue::VOBJ};

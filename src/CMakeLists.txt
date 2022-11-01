@@ -131,6 +131,7 @@ add_library(util
 	random.h
 	rpc/protocol.cpp
 	rpc/protocol.h
+	rpc/text_writer.cpp
 	rpc/text_writer.h
 	serialize.h
 	support/cleanse.cpp
@@ -258,12 +259,14 @@ add_library(common
 	mining/assembler.h
 	mining/candidates.h
 	mining/factory.h
+	mining/group_builder.h
 	mining/journal.h
 	mining/journal_builder.h
 	mining/journal_change_set.h
 	mining/journal_entry.h
 	net/association.h
 	net/association_id.h
+	net/authconn.h
 	net/net.h
 	net/net_message.h
 	net/net_types.h
@@ -436,9 +439,34 @@ add_library(server
 	merkletreestore.cpp
 	merkletreestore.h
 	metrics.h
+	miner_id/coinbase_doc.cpp
+	miner_id/coinbase_doc.h
+    miner_id/dataref_index.cpp
+    miner_id/dataref_index.h
+    miner_id/dataref_index_detail.h
+    miner_id/datareftx.cpp
+    miner_id/datareftx.h
+	miner_id/miner_id.cpp
+	miner_id/miner_id.h
+	miner_id/miner_info_tracker.cpp
+	miner_id/miner_info_tracker.h
+    miner_id/miner_id_db.cpp
+    miner_id/miner_id_db.h
+    miner_id/miner_id_db_defaults.h
+	miner_id/miner_info.cpp
+	miner_id/miner_info.h
+    miner_id/miner_info_doc.cpp
+    miner_id/miner_info_doc.h
+    miner_id/miner_info_error.cpp
+    miner_id/miner_info_error.h
+    miner_id/miner_info_ref.cpp
+    miner_id/miner_info_ref.h
+    miner_id/revokemid.cpp
+    miner_id/revokemid.h
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
+	mining/group_builder.cpp
 	mining/journal.cpp
 	mining/journal_builder.cpp
 	mining/journal_change_set.cpp
@@ -470,6 +498,8 @@ add_library(server
 	pow.cpp
 	processing_block_index.cpp
 	processing_block_index.h
+	rawtxvalidator.cpp
+	rawtxvalidator.h
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp
@@ -479,6 +509,7 @@ add_library(server
 	rpc/mining-fbb.cpp
 	rpc/mining.cpp
 	rpc/mining.h
+	rpc/miner_info.cpp
 	rpc/misc.cpp
 	rpc/misc.h
 	rpc/net.cpp
@@ -539,7 +570,6 @@ target_link_libraries(server
 	${EVENT_LIBRARY}
 	bitcoinconsensus
 	leveldb
-	memenv
 )
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -574,6 +604,10 @@ endif()
 add_library(rpcclient
 	cfile_util.cpp
 	cfile_util.h
+    net/netaddress.cpp
+    net/netaddress.h
+    net/netbase.cpp
+    net/netbase.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp
@@ -634,7 +668,6 @@ endif()
 if (MSVC)
 	# prevents default build from running unit tests automaticaly
 	set_target_properties(check-bitcoin PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
-	set_target_properties(check-leveldb PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
 	set_target_properties(check-secp256k1 PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
 	set_target_properties(check-univalue PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
 	set_target_properties(check-all PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)

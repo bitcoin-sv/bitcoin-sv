@@ -22,6 +22,15 @@
 #include "limited_cache.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
+#include "merkleproof.h"
+#include "merkletreestore.h"
+#include "miner_id/dataref_index.h"
+#include "miner_id/datareftx.h"
+#include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_ref.h"
+#include "miner_id/miner_info_tracker.h"
+#include "miner_id/revokemid.h"
+#include "net/authconn.h"
 #include "net/block_download_tracker.h"
 #include "net/net.h"
 #include "net/netbase.h"
@@ -192,7 +201,6 @@ void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectI
             std::forward_as_tuple(nodeid),
             std::forward_as_tuple(std::make_shared<CNodeState>(addr, std::move(addrName))));
     }
-
     if (!pnode->fInbound) {
         if(connectInfo && connectInfo->fNewStream) {
             PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
@@ -382,8 +390,7 @@ static void FindNextBlocksToDownload(
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->GetHeight(), nWindowEnd + 1);
     NodeId waitingfor = -1;
 
-    unsigned int nDownloadHeightThreshold =
-        chainActive.Height() + 10;
+    const int32_t nDownloadHeightThreshold = chainActive.Height() + 10;
 
     // Lambda to record a block we should fetch
     auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor, nDownloadHeightThreshold](const CBlockIndex* pindex)
@@ -983,10 +990,8 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     std::array<std::pair<uint64_t, CNodePtr>, 2> best {{{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
-    bool allowUnsolictedAddr { gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
-    auto sortfunc = [&best, &hasher, nRelayNodes, allowUnsolictedAddr](const CNodePtr& pnode) {
-        // FIXME: When we get rid of -allowunsolicitedaddr, change to just: pnode->fInbound && ...
-        if ((allowUnsolictedAddr || pnode->fInbound) && pnode->nVersion >= CADDR_TIME_VERSION) {
+    auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
+        if (pnode->fInbound && pnode->nVersion >= CADDR_TIME_VERSION) {
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
             for (unsigned int i = 0; i < nRelayNodes; i++) {
                 if (hashKey > best[i].first) {
@@ -1327,7 +1332,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         // Trigger the peer node to send a getblocks request for the
                         // next batch of inventory.
                         if (inv.hash == pfrom->hashContinue) {
-                            // Bypass PushInventory, this must send even if
+                            // Bypass PushBlockInventory, this must send even if
                             // redundant, and we want it right after the last block
                             // so they don't wait for other stuff first.
                             std::vector<CInv> vInv;
@@ -1369,6 +1374,30 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     vNotFound.push_back(inv);
                 }
             }
+            else if(inv.type == MSG_DATAREF_TX) {
+                bool found {false};
+                if(g_dataRefIndex) {
+                    // Lookup up inv.hash in the dataref index
+                    try {
+                        const auto& dataref { g_dataRefIndex->CreateLockingAccess().GetDataRefEntry(inv.hash) };
+                        if(dataref) {
+                            // Push datareftx msg back to requester
+                            DataRefTx datareftx { dataref->txn, dataref->proof };
+                            CSerializedNetMsg msg { msgMaker.Make(NetMsgType::DATAREFTX, datareftx) };
+                            connman.PushMessage(pfrom, std::move(msg));
+                            found = true;
+                        }
+                    }
+                    catch(const std::exception& e) {
+                        LogPrint(BCLog::NETMSG, "Couldn't fetch dataref from index: %s\n", e.what());
+                    }
+                }
+
+                if(!found) {
+                    // Return not found
+                    vNotFound.push_back(inv);
+                }
+            }
 
             // Track requests for our stuff.
             GetMainSignals().Inventory(inv.hash);
@@ -1403,7 +1432,7 @@ inline static void SendBlockTransactions(const CBlock &block,
     for (size_t i = 0; i < req.indices.size(); i++) {
         if (req.indices[i] >= block.vtx.size()) {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
             return;
         }
         resp.txn[i] = block.vtx[req.indices[i]];
@@ -1614,7 +1643,6 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
 
     int64_t nTime;
     CAddress addrMe;
-    CAddress addrFrom;
     uint64_t nNonce = 1;
     uint64_t nServiceInt;
     ServiceFlags nServices;
@@ -1668,7 +1696,9 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             return false;
         }
 
-        if(!vRecv.empty()) {
+        if(!vRecv.empty()) 
+        {
+            CAddress addrFrom;
             vRecv >> addrFrom >> nNonce;
         }
         if(!vRecv.empty()) {
@@ -1677,6 +1707,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             
             if (config.IsClientUABanned(cleanSubVer))
             {
+                LogPrint(BCLog::NETCONN, "Client UA is banned (%s) peer=%d\n", cleanSubVer, pfrom->id);
                 Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
                 return false;
             }
@@ -1847,7 +1878,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
 }
 
 /**
-* Prcess version ack message.
+* Process version ack message.
 */
 static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
     CConnman& connman)
@@ -1871,6 +1902,18 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
                   pfrom->nVersion.load(), pfrom->cleanSubVer, pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
     }
+    // Create and send the authch network message.
+    uint256 rndMsgHash { GetRandHash() };
+    {
+            LOCK(pfrom->cs_authconn);
+            pfrom->authConnData.msgHash = rndMsgHash;
+    }
+    using namespace authconn;
+    connman.
+        PushMessage(pfrom, msgMaker.Make(NetMsgType::AUTHCH, AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash));
+    // Add a log message.
+    LogPrint(BCLog::NETCONN, "Sent authch message (version: %d, nMsgLen: %d, msg: %s), to peer=%d\n",
+       AUTHCH_V1, AUTHCH_MSG_SIZE_IN_BYTES_V1, rndMsgHash.ToString(), pfrom->id);
 
     if(pfrom->nVersion >= SENDHEADERS_VERSION) {
         // Tell our peer we prefer to receive headers rather than inv's
@@ -1893,6 +1936,264 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
                                           nCMPCTBLOCKVersion));
     }
     pfrom->fSuccessfullyConnected = true;
+}
+
+/**
+* Process authch message.
+*/
+static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
+    const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
+{
+    // Skip the message if the AuthConn has already been established.
+    if (pfrom->fAuthConnEstablished) {
+        return true;
+    }
+    using namespace authconn;
+    uint32_t nVersion {0};
+    uint32_t nMsgLen {0};
+    uint256 msg {};
+
+    try {
+        // Read data from the message.
+        vRecv >> nVersion;
+        vRecv >> nMsgLen;
+        vRecv >> msg;
+        // Add a log message.
+        LogPrint(BCLog::NETCONN, "Got authch message (version: %d, nMsgLen: %d, msg: %s), from peer=%d\n",
+            nVersion, nMsgLen, msg.ToString(), pfrom->id);
+        if (AUTHCH_V1 != nVersion) {
+            throw std::runtime_error("Unsupported authch message version= "+ std::to_string(AUTHCH_V1));
+        }
+
+        /**
+         * Create signature.
+         *
+         * Make a hash of the following data and sign it:
+         * (a) the received auth challenge message, (b) the nonce we've generated.
+         */
+        // Generate our nonce.
+        uint64_t nClientNonce {0};
+        while (nClientNonce == 0) {
+            GetRandBytes((uint8_t *)&nClientNonce, sizeof(nClientNonce));
+        }
+        // Create the message to be signed.
+        uint256 hash {};
+        CHash256()
+            .Write(msg.begin(), msg.size()) // (a)
+            .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
+            .Finalize(hash.begin());
+
+        // Get the current MinerID from this node
+        std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
+
+        try {
+            using namespace rpc::client;
+            if (g_pWebhookClient) {
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
+                using HTTPRequest = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateGetMinerIdRequest(
+                                        rpcConfig,
+                                        config.GetMinerIdGeneratorAlias())) };
+                auto response { std::make_shared<StringHTTPResponse>() };
+                auto fut = g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+                fut.wait();
+                auto futResponse = fut.get();
+                const StringHTTPResponse* r = dynamic_cast<StringHTTPResponse*> (futResponse.get());
+                if (!r)
+                    throw std::runtime_error("Could not get the miner-id from the MinerID Generator.");
+
+                pubKeyOpt = CPubKey(ParseHex(r->GetBody()));
+                if (!pubKeyOpt)
+                    throw std::runtime_error("Could not get the miner-id from the MinerID Generator.");
+
+                auto docinfo = GetMinerCoinbaseDocInfo(*g_minerIDs, *pubKeyOpt);
+                if (!docinfo)
+                    throw std::runtime_error("Miner-id from MinerID Generator is not in the minerid database.");
+
+                g_BlockDatarefTracker->set_current_minerid(*pubKeyOpt);
+            }
+            if (!pubKeyOpt) {
+                throw std::runtime_error ("Ignoring authch messages until this node has mined a block containing a miner_info document\n");
+            }
+        } catch (const std::exception& e) {
+            LogPrint(BCLog::MINERID, strprintf("Ignoring authch messages until this node has mined a block containing a miner_info document. %s\n", e.what()));
+            return true;
+        }
+
+        CPubKey pubKey = pubKeyOpt.value();
+
+        // Create the DER-encoded signature of the expected minimal size.
+        // For this purpose send a request to the MinerID Generator which knows the private keys.
+        std::vector<uint8_t> vSign {};
+        {
+            vSign.clear();
+            using namespace rpc::client;
+            if (!g_pWebhookClient) {
+                // we log unconditionally because we already checked that we do have a minerid.
+                LogPrintf("No authentication client for minerid authentication instantiated\n");
+                // we return true because we still want to connect, but unauthenticated instead.
+                return true;
+            } else {
+                LogPrint(BCLog::MINERID, "sending signature request to MinerID Generator\n");
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
+                using HTTPRequest = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateMinerIdGeneratorSigningRequest(
+                        rpcConfig,
+                        config.GetMinerIdGeneratorAlias(),
+                        HexStr(hash))) };
+                auto response { std::make_shared<JSONHTTPResponse>() };
+                auto fut = g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+                fut.wait();
+                auto futResponse = fut.get();
+                const JSONHTTPResponse* r = dynamic_cast<JSONHTTPResponse*> (futResponse.get());
+                if (!r)
+                    throw std::runtime_error("Signature creation has not returned from the MinerID Generator.");
+                const UniValue& uv = r->GetBody();
+                if (!uv.isObject() || !uv.exists("signature"))
+                    throw std::runtime_error("JSON error, object containing a string with key name \"signature\" expected");
+                std::string signedHex = uv["signature"].get_str();
+                vSign = ParseHex(signedHex);
+            }
+        }
+        // Check if the signature is correct before sending it.
+        if (!pubKey.Verify(hash, vSign)) {
+            throw std::runtime_error("Could not create authresp message as the MinerID Generator created signature failed to verify.");
+        }
+        // Get the public key as a byte's vector.
+        std::vector<uint8_t> vPubKey { ToByteVector(pubKey) };
+        // Send the authresp message.
+        connman.
+            PushMessage(pfrom,
+                msgMaker.Make(NetMsgType::AUTHRESP, vPubKey, nClientNonce, vSign));
+        // Add a log message.
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
+            vPubKey.size(), HexStr(vPubKey).c_str(), nClientNonce, vSign.size(), HexStr(vSign).c_str(), pfrom->id);
+    } catch(std::exception& e) {
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "peer=%d Failed to process authch: (%s)\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, msgMaker
+            .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
+	    // We still connect if authentication failed.
+        return false;
+    }
+    return true;
+}
+
+/**
+* Process authresp messages.
+*/
+static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& strCommand,
+    CDataStream& vRecv, CConnman& connman)
+{
+    // Skip the message if the AuthConn has already been established.
+    if (pfrom->fAuthConnEstablished) {
+        return true;
+    }
+    using namespace authconn;
+    std::vector<uint8_t> vPubKey {};
+    uint64_t nClientNonce {0};
+    std::vector<uint8_t> vSign {};
+
+    try {
+        // Read data from the message.
+        vRecv >> LIMITED_BYTE_VEC(vPubKey, SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES);
+        if(SECP256K1_COMP_PUB_KEY_SIZE_IN_BYTES != vPubKey.size())
+            throw std::runtime_error("Incorrect nPubKeyLen="+std::to_string(vPubKey.size()));
+
+        vRecv >> nClientNonce;
+
+        vRecv >> LIMITED_BYTE_VEC(vSign, SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES);
+        const size_t vSignSize {vSign.size()};
+        if (!(SECP256K1_DER_SIGN_MIN_SIZE_IN_BYTES <= vSignSize &&
+              vSignSize <= SECP256K1_DER_SIGN_MAX_SIZE_IN_BYTES))
+            throw std::runtime_error("Incorrect vSign.size()=" +
+                                     std::to_string(vSignSize));
+
+        // Add a log message.
+        LogPrint(BCLog::NETCONN,
+                 "Got authresp message (nPubKeyLen: %d, vPubKey: %s, "
+                 "nClientNonce: %d, nSignLen: %d, vSign: %s), from peer=%d\n",
+                 vPubKey.size(), HexStr(vPubKey).c_str(), nClientNonce,
+                 vSignSize, HexStr(vSign).c_str(), pfrom->id);
+
+        /**
+         * Verify signature.
+         *
+         * Recreate the original message and verify the received signature using sender's public key.
+         * The message contains: (a) the authch challenge message, (b) the client's nonce.
+         */
+        uint256 msgHash {};
+        {
+            LOCK(pfrom->cs_authconn);
+            msgHash = pfrom->authConnData.msgHash;
+        }
+        // Check if the public key has been correctly recreated.
+        CPubKey recvPubKey(vPubKey);
+        if (!recvPubKey.IsValid()) {
+            throw std::runtime_error("Invalid public key data");
+        }
+
+        // check if the address is the one advertised in the minerid document
+        if (g_minerIDs) {
+            auto ipMatchesMineridDocument = [](const CPubKey& minerid, const std::string& socket_addr) {
+                auto docinfo = GetMinerCoinbaseDocInfo(*g_minerIDs, minerid);
+                if (docinfo) {
+                    UniValue uv;
+                    uv.read(docinfo->first.GetRawJSON());
+                    if (uv.exists("extensions")) {
+                        UniValue ex = uv["extensions"];
+                        if (ex.isObject() && ex.exists("PublicIP")) {
+                            UniValue pk = ex["PublicIP"];
+                            if (pk.isStr() && pk.get_str() == socket_addr) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            };
+
+            const Association& assoc = pfrom->GetAssociation();
+            const std::string addr = assoc.GetPeerAddr().ToStringIP();
+            if (!ipMatchesMineridDocument(recvPubKey, addr))
+                throw std::runtime_error("Public ip address does not match the one advertised in the miner info document.");
+        }
+
+        // Does the miner identified with the given miner ID have a good reputation?
+        // 1. true (if all listed conditions are met):
+        //    - the public key is present and marked as a valid key in the MinerID DB
+        //    - the miner identified by the public key passes further criterion, such as 'the M of the last N' check
+        // 2. false (if any of the listed conditions is met):
+        //    - the public key is not present or it is marked as an invalid key in the MinerID DB
+        //    - the miner identified by the public key doesn't pass further criterion, such as 'the M of the last N' check
+        if (g_minerIDs && !MinerHasGoodReputation(*g_minerIDs, recvPubKey)) {
+            LogPrint(BCLog::NETCONN, "Authentication has failed. The miner identified with the minerId= %s doesn't have a good reputation, peer= %d\n",
+                HexStr(ToByteVector(recvPubKey)).c_str(), pfrom->id);
+            return true;
+        }
+        // Recreate the message.
+        uint256 hash;
+        CHash256()
+            .Write(msgHash.begin(), msgHash.size()) // (a)
+            .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
+            .Finalize(hash.begin());
+        // Execute verification.
+        if (!recvPubKey.Verify(hash, vSign)) {
+            throw std::runtime_error("authresp message signature failed to verify.");
+        }
+    } catch(std::exception& e) {
+        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
+	    // We still connect if authentication failed.
+        return false;
+    }
+
+    // Mark the connection as successfully established.
+    pfrom->fAuthConnEstablished = true;
+    // Add a log message.
+    LogPrint(BCLog::NETCONN, "Authenticated connection has been established with the remote peer=%d\n", pfrom->id);
+
+    return true;
 }
 
 /**
@@ -1920,50 +2221,43 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
 
     const CAddress& peerAddr { pfrom->GetAssociation().GetPeerAddr() };
 
-    // FIXME: For now we make rejecting unsolicited addr messages configurable (on by default).
-    // Once we are happy this doesn't have any adverse effects on address propagation we can
-    // remove the config option and make it the only behaviour.
-    bool rejectUnsolictedAddr { !gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
-    if(rejectUnsolictedAddr)
+    // To avoid malicious flooding of our address table, only allow unsolicited
+    // ADDR messages to insert the connecting IP. We need to allow this IP
+    // to be inserted, or there is no way for that node to tell the network
+    // about itself if its behind a NAT.
+
+    // Digression about how things work behind a NAT:
+    //      Node A periodically ADDRs node B with the address that B reported
+    //      to A as A's own address (in the VERSION message).
+    if (!requestedAddr && pfrom->fInbound)
     {
-        // To avoid malicious flooding of our address table, only allow unsolicited
-        // ADDR messages to insert the connecting IP. We need to allow this IP
-        // to be inserted, or there is no way for that node to tell the network
-        // about itself if its behind a NAT.
-
-        // Digression about how things work behind a NAT:
-        //      Node A periodically ADDRs node B with the address that B reported
-        //      to A as A's own address (in the VERSION message).
-        if (!requestedAddr && pfrom->fInbound)
+        bool reportedOwnAddr {false};
+        CAddress ownAddr {};
+        for (const CAddress& addr : vAddr)
         {
-            bool reportedOwnAddr {false};
-            CAddress ownAddr {};
-            for (const CAddress& addr : vAddr)
+            // Server listen port will be different. We want to compare IPs and then use provided port
+            if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(peerAddr))
             {
-                // Server listen port will be different. We want to compare IPs and then use provided port
-                if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(peerAddr))
-                {
-                    ownAddr = addr;
-                    reportedOwnAddr = true;
-                    break;
-                }
+                ownAddr = addr;
+                reportedOwnAddr = true;
+                break;
             }
-            if (reportedOwnAddr)
-            {
-                // Get rid of every address the remote node tried to inject except itself.
-                vAddr.resize(1);
-                vAddr[0] = ownAddr;
-            }
-            else
-            {
-                // Today unsolicited ADDRs are not illegal, but we should consider
-                // misbehaving on this because a few unsolicited ADDRs are ok from
-                // a DOS perspective but lots are not.
-                LogPrint(BCLog::NETMSG, "Peer %d sent unsolicited ADDR\n", pfrom->id);
+        }
+        if (reportedOwnAddr)
+        {
+            // Get rid of every address the remote node tried to inject except itself.
+            vAddr.resize(1);
+            vAddr[0] = ownAddr;
+        }
+        else
+        {
+            // Today unsolicited ADDRs are not illegal, but we should consider
+            // misbehaving on this because a few unsolicited ADDRs are ok from
+            // a DOS perspective but lots are not.
+            LogPrint(BCLog::NETMSG, "Peer %d sent unsolicited ADDR\n", pfrom->id);
 
-                // We don't want to process any other addresses, but giving them is not an error
-                return true;
-            }
+            // We don't want to process any other addresses, but giving them is not an error
+            return true;
         }
     }
 
@@ -1971,7 +2265,8 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
     std::vector<CAddress> vAddrOk;
     int64_t nNow = GetAdjustedTime();
     int64_t nSince = nNow - 10 * 60;
-    for (CAddress& addr : vAddr) {
+    for (CAddress& addr : vAddr)
+    {
         if (interruptMsgProc) {
             return true;
         }
@@ -1985,8 +2280,7 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
         }
         pfrom->AddAddressKnown(addr);
         bool fReachable = IsReachable(addr);
-        // FIXME: When we remove -allowunsolicitedaddr, remove the whole (rejectUnsolictedAddr || !requestedAddr) check
-        if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable() && (rejectUnsolictedAddr || !requestedAddr)) {
+        if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable()) {
             // Relay to a limited number of other nodes
             RelayAddress(addr, fReachable, connman);
         }
@@ -2020,6 +2314,30 @@ static void ProcessSendHeadersMessage(const CNodePtr& pfrom)
         }
         else {
             state->fPreferHeaders = true;
+        }
+    }
+}
+
+/**
+* Process sendhdrsen message.
+*/
+static void ProcessSendHdrsEnMessage(const CNodePtr& pfrom)
+{
+    // Try to obtain an access to the node's state data.
+    const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+    const CNodeStatePtr& state { stateRef.get() };
+    if(state)
+    {
+        if(state->fPreferHeadersEnriched)
+        {
+            // This message should only be received once. If its already set it might
+            // indicate a misbehaving node. Increase the banscore
+            Misbehaving(pfrom, 1, "Invalid SendHdrsEn activity");
+            LogPrint(BCLog::NETMSG, "Peer %d sent SendHdrsEn more than once\n", pfrom->id);
+        }
+        else
+        {
+            state->fPreferHeadersEnriched = true;
         }
     }
 }
@@ -2202,7 +2520,7 @@ static bool ProcessGetBlocks(
                 pindex->GetHeight(), pindex->GetBlockHash().ToString());
             break;
         }
-        pfrom->PushInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
+        pfrom->PushBlockInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
         if(--nLimit <= 0) {
             // When this block is requested, we'll send an inv that'll
             // trigger the peer to getblocks the next batch of inventory.
@@ -2260,7 +2578,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
 
     auto index = mapBlockIndex.Get(req.blockhash);
     if(!index) {
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
 
@@ -2273,7 +2591,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         // might maliciously send lots of getblocktxn requests to trigger
         // expensive disk reads, because it will require the peer to
         // actually receive all the data read from disk over the network.
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep",
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n",
                  pfrom->id, MAX_BLOCKTXN_DEPTH);
         CInv inv;
         inv.type = MSG_BLOCK;
@@ -2287,7 +2605,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     auto block_stream_reader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
     if (!block_stream_reader)
     {
-        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
     // Number of transactions in block
@@ -2302,7 +2620,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         if (txn_idx >= num_txn_in_block)
         {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
             return;
         }
 
@@ -2328,7 +2646,45 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     connman.PushMessage(pfrom,
         msgMaker.Make(NetMsgType::BLOCKTXN, std::move(resp)));
 }
- 
+
+
+namespace {
+
+/**
+ * Returns pointer to the first block specified by locator or nullptr.
+ *
+ * Returns nullopt if locator is not specified and block in hashStop is not found.
+ */
+std::optional<const CBlockIndex*> GetFirstBlockIndexFromLocatorNL(const CBlockLocator& locator, const uint256& hashStop)
+{
+    AssertLockHeld(cs_main);
+
+    const CBlockIndex* pindex = nullptr;
+    if(locator.IsNull())
+    {
+        // If locator is null, return the hashStop block
+        pindex = mapBlockIndex.Get(hashStop);
+        if (!pindex)
+        {
+            return {};
+
+        }
+    }
+    else 
+    {
+        // Find the last block the caller has in the main chain
+        pindex = FindForkInGlobalIndex(chainActive, locator);
+        if(pindex) 
+        {
+            pindex = chainActive.Next(pindex);
+        }
+    }
+
+    return pindex;
+}
+
+} // anonymous namespace
+
 /**
 * Process get headers message.
 */
@@ -2344,26 +2700,22 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
     LOCK(cs_main);
     if(IsInitialBlockDownload() && !pfrom->fWhitelisted) {
         LogPrint(BCLog::NETMSG, "Ignoring getheaders from peer=%d because "
-                             "node is in initial block download\n",
+                                "node is in initial block download\n",
                  pfrom->id);
         return;
     }
 
     const CBlockIndex* pindex = nullptr;
-    if(locator.IsNull()) {
-        // If locator is null, return the hashStop block
-        pindex = mapBlockIndex.Get(hashStop);
-        if(!pindex)
-        {
-            return;
-        }
+    if(auto opt_block_index = GetFirstBlockIndexFromLocatorNL(locator, hashStop))
+    {
+        pindex = *opt_block_index;
     }
-    else {
-        // Find the last block the caller has in the main chain
-        pindex = FindForkInGlobalIndex(chainActive, locator);
-        if(pindex) {
-            pindex = chainActive.Next(pindex);
-        }
+    else
+    {
+        LogPrint(BCLog::NETMSG, "Ignoring getheaders from peer=%d because "
+                                "it requested unknown block (hashstop=%s) without locator\n",
+                 pfrom->id, hashStop.ToString());
+        return;
     }
 
     // We must use CBlocks, as CBlockHeaders won't include the 0x00 nTx
@@ -2398,7 +2750,274 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
     state->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
 }
- 
+
+namespace {
+
+/**
+ * Defines the structure of hdrsen message and holds data needed to create it
+ */
+class CBlockHeaderEnriched
+{
+    struct TxnAndProof
+    {
+        // Contains Merkle proof in binary TSC format (https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format)
+        using TSCMerkleProof = ::MerkleProof;
+
+        // Serialisation
+        ADD_SERIALIZE_METHODS
+        template <typename Stream, typename Operation>
+        inline void SerializationOp(Stream& s, Operation ser_action)
+        {
+            READWRITE(txn);
+            READWRITE(proof);
+        }
+
+        CTransactionRef txn {nullptr};
+        TSCMerkleProof proof {};
+    };
+
+public:
+    CBlockHeader blockHeader {};
+    uint64_t nTx{ 0 };
+    bool noMoreHeaders{ false };
+    std::optional<TxnAndProof> coinbaseAndProof { std::nullopt };
+    std::optional<TxnAndProof> minerInfoAndProof { std::nullopt };
+
+    // Pointer to block index object is only included in object so that it can be used
+    // when setting (non-const) data members after construction.
+    const CBlockIndex* blockIndex{nullptr};
+
+    /**
+     * Return size (in bytes) of serialized message when transmitted over the network
+     */
+    std::size_t GetSerializedSize() const
+    {
+        return GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+    }
+
+    // Default constructor is only needed by serialization framework
+    CBlockHeaderEnriched() = default;
+
+    CBlockHeaderEnriched(const CBlockIndex* blockIndex)
+    : blockHeader { blockIndex->GetBlockHeader() }
+    , nTx { blockIndex->GetBlockTxCount() }
+    , blockIndex { blockIndex }
+    {
+    }
+
+    // Serialisation
+    ADD_SERIALIZE_METHODS
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(blockHeader);
+        READWRITECOMPACTSIZE(nTx);
+        READWRITE(noMoreHeaders);
+        READWRITE(coinbaseAndProof);
+        READWRITE(minerInfoAndProof);
+    }
+
+    /**
+     * Set values of members that provide information about coinbase transaction
+     * by reading the data from block file and Merkle tree factory.
+     *
+     * If data is not available, values of these members are cleared and hasCoinbaseData
+     * is set to false.
+     *
+     * @param version Serialization version (including any flags) used to serialize coinbase transaction.
+     * @param config Needed by CMerkleTreeFactory.
+     * @param chainActiveHeight Current height of active chain. Needed by CMerkleTreeFactory.
+     */
+    void SetCoinBaseInfo(int serializationVersion, const Config& config, int32_t chainActiveHeight)
+    {
+        coinbaseAndProof.reset();
+        try
+        {
+            auto blockReader = blockIndex->GetDiskBlockStreamReader();
+            if(blockReader)
+            {
+                // Read CB txn from disk
+                CTransaction cbTx { blockReader->ReadTransaction() };
+                coinbaseAndProof = std::make_optional<TxnAndProof>(TxnAndProof{});
+
+                coinbaseAndProof->proof.TxnId(cbTx.GetId());
+                coinbaseAndProof->proof.Target(blockIndex->GetBlockHash());
+
+                coinbaseAndProof->txn = MakeTransactionRef(std::move(cbTx));
+
+                // Default constructor should set these to values we expect here
+                assert( coinbaseAndProof->proof.Flags() == 0 ); // Always set to 0 because we're providing transaction ID in txOrId, block hash in target, Merkle branch as proof in nodes and there is a single proof
+                assert( coinbaseAndProof->proof.Index() == 0 ); // Always set to 0, because we're providing proof for coinbase transaction
+
+                // See if this coinbase contains a miner-info reference
+                if(g_dataRefIndex && coinbaseAndProof->txn->vout.size() > 1)
+                {
+                    const bsv::span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
+                    if(IsMinerInfo(script))
+                    {
+                        const auto& mir { ParseMinerInfoRef(script) };
+                        if(std::holds_alternative<miner_info_ref>(mir))
+                        {
+                            const auto& ref { std::get<miner_info_ref>(mir) };
+
+                            // Lookup miner-info txn in the dataref index
+                            const auto& locking { g_dataRefIndex->CreateLockingAccess() };
+                            const auto& minerInfo { locking.GetMinerInfoEntry(ref.txid()) };
+                            if(minerInfo)
+                            {
+                                // Return txn and proof details for the miner-info txn as well
+                                minerInfoAndProof = std::make_optional<TxnAndProof>(TxnAndProof{});
+                                minerInfoAndProof->txn = minerInfo->txn;
+                                minerInfoAndProof->proof = minerInfo->proof;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch(...)
+        {
+            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.\n");
+        }
+
+        if(coinbaseAndProof)
+        {
+            // Get Merkle proof for CB txn from Merkle tree cache.
+            // Note that this can be done without holding cs_main lock.
+            if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, chainActiveHeight))
+            {
+                auto merkleTreeHashes = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
+
+                TxnAndProof::TSCMerkleProof::nodes_type nodes;
+                for(const auto& h: merkleTreeHashes)
+                {
+                    nodes.emplace_back(h);
+                    assert( nodes.back().mType ==0 ); // Type of node in Merkle proof is always 0 because we're providing hash in value field
+                }
+                coinbaseAndProof->proof.Nodes( std::move(nodes) );
+            }
+            else
+            {
+                // Delete CB txn if we were unable to get its Merkle proof, since it is not needed.
+                coinbaseAndProof.reset();
+            }
+        }
+    }
+};
+
+} // anonymous namespace
+
+/**
+ * Process enriched get headers message.
+ */
+static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
+                                             const CNetMsgMaker& msgMaker,
+                                             CDataStream& vRecv,
+                                             CConnman& connman,
+                                             const Config& config)
+{
+    CBlockLocator locator;
+    uint256 hashStop;
+    vRecv >> locator >> hashStop;
+
+    // Get block data that must be obtained under lock
+    const CBlockIndex* lastBlockIndex;
+    std::vector<CBlockHeaderEnriched> vHeadersEnriched;
+    int32_t chainActiveHeight;
+    {
+        if(IsInitialBlockDownload() && !pfrom->fWhitelisted) {
+            LogPrint(BCLog::NETMSG, "Ignoring gethdrsen from peer=%d because "
+                                    "node is in initial block download\n",
+                     pfrom->id);
+            return;
+        }
+
+        LOCK(cs_main);
+
+        // Get index of the first requested block
+        const CBlockIndex* pindex = nullptr;
+        if(auto opt_block_index = GetFirstBlockIndexFromLocatorNL(locator, hashStop))
+        {
+            pindex = *opt_block_index;
+        }
+        else
+        {
+            LogPrint(BCLog::NET, "Ignoring gethdrsen from peer=%d because "
+                                 "it requested unknown block (hashstop=%s) without locator\n",
+                     pfrom->id, hashStop.ToString());
+            return;
+        }
+
+        LogPrint(BCLog::NET, "gethdrsen %d to %s from peer=%d\n",
+                 (pindex ? pindex->GetHeight() : -1),
+                 hashStop.IsNull() ? "end" : hashStop.ToString(), pfrom->id);
+
+        int nLimit = MAX_HEADERS_RESULTS;
+        for (; pindex; pindex = chainActive.Next(pindex))
+        {
+            auto& hdr = vHeadersEnriched.emplace_back( pindex );
+
+            if (chainActive.Tip() == pindex)
+            {
+                // This is the last header that we currently have.
+                hdr.noMoreHeaders = true;
+            }
+
+            if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
+            {
+                break;
+            }
+        }
+
+        // Remember index of the last block that will be returned to node so that
+        // we can later update BestHeaderSent for that node.
+        // Null values are handled in the same way as in ProcessGetHeadersMessage.
+        lastBlockIndex = pindex ? pindex : chainActive.Tip();
+
+        chainActiveHeight = chainActive.Height();
+    }
+
+    // Get data that is slow to obtain but can be obtained without holding cs_main lock
+    size_t combinedMsgSize = GetSizeOfCompactSize(vHeadersEnriched.size()); // number of bytes needed to store number of enriched headers
+    for (auto it=vHeadersEnriched.begin(); it!=vHeadersEnriched.end(); ++it)
+    {
+        auto& enrichedHeader = *it;
+
+        // Store coinbase info to enriched header object.
+        // CB txn should be serialized using the same protocol version as in msgMaker.
+        enrichedHeader.SetCoinBaseInfo(msgMaker.GetVersion(), config, chainActiveHeight);
+
+        // Check if total message size is still within limits.
+        // Note that we start checking only after we have already created one header,
+        // so that a single header is always returned even if the message is too big.
+        combinedMsgSize += enrichedHeader.GetSerializedSize();
+        if (combinedMsgSize > static_cast<size_t>(pfrom->maxRecvPayloadLength))
+        {
+            if (it==vHeadersEnriched.begin())
+            {
+                // Do not return subsequent headers if message has gotten too big after the first header.
+                vHeadersEnriched.erase(it+1, vHeadersEnriched.end());
+            }
+            else
+            {
+                // Do not return this and subsequent headers if message has gotten too big.
+                vHeadersEnriched.erase(it, vHeadersEnriched.end());
+            }
+            lastBlockIndex = vHeadersEnriched.back().blockIndex;
+            break;
+        }
+    }
+
+    // Update node's BestHeaderSent like it is done in ProcessGetHeadersMessage so that
+    // 'gethdrsen' is functionally equivalent to 'getheaders' except it provides more data.
+    const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+    const CNodeStatePtr& state { stateRef.get() };
+    assert(state);
+    state->pindexBestHeaderSent = lastBlockIndex;
+
+    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::HDRSEN, vHeadersEnriched));
+}
+
 /**
 * Process tx message.
 */
@@ -3402,6 +4021,7 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
         // Limit the amount of data we are willing to send if a peer (or an attacker)
         // that is running a newer version sends us large size, that we are not prepared to handle. 
         pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(config.GetMaxProtocolSendPayloadLength(), protoconf.maxRecvPayloadLength));
+        pfrom->maxRecvPayloadLength = protoconf.maxRecvPayloadLength;
 
         // Parse supported stream policies if we have them
         if(protoconf.numberOfFields >= 2) {
@@ -3496,6 +4116,56 @@ static bool ValidateForkHeight(const DSDetected& msg, const int64_t max_fork_dis
     const CBlockIndex& bestIndex{mapBlockIndex.GetBestHeader()};
     const size_t best_height = bestIndex.GetHeight();
     return (ca_height + fork_len + max_fork_distance) > best_height;
+}
+
+/**
+* Proces revokemid message.
+*/
+static void ProcessRevokeMidMessage(const CNodePtr& pfrom,
+                                    CDataStream& vRecv,
+                                    CConnman& connman,
+                                    const CNetMsgMaker& msgMaker)
+{
+    if(g_minerIDs)
+    {
+        try
+        {
+            // Deserialise and check signatures
+            RevokeMid msg {};
+            vRecv >> msg;
+
+            // Check for duplicate message
+            constexpr size_t cacheSize { 1000 };
+            static limited_cache msgCache { cacheSize }; 
+            const std::hash<RevokeMid> hasher {};
+            const auto hash { hasher(msg) };
+            if(msgCache.contains(hash))
+            {
+                LogPrint(BCLog::NETMSG, "Ignoring duplicate revokemid message from peer=%d\n", pfrom->id);
+                return;
+            }
+            msgCache.insert(hash);
+
+            // Pass to miner ID database for processing
+            g_minerIDs->ProcessRevokemidMessage(msg);
+
+            // Relay to our peers
+            connman.ForEachNode([&pfrom, &msg, &connman, &msgMaker](const CNodePtr& to)
+            {
+                // No point echoing back to the sender
+                if(!IsSamePeer(*pfrom, *to))
+                {
+                    connman.PushMessage(to, msgMaker.Make(NetMsgType::REVOKEMID, msg));
+                }
+            });
+        }
+        catch(const std::exception& e)
+        {
+            LogPrint(BCLog::NETMSG | BCLog::MINERID,
+                "Error processing revokemid message from peer=%d: %s\n", pfrom->id, e.what());
+            Misbehaving(pfrom, 10, "Invalid revokemid message");
+        }
+    }
 }
 
 /**
@@ -3669,6 +4339,14 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
         ProcessVerAckMessage(pfrom, msgMaker, connman);
     }
 
+    else if (strCommand == NetMsgType::AUTHCH) {
+        return ProcessAuthChMessage(config, pfrom, msgMaker, strCommand, vRecv, connman);
+    }
+
+    else if (strCommand == NetMsgType::AUTHRESP) {
+        return ProcessAuthRespMessage(pfrom, strCommand, vRecv, connman);
+    }
+
     else if (!pfrom->fSuccessfullyConnected) {
         // Must have a verack message before anything else
         Misbehaving(pfrom, 1, "missing-verack");
@@ -3681,6 +4359,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (strCommand == NetMsgType::SENDHEADERS) {
         ProcessSendHeadersMessage(pfrom);
+    }
+
+    else if (strCommand == NetMsgType::SENDHDRSEN) {
+        ProcessSendHdrsEnMessage(pfrom);
     }
 
     else if (strCommand == NetMsgType::SENDCMPCT) {
@@ -3707,6 +4389,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (strCommand == NetMsgType::GETHEADERS) {
         ProcessGetHeadersMessage(pfrom, msgMaker, vRecv, connman);
+    }
+
+    else if (strCommand == NetMsgType::GETHDRSEN) {
+        ProcessGetHeadersEnrichedMessage(pfrom, msgMaker, vRecv, connman, config);
     }
 
     else if (strCommand == NetMsgType::TX) {
@@ -3773,6 +4459,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (strCommand == NetMsgType::PROTOCONF) {
         return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand, config);
+    }
+
+    else if (strCommand == NetMsgType::REVOKEMID) {
+        ProcessRevokeMidMessage(pfrom, vRecv, connman, msgMaker);
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {
@@ -4163,7 +4853,7 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
     // and send. If no header would connect, or if we have too many blocks,
     // or if the peer doesn't want headers, just add all to the inv queue.
     bool fRevertToInv =
-        ((!state->fPreferHeaders &&
+        ((!state->fPreferHeaders && !state->fPreferHeadersEnriched &&
           (!state->fPreferHeaderAndIDs ||
            pto->vBlockHashesToAnnounce.size() > 1)) ||
          pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
@@ -4279,6 +4969,60 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
             state->pindexBestHeaderSent = pBestIndex;
         }
+        else if (state->fPreferHeadersEnriched) {
+            const CBlockIndex* tip = chainActive.Tip();
+            const std::int32_t chainActiveHeight = tip->GetHeight();
+
+            // Convert vHeaders to array of enriched headers.
+            std::vector<CBlockHeaderEnriched> vHeadersEnriched;
+            vHeadersEnriched.reserve(vHeaders.size());
+            size_t combinedMsgSize = 0;
+            for(auto& h: vHeaders)
+            {
+                auto pindex = mapBlockIndex.Get(h.GetHash());
+                assert(pindex);
+
+                // Create enriched header
+                auto& enrichedHeader = vHeadersEnriched.emplace_back(pindex);
+
+                if (tip == pindex)
+                {
+                    // This is the last header that we currently have.
+                    enrichedHeader.noMoreHeaders = true;
+                }
+
+                // Set coinbase information in enriched header
+                // Note that contents of CB tx and its Merkle proof should be available here
+                // since we only recently processed this block.
+                enrichedHeader.SetCoinBaseInfo(msgMaker.GetVersion(), config, chainActiveHeight);
+
+                combinedMsgSize += enrichedHeader.GetSerializedSize();
+                if ( (combinedMsgSize + GetSizeOfCompactSize(vHeadersEnriched.size())) > static_cast<std::size_t>(pto->maxRecvPayloadLength) )
+                {
+                    // Size of hdrsen message would exceed maximum message size the peer can accept.
+                    // Revert to sending inv.
+                    fRevertToInv=true;
+                    break;
+                }
+            }
+
+            if(!fRevertToInv) {
+                if (vHeadersEnriched.size() > 1) {
+                    LogPrint(BCLog::NETMSG,
+                             "%s: %u hdrsen, range (%s, %s), to peer=%d\n",
+                             __func__, vHeadersEnriched.size(),
+                             vHeadersEnriched.front().blockHeader.GetHash().ToString(),
+                             vHeadersEnriched.back().blockHeader.GetHash().ToString(), pto->id);
+                }
+                else {
+                    LogPrint(BCLog::NETMSG, "%s: sending hdrsen %s to peer=%d\n",
+                             __func__, vHeadersEnriched.front().blockHeader.GetHash().ToString(),
+                             pto->id);
+                }
+                connman.PushMessage(pto, msgMaker.Make(NetMsgType::HDRSEN, vHeadersEnriched));
+                state->pindexBestHeaderSent = pBestIndex;
+            }
+        }
         else {
             fRevertToInv = true;
         }
@@ -4305,7 +5049,7 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
 
             // If the peer's chain has this block, don't inv it back.
             if (!PeerHasHeader(state, pindex)) {
-                pto->PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
+                pto->PushBlockInventory(CInv(MSG_BLOCK, hashToAnnounce));
                 LogPrint(BCLog::NETMSG, "%s: sending block inv peer=%d hash=%s\n",
                          __func__, pto->id, hashToAnnounce.ToString());
             }
@@ -4383,14 +5127,6 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         pto->nNextInvSend = nNow + Fixed_delay_microsecs; 
     }
 
-    // Time to send but the peer has requested we not relay transactions.
-    if (fSendTrickle) {
-        LOCK(pto->cs_filter);
-        if (!pto->fRelayTxes) {
-            pto->setInventoryTxToSend.clear();
-        }
-    }
-
     // Respond to BIP35 mempool requests
     if (fSendTrickle && pto->fSendMempool) {
         auto vtxinfo = mempool.InfoAll();
@@ -4406,7 +5142,6 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         for (const auto &txinfo : vtxinfo) {
             const uint256 &txid = txinfo.GetTxId();
             CInv inv(MSG_TX, txid);
-            pto->setInventoryTxToSend.erase(txid);
             if (filterrate != Amount(0)) {
                 if (txinfo.feeRate.GetFeePerK() < filterrate) {
                     continue;

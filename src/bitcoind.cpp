@@ -195,6 +195,7 @@ bool AppInit(int argc, char *argv[]) {
     } catch (...) {
         PrintExceptionContinue(nullptr, "AppInit()");
     }
+    GetAppInitCompleted().store(true);
 
     if (!fRet) {
         Interrupt(threadGroup);

@@ -116,14 +116,7 @@ public:
         return *this;
     }
 
-    CScript &operator<<(const CScript &b) {
-        // I'm not sure if this should push the script or concatenate scripts.
-        // If there's ever a use for pushing a script onto a script, delete this
-        // member fn.
-        assert(!"Warning: Pushing a CScript onto a CScript with << is probably "
-                "not intended, use + to concatenate!");
-        return *this;
-    }
+    CScript &operator<<(const CScript& b) = delete;
 
     bsv::instruction_iterator begin_instructions() const;
     bsv::instruction_iterator end_instructions() const;
@@ -306,8 +299,21 @@ std::string to_string(const CScript&);
 
 bool IsP2SH(bsv::span<const uint8_t>);
 bool IsDSNotification(bsv::span<const uint8_t>);
-bool IsDustReturnScript (bsv::span<const uint8_t> script);
+bool IsDustReturnScript(bsv::span<const uint8_t> script);
+bool IsMinerId(bsv::span<const uint8_t> script);
 
+constexpr bool IsMinerInfo(const bsv::span<const uint8_t> script)
+{
+    constexpr std::array<uint8_t, 4> protocol_id{0x60, 0x1d, 0xfa, 0xce};
+    return script.size() >= 7 && 
+           script[0] == OP_FALSE &&
+           script[1] == OP_RETURN && 
+           script[2] == protocol_id.size() &&
+           script[3] == protocol_id[0] &&
+           script[4] == protocol_id[1] &&
+           script[5] == protocol_id[2] &&
+           script[6] == protocol_id[3];
+}
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 

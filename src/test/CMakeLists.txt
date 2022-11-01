@@ -8,7 +8,7 @@ project(bitcoin-test)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
 # Python is required to build C++ tests (and to execute functional tests)
-find_package(PythonInterp 3 REQUIRED)
+find_package(Python3 REQUIRED)
 
 
 function(gen_json_header NAME)
@@ -77,6 +77,8 @@ add_test_to_suite(bitcoin test_bitcoin
 	bswap_tests.cpp
 	checkpoints_tests.cpp
 	checkqueue_tests.cpp
+	check_selfish_mining_tests.cpp
+	coinbase_doc_tests.cpp
 	coins_tests.cpp
 	write_preferring_upgradable_mutex_tests.cpp
 	compress_tests.cpp
@@ -86,6 +88,8 @@ add_test_to_suite(bitcoin test_bitcoin
 	crypto_tests.cpp
 	cscript_tests.cpp
 	cuckoocache_tests.cpp
+    dataref_index_tests.cpp
+    datareftx_tests.cpp
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
     dsattempt_tests.cpp
@@ -104,6 +108,7 @@ add_test_to_suite(bitcoin test_bitcoin
     int_serialization_tests.cpp
     instruction_iterator_tests.cpp
     invalid_txn_publisher_tests.cpp
+    jba_selfish_mining_tests.cpp
 	journal_assembler_group_tests.cpp
 	journal_tests.cpp
 	json_tests.cpp
@@ -122,7 +127,15 @@ add_test_to_suite(bitcoin test_bitcoin
 	mempool_limit_tests.cpp
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp
+    mining_group_builder_tests.cpp
+    miner_id_db_tests.cpp 
+    miner_id_db_tests3.cpp 
 	miner_tests.cpp
+	minerid_tests.cpp
+	miner_info_tests.cpp
+	miner_info_doc_tests.cpp
+	miner_info_error_tests.cpp
+	miner_info_ref_tests.cpp
 	multisig_tests.cpp
     net_message_maker_tests.cpp
     net_association_tests.cpp
@@ -137,6 +150,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	raii_event_tests.cpp
 	random_tests.cpp
 	reverselock_tests.cpp
+    revokemid_tests.cpp
 	rpc_tests.cpp
 	sanity_tests.cpp
 	scheduler_tests.cpp

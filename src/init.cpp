@@ -24,6 +24,10 @@
 #include "httpserver.h"
 #include "invalid_txn_publisher.h"
 #include "key.h"
+#include "miner_id/dataref_index.h"
+#include "miner_id/miner_info_tracker.h"
+#include "miner_id/miner_id_db.h"
+#include "miner_id/miner_id_db_defaults.h"
 #include "mining/journaling_block_assembler.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -157,11 +161,20 @@ void Shutdown() {
     TRY_LOCK(cs_Shutdown, lockShutdown);
     if (!lockShutdown) return;
 
+
+    // Remove all datarefs and minerinfo txns from the mempool
+    if (g_MempoolDatarefTracker) {
+        std::vector<COutPoint> funds = g_MempoolDatarefTracker->funds();
+        std::vector<TxId> datarefs;
+        std::transform(funds.cbegin(), funds.cend(), std::back_inserter(datarefs), [](const COutPoint& p) {return p.GetTxId();});
+        if (!datarefs.empty())
+            mempool.RemoveTxnsAndDescendants(datarefs, nullptr);
+    }
+
     /// Note: Shutdown() must be able to handle cases in which AppInit2() failed
     /// part of the way, for example if the data directory was found to be
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
-
     RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
@@ -184,8 +197,7 @@ void Shutdown() {
     if (g_connman) {
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
-        // nullptr (which happens before the destructor is called making Stop
-        // call inside CConnman destructor too late)
+        // nullptr
         g_connman->Stop();
         g_connman.reset();
     }
@@ -209,6 +221,12 @@ void Shutdown() {
         delete pblocktree;
         pblocktree = nullptr;
     }
+
+    // Flush/destroy miner ID database
+    g_minerIDs.reset();
+    // Destroy dataRef index
+    g_dataRefIndex.reset();
+
 #ifdef ENABLE_WALLET
     for (CWalletRef pwallet : vpwallets) {
         pwallet->Flush(true);
@@ -408,7 +426,18 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                        strprintf(_("Do not keep transactions in the non-final mempool "
                                    "longer than <n> hours (default: %u)"),
                                  DEFAULT_NONFINAL_MEMPOOL_EXPIRY));
-
+    strUsage +=
+        HelpMessageOpt("-mempoolnonfinalmaxreplacementrate=<n>",
+                       strprintf(_("The maximum rate at which a transaction in the non-final mempool can be replaced by "
+                                   "another updated transaction, expressed as transactions per hour. (default: %u/hour)"),
+                                 DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE));
+    if (showDebug) {
+        strUsage +=
+            HelpMessageOpt("-mempoolnonfinalmaxreplacementrateperiod=<n>",
+                           strprintf(_("The period of time (in minutes) over which the maximum rate for non-final transactions "
+                                       "is measured (see -mempoolnonfinalmaxreplacementrate above). (default: %u)"),
+                                     DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD));
+    }
     if (showDebug) {
         strUsage += HelpMessageOpt("-checknonfinalfreq=<n>",
                        strprintf(_("Run checks on non-final transactions every <n> "
@@ -514,27 +543,23 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
-        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        MIN_DISK_SPACE_FOR_MERKLETREE_FILES));
+        "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculateMinDiskSpaceForMerkleFiles(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-preferredmerkletreefilesize", strprintf(_("Preferred size of a single datafile containing "
         "merkle trees. When size is reached, new datafile is created. If preferred size is less than "
         "size of a single merkle tree, it will still be stored, meaning datafile size can be larger than "
-        "preferred size. (default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE));
+        "preferred size. (default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculatePreferredMerkleTreeSize(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxmerkletreememcachesize", strprintf(_("Maximum merkle trees memory cache size in bytes. For "
         "faster responses, requested merkle trees are stored into a memory cache. "
-        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE));
+        "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculatePreferredMerkleTreeSize(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
         _("Add a node to connect to and attempt to keep the connection open"));
-    if (showDebug) {
-        strUsage += HelpMessageOpt("-allowunsolicitedaddr",
-            _("Allow inbound peers to send us unsolicted addr messages"));
-    }
     strUsage += HelpMessageOpt(
         "-banscore=<n>",
         strprintf(
@@ -1052,6 +1077,25 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB).",
             DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
 
+    strUsage += HelpMessageOpt(
+        "-softconsensusfreezeduration",
+        strprintf("Set for how many blocks a block that contains transaction spending "
+                  "consensus frozen TXO will remain frozen before it auto unfreezes "
+                  "due to the amount of child blocks that were mined after it "
+                  "(default: %u; note: 0 - soft consensus freeze duration is "
+                  "disabled and block is frozen indefinitely).",
+                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
+    strUsage += HelpMessageOpt(
+        "-enableassumewhitelistedblockdepth=<n>",
+        strprintf("Assume confiscation transaction to be whitelisted if it is in block that is at least as deep under tip as specified by option 'assumewhitelistedblockdepth'. (default: %d)",
+            DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH));
+
+    strUsage += HelpMessageOpt(
+        "-assumewhitelistedblockdepth=<n>",
+        strprintf("Set minimal depth of block under tip at which confiscation transaction is assumed to be whitelisted. (default: %d)",
+            DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -1073,6 +1117,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. This is a mandatory setting"),
                   CURRENCY_UNIT));
+
+    strUsage +=
+        HelpMessageOpt("-detectselfishmining=<n>",
+                       strprintf(_("Detect selfish mining (default: %u). "),
+                                 DEFAULT_DETECT_SELFISH_MINING));
+    strUsage +=
+        HelpMessageOpt("-selfishtxpercentthreshold=<n>",
+        strprintf(_("Set percentage threshold of number of txs in mempool "
+                    "that are not included in received block for "
+                    "the block to be classified as selfishly mined (default: %u). "),
+                        DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT));
+    strUsage += HelpMessageOpt("-minblockmempooltimedifferenceselfish=<n>",
+        strprintf(_("Set lowest time difference in sec between the last block and last mempool "
+                    "transaction for the block to be classified as selfishly mined (default: %ds)"),
+                    DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH));
+
     strUsage += HelpMessageOpt(
         "-invalidateblock=<hash>",
         strprintf(_("Permanently marks an existing block as invalid as if it violated "
@@ -1127,7 +1187,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                         "subset of the available transactions from the mempool (default: %d)"),
                 mining::JournalingBlockAssembler::DEFAULT_NEW_BLOCK_FILL)
         );
+        strUsage += HelpMessageOpt(
+            "-jbarunfrequency",
+            strprintf(_("How frequently (in milliseconds) does the jounaling block assembler background thread "
+                        "run to sweep up newly seen transactions and add them to the latest block template "
+                        "(default: %dms)"),
+                mining::JournalingBlockAssembler::DEFAULT_RUN_FREQUENCY_MILLIS)
+        );
     }
+    strUsage += HelpMessageOpt(
+        "-jbathrottlethreshold",
+        strprintf(_("To prevent the appearance of selfish mining when a block template becomes full, "
+                    "the journaling block assembler will start to throttle back the rate at which it "
+                    "adds new transactions from the journal to the next block template when the block "
+                    "template reaches this percent full (default: %d%%)"),
+            mining::JournalingBlockAssembler::DEFAULT_THROTTLE_THRESHOLD)
+    );
 
     strUsage += HelpMessageGroup(_("RPC client/server options:"));
     strUsage += HelpMessageOpt("-server",
@@ -1398,17 +1473,50 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE));
 
+    /** MinerID */
+    strUsage += HelpMessageGroup(_("Miner ID database / authenticated connection options:"));
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-minerid",
+            strprintf(_("Enable the building and use of the miner ID database (default: %d)"),
+                MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED));
+    }
     strUsage += HelpMessageOpt(
-        "-softconsensusfreezeduration",
-        strprintf("Set for how many blocks a block that contains transaction spending "
-                  "consensus frozen TXO will remain frozen before it auto unfreezes "
-                  "due to the amount of child blocks that were mined after it "
-                  "(default: %u; note: 0 - soft consensus freeze duration is "
-                  "disabled and block is frozen indefinitely).",
-                  DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+        "-mineridcachesize=<n>",
+        strprintf(_("Cache size to use for the miner ID database (default: %uMB, maximum: %uMB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE / ONE_MEBIBYTE, MinerIdDatabaseDefaults::MAX_CACHE_SIZE / ONE_MEBIBYTE));
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-mineridnumtokeep=<n>",
+            strprintf(_("Maximum number of old (rotated, expired) miner IDs we will keep in the database (default: %u)"),
+                MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP));
+    }
+    strUsage += HelpMessageOpt(
+        "-mineridreputation_m=<n>",
+        strprintf(_("Miners who identify themselves using miner ID can accumulate certain priviledges over time by gaining "
+            "a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. "
+            "This parameter sets the M value for that test. (default: %u, maximum %u)"),
+            MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_M));
+    strUsage += HelpMessageOpt(
+        "-mineridreputation_n=<n>",
+        strprintf(_("Miners who identify themselves using miner ID can accumulate certain priviledges over time by gaining "
+            "a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. "
+            "This parameter sets the N value for that test. (default: %u, maximum %u)"),
+            MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, MinerIdDatabaseDefaults::MAX_MINER_REPUTATION_N));
+    strUsage += HelpMessageOpt(
+        "-mineridreputation_mscale=<n>",
+        strprintf(_("Miners who lose their good reputation can in some circumstances recover that reputation, "
+            "but at the cost of a temporarily increased M of N block target. This parameter determines how "
+            "much to scale the base M value in such cases. (default: %f)"),
+            MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR));
+    strUsage += HelpMessageOpt("-mineridgeneratorurl=<url>",
+        "URL for communicating with the miner ID generator. Required to setup authenticated connections. "
+        "For example: http://127.0.0.1:9002");
+    strUsage += HelpMessageOpt("-mineridgeneratoralias=<string>",
+        "Alias used to identify our current miner ID in the generator. Required to setup authenticated connections.");
 
-
-    /** Double-Spend detection/reporting */
+    /** Safe mode */
     strUsage += HelpMessageGroup(_("Safe-mode activation options:"));
 
     strUsage += HelpMessageOpt(
@@ -1431,7 +1539,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-safemodeminforklength=<n>",
         strprintf("Minimum length of valid fork to enter safe mode "
             "(default: %d)", SAFE_MODE_DEFAULT_MIN_FORK_LENGTH));
-
 
     return strUsage;
 }
@@ -1596,7 +1703,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
         if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
-            LogPrintf("Failed to connect best block");
+            LogPrintf("Failed to connect best block\n");
             StartShutdown();
         }
 
@@ -2332,6 +2439,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
+    config.SetEnableAssumeWhitelistedBlockDepth(gArgs.GetBoolArg("-enableassumewhitelistedblockdepth", DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH));
+    if(std::string err; !config.SetAssumeWhitelistedBlockDepth(gArgs.GetArg("-assumewhitelistedblockdepth", DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH), &err)) {
+        return InitError(err);
+    }
+
 #if ENABLE_ZMQ
     if (gArgs.IsArgSet("-invalidtxzmqmaxmessagesize"))
     {
@@ -2525,6 +2637,49 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    // MinerID parameters
+    if(std::string err; !config.SetMinerIdEnabled(
+        gArgs.GetBoolArg("-minerid", MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdCacheSize(
+        gArgs.GetArgAsBytes("-mineridcachesize", MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdsNumToKeep(
+        gArgs.GetArg("-mineridnumtokeep", MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationM(
+        gArgs.GetArg("-mineridreputation_m", MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationN(
+        gArgs.GetArg("-mineridreputation_n", MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMinerIdReputationMScale(
+        gArgs.GetDoubleArg("-mineridreputation_mscale", MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR), &err))
+    {
+        return InitError(err);
+    }
+    if(gArgs.IsArgSet("-mineridgeneratorurl"))
+    {
+        if(std::string err; !config.SetMinerIdGeneratorURL(gArgs.GetArg("-mineridgeneratorurl", ""), &err))
+        {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetMinerIdGeneratorAlias(gArgs.GetArg("-mineridgeneratoralias", ""), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -2567,6 +2722,17 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError("-minminingtxfee is mandatory");
     }
 
+    if(gArgs.IsArgSet("-rollingminfeeratehalflife"))
+    {
+        const auto halflife = gArgs.GetArg(
+            "-rollingminfeeratehalflife", CTxMemPool::MAX_ROLLING_FEE_HALFLIFE);
+
+        if(!mempool.SetRollingMinFee(halflife))
+            LogPrintf("Warning: configuration parameter -rollingminfeeratehalflife out-of-range %i - %i\n",
+                      CTxMemPool::MIN_ROLLING_FEE_HALFLIFE,
+                      CTxMemPool::MAX_ROLLING_FEE_HALFLIFE);
+    }
+
     if (gArgs.IsArgSet("-mindebugrejectionfee")) {
         if (chainparams.NetworkIDString() != "main") {
             Amount n(0);
@@ -2599,6 +2765,31 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     config.SetAcceptNonStandardOutput(
         gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+
+
+    // Enable selfish mining detection
+    config.SetDetectSelfishMining(gArgs.GetBoolArg("-detectselfishmining", DEFAULT_DETECT_SELFISH_MINING));
+    
+    // Min time difference in sec between the last block and last mempool 
+    // transaction for the block to be classified as selfishly mined
+    if (gArgs.IsArgSet("-minblockmempooltimedifferenceselfish")) {
+        int64_t minBlockMempoolTimeDiff = gArgs.GetArg("-minblockmempooltimedifferenceselfish", DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH);
+        if (std::string err;
+            !config.SetMinBlockMempoolTimeDifferenceSelfish(minBlockMempoolTimeDiff, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // Set percentage threshold of number of txs in mempool 
+    // that are not included in received block for the block to be classified as selfishly mined
+    if (gArgs.IsArgSet("-selfishtxpercentthreshold"))
+    {
+        int64_t selfishTxPercentThreshold = gArgs.GetArg("-selfishtxpercentthreshold", DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT);
+        if (std::string err; !config.SetSelfishTxThreshold(selfishTxPercentThreshold, &err))
+        {
+            return InitError(err);
+        }
+    }
 
 #ifdef ENABLE_WALLET
     if (!CWallet::ParameterInteraction()) return false;
@@ -2696,34 +2887,30 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         config.SetAllowClientUA(std::move(validUAClients));
     }
 
-    // Configure maximum disk space that can be taken by Merkle Tree data files.
     {
-        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", MIN_DISK_SPACE_FOR_MERKLETREE_FILES);
+        int64_t maxBlockEstimate = std::min(config.GetMaxBlockSize(), config.GetMaxMempool());
         std::string err;
-        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
-        {
-            return InitError(err);
-        }
-    }
 
-    // Configure preferred size of a single Merkle Tree data file.
-    {
-        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE);
-        std::string err;
+        // Configure preferred size of a single Merkle Tree data file.
+        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
-        {
             return InitError(err);
-        }
-    }
 
-    // Configure size of Merkle Trees memory cache.
-    {
-        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE);
-        std::string err;
+        // Configure size of Merkle Trees memory cache.
+        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
+            return InitError(err);
+
+        // Configure maximum disk space that can be taken by Merkle Tree data files.
+        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", CalculateMinDiskSpaceForMerkleFiles(maxBlockEstimate));
+        if (maxMerkleTreeDiskspaceArg < merkleTreeFileSizeArg || maxMerkleTreeDiskspaceArg < maxMerkleTreeMemCacheSizeArg)
         {
+            err = "-maxmerkletreediskspace cannot be less than -maxmerkletreememcachesize or -preferredmerkletreefilesize";
             return InitError(err);
         }
+
+        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
+            return InitError(err);
     }
 
     const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
@@ -2841,7 +3028,7 @@ void preloadChainStateThreadFunction()
     }
 
 #else
-    LogPrintf("Preload is not supported on this platform!");
+    LogPrintf("Preload is not supported on this platform!\n");
     return;
 #endif
 }
@@ -2925,6 +3112,9 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     InitSignatureCache();
     InitScriptExecutionCache();
+
+    g_MempoolDatarefTracker = std::make_unique<mining::MempoolDatarefTracker>();
+    g_BlockDatarefTracker = mining::make_from_dir();
 
     LogPrintf("Using %u threads for script verification\n",
               config.GetPerBlockScriptValidatorThreadsCount());
@@ -3288,7 +3478,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                     gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) >
                         MIN_BLOCKS_TO_KEEP) {
                     LogPrintf("Prune: pruned datadir may not have more than %d "
-                              "blocks; only checking available blocks",
+                              "blocks; only checking available blocks\n",
                               MIN_BLOCKS_TO_KEEP);
                 }
 
@@ -3370,8 +3560,6 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
-
-
 // Step 8: load wallet
 #ifdef ENABLE_WALLET
     if (!CWallet::InitLoadWallet(chainparams)) return false;
@@ -3439,6 +3627,23 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     preloadChainState(threadGroup);
 
+    // Create minerID database  and dataref index if required
+    if(config.GetMinerIdEnabled()) {
+        try {
+            g_minerIDs = std::make_unique<MinerIdDatabase>(config);
+            ScheduleMinerIdPeriodicTasks(scheduler, *g_minerIDs);
+        }
+        catch(const std::exception& e) {
+            LogPrintf("Error creating miner ID database: %s\n", e.what());
+        }
+        try {
+            g_dataRefIndex = std::make_unique<DataRefTxnDB>(config);
+        }
+        catch(const std::exception& e) {
+            LogPrintf("Error creating dataRef index: %s\n", e.what());
+        }
+    }
+
     // Step 11: start node
 
     //// debug print
@@ -3498,3 +3703,11 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
     return !shutdownToken.IsCanceled();
 }
+
+// Get/set AppInit finished flag
+std::atomic_bool& GetAppInitCompleted()
+{
+    static std::atomic_bool appInitCompleted {false};
+    return appInitCompleted;
+}
+

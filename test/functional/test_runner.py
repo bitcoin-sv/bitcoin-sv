@@ -30,16 +30,10 @@ import json
 
 # Formatting. Default colors to empty strings.
 BOLD, BLUE, RED, GREY = ("", ""), ("", ""), ("", ""), ("", "")
-try:
-    # Make sure python thinks it can write unicode to its stdout
-    "\u2713".encode("utf_8").decode(sys.stdout.encoding)
-    TICK = "✓ "
-    CROSS = "✖ "
-    CIRCLE = "○ "
-except UnicodeDecodeError:
-    TICK = "P "
-    CROSS = "x "
-    CIRCLE = "o "
+
+TICK = "P "
+CROSS = "x "
+CIRCLE = "o "
 
 if os.name == 'posix':
     # primitive formatting on supported
@@ -106,7 +100,12 @@ ENVIRONMENT_TYPE = {
 # test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
 # factor for release build is always 1; it is still present in this map for consistency
 TIMEOUT_FACTOR_FOR_TESTS = {
-    "bsv-4gb-plus-block.py" : [1,2,2,3]
+    "bsv-block-propagation-priority.py" : [1,2,2,3],
+    "bsv-consolidation-feefilter.py" : [1,4,4,5],
+    "bsv-genesis-general.py" : [1,2,2,3],
+    "bsv-mempool-eviction.py" : [1,1,3,5],
+    "bsv-4gb-plus-block.py" : [1,2,2,3],
+    "bsv-block-stalling-test.py" : [1,2,2,3]
 }
 
 # This tests can be only run by explicitly specifying them on command line. 
@@ -166,8 +165,10 @@ def main():
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--coverage', action='store_true',
                         help='generate a basic coverage report for the RPC interface')
-    parser.add_argument(
-        '--exclude', '-x', help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
+    parser.add_argument('--exclude', '-x',
+                        help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
+    parser.add_argument('--run-solo',
+                        help='specify a comma-seperated-list of scripts to execute non-parallel. Do not include the .py extension in the name.')
     parser.add_argument('--extended', action='store_true',
                         help='run the extended test suite in addition to the basic tests')
     parser.add_argument('--list-tests', action='store_true',
@@ -237,6 +238,15 @@ def main():
         print(
             "Rerun `configure` with -enable-wallet, -with-utils and -with-daemon and rerun make")
         sys.exit(0)
+
+    # Parse '--run-solo'. Add specified tests to the SOLO_TESTS list
+    if args.run_solo:
+        for test_name in args.run_solo.split(','):
+            test_name = test_name + ".py"
+            if test_name not in SOLO_TESTS:
+                SOLO_TESTS.add(test_name)
+            else:
+                print("Warning: %s already a part of SOLO_TESTS" % test_name)
 
     # Build list of tests
     all_scripts = get_all_scripts_from_disk(tests_dir, NON_SCRIPTS)

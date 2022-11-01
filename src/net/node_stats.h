@@ -55,6 +55,7 @@ public:
     bool fInbound;
     bool fAddnode;
     bool fWhitelisted;
+    bool fAuthConnEstablished;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     std::string addrName;

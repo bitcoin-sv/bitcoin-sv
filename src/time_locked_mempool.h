@@ -5,10 +5,11 @@
 
 #include <bloom.h>
 #include <consensus/validation.h>
+#include <leaky_bucket.h>
+#include <taskcancellation.h>
 #include <tx_mempool_info.h>
 #include <txn_validation_data.h>
 #include <utiltime.h>
-#include <taskcancellation.h>
 
 #include <atomic>
 #include <map>
@@ -59,6 +60,9 @@ class CTimeLockedMempool final
     // our locked UTXOs.
     std::set<CTransactionRef> checkForDoubleSpend(const CTransactionRef& txn) const;
 
+    // Check if an coming update exceeds our configured allowable rate
+    bool checkUpdateWithinRate(const CTransactionRef& txn, CValidationState& state) const;
+
     // Is the given txn ID for one currently held?
     bool exists(const uint256& id) const;
 
@@ -93,20 +97,43 @@ class CTimeLockedMempool final
     // Save file version ID
     static constexpr uint64_t DUMP_FILE_VERSION {1};
 
+    // Transaction details we store
+    using RateLeakyBucket = LeakyBucket<std::chrono::minutes>;
+    struct NonFinalTxn
+    {
+        NonFinalTxn(const TxMempoolInfo& tmi, size_t mins, size_t maxUpdateRate)
+            : info{tmi}
+        {
+            updateRate = { maxUpdateRate, std::chrono::minutes{mins}, static_cast<double>(maxUpdateRate) };
+        }
+        NonFinalTxn(const TxMempoolInfo& tmi, const RateLeakyBucket& rate)
+            : info{tmi}, updateRate{rate}
+        {}
+
+        const CTransactionRef& GetTx() const;
+
+        TxMempoolInfo info {};
+        RateLeakyBucket updateRate {};
+    };
+
     // Fetch all transactions updated by the given new transaction.
     // Caller holds mutex.
     std::set<CTransactionRef> getTransactionsUpdatedByNL(const CTransactionRef& txn) const;
 
+    // Calculate updated replacement rate for txn
+    RateLeakyBucket updateReplacementRateNL(const NonFinalTxn& txn, CValidationState& state) const;
+
     // Insert a new transaction
-    void insertNL(const TxMempoolInfo& info, CValidationState& state);
+    void insertNL(NonFinalTxn&& txn, CValidationState& state);
     // Remove an old transaction
     void removeNL(const CTransactionRef& txn);
 
     // Perform checks on a transaction before allowing an update
-    bool validateUpdate(const CTransactionRef& newTxn,
-                        const CTransactionRef& oldTxn,
-                        CValidationState& state,
-                        bool& finalised) const;
+    bool validateUpdateNL(const CTransactionRef& newTxn,
+                          const CTransactionRef& oldTxn,
+                          CValidationState& state,
+                          bool& finalised,
+                          RateLeakyBucket& newRate) const;
 
     // Estimate our memory usage
     // Caller holds mutex.
@@ -123,6 +150,7 @@ class CTimeLockedMempool final
             return txn1->GetId() < txn2->GetId();
         }
     };
+
     // Compare transactions by unlocking time
     struct CompareTxnUnlockingTime
     {
@@ -136,9 +164,9 @@ class CTimeLockedMempool final
     struct TxIdExtractor
     {
         using result_type = uint256;
-        result_type operator()(const TxMempoolInfo& info) const
+        result_type operator()(const NonFinalTxn& nft) const
         {
-            return info.GetTxId();
+            return nft.info.GetTxId();
         }
     };
 
@@ -147,12 +175,12 @@ class CTimeLockedMempool final
     struct TagRawTxID {};
     struct TagUnlockingTime {};
     using TxnMultiIndex = boost::multi_index_container<
-        TxMempoolInfo,
+        NonFinalTxn,
         boost::multi_index::indexed_by<
             // By TxID
             boost::multi_index::ordered_unique<
                 boost::multi_index::tag<TagTxID>,
-                boost::multi_index::const_mem_fun<TxMempoolInfo,const CTransactionRef&,&TxMempoolInfo::GetTx>,
+                boost::multi_index::const_mem_fun<NonFinalTxn,const CTransactionRef&,&NonFinalTxn::GetTx>,
                 CompareTxnID
             >,
             // By raw TxID
@@ -163,7 +191,7 @@ class CTimeLockedMempool final
             // By unlocking time
             boost::multi_index::ordered_non_unique<
                 boost::multi_index::tag<TagUnlockingTime>,
-                boost::multi_index::const_mem_fun<TxMempoolInfo,const CTransactionRef&,&TxMempoolInfo::GetTx>,
+                boost::multi_index::const_mem_fun<NonFinalTxn,const CTransactionRef&,&NonFinalTxn::GetTx>,
                 CompareTxnUnlockingTime
             >
         >
@@ -186,9 +214,11 @@ class CTimeLockedMempool final
     CRollingBloomFilter         mRecentlyRemoved { 10000, 0.000001 };
 
     // Cached configuration values
-    std::atomic<size_t>         mMaxMemory {0};     // Max memory target
-    int64_t                     mPeriodRunFreq {0}; // Run frequency for periodic checks
-    int64_t                     mPurgeAge {0};      // Age at which we purge unfinalised txns
+    std::atomic<size_t>         mMaxMemory {0};         // Max memory target
+    int64_t                     mPeriodRunFreq {0};     // Run frequency for periodic checks
+    int64_t                     mPurgeAge {0};          // Age at which we purge unfinalised txns
+    uint64_t                    mMaxUpdateRate {0};     // Max rate to accept updates to transactions (in txns / mUpdatePeriodMins minutes)
+    uint64_t                    mUpdatePeriodMins {0};  // Minutes over which max rate is measured
 
     // Our mutex
     mutable std::shared_mutex   mMtx {};

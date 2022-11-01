@@ -15,89 +15,90 @@ BOOST_AUTO_TEST_SUITE(instruction_iterator_tests)
 
 BOOST_AUTO_TEST_CASE(decode_instruction_tests)
 {
-    // input script, expected opcode, expected offset, expected length] : test_data)
-    using test_data_type = tuple< vector<uint8_t>, int, size_t, size_t>;
+    // input script, expected values: status, opcode, offset, length]
+    using test_data_type = tuple< vector<uint8_t>, bool, int, size_t, size_t>;
 
     vector<test_data_type> test_data {
-        { {}, OP_INVALIDOPCODE, 0, 0 }, 
+        { {}, false, OP_INVALIDOPCODE, 0, 0 }, 
 
-        { {0}, OP_0, 0, 0 }, 
+        { {0}, true, OP_0, 0, 0 }, 
         
-        { {1 }, OP_INVALIDOPCODE, 0, 0 },
-        { {1, 42}, 1, 0, 1 },
+        { {1 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {1, 42}, true, 1, 0, 1 },
         
-        { {2 }, OP_INVALIDOPCODE, 0, 0 },
-        { {2, 42}, OP_INVALIDOPCODE, 0, 0 },
-        { {2, 42, 42}, 2, 0, 2 },
+        { {2 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {2, 42}, false, OP_INVALIDOPCODE, 0, 0 },
+        { {2, 42, 42}, true, 2, 0, 2 },
 
         // ...
 
-        { {75}, OP_INVALIDOPCODE, 0, 0 },
-        { {75, 1}, OP_INVALIDOPCODE, 0, 0 },
-        { {75, 1, 2}, OP_INVALIDOPCODE, 0, 0 },
+        { {75}, false, OP_INVALIDOPCODE, 0, 0 },
+        { {75, 1}, false, OP_INVALIDOPCODE, 0, 0 },
+        { {75, 1, 2}, false, OP_INVALIDOPCODE, 0, 0 },
         // ...
         
-        { {OP_PUSHDATA1 }, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA1 }, false, OP_INVALIDOPCODE, 0, 0 },
 
-        { {OP_PUSHDATA1, 1 }, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA1, 2, 42 }, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA1, 1 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA1, 2, 42 }, false, OP_INVALIDOPCODE, 0, 0 },
 
-        { {OP_PUSHDATA1, 0 }, OP_PUSHDATA1, 1, 0 },
-        { {OP_PUSHDATA1, 1, 42 }, OP_PUSHDATA1, 1, 1 },
-        { {OP_PUSHDATA1, 2, 42, 42 }, OP_PUSHDATA1, 1, 2 },
-
-
-        { {OP_PUSHDATA2 }, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA2, 1 }, OP_INVALIDOPCODE, 0, 0 },
-
-        { {OP_PUSHDATA2, 1, 0}, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA2, 2, 0, 42}, OP_INVALIDOPCODE, 0, 0 },
-
-        { {OP_PUSHDATA2, 0, 0}, OP_PUSHDATA2, 2, 0 },
-        { {OP_PUSHDATA2, 1, 0, 42}, OP_PUSHDATA2, 2, 1 },
-        { {OP_PUSHDATA2, 2, 0, 42, 42}, OP_PUSHDATA2, 2, 2 },
+        { {OP_PUSHDATA1, 0 }, true, OP_PUSHDATA1, 1, 0 },
+        { {OP_PUSHDATA1, 1, 42 }, true, OP_PUSHDATA1, 1, 1 },
+        { {OP_PUSHDATA1, 2, 42, 42 }, true, OP_PUSHDATA1, 1, 2 },
 
 
-        { {OP_PUSHDATA4 }, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA4, 1 }, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA4, 1, 1 }, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA4, 1, 1, 1 }, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA2 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA2, 1 }, false, OP_INVALIDOPCODE, 0, 0 },
+
+        { {OP_PUSHDATA2, 1, 0}, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA2, 2, 0, 42}, false, OP_INVALIDOPCODE, 0, 0 },
+
+        { {OP_PUSHDATA2, 0, 0}, true, OP_PUSHDATA2, 2, 0 },
+        { {OP_PUSHDATA2, 1, 0, 42}, true, OP_PUSHDATA2, 2, 1 },
+        { {OP_PUSHDATA2, 2, 0, 42, 42}, true, OP_PUSHDATA2, 2, 2 },
+
+
+        { {OP_PUSHDATA4 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA4, 1 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA4, 1, 1 }, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA4, 1, 1, 1 }, false, OP_INVALIDOPCODE, 0, 0 },
         
-        { {OP_PUSHDATA4, 1, 0, 0, 0}, OP_INVALIDOPCODE, 0, 0 },
-        { {OP_PUSHDATA4, 2, 0, 0, 0, 42}, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA4, 1, 0, 0, 0}, false, OP_INVALIDOPCODE, 0, 0 },
+        { {OP_PUSHDATA4, 2, 0, 0, 0, 42}, false, OP_INVALIDOPCODE, 0, 0 },
 
-        { {OP_PUSHDATA4, 0, 0, 0, 0}, OP_PUSHDATA4, 4, 0},
-        { {OP_PUSHDATA4, 1, 0, 0, 0, 42}, OP_PUSHDATA4, 4, 1},
-        { {OP_PUSHDATA4, 2, 0, 0, 0, 42, 42}, OP_PUSHDATA4, 4, 2},
+        { {OP_PUSHDATA4, 0, 0, 0, 0}, true, OP_PUSHDATA4, 4, 0},
+        { {OP_PUSHDATA4, 1, 0, 0, 0, 42}, true, OP_PUSHDATA4, 4, 1},
+        { {OP_PUSHDATA4, 2, 0, 0, 0, 42, 42}, true, OP_PUSHDATA4, 4, 2},
         
-        { {OP_0}, OP_0, 0, 0 }, // Note: OP_0 = 0
-        { {OP_1}, OP_1, 0, 0 },
-        { {OP_2}, OP_2, 0, 0 },
-        { {OP_3}, OP_3, 0, 0 },
-        { {OP_4}, OP_4, 0, 0 },
-        { {OP_5}, OP_5, 0, 0 },
-        { {OP_6}, OP_6, 0, 0 },
-        { {OP_7}, OP_7, 0, 0 },
-        { {OP_8}, OP_8, 0, 0 },
-        { {OP_9}, OP_9, 0, 0 },
-        { {OP_10}, OP_10, 0, 0 },
-        { {OP_11}, OP_11, 0, 0 },
-        { {OP_12}, OP_12, 0, 0 },
-        { {OP_13}, OP_13, 0, 0 },
-        { {OP_14}, OP_14, 0, 0 },
-        { {OP_15}, OP_15, 0, 0 },
-        { {OP_16}, OP_16, 0, 0 },
+        { {OP_0}, true, OP_0, 0, 0 }, // Note: OP_0 = 0
+        { {OP_1}, true, OP_1, 0, 0 },
+        { {OP_2}, true, OP_2, 0, 0 },
+        { {OP_3}, true, OP_3, 0, 0 },
+        { {OP_4}, true, OP_4, 0, 0 },
+        { {OP_5}, true, OP_5, 0, 0 },
+        { {OP_6}, true, OP_6, 0, 0 },
+        { {OP_7}, true, OP_7, 0, 0 },
+        { {OP_8}, true, OP_8, 0, 0 },
+        { {OP_9}, true, OP_9, 0, 0 },
+        { {OP_10}, true, OP_10, 0, 0 },
+        { {OP_11}, true, OP_11, 0, 0 },
+        { {OP_12}, true, OP_12, 0, 0 },
+        { {OP_13}, true, OP_13, 0, 0 },
+        { {OP_14}, true, OP_14, 0, 0 },
+        { {OP_15}, true, OP_15, 0, 0 },
+        { {OP_16}, true, OP_16, 0, 0 },
         
-        { {OP_NOP}, OP_NOP, 0, 0 },
+        { {OP_NOP}, true, OP_NOP, 0, 0 },
         // ...
-        { {OP_PUBKEY}, OP_PUBKEY, 0, 0 },
-        { {OP_INVALIDOPCODE}, OP_INVALIDOPCODE, 0, 0 } 
+        { {OP_PUBKEY}, true, OP_PUBKEY, 0, 0 },
+        { {OP_INVALIDOPCODE}, true, OP_INVALIDOPCODE, 0, 0 } 
     };
-    for(const auto& [ip, exp_opcode, exp_offset, exp_len] : test_data)
+    for(const auto& [ip, exp_status, exp_opcode, exp_offset, exp_len] : test_data)
     {
         const CScript script(begin(ip), end(ip));
-        const auto [opcode, offset, len] = decode_instruction(
+        const auto [status, opcode, offset, len] = decode_instruction(
             span<const uint8_t>{script.data(), script.size()});
+        BOOST_CHECK_EQUAL(exp_status, status);
         BOOST_CHECK_EQUAL(exp_opcode, opcode);
         BOOST_CHECK_EQUAL(exp_offset, offset);
         BOOST_CHECK_EQUAL(exp_len, len);

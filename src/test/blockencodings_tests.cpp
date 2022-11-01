@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
 
     pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
-        pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+        testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
 
     // Do a simple ShortTxIDs RT
@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
         BOOST_CHECK(partialBlock.IsTxAvailable(2));
 
         BOOST_CHECK_EQUAL(
-            pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+            testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
             SHARED_TX_OFFSET + 1);
 
         size_t poolSize = pool.Size();
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 
     pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
-        pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+        testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
 
     uint256 txhash;
@@ -225,7 +225,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         BOOST_CHECK(partialBlock.IsTxAvailable(2));
 
         BOOST_CHECK_EQUAL(
-            pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+            testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
             SHARED_TX_OFFSET + 1);
 
         CBlock block2;
@@ -274,10 +274,10 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         block3.vtx.clear();
 
         // + 1 because of partialBlockCopy.
-        BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+        BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                           SHARED_TX_OFFSET + 1);
     }
-    BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+    BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                       SHARED_TX_OFFSET + 0);
 }
 
@@ -289,7 +289,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
 
     pool.AddUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
-        pool.mapTx.find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
+        testPoolAccess.mapTx().find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
 
     uint256 txhash;
@@ -318,7 +318,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
         BOOST_CHECK(partialBlock.IsTxAvailable(2));
 
         BOOST_CHECK_EQUAL(
-            pool.mapTx.find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
+            testPoolAccess.mapTx().find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
             SHARED_TX_OFFSET + 1);
 
         CBlock block2;
@@ -341,10 +341,10 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
         block2.vtx.clear();
 
         // + 1 because of partialBlockCopy.
-        BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+        BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                           SHARED_TX_OFFSET + 1);
     }
-    BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+    BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                       SHARED_TX_OFFSET + 0);
 }
 

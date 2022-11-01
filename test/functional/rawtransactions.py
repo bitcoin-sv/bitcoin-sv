@@ -30,7 +30,8 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 4
         self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
-        self.extra_args = [[],[],[],['-maxmempool=300', '-maxmempoolsizedisk=0', f"-minminingtxfee={self.relayfee}"
+        self.extra_args = [['-persistmempool=0'],['-persistmempool=0'],['-persistmempool=0'],
+                            ['-persistmempool=0', '-maxmempool=300', '-maxmempoolsizedisk=0', f"-minminingtxfee={self.relayfee}"
                                      , f"-mindebugrejectionfee={self.relayfee}"]]
 
     def setup_network(self, split=False):
@@ -77,7 +78,13 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         # This will raise an exception since there are missing inputs
         assert_raises_rpc_error(
-            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'])
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex']) # allowhighfees=False, dontcheckfee=False
+        assert_raises_rpc_error(
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'], False, True) # dontcheckfee=True
+        assert_raises_rpc_error(
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'], True, False) # allowhighfees=True
+        assert_raises_rpc_error(
+            -25, "Missing inputs", self.nodes[2].sendrawtransaction, rawtx['hex'], True, True) # allowhighfees=True, dontcheckfee=True
 
         #
         # RAW TX MULTISIG TESTS #
@@ -353,13 +360,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(txid2 not in mempool)
         # Don't check fee.
         rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True }, {'hex': txnhex2, 'dontcheckfee': True}])
-        assert_equal(len(rejectedTxns), 1)
-        assert_equal(len(rejectedTxns['evicted']), 2)
+        assert_equal(len(rejectedTxns), 0)
         mempool = self.nodes[3].getrawmempool()
         assert(txid1 in mempool)
         assert(txid2 in mempool)
-        assert(rejectedTxns['evicted'][0] not in mempool)
-        assert(rejectedTxns['evicted'][1] not in mempool)
         # Test listunconfirmedancestors option
         # Create two parents and send one child
         parent_tx_1 = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("0.1"))

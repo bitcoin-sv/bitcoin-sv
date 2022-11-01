@@ -28,6 +28,7 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/uuid/uuid.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -168,8 +169,8 @@ private:
 
     //!< Chain height when entering the mempool
     int32_t entryHeight;
-    //!< keep track of transactions that spend a coinbase
-    bool spendsCoinbase;
+    //!< keep track of transactions that spend a coinbase or confiscation
+    bool spendsCoinbaseOrConfiscation;
     // index of insertion to mempool, entry with smaller index is inserted before the one with larger
     uint64_t insertionIndex;
     // ancestors count
@@ -179,7 +180,7 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime,
                     int32_t _entryHeight,
-                    bool spendsCoinbase, LockPoints lp);
+                    bool spendsCoinbaseOrConfiscation, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
@@ -204,7 +205,7 @@ public:
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    bool GetSpendsCoinbase() const { return spendsCoinbase; }
+    bool GetSpendsCoinbaseOrConfiscation() const { return spendsCoinbaseOrConfiscation; }
 
     bool IsCPFPGroupMember() const { return group != nullptr; }
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
@@ -301,8 +302,29 @@ enum class MemPoolRemovalReason {
     //! Removed for replacement
     REPLACED,
     //! Removed because input was frozen
-    FROZEN_INPUT
+    FROZEN_INPUT,
+    //! Removed because it is no longer whitelisted
+    NOT_WHITELISTED
 };
+
+inline const enumTableT<MemPoolRemovalReason>& enumTable(MemPoolRemovalReason)
+{
+    static enumTableT<MemPoolRemovalReason> table
+    {
+        {MemPoolRemovalReason::UNKNOWN, "UNKNOWN"},
+        {MemPoolRemovalReason::EXPIRY, "EXPIRY"},
+        {MemPoolRemovalReason::SIZELIMIT, "SIZELIMIT"},
+        {MemPoolRemovalReason::REORG, "REORG"},
+        {MemPoolRemovalReason::BLOCK, "BLOCK"},
+        {MemPoolRemovalReason::CONFLICT, "CONFLICT"},
+        {MemPoolRemovalReason::REPLACED, "REPLACED"},
+        {MemPoolRemovalReason::FROZEN_INPUT, "FROZEN_INPUT"},
+        {MemPoolRemovalReason::NOT_WHITELISTED, "NOT_WHITELISTED"},
+    };
+    return table;
+}
+
+std::ostream& operator<<(std::ostream&, const MemPoolRemovalReason&);
 
 struct DisconnectedBlockTransactions;
 
@@ -438,8 +460,8 @@ private:
     // The group definition needs access to the mempool index iterator type.
     friend class CPFPGroup;
 
-public:
-    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
+private:
+    // FIXME: DEPRECATED - ultimately this will be changed or removed
     typedef boost::multi_index_container<
         CTxMemPoolEntry, boost::multi_index::indexed_by<
                              // sorted by txid
@@ -456,13 +478,12 @@ public:
                                  boost::multi_index::tag<insertion_order>>>>
         indexed_transaction_set;
 
-    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - ultimately this will be changed or removed
     mutable std::shared_mutex smtx;
-    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - ultimately this will be changed or removed
     indexed_transaction_set mapTx;
 
-private:
-    static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
+    int64_t halflife_{MAX_ROLLING_FEE_HALFLIFE};
 
     using txiter = indexed_transaction_set::index<transaction_id>::type::const_iterator;
 
@@ -602,6 +623,12 @@ public:
     CTxMemPool();
     ~CTxMemPool();
 
+    constexpr static int MIN_ROLLING_FEE_HALFLIFE = 60 * 30;
+    constexpr static int MAX_ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
+
+    int64_t GetRollingMinFee() const { return halflife_; }
+    bool SetRollingMinFee(int64_t fee);
+
     /**
      * If sanity-checking is turned on, check makes sure the pool is consistent
      * (does not contain two transactions that spend the same inputs, all inputs
@@ -657,7 +684,7 @@ private:
     SecondaryMempoolEntryData CalculateSecondaryMempoolData(txiter entryIt) const;
 
     // modifies entry by adding grouping data
-    void SetGroupingData(txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData);
+    void SetGroupingDataNL(txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData);
 
     // forms a group out of groupMembers, modifys mempool entry (remove grouping data and create group object) and adds
     // changes to the changeSet
@@ -702,14 +729,44 @@ private:
     // walks recursively through all descedants of the items in the set and updates theirs ancestorsCouunt
     void UpdateAncestorsCountNL(setEntriesTopoSorted entries);
 
+
+    void RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet);
+    void RemoveInvalidCTXsNL(const mining::CJournalChangeSetPtr& changeSet);
+
 public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             const mining::CJournalChangeSetPtr& changeSet,
             const uint256& blockhash,
-            std::vector<CTransactionRef>& txNew);
+            std::vector<CTransactionRef>& txNew,
+            const Config& config);
+
+    /**
+    * Returns the result of checking if the received block is selfishly mined.
+    * Block's txs are compared with mempool's txs. If the time difference between
+    * the last transaction that was included in the block and the last transaction
+    * that was left in the mempool is more than time difference selfish threshold
+    * (-minblockmempooltimedifferenceselfish), then it is checked if there are
+    * txs in mempool that were not included in the block.
+    * All txs that were not included are checked against block fee rate.
+    * If percentage of those txs in mempool that are not included
+    * in received block is above threshold (-selfishtxpercentthreshold),
+    * the block is considered as selfishly mined. The results are logged.
+    * Functionality is enabled with the -detectselfishmining parameter
+    * set to true (by default).
+    */
+    bool CheckSelfishNL(const setEntries& block_entries,
+                        int64_t last_block_tx_time,
+                        const CFeeRate& minBlockFeeRate, 
+                        const Config& config);
+
 
     void RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Remove all confiscation transactions that are no longer valid (i.e. not whitelisted).
+     */
+    void RemoveInvalidCTXs(const mining::CJournalChangeSetPtr& changeSet);
 
     void Clear();
 
@@ -859,6 +916,13 @@ public:
     /** Expire all transaction (and their dependencies) in the mempool older
      * than time. Return the number of removed transactions. */
     int Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet);
+
+    /** Remove transactions from the mempool when discarding minerid/dataref transactions for
+     * blocks after the next block.
+     * This is  needed for replacement mineridinfo transactions and for removing minerid/dataref txns during reorg*/
+    int RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet);
+    std::vector<TxId> RemoveTxnsAndDescendants(const std::vector<TxId>& txid, const mining::CJournalChangeSetPtr& changeSet);
+
 
     /**
      * Check for conflicts with in-mempool transactions.
@@ -1116,17 +1180,13 @@ public:
      * into disconnectpool need to have their descendants removed from mempool, too
      */
     void AddToDisconnectPoolUpToLimit(
-        const mining::CJournalChangeSetPtr &changeSet,
-        DisconnectedBlockTransactions *disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet,
+        DisconnectedBlockTransactions* disconnectpool,
         uint64_t maxDisconnectedTxPoolSize,
-        const std::vector<CTransactionRef> &vtx);
+        const CBlock& block,
+        int32_t height);
 
 private:
-    void RemoveRecursive(
-        const CTransaction &tx,
-        const mining::CJournalChangeSetPtr& changeSet,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
-
     // A non-locking version of CheckMempool
     void CheckMempoolNL(
             CoinsDBView& view,
@@ -1143,7 +1203,7 @@ private:
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
 
-    void RemoveForReorg(
+    void RemoveForReorgNL(
         const Config &config,
         const CoinsDB& coinsTip,
         const mining::CJournalChangeSetPtr& changeSet,
@@ -1388,50 +1448,75 @@ struct DisconnectedBlockTransactions {
     ~DisconnectedBlockTransactions();
 
 private:
-    indexed_disconnected_transactions queuedTx;
-    uint64_t cachedInnerUsage = 0;
+    std::set<TxId> filteredTx {};
+    indexed_disconnected_transactions queuedTx {};
+    uint64_t cachedInnerUsage {0};
 
     friend class CTxMemPool;
 public:
     // Estimate the overhead of queuedTx to be 6 pointers + an allocation, as
     // no exact formula for boost::multi_index_contained is implemented.
-    size_t DynamicMemoryUsage() const {
-        return memusage::MallocUsage(sizeof(CTransactionRef) +
-                                     6 * sizeof(void *)) *
-                   queuedTx.size() +
-               cachedInnerUsage;
+    size_t DynamicMemoryUsage() const
+    {
+        return memusage::MallocUsage(
+            sizeof(CTransactionRef) +
+            6 * sizeof(void*)) * queuedTx.size() +
+            cachedInnerUsage;
     }
 
-    void addTransaction(const CTransactionRef &tx) {
+    void addTransaction(const CTransactionRef& tx, bool filter)
+    {
         queuedTx.insert(tx);
         cachedInnerUsage += RecursiveDynamicUsage(tx);
+        if(filter)
+        {
+            filteredTx.insert(tx->GetId());
+        }
+    }
+
+    bool isFiltered(const TxId& txid) const
+    {
+        return (filteredTx.count(txid) > 0);
     }
 
     // Remove entries based on txid_index, and update memory usage.
-    void removeForBlock(const std::vector<CTransactionRef> &vtx) {
+    void removeForBlock(const std::vector<CTransactionRef>& vtx)
+    {
         // Short-circuit in the common case of a block being added to the tip
-        if (queuedTx.empty()) {
+        if(queuedTx.empty() && filteredTx.empty())
+        {
             return;
         }
-        for (auto const &tx : vtx) {
-            auto it = queuedTx.find(tx->GetHash());
-            if (it != queuedTx.end()) {
-                cachedInnerUsage -= RecursiveDynamicUsage(*it);
-                queuedTx.erase(it);
+        for(auto const& tx : vtx)
+        {
+            auto txit { queuedTx.find(tx->GetHash()) };
+            if(txit != queuedTx.end())
+            {
+                cachedInnerUsage -= RecursiveDynamicUsage(*txit);
+                queuedTx.erase(txit);
             }
+
+            // Remove from filtered set (if it exists)
+            filteredTx.erase(tx->GetId());
         }
     }
 
     // Remove an entry by insertion_order index, and update memory usage.
     void removeEntry(indexed_disconnected_transactions::index<
-                     insertion_order>::type::iterator entry) {
+                     insertion_order>::type::iterator entry)
+    {
+        // Remove from filtered set (if it exists)
+        filteredTx.erase((*entry)->GetId());
+
         cachedInnerUsage -= RecursiveDynamicUsage(*entry);
         queuedTx.get<insertion_order>().erase(entry);
     }
 
-    void clear() {
+    void clear()
+    {
         cachedInnerUsage = 0;
         queuedTx.clear();
+        filteredTx.clear();
     }
 };
 

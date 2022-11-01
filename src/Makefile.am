@@ -1,5 +1,5 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
-# Copyright (c) 2018-2020 Bitcoin Association
+# Copyright (c) 2018-2021 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 DIST_SUBDIRS = secp256k1 univalue
@@ -102,6 +102,7 @@ BITCOIN_CORE_H = \
   checkqueuepool.h \
   clientversion.h \
   coins.h \
+  miner_id/coinbase_doc.h \
   compat.h \
   compat/byteswap.h \
   compat/endian.h \
@@ -151,9 +152,22 @@ BITCOIN_CORE_H = \
   merkletreedb.h \
   merkletreestore.h \
   metrics.h \
+  miner_id/dataref_index.h \
+  miner_id/dataref_index_detail.h \
+  miner_id/datareftx.h \
+  miner_id/miner_id.h \
+  miner_id/miner_id_db.h \
+  miner_id/miner_id_db_defaults.h \
+  miner_id/miner_info.h \
+  miner_id/miner_info_doc.h \
+  miner_id/miner_info_error.h \
+  miner_id/miner_info_ref.h \
+  miner_id/revokemid.h \
+  miner_id/miner_info_tracker.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
+  mining/group_builder.h \
   mining/journal.h \
   mining/journal_builder.h \
   mining/journal_change_set.h \
@@ -161,6 +175,7 @@ BITCOIN_CORE_H = \
   mining/journaling_block_assembler.h \
   net/association.h \
   net/association_id.h \
+  net/authconn.h \
   net/block_download_tracker.h \
   net/net.h \
   net/netaddress.h \
@@ -184,6 +199,7 @@ BITCOIN_CORE_H = \
   processing_block_index.h \
   protocol.h \
   random.h \
+  rawtxvalidator.h \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
@@ -292,6 +308,7 @@ libbitcoin_server_a_SOURCES = \
   block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
+  miner_id/coinbase_doc.cpp \
   frozentxo.cpp \
   frozentxo_db.cpp \
   frozentxo_logging.cpp \
@@ -312,9 +329,20 @@ libbitcoin_server_a_SOURCES = \
   merkletree.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
+  miner_id/dataref_index.cpp \
+  miner_id/datareftx.cpp \
+  miner_id/miner_id.cpp \
+  miner_id/miner_id_db.cpp \
+  miner_id/miner_info.cpp \
+  miner_id/miner_info_doc.cpp \
+  miner_id/miner_info_error.cpp \
+  miner_id/miner_info_ref.cpp \
+  miner_id/revokemid.cpp \
+  miner_id/miner_info_tracker.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
+  mining/group_builder.cpp \
   mining/journal.cpp \
   mining/journal_builder.cpp \
   mining/journal_change_set.cpp \
@@ -337,11 +365,13 @@ libbitcoin_server_a_SOURCES = \
   policy/policy.cpp \
   pow.cpp \
   processing_block_index.cpp \
+  rawtxvalidator.cpp \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
   rpc/frozentxo_rpc.cpp \
   rpc/mining.cpp \
+  rpc/miner_info.cpp \
   rpc/mining-fbb.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
@@ -515,6 +545,7 @@ libbitcoin_util_a_SOURCES = \
   logging.cpp \
   random.cpp \
   rpc/protocol.cpp \
+  rpc/text_writer.cpp \
   support/cleanse.cpp \
   sync.cpp \
   threadinterrupt.cpp \
@@ -536,6 +567,8 @@ libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
   cfile_util.cpp \
+  net/netaddress.cpp \
+  net/netbase.cpp \
   rpc/client.cpp \
   rpc/client_config.cpp \
   rpc/client_utils.cpp \
@@ -564,7 +597,7 @@ bitcoind_LDADD = \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
-  $(LIBLEVELDB_SSE42) \
+  $(LIBCRC32C) \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
@@ -716,6 +749,7 @@ endif
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(<D) $<
 
 if EMBEDDED_LEVELDB
+include Makefile.crc32c.include
 include Makefile.leveldb.include
 endif
 

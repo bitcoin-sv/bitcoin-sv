@@ -79,7 +79,6 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"listunspent", 0, "minconf"},
     {"listunspent", 1, "maxconf"},
     {"listunspent", 2, "addresses"},
-    {"getblockheader", 1, "verbose"},
     {"getchaintxstats", 0, "nblocks"},
     {"gettransaction", 1, "include_watchonly"},
     {"getrawtransaction", 1, "verbose"},
@@ -136,6 +135,10 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"addToConsensusBlacklist", 0, "funds"},
     {"removeFromPolicyBlacklist", 0, "funds"},
     {"clearBlacklists", 0, "removeAllEntries"},
+    {"addToConfiscationTxidWhitelist", 0, "txs"},
+    {"queryConfiscationTxidWhitelist", 0, "verbose"},
+    {"rebuildminerids", 0, "fullrebuild"},
+    {"revokeminerid", 0, "input"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},
@@ -147,6 +150,8 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"echojson", 7, "arg7"},
     {"echojson", 8, "arg8"},
     {"echojson", 9, "arg9"},
+    {"createdatareftx", 0, "inputs"},
+    {"setminerinfotxfundingoutpoint", 1, "n"},
 };
 
 class CRPCConvertTable {

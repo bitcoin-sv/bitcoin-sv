@@ -15,7 +15,6 @@
 #include "dstencode.h"
 #include "keystore.h"
 #include "merkleblock.h"
-#include "mining/journal_builder.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
@@ -36,6 +35,8 @@
 #include "rpc/blockchain.h"
 #include "rpc/misc.h"
 #include "consensus/merkle.h"
+#include "util.h"
+#include "rawtxvalidator.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -1062,7 +1063,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false, false), true, genesisActivationHeight);
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -1522,8 +1523,8 @@ static UniValue sendrawtransaction(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
     // Make transaction's input data object.
-    TxInputDataSPtr pTxInputData =
-        std::make_shared<CTxInputData>(
+    std::unique_ptr<CTxInputData> pTxInputData =
+        std::make_unique<CTxInputData>(
             g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
             std::move(tx),                  // a pointer to the tx
             TxSource::rpc,                  // tx source
@@ -1533,21 +1534,21 @@ static UniValue sendrawtransaction(const Config &config,
             nMaxRawTxFee);                 // nAbsurdFee
     // Check if transaction is already received through p2p interface,
     // and thus, couldn't be added to the TxIdTracker.
-
+    bool fKnownTxn { !pTxInputData->IsTxIdStored() };
     // Check if txn is present in one of the mempools.
-    auto txid_in_mempool = [&](){return mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);};
-
-    if (dontCheckFee && (txid_in_mempool() || !pTxInputData->IsTxIdStored()))
+    auto txid_in_mempool = [&]()
     {
-        CTxPrioritizer txPrioritizer{mempool, txid};
-        LogPrint(BCLog::TXNSRC, "got txn via rpc sendrawtransaction after same tx arrived from relaying: %s txnsrc user=%s\n",
+        return mempool.Exists(txid) 
+            || mempool.getNonFinalPool().exists(txid);
+    };
+
+    if (dontCheckFee && txid_in_mempool())
+    {
+        LogPrint(BCLog::TXNSRC, "got in-mempool txn to prioritise: %s txnsrc-user=%s\n",
                  txid.ToString(), request.authUser.c_str());
+        CTxPrioritizer txPrioritizer{mempool, txid};
 
         return txid.GetHex();
-    }
-    if (!pTxInputData->IsTxIdStored()) {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED,
-                           strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
     }
     if (!txid_in_mempool()) {
         // Mempool Journal ChangeSet
@@ -1560,36 +1561,44 @@ static UniValue sendrawtransaction(const Config &config,
         // The mempool prioritisation is not executed on a null TxId
         // - no-op in terms of prioritise/clear operations
         CTxPrioritizer txPrioritizer{mempool, dontCheckFee ? txid : TxId()};
-        // Forward transaction to the validator and wait for results.
-        const auto& txValidator = g_connman->getTxnValidator();
-        const CValidationState& status {
-            txValidator->processValidation(
-                std::move(pTxInputData), // txn's input data
-                changeSet, // an instance of the journal
-                true) // fLimitMempoolSize
-        };
-        // Check if the transaction was accepted by the mempool.
-        // Due to potential race-condition we have to explicitly call exists() instead of
-        // checking a result from the status variable.
-        if (!txid_in_mempool()) {
-            if (!status.IsValid()) {
-                if (status.IsMissingInputs()) {
-                        throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
-                } else if (status.IsInvalid()) {
+
+        auto futureResult = g_connman->getRawTxValidator()->SubmitSingle(move(pTxInputData));
+        auto result = futureResult.get();
+        
+        if (result.state.has_value())
+        {
+            const auto& status = result.state.value();
+            // Check if the transaction was accepted by the mempool.
+            // Due to potential race-condition we have to explicitly call exists() instead of
+            // checking a result from the status variable.
+            if (!txid_in_mempool()) 
+            { 
+                if (status.IsMissingInputs()) 
+                {
+                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
+                } 
+                else if (status.IsInvalid()) 
+                {
                     throw JSONRPCError(RPC_TRANSACTION_REJECTED,
-                                       strprintf("%i: %s", status.GetRejectCode(),
-                                                 status.GetRejectReason()));
-                } else {
-                    throw JSONRPCError(RPC_TRANSACTION_ERROR, status.GetRejectReason());
+                                        strprintf("%i: %s", status.GetRejectCode(),
+                                                    status.GetRejectReason()));
                 }
+                else
+                {
+                    throw JSONRPCError(RPC_TRANSACTION_ERROR, status.GetRejectReason());
+                }            
             }
-        // At this stage we do reject a request which reached this point due to a race
-        // condition so we can return correct error code to the caller.
-        } else if (!status.IsValid()) {
-            throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
+            // At this stage we do reject a request which reached this point due to a race
+            // condition so we can return correct error code to the caller.
+            else if (!status.IsValid())
+            {
+                throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
                                "Transaction already in the mempool");
+            }
         }
-    } else {
+    }
+    else
+    {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
                            "Transaction already in the mempool");
     }
@@ -1610,10 +1619,21 @@ static UniValue sendrawtransaction(const Config &config,
     // - the Validator's asynch mode removed the txn (and triggered reject msg)
     // - this txn is final version of timelocked txn and is still being validated
     if (!txinfo.IsNull()){
-        g_connman->EnqueueTransaction({ inv, txinfo });
+        if (g_connman->EnqueueTransaction({ inv, txinfo }))
+            LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
+                inv.hash.ToString(), request.authUser.c_str());
+    }
+    if (fKnownTxn) {
+        const auto& p2pOrphans = g_connman->getTxnValidator()->getOrphanTxnsPtr().get();
+        // Remove the tx duplicate if it exists in the p2p orphan pool
+        // (further explained in the batch counterpart of this interface)
+        if (p2pOrphans->checkTxnExists(txid)) {
+            p2pOrphans->eraseTxn(txid);
+            LogPrint(BCLog::TXNSRC, "txn= %s duplicate removed from the p2p orphan pool\n", txid.ToString());
+        }
     }
 
-    LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
+    LogPrint(BCLog::TXNSRC, "Processing completed: txn= %s txnsrc-user=%s\n",
         inv.hash.ToString(), request.authUser.c_str());
 
     return txid.GetHex();
@@ -1622,26 +1642,28 @@ static UniValue sendrawtransaction(const Config &config,
 /**
  * Pushes a JSON object for invalid transactions to JSON writer.
  */
-static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, CJSONWriter& writer)
+static void InvalidTxnsToJSON(const std::vector<RawTxValidator::RawTxValidatorResult>& invalidTxns, CJSONWriter& writer)
 {
     if (!invalidTxns.empty())
     {
         writer.writeBeginArray("invalid");
         for (const auto& elem: invalidTxns)
         {
+            assert(elem.state.has_value());
+            const auto& validationState = elem.state.value();
             writer.writeBeginObject();
-            writer.pushKV("txid", elem.first.ToString());
-            if (elem.second.IsMissingInputs())
+            writer.pushKV("txid", elem.txid.ToString());
+            if (validationState.IsMissingInputs())
             {
                 writer.pushKV("reject_code", REJECT_INVALID);
                 writer.pushKV("reject_reason", "missing-inputs");
             } 
             else
             {
-                writer.pushKV("reject_code", uint64_t(elem.second.GetRejectCode()));
-                writer.pushKV("reject_reason", elem.second.GetRejectReason());
+                writer.pushKV("reject_code", uint64_t(validationState.GetRejectCode()));
+                writer.pushKV("reject_reason", validationState.GetRejectReason());
             }
-            const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
+            const std::set<CTransactionRef>& collidedWithTx = validationState.GetCollidedWithTx();
             if (!collidedWithTx.empty())
             {
                 writer.writeBeginArray("collidedWith");
@@ -1667,7 +1689,7 @@ static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidT
 /**
  * Pushes insufficient fee txns to JSON writer.
  */
-static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, CJSONWriter& writer)
+static void EvictedTxnsToJSON(const std::vector<TxId>& evictedTxns, CJSONWriter& writer)
 {
     if (!evictedTxns.empty())
     {
@@ -1825,19 +1847,19 @@ void sendrawtransactions(const Config& config,
 
             "\nExamples:\n" +
             HelpExampleCli("sendrawtransactions",
-                           "\"[{\\\"hex\\\":\\\"hexstring\\\"}]\"") +
+                           R"("[{\"hex\":\"hexstring\"}]")") +
             HelpExampleCli("sendrawtransactions",
-                           "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true}]\"") +
+                           R"("[{\"hex\":\"hexstring\", \"allowhighfees\":true}]")") +
             HelpExampleCli("sendrawtransactions",
-                           "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true, \\\"dontcheckfee\\\":true}]\"") +
+                           R"("[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true, \"config\":{\"minconsolidationfactor\":10}}]")") +
             HelpExampleCli("sendrawtransactions",
-                           R"("[{\"hex\":\"hexstring\", \"listunconfirmedancestors\":true}]")") +
+                           R"("[{\"hex\":\"hexstring\", \"listunconfirmedancestors\":true}]" "{\"minconsolidationfactor\":10}")") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\"}]") +
+                           R"([{"hex":"hexstring"}])") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true}]") +
+                           R"([{"hex":"hexstring", "allowhighfees":true, "config":{"minconsolidationfactor":10}}])") +
             HelpExampleRpc("sendrawtransactions",
-                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]") +
+                           R"([{"hex":"hexstring", "allowhighfees":true, "dontcheckfee":true}], {"minconsolidationfactor":10})") +
             HelpExampleRpc("sendrawtransactions",
                            R"([{"hex":"hexstring", "listunconfirmedancestors":true}])"));
     }
@@ -1882,7 +1904,7 @@ void sendrawtransactions(const Config& config,
     // Check if inputs are present
     UniValue inputs = request.params[0].get_array();
     // A vector to store input transactions.
-    TxInputDataSPtrVec vTxInputData {};
+    std::vector<std::unique_ptr<CTxInputData>> vTxInputData {};
     vTxInputData.reserve(inputs.size());
     // A vector to store transactions that need to be prioritised.
     std::vector<TxId> vTxToPrioritise {};
@@ -1890,9 +1912,15 @@ void sendrawtransactions(const Config& config,
     std::vector<TxId> vKnownTxns {};
     // A vector to store transactions that need a list of unconfirmed ancestors.
     std::vector<TxId> vTxListUnconfirmedAncestors {};
-    // A vector of transactions that have invalid configs
-    CTxnValidator::InvalidTxnStateUMap invalidConfigTxns {};
-
+    // A vector of transactions that did not passed validation
+    std::vector<RawTxValidator::RawTxValidatorResult> invalidTxs;
+    // Store TxId of transactions pre-existed in the node's internal buffers
+    // (in memory but not in the mempool).
+    // The pre-existed transactions are transactions from the request which were:
+    // (a) enqueued to be processed asynchronously, or
+    // (b) validated asynchronously and detected as p2p orphan txs (they didn't end up in the mempool)
+    std::unordered_set<TxId, std::hash<TxId>> usetP2PEnqueuedTxIds {};
+    
     /**
      * Parse an input data
      * - read data from top to the bottom
@@ -1954,9 +1982,9 @@ void sendrawtransactions(const Config& config,
             // set transaction specific config and skipScriptFlags. Put transaction to invalid array with appropriate reject_reason if anything fails.
             if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, rejectReason))
             {
-                CValidationState state;
-                state.Error(rejectReason);
-                invalidConfigTxns.try_emplace(txid, state);
+                RawTxValidator::RawTxValidatorResult result{ txid, CValidationState(), false };
+                result.state.value().Error(rejectReason);
+                invalidTxs.emplace_back(result);
                 // If configuration settings were wrong we don't want to validate transaction
                 continue;
             }
@@ -1990,10 +2018,9 @@ void sendrawtransactions(const Config& config,
 
         // Choose which TransactionSpecificConfig to use (if per transaction is set -> use it, else use per function call tsc or null if not provided)
         std::shared_ptr<TransactionSpecificConfig> transactionConfig = (tsc == nullptr) ? global_tsc : tsc;
-
-        // Create an object with transaction's input data.
-        TxInputDataSPtr pTxInputData =
-            std::make_shared<CTxInputData>(
+        // Add transaction to the vector.
+        const auto& txInputData = vTxInputData.emplace_back(
+            std::make_unique<CTxInputData>(
                 g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
                 std::move(tx),                  // a pointer to the tx
                 TxSource::rpc,                  // tx source
@@ -2003,91 +2030,98 @@ void sendrawtransactions(const Config& config,
                 nMaxRawTxFee,                   // nAbsurdFee
                 std::weak_ptr<CNode>(),         // pNode
                 false,                          // fOrphan
-                transactionConfig);             // transaction specific config
-
-        // Check if transaction is already known
-        // - received through p2p interface or present in the mempools
-        if (!pTxInputData->IsTxIdStored()) {
-            if (fTxToPrioritise) {
-                vTxToPrioritise.emplace_back(txid);
-            } else {
-                vKnownTxns.emplace_back(txid);
-            }
-        // Move it to the vector of transactions awaiting to be processed
-        } else {
-            vTxInputData.emplace_back(std::move(pTxInputData));
-            // Check if txn needs to be prioritised
-            if (fTxToPrioritise) {
-                vTxToPrioritise.emplace_back(txid);
-            }
-            // Remember a transaction for which we want to list its unconfirmed ancestors
-            if (listUnconfirmedAncestors)
-            {
-                vTxListUnconfirmedAncestors.emplace_back(txid);
-            }
+                transactionConfig)              // transaction specific config
+        );
+        // Check if txn pre-existed in the node's internal buffers.
+        if (!txInputData->IsTxIdStored()) {
+            usetP2PEnqueuedTxIds.insert(txid);
+        }
+        // Check if txn needs to be prioritised
+        if (fTxToPrioritise) {
+            vTxToPrioritise.emplace_back(txid);
+        }
+        // Remember a transaction for which we want to list its unconfirmed ancestors
+        if (listUnconfirmedAncestors)
+        {
+            vTxListUnconfirmedAncestors.emplace_back(txid);
         }
     }
 
     /**
-     * Run synchronous batch validation.
+     * 1. Collect invalid and evicted transactions from the request.
+     *
+     * 2. Enqueue INVs.
+     *
+     * Conditions to send an inventory network message for a transaction from the request:
+     * (a) a tx can not be rejected by tx validation
+     * (b) a tx can not be evicted from the mempool while the request is being processed
+     *
+     * The above conditions ensure that a transaction from the request ended up in the mempool
+     * when the batch validation finishes.
+     *
+     * 3. Remove tx duplicates from the p2p orphan pool if any were detected.
      */
-    CTxnValidator::RejectedTxns rejectedTxns {};
-    // Applay journal changeSet straight after processValidation call.
+    std::vector<TxId> evictedTxs;
     {
-        // Mempool Journal ChangeSet
-        CJournalChangeSetPtr changeSet {
-            mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
-        };
         // Prioritise transactions (if any were requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction
         //   for those txns which are not accepted by the mempool
         CTxPrioritizer txPrioritizer{mempool, std::move(vTxToPrioritise)};
-        // Run synch batch validation and wait for results.
-        const auto& txValidator = g_connman->getTxnValidator();
-        rejectedTxns =
-            txValidator->processValidation(
-                vTxInputData, // A vector of txns that need to be processed
-                changeSet, // an instance of the journal
-                true); // fLimitMempoolSize
-    }
+        
+        auto resultVec = g_connman->getRawTxValidator()->SubmitMany(vTxInputData);
+        const auto& p2pOrphans = g_connman->getTxnValidator()->getOrphanTxnsPtr().get();
+        auto removeP2POrphanTxDupIfExists = [&p2pOrphans, &usetP2PEnqueuedTxIds](const TxId& txid) {
+            // The below instruction is added to check/remove if a duplicate exists in the p2p orphan pool
+            // (despite the fact that the p2p orphan pool is able to detect and evict expired txs).
+            //
+            // Note: The current split between the synchronous and asynchronous tx validation interface doesn't
+            // allow the synchronous batch processing to interfere into the p2p orphan pool to:
+            // (a) detect and remove a tx duplicate from the p2p orphan pool during the synchronous tx processing, or
+            // (b) detect and reprocess any p2p orphans for which the parent is being added to the mempool by the synchronous request
+            if (usetP2PEnqueuedTxIds.find(txid) != usetP2PEnqueuedTxIds.end() && p2pOrphans->checkTxnExists(txid)) {
+                p2pOrphans->eraseTxn(txid);
+                LogPrint(BCLog::TXNSRC, "txn= %s duplicate removed from the p2p orphan pool\n", txid.ToString());
+            }
+        };
 
-    /**
-     * Enqueue INVs.
-     */
-    // Create a lookup table.
-    std::unordered_set<TxId, std::hash<TxId>>
-        usRemovedTxns(rejectedTxns.second.begin(), rejectedTxns.second.end());
-    for (const TxInputDataSPtr& pTxInputData: vTxInputData) {
-        const TxId& txid = pTxInputData->GetTxnPtr()->GetId();
-        if (!rejectedTxns.first.count(txid) && !usRemovedTxns.count(txid)) {
-            // Create an inv msg.
-            CInv inv(MSG_TX, txid);
-            TxMempoolInfo txinfo {};
-            if(mempool.Exists(txid)) {
-                txinfo = mempool.Info(txid);
+        for (auto& resultFuture: resultVec)
+        {
+            auto result = resultFuture.get();
+
+            if (result.state.has_value()) {
+                invalidTxs.push_back(result);
             }
-            else if(mempool.getNonFinalPool().exists(txid)) {
-                txinfo = mempool.getNonFinalPool().getInfo(txid);
+            else if (result.evicted) {
+                evictedTxs.push_back(result.txid);
+                removeP2POrphanTxDupIfExists(result.txid);
+            } else {
+                // At this stage it is possible that the given tx was removed from the mempool, because:
+                // (a) a new block was connected (mined by the node or received from its peer)
+                // (b) the PTV's asynch mode removed the tx to make a room for another tx paying a higher tx fee
+                // We want to minimise the number of false-possitive inv messages so recheck if the tx is still present in the mempool.
+                TxMempoolInfo txinfo {};
+                if(mempool.Exists(result.txid)) {
+                    txinfo = mempool.Info(result.txid);
+                }
+                else if(mempool.getNonFinalPool().exists(result.txid)) {
+                    txinfo = mempool.getNonFinalPool().getInfo(result.txid);
+                }
+                if (txinfo.GetTx() != nullptr) {
+                    CInv inv(MSG_TX, result.txid);
+                    if (g_connman->EnqueueTransaction({ inv, txinfo }))
+                        LogPrint(BCLog::TXNSRC, "txn= %s inv message enqueued, txnsrc-user=%s\n",
+                            inv.hash.ToString(), request.authUser.c_str());
+                    removeP2POrphanTxDupIfExists(result.txid);
+                }
             }
-            // It is possible that txn was added and removed from the mempool, because:
-            // - a block was mined
-            // - PTV's asynch mode removed txn(s)
-            if (txinfo.GetTx() != nullptr){
-                g_connman->EnqueueTransaction({ inv, txinfo });
-            }
-            LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
-                inv.hash.ToString(), request.authUser.c_str());
         }
     }
-
 
     /**
      * Construct and return a result set, as a json object with rejected txids, which contains:
      *
      * 1. txid of a transaction which was detected as already known:
      *   - exists in the mempool
-     *   - stored in ptv queues
-     *   - stored as an orphan txn received through p2p interface
      * 2. txid of an invalid transaction, including validation state information:
      *   - reject code
      *   - reject reason
@@ -2105,6 +2139,7 @@ void sendrawtransactions(const Config& config,
      * If the result set is empty, then all transactions are valid, and most likely,
      * present in the mempool.
      */
+
     // A result json object.
     if (!processedInBatch)
     {
@@ -2121,10 +2156,9 @@ void sendrawtransactions(const Config& config,
     // Known txns array.
     KnownTxnsToJSON(vKnownTxns, jWriter);
     // Rejected txns array.
-    rejectedTxns.first.insert(invalidConfigTxns.begin(), invalidConfigTxns.end());
-    InvalidTxnsToJSON(rejectedTxns.first, jWriter);
+    InvalidTxnsToJSON(invalidTxs, jWriter);
     // Evicted txns array.
-    EvictedTxnsToJSON(rejectedTxns.second, jWriter);
+    EvictedTxnsToJSON(evictedTxs, jWriter);
     // List unconfirmed ancestors.
     UnconfirmedAncestorsToJSON(vTxListUnconfirmedAncestors, jWriter);
     jWriter.writeEndObject();
@@ -2137,6 +2171,9 @@ void sendrawtransactions(const Config& config,
     {
         httpReq->StopWritingChunks();
     }
+
+    LogPrint(BCLog::TXNSRC, "Processing completed: batch size= %ld, user=%s\n",
+        inputs.size(), request.authUser.c_str());
 }
 
 static UniValue getmerkleproof(const Config& config,
@@ -2147,7 +2184,7 @@ static UniValue getmerkleproof(const Config& config,
     {
         throw std::runtime_error(
                 "getmerkleproof \"txid\" ( blockhash )\n"
-                "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
+                "\nDEPRECATED (use getmerkleproof2 instead): Returns a Merkle proof for a transaction represented by txid in a list of Merkle"
                 "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
                 "\n Merkle root can be used to prove that the transaction was included in a block.\n"
                 "\nNOTE: This only works if transaction was already included in a block and the block"
@@ -2230,8 +2267,10 @@ static UniValue getmerkleproof(const Config& config,
         LOCK(cs_main);
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
     }
+
     // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
-    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
+    CDiskBlockMetaData diskBlockMetaData = blockIndex->GetDiskBlockMetaData();
+    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash, diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData }));
     callbackDataObject.pushKV("nodes", merkleProofArray);
     return callbackDataObject;
 }
@@ -2390,6 +2429,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
                 assert(requestedBlockHash == hashBlock);
 
             CStringWriter writer;
+            writer.ReserveAdditional(tx->GetTotalSize() * 2);
             EncodeHexTx(*tx, writer, RPCSerializationFlags());
             std::string hex = writer.MoveOutString();
             callbackDataObject.pushKV("txOrId", hex);

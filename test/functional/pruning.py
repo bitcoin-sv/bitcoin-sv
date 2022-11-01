@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2021 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #
 # Test pruning code
@@ -17,8 +17,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
 import os
-
-MIN_BLOCKS_TO_KEEP = 288
+from test_framework.cdefs import MIN_BLOCKS_TO_KEEP
 
 # Rescans start at the earliest block up to 2 hours before a key timestamp, so
 # the manual prune RPC avoids pruning blocks in the same window to be
@@ -29,7 +28,7 @@ TIMESTAMP_WINDOW = 2 * 60 * 60
 def calc_usage(blockdir):
     return sum(os.path.getsize(blockdir + f) for f in os.listdir(blockdir) if os.path.isfile(blockdir + f)) / (1024. * 1024.)
 
-
+            
 class PruneTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -202,13 +201,19 @@ class PruneTest(BitcoinTestFramework):
         sync_blocks(self.nodes[0:3], timeout=300)
 
         usage = calc_usage(self.prunedir)
-        self.log.info("Usage should be below target: %d" % usage)
-        if (usage > 550):
+        # NOTE: Although the last batch of blocks was generated specifically to prune stale blocks, the last time pruning is actually run,
+        #       may be before all blocks were received. At that time many of received blocks have not yet been validated and added to
+        #       the active chain. Also, blocks stored in block files are typically not ordered by height.
+        #       Consequently, usage could be higher than target.
+        self.log.info("Usage should be below target + 1 block file (128MB) + margin (48MB) to account for stale blocks: %d" % usage)
+        if (usage > 550 + 128 + 48):
             raise AssertionError("Pruning target not being met")
 
         return invalidheight, badhash
 
     def reorg_back(self):
+        # Wait for pruning to complete
+        wait_until(lambda: self.nodes[2].getblockchaininfo()["pruneheight"] >= self.forkheight)
         # Verify that a block on the old main chain fork has been pruned away
         assert_raises_rpc_error(
             -1, "Block file {} not available.".format(self.forkhash), self.nodes[2].getblock, self.forkhash)

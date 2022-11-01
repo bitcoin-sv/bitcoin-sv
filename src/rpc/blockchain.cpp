@@ -17,6 +17,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
+#include "merkletreestore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/http_protocol.h"
@@ -88,12 +89,18 @@ int ComputeNextBlockAndDepthNL(const CBlockIndex* tip, const CBlockIndex* blocki
 
 UniValue blockheaderToJSON(const CBlockIndex *blockindex, 
                            const int confirmations, 
-                           const std::optional<uint256>& nextBlockHash) 
+                           const std::optional<uint256>& nextBlockHash,
+                           const std::optional<CDiskBlockMetaData>& diskBlockMetaData) 
 {
     UniValue result(UniValue::VOBJ);
 
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     result.push_back(Pair("confirmations", confirmations));
+    if(diskBlockMetaData.has_value())
+    {
+        // Include size of block to header if we have it
+        result.push_back(Pair("size", diskBlockMetaData->diskDataSize));
+    }
     result.push_back(Pair("height", blockindex->GetHeight()));
     result.push_back(Pair("version", blockindex->GetVersion()));
     result.push_back(
@@ -145,6 +152,51 @@ UniValue blockStatusToJSON(const BlockStatus& block_status)
     uv.push_back(Pair("soft consensus frozen", block_status.hasDataForSoftConsensusFreeze()));
 
     return uv;
+}
+
+void writeBlockHeaderJSONFields(CJSONWriter& jWriter,
+    const CBlockIndex* blockindex, int confirmations,
+    const std::optional<uint256>& nextBlockHash,
+    const std::optional<CDiskBlockMetaData>& diskBlockMetaData)
+{
+    UniValue block_header_json = blockheaderToJSON(blockindex, confirmations, nextBlockHash, diskBlockMetaData);
+
+    const auto& keys = block_header_json.getKeys();
+    const auto& values = block_header_json.getValues();
+    assert(keys.size()==values.size());
+
+    for(std::size_t i=0; i<keys.size(); ++i)
+    {
+        jWriter.pushKVJSONFormatted(keys[i], values[i].write());
+    }
+}
+
+void writeBlockHeaderEnhancedJSONFields(CJSONWriter& jWriter,
+    const CBlockIndex* blockindex, int confirmations,
+    const std::optional<uint256>& nextBlockHash,
+    const std::optional<CDiskBlockMetaData>& diskBlockMetaData,
+    const std::optional<std::vector<uint256>>& coinbaseMerkleProof,
+    const CTransaction* coinbaseTx,
+    const Config& config)
+{
+    if(coinbaseTx)
+    {
+        jWriter.writeBeginArray("tx");
+        TxToJSON(*coinbaseTx, uint256(), IsGenesisEnabled(config, blockindex->GetHeight()), RPCSerializationFlags(), jWriter);
+        jWriter.writeEndArray();
+    }
+
+    writeBlockHeaderJSONFields(jWriter, blockindex, confirmations, nextBlockHash, diskBlockMetaData);
+
+    if(coinbaseMerkleProof.has_value())
+    {
+        jWriter.writeBeginArray("merkleproof");
+        for (uint256 hash : coinbaseMerkleProof.value())
+        {
+            jWriter.pushV(hash.GetHex());
+        }
+        jWriter.writeEndArray();
+    }
 }
 
 UniValue getblockcount(const Config &config, const JSONRPCRequest &request) {
@@ -764,25 +816,90 @@ UniValue getblockhash(const Config &config, const JSONRPCRequest &request) {
     return pblockindex->GetBlockHash().GetHex();
 }
 
-UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
+/**
+ * Verbosity can be passed in multiple forms:
+ *  - as bool true/false
+ *  - as integer 0/1/2
+ *  - as enum value RAW_HEADER / DECODE_HEADER / DECODE_HEADER_EXTENDED /
+ * To maintain compatibility with different clients
+ * we also try to parse JSON string as booleans and integers.
+ */
+static void parseGetBlockHeaderVerbosity(const UniValue& verbosityParam,
+    GetHeaderVerbosity& verbosity)
+{
+
+    if (verbosityParam.isNum())
+    {
+        auto verbosityNum = verbosityParam.get_int();
+        if (verbosityNum < 0 || verbosityNum > 2)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value out of range");
+        }
+        verbosity = static_cast<GetHeaderVerbosity>(verbosityNum);
+    }
+    else if (verbosityParam.isStr())
+    {
+        std::string verbosityStr = verbosityParam.get_str();
+        boost::to_upper(verbosityStr);
+
+        if (verbosityStr == "0" || verbosityStr == "FALSE")
+        {
+            verbosity = GetHeaderVerbosity::RAW_HEADER;
+        }
+        else if (verbosityStr == "1" || verbosityStr == "TRUE")
+        {
+            verbosity = GetHeaderVerbosity::DECODE_HEADER;
+        }
+        else if (verbosityStr == "2")
+        {
+            verbosity = GetHeaderVerbosity::DECODE_HEADER_EXTENDED;
+        }
+        else
+        {
+            if (!GetHeaderVerbosityNames::TryParse(verbosityStr, verbosity))
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value not recognized");
+            }
+        }
+    }
+    else if (verbosityParam.isBool())
+    {
+        verbosity = (verbosityParam.get_bool() ? GetHeaderVerbosity::DECODE_HEADER
+            : GetHeaderVerbosity::RAW_HEADER);
+    }
+    else
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid verbosity input type");
+    }
+}
+
+void getblockheader(const Config &config, const JSONRPCRequest &request, HTTPRequest* httpReq, bool processedInBatch) 
+{
     if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
+        request.params.size() > 2) 
+    {
         throw std::runtime_error(
-            "getblockheader \"hash\" ( verbose )\n"
-            "\nIf verbose is false, returns a string that is serialized, "
-            "hex-encoded data for blockheader 'hash'.\n"
-            "If verbose is true, returns an Object with information about "
-            "blockheader <hash>.\n"
+            "getblockheader \"hash\" ( verbosity )\n"
+            "\nIf verbosity is 0, false or RAW_HEADER, returns a string that is "
+            "serialized, hex-encoded data for blockheader 'hash'.\n"
+            "If verbosity is 1, true or DECODE_HEADER, returns an Object with "
+            "information about blockheader <hash>.\n"
+            "If verbosity is 2 or DECODE_HEADER_EXTENDED, returns an Object "
+            "with information about blockheader <hash>, merkle proof and coinbase transaction.\n"
             "\nArguments:\n"
             "1. \"hash\"          (string, required) The block hash\n"
-            "2. verbose           (boolean, optional, default=true) true for a "
-            "json object, false for the hex encoded data\n"
-            "\nResult (for verbose = true):\n"
+            "2. verbosity       (boolean, numeric or string, optional, default=1) "
+            "0 (false, RAW_HEADER) for the hex encoded data, 1 (true, DECODE_HEADER) for a "
+            "json object, 2 (DECODE_HEADER_EXTENDED) for a json object with "
+            "coinbase transaction and proof of inclusion.\n"
+            "\nResult (for verbosity = true or 2):\n"
             "{\n"
+            "  \"tx\" : [ ... ],        (array of transactions) Only coinbase transaction is included. Field is only present with verbosity 2 and if transaction details are available.\n"
             "  \"hash\" : \"hash\",     (string) the block hash (same as "
             "provided)\n"
             "  \"confirmations\" : n,   (numeric) The number of confirmations, "
             "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) Size of block\n"
             "  \"height\" : n,          (numeric) The block height or index\n"
             "  \"version\" : n,         (numeric) The block version\n"
             "  \"versionHex\" : \"00000000\", (string) The block version "
@@ -802,6 +919,10 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
             "previous block\n"
             "  \"nextblockhash\" : \"hash\",      (string) The hash of the "
             "next block\n"
+            "  \"merkleproof\" : [      (array) Merkle proof for coinbase transaction. Field is only present with verbosity 2 and if transaction details are available.\n"
+            "      \"node\" : \"hash\", (string) Hash of the node in merkle proof\n"
+            "      \"position\" \"Right\" (string) Position of the hash in the Merkle tree\n"
+            "  ]\n"
             "status: {\n"
             "  \"validity\" : (string) Validation state of the block\n"
             "  \"data\" : (boolean) Data flag\n"
@@ -814,7 +935,7 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
             "  \"soft consensus frozen\" : (boolean) Soft consensus frozen flag\n"
             "  }\n"
             "}\n"
-            "\nResult (for verbose=false):\n"
+            "\nResult (for verbosity=false):\n"
             "\"data\"             (string) A string that is serialized, "
             "hex-encoded data for block 'hash'.\n"
             "\nExamples:\n" +
@@ -826,12 +947,20 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
                                              "\""));
     }
 
+    if (httpReq == nullptr)
+    {
+        return;
+    }
+
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
-    bool fVerbose = true;
-    if (request.params.size() > 1) {
-        fVerbose = request.params[1].get_bool();
+    // Parse verbosity parameter which can be false/true, numeric or string.
+    // Default is true, which means the same as DECODE_HEADER.
+    GetHeaderVerbosity verbosity = GetHeaderVerbosity::DECODE_HEADER;
+    if (request.params.size() > 1)
+    {
+        parseGetBlockHeaderVerbosity(request.params[1], verbosity);
     }
 
     int confirmations;
@@ -848,14 +977,79 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), pblockindex, nextBlockHash);
     }
 
-    if (!fVerbose) {
-        CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-        ssBlock << pblockindex->GetBlockHeader();
-        std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
-        return strHex;
+    if (!processedInBatch) 
+    {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
-    return blockheaderToJSON(pblockindex, confirmations, nextBlockHash);
+    CHttpTextWriter httpWriter(*httpReq);
+    CJSONWriter jWriter(httpWriter, false);
+
+    jWriter.writeBeginObject();
+
+    if (verbosity == GetHeaderVerbosity::RAW_HEADER)
+    {
+        CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+        ssBlock << pblockindex->GetBlockHeader();
+        jWriter.pushKV("result", HexStr(ssBlock.begin(), ssBlock.end()));
+    }
+    else
+    {
+        CDiskBlockMetaData diskBlockMetaData = pblockindex->GetDiskBlockMetaData();
+        jWriter.writeBeginObject("result");
+        if(verbosity == GetHeaderVerbosity::DECODE_HEADER_EXTENDED)
+        {
+            // Read coinbase txn and store pointer to CTransaction object that is stored in reader.
+            // If block was already pruned, then reader is not available and coinbase transaction will not be returned in enriched header.
+            const CTransaction* coinbaseTx = nullptr;
+            auto reader = pblockindex->GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
+            if(reader)
+            {
+                try
+                {
+                    coinbaseTx = &reader->ReadTransaction();
+                }
+                catch(...)
+                {
+                    // Exceptions cannot be thrown while we already started streaming the result.
+                    // If coinbase txn could not be read, it will not be returned.
+                    LogPrint(BCLog::RPC, "getblockheader: Reading of coinbase txn failed.\n");
+                }
+            }
+
+            std::optional<std::vector<uint256>> coinbaseMerkleProof;
+            if (coinbaseTx) // Merkle proof for CB is only needed if we were able to get CB txn
+            {
+                if (CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *pblockindex, chainActive.Height()))
+                {
+                    coinbaseMerkleProof = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
+                }
+                else
+                {
+                    // Do not return just CB txn if we were unable to get its Merkle proof.
+                    coinbaseTx = nullptr;
+                }
+            }
+            
+            writeBlockHeaderEnhancedJSONFields(jWriter, pblockindex, confirmations, nextBlockHash, diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData }, coinbaseMerkleProof, coinbaseTx, config);
+        }
+        else
+        {
+            writeBlockHeaderJSONFields(jWriter, pblockindex, confirmations, nextBlockHash, diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData });
+        }
+        jWriter.writeEndObject();
+    }
+
+    jWriter.pushKV("error", nullptr);
+    jWriter.pushKVJSONFormatted("id", request.id.write());
+
+    jWriter.writeEndObject();
+    jWriter.flush();
+    if (!processedInBatch)
+    {
+        httpReq->StopWritingChunks();
+    }
 }
 
 /**
@@ -1376,11 +1570,11 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
 void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req, bool showTxDetails,
                                            CBlockIndex& blockIndex, bool showOnlyCoinbase, 
                                            bool processedInBatch, const int confirmations, 
-                                           const std::optional<uint256>& nextBlockHash, 
+                                           const std::optional<uint256>& nextBlockHash,
                                            const std::string& rpcReqId)
 {
     CDiskBlockMetaData diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
-
+    
     auto reader = blockIndex.GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
 
     if (!reader) 
@@ -1401,8 +1595,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     // RPC requests have additional layer around the actual response 
     if (!rpcReqId.empty())
     {
-        jWriter.pushKNoComma("result");
-        jWriter.writeBeginObject();
+        jWriter.writeBeginObject("result");
     }
 
     jWriter.writeBeginArray("tx");
@@ -1421,16 +1614,14 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     } while(!reader->EndOfStream() && !showOnlyCoinbase);
     jWriter.writeEndArray();
 
-    CBlockHeader header = reader->GetBlockHeader();
-
     // set metadata so it is available when setting header in the next step
     if (diskBlockMetaData.diskDataHash.IsNull() && reader->EndOfStream())
     {
         diskBlockMetaData = reader->getDiskBlockMetadata();
         blockIndex.SetBlockIndexFileMetaDataIfNotSet(diskBlockMetaData, mapBlockIndex);
     }
-    headerBlockToJSON(config, header, &blockIndex, diskBlockMetaData, confirmations, nextBlockHash, jWriter);
 
+    writeBlockHeaderJSONFields(jWriter, &blockIndex, confirmations, nextBlockHash, diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData });
     // RPC requests have additional layer around the actual response 
     if (!rpcReqId.empty())
     {
@@ -1446,45 +1637,6 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     if (!processedInBatch)
     {
         req.StopWritingChunks();
-    }
-}
-
-void headerBlockToJSON(const Config& config,
-                       const CBlockHeader& blockHeader,
-                       const CBlockIndex* blockindex, 
-                       const CDiskBlockMetaData& diskBlockMetaData,
-                       const int confirmations, 
-                       const std::optional<uint256>& nextBlockHash,
-                       CJSONWriter& jWriter)
-{
-    jWriter.pushKV("hash", blockindex->GetBlockHash().GetHex());
-    jWriter.pushKV("confirmations", confirmations);
-    if (!diskBlockMetaData.diskDataHash.IsNull())
-    {
-        jWriter.pushKV("size", diskBlockMetaData.diskDataSize);
-    }
-    jWriter.pushKV("height", blockindex->GetHeight());
-    jWriter.pushKV("version", blockHeader.nVersion);
-    jWriter.pushKV("versionHex", strprintf("%08x", blockHeader.nVersion));
-    jWriter.pushKV("merkleroot", blockHeader.hashMerkleRoot.GetHex());
-    jWriter.pushKV("num_tx", uint64_t(blockindex->GetBlockTxCount()));
-    jWriter.pushKV("time", blockHeader.GetBlockTime());
-    jWriter.pushKV("mediantime", blockindex->GetMedianTimePast());
-    jWriter.pushKV("nonce", uint64_t(blockHeader.nNonce));
-    jWriter.pushKV("bits", strprintf("%08x", blockHeader.nBits));
-    jWriter.pushKV("difficulty", GetDifficulty(blockindex));
-    jWriter.pushKV("chainwork", blockindex->GetChainWork().GetHex());
-
-    if (!blockindex->IsGenesis())
-    {
-        jWriter.pushKV(
-            "previousblockhash",
-            blockindex->GetPrev()->GetBlockHash().GetHex());
-    }
-
-    if (nextBlockHash.has_value())
-    {
-        jWriter.pushKV("nextblockhash", nextBlockHash.value().GetHex());
     }
 }
 
@@ -1618,7 +1770,7 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
             "Blockchain is shorter than the attempted prune height.");
     } else if (height > chainHeight - MIN_BLOCKS_TO_KEEP) {
         LogPrint(BCLog::RPC, "Attempt to prune blocks close to the tip. "
-                             "Retaining the minimum number of blocks.");
+                             "Retaining the minimum number of blocks.\n");
         height = chainHeight - MIN_BLOCKS_TO_KEEP;
     }
 
@@ -1706,6 +1858,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             "     ]\n"
             "  },\n"
             "  \"coinbase\" : true|false   (boolean) Coinbase or not\n"
+            "  \"confiscation\" : true|false (boolean) Output of confiscation transaction or not\n"
             "}\n"
 
             "\nExamples:\n"
@@ -1750,6 +1903,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
                                IsGenesisEnabled(config, height), o);
             ret.push_back(Pair("scriptPubKey", o));
             ret.push_back(Pair("coinbase", coin.IsCoinBase()));
+            ret.push_back(Pair("confiscation", coin.IsConfiscation()));
         };
 
     if (fMempool) {
@@ -3506,7 +3660,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockbyheight",       getblockbyheight,       true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
-    { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbose"} },
+    { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockstats",          getblockstats,          true,  {"blockhash","stats"} },
     { "blockchain",         "getblockstatsbyheight",  getblockstatsbyheight,  true,  {"height","stats"} },
     { "blockchain",         "getchaintips",           getchaintips,           true,  {} },
@@ -3539,7 +3693,7 @@ static const CRPCCommand commands[] = {
     { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
     { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
     { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
-    { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} }
+    { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} },
 };
 // clang-format on
 

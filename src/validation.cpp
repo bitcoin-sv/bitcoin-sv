@@ -8,8 +8,11 @@
 #include "abort_node.h"
 #include "arith_uint256.h"
 #include "async_file_reader.h"
+#include "block_file_access.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
+#include "blockfileinfostore.h"
+#include "blockindex_with_descendants.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -25,6 +28,10 @@
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
+#include "invalid_txn_publisher.h"
+#include "metrics.h"
+#include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_tracker.h"
 #include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -34,6 +41,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "processing_block_index.h"
+#include "pubkey.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -554,7 +562,7 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled)
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t height)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
@@ -758,14 +766,14 @@ static bool IsAbsurdlyHighFeeSetForTxn(
     return !(nAbsurdFee != Amount(0) && nFees > nAbsurdFee);
 }
 
-static bool CheckTxSpendsCoinbase(
+static bool CheckTxSpendsCoinbaseOrConfiscation(
     const CTransaction &tx,
     const CCoinsViewCache& view) {
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     for (const CTxIn &txin : tx.vin) {
         if (auto coin = view.GetCoin(txin.prevout);
-            coin.has_value() && coin->IsCoinBase()) {
+            coin.has_value() && (coin->IsCoinBase() || coin->IsConfiscation())) {
             return true;
         }
     }
@@ -887,6 +895,10 @@ std::vector<TxId> LimitMempoolSize(
         vRemovedTxIds =
             pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
         usageTotal = pool.DynamicMemoryUsage();
+        for (const auto& txid: vRemovedTxIds) {
+            LogPrint(BCLog::MEMPOOL, "Limit mempool size: txn= %s removed from the memory pool\n",
+                txid.ToString());
+        }
     }
 
     // Disk usage is eventually consistent with total usage.
@@ -1141,6 +1153,12 @@ CTxnValResult TxnValidation(
                 return Result{state, pTxInputData};
             }
 
+            // Bail out early if replacement of non-final txns exceeds rate limit
+            if(!mempool.getNonFinalPool().checkUpdateWithinRate(ptx, state)) {
+                // state set in call to checkUpdateWithinRate
+                return Result{state, pTxInputData};
+            }
+
             // Currently we don't allow chains of non-final txns
             if(DoesNonFinalSpendNonFinal(tx)) {
                 state.DoS(0, false, REJECT_NONSTANDARD, "too-long-non-final-chain",
@@ -1265,6 +1283,7 @@ CTxnValResult TxnValidation(
     }
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     Amount nModifiedFees = nFees;
+    pool.ApplyDeltas(txid, nModifiedFees);
 
     // Calculate tx's size.
     const unsigned int nTxSize = ptx->GetTotalSize();
@@ -1273,23 +1292,30 @@ CTxnValResult TxnValidation(
     // Note that consolidation transactions paying a voluntary fee will
     // be treated with higher priority. The higher the fee the higher
     // the priority
-    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
-    if (skipFeeTest) {
-        const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
+    AnnotatedType<bool> isFree = IsFreeConsolidationTxn(config, tx, view, chainActive.Height());
+    if (isFree.value) {
+        const CFeeRate blockMinTxFee = pool.GetBlockMinTxFee();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
-        pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
-        LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
+        if (nModifiedFees == nFees) {
+            pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
+            pool.ApplyDeltas(txid, nModifiedFees);
+        }
+        if(isFree.hint) {
+            LogPrint(BCLog::TXNVAL,isFree.hint.value());
+        }
     }
-
-    pool.ApplyDeltas(txid, nModifiedFees);
 
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
-    const bool fSpendsCoinbase = CheckTxSpendsCoinbase(tx, view);
+    const bool fSpendsCoinbaseOrConfiscation = CheckTxSpendsCoinbaseOrConfiscation(tx, view);
 
     // Check mempool minimal fee requirement.
     const Amount& nMempoolRejectFee = GetMempoolRejectFee(config, pool, nTxSize);
     if(!CheckMempoolMinFee(nModifiedFees, nMempoolRejectFee)) {
+        // If this was considered a consolidation but not accepted as such,
+        // then print us a hint
+        if (!isFree.value && isFree.hint)
+            LogPrint(BCLog::TXNVAL,isFree.hint.value());
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                  "mempool min fee not met",
                   strprintf("%d < %d", nFees, nMempoolRejectFee));
@@ -1307,8 +1333,9 @@ CTxnValResult TxnValidation(
             nFees,
             nAcceptTime,
             uiChainActiveHeight,
-            fSpendsCoinbase,
+            fSpendsCoinbaseOrConfiscation,
             lp) };
+
     // Calculate in-mempool ancestors, up to a limit.
     std::string errString;
     if (!CheckAncestorLimits(pool, *pMempoolEntry, errString, config)) {
@@ -2408,14 +2435,22 @@ static void InvalidChainFound(const Config& config, const CBlockIndex *pindexNew
     CheckSafeModeParameters(config, pindexNew);
 }
 
-static void InvalidBlockFound(const Config& config, CBlockIndex *pindex,
-                              const CValidationState &state) {
-    if (state.GetRejectCode() != REJECT_SOFT_CONSENSUS_FREEZE &&
-        !state.CorruptionPossible())
+static void InvalidBlockFound(const Config& config,
+                              CBlockIndex* pindex,
+                              const CBlock& block,
+                              const CValidationState& state)
+{
+    if(state.GetRejectCode() != REJECT_SOFT_CONSENSUS_FREEZE &&
+       !state.CorruptionPossible())
     {
         pindex->ModifyStatusWithFailed(mapBlockIndex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(config, pindex);
+    }
+
+    // Update miner ID database if required
+    if(g_minerIDs) {
+        g_minerIDs->InvalidBlock(block, pindex->GetHeight());
     }
 }
 
@@ -2433,7 +2468,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
     }
 
     // Add outputs.
-    AddCoins(inputs, tx, nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
+    AddCoins(inputs, tx, CFrozenTXOCheck::IsConfiscationTx(tx), nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
 }
 
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight) {
@@ -2472,22 +2507,56 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
         return state.Invalid(false, 0, "", "Inputs unavailable");
     }
 
+    // Are we checking inputs for confiscation transaction?
+    const bool isConfiscationTx = CFrozenTXOCheck::IsConfiscationTx(tx);
+    if(isConfiscationTx)
+    {
+        // Validate contents of confiscation transaction
+        if(!CFrozenTXOCheck::ValidateConfiscationTxContents(tx))
+        {
+            return
+                state.Invalid(
+                    false,
+                    REJECT_INVALID,
+                    "bad-ctx-invalid",
+                    "confiscation transaction is invalid");
+        }
+
+        // Confiscation transaction must be whitelisted and valid at given height
+        if(!frozenTXOCheck.CheckConfiscationTxWhitelisted(tx))
+        {
+            return
+                state.Invalid(
+                    false,
+                    REJECT_INVALID,
+                    "bad-ctx-not-whitelisted",
+                    "confiscation transaction is not whitelisted");
+        }
+    }
+
     Amount nValueIn(0);
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
 
-        if(!frozenTXOCheck.Check(prevout, tx))
+        if(!isConfiscationTx)
         {
-            return
-                state.Invalid(
-                    false,
+            // For normal transaction no input must be frozen
+            if(!frozenTXOCheck.Check(prevout, tx))
+            {
+                return
+                    state.Invalid(
+                        false,
                     frozenTXOCheck.IsCheckOnBlock() ?
                         REJECT_SOFT_CONSENSUS_FREEZE :
                         REJECT_INVALID,
-                    "bad-txns-inputs-frozen",
-                    "tried to spend blacklisted input");
+                        "bad-txns-inputs-frozen",
+                        "tried to spend blacklisted input");
+            }
         }
+        // For confiscation transaction all inputs must be frozen, but this is implicitly guaranteed here,
+        // since confiscation transaction is whitelisted and consequently all of its inputs are on Confiscation
+        // blacklist and therefore consensus frozen on every height.
 
         auto coin = inputs.GetCoin(prevout);
         assert(coin.has_value() && !coin->IsSpent());
@@ -2499,6 +2568,17 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
                     false, REJECT_INVALID,
                     "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d",
+                              nSpendHeight - coin->GetHeight()));
+            }
+        }
+
+        // If prev is output of a confiscation transaction, check that it's matured
+        if (coin->IsConfiscation()) {
+            if (nSpendHeight - coin->GetHeight() < CONFISCATION_MATURITY) {
+                return state.Invalid(
+                    false, REJECT_INVALID,
+                    "bad-txns-premature-spend-of-confiscation",
+                    strprintf("tried to spend confiscation at depth %d",
                               nSpendHeight - coin->GetHeight()));
             }
         }
@@ -2676,6 +2756,13 @@ std::optional<bool> CheckInputs(
         return false;
     }
 
+    if(CFrozenTXOCheck::IsConfiscationTx(tx))
+    {
+        // If we're checking inputs for confiscation transaction, scripts are valid by definition and do not need to be checked.
+        // Note that here we already know that confiscation transaction is valid (whitelisted, valid contents, unspent inputs...) because this was checked by CheckTxInputs() above.
+        return true;
+    }
+
     if (pvChecks) 
     {
         pvChecks->reserve(tx.vin.size());
@@ -2848,6 +2935,7 @@ public:
         CValidationState& state_,
         CBlockIndex* pindex_,
         CCoinsViewCache& view_,
+        std::int32_t mostWorkBlockHeight_,
         const arith_uint256& mostWorkOnChain_,
         bool fJustCheck_ )
     : config{ config_ }
@@ -2855,6 +2943,7 @@ public:
     , state{ state_ }
     , pindex{ pindex_ }
     , view{ view_ }
+    , mostWorkBlockHeight{ mostWorkBlockHeight_ }
     , mostWorkOnChain{ mostWorkOnChain_ }
     , fJustCheck{ fJustCheck_ }
     , parallelBlockValidation{ parallelBlockValidation_ }
@@ -3001,7 +3090,7 @@ public:
                 CCoinsViewCache& mView;
             } csGuard{ view };
 
-            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo ))
+            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo, mostWorkBlockHeight ))
             {
                 return false;
             }
@@ -3013,7 +3102,7 @@ public:
         }
         else
         {
-            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo ))
+            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo, mostWorkBlockHeight ))
             {
                 return false;
             }
@@ -3101,7 +3190,8 @@ private:
         int64_t nTime2,
         std::vector<std::pair<uint256, CDiskTxPos>>& vPos,
         size_t& nInputs,
-        CBlockUndo& blockundo )
+        CBlockUndo& blockundo,
+        std::int32_t mostWorkBlockHeight )
     {
         vPos.reserve(block.vtx.size());
         blockundo.vtxundo.reserve(block.vtx.size() - 1);
@@ -3181,6 +3271,38 @@ private:
                        GetSizeOfCompactSize(block.vtx.size()));
 
         CFrozenTXOCheck frozenTXOCheck{ *pindex };
+        if( config.GetEnableAssumeWhitelistedBlockDepth() )
+        {
+            if( (mostWorkBlockHeight - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() )
+            {
+                // This block is deep enough under the block with most work to assume that a confiscation transaction is whitelisted
+                // even if its TxId is not present in our frozen TXO database.
+                // Note that block with most work is only available after its contents have already been downloaded.
+                // Consequently this check may not work during IBD where descendant blocks have not been downloaded so that
+                // block with most work is the same as block currently being validated.
+                // Checking against most work block, however, does provide a guarantee that this block extends the chain towards
+                // the block with most work, which means that (small) reorgs are handled properly.
+                frozenTXOCheck.DisableEnforcingConfiscationTransactionChecks();
+            }
+            else if( const auto& bestHeader = mapBlockIndex.GetBestHeader();
+                     (bestHeader.GetHeight() - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() &&
+                     bestHeader.GetAncestor(pindex->GetHeight()) == pindex )
+            {
+                // This block is deep enough under the block with best known header to assume that a confiscation transaction is whitelisted
+                // even if its TxId is not present in our frozen TXO database.
+                // Best known header is always available, but this block may not necessarily extend the chain towards it (e.g. in
+                // case of soft consensus freeze). Therefore the ancestor check also needs to be performed here.
+                // But checking depth against the best known header will work properly during IBD, which is the primary use case for
+                // configuration option -assumewhitelistedblockdepth.
+                frozenTXOCheck.DisableEnforcingConfiscationTransactionChecks();
+            }
+            // NOTE: It is also possible to have a large reorg towards the block whose header is not the best and also not have block
+            //       with most work available during reorg. In this case confiscation transactions in blocks on new chain will not
+            //       not be assumed whitelisted (even if block is deep enough) because here we do not yet know how deep the block is
+            //       in the new chain.
+            //       Such cases are rare and are assumed to be handled manually by the node operator in the same way as if a new block
+            //       with non-whitelisted confiscation transaction is mined.
+        }
 
         for (size_t i = 0; i < block.vtx.size(); i++) {
             auto& txRef = block.vtx[i];
@@ -3403,6 +3525,7 @@ private:
     CValidationState& state;
     CBlockIndex* pindex;
     CCoinsViewCache& view;
+    std::int32_t mostWorkBlockHeight;
     const arith_uint256& mostWorkOnChain;
     bool fJustCheck;
     bool parallelBlockValidation;
@@ -3435,6 +3558,7 @@ static bool ConnectBlock(
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
+    std::int32_t mostWorkBlockHeight,
     const arith_uint256& mostWorkOnChain,
     bool fJustCheck = false)
 {
@@ -3445,6 +3569,7 @@ static bool ConnectBlock(
         state,
         pindex,
         view,
+        mostWorkBlockHeight,
         mostWorkOnChain,
         fJustCheck };
 
@@ -3615,7 +3740,8 @@ void PruneAndFlush() {
  * Update chainActive and related internal data structures when adding a new
  * block to the chain tip.
  */
-static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
+static void UpdateTip(const Config &config, CBlockIndex *pindexNew)
+{
     chainActive.SetTip(pindexNew);
 
     // New best block
@@ -3623,29 +3749,8 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
 
     cvBlockChange.notify_all();
 
-    std::vector<std::string> warningMessages;
-    if (!IsInitialBlockDownload()) {
-        int nUpgraded = 0;
-        const CBlockIndex *pindex = chainActive.Tip();
-
-        // Check the version of the last 100 blocks to see if we need to
-        // upgrade:
-        for (int i = 0; i < 100 && pindex != nullptr; i++) {
-            int32_t nExpectedVersion = VERSIONBITS_TOP_BITS;
-            if (pindex->GetVersion() > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
-                (pindex->GetVersion() & ~nExpectedVersion) != 0) {
-                ++nUpgraded;
-            }
-            pindex = pindex->GetPrev();
-        }
-        if (nUpgraded > 0) {
-            warningMessages.push_back(strprintf(
-                "%d of last 100 blocks have unexpected version", nUpgraded));
-        }
-    }
-
     LogPrintf("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu "
-              "date='%s' progress=%f cache=%.1fMiB(%utxo)",
+              "date='%s' progress=%f cache=%.1fMiB(%utxo)\n",
               __func__, chainActive.Tip()->GetBlockHash().ToString(),
               chainActive.Height(), chainActive.Tip()->GetVersion(),
               log(chainActive.Tip()->GetChainWork().getdouble()) / log(2.0),
@@ -3656,12 +3761,6 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
                                         chainActive.Tip()),
               pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)),
               pcoinsTip->GetCacheSize());
-
-    if (!warningMessages.empty()) {
-        LogPrintf(" warning='%s'",
-                  boost::algorithm::join(warningMessages, ", "));
-    }
-    LogPrintf("\n");
 }
 
 static void FinalizeGenesisCrossing(const Config &config, int32_t height, const CJournalChangeSetPtr& changeSet)
@@ -3695,8 +3794,9 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
+    int32_t blockHeight { pindexDelete->GetHeight() };
 
-    FinalizeGenesisCrossing(config, pindexDelete->GetHeight(), changeSet);
+    FinalizeGenesisCrossing(config, blockHeight, changeSet);
 
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -3723,8 +3823,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
 
-    LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms\n",
-             (GetTimeMicros() - nStart) * 0.001);
+    LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms, hash=%s, height=%d\n",
+             (GetTimeMicros() - nStart) * 0.001, pindexDelete->GetBlockHash().ToString(), pindexDelete->GetHeight());
 
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(config.GetChainParams(), state,
@@ -3736,11 +3836,17 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         //  The amount of transactions we are willing to store during reorg is the same as max mempool size
         uint64_t maxDisconnectedTxPoolSize = config.GetMaxMempool();
         // Save transactions to re-add to mempool at end of reorg
-        mempool.AddToDisconnectPoolUpToLimit(changeSet, disconnectpool, maxDisconnectedTxPoolSize, block.vtx);
+        mempool.AddToDisconnectPoolUpToLimit(changeSet, disconnectpool, maxDisconnectedTxPoolSize, block, blockHeight);
     }
 
     // Update chainActive and related variables.
     UpdateTip(config, pindexDelete->GetPrev());
+
+    // Update miner ID database if required
+    if(g_minerIDs) {
+        g_minerIDs->BlockRemoved(block);
+    }
+
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
     GetMainSignals().BlockDisconnected(pblock);
@@ -3753,6 +3859,7 @@ static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
 static int64_t nTimeRemoveFromMempool = 0;
+static int64_t nTimeMinerId = 0;
 
 struct PerBlockConnectTrace {
     const CBlockIndex *pindex = nullptr;
@@ -3872,6 +3979,7 @@ static bool ConnectTip(
     ConnectTrace &connectTrace,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet,
+    std::int32_t mostWorkBlockHeight,
     const arith_uint256& mostWorkOnChain)
 {
     auto guard =
@@ -3917,19 +4025,33 @@ static bool ConnectTip(
                 state,
                 pindexNew,
                 pCoinsTipSpan,
+                mostWorkBlockHeight,
                 mostWorkOnChain);
 
         // re-enable tracing of events if it was disabled
         connectTrace.TracePoolEntryRemovedEvents(true);
 
         GetMainSignals().BlockChecked(blockConnecting, state);
-        if (!rv) {
-            if (state.IsInvalid()) {
-                InvalidBlockFound(config, pindexNew, state);
+        if(!rv)
+        {
+            if(state.IsInvalid())
+            {
+                InvalidBlockFound(config, pindexNew, blockConnecting, state);
             }
             return error("ConnectTip(): ConnectBlock %s failed (%s)",
                          pindexNew->GetBlockHash().ToString(),
                          FormatStateMessage(state));
+        }
+        else {
+            // Update miner ID database if required
+            if(g_minerIDs) {
+                int64_t nMinerIdStart = GetTimeMicros();
+                g_minerIDs->BlockAdded(blockConnecting, pindexNew);
+                int64_t nThisMinerIdTime = GetTimeMicros() - nMinerIdStart;
+                nTimeMinerId += nThisMinerIdTime;
+                LogPrint(BCLog::BENCH, "    - MinerID total: %.2fms [%.2fs]\n",
+                    nThisMinerIdTime * 0.001, nTimeMinerId * 0.000001);
+            }
         }
         nTime3 = GetTimeMicros();
         nTimeConnectTotal += nTime3 - nTime2;
@@ -3945,12 +4067,12 @@ static bool ConnectTip(
     }
     std::vector<CTransactionRef> txNew;
     auto asyncRemoveForBlock = std::async(std::launch::async,
-        [&blockConnecting, &changeSet, &txNew]()
+        [&blockConnecting, &changeSet, &txNew, &config]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash(), txNew);
+            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash(), txNew, config);
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
@@ -4303,6 +4425,7 @@ static bool ActivateBestChainStep(
                         connectTrace,
                         reorgUpdate.GetDisconnectpool(),
                         changeSet,
+                        pindexMostWork->GetHeight(),
                         pindexMostWork->GetChainWork() ))
                 {
                     auto result =
@@ -4350,23 +4473,62 @@ static bool ActivateBestChainStep(
                 }
             }
         }
+        reorgUpdate.UpdateIfNeeded();
+
+        // remove the minerid transactions that could not be mined by ourselves
+        try {
+            if (pindexOldTip) {
+                // If this block was from someone else, then we have to remove our own
+                // minerinfo transactions from the mempool
+                std::vector<COutPoint> funds = g_MempoolDatarefTracker->funds();
+                std::vector<TxId> datarefs;
+                std::transform(
+                        funds.cbegin(),
+                        funds.cend(),
+                        std::back_inserter(datarefs),
+                        [](const COutPoint& p) {return p.GetTxId();});
+
+                if (!datarefs.empty()) {
+
+                    std::stringstream ss;
+                    for (const auto& txid: datarefs)
+                        ss << ' ' << txid.ToString();
+                    LogPrint(BCLog::MINERID,
+                             "minerinfotx tracker, remove minerinfo and dataref txns:%s\n", ss.str());
+
+                    std::vector<TxId> toRemove = mempool.RemoveTxnsAndDescendants(datarefs, changeSet);
+                    if (toRemove.size() != funds.size()) {
+                        // if we mined them by error (calling bitcoin-cli generate for e.g.), then we have to
+                        // store them as potential funds
+                        for (const TxId& txid: toRemove) {
+                            const auto it = std::find_if(
+                                    funds.cbegin(),
+                                    funds.cend(),
+                                    [&txid](const COutPoint& p){return txid == p.GetTxId();});
+                            if (it != funds.end())
+                                funds.erase(it);
+                        }
+                        g_MempoolDatarefTracker->funds_replace(std::move(funds));
+                        move_and_store(*g_MempoolDatarefTracker, *g_BlockDatarefTracker);
+                    }
+                    g_MempoolDatarefTracker->funds_clear();
+                }
+            }
+        } catch(...) {
+            LogPrintf("Exception caught while removing mineridinfo-tx from mempool\n");
+        }
 
         // We will soon exit this function, lets update the mempool before we check it.
-        reorgUpdate.UpdateIfNeeded();
         mempool.CheckMempool(*pcoinsTip, changeSet);
         // If we made any changes lets apply them now.
         if(changeSet)
-        {
             changeSet->apply();
-        }
 
-    }
-    catch(...) {
+    } catch(...) {
         // We were probably cancelled.
         LogPrintf("Exception caught during ActivateBestChainStep;\n");
         throw;
     }
-
     return true;
 }
 
@@ -5355,7 +5517,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled, blockHeight)) {
         auto result = state.Invalid(false, state.GetRejectCode(),
                                     state.GetRejectReason(),
                                     strprintf("Coinbase check failed (txid %s) %s",
@@ -6090,7 +6252,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
     }
     auto source = task::CCancellationSource::Make();
 
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, indexDummy.get(), viewNew, indexDummy->GetChainWork(), true))
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, indexDummy.get(), viewNew, chainActive.Height(), indexDummy->GetChainWork(), true))
     {
         return false;
     }
@@ -6447,7 +6609,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                     pindex->GetHeight(), pindex->GetBlockHash().ToString());
             }
             auto source = task::CCancellationSource::Make();
-            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, pindex->GetChainWork()))
+            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, chainActive.Height(), pindex->GetChainWork()))
             {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
@@ -6491,7 +6653,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
         }
 
         // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, *tx, pindex->GetHeight(), config.GetGenesisActivationHeight(), true);
+        AddCoins(inputs, *tx, CFrozenTXOCheck::IsConfiscationTx(*tx), pindex->GetHeight(), config.GetGenesisActivationHeight(), true);
     }
 
     return true;

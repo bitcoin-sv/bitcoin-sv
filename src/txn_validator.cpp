@@ -405,8 +405,8 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 LogPrint(BCLog::TXNVAL, "Txnval-asynch: Got %d new transactions\n",
                                          mProcessingQueue.size());
                                 // Special handlers
-                                mining::CJournalChangeSetPtr changeSet {
-                                    mMempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::NEW_TXN) };
+                                // Mempool Journal ChangeSet should be nullptr for simple mempool operations
+                                mining::CJournalChangeSetPtr changeSet {nullptr};
                                 CTxnHandlers handlers {
                                     changeSet,
                                     mpTxnDoubleSpendDetector,
@@ -626,7 +626,7 @@ void CTxnValidator::postValidationStepsNL(
         } else {
             imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
         }
-    } else if (!state.IsMissingInputs()) {
+    } else if (!state.IsMissingInputs()){
         imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
     }
 }

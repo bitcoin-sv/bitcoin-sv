@@ -27,7 +27,9 @@ class CQueueAdaptor
   public:
 
     // Are we empty?
-    bool empty() const { return mTasks.empty(); }
+    [[nodiscard]] bool empty() const { return mTasks.empty(); }
+    // Get size
+    size_t size() const { return mTasks.size(); }
 
     // Push a task onto the queue
     void push(CTask&& task) { mTasks.emplace(std::move(task)); }
@@ -67,9 +69,15 @@ class CDualQueueAdaptor
   public:
 
     // Are we empty?
-    bool empty() const
+    [[nodiscard]] bool empty() const
     {
         return mStdTasks.empty() && mNonStdTasks.empty();
+    }
+
+    // Get size
+    size_t size() const
+    {
+        return mStdTasks.size() + mNonStdTasks.size();
     }
 
     // Push a task onto the queue
@@ -130,7 +138,9 @@ class CPriorityQueueAdaptor
   public:
 
     // Are we empty?
-    bool empty() const { return mTasks.empty(); }
+    [[nodiscard]] bool empty() const { return mTasks.empty(); }
+    // Get size
+    size_t size() const { return mTasks.size(); }
 
     // Push a task onto the queue
     void push(CTask&& task) { mTasks.emplace(std::move(task)); }
@@ -184,6 +194,8 @@ class CThreadPool final
 
     // Query size of the pool.
     size_t getPoolSize() const { return mThreads.size(); }
+    // Query number of queued tasks
+    size_t getTaskDepth() const;
 
     // Submit a task to the pool.
     void submit(CTask&& task);

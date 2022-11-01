@@ -607,6 +607,11 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_do_not_collect_tx_with_too_many_outputs) {
 // In this test we are testing limitation on number of transactions released at once (in single batch)
 BOOST_AUTO_TEST_CASE(test_orphantxns_max_percentage_in_batch) {
 
+    // This value affects number of released txs. The default value needs to be set 
+    // in order to avoid some random value that would be set by a previously 
+    // performed test (e.g. test_txnvalidator/txnvalidator_low_priority_chain_async_api).
+    gArgs.ForceSetArg("-maxstdtxnsperthreadratio", std::to_string(DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO));
+
     const uint64_t MAX_PERCENTAGE_ORPHANS_IN_BATCH = 5;
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {

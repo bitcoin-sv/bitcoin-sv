@@ -15,6 +15,15 @@ void StringHTTPResponse::SetBody(const unsigned char* body, size_t size)
     }
 }
 
+void JSONHTTPResponse::SetBody(const unsigned char* body, size_t size)
+{
+    if(body)
+    {
+        const char* data { reinterpret_cast<const char*>(body) };
+        mBody.read(data, size);
+    }
+}
+
 void BinaryHTTPResponse::SetBody(const unsigned char* body, size_t size)
 {
     if(body)

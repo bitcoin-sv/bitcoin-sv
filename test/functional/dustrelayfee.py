@@ -7,7 +7,7 @@ when the dustrelayfee and dustlimitfactor setting changes between releases or is
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_raises_rpc_error
+from test_framework.util import assert_raises_rpc_error, sync_blocks
 from test_framework.mininode import COIN
 from decimal import Decimal
 
@@ -47,6 +47,10 @@ class DustRelayFeeTest(BitcoinTestFramework):
     # - node accepts tx output which meets dust threshold
     def test_node_with_fees(self, nodeid):
         node = self.nodes[nodeid]
+        
+        # Check that nodes agree before shutting one off
+        sync_blocks(self.nodes[nodeid:], timeout=20)
+
         self.restart_node(nodeid, extra_args=[
             "-acceptnonstdtxn=0"])
 

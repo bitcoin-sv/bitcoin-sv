@@ -55,17 +55,17 @@ namespace
     };
 
     // Parse an HTTP response
-    ResponseStatus GetHTTPStatusAndWantsProof(const rpc::client::HTTPResponse& response)
+    ResponseStatus GetHTTPStatusAndWantsProof(const rpc::client::HTTPResponse& response, const std::string& endpoint)
     {
         int status { response.GetStatus() };
-        LogPrint(BCLog::DOUBLESPEND, "Got %d response from endpoint\n", status);
+        LogPrint(BCLog::DOUBLESPEND, "Got %d response from endpoint %s\n", status, endpoint);
 
         // Does endpoint want proof?
         const auto& headers { response.GetHeaders() };
         const auto& dsntheader { headers.find(DSNT_HTTP_HEADER) };
         if(dsntheader == headers.end())
         {
-            LogPrint(BCLog::DOUBLESPEND, "Missing %s header in response from endpoint\n", DSNT_HTTP_HEADER);
+            LogPrint(BCLog::DOUBLESPEND, "Missing %s header in response from endpoint %s\n", DSNT_HTTP_HEADER, endpoint);
             return { false, false, status };
         }
         bool wantsProof { boost::lexical_cast<bool>(dsntheader->second) };
@@ -476,7 +476,7 @@ bool DSAttemptHandler::SubmitQuery(
     client.SubmitRequest(request, &response);
 
     // Check and parse query response
-    ResponseStatus rs { GetHTTPStatusAndWantsProof(response) };
+    ResponseStatus rs { GetHTTPStatusAndWantsProof(response, endpointAddrStr) };
     if(!rs.ok)
     {
         // Bad response, add endpoint address to blacklist
@@ -498,7 +498,7 @@ bool DSAttemptHandler::SubmitQuery(
     // Does endpoint want proof?
     if(!rs.wantsProof)
     {
-        LogPrint(BCLog::DOUBLESPEND, "Endpoint doesn't want proof for %s\n", txid);
+        LogPrint(BCLog::DOUBLESPEND, "Endpoint %s doesn't want proof for %s\n", endpointAddrStr, txid);
         return false;
     }
 
@@ -724,7 +724,7 @@ bool DSAttemptHandler::QueryAndSubmitProof(
         client.SubmitRequest(request, &response);
 
         // Check and parse submit response
-        ResponseStatus rs { GetHTTPStatusAndWantsProof(response) };
+        ResponseStatus rs { GetHTTPStatusAndWantsProof(response, endpointAddrStr) };
         if(!rs.ok)
         {
             // Very strange, server responded ok to our initial query but now it seems to be misbehaving.

@@ -34,7 +34,8 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         self.data_carrier_size = 500000
         self.num_nodes = 1
         self.setup_clean_chain = True        
-        self.extra_args = [['-whitelist=127.0.0.1', "-datacarriersize=%d" % self.data_carrier_size]]
+        self.extra_args = [['-whitelist=127.0.0.1', "-datacarriersize=%d" % self.data_carrier_size,
+                            '-jbathrottlethreshold=100']]
 
     def setup_nodes(self):
         # Append -blocksizeactivationtime only if explicitly specified

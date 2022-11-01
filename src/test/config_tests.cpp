@@ -566,6 +566,63 @@ BOOST_AUTO_TEST_CASE(dsattempt_config)
     BOOST_CHECK(!config.SetDoubleSpendDetectedWebhookMaxTxnSize(-1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(minerid_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdEnabled(), MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED);
+    BOOST_CHECK(config.SetMinerIdEnabled(false, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdEnabled(), false);
+    BOOST_CHECK(config.SetMinerIdEnabled(true, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdEnabled(), true);
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdCacheSize(), MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE);
+    BOOST_CHECK(config.SetMinerIdCacheSize(2 * MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdCacheSize(), 2 * MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE);
+    BOOST_CHECK(config.SetMinerIdCacheSize(0, &err));
+    BOOST_CHECK(config.SetMinerIdCacheSize(MinerIdDatabaseDefaults::MAX_CACHE_SIZE, &err));
+    BOOST_CHECK(!config.SetMinerIdCacheSize(-1, &err));
+    BOOST_CHECK(!config.SetMinerIdCacheSize(MinerIdDatabaseDefaults::MAX_CACHE_SIZE + 1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdsNumToKeep(), MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP);
+    BOOST_CHECK(config.SetMinerIdsNumToKeep(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdsNumToKeep(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP);
+    BOOST_CHECK(!config.SetMinerIdsNumToKeep(1, &err));
+    BOOST_CHECK(!config.SetMinerIdsNumToKeep(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationM(), MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M);
+    BOOST_CHECK(config.SetMinerIdReputationM(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationM(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M);
+    BOOST_CHECK(config.SetMinerIdReputationM(config.GetMinerIdReputationN(), &err));
+    BOOST_CHECK(!config.SetMinerIdReputationM(config.GetMinerIdReputationN() + 1, &err));
+    BOOST_CHECK(config.SetMinerIdReputationM(1, &err));
+    BOOST_CHECK(!config.SetMinerIdReputationM(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationN(), MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N);
+    BOOST_CHECK(config.SetMinerIdReputationN(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationN(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N);
+    BOOST_CHECK(config.SetMinerIdReputationN(1, &err));
+    BOOST_CHECK(!config.SetMinerIdReputationN(-1, &err));
+    config.SetMinerIdReputationM(MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err);
+    BOOST_CHECK(config.SetMinerIdReputationN(config.GetMinerIdReputationM(), &err));
+    BOOST_CHECK(!config.SetMinerIdReputationN(config.GetMinerIdReputationM() - 1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationMScale(), MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR);
+    BOOST_CHECK(config.SetMinerIdReputationMScale(2 * MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR, &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdReputationMScale(), 2 * MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR);
+    BOOST_CHECK(config.SetMinerIdReputationMScale(1, &err));
+    BOOST_CHECK(!config.SetMinerIdReputationMScale(-1, &err));
+
+    BOOST_CHECK(config.SetMinerIdGeneratorURL("http://127.0.0.1:8080", &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorAddress(), "127.0.0.1");
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorPort(), 8080);
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorPath(), "");
+
+    BOOST_CHECK(config.SetMinerIdGeneratorAlias("OurAlias", &err));
+    BOOST_CHECK_EQUAL(config.GetMinerIdGeneratorAlias(), "OurAlias");
+}
+
 BOOST_AUTO_TEST_CASE(disable_BIP30)
 {
     GlobalConfig config {};

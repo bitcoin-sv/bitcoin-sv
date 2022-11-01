@@ -2,6 +2,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <cstddef>
 #include <string.h>
 #include <vector>
 #include <stdio.h>
@@ -41,8 +42,9 @@ static const char *hatoui(const char *first, const char *last,
     return first;
 }
 
-enum jtokentype getJsonToken(std::string& tokenVal, unsigned int& consumed,
-                            const char *raw, const char *end)
+enum jtokentype getJsonToken(std::string& tokenVal, 
+                             std::ptrdiff_t& consumed,
+                             const char* raw, const char* end)
 {
     tokenVal.clear();
     consumed = 0;
@@ -257,7 +259,7 @@ bool UniValue::read(const char *raw, size_t size)
     std::vector<UniValue*> stack;
 
     std::string tokenVal;
-    unsigned int consumed;
+    std::ptrdiff_t consumed;
     enum jtokentype tok = JTOK_NONE;
     enum jtokentype last_tok = JTOK_NONE;
     const char* end = raw + size;

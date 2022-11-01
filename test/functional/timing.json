@@ -874,5 +874,13 @@
  {
   "name": "zapwallettxes.py",
   "time": 13
+ },
+ {
+  "name": "bsv-createdatareftx-reorg-extended.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-merkleproof-storage-overflow.py",
+  "time": 5
  }
 ]

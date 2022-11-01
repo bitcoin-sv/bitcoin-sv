@@ -64,7 +64,8 @@ class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Increased max policy tx size"
     _UTXO_KEY = make_key()    
-    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-maxtxsizepolicy=%d' % NEW_MAX_TX_SIZE_POLICY, '-datacarriersize=%d' % NEW_MAX_TX_SIZE_POLICY]
+    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-maxtxsizepolicy=%d' % NEW_MAX_TX_SIZE_POLICY, '-datacarriersize=%d' % NEW_MAX_TX_SIZE_POLICY] +\
+                                             ['-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
 
     def get_transactions_for_test(self, tx_collection, coinbases):
         if tx_collection.label == "PRE-GENESIS":

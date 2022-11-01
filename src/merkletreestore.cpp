@@ -520,11 +520,11 @@ CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databas
     // Try to load index data from the database or rebuild index if needed
     if (!merkleTreeStore.LoadMerkleTreeIndexDB())
     {
-        LogPrintf("Merkle Trees will not be stored to disk until next successful initialization.");
+        LogPrintf("Merkle Trees will not be stored to disk until next successful initialization.\n");
     }
 }
 
-CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight)
+CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, const CBlockIndex& blockIndex, const int32_t currentChainHeight)
 {
     {
         LOCK(cs_merkleTreeFactory);

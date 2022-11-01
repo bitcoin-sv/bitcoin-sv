@@ -87,6 +87,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     // Make sure nothing starts executing until we have queued everything
     pool.pause();
     BOOST_CHECK(pool.paused());
+    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 0);
 
     // Each task will add a result to this vector
     std::vector<std::string> taskResults {};
@@ -99,6 +100,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     results.push_back(make_task(pool, CTask::Priority::Medium, [&taskResults](){ taskResults.push_back("Medium"); }));
     results.push_back(make_task(pool, CTask::Priority::High, [&taskResults](){ taskResults.push_back("High"); }));
     results.push_back(make_task(pool, 10, [&taskResults](){ taskResults.push_back("VeryHigh"); }));
+    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 4);
 
     // Wait for all tasks to complete
     pool.run();
@@ -109,6 +111,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     }
 
     BOOST_CHECK(taskResults == expectedResults);
+    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 0);
 
     taskResults.clear();
     expectedResults.clear();

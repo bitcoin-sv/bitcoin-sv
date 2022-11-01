@@ -30,6 +30,7 @@
 
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/test/unit_test.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 #include <univalue.h>
 
@@ -261,7 +262,7 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions[0].vout[1].nValue = 50 * CENT;
     dummyTransactions[0].vout[1].scriptPubKey
         << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
-    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), 0, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), false, 0, 0);
 
     dummyTransactions[1].vout.resize(2);
     dummyTransactions[1].vout[0].nValue = 21 * CENT;
@@ -270,7 +271,7 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions[1].vout[1].nValue = 22 * CENT;
     dummyTransactions[1].vout[1].scriptPubKey =
         GetScriptForDestination(key[3].GetPubKey().GetID());
-    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), 0, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), false, 0, 0);
 
     return dummyTransactions;
 }
@@ -476,7 +477,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         CTxOut out;
         out.nValue = Amount(1000);
         out.scriptPubKey = scriptPubKey;
-        coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false));
+        coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false, false));
     }
 
     for (size_t i = 0; i < mtx.vin.size(); i++) {
@@ -943,7 +944,7 @@ SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCach
     else
         dummyTransactions[0].vout[1].scriptPubKey << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
 
-    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), height, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), false, height, 0);
 
     dummyTransactions[1].vout.resize(2);
     dummyTransactions[1].vout[0].nValue = 21 * CENT;
@@ -952,7 +953,7 @@ SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCach
     dummyTransactions[1].vout[1].nValue = 22 * CENT;
     dummyTransactions[1].vout[1].scriptPubKey =
             GetScriptForDestination(key[3].GetPubKey().GetID());
-    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), height, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), false, height, 0);
     return dummyTransactions;
 }
 
@@ -979,7 +980,7 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
 
     static const std::vector<uint8_t> protocol_id = {'d','u','s','t'};
 
-    // Test IsDustReturnTxn function which is called by IsConsolidationTxn
+    // Test IsDustReturnTxn function which is called by IsFreeConsolidationTxn
     // IsDustReturnTxn calls IsDustReturnScript which is tested in module script_tests.
 
     // good
@@ -1001,13 +1002,24 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
     // Correct Dust transaction, Note that IsDustReturnScript is tested elsewhere
     CreateDustReturnTransaction(t, testConfig, inputTxns);
     t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
-    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, 1);
+        BOOST_CHECK(isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(isFree.hint.value() == strprintf("free donation transaction: %s", tx.GetId().ToString()));
+    }
 
     /* testing switching dust on and of together with consolidation transactions */
     CreateDustReturnTransaction(t, testConfig, inputTxns);
     t.vout[0].scriptPubKey << OP_FALSE << OP_RETURN << protocol_id;
     testConfig.SetMinConsolidationFactor(0);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, 1));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, 1);
+        BOOST_CHECK(!isFree.value);
+        BOOST_CHECK(!isFree.hint.has_value()); // We do not produce hints if consolidation txns are deactivated
+    }
 }
 
 uint64_t CreateTestConsolidationTxn(CMutableTransaction & t, ConfigInit & config, size_t nbInputs, size_t outputScriptSize, const std::vector<CMutableTransaction> & inputTxns, size_t scriptSigLen)
@@ -1057,29 +1069,65 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
     // check correct consolidation transaction
     uint64_t sumInputScriptPubKeySize = CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, 65);
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2, inputTxns, 65);
-    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(isFree.hint.value() == strprintf("free consolidation transaction: %s", tx.GetId().ToString()));
+    }
 
     // consolidation transactions turned off
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2, inputTxns, 65);
     testConfig.SetMinConsolidationFactor(0);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(!isFree.value);
+        BOOST_CHECK(!isFree.hint.has_value());// We do not produce hints if consolidation txns are deactivated
+    }
 
     // not enough confirmations
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2 , inputTxns, 65);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight - 1));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight - 1);
+        BOOST_CHECK(!isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "minconsolidationinputmaturity"));
+    }
 
     // not enough inputs
     CreateTestConsolidationTxn(t,  testConfig, 1, sumInputScriptPubKeySize / 2, inputTxns, 65);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(!isFree.value); // there may or may not be a hint produced in this circumstance
+    }
+
+
 
     // output script to big, i.e. sum of inputs sizes divided by sum of output sizes
     // smaller than consolidation factor
     CreateTestConsolidationTxn(t, testConfig, 2, sumInputScriptPubKeySize / 2 + 1, inputTxns, 65);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(!isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "minconsolidationfactor"));
+    }
 
     // spam inputs
     CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize() + 1);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(!isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "too large scriptSig"));
+        BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "maxconsolidationinputscriptsize"));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
@@ -1097,12 +1145,24 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
     // non-standard transaction and non-standard inputs allowed
     CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize());
     testConfig.SetAcceptNonStdConsolidationInput(true);
-    BOOST_CHECK(IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(isFree.hint.value() == strprintf("free consolidation transaction: %s", tx.GetId().ToString()));
+    }
 
     // non-standard transaction and non-standard inputs disallowed
     CreateTestConsolidationTxn(t, testConfig, 2, 1, inputTxns, testConfig.GetMaxConsolidationInputScriptSize());
     testConfig.SetAcceptNonStdConsolidationInput(false);
-    BOOST_CHECK(!IsConsolidationTxn(testConfig, CTransaction(t), coins, tipHeight));
+    {
+        CTransaction tx = CTransaction(t);
+        AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
+        BOOST_CHECK(!isFree.value);
+        BOOST_CHECK(isFree.hint.has_value());
+        BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "acceptnonstdconsolidationinput"));
+    }
 }
 
 

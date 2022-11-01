@@ -88,6 +88,9 @@ struct CNodeState
     //! Whether this peer wants invs or headers (when possible) for block
     //! announcements.
     bool fPreferHeaders {false};
+    //! Whether this peer wants invs or hdrsen (when possible) for block
+    //! announcements.
+    bool fPreferHeadersEnriched {false};
     //! Whether this peer wants invs or cmpctblocks (when possible) for block
     //! announcements.
     bool fPreferHeaderAndIDs {false};

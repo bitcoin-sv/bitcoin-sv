@@ -55,6 +55,18 @@ _textwriter_h_fh = open(os.path.join(get_srcdir(), 'src', 'rpc',
 _textwriter_h_contents = _textwriter_h_fh.read()
 _textwriter_h_fh.close()
 
+# Slurp in txn_validation_config.h contents
+_txnvalidationconfig_h_fh = open(os.path.join(get_srcdir(), 'src',
+                                    'txn_validation_config.h'), 'rt')
+_txnvalidationconfig_h_contents = _txnvalidationconfig_h_fh.read()
+_txnvalidationconfig_h_fh.close()
+
+# Slurp in txn_validator.h contents
+_txnvalidator_h_fh = open(os.path.join(get_srcdir(), 'src',
+                                    'txn_validator.h'), 'rt')
+_txnvalidator_h_contents = _txnvalidator_h_fh.read()
+_txnvalidator_h_fh.close()
+
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
@@ -82,6 +94,13 @@ def _extractValidationValue(name):
 
 def _extractTextWriterValue(name):
     return int(eval(re.search(name + ' = (.+);', _textwriter_h_contents).group(1)))
+
+def _extractTxnValidationConfigValue(name):
+    return int(eval(re.search(name + " =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
+
+def _extractTxnValidatorValue(name):
+    return int(eval(re.search(name + " \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))
+
 
 # Extract relevant default values parameters
 
@@ -159,8 +178,12 @@ MIN_TTOR_VALIDATION_DISTANCE  = _extractValidationValue('MIN_TTOR_VALIDATION_DIS
 SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = _extractValidationValue('SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE')
 SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = _extractValidationValue('SAFE_MODE_DEFAULT_MIN_FORK_LENGTH')
 SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE = _extractValidationValue('SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE')
+MIN_BLOCKS_TO_KEEP = _extractValidationValue('MIN_BLOCKS_TO_KEEP')
 
 BUFFER_SIZE_HttpTextWriter = _extractTextWriterValue('BUFFER_SIZE')
+
+DEFAULT_MAX_STD_TXN_VALIDATION_DURATION = _extractTxnValidationConfigValue('DEFAULT_MAX_STD_TXN_VALIDATION_DURATION')
+DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION = _extractTxnValidatorValue('DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION')
 
 if __name__ == "__main__":
     # Output values if run standalone to verify
@@ -192,3 +215,7 @@ if __name__ == "__main__":
     print("SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE = %d" % SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE)
 
     print("BUFFER_SIZE_HttpTextWriter = %d" % BUFFER_SIZE_HttpTextWriter)
+
+    print("DEFAULT_MAX_STD_TXN_VALIDATION_DURATION = %d" % DEFAULT_MAX_STD_TXN_VALIDATION_DURATION)
+
+    print("DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION = %d" % DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION)

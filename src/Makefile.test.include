@@ -51,15 +51,19 @@ BITCOIN_TESTS =\
   test/bswap_tests.cpp \
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
+  test/check_selfish_mining_tests.cpp \
   test/coins_tests.cpp \
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
+  test/coinbase_doc_tests.cpp \
   test/core_io_tests.cpp \
   test/cpfp_tests.cpp \
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
+  test/dataref_index_tests.cpp \
+  test/datareftx_tests.cpp \
   test/dsattempt_tests.cpp \
   test/dsdetected_tests.cpp \
   test/dstxn_serialiser_tests.cpp \
@@ -78,6 +82,8 @@ BITCOIN_TESTS =\
   test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
   test/invalid_txn_publisher_tests.cpp \
+  test/jba_selfish_mining_tests.cpp \
+  test/journal_assembler_group_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
   test/json_tests.cpp \
@@ -97,7 +103,15 @@ BITCOIN_TESTS =\
   test/mempooltxdb_tests.cpp \
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
+  test/mining_group_builder_tests.cpp \
+  test/miner_id_db_tests.cpp \
+  test/miner_id_db_tests3.cpp \
+  test/miner_info_tests.cpp \
+  test/miner_info_doc_tests.cpp \
+  test/miner_info_error_tests.cpp \
+  test/miner_info_ref_tests.cpp \
   test/miner_tests.cpp \
+  test/minerid_tests.cpp \
   test/multisig_tests.cpp \
   test/net_association_tests.cpp \
   test/net_message_maker_tests.cpp \
@@ -112,6 +126,7 @@ BITCOIN_TESTS =\
   test/raii_event_tests.cpp \
   test/random_tests.cpp \
   test/reverselock_tests.cpp \
+  test/revokemid_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
   test/scheduler_tests.cpp \
@@ -177,7 +192,7 @@ if ENABLE_WALLET
 test_test_bitcoin_LDADD += $(LIBBITCOIN_WALLET)
 endif
 test_test_bitcoin_LDADD += $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CONSENSUS) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) \
-  $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(EVENT_LIBS) $(EVENT_PTHREADS_LIBS) $(AIO_LIBS)
+  $(LIBLEVELDB) $(LIBCRC32C) $(LIBMEMENV) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(EVENT_LIBS) $(EVENT_PTHREADS_LIBS) $(AIO_LIBS)
 test_test_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 test_test_bitcoin_LDADD += $(LIBBITCOIN_CONSENSUS) $(BDB_LIBS) $(OPENSSL_LIBS) $(MINIUPNPC_LIBS)

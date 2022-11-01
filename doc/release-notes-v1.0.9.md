@@ -80,7 +80,7 @@ block_header:
 | -------------- | ------------------- | ------------- | ------------------------------------------ |
 | 4              | version             | int32_t       | Block version information.                 |
 | 32             | hash previous block | char[32]      | Hash of the previous block in the fork.    |
-| 32             | hash merkle root    | char[32]      | The merkle root for this block.            |safemodemaxforkdistance
+| 32             | hash merkle root    | char[32]      | The merkle root for this block.            |
 | 4              | time                | uint32_t      | Timestamp for when this block was created. |
 | 4              | bits                | uint32_t      | Difficulty target for this block.          |
 | 4              | nonce               | uint32_t      | Nonce used when hashing this block.        |

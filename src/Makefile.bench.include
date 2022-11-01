@@ -28,6 +28,7 @@ bench_bench_bitcoin_SOURCES = \
   bench/perf.h \
   bench/cscript.cpp \
   bench/interpreter.cpp \
+  bench/serialisation.cpp \
   bench/thread_safe_queue.cpp
 
 bench_bench_bitcoin_SOURCES += bench/data/hexhdr.py
@@ -44,7 +45,7 @@ bench_bench_bitcoin_LDADD = \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
-  $(LIBLEVELDB_SSE42) \
+  $(LIBCRC32C) \
   $(LIBMEMENV) \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE)

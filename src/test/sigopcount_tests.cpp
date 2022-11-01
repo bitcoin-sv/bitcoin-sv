@@ -205,7 +205,7 @@ void BuildTxs(CMutableTransaction &spendingTx, CCoinsViewCache &coins,
     spendingTx.vout[0].nValue = Amount(1);
     spendingTx.vout[0].scriptPubKey = CScript();
 
-    AddCoins(coins, CTransaction(creationTx), nHeight, 10 /* scriptPubKey is not a data about, so genesisActivationHEight does not matter */);
+    AddCoins(coins, CTransaction(creationTx), false, nHeight, 10 /* scriptPubKey is not a data about, so genesisActivationHEight does not matter */);
 }
 
 BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {

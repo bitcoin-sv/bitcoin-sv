@@ -28,18 +28,14 @@ class CJournalEntry
 {
   public:
 
-    // Constructors
-    CJournalEntry(const CTransactionWrapperRef& txn,
-                  uint64_t txnSize,
-                  const Amount& fee,
-                  GroupID groupId,
-                  bool isCpfpGroupPayingTx);
+    // Constructor
     explicit CJournalEntry(const CTxMemPoolEntry& entry);
 
-    // accessors
+    // Accessors
     const CTransactionWrapperRef& getTxn() const { return mTxn; }
     uint64_t getTxnSize() const { return mTxnSize; }
     const Amount& getFee() const { return mFee; }
+    int64_t getTime() const { return mTime; }
 
     // Which group of transactions if any does this entry belong to
     const GroupID& getGroupId() const { return mGroupId; }
@@ -47,7 +43,18 @@ class CJournalEntry
     // Is this the paying transaction of its group (if any)
     bool isPaying() const { return isCpfpPayingTx; }
 
+    // Unit test access
+    template<typename T> struct UnitTestAccess;
+
   private:
+
+    // Delegated constructor and used in unit tests
+    CJournalEntry(const CTransactionWrapperRef& txn,
+                  uint64_t txnSize,
+                  const Amount& fee,
+                  int64_t time,
+                  GroupID groupId,
+                  bool isCpfpGroupPayingTx);
 
     // Shared pointer to the transaction wrapper
     CTransactionWrapperRef mTxn {};
@@ -57,6 +64,9 @@ class CJournalEntry
 
     // Fee for the transaction
     Amount mFee {0};
+
+    // Time txn was seen
+    int64_t mTime {0};
 
     // Group id for the transaction
     GroupID mGroupId {};

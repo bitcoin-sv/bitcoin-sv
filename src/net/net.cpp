@@ -17,12 +17,14 @@
 #include "crypto/common.h"
 #include "crypto/sha256.h"
 #include "hash.h"
+#include "miner_id/miner_info_tracker.h"
 #include "net/netbase.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
 #include "taskcancellation.h"
 #include "txn_propagator.h"
 #include "txn_validator.h"
+#include "rawtxvalidator.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 #include "invalid_txn_publisher.h"
@@ -728,6 +730,7 @@ void CNode::copyStats(NodeStats &stats)
     }
     stats.fPauseSend = GetPausedForSending();
     stats.fUnpauseSend = stats.fPauseSend && !GetPausedForSending(true);
+    stats.fAuthConnEstablished = fAuthConnEstablished;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();
@@ -2440,6 +2443,8 @@ CConnman::CConnman(
             mempool,
             std::make_shared<CTxnDoubleSpendDetector>(),
             mTxIdTracker);
+
+    mRawTxnValidator = std::make_shared<RawTxValidator>(*config);
 }
 
 NodeId CConnman::GetNewNodeId() {
@@ -2652,6 +2657,8 @@ void CConnman::Stop() {
         DumpData();
         fAddressesInitialized = false;
     }
+    
+    mRawTxnValidator = nullptr;
 
    mTxnValidator->shutdown();
    mTxnPropagator->shutdown();
@@ -2694,11 +2701,6 @@ void CConnman::DeleteNode(const CNodePtr& pnode) {
     if (fUpdateConnectionTime) {
         addrman.Connected(pnode->GetAssociation().GetPeerAddr());
     }
-}
-
-CConnman::~CConnman() {
-    Interrupt();
-    Stop();
 }
 
 size_t CConnman::GetAddressCount() const {
@@ -2971,6 +2973,8 @@ void CNode::AskFor(const CInv &inv, const Config &config) {
     const size_t idIndexMaxSize { mapAskForMaxSize * IDINDEXSIZE_FACTOR };
     auto& idIndex { indexAskFor.get<TagTxnID>() };
     if(mapAskFor.size() > mapAskForMaxSize || idIndex.size() > idIndexMaxSize) {
+        LogPrint(BCLog::NETMSG, "mapAskFor exceeds the max size limit: %ld. Dropping askfor %s request to peer=%d. Increase -recvinvqueuefactor=%d value to prevent inv requests from being dropped.\n",
+            mapAskForMaxSize, inv.ToString(), id, config.GetRecvInvQueueFactor());
         return;
     }
 
@@ -3123,6 +3127,10 @@ const std::shared_ptr<CTxnValidator>& CConnman::getTxnValidator() {
 	return mTxnValidator;
 }
 
+const std::shared_ptr<RawTxValidator>& CConnman::getRawTxValidator() {
+    return mRawTxnValidator;
+}
+
 CInvalidTxnPublisher& CConnman::getInvalidTxnPublisher()
 {
     return mInvalidTxnPublisher;
@@ -3254,9 +3262,14 @@ CConnman::GetCompactExtraTxns() const {
 }
 
 /** Enqueue a new transaction for later sending to our peers */
-void CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
+bool CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {
+    // do not relay minerinfoid transactions
+    if(g_MempoolDatarefTracker->contains(txn.getInfo().GetTxId()))
+        return false;
+
     mTxnPropagator->newTransaction(txn);
+    return true;
 }
 
 /** Remove some transactions from our peers list of new transactions */

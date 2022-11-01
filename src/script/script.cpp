@@ -17,7 +17,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
 {
     sigOpCountError = false;
     uint64_t n = 0;
-    bsv::instruction last_instruction{OP_INVALIDOPCODE};
+    bsv::instruction last_instruction;
     const auto it_end{end_instructions()};
     for(auto it{begin_instructions()}; it != it_end; ++it)
     {
@@ -137,7 +137,7 @@ bool IsDSNotification(bsv::span<const uint8_t> script) {
        script[3] == 0x64 && script[4] == 0x73 && script[5] == 0x6e && script[6] == 0x74;
 }
 
-bool IsDustReturnScript (bsv::span<const uint8_t> script)
+bool IsDustReturnScript(const bsv::span<const uint8_t> script)
 {
     // OP_FALSE, OP_RETURN, OP_PUSHDATA, 'dust'
     static constexpr std::array<uint8_t, 7> dust_return = {0x00,0x6a,0x04,0x64,0x75,0x73,0x74};
@@ -145,6 +145,24 @@ bool IsDustReturnScript (bsv::span<const uint8_t> script)
         return false;
 
     return std::equal(script.begin(), script.end(), dust_return.begin());
+}
+
+/*
+ * The beginning of the script should look like this: OP_FALSE OP_RETURN
+ * OP_PUSHDATA protocol_id OP_PUSHDATA data Method only works for 4-byte
+ * protocol ids. It does not check data after OP_PUSHDATA (i.e. is length of
+ * data consistent with the chosen PUSHDATA). This should be done on the
+ * call-site.
+ */
+bool IsMinerId(const bsv::span<const uint8_t> script)
+{
+    constexpr std::array<uint8_t, 4> protocol_id{0xac, 0x1e, 0xed, 0x88};
+    return script.size() >= 8 && 
+           script[0] == OP_FALSE &&
+           script[1] == OP_RETURN && 
+           script[2] == protocol_id.size() &&
+           std::equal(protocol_id.begin(), protocol_id.end(), script.begin() + 3) &&
+           script[7] <= OP_PUSHDATA4;
 }
 
 bool CScript::IsPushOnly(const_iterator pc) const {

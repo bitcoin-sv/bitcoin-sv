@@ -21,6 +21,8 @@ template<>
 struct CTxMemPool::UnitTestAccess<UnitTestAccessTag>
 {
 public:
+    using Indexed_transaction_set = indexed_transaction_set;
+
     CTxMemPool& mempool;
 
     UnitTestAccess(CTxMemPool& _mempool)
@@ -28,7 +30,7 @@ public:
     {}
 
     // Expose private members of CTxMemPool.
-    static const int ROLLING_FEE_HALFLIFE = CTxMemPool::ROLLING_FEE_HALFLIFE;
+    inline static const int ROLLING_FEE_HALFLIFE = CTxMemPool::MAX_ROLLING_FEE_HALFLIFE;
 
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
@@ -51,7 +53,9 @@ public:
         const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN)
     {
-        mempool.RemoveRecursive(tx, changeSet, reason);
+        std::unique_lock lock{ mempool.smtx };
+
+        mempool.removeRecursiveNL(tx, changeSet, mempool.noConflict, reason);
     }
   
     mining::CJournalBuilder& getJournalBuilder()

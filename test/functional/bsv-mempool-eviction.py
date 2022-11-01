@@ -18,6 +18,10 @@ from test_framework.util import wait_until, check_mempool_equals
 #    usage of the single transaction is bigger because of metadata associated with txs in the mempool)
 # 3. Send high paying transaction (one by one) and check which tx are evicted
 
+# For Release build with sanitizers enabled (TSAN / ASAN / UBSAN), recommended timeoutfactor is 1.
+# For Debug build, recommended timeoutfactor is 3.
+# For Debug build with sanitizers enabled, recommended timeoutfactor is 5.
+
 class Evictions(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -29,7 +33,6 @@ class Evictions(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-
 
     def tx_size(self, tx):
         return len(tx.serialize())
@@ -62,7 +65,7 @@ class Evictions(BitcoinTestFramework):
 
     def run_test(self):
 
-        with self.run_node_with_connections("Eviction order test; fill the memppol over its size and see what txs will be evicted.",
+        with self.run_node_with_connections("Eviction order test; fill the mempool over its size and see what txs will be evicted.",
                                             0, ["-minminingtxfee=0.00001", # 1 satoshi/byte
                                                 "-minrelaytxfee=0",
                                                 "-maxmempool=300MB",
@@ -210,7 +213,7 @@ class Evictions(BitcoinTestFramework):
                                             number_of_connections=1) as (conn,):
 
             # check that we have all txs in the mempool
-            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1, timeout=60)
+            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1, timeout=(60 * self.options.timeoutfactor))
 
             # check that we are not using the tx database
             assert conn.rpc.getmempoolinfo()['usagedisk'] == 0
@@ -242,12 +245,10 @@ class Evictions(BitcoinTestFramework):
                                             number_of_connections=1) as (conn,):
 
             # check that we have all txs in the mempool
-            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1, timeout=60)
+            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1, timeout=(60 * self.options.timeoutfactor))
 
             # make sure that we are using the tx database
             assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
-
-
 
 if __name__ == '__main__':
     Evictions().main()

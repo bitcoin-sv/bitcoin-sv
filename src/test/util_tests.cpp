@@ -11,6 +11,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 
+#include <boost/test/unit_test_suite.hpp>
 #include <cstdint>
 #include <vector>
 
@@ -716,6 +717,155 @@ BOOST_AUTO_TEST_CASE(test_ConvertBits) {
     CheckConvertBits<8, 5>({0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef},
                            {0x00, 0x04, 0x11, 0x14, 0x0a, 0x19, 0x1c, 0x09,
                             0x15, 0x0f, 0x06, 0x1e, 0x1e});
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+using namespace std;
+
+BOOST_AUTO_TEST_SUITE(transform_hex_tests)
+
+BOOST_AUTO_TEST_CASE(transform_hex_happy_case)
+{
+    const string in{"1289abef"};
+    vector<uint8_t> out;
+    const auto it = transform_hex(in.begin(), in.end(), back_inserter(out));
+    BOOST_CHECK(in.end() == it);
+
+    vector<uint8_t> expected{0x12, 0x89, 0xab, 0xef};
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_hex_empty)
+{
+    const string in;
+    vector<uint8_t> out;
+    const auto it = transform_hex(in.begin(), in.end(), back_inserter(out));
+    BOOST_CHECK(in.end() == it);
+    vector<uint8_t> expected;
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_hex_uppercase_hex)
+{
+    const string_view in{"AB"};
+    vector<uint8_t> out;
+    const auto it = transform_hex(in, back_inserter(out));
+    BOOST_CHECK(in.begin() == it);
+    BOOST_CHECK(out.empty());
+}
+
+BOOST_AUTO_TEST_CASE(transform_hex_1_element)
+{
+    const string in{"1"};
+    vector<uint8_t> out;
+    const auto it = transform_hex(in.begin(), in.end(), back_inserter(out));
+    BOOST_CHECK(in.begin() == it);
+
+    vector<uint8_t> expected;
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_hex_2_elements)
+{
+    const string in{"123456789abcdef0"};
+    vector<uint8_t> out;
+    const auto it = transform_hex(in.begin(), in.end(), back_inserter(out));
+    BOOST_CHECK(in.end() == it);
+
+    vector<uint8_t> expected{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0};
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_hex_3_elements)
+{
+    const string in{"0123"};
+    vector<uint8_t> out;
+    const auto it = transform_hex(in.begin(), in.end(), back_inserter(out));
+    BOOST_CHECK(in.end() == it);
+
+    vector<uint8_t> expected{0x01, 0x23};
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(transform_pairs_tests)
+
+BOOST_AUTO_TEST_CASE(transform_pairs_4_elements)
+{
+    const string in{"1233"};
+    vector<uint8_t> out;
+    const auto it =
+        transform_pairs(in.begin(),
+                        in.end(),
+                        back_inserter(out),
+                        [](const auto& a, const auto& b) { return a == b; });
+    BOOST_CHECK(in.end() == it);
+    vector<bool> expected{false, true};
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_pairs_3_elements)
+{
+    const string in{"123"};
+    vector<uint8_t> out;
+    const auto it =
+        transform_pairs(in.begin(),
+                        in.end(),
+                        back_inserter(out),
+                        [](const auto& a, const auto& b) { return a == b; });
+    BOOST_CHECK(in.end() - 1 == it);
+    vector<bool> expected{false};
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_pairs_2_elements)
+{
+    const string in{"12"};
+    vector<uint8_t> out;
+    const auto it =
+        transform_pairs(in.begin(),
+                        in.end(),
+                        back_inserter(out),
+                        [](const auto& a, const auto& b) { return a == b; });
+    BOOST_CHECK(in.end() == it);
+    vector<bool> expected{false};
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        expected.begin(), expected.end(), out.begin(), out.end());
+}
+
+BOOST_AUTO_TEST_CASE(transform_pairs_1_element)
+{
+    const string in{"1"};
+    vector<uint8_t> out;
+    const auto it =
+        transform_pairs(in.begin(),
+                        in.end(),
+                        back_inserter(out),
+                        [](const auto& a, const auto& b) { return a == b; });
+    BOOST_CHECK(in.begin() == it);
+    BOOST_CHECK(out.empty());
+}
+
+BOOST_AUTO_TEST_CASE(transform_pairs_empty)
+{
+    const string in;
+    vector<uint8_t> out;
+    const auto it =
+        transform_pairs(in.begin(),
+                        in.end(),
+                        back_inserter(out),
+                        [](const auto& a, const auto& b) { return a == b; });
+    BOOST_CHECK(in.end() == it);
+    BOOST_CHECK(out.empty());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

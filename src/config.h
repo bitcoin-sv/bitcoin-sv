@@ -9,6 +9,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 
 #include "amount.h"
 #include "consensus/consensus.h"
+#include "miner_id/miner_id_db_defaults.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "mining/factory.h"
 #include "net/net.h"
@@ -52,7 +53,6 @@ public:
     virtual CFeeRate GetMinFeePerKB() const = 0;
     virtual CFeeRate GetDustRelayFee() const = 0;
     virtual int64_t GetDustLimitFactor() const = 0;
-    virtual CFeeRate GetBlockMinFeePerKB() const = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
     virtual bool GetDataCarrier() const = 0;
@@ -98,6 +98,8 @@ public:
     virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
+    virtual bool GetEnableAssumeWhitelistedBlockDepth() const = 0;
+    virtual int32_t GetAssumeWhitelistedBlockDepth() const = 0;
 
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
@@ -157,6 +159,23 @@ public:
     virtual int64_t GetSafeModeMinForkLength() const = 0;
     virtual int64_t GetSafeModeMinForkHeightDifference() const = 0;;
 
+    // MinerID
+    virtual bool GetMinerIdEnabled() const = 0;
+    virtual uint64_t GetMinerIdCacheSize() const = 0;
+    virtual uint64_t GetMinerIdsNumToKeep() const = 0;
+    virtual uint32_t GetMinerIdReputationM() const = 0;
+    virtual uint32_t GetMinerIdReputationN() const = 0;
+    virtual double GetMinerIdReputationMScale() const = 0;
+    virtual std::string GetMinerIdGeneratorAddress() const = 0;
+    virtual int16_t GetMinerIdGeneratorPort() const = 0;
+    virtual std::string GetMinerIdGeneratorPath() const = 0;
+    virtual std::string GetMinerIdGeneratorAlias() const = 0;
+
+    // Detect selfish mining
+    virtual bool GetDetectSelfishMining() const = 0;
+    virtual int64_t GetMinBlockMempoolTimeDifferenceSelfish() const = 0;
+    virtual uint64_t GetSelfishTxThreshold() const = 0;
+
 protected:
     virtual ~Config() = default;
 };
@@ -174,7 +193,6 @@ public:
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual bool SetDustRelayFee(Amount amt, std::string* err = nullptr) = 0;
     virtual bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) = 0;
-    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual void SetDataCarrier(bool dataCarrier) = 0;
@@ -227,6 +245,8 @@ public:
     virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+    virtual void SetEnableAssumeWhitelistedBlockDepth(bool enabled) = 0;
+    virtual bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) = 0;
 
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
@@ -304,6 +324,21 @@ public:
     virtual bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) = 0;
 
 
+    // MinerID
+    virtual bool SetMinerIdEnabled(bool enabled, std::string* err) = 0;
+    virtual bool SetMinerIdCacheSize(int64_t size, std::string* err) = 0;
+    virtual bool SetMinerIdsNumToKeep(int64_t num, std::string* err) = 0;
+    virtual bool SetMinerIdReputationM(int64_t num, std::string* err) = 0;
+    virtual bool SetMinerIdReputationN(int64_t num, std::string* err) = 0;
+    virtual bool SetMinerIdReputationMScale(double num, std::string* err) = 0;
+    virtual bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) = 0;
+    virtual bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) = 0;
+
+    // Detect selfish mining
+    virtual void SetDetectSelfishMining(bool detectSelfishMining) = 0;
+    virtual bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err = nullptr) = 0;
+    virtual bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) = 0;
+
 protected:
     ~ConfigInit() = default;
 };
@@ -351,9 +386,6 @@ public:
 
     bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override;
     int64_t GetDustLimitFactor() const override;
-
-    void SetBlockMinFeePerKB(CFeeRate amt) override;
-    CFeeRate GetBlockMinFeePerKB() const override;
 
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
     uint64_t GetPreferredBlockFileSize() const override;
@@ -504,6 +536,11 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    void SetEnableAssumeWhitelistedBlockDepth(bool enabled) override;
+    bool GetEnableAssumeWhitelistedBlockDepth() const override;
+    bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) override;
+    int32_t GetAssumeWhitelistedBlockDepth() const override;
+
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
     uint64_t GetBlockStallingMinDownloadSpeed() const override;
@@ -596,6 +633,34 @@ public:
     bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override;
 
 
+    // MinerID
+    bool SetMinerIdEnabled(bool enabled, std::string* err) override;
+    bool GetMinerIdEnabled() const override;
+    bool SetMinerIdCacheSize(int64_t size, std::string* err) override;
+    uint64_t GetMinerIdCacheSize() const override;
+    bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override;
+    uint64_t GetMinerIdsNumToKeep() const override;
+    bool SetMinerIdReputationM(int64_t num, std::string* err) override;
+    uint32_t GetMinerIdReputationM() const override;
+    bool SetMinerIdReputationN(int64_t num, std::string* err) override;
+    uint32_t GetMinerIdReputationN() const override;
+    bool SetMinerIdReputationMScale(double num, std::string* err) override;
+    double GetMinerIdReputationMScale() const override;
+    std::string GetMinerIdGeneratorAddress() const override;
+    int16_t GetMinerIdGeneratorPort() const override;
+    std::string GetMinerIdGeneratorPath() const override;
+    std::string GetMinerIdGeneratorAlias() const override;
+    bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) override;
+    bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) override;
+
+    // Detect selfish mining
+    bool GetDetectSelfishMining() const override;
+    void SetDetectSelfishMining(bool detectSelfishMining) override;
+    int64_t GetMinBlockMempoolTimeDifferenceSelfish() const override;
+    bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err = nullptr) override;
+    uint64_t GetSelfishTxThreshold() const override;
+    bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset() override;
@@ -610,11 +675,10 @@ private:
 
     struct GlobalConfigData {
     private: friend class GlobalConfig;
-        // All fileds are initialized in Reset()    
+        // All fields are initialized in Reset()    
         CFeeRate feePerKB;
         CFeeRate dustRelayFee{DUST_RELAY_TX_FEE};
         int64_t dustLimitFactor;
-        CFeeRate blockMinFeePerKB;
         uint64_t preferredBlockFileSize;
         uint64_t factorMaxSendQueuesBytes;
 
@@ -693,6 +757,8 @@ private:
         bool mIsSetPromiscuousMempoolFlags;
 
         std::set<uint256> mInvalidBlocks;
+        bool enableAssumeWhitelistedBlockDepth;
+        int32_t assumeWhitelistedBlockDepth;
 
         std::set<std::string> mBannedUAClients{DEFAULT_CLIENTUA_BAN_PATTERNS};
         std::set<std::string> mAllowedUAClients;
@@ -751,7 +817,23 @@ private:
         int64_t safeModeMinForkLength;
         int64_t safeModeMinHeightDifference;
 
+        // MinerID
+        bool minerIdEnabled;
+        uint64_t minerIdCacheSize;
+        uint64_t numMinerIdsToKeep;
+        uint32_t minerIdReputationM;
+        uint32_t minerIdReputationN;
+        double minerIdReputationMScale;
+        std::string minerIdGeneratorAddress;
+        int16_t minerIdGeneratorPort;
+        std::string minerIdGeneratorPath;
+        std::string minerIdGeneratorAlias;
+
         std::optional<bool> mDisableBIP30Checks;
+
+        bool mDetectSelfishMining;
+        int64_t minBlockMempoolTimeDifferenceSelfish;
+        uint64_t mSelfishTxThreshold;
 
     #if ENABLE_ZMQ
         int64_t invalidTxZMQMaxMessageSize;
@@ -850,9 +932,6 @@ public:
 
     bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override{return true;};
     int64_t GetDustLimitFactor() const override { return 0; }
-
-    void SetBlockMinFeePerKB(CFeeRate amt) override{};
-    CFeeRate GetBlockMinFeePerKB() const override { return CFeeRate(Amount(0)); }
 
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override {}
     uint64_t GetPreferredBlockFileSize() const override { return 0; }
@@ -1168,6 +1247,11 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
 
+    void SetEnableAssumeWhitelistedBlockDepth(bool enabled) override {}
+    bool GetEnableAssumeWhitelistedBlockDepth() const override { return DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH; }
+    bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) override { return true; }
+    int32_t GetAssumeWhitelistedBlockDepth() const override { return DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH; }
+
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
     uint64_t GetBlockStallingMinDownloadSpeed() const override { return DEFAULT_MIN_BLOCK_STALLING_RATE; }
@@ -1229,6 +1313,26 @@ public:
     std::string GetDoubleSpendDetectedWebhookPath() const override { return ""; }
     bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err) override { return true; }
     uint64_t GetDoubleSpendDetectedWebhookMaxTxnSize() const override { return DSDetectedDefaults::DEFAULT_MAX_WEBHOOK_TXN_SIZE * ONE_MEBIBYTE; }
+
+    // MinerID
+    bool SetMinerIdEnabled(bool enabled, std::string* err) override { return true; }
+    bool GetMinerIdEnabled() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED; }
+    bool SetMinerIdCacheSize(int64_t size, std::string* err) override { return true; }
+    uint64_t GetMinerIdCacheSize() const override { return MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE; }
+    bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override { return true; }
+    uint64_t GetMinerIdsNumToKeep() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP; }
+    bool SetMinerIdReputationM(int64_t num, std::string* err) override { return true; }
+    uint32_t GetMinerIdReputationM() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M; }
+    bool SetMinerIdReputationN(int64_t num, std::string* err) override { return true; }
+    uint32_t GetMinerIdReputationN() const override { return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N; }
+    bool SetMinerIdReputationMScale(double num, std::string* err) override { return true; }
+    double GetMinerIdReputationMScale() const override { return MinerIdDatabaseDefaults::DEFAULT_M_SCALE_FACTOR; }
+    std::string GetMinerIdGeneratorAddress() const override { return ""; }
+    int16_t GetMinerIdGeneratorPort() const override { return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT; }
+    std::string GetMinerIdGeneratorPath() const override { return ""; }
+    std::string GetMinerIdGeneratorAlias() const override { return ""; }
+    bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) override { return true; }
+    bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) override { return true; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
@@ -1296,6 +1400,33 @@ public:
     bool SetSafeModeMinForkLength(int64_t length, std::string* err) override {return true;};
     int64_t GetSafeModeMinForkHeightDifference() const  override { return 5;};
     bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override {return true;};
+
+    bool GetDetectSelfishMining() const override
+    {
+        return true;    
+    };
+
+    void SetDetectSelfishMining(bool detectSelfishMining) override {}
+
+    int64_t GetMinBlockMempoolTimeDifferenceSelfish() const override
+    {
+        return DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
+    };
+
+    bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err) override
+    {
+        return true;
+    }
+
+    uint64_t GetSelfishTxThreshold() const override
+    {
+        return DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
+    }
+
+    bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err) override
+    {
+        return true;
+    }
 
     void Reset() override;
 

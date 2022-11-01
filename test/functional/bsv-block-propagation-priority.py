@@ -5,6 +5,10 @@
 """
 Verify that a BSV node is able to prioritise block propagation above other
 messages over the P2P.
+
+# For Release build with sanitizers enabled (TSAN / ASAN / UBSAN), recommended timeoutfactor is 2.
+# For Debug build, recommended timeoutfactor is 2.
+# For Debug build with sanitizers enabled, recommended timeoutfactor is 3.
 """
 
 from test_framework.associations import AssociationCB
@@ -113,8 +117,8 @@ class BlockPriorityTest(BitcoinTestFramework):
 
         # Initial node setup
         extra_args = [
-            '-maxnonstdtxvalidationduration=100000',
-            '-maxtxnvalidatorasynctasksrunduration=100001'
+            '-checkmempool=0',
+            '-mindebugrejectionfee=0.00000250'
         ]
         with self.run_node_with_connections("Setup node", 0, extra_args, 1) as connections:
             conn = connections[0]
@@ -127,14 +131,13 @@ class BlockPriorityTest(BitcoinTestFramework):
             for tx in islice(tx_generator, self.num_txns):
                 inv_items.append(CInv(1, tx.sha256))
                 conn.send_message(msg_tx(tx))
-            wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns, timeout=240)
+            wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns, timeout=(240 * self.options.timeoutfactor))
 
         # Restart node with associations
         associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
         extra_args = [
             '-whitelist=127.0.0.1',
-            '-maxnonstdtxvalidationduration=100000',
-            '-maxtxnvalidatorasynctasksrunduration=100001'
+            '-mindebugrejectionfee=0.00000250'
         ]
         with self.run_node_with_associations("Test block priority", 0, extra_args, associations_stream_policies, cb_class=MyAssociationCB) as associations:
             # Wait for node to fully reinitialise itself

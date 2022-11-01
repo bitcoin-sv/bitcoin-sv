@@ -463,4 +463,104 @@ BOOST_AUTO_TEST_CASE(class_methods) {
     BOOST_CHECK(methodtest3 == methodtest4);
 }
 
+BOOST_AUTO_TEST_CASE(map_set_serialise) {
+    // Map
+    {
+        std::map<int, std::string> testMap {
+            { 1, "Entry1" },
+            { 2, "Entry2" },
+            { 3, "Entry3" },
+        };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testMap;
+
+        // Deserialise
+        decltype(testMap) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testMap == decoded);
+    }
+
+    // Unordered map
+    {
+        std::unordered_map<int, std::string> testMap {
+            { 1, "Entry1" },
+            { 2, "Entry2" },
+            { 3, "Entry3" },
+        };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testMap;
+
+        // Deserialise
+        decltype(testMap) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testMap == decoded);
+    }
+
+    // Set
+    {
+        std::set<std::string> testSet { "Entry1", "Entry2", "Entry3" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testSet;
+
+        // Deserialise
+        decltype(testSet) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testSet == decoded);
+    }
+
+    // Unordered set
+    {
+        std::unordered_set<std::string> testSet { "Entry1", "Entry2", "Entry3" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testSet;
+
+        // Deserialise
+        decltype(testSet) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testSet == decoded);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(optional_serialise) {
+    {
+        std::optional<std::string> testOpt { "TestString" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testOpt;
+
+        // Deserialise
+        decltype(testOpt) decoded {};
+        ss >> decoded;
+        BOOST_CHECK_EQUAL(testOpt, decoded);
+    }
+
+    {
+        std::optional<std::string> testOpt { std::nullopt };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0);
+        ss << testOpt;
+
+        // Deserialise
+        decltype(testOpt) decoded {};
+        ss >> decoded;
+        BOOST_CHECK_EQUAL(testOpt, decoded);
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -108,10 +108,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        // 95% of 2016
-        consensus.nRuleChangeActivationThreshold = 1916;
-        // nPowTargetTimespan / nPowTargetSpacing
-        consensus.nMinerConfirmationWindow = 2016;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S(
@@ -161,10 +157,8 @@ public:
         // subset of possible options.
         // Bitcoin SV seeder
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "seed.bitcoinsv.io", true));
-        // cascharia.com
-        vSeeds.push_back(CDNSSeedData("cascharia.com", "seed.cascharia.com", true));
-        // satoshisvision.network
         vSeeds.push_back(CDNSSeedData("satoshisvision.network", "seed.satoshisvision.network", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory", "seed.bitcoinseed.directory", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 5);
@@ -242,8 +236,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = false;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = false;
     }
 };
 
@@ -274,10 +268,7 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         // Do not allow min difficulty blocks after some time has elapsed
         consensus.fPowAllowMinDifficultyBlocks = false;
-
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1916; // 95% of 2016
-        consensus.nMinerConfirmationWindow = 144; // fast
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -310,6 +301,9 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "stn-seed.bitcoinsv.io", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory",
+                                      "stn-seed.bitcoinseed.directory",
+                                      true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -330,7 +324,8 @@ public:
                 {2, uint256S("0000000040f8f40b5111d037b8b7ff69130de676327bcbd76ca0e0498a06c44a")},
                 {4, uint256S("00000000d33661d5a6906f84e3c64ea6101d144ec83760bcb4ba81edcb15e68d")},
                 {5, uint256S("00000000e9222ebe623bf53f6ec774619703c113242327bdc24ac830787873d6")},
-                {6, uint256S("00000000764a4ff15c2645e8ede0d0f2af169f7a517dd94a6778684ed85a51e4")}
+                {6, uint256S("00000000764a4ff15c2645e8ede0d0f2af169f7a517dd94a6778684ed85a51e4")},
+                {7, uint256S("000000001f15fe3dac966c6bb873c63348ca3d877cd606759d26bd9ad41e5545")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{
@@ -345,8 +340,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
     }
 };
 
@@ -374,10 +369,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
-        // 75% for testchains
-        consensus.nRuleChangeActivationThreshold = 1512;
-        // nPowTargetTimespan / nPowTargetSpacing
-        consensus.nMinerConfirmationWindow = 2016;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S(
@@ -423,8 +414,12 @@ public:
         // nodes with support for servicebits filtering should be at the top
         // Bitcoin SV seeder
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "testnet-seed.bitcoinsv.io", true));
-        vSeeds.push_back(CDNSSeedData("cascharia.com", "testnet-seed.cascharia.com", true));
-        vSeeds.push_back(CDNSSeedData("bitcoincloud.net", "testnet-seed.bitcoincloud.net", true));
+        vSeeds.push_back(CDNSSeedData("bitcoincloud.net",
+                                      "testnet-seed.bitcoincloud.net",
+                                      true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory",
+                                      "testnet-seed.bitcoinseed.directory",
+                                      true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -467,8 +462,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
     }
 };
 
@@ -497,10 +492,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = true;
-        // 75% for testchains
-        consensus.nRuleChangeActivationThreshold = 108;
-        // Faster than normal for regtest (144 instead of 2016)
-        consensus.nMinerConfirmationWindow = 144;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -573,8 +564,8 @@ public:
         };
 
         fTestBlockCandidateValidity = true;
-        fDisbleBIP30Checks = false;
-        fCanDisbleBIP30Checks = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
     }
 };
 

@@ -59,7 +59,7 @@ static const unsigned int DEFAULT_RECV_INV_QUEUE_FACTOR = 3;
 /**
  * Maximal and minimal factors of full size inventory messages allowed to be stored.
  */
-static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 10;
+static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 100;
 static const unsigned int MIN_RECV_INV_QUEUE_FACTOR = 1;
 
 /**
@@ -246,6 +246,14 @@ extern const char *GETBLOCKS;
  */
 extern const char *GETHEADERS;
 /**
+ * The gethdrsen message requests a headers message that provides block
+ * headers starting from a particular point in the block chain.  The 
+ * gethdrsen message is an upgrade of getheaders message that also
+ * sends number of transaction, coinbase transaction and merkleproof
+ * for coinbase transaction
+ */
+extern const char* GETHDRSEN;
+/**
  * The tx message transmits a single transaction.
  * @see https://bitcoin.org/en/developer-reference#tx
  */
@@ -257,6 +265,11 @@ extern const char *TX;
  * @see https://bitcoin.org/en/developer-reference#headers
  */
 extern const char *HEADERS;
+/**
+ * The hdrsen message sends one or more block headers to a node which
+ * previously requested certain headers with a gethdrsen message.
+ */
+extern const char* HDRSEN;
 /**
  * The block message transmits a single serialized block.
  * @see https://bitcoin.org/en/developer-reference#block
@@ -337,6 +350,11 @@ extern const char *REJECT;
  */
 extern const char *SENDHEADERS;
 /**
+ * Same as "sendheaders" except that new new blocks are announced via
+ * "hdrsen" message.
+ */
+extern const char *SENDHDRSEN;
+/**
  * The feefilter message tells the receiving peer not to inv us any txs
  * which do not meet the specified min fee rate.
  * @since protocol version 70013 as described by BIP133
@@ -392,6 +410,23 @@ extern const char *DSDETECTED;
  * Contains an extended message (one which may exceed 4GB in size).
  */
 extern const char *EXTMSG;
+/**
+ * The revokemid message is an early notification that the contained miner ID
+ * should be revoked.
+ */
+extern const char *REVOKEMID;
+/**
+ * The authch net message is for delivering the challenge message to the other party.
+ */
+extern const char *AUTHCH;
+/**
+ * The authresp net message delivers the response message to the requestor.
+ */
+extern const char *AUTHRESP;
+/**
+ * Contains a dataref transaction.
+ */
+extern const char *DATAREFTX;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -499,6 +534,7 @@ enum GetDataMsg {
     MSG_FILTERED_BLOCK = 3,
     //!< Defined in BIP152
     MSG_CMPCT_BLOCK = 4,
+    MSG_DATAREF_TX = 5
 };
 
 /** inv message data */
