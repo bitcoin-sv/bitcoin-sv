@@ -63,8 +63,8 @@ BOOST_FIXTURE_TEST_CASE(Creation, BasicTestingSetup)
         DatarefDB db = dbx.CreateLockingAccess();
         DataDB & db_detail = UnitTestAccess::GetDetail(db);
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, 0);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBDataref>().size(), 0);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBMinerInfo>().size(), 0);
+        BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 0);
+        BOOST_CHECK_EQUAL(db_detail.GetAllMinerInfoEntries().size(), 0);
     }
     {
         // Creation from existing empty DB
@@ -72,8 +72,8 @@ BOOST_FIXTURE_TEST_CASE(Creation, BasicTestingSetup)
         DatarefDB db = dbx.CreateLockingAccess();
         DataDB & db_detail = UnitTestAccess::GetDetail(db);
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, 0);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBDataref>().size(), 0);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBMinerInfo>().size(), 0);
+        BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 0);
+        BOOST_CHECK_EQUAL(db_detail.GetAllMinerInfoEntries().size(), 0);
     }
 }
 
@@ -101,7 +101,7 @@ BOOST_FIXTURE_TEST_CASE(StorageRetrieval, BasicTestingSetup)
         db_detail.AddEntry(entry1, dataRefTxn->GetId());
         BOOST_CHECK(db.DataRefTxnExists(dataRefTxn->GetId()));
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, SizeofOneTxnInDB);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBDataref>().size(), 1);
+        BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 1);
         auto dbentry { db.GetDataRefEntry(dataRefTxn->GetId()) };
         BOOST_CHECK (dbentry);
         BOOST_CHECK_EQUAL(dbentry->blockId.ToString(), blockId.ToString());
@@ -118,7 +118,7 @@ BOOST_FIXTURE_TEST_CASE(StorageRetrieval, BasicTestingSetup)
         DataDB & db_detail = UnitTestAccess::GetDetail(db);
         BOOST_CHECK(db.DataRefTxnExists(dataRefTxn->GetId()));
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, SizeofOneTxnInDB);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBDataref>().size(), 1);
+        BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 1);
         auto dbentry { db.GetDataRefEntry(dataRefTxn->GetId()) };
         BOOST_CHECK (dbentry);
         BOOST_CHECK_EQUAL(dbentry->blockId.ToString(), blockId.ToString());
@@ -135,7 +135,7 @@ BOOST_FIXTURE_TEST_CASE(StorageRetrieval, BasicTestingSetup)
         BOOST_CHECK(db.DataRefTxnExists(dataRefTxn->GetId()));
         BOOST_CHECK_NO_THROW(db.DeleteDatarefTxn(dataRefTxn->GetId()));
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, 0);
-        BOOST_CHECK_EQUAL(db_detail.GetAllEntries<DBDataref>().size(), 0);
+        BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 0);
     }
 }
 

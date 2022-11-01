@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(connect_utxo_extblock) {
     tx.nVersion = 2;
 
     auto prevTx0 = CTransaction(tx);
-    AddCoins(view, prevTx0, 100, 0);
+    AddCoins(view, prevTx0, false, 100, 0);
 
     tx.vin[0].prevout = COutPoint(prevTx0.GetId(), 0);
     auto tx0 = CTransaction(tx);

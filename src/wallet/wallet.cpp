@@ -1869,6 +1869,9 @@ Amount CWalletTx::GetCredit(const isminefilter &filter) const {
         return Amount(0);
     }
 
+    // NOTE: Maturity of outputs created by confiscation transactions does not need to be checked
+    //       because these outputs are never sent directly to the final owner.
+
     Amount credit(0);
     if (filter & ISMINE_SPENDABLE) {
         // GetBalance can assume transactions in mapWallet won't change.

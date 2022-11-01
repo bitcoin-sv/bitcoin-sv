@@ -606,7 +606,19 @@ std::optional<MinerId> FindMinerId(const CBlock& block, int32_t blockHeight)
                     const auto var_mi_doc_sig { ParseMinerInfo(block, mi_ref) };
                     if(std::holds_alternative<miner_info_error>(var_mi_doc_sig))
                     {
-                        log_parse_error(get<miner_info_error>(var_mi_doc_sig), tx.GetId().ToString(), i);
+                        const auto error_id = get<miner_info_error>(var_mi_doc_sig);
+                        if (error_id == miner_info_error::txid_not_found)
+                        {
+                            std::stringstream ss;
+                            ss  << "coinbase references minerinfo txn "
+                                << mi_ref.txid().ToString()
+                                << " but this txn could not be found in this block";
+                            log_parse_error(error_id, tx.GetId().ToString(), i, ss.str());
+                        }
+                        else
+                        {
+                            log_parse_error(error_id, tx.GetId().ToString(), i);
+                        }
                         break;
                     }
 

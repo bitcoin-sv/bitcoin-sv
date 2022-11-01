@@ -161,11 +161,20 @@ void Shutdown() {
     TRY_LOCK(cs_Shutdown, lockShutdown);
     if (!lockShutdown) return;
 
+
+    // Remove all datarefs and minerinfo txns from the mempool
+    if (g_MempoolDatarefTracker) {
+        std::vector<COutPoint> funds = g_MempoolDatarefTracker->funds();
+        std::vector<TxId> datarefs;
+        std::transform(funds.cbegin(), funds.cend(), std::back_inserter(datarefs), [](const COutPoint& p) {return p.GetTxId();});
+        if (!datarefs.empty())
+            mempool.RemoveTxnsAndDescendants(datarefs, nullptr);
+    }
+
     /// Note: Shutdown() must be able to handle cases in which AppInit2() failed
     /// part of the way, for example if the data directory was found to be
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
-
     RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
@@ -534,19 +543,19 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
-        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        MIN_DISK_SPACE_FOR_MERKLETREE_FILES));
+        "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculateMinDiskSpaceForMerkleFiles(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-preferredmerkletreefilesize", strprintf(_("Preferred size of a single datafile containing "
         "merkle trees. When size is reached, new datafile is created. If preferred size is less than "
         "size of a single merkle tree, it will still be stored, meaning datafile size can be larger than "
-        "preferred size. (default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE));
+        "preferred size. (default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculatePreferredMerkleTreeSize(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxmerkletreememcachesize", strprintf(_("Maximum merkle trees memory cache size in bytes. For "
         "faster responses, requested merkle trees are stored into a memory cache. "
-        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
-        DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE));
+        "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        CalculatePreferredMerkleTreeSize(4 * ONE_GIGABYTE)/ONE_MEGABYTE));
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
@@ -1076,6 +1085,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                   "(default: %u; note: 0 - soft consensus freeze duration is "
                   "disabled and block is frozen indefinitely).",
                   DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION));
+
+    strUsage += HelpMessageOpt(
+        "-enableassumewhitelistedblockdepth=<n>",
+        strprintf("Assume confiscation transaction to be whitelisted if it is in block that is at least as deep under tip as specified by option 'assumewhitelistedblockdepth'. (default: %d)",
+            DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH));
+
+    strUsage += HelpMessageOpt(
+        "-assumewhitelistedblockdepth=<n>",
+        strprintf("Set minimal depth of block under tip at which confiscation transaction is assumed to be whitelisted. (default: %d)",
+            DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
@@ -1684,7 +1703,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
         if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
-            LogPrintf("Failed to connect best block");
+            LogPrintf("Failed to connect best block\n");
             StartShutdown();
         }
 
@@ -2420,6 +2439,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
+    config.SetEnableAssumeWhitelistedBlockDepth(gArgs.GetBoolArg("-enableassumewhitelistedblockdepth", DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH));
+    if(std::string err; !config.SetAssumeWhitelistedBlockDepth(gArgs.GetArg("-assumewhitelistedblockdepth", DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH), &err)) {
+        return InitError(err);
+    }
+
 #if ENABLE_ZMQ
     if (gArgs.IsArgSet("-invalidtxzmqmaxmessagesize"))
     {
@@ -2696,6 +2720,17 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         mempool.SetBlockMinTxFee(CFeeRate(n));
     }
 
+    if(gArgs.IsArgSet("-rollingminfeeratehalflife"))
+    {
+        const auto halflife = gArgs.GetArg(
+            "-rollingminfeeratehalflife", CTxMemPool::MAX_ROLLING_FEE_HALFLIFE);
+
+        if(!mempool.SetRollingMinFee(halflife))
+            LogPrintf("Warning: configuration parameter -rollingminfeeratehalflife out-of-range %i - %i\n",
+                      CTxMemPool::MIN_ROLLING_FEE_HALFLIFE,
+                      CTxMemPool::MAX_ROLLING_FEE_HALFLIFE);
+    }
+
     if (gArgs.IsArgSet("-mindebugrejectionfee")) {
         if (chainparams.NetworkIDString() != "main") {
             Amount n(0);
@@ -2850,34 +2885,30 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         config.SetAllowClientUA(std::move(validUAClients));
     }
 
-    // Configure maximum disk space that can be taken by Merkle Tree data files.
     {
-        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", MIN_DISK_SPACE_FOR_MERKLETREE_FILES);
+        int64_t maxBlockEstimate = std::min(config.GetMaxBlockSize(), config.GetMaxMempool());
         std::string err;
-        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
-        {
-            return InitError(err);
-        }
-    }
 
-    // Configure preferred size of a single Merkle Tree data file.
-    {
-        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE);
-        std::string err;
+        // Configure preferred size of a single Merkle Tree data file.
+        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
-        {
             return InitError(err);
-        }
-    }
 
-    // Configure size of Merkle Trees memory cache.
-    {
-        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE);
-        std::string err;
+        // Configure size of Merkle Trees memory cache.
+        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
+            return InitError(err);
+
+        // Configure maximum disk space that can be taken by Merkle Tree data files.
+        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", CalculateMinDiskSpaceForMerkleFiles(maxBlockEstimate));
+        if (maxMerkleTreeDiskspaceArg < merkleTreeFileSizeArg || maxMerkleTreeDiskspaceArg < maxMerkleTreeMemCacheSizeArg)
         {
+            err = "-maxmerkletreediskspace cannot be less than -maxmerkletreememcachesize or -preferredmerkletreefilesize";
             return InitError(err);
         }
+
+        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
+            return InitError(err);
     }
 
     const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
@@ -2995,7 +3026,7 @@ void preloadChainStateThreadFunction()
     }
 
 #else
-    LogPrintf("Preload is not supported on this platform!");
+    LogPrintf("Preload is not supported on this platform!\n");
     return;
 #endif
 }
@@ -3445,7 +3476,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                     gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) >
                         MIN_BLOCKS_TO_KEEP) {
                     LogPrintf("Prune: pruned datadir may not have more than %d "
-                              "blocks; only checking available blocks",
+                              "blocks; only checking available blocks\n",
                               MIN_BLOCKS_TO_KEEP);
                 }
 

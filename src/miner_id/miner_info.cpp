@@ -13,6 +13,7 @@
 #include "miner_id/miner_info_ref.h"
 #include "primitives/block.h"
 #include "pubkey.h"
+#include "script/instruction_iterator.h"
 #include "span.h"
 
 using namespace std;
@@ -186,4 +187,76 @@ bool is_der_signature(const bsv::span<const uint8_t> script)
 {
     return script.size() >= 69 && script.size() <= 72;
 }
+
+namespace
+{
+    std::variant<bool, miner_info_error>  verify_data_obj(const UniValue& uv)
+    {
+        using mie = miner_info_error;
+
+        const auto& keys{uv.getKeys()};
+
+        if(!all_of(keys.cbegin(), keys.cend(), [](const auto& key) {
+               return key.size() == 12;
+           }))
+            return mie::brfcid_invalid_length;
+
+        if(!all_of(keys.cbegin(), keys.cend(), [](const auto& key) {
+               static const std::regex rgx{"[0-9a-fA-F]{12}"};
+               return regex_match(key, rgx);
+           }))
+            return mie::brfcid_invalid_content;
+
+        const auto& values{uv.getValues()};
+        if(!all_of(values.cbegin(), values.cend(), [](const auto& uv) {
+               return uv.isObject();
+           }))
+            return mie::brfcid_invalid_value_type;
+
+        return true;
+    }
+}
+
+std::variant<bool, miner_info_error> VerifyDataObject(const string_view sv)
+{
+    UniValue uv;
+    if(!uv.read(sv.data(), sv.size()))
+        return miner_info_error::doc_parse_error_ill_formed_json;
+
+    return verify_data_obj(uv);
+}
+
+std::variant<bool, miner_info_error> VerifyDataScript(const bsv::span<const uint8_t> script)
+{
+    assert(IsMinerInfo(script)); // programming error in calling code if false
+
+    // 0 OP_FALSE (1)
+    // 1 OP_RETURN (1)
+    // 2 pushdata 4 (1)
+    // 3 protocol-id (4) 
+    // 7 pushdata 1 (1)
+    // 8 version (1)
+    // 9 pushdata len(json) (1-9) 
+    // x json (len(json) )
+
+    // miner_info_ref starts at 7th byte of the output message
+    bsv::instruction_iterator it{script.last(script.size() - 7)};
+    if(!it)
+        return miner_info_error::invalid_instruction;
+
+    const auto operand{it->operand()};
+    if(operand.size() != 1)
+        return miner_info_error::script_version_unsupported;
+
+    const auto version{operand[0]};
+    if(version != 0)
+        return miner_info_error::script_version_unsupported;
+    
+    if(!++it)
+        return miner_info_error::invalid_instruction;
+
+    const auto json = bsv::to_sv(it->operand());
+    return VerifyDataObject(json);
+}
+
 

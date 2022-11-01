@@ -30,7 +30,7 @@ public:
     {}
 
     // Expose private members of CTxMemPool.
-    static const int ROLLING_FEE_HALFLIFE = CTxMemPool::ROLLING_FEE_HALFLIFE;
+    inline static const int ROLLING_FEE_HALFLIFE = CTxMemPool::MAX_ROLLING_FEE_HALFLIFE;
 
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
