@@ -136,6 +136,12 @@ bool AppInit(int argc, char *argv[]) {
                             "https://bitcoinsv.io/choosing-consensus-settings/");
             return false;
         }
+        if (!gArgs.IsArgSet("-minminingtxfee"))
+        {
+            fprintf(stderr, "Mandatory policy parameter is not set. In order to start bitcoind you must set the "
+                            "following policy parameters: \"minminingtxfee\"");
+            return false;
+        }
 
         // Command-line RPC
         bool fCommandLine = false;
