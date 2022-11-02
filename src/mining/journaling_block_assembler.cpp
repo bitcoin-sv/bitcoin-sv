@@ -88,7 +88,7 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
         std::unique_lock<std::mutex> lock { mMtx };
 
         // Get our best block even if the background thread hasn't run for a while
-        updateBlock(pindexPrevNew, mNewBlockFill? std::numeric_limits<uint64_t>::max() : mMaxSlotTransactions.load());
+        updateBlock(pindexPrevNew, mNewBlockFill? std::numeric_limits<uint64_t>::max() : mMaxSlotTransactions.load() * 1.5);
         // Copy our current transactions into the block
         block->vtx = mBlockTxns;
     }
