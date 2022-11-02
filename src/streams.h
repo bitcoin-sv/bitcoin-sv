@@ -19,6 +19,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <set>
 #include <string>
 #include <utility>
@@ -967,5 +968,52 @@ private:
     std::shared_ptr<const std::vector<uint8_t>> mData;
     size_t mConsumed = 0u;
 };
+
+constexpr size_t cmpt_ser_size(size_t n)
+{
+      if(n < 0xfd)
+          return 1;        
+      else if(n <= 0xffff)
+          return 3;
+      else if(n <= 0xffff'ffff)
+          return 5;
+      else if(n <= 0xffff'ffff'ffff'ffff)
+          return 9;
+      else                    
+          assert(false);
+}
+
+template<typename T>
+inline constexpr size_t ser_size(const T&)
+{
+    return sizeof(T);
+}
+
+inline size_t ser_size(const std::string& s) { return s.size(); }
+
+template<typename T>
+inline size_t ser_size(const std::vector<T>& v)
+{ 
+    return sizeof(typename std::vector<T>::value_type) * v.size();
+}
+
+inline constexpr size_t ser_size(){ return 0; }
+
+template<typename T, typename... Ts>
+inline size_t ser_size(const T& a, const Ts&... args)
+{
+    return ser_size(a) + ser_size(args...);
+}
+
+template<typename T>
+inline size_t ser_size(T f, T l, size_t init)
+{
+    return std::accumulate(f,
+                           l,
+                           init,
+                           [](auto& total, const auto& ip) {
+                               return total += ser_size(ip);
+                           });
+}
 
 #endif // BITCOIN_STREAMS_H

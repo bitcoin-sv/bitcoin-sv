@@ -2,10 +2,12 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "blockencodings.h"
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
+#include "protocol.h"
 
 #include <cstdint>
 #include <limits>
@@ -564,3 +566,108 @@ BOOST_AUTO_TEST_CASE(optional_serialise) {
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+
+BOOST_AUTO_TEST_SUITE(ser_size_tests)
+
+BOOST_AUTO_TEST_CASE(no_args_ser_size)
+{
+    BOOST_CHECK_EQUAL(0, ser_size());
+}
+
+BOOST_AUTO_TEST_CASE(txin_ser_size)
+{
+    BOOST_CHECK_EQUAL(41, ser_size(CTxIn{}));
+
+    const CTxIn cin;
+    BOOST_CHECK_EQUAL(41, ser_size(cin));
+    
+    CTxIn in;
+    BOOST_CHECK_EQUAL(41, ser_size(in));
+
+    const std::vector<uint8_t> v(0xfd);
+    CScript s{v.cbegin(), v.cend()};
+    in.scriptSig = s;
+    BOOST_CHECK_EQUAL(296, ser_size(in));
+}
+
+BOOST_AUTO_TEST_CASE(txout_ser_size)
+{
+    BOOST_CHECK_EQUAL(9, ser_size(CTxOut{}));
+
+    const CTxOut cout;
+    BOOST_CHECK_EQUAL(9, ser_size(cout));
+
+    CTxOut out;
+    BOOST_CHECK_EQUAL(9, ser_size(out));
+    
+    const std::vector<uint8_t> v(0xfd);
+    CScript s{v.cbegin(), v.cend()};
+    out.scriptPubKey = s;
+    BOOST_CHECK_EQUAL(264, ser_size(out));
+}
+
+BOOST_AUTO_TEST_CASE(tx_ser_size)
+{
+    BOOST_CHECK_EQUAL(10, ser_size(CTransaction{}));
+
+    const CTransaction ctx;
+    BOOST_CHECK_EQUAL(10, ser_size(ctx));
+
+    CTransaction tx0;
+    BOOST_CHECK_EQUAL(10, ser_size(tx0));
+    
+    CMutableTransaction mtx1;
+    mtx1.vin.resize(1);
+    mtx1.vout.resize(1);
+    CTransaction tx1{mtx1};
+    BOOST_CHECK_EQUAL(60, ser_size(tx1));
+   
+    CMutableTransaction mtx2;
+    mtx2.vin.resize(0xfd);
+    mtx2.vout.resize(0xfd);
+    CTransaction tx2{mtx2};
+    BOOST_CHECK_EQUAL(12'664, ser_size(tx2));
+}
+
+BOOST_AUTO_TEST_CASE(btx_ser_size)
+{
+    BOOST_CHECK_EQUAL(33, ser_size(BlockTransactions{}));
+
+    const BlockTransactions cbtxs;
+    BOOST_CHECK_EQUAL(33, ser_size(cbtxs));
+
+    BlockTransactions btxs0;
+    BOOST_CHECK_EQUAL(33, ser_size(btxs0));
+
+    BlockTransactions btxs1;
+    btxs1.txn.push_back(std::make_shared<const CTransaction>());
+    BOOST_CHECK_EQUAL(43, ser_size(btxs1));
+
+    BlockTransactions btxs2;
+    for(int i{}; i<0xfd; ++i)
+        btxs2.txn.push_back(std::make_shared<const CTransaction>());
+    BOOST_CHECK_EQUAL(2'565, ser_size(btxs2));
+}
+
+BOOST_AUTO_TEST_CASE(cinv_ser_size)
+{
+    BOOST_CHECK_EQUAL(sizeof(CInv), ser_size(CInv{}));
+
+    CInv cinv;
+    BOOST_CHECK_EQUAL(sizeof(CInv), ser_size(cinv));
+
+    CInv inv;
+    BOOST_CHECK_EQUAL(sizeof(CInv), ser_size(inv));
+    
+    BOOST_CHECK_EQUAL(10*sizeof(CInv), ser_size(std::vector<CInv>(10)));
+    
+    const std::vector<CInv> cinvs(10);
+    BOOST_CHECK_EQUAL(10*sizeof(CInv), ser_size(cinvs));
+
+    std::vector<CInv> invs(10);
+    BOOST_CHECK_EQUAL(10*sizeof(CInv), ser_size(invs));
+}
+
+BOOST_AUTO_TEST_SUITE_END();
+

@@ -293,3 +293,16 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(
 
     return READ_STATUS_OK;
 }
+
+size_t ser_size(const BlockTransactions& txns) 
+{ 
+    size_t total{sizeof(txns.blockhash)};
+    total += cmpt_ser_size(txns.txn.size());
+    return std::accumulate(txns.txn.cbegin(),
+                           txns.txn.cend(),
+                           total,
+                           [](auto total, const auto& sp_tx) {
+                               total += ser_size(*sp_tx);
+                               return total;
+                           });
+}

@@ -165,6 +165,8 @@ public:
     std::string ToString() const;
 };
 
+size_t ser_size(const CTxIn&);
+
 class Config; // declared in config.h, but including the header file here brings in additional problem
 /**
  * An output of a transaction.  It contains the public key that the next input
@@ -217,6 +219,8 @@ public:
 
     std::string ToString() const;
 };
+
+size_t ser_size(const CTxOut&); 
 
 class CMutableTransaction;
 
@@ -332,6 +336,8 @@ public:
 
     std::string ToString() const;
 };
+
+size_t ser_size(const CTransaction&);
 
 /**
  * A mutable version of CTransaction.

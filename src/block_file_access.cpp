@@ -192,8 +192,9 @@ bool BlockFileAccess::WriteBlockToDisk(
     }
 
     pos = { pos.File(), (unsigned int)fileOutPos };
-
+    
     std::vector<uint8_t> data;
+    data.reserve(ser_size(block));
     CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
     metaData = { Hash(data.begin(), data.end()), data.size() };
 
