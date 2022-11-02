@@ -165,5 +165,8 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
     BOOST_CHECK(GetMerkleTreesDataSize() <= testConfig.GetMaxMerkleTreeDiskSpace());
 
 }
-
 BOOST_AUTO_TEST_SUITE_END()
+
+static_assert(0 == CalculatePreferredMerkleTreeSize(std::numeric_limits<uint64_t>::min()));
+static_assert(295'147'905'179'352'768 == CalculatePreferredMerkleTreeSize(std::numeric_limits<uint64_t>::max()));
+static_assert(64 == CalculatePreferredMerkleTreeSize(4'000));

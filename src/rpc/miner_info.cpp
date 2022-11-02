@@ -8,11 +8,14 @@
 #include "keystore.h"
 #include "miner_id/dataref_index.h"
 #include "miner_id/miner_id_db.h"
+#include "miner_id/miner_info_error.h"
 #include "miner_id/miner_info_tracker.h"
 #include "miner_id/revokemid.h"
+#include "miner_id/miner_info.h"
 #include "netmessagemaker.h"
 #include "rpc/server.h"
 #include "script/instruction_iterator.h"
+#include "script/script.h"
 #include "script/script_num.h"
 #include "script/sign.h"
 #include "txdb.h"
@@ -21,6 +24,7 @@
 #include <iostream>
 #include <memory>
 #include <univalue.h>
+#include <variant>
 #include <vector>
 
 namespace mining {
@@ -282,8 +286,20 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
 
     // create and fund minerinfo txn
     CMutableTransaction mtx;
-    for (const CScript& script: scriptPubKeys)
+    for(const CScript& script: scriptPubKeys)
+    {
+        if(!IsMinerInfo(script))
+            throw std::runtime_error("invalid miner info script");
+
+        const auto var_data_obj = VerifyDataScript(script);
+        if(std::holds_alternative<miner_info_error>(var_data_obj))
+        {
+            const auto err{std::get<miner_info_error>(var_data_obj)};
+            throw std::runtime_error(enum_cast<std::string>(err));
+        }
+
         mtx.vout.push_back(CTxOut{Amount{0}, script});
+    }        
 
     auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
     auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
@@ -317,7 +333,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
         // check that no new block has been added to the tip in the meantime.
         int32_t blockHeight2 = chainActive.Height() + 1;
         if (blockHeight != blockHeight2) {
-            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a dataref-tx %s was created. Currrent height: %ld", txid.ToString(), chainActive.Height()));
+            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a dataref-tx %s was created. Currrent height: %ld\n", txid.ToString(), chainActive.Height()));
         }
 	raii.good();
     }
@@ -440,7 +456,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
         // check that no new block has been added to the tip in the meantime.
         int32_t blockHeight2 = chainActive.Height() + 1;
         if (blockHeight != blockHeight2) {
-            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a minerinfo-tx %s was created. Currrent height: %ld", txid.ToString(), chainActive.Height()));
+            LogPrint(BCLog::MINERID, strprintf("A block was added to the tip while a minerinfo-tx %s was created. Currrent height: %ld\n", txid.ToString(), chainActive.Height()));
         }
 	raii.good();
     }
@@ -517,8 +533,8 @@ static UniValue createdatareftx(const Config &config, const JSONRPCRequest &requ
                 "1. \"scriptPubKey...:\" (array of hex strings)\n"
                 "\nResult: a hex encoded transaction id\n"
                 "\nExamples:\n" +
-                HelpExampleCli("createdatareftx", "\"006a04601dface01004dba027b22 ...\"") +
-                HelpExampleRpc("createdatareftx", "\"006a04601dface01004dba027b22 ...\""));
+                HelpExampleCli("createdatareftx", R"([\"006a04601dface01004dba027b22...\", ...])") +
+                HelpExampleRpc("createdatareftx", R"([\"006a04601dface01004dba027b22...\", ...])"));
     }
 
     std::vector<CScript> scriptPubKeys;
@@ -624,6 +640,7 @@ static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPC
     if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
                 "getminerinfotxfundingaddress  \n"
+                "Get the address that will fund the miner info transaction.\n"
                 "\nExamples:\n" +
                 HelpExampleCli("getminerinfotxfundingaddress","") +
                 HelpExampleRpc("getminerinfotxfundingaddress",""));
@@ -652,13 +669,13 @@ static UniValue setminerinfotxfundingoutpoint(const Config &config, const JSONRP
     if (request.fHelp || request.params.size() != 2) {
         throw std::runtime_error(
                 "setminerinfotxfundingoutpoint \"txid\" \"n\"\n"
-                "\nsend the output used to fund the minerinfo transactions\n"
+                "\nConfigure the node to use the miner-info funding outpoint\n"
                 "\nArguments:\n"
                 "1. \"txid:\" (hex string mandatory) a transaction that can be spend using the \n"
                 "key created by rpc function makeminerinfotxspendingkey\n"
                 "2. \"n:\" (int) the output to spend \n"
                 "\nExamples:\n" +
-                HelpExampleCli("setminerinfotxfundingoutpoint", "\"txid\", n") +
+                HelpExampleCli("setminerinfotxfundingoutpoint", "\"txid\" n") +
                 HelpExampleRpc("setminerinfotxfundingoutpoint", "\"txid\", n"));
     }
 
@@ -945,15 +962,14 @@ UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
             "1. \"txid\"   (string, required) The ID of the dataRef transaction to delete from the index.\n"
             "\nResult:\n"
             "\nExamples:\n" +
-            HelpExampleCli("datareftxndelete", "") +
-            HelpExampleRpc("datareftxndelete", ""));
+            HelpExampleCli("datareftxndelete", "\"mytxid\"") +
+            HelpExampleRpc("datareftxndelete", "\"mytxid\""));
     }
 
     // Check we have the dataref index database
     if(g_dataRefIndex)
     {
-        const std::string strTxId { request.params[0].get_str() };
-        const uint256 txid { uint256S(strTxId) };
+        const uint256 txid = ParseHashV(request.params[0], "txid");
         auto data_access = g_dataRefIndex->CreateLockingAccess();
         data_access.DeleteDatarefTxn(txid);
     }

@@ -1014,7 +1014,7 @@ void getblockheader(const Config &config, const JSONRPCRequest &request, HTTPReq
                 {
                     // Exceptions cannot be thrown while we already started streaming the result.
                     // If coinbase txn could not be read, it will not be returned.
-                    LogPrint(BCLog::RPC, "getblockheader: Reading of coinbase txn failed.");
+                    LogPrint(BCLog::RPC, "getblockheader: Reading of coinbase txn failed.\n");
                 }
             }
 
@@ -1770,7 +1770,7 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
             "Blockchain is shorter than the attempted prune height.");
     } else if (height > chainHeight - MIN_BLOCKS_TO_KEEP) {
         LogPrint(BCLog::RPC, "Attempt to prune blocks close to the tip. "
-                             "Retaining the minimum number of blocks.");
+                             "Retaining the minimum number of blocks.\n");
         height = chainHeight - MIN_BLOCKS_TO_KEEP;
     }
 
@@ -1858,6 +1858,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             "     ]\n"
             "  },\n"
             "  \"coinbase\" : true|false   (boolean) Coinbase or not\n"
+            "  \"confiscation\" : true|false (boolean) Output of confiscation transaction or not\n"
             "}\n"
 
             "\nExamples:\n"
@@ -1902,6 +1903,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
                                IsGenesisEnabled(config, height), o);
             ret.push_back(Pair("scriptPubKey", o));
             ret.push_back(Pair("coinbase", coin.IsCoinBase()));
+            ret.push_back(Pair("confiscation", coin.IsConfiscation()));
         };
 
     if (fMempool) {

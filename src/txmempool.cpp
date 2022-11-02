@@ -49,7 +49,7 @@ using namespace mining;
             CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
             if (ptx) {
                 if (outpoint.GetN() < ptx->vout.size()) {
-                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false, CFrozenTXOCheck::IsConfiscationTx(*ptx));
                 }
                 return {};
             }
@@ -118,7 +118,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
                                  int32_t _entryHeight,
-                                 bool _spendsCoinbase,
+                                 bool _spendsCoinbaseOrConfiscation,
                                  LockPoints lp)
     : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
@@ -128,7 +128,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
       feeDelta{Amount{0}},
       lockPoints{lp},
       entryHeight{_entryHeight},
-      spendsCoinbase{_spendsCoinbase}
+      spendsCoinbaseOrConfiscation{_spendsCoinbaseOrConfiscation}
 {}
 
 // CPFP group, if any that this transaction belongs to.
@@ -964,7 +964,7 @@ void CTxMemPool::RemoveForReorgNL(
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.
             txToRemove.insert(it);
-        } else if (it->GetSpendsCoinbase()) {
+        } else if (it->GetSpendsCoinbaseOrConfiscation()) {
             for (const auto& prevout: GetOutpointsSpentByNL(it)) {
                 txiter it2 = mapTx.find(prevout.GetTxId());
                 if (it2 != mapTx.end()) {
@@ -980,7 +980,10 @@ void CTxMemPool::RemoveForReorgNL(
                 if (!coin.has_value() || coin->IsSpent() ||
                     (coin->IsCoinBase() &&
                      nMemPoolHeight - coin->GetHeight() <
-                         COINBASE_MATURITY)) {
+                         COINBASE_MATURITY) ||
+                    (coin->IsConfiscation() &&
+                     nMemPoolHeight - coin->GetHeight() <
+                         CONFISCATION_MATURITY)) {
                     txToRemove.insert(it);
                     break;
                 }
@@ -1240,26 +1243,26 @@ void CTxMemPool::RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet)
     setEntries spendingFrozenTXOs;
     for(const auto& spentTXO: mapNextTx.get<by_prevout>())
     {
-        struct TxGetterMP : CFrozenTXOCheck::TxGetter
+        std::uint8_t effectiveBlacklist;
+        if(!frozenTXOCheck.Check(spentTXO.outpoint, effectiveBlacklist))
         {
-            TxGetterMP(const CTxMemPoolEntry& mpe)
-            : mpe(mpe)
-            {}
-
-            TxData GetTxData() override
+            // Is this input spent by confiscation transaction?
+            // NOTE: This is inefficient because we're loading every tx to memory and we're doing
+            //       it more than once for txs with several inputs. But since there will not be
+            //       many transactions in mempool that spend frozen TXOs, this is not an issue.
+            auto ptx = spentTXO.spentBy->GetSharedTx();
+            const bool isConfiscationTx = CFrozenTXOCheck::IsConfiscationTx(*ptx);
+            if(!isConfiscationTx)
             {
-                txRef = mpe.GetSharedTx();
-                return TxData(*txRef, mpe.GetTime());
+                // For normal transaction input must not be frozen.
+                frozenTXOCheck.LogAttemptToSpendFrozenTXO(spentTXO.outpoint, *ptx, effectiveBlacklist, spentTXO.spentBy->GetTime());
+
+                // Store iterator to this tx and all its descendants
+                GetDescendantsNL(spentTXO.spentBy, spendingFrozenTXOs);
             }
-
-            const CTxMemPoolEntry& mpe;
-            CTransactionRef txRef;
-        } txGetter(*spentTXO.spentBy);
-
-        if(!frozenTXOCheck.Check(spentTXO.outpoint, txGetter))
-        {
-            // Store iterator to this tx and all its descendants
-            GetDescendantsNL(spentTXO.spentBy, spendingFrozenTXOs);
+            // For confiscation transaction all inputs must be frozen, but this is implicitly guaranteed if
+            // confiscation transaction is whitelisted, which will be checked elsewhere. Consequently, here we
+            // do not need to check that every confiscation transaction in mempool only spends frozen inputs.
         }
     }
 
@@ -1267,6 +1270,54 @@ void CTxMemPool::RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet)
     {
         removeStagedNL(spendingFrozenTXOs, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::FROZEN_INPUT);
 
+        mFrozenTxnUpdatedAt = nTransactionsUpdated.load();
+    }
+}
+
+void CTxMemPool::RemoveInvalidCTXs(const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unique_lock lock{smtx};
+    RemoveInvalidCTXsNL( changeSet );
+}
+
+void CTxMemPool::RemoveInvalidCTXsNL(const mining::CJournalChangeSetPtr& changeSet)
+{
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
+    CFrozenTXOCheck frozenTXOCheck{
+        chainActive.Tip()->GetHeight() + 1,
+        "mempool",
+        chainActive.Tip()->GetBlockHash()};
+
+    // Find confiscation transactions in mempool that are now no longer valid. Possible reasons:
+    //  - confiscation transaction is no longer valid because mempool height is <enforceAtHeight
+    //  - confiscation transaction is no longer whitelisted
+    setEntries nonWhitelistedConfiscationTxs;
+    for (txiter it = mapTx.begin(); it != mapTx.end(); it++)
+    {
+        const CTransactionRef tx = it->GetSharedTx();
+        if(!CFrozenTXOCheck::IsConfiscationTx(*tx))
+        {
+            // Not a confiscation transaction
+            continue;
+        }
+
+        // Confiscation transaction must still be whitelisted at mempool height
+        if(!frozenTXOCheck.CheckConfiscationTxWhitelisted(*tx, it->GetTime()))
+        {
+            GetDescendantsNL(it, nonWhitelistedConfiscationTxs);
+        }
+
+        // NOTE: It is assumed that confiscation transaction is otherwise valid (i.e. correct contents) otherwise it would not be in mempool.
+        //       Since confiscation transaction is whitelisted, it is also guaranteed that all of its inputs are confiscated and therefore
+        //       consensus frozen at all heights so we do not need to check this.
+    }
+
+    if(!nonWhitelistedConfiscationTxs.empty())
+    {
+        removeStagedNL(nonWhitelistedConfiscationTxs, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::NOT_WHITELISTED);
+
+        // We can use same mempool modification flag as for frozen transactions, because semantics are similar for confiscation transactions
         mFrozenTxnUpdatedAt = nTransactionsUpdated.load();
     }
 }
@@ -1988,7 +2039,7 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
     CTransactionRef ptx = GetCachedTransactionRef(outpoint);
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
-            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false, CFrozenTXOCheck::IsConfiscationTx(*ptx));
         }
         return {};
     }
@@ -2314,6 +2365,16 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             LogPrint(BCLog::MEMPOOL, "Removing any transactions that spend TXOs, which were previously not considered policy frozen, but now are because the mempool height has become lower.\n");
             RemoveFrozenNL(changeSet);
         }
+
+        if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_WhitelistedTxData_enforceAtHeight())
+        {
+            // Remove any confiscation transactions that are now no longer valid.
+            // Here we use the same trick as in the case of regular transaction spending frozen TXO to avoid
+            // unneeded scans. If maximum enforceAtHeight of all confiscation transactions is at or below current
+            // mempool height, it is not possible that a confiscation transaction in mempool has become invalid.
+            LogPrint(BCLog::MEMPOOL, "Removing any confiscation transactions, which were previously valid, but are now not because the mempool height has become lower.\n");
+            RemoveInvalidCTXsNL(changeSet);
+        }
     }
 
     // Check mempool & journal
@@ -2481,13 +2542,22 @@ CTxMemPool::GetMemPoolChildrenNL(txiter entry) const {
     return it->second.children;
 }
 
+bool CTxMemPool::SetRollingMinFee(int64_t fee)
+{ 
+    if(fee < MIN_ROLLING_FEE_HALFLIFE || fee > MAX_ROLLING_FEE_HALFLIFE)
+        return false;
+
+    halflife_ = fee;
+    return true;
+}
+
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const 
 {
     std::lock_guard lock{smtx};
     if (blockSinceLastRollingFeeBump && rollingMinimumFeeRate != 0) {
         int64_t time = GetTime();
         if (time > lastRollingFeeUpdate + 10) {
-            double halflife = ROLLING_FEE_HALFLIFE;
+            double halflife = halflife_;
             if (DynamicMemoryUsageNL() < sizelimit / 4) {
                 halflife /= 4;
             } else if (DynamicMemoryUsageNL() < sizelimit / 2) {

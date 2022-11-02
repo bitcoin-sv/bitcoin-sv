@@ -783,4 +783,26 @@ BOOST_AUTO_TEST_CASE(ReorgWithTransactionsOnDisk)
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 
+BOOST_AUTO_TEST_CASE(rolling_min_tests) 
+{
+    using namespace std;
+
+    CTxMemPool pool;
+    BOOST_CHECK_EQUAL(CTxMemPool::MAX_ROLLING_FEE_HALFLIFE, pool.GetRollingMinFee());
+
+    constexpr auto too_low{CTxMemPool::MIN_ROLLING_FEE_HALFLIFE - 1};
+    BOOST_CHECK(!pool.SetRollingMinFee(too_low));
+    BOOST_CHECK_EQUAL(CTxMemPool::MAX_ROLLING_FEE_HALFLIFE, pool.GetRollingMinFee());
+    
+    constexpr auto too_high{CTxMemPool::MAX_ROLLING_FEE_HALFLIFE + 1};
+    BOOST_CHECK(!pool.SetRollingMinFee(too_high));
+    BOOST_CHECK_EQUAL(CTxMemPool::MAX_ROLLING_FEE_HALFLIFE, pool.GetRollingMinFee());
+
+    BOOST_CHECK(pool.SetRollingMinFee(CTxMemPool::MIN_ROLLING_FEE_HALFLIFE));
+    BOOST_CHECK_EQUAL(CTxMemPool::MIN_ROLLING_FEE_HALFLIFE, pool.GetRollingMinFee());
+    
+    BOOST_CHECK(pool.SetRollingMinFee(CTxMemPool::MAX_ROLLING_FEE_HALFLIFE));
+    BOOST_CHECK_EQUAL(CTxMemPool::MAX_ROLLING_FEE_HALFLIFE, pool.GetRollingMinFee());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

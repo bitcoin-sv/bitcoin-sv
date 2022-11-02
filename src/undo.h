@@ -34,7 +34,7 @@ public:
 
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(
-            s, VARINT(pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0)));
+            s, VARINT( (pcoin->IsConfiscation() ? 0x100000000ll : 0ll) + pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0) ));
         if (pcoin->GetHeight() > 0) {
             // Required to maintain compatibility with older undo format.
             ::Serialize(s, uint8_t(0));
@@ -50,10 +50,11 @@ public:
     TxInUndoDeserializer(CoinWithScript* pcoinIn) : pcoin(pcoinIn) {}
 
     template <typename Stream> void Unserialize(Stream &s) {
-        uint32_t nCode = 0;
+        uint64_t nCode = 0;
         ::Unserialize(s, VARINT(nCode));
-        int32_t nHeight = nCode / 2;
+        int32_t nHeight = static_cast<uint32_t>(nCode & 0xffffffff) / 2;
         bool fCoinBase = nCode & 1;
+        bool fConfiscation = nCode & 0x100000000ull;
         if (nHeight > 0) {
             // Old versions stored the version number for the last spend of a
             // transaction's outputs. Non-final spends were indicated with
@@ -65,7 +66,7 @@ public:
         CTxOut txout;
         ::Unserialize(s, REF(CTxOutCompressor(REF(txout))));
 
-        *pcoin = CoinWithScript::MakeOwning(std::move(txout), nHeight, fCoinBase);
+        *pcoin = CoinWithScript::MakeOwning(std::move(txout), nHeight, fCoinBase, fConfiscation);
     }
 };
 

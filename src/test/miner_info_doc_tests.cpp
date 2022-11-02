@@ -7,9 +7,10 @@
 
 #include <boost/test/unit_test.hpp>
 #include <sstream>
+#include <variant>
 #include "boost/algorithm/hex.hpp"
 
-#include "miner_id/miner_info_doc.h"
+#include "miner_id/miner_info.h"
 #include "miner_id/miner_info_error.h"
 #include "script/instruction_iterator.h"
 #include "script/opcodes.h"
@@ -1072,6 +1073,103 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_with_datarefs_happy_case)
                                   expected.cend(),
                                   data_refs.cbegin(),
                                   data_refs.cend());
+}
+
+BOOST_AUTO_TEST_CASE(verify_data_script_failure_cases)
+{
+    // 0 OP_FALSE (1)
+    // 1 OP_RETURN (1)
+    // 2 pushdata 4 (1)
+    // 3 protocol-id (4) 
+    // 7 pushdata 1 (1)
+    // 8 version (1)
+    // 9 pushdata len(json_data_obj) (1-9) 
+    // ? json_data_obj (len(json_data_obj))
+    // ? pushdata 69-72 (1)
+    // ? sig(miner-info-doc) (69-72)
+    // Total >= ? elements
+    
+    vector<uint8_t> script{0x0, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1};
+
+    script.push_back(1); // unsupported_version
+    auto var = VerifyDataScript(script);
+    BOOST_CHECK_EQUAL(miner_info_error::script_version_unsupported, get<miner_info_error>(var));
+
+    script[script.size()-1] = 0; // supported version
+    const string json{R"({ "123456789abc" : "INVALID" })"};
+    vector<uint8_t> mi_script;
+    transform(json.begin(),
+              json.end(),
+              back_inserter(mi_script),
+              [](const auto c) { return c; });
+    concat(mi_script, script);
+  
+    var = VerifyDataScript(script);
+    BOOST_CHECK_EQUAL(miner_info_error::brfcid_invalid_value_type, get<miner_info_error>(var));
+}
+
+BOOST_AUTO_TEST_CASE(verify_data_script_happy_case)
+{
+    // 0 OP_FALSE (1)
+    // 1 OP_RETURN (1)
+    // 2 pushdata 4 (1)
+    // 3 protocol-id (4) 
+    // 7 pushdata 1 (1)
+    // 8 version (1)
+    // 9 pushdata len(json_data_obj) (1-9) 
+    // ? json_data_obj (len(json_data_obj))
+    // ? pushdata 69-72 (1)
+    // ? sig(miner-info-doc) (69-72)
+    // Total >= ? elements
+
+    vector<uint8_t> script{0x0, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
+
+    const string json{R"({ "123456789abc" : {}})"};
+    vector<uint8_t> mi_script;
+    transform(json.begin(),
+              json.end(),
+              back_inserter(mi_script),
+              [](const auto c) { return c; });
+
+    concat(mi_script, script);
+  
+    const auto var = VerifyDataScript(script);
+    BOOST_CHECK(get<bool>(var));
+}
+
+BOOST_AUTO_TEST_CASE(parse_dataref_objects_invalid_json)
+{
+    using mie = miner_info_error;
+
+    // clang-format off
+    const vector<pair<string, miner_info_error>>
+        test_data{
+                  make_pair(R"()",
+                            mie::doc_parse_error_ill_formed_json),
+                  make_pair(R"({"123456789ab": {}})",
+                            mie::brfcid_invalid_length),
+                  make_pair(R"({"123456789abcd": {}})",
+                            mie::brfcid_invalid_length),
+                  make_pair(R"({"123456789abz": {}})",
+                            mie::brfcid_invalid_content),
+                  make_pair(R"({"123456789abc": "INVALID"})",
+                            mie::brfcid_invalid_value_type),
+                 };
+    // clang-format on
+
+    for(const auto& [ip, expected] : test_data)
+    {
+        const auto var{VerifyDataObject(ip)};
+        BOOST_CHECK_EQUAL(expected, get<miner_info_error>(var));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(parse_dataref_objects_happy_case)
+{
+    const auto s = R"({"123456789abc": {}})";
+    const auto var{VerifyDataObject(s)};
+    BOOST_CHECK(holds_alternative<bool>(var));
+    BOOST_CHECK(get<bool>(var));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

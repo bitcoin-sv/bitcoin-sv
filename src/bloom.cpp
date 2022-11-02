@@ -38,7 +38,7 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
     , nFlags(nFlagsIn)
 {
     if (nFPRate <= 0 || nFPRate > 1.18){
-        LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!", nFPRate);
+        LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!\n", nFPRate);
         throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
     vData.resize (std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);

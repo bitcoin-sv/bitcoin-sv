@@ -308,5 +308,25 @@ class AuthConnTestReputation(BitcoinTestFramework):
         assert (self.isAuthenticated(0))
         assert (self.isAuthenticated(1))
 
+        # check if authenticate still works after restarting a node
+        p2p_port0_before = p2p_port(0)
+        p2p_port1_before = p2p_port(1)
+        rpc_port0_before = rpc_port(0)
+        rpc_port1_before = rpc_port(1)
+        self.stop_nodes()
+        self.start_nodes()
+        disconnect_nodes_bi(self.nodes, 0, 1)
+        connect_nodes_bi(self.nodes, 0, 1)
+        p2p_port0_after = p2p_port(0)
+        p2p_port1_after = p2p_port(1)
+        rpc_port0_after = rpc_port(0)
+        rpc_port1_after = rpc_port(1)
+        assert (p2p_port0_before == p2p_port0_after)
+        assert (p2p_port1_before == p2p_port1_after)
+        assert (rpc_port0_before == rpc_port0_after)
+        assert (rpc_port1_before == rpc_port1_after)
+        assert (self.isAuthenticated(0))
+        assert (self.isAuthenticated(1))
+
 if __name__ == '__main__':
     AuthConnTestReputation().main()

@@ -732,7 +732,7 @@ BOOST_AUTO_TEST_CASE(client_config_minerid_generator)
     const Config& config { GlobalConfig::GetConfig() };
 
     BOOST_CHECK_NO_THROW(
-        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(config) };
+        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
         BOOST_CHECK_EQUAL(clientConfig.GetServerIP(), "127.0.0.1");
         BOOST_CHECK_EQUAL(clientConfig.GetServerPort(), 8080);
         BOOST_CHECK_EQUAL(clientConfig.GetServerHTTPHost(), "127.0.0.1");
@@ -812,7 +812,7 @@ BOOST_AUTO_TEST_CASE(http_requests)
     {
         // REST request to a miner ID generator
         GlobalConfig::GetModifiableGlobalConfig().SetMinerIdGeneratorURL("http://127.0.0.1:8080", nullptr);
-        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(GlobalConfig::GetConfig()) };
+        RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(GlobalConfig::GetConfig(), 5) };
 
         const std::string alias { "MyAlias" };
         const uint256 hash { GetRandHash() };

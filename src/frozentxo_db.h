@@ -8,8 +8,7 @@
 #include "dbwrapper.h"
 #include "prevector.h"
 
-#include <boost/thread/shared_mutex.hpp>
-
+#include <shared_mutex>
 #include <utility>
 #include <memory>
 #include <limits>
@@ -33,7 +32,7 @@ private:
      * if there are several levelDB operations executed one after another (e.g. first a read and
      * then a write that depends on the read result).
      */
-    boost::shared_mutex mtx_db;
+    std::shared_mutex mtx_db;
 
     // This levelDB database stores data for frozen TXOs
     CDBWrapper db;
@@ -63,6 +62,17 @@ private:
      * Access to the value is protected by mtx_db.
      */
     std::int32_t max_FrozenTXOData_enforceAtHeight_stop;
+
+    /**
+     * Maximum enforceAtHeight of all whitelisted confiscation transactions currently stored in database.
+     *
+     * The value is MININT if no confiscation transactions have been whitelisted yet.
+     *
+     * Access to the value is protected by mtx_db.
+     *
+     * This member has similar purpose as max_FrozenTXOData_enforceAtHeight_stop.
+     */
+    std::int32_t max_WhitelistedTxData_enforceAtHeight;
 
     /**
      * Constructor opens an existing database creating it if it does not exist.
@@ -198,7 +208,14 @@ public:
              * not included in next block.
              * Already mined blocks are accepted, even if they contain such transactions.
              */
-            PolicyOnly = 2
+            PolicyOnly = 2,
+
+            /**
+             * TXO is confiscated by a whitelisted confiscation transaction
+             *
+             * Confiscated TXO is considered consensus frozen on all heights and, by extension, also policy frozen.
+             */
+            Confiscation = 3
         } blacklist;
 
         /**
@@ -277,7 +294,7 @@ public:
          * Note that TXO is considered frozen on policy blacklist also on heights before start of a valid interval.
          * Consequently, TXO is policy frozen in any gaps between intervals.
          *
-         * Only applicable if frozen TXO is stored on consensus blacklist.
+         * Only applicable if frozen TXO is stored on consensus or confiscation blacklist.
          */
         EnforceAtHeightType enforceAtHeight;
 
@@ -291,7 +308,7 @@ public:
          *
          * If false, TXO is considered to be removed only from consensus blacklist, but remains on policy blacklist.
          *
-         * Only applicable if frozen TXO is stored on consensus blacklist.
+         * Only applicable if frozen TXO is stored on consensus or confiscation blacklist.
          */
         bool policyExpiresWithConsensus;
 
@@ -310,9 +327,9 @@ public:
          */
         bool IsFrozenOnPolicy(std::int32_t nHeight) const
         {
-            if(this->blacklist == Blacklist::PolicyOnly)
+            if(this->blacklist == Blacklist::PolicyOnly || this->blacklist == Blacklist::Confiscation)
             {
-                // All TXOs on PolicyOnly blacklist are always considered frozen regardless of block height.
+                // All TXOs on PolicyOnly or Confiscation blacklist are always considered frozen regardless of block height.
                 return true;
             }
 
@@ -340,6 +357,12 @@ public:
          */
         bool IsFrozenOnConsensus(std::int32_t nHeight) const
         {
+            if(this->blacklist == Blacklist::Confiscation)
+            {
+                // If TXO is on Confiscation blacklist, it is considered consensus frozen on all heights
+                return true;
+            }
+
             if(this->blacklist != Blacklist::Consensus)
             {
                 // If TXO is not on Consensus blacklist, it is not consensus frozen
@@ -388,7 +411,7 @@ public:
      * If TXO is already frozen (i.e. if the record already exists) the method proceeds as follows:
      *  - if record in DB has frozenTXOData.blacklist=PolicyOnly, method does nothing and
      *    returns OK_ALREADY_FROZEN.
-     *  - if record in DB has frozenTXOData.blacklist=Consensus, method does nothing and
+     *  - if record in DB has frozenTXOData.blacklist=Consensus or frozenTXOData.blacklist=Confiscation, method does nothing and
      *    returns ERROR_ALREADY_IN_CONSENSUS_BLACKLIST.
      *
      * For performance reasons changes in database may not be immediately flushed to disk. @see Sync
@@ -411,6 +434,9 @@ public:
      *    returns OK_ALREADY_FROZEN.
      *  - otherwise, method updates values in frozenTXOData and
      *    returns OK_UPDATED.
+     *    Note that if frozenTXOData.blacklist=Confiscation, blacklist is unchanged and values in frozenTXOData
+     *    are still updated for consistency reasons even though these values have no effect, because confiscated
+     *    TXO is considered consensus frozen on all heights.
      *
      * This method is also used to unfreeze consensus frozen TXO by specifying enforceAtHeight accordingly.
      *
@@ -455,16 +481,20 @@ public:
     {
         unsigned int numUnfrozenPolicyOnly;
         unsigned int numUnfrozenConsensus;
+        unsigned int numUnwhitelistedTxs;
     };
 
     /**
-     * Unfreeze all currently frozen TXOs
+     * Unfreeze all currently frozen TXOs and un-whitelist all whitelisted transactions
      *
-     * This effectively removes all TXO records from DB.
+     * This effectively removes all records from DB if keepPolicyEntries=false.
      *
-     * @return number of TXOs that were unfrozen
+     * @param keepPolicyEntries If true, TXOs only frozen on PolicyOnly blacklist are not unfrozen.
+     *                          This option does not apply to expired consensus frozen TXOs that are now considered policy frozen
+     *                          because of policyExpiresWithConsensus=false (i.e. these are also unfrozen if this option is true).
+     * @return number of TXOs that were unfrozen and number of un-whitelisted transactions
      */
-    auto UnfreezeAll() -> UnfreezeAllResult;
+    auto UnfreezeAll(bool keepPolicyEntries=false) -> UnfreezeAllResult;
 
     struct CleanExpiredRecordsResult
     {
@@ -538,12 +568,164 @@ public:
      */
     std::int32_t Get_max_FrozenTXOData_enforceAtHeight_stop();
 
+
+    /**
+     * Returns true if tx is considered a confiscation transaction and false if not.
+     *
+     * Validity of a confiscation transaction is not checked.
+     */
+    static bool IsConfiscationTx(const CTransaction& tx);
+
+    /**
+     * Returns true if contents of given confiscation transaction is valid and false if not.
+     *
+     * It is not checked if confiscation transaction is whitelisted.
+     * Only validation checks specific to confiscation transactions are performed. Even if this method
+     * returns true, transaction may still be invalid (e.g. missing inputs, invalid amounts in outputs,
+     * spending coinbase output too soon...).
+     *
+     * @param confiscationTx Confiscation transaction. IsConfiscationTx(confiscationTx) must return true (assert).
+     */
+    static bool ValidateConfiscationTxContents(const CTransaction& confiscationTx);
+
+    /**
+     * Provides data about a whitelisted confiscation transaction
+     */
+    class WhitelistedTxData
+    {
+    private:
+        // Default constructor leaves all fields uninitialized and is private so that
+        // Create* factory method must be used.
+        explicit WhitelistedTxData() = default;
+
+    public:
+        /**
+         * Create WhitelistedTXData object where all data members are left uninitialized
+         *
+         * Should only be used when values for all data members will be set later (e.g. by call to IsTxWhitelisted() or by unserialization)
+         */
+        static WhitelistedTxData Create_Uninitialized()
+        {
+            return WhitelistedTxData();
+        }
+
+        /**
+         * Minimum block height at which confiscation transaction can be spent
+         */
+        std::int32_t enforceAtHeight;
+
+        /**
+         * List of TXOs confiscated by this confiscation transaction
+         */
+        std::vector<COutPoint> confiscatedTXOs;
+    };
+
+    enum class WhitelistTxResult
+    {
+        OK = 0,
+        OK_ALREADY_WHITELISTED_AT_LOWER_HEIGHT = 1,
+        OK_UPDATED = 2,
+        ERROR_TXO_NOT_CONSENSUS_FROZEN = 3,
+        ERROR_NOT_VALID = 4
+    };
+
+    /**
+     * Whitelist a confiscation transaction.
+     *
+     * If the transaction is not yet whitelisted:
+     *   If specified transaction is not a valid confiscation transaction, method returns ERROR_NOT_VALID and does nothing.
+     *   If its inputs are not all considered consensus frozen at enforceAtHeight, method returns ERROR_TXO_NOT_CONSENSUS_FROZEN and does nothing. Note that it is allowed for an input to be already confiscated by a previously whitelisted confiscation transaction.
+     *   Otherwise new record is added to DB, specified TXOs are moved to Confiscation blacklist and method returns OK.
+     *
+     * If the transaction is already whitelisted:
+     *   If specified value of enforceAtHeight is larger than the before, method returns OK_ALREADY_WHITELISTED_AT_LOWER_HEIGHT and does nothing.
+     *   If specified value of enforceAtHeight is the same as before, method returns OK and does nothing.
+     *   Otherwise, value of enforceAtHeight in database is updated and method returns OK_UPDATED.
+     *
+     * For performance reasons changes in database may not be immediately flushed to disk. @see Sync
+     *
+     * @throws dbwrapper_error If writing to database fails.
+     *
+     * @param confiscationTx Confiscation transaction
+     * @param enforceAtHeight Minimum block height at which confiscation transaction can be spent.
+     */
+    auto WhitelistTx(std::int32_t enforceAtHeight, const CTransaction& confiscationTx) -> WhitelistTxResult;
+
+    /**
+     * Check if transaction with given id is whitelisted.
+     *
+     * @return true, if transaction is whitelisted and false otherwise.
+     *
+     * @param txid Id (hash) of confiscation transaction
+     * @param[out] whitelistedTxData If transaction is whitelisted, data for whitelisted confiscation transaction is set in this variable.
+     *                               If transaction is not whitelisted, value of this variable is left unchanged.
+     *
+     * @note The implementation always accesses the underlying database, which is assumed to provide suitable caching to increase performance.
+     */
+    [[nodiscard]] bool IsTxWhitelisted(const TxId& txid, WhitelistedTxData& whitelistedTxData);
+
+    /**
+     * Provides ability to iterate over whitelisted confiscation transactions
+     */
+    class WhitelistedTxIterator : public IteratorBase<2>
+    {
+    private:
+        WhitelistedTxIterator(std::unique_ptr<CDBIterator>&& db_iter)
+        : IteratorBase(std::move(db_iter))
+        {}
+        friend class CFrozenTXODB;
+
+    public:
+        /**
+         * Return id and other data about whitelisted transaction to which the iterator currently points.
+         *
+         * Method returns a std::pair object with the following contents:
+         *  - first: id of transaction
+         *  - second: WhitelistedTxData
+         *
+         * @note This method must not be called if Valid() returns false.
+         */
+        auto GetWhitelistedTx() const -> std::pair<TxId, WhitelistedTxData>;
+    };
+
+    /**
+     * Return iterator that can be used to get data about all whitelisted transactions currently stored in DB
+     */
+    auto QueryAllWhitelistedTxs() -> WhitelistedTxIterator;
+
+    struct ClearWhitelistResult
+    {
+        unsigned int numFrozenBackToConsensus;
+        unsigned int numUnwhitelistedTxs;
+    };
+
+    /**
+     * Remove all confiscation transactions from whitelist and move all confiscated TXOs back to consensus blacklist.
+     *
+     * After the method completes, previously confiscated TXOs are again considered consensus frozen according to
+     * consensus freeze intervals.
+     *
+     * @return number of TXOs that were moved back to consensus blacklist and number of un-whitelisted transactions
+     */
+    auto ClearWhitelist() -> ClearWhitelistResult;
+
+    /**
+     * Return value of max_WhitelistedTxData_enforceAtHeight
+     */
+    std::int32_t Get_max_WhitelistedTxData_enforceAtHeight();
+
 private:
     // non-locking version of GetFrozenTXOData() used internally
     bool GetFrozenTXODataNL(const COutPoint& txo, FrozenTXOData& frozenTXOData);
 
+    // non-locking version of IsTxWhitelisted() used internally
+    bool IsTxWhitelistedNL(const TxId& txid, WhitelistedTxData& whitelistedTxData);
+
     // Update value of max_FrozenTXOData_enforceAtHeight_stop if max(frozenTXOData.enforceAtHeight.stop) is larger.
     void Update_max_FrozenTXOData_enforceAtHeight_stopNL(const FrozenTXOData& frozenTXOData);
+
+    // Update value of max_WhitelistedTxData_enforceAtHeight if whitelistedTxData.enforceAtHeight is larger.
+    void Update_max_WhitelistedTxData_enforceAtHeightNL(const WhitelistedTxData& whitelistedTxData);
 };
 
 

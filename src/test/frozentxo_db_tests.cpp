@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
         // TXO frozen on PolicyOnly blacklist must be considered frozen at any height
         BOOST_CHECK( ftd_po.IsFrozenOnPolicy(h) );
 
-        // Check TXOs frozen on Consensus blacklist 
+        // Check TXOs frozen on Consensus blacklist
         for(std::int32_t h2: test_heights )
         {
             // Must be considered frozen on PolicyOnly at any height
@@ -188,7 +188,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     // txo2 must not be frozen and ftd must remain unchanged if call to GetFrozenTXOData() returns false
     ftd = ftd0;
     BOOST_CHECK( !db.GetFrozenTXOData(txo2, ftd) && ftd==ftd0 );
-    
+
     // Add a new consensus frozen TXO txo2 to DB
     BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{0}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
 
@@ -288,7 +288,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     BOOST_CHECK( db.FreezeTXOConsensus(txo1, {{1,2}}, true)==CFrozenTXODB::FreezeTXOResult::OK );
     {
         // Must not be considered expired at height 0.
-        auto res = db.CleanExpiredRecords(0); 
+        auto res = db.CleanExpiredRecords(0);
         BOOST_CHECK( db.GetFrozenTXOData(txo1, ftd) && res.numConsensusRemoved==0 && res.numConsensusUpdatedToPolicyOnly==0 );
         // Must not be considered expired at height 1.
         res = db.CleanExpiredRecords(1);
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     BOOST_CHECK( db.FreezeTXOConsensus(txo1, {{1,2}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
     {
         // Must not be considered expired at height 0.
-        auto res = db.CleanExpiredRecords(0); 
+        auto res = db.CleanExpiredRecords(0);
         BOOST_CHECK( db.GetFrozenTXOData(txo1, ftd) && res.numConsensusRemoved==0 && res.numConsensusUpdatedToPolicyOnly==0 );
         // Must not be considered expired at height 1.
         res = db.CleanExpiredRecords(1);
@@ -463,17 +463,341 @@ BOOST_AUTO_TEST_CASE(db_tests)
     BOOST_CHECK( N2 + N_removed + 1 == N );
     BOOST_CHECK( !db.QueryAllFrozenTXOs().Valid() );
 
-    // Check UnfreezeAll() method
+    // Check whitelisting confiscation transactions
+    auto whitelistedTxData = CFrozenTXODB::WhitelistedTxData::Create_Uninitialized();
+
+    // Frozen TXOs used by whitelisting tests
     BOOST_CHECK( db.FreezeTXOPolicyOnly(txo1)==CFrozenTXODB::FreezeTXOResult::OK );
-    BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{0}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
+    BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{100,200}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
+    COutPoint txo3(uint256S("cbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcb"), 123);
+    BOOST_CHECK( db.FreezeTXOConsensus(txo3, {{300,700}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
+
+    // Helper to create transactions used by whitelisting tests
+    auto createCTX = [](const COutPoint& txo, std::uint8_t order_id=0){
+        CMutableTransaction ctx;
+        ctx.vin.resize(1);
+        ctx.vin[0].prevout = txo;
+        ctx.vin[0].scriptSig = CScript();
+        ctx.vout.resize(2);
+        ctx.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << std::vector<std::uint8_t>{'c','f','t','x'} << std::vector<std::uint8_t>{1, order_id,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+        ctx.vout[0].nValue = Amount(0);
+        ctx.vout[1].scriptPubKey = CScript() << OP_TRUE;
+        ctx.vout[1].nValue = Amount(42);
+        return CTransaction(ctx);
+    };
+
+    // Transactions used by whitelisting tests
+    auto ctx1 = createCTX(txo2);
+    BOOST_REQUIRE(CFrozenTXODB::IsConfiscationTx(ctx1));
+    BOOST_REQUIRE(CFrozenTXODB::ValidateConfiscationTxContents(ctx1));
+    auto ctx2 = createCTX(txo3);
+    BOOST_REQUIRE(CFrozenTXODB::IsConfiscationTx(ctx2));
+    BOOST_REQUIRE(CFrozenTXODB::ValidateConfiscationTxContents(ctx2));
+    auto ctx3 = createCTX(txo3, 123); // spends the same input as ctx2
+    BOOST_REQUIRE(ctx3.GetId() != ctx2.GetId());
+    BOOST_REQUIRE(CFrozenTXODB::IsConfiscationTx(ctx2));
+    BOOST_REQUIRE(CFrozenTXODB::ValidateConfiscationTxContents(ctx2));
+    auto not_ctx1 = [&]{
+        CMutableTransaction tx = createCTX(txo1);
+        tx.vout[0].scriptPubKey = CScript() << OP_TRUE; // non OP_RETURN first input
+        return CTransaction(tx);
+    }();
+    BOOST_REQUIRE(!CFrozenTXODB::IsConfiscationTx(not_ctx1));
+    auto not_ctx2 = [&]{
+        CMutableTransaction tx = createCTX(txo1);
+        tx.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << std::vector<std::uint8_t>{'X','X','X','X'}; // invalid protocol id
+        return CTransaction(tx);
+    }();
+    BOOST_REQUIRE(!CFrozenTXODB::IsConfiscationTx(not_ctx2));
+    auto inv_ctx1 = [&]{
+        CMutableTransaction tx = createCTX(txo1);
+        tx.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << std::vector<std::uint8_t>{'c','f','t','x'}; // missing confiscation order hash
+        return CTransaction(tx);
+    }();
+    BOOST_REQUIRE(CFrozenTXODB::IsConfiscationTx(inv_ctx1));
+    BOOST_REQUIRE(!CFrozenTXODB::ValidateConfiscationTxContents(inv_ctx1));
+    auto inv_ctx2 = [&]{
+        CMutableTransaction tx = createCTX(txo1);
+        tx.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << std::vector<std::uint8_t>{'c','f','t','x'} << std::vector<std::uint8_t>{0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // 0 is invalid version
+        return CTransaction(tx);
+    }();
+    BOOST_REQUIRE(CFrozenTXODB::IsConfiscationTx(inv_ctx2));
+    BOOST_REQUIRE(!CFrozenTXODB::ValidateConfiscationTxContents(inv_ctx2));
+
+
+    BOOST_CHECK( !db.QueryAllWhitelistedTxs().Valid() ); // Initially no txs are whitelisted txs
+    BOOST_CHECK( !db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) );
+
+    BOOST_CHECK( db.WhitelistTx(50, not_ctx1) == CFrozenTXODB::WhitelistTxResult::ERROR_NOT_VALID );
+    BOOST_CHECK( db.WhitelistTx(50, not_ctx2) == CFrozenTXODB::WhitelistTxResult::ERROR_NOT_VALID );
+    BOOST_CHECK( db.WhitelistTx(50, inv_ctx1) == CFrozenTXODB::WhitelistTxResult::ERROR_NOT_VALID );
+    BOOST_CHECK( db.WhitelistTx(50, inv_ctx2) == CFrozenTXODB::WhitelistTxResult::ERROR_NOT_VALID );
+
+    BOOST_CHECK( db.WhitelistTx(50, createCTX(COutPoint(uint256S("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), 0))) == CFrozenTXODB::WhitelistTxResult::ERROR_TXO_NOT_CONSENSUS_FROZEN ); // cannot whitelist a tx confiscating a TXO that is not frozen
+    BOOST_CHECK( db.WhitelistTx(50, createCTX(txo1)) == CFrozenTXODB::WhitelistTxResult::ERROR_TXO_NOT_CONSENSUS_FROZEN ); // cannot whitelist a tx confiscating a TXO that is not consensus frozen
+    BOOST_CHECK( db.WhitelistTx(99, createCTX(txo2)) == CFrozenTXODB::WhitelistTxResult::ERROR_TXO_NOT_CONSENSUS_FROZEN ); // cannot whitelist a tx confiscating a TXO that is not considered consensus frozen at enforceAtHeight
+    BOOST_CHECK( db.WhitelistTx(322, createCTX(txo2)) == CFrozenTXODB::WhitelistTxResult::ERROR_TXO_NOT_CONSENSUS_FROZEN );
+
+    // Update freeze interval
+    BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{100,400}}, true)==CFrozenTXODB::FreezeTXOResult::OK_UPDATED );
+
+    for(int i=0; i<3; ++i)
+    {
+        BOOST_CHECK( db.WhitelistTx(322, ctx1) == CFrozenTXODB::WhitelistTxResult::OK ); // Whitelisting a previously unknown tx confiscating a TXO that is considered consensus frozen at enforceAtHeight must succeed
+        BOOST_CHECK( db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) && whitelistedTxData.enforceAtHeight==322 && whitelistedTxData.confiscatedTXOs==std::vector<COutPoint>{txo2} ); // This tx must now be whitelisted
+        BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnConsensus(50) && ftd.IsFrozenOnConsensus(450) && ftd.IsFrozenOnConsensus(200) ); // Confiscated TXO must be consensus frozen at all heights
+        BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnPolicy(50) && ftd.IsFrozenOnPolicy(450) && ftd.IsFrozenOnPolicy(200) ); // Confiscated TXO must be policy frozen at all heights
+
+        if(i==0)
+        {
+            // Check clearing all whitelisted transactions
+            auto res = db.ClearWhitelist();
+            BOOST_CHECK( res.numUnwhitelistedTxs==1 && res.numFrozenBackToConsensus==1 );
+            BOOST_CHECK( !db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) ); // This tx must not be whitelisted
+            // Previously confiscated TXOs must again be consensus frozen according to specified interval
+            BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && !ftd.IsFrozenOnConsensus(50) && !ftd.IsFrozenOnConsensus(450) && ftd.IsFrozenOnConsensus(200) );
+            BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnPolicy(50) && !ftd.IsFrozenOnPolicy(450) && ftd.IsFrozenOnPolicy(200) );
+
+            // Running it again should have no effect
+            res = db.ClearWhitelist();
+            BOOST_CHECK( res.numUnwhitelistedTxs==0 && res.numFrozenBackToConsensus==0 );
+        }
+
+        if(i==1)
+        {
+            // Check that consensus freeze intervals can be updated while TXOs are confiscated
+            BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{50,150}}, true)==CFrozenTXODB::FreezeTXOResult::OK_UPDATED );
+            auto res = db.ClearWhitelist();
+            BOOST_CHECK( res.numUnwhitelistedTxs==1 && res.numFrozenBackToConsensus==1 );
+            BOOST_CHECK( !db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) ); // This tx must not be whitelisted
+            // Previously confiscated TXOs must be consensus frozen according to updated interval
+            BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnConsensus(50) && !ftd.IsFrozenOnConsensus(450) && !ftd.IsFrozenOnConsensus(200) && ftd.IsFrozenOnConsensus(149) && !ftd.IsFrozenOnConsensus(49) && !ftd.IsFrozenOnConsensus(150) );
+            BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnPolicy(50) && !ftd.IsFrozenOnPolicy(450) && !ftd.IsFrozenOnPolicy(200) && ftd.IsFrozenOnPolicy(149) && ftd.IsFrozenOnPolicy(49) && !ftd.IsFrozenOnPolicy(150));
+
+            // Restore freeze interval to previous value
+            BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{100,400}}, true)==CFrozenTXODB::FreezeTXOResult::OK_UPDATED );
+        }
+    }
+
+    BOOST_CHECK( db.FreezeTXOConsensus(txo2, {}, true)==CFrozenTXODB::FreezeTXOResult::OK_UPDATED ); // Confiscated TXO must remain frozen even if consensus freeze intervals are updated
+    BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnConsensus(50) && ftd.IsFrozenOnConsensus(450) && ftd.IsFrozenOnConsensus(200) );
+    BOOST_CHECK( db.GetFrozenTXOData(txo2, ftd) && ftd.IsFrozenOnPolicy(50) && ftd.IsFrozenOnPolicy(450) && ftd.IsFrozenOnPolicy(200) );
+
+    BOOST_CHECK( db.WhitelistTx(321, ctx1) == CFrozenTXODB::WhitelistTxResult::OK_UPDATED ); // Whitelisting the tx again with lower enforceAtHeight must update the record in database
+    BOOST_CHECK( db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) && whitelistedTxData.enforceAtHeight==321 && whitelistedTxData.confiscatedTXOs==std::vector<COutPoint>{txo2} ); // This tx must now be whitelisted with lower enforceAtHeight
+
+    BOOST_CHECK( db.WhitelistTx(321, ctx1) == CFrozenTXODB::WhitelistTxResult::OK ); // Whitelisting the tx again with the same data has no effect
+    BOOST_CHECK( db.WhitelistTx(654, ctx1) == CFrozenTXODB::WhitelistTxResult::OK_ALREADY_WHITELISTED_AT_LOWER_HEIGHT ); // Whitelisting the tx again with higher enforceAtHeight has no effect
+    BOOST_CHECK( db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) && whitelistedTxData.enforceAtHeight==321 && whitelistedTxData.confiscatedTXOs==std::vector<COutPoint>{txo2} ); // Additional whitelisting with higher enforceAtHeight must have no effect on already whitelisted tx.
+
+    BOOST_CHECK( db.WhitelistTx(654, ctx2) == CFrozenTXODB::WhitelistTxResult::OK ); // Whitelist another tx
+    BOOST_CHECK( db.IsTxWhitelisted(ctx1.GetId(), whitelistedTxData) && whitelistedTxData.enforceAtHeight==321 && whitelistedTxData.confiscatedTXOs==std::vector<COutPoint>{txo2} ); // Both must now be whitelisted
+    BOOST_CHECK( db.IsTxWhitelisted(ctx2.GetId(), whitelistedTxData) && whitelistedTxData.enforceAtHeight==654 && whitelistedTxData.confiscatedTXOs==std::vector<COutPoint>{txo3} );
+
+    // Whitelisting the tx again with lower enforceAtHeight, which is before the TXO was initially considered consensus frozen,
+    // must also update the record in db, because TXO is now on Confiscation blacklist and frozen at all heights.
+    BOOST_CHECK( db.WhitelistTx(50, ctx1) == CFrozenTXODB::WhitelistTxResult::OK_UPDATED );
+
+    // Whitelisting a tx that spends already confiscated input must succeed
+    BOOST_CHECK( db.WhitelistTx(70, ctx3) == CFrozenTXODB::WhitelistTxResult::OK );
+
+    cnt = 0;
+    BOOST_CHECK( db.FreezeTXOConsensus(COutPoint(ctx2.GetId(), 0), {{0}}, false)==CFrozenTXODB::FreezeTXOResult::OK );// A TXO record in database must not interfere with iteration of whitelisted tx
+    for(auto it=db.QueryAllWhitelistedTxs(); it.Valid(); it.Next(), ++cnt) // Check iteration
+    {
+        auto t = it.GetWhitelistedTx();
+        if(t.first == ctx1.GetId() && t.second.enforceAtHeight == 50 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo2})
+        {
+            continue;
+        }
+        else if(t.first == ctx2.GetId() && t.second.enforceAtHeight == 654 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo3})
+        {
+            continue;
+        }
+        else if(t.first == ctx3.GetId() && t.second.enforceAtHeight == 70 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo3})
+        {
+            continue;
+        }
+        else
+        {
+            BOOST_TEST_ERROR("Unexpected tx during Iteration over whitelisted txs!");
+        }
+    }
+    BOOST_CHECK( cnt == 3 );
+
+    // Check UnfreezeAll() method
+    BOOST_CHECK( db.FreezeTXOPolicyOnly(txo1)==CFrozenTXODB::FreezeTXOResult::OK_ALREADY_FROZEN );
+    BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{0}}, false)==CFrozenTXODB::FreezeTXOResult::OK_UPDATED );
     BOOST_CHECK( db.FreezeTXOConsensus(COutPoint(uint256S("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"), 0), {{0}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
     auto res = db.UnfreezeAll();
     BOOST_CHECK( res.numUnfrozenPolicyOnly==1 );
-    BOOST_CHECK( res.numUnfrozenConsensus==2 );
+    BOOST_CHECK( res.numUnfrozenConsensus==4 );
+    BOOST_CHECK( res.numUnwhitelistedTxs==3 );
     BOOST_CHECK( !db.QueryAllFrozenTXOs().Valid() );
+    BOOST_CHECK( !db.QueryAllWhitelistedTxs().Valid() );
     res = db.UnfreezeAll(); // running on empty db should do nothing
     BOOST_CHECK( res.numUnfrozenPolicyOnly==0 );
     BOOST_CHECK( res.numUnfrozenConsensus==0 );
+    BOOST_CHECK( res.numUnwhitelistedTxs==0 );
+
+    // Check UnfreezeAll(true) method
+    BOOST_CHECK( db.FreezeTXOPolicyOnly(txo1)==CFrozenTXODB::FreezeTXOResult::OK );
+    BOOST_CHECK( db.FreezeTXOConsensus(txo2, {{0}}, true)==CFrozenTXODB::FreezeTXOResult::OK );
+    BOOST_CHECK( db.FreezeTXOConsensus(COutPoint(uint256S("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"), 0), {{0}}, false)==CFrozenTXODB::FreezeTXOResult::OK );
+    BOOST_CHECK( db.WhitelistTx(322, ctx1) == CFrozenTXODB::WhitelistTxResult::OK );
+    res = db.UnfreezeAll(true);
+    BOOST_CHECK( res.numUnfrozenPolicyOnly==0 );
+    BOOST_CHECK( res.numUnfrozenConsensus==2 );
+    BOOST_CHECK( res.numUnwhitelistedTxs==1 );
+    BOOST_CHECK( !db.QueryAllWhitelistedTxs().Valid() );
+    BOOST_CHECK( db.GetFrozenTXOData(txo1, ftd) && ftd.IsFrozenOnPolicy(0) && !ftd.IsFrozenOnConsensus(0) ); // policy frozen TXO must be unaffected
+    cnt=0;
+    for(auto it=db.QueryAllFrozenTXOs(); it.Valid(); it.Next())
+    {
+        if(it.GetFrozenTXO().first == txo1)
+        {
+            ++cnt;
+            continue;
+        }
+
+        BOOST_TEST_ERROR("Unexpected txo!");
+    }
+    BOOST_CHECK( cnt==1 );
+    res = db.UnfreezeAll(true); // running again should do nothing
+    BOOST_CHECK( res.numUnfrozenPolicyOnly==0 );
+    BOOST_CHECK( res.numUnfrozenConsensus==0 );
+    BOOST_CHECK( res.numUnwhitelistedTxs==0 );
+    BOOST_CHECK( db.QueryAllFrozenTXOs().Valid() );
+    BOOST_CHECK( !db.QueryAllWhitelistedTxs().Valid() );
+    res = db.UnfreezeAll(); // running again without the keepPolicyEntries should remove the remaining record
+    BOOST_CHECK( res.numUnfrozenPolicyOnly==1 );
+    BOOST_CHECK( res.numUnfrozenConsensus==0 );
+    BOOST_CHECK( res.numUnwhitelistedTxs==0 );
+    BOOST_CHECK( !db.QueryAllFrozenTXOs().Valid() );
+    BOOST_CHECK( !db.QueryAllWhitelistedTxs().Valid() );
+}
+
+
+BOOST_AUTO_TEST_CASE(IsConfiscationTx_test)
+{
+    using namespace std;
+    using script = vector<uint8_t>;
+
+    vector<pair<script, bool>> v{
+        make_pair(script{}, false),
+        make_pair(script{0x0}, false),
+        make_pair(script{0x0, 0x6a}, false),
+        make_pair(script{0x0, 0x6a, 0x4}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x66}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x66, 0x74}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x66, 0x74, 0x78}, true),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x66, 0x74, 0x78, 0x00}, true),
+        make_pair(script{0x9, 0x6a, 0x4, 0x63, 0x66, 0x74, 0x78}, false),
+        make_pair(script{0x0, 0x99, 0x4, 0x63, 0x66, 0x74, 0x78}, false),
+        make_pair(script{0x0, 0x6a, 0x9, 0x63, 0x66, 0x74, 0x78}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x99, 0x66, 0x74, 0x78}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x99, 0x74, 0x78}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x66, 0x99, 0x78}, false),
+        make_pair(script{0x0, 0x6a, 0x4, 0x63, 0x66, 0x74, 0x99}, false)
+    };
+
+    for(const auto& [input, expected] : v)
+    {
+        const vector<uint8_t> scr{input};
+
+        CMutableTransaction ctx;
+        ctx.vout.resize(1);
+        ctx.vout[0].scriptPubKey = CScript(scr.begin(), scr.end());
+
+        BOOST_CHECK_EQUAL(expected, CFrozenTXODB::IsConfiscationTx( CTransaction(ctx) ));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(ValidateConfiscationTxContents_test)
+{
+    using namespace std;
+    using script = vector<uint8_t>;
+
+    static constexpr auto version_len{1};
+    static constexpr auto version{1};
+    const script preamble{0x0, 0x6a, 0x4, 0x63, 0x66, 0x74, 0x78};
+    static constexpr size_t order_hash_len{20};
+    static constexpr size_t location_hint_len{54};
+    static constexpr uint8_t op_push{version_len + order_hash_len + location_hint_len};
+
+    // preamble, op_push, version, orderhash_length, locationhint_length, expected
+    using value_type = tuple<script, uint8_t, uint8_t, size_t, size_t, bool>;
+    // clang-format off
+    vector<value_type> v
+    {
+        // happy case
+        make_tuple(preamble, op_push, version, order_hash_len, location_hint_len, true),
+
+        // wrong version
+        make_tuple(preamble, op_push, 0, order_hash_len, location_hint_len, false),
+        make_tuple(preamble, op_push, 2, order_hash_len, location_hint_len, false),
+
+        // orderhash too short, no location hint
+        make_tuple(preamble,
+                   version_len + order_hash_len - 1,
+                   version, order_hash_len -1, 0, false),
+
+        // variable location hint
+        make_tuple(preamble,
+                   version_len + order_hash_len + 0,
+                   version, order_hash_len, 0, true),
+        make_tuple(preamble,
+                   version_len + order_hash_len + 1,
+                   version, order_hash_len, 1, true),
+        make_tuple(preamble,
+                   version_len + order_hash_len + location_hint_len,
+                   version, order_hash_len, location_hint_len, true),
+        make_tuple(preamble,
+                   version_len + order_hash_len + location_hint_len + 1,
+                   version, order_hash_len, location_hint_len + 1, false),
+
+        // op_pushdata > 75 (only single byte OP_PUSHDATA is allowed)
+        make_tuple(preamble, 76, version, order_hash_len, location_hint_len, false),
+
+        // op_push > total script size
+        make_tuple(preamble, op_push, version, order_hash_len, location_hint_len-1, false),
+
+        // op_push < total script size
+        make_tuple(preamble, op_push-1, version, order_hash_len, location_hint_len, false)
+    };
+    // clang-format on
+
+    for(const auto& [preamble, op_push, version, order_hash_len, location_hint_len, exp] : v)
+    {
+        vector<uint8_t> scr{preamble};
+        scr.push_back(op_push);
+        scr.push_back(version);
+
+        vector<uint8_t> order_hash(order_hash_len);
+        iota(order_hash.begin(), order_hash.end(), 0);
+        scr.insert(scr.end(), order_hash.begin(), order_hash.end());
+
+        vector<uint8_t> location_hint(location_hint_len);
+        iota(location_hint.begin(), location_hint.end(), 0);
+        scr.insert(scr.end(), location_hint.begin(), location_hint.end());
+
+        CMutableTransaction ctx;
+        ctx.vin.resize(1);
+        ctx.vout.resize(1);
+        ctx.vout[0].scriptPubKey = CScript(scr.begin(), scr.end());
+
+        BOOST_CHECK( CFrozenTXODB::IsConfiscationTx( CTransaction(ctx) ) );
+        BOOST_CHECK_EQUAL(exp, CFrozenTXODB::ValidateConfiscationTxContents( CTransaction(ctx) ));
+
+        if(exp)
+        {
+            // Otherwise valid confiscation transaction must also have no provable unspendable outputs
+            ctx.vout.resize(2);
+            ctx.vout[1].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;
+            BOOST_CHECK_EQUAL(false, CFrozenTXODB::ValidateConfiscationTxContents( CTransaction(ctx) ));
+        }
+    }
 }
 
 
@@ -575,7 +899,7 @@ BOOST_AUTO_TEST_CASE(db_thread_safety_tests)
     };
 
     // Provides counters that are used to check if function completed successfully
-    struct Cnt 
+    struct Cnt
     {
         std::size_t ok = 0;
         std::size_t alt = 0;

@@ -43,7 +43,7 @@ void CFrozenTXOLogger::Shutdown()
 
 namespace {
 
-std::string le_to_string(const CFrozenTXOLogger::LogEntry_Rejected& le)
+std::string le_to_string(const CFrozenTXOLogger::LogEntry_Rejected& le, bool log_frozenTXO=true)
 {
     std::string s;
     s += " received_timestamp=";
@@ -63,7 +63,10 @@ std::string le_to_string(const CFrozenTXOLogger::LogEntry_Rejected& le)
     }
     s += " rejected_tx_hash="+le.rejectedTx.GetHash().ToString();
     s += " source='"+le.source+"'";
-    s += " frozen_TXO={"+le.frozenTXO.GetTxId().ToString()+","+std::to_string(le.frozenTXO.GetN())+"}";
+    if(log_frozenTXO)
+    {
+        s += " frozen_TXO={"+le.frozenTXO.GetTxId().ToString()+","+std::to_string(le.frozenTXO.GetN())+"}";
+    }
     s += " previous_active_block_hash="+le.previousActiveBlockHash.ToString();
     return s;
 }
@@ -94,5 +97,48 @@ void CFrozenTXOLogger::LogRejectedTransaction(const LogEntry_Rejected& le)
     this->logger->LogPrintStr(msg);
 
     // Also write entry to standard log
+    GetLogger().LogPrintStr(msg);
+}
+
+void CFrozenTXOLogger::LogRejectedBlockCTNotWhitelisted(const LogEntry_Rejected& le, std::optional<std::int32_t> whitelistEnforceAtHeight, const uint256& rejectedBlockHash, bool onlyWarning)
+{
+    std::string msg = "Block was rejected because it included a confiscation transaction";
+    if(onlyWarning)
+    {
+        msg = "WARNING! Block included a confiscation transaction";
+    }
+    if(!whitelistEnforceAtHeight.has_value())
+    {
+        msg+=", which was not whitelisted!";
+    }
+    else
+    {
+        msg+=", which was whitelisted but not valid before height "+std::to_string(*whitelistEnforceAtHeight)+"!";
+    }
+    msg += le_to_string(le, false);
+    msg += " rejected_block_hash="+rejectedBlockHash.ToString();
+    msg += " rejected_tx_hex="+EncodeHexTx(le.rejectedTx);
+    msg += '\n';
+
+    this->logger->LogPrintStr(msg);
+    GetLogger().LogPrintStr(msg);
+}
+
+void CFrozenTXOLogger::LogRejectedTransactionCTNotWhitelisted(const LogEntry_Rejected& le, std::optional<std::int32_t> whitelistEnforceAtHeight)
+{
+    std::string msg = "Confiscation transaction was rejected because";
+    if(!whitelistEnforceAtHeight.has_value())
+    {
+        msg+=" it was not whitelisted!";
+    }
+    else
+    {
+        msg+=" it was whitelisted but not valid before height "+std::to_string(*whitelistEnforceAtHeight)+"!";
+    }
+    msg += le_to_string(le, false);
+    msg += " rejected_tx_hex="+EncodeHexTx(le.rejectedTx);
+    msg += '\n';
+
+    this->logger->LogPrintStr(msg);
     GetLogger().LogPrintStr(msg);
 }

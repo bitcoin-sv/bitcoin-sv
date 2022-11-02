@@ -1432,7 +1432,7 @@ inline static void SendBlockTransactions(const CBlock &block,
     for (size_t i = 0; i < req.indices.size(); i++) {
         if (req.indices[i] >= block.vtx.size()) {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
             return;
         }
         resp.txn[i] = block.vtx[req.indices[i]];
@@ -1986,10 +1986,40 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
         // Get the current MinerID from this node
         std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
 
-        if (!pubKeyOpt) {
-            LogPrint(BCLog::MINERID, "Ignoring authch messages until this node has mined a block containing a miner_info document");
+        try {
+            using namespace rpc::client;
+            if (g_pWebhookClient) {
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
+                using HTTPRequest = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateGetMinerIdRequest(
+                                        rpcConfig,
+                                        config.GetMinerIdGeneratorAlias())) };
+                auto response { std::make_shared<StringHTTPResponse>() };
+                auto fut = g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
+                fut.wait();
+                auto futResponse = fut.get();
+                const StringHTTPResponse* r = dynamic_cast<StringHTTPResponse*> (futResponse.get());
+                if (!r)
+                    throw std::runtime_error("Could not get the miner-id from the MinerID Generator.");
+
+                pubKeyOpt = CPubKey(ParseHex(r->GetBody()));
+                if (!pubKeyOpt)
+                    throw std::runtime_error("Could not get the miner-id from the MinerID Generator.");
+
+                auto docinfo = GetMinerCoinbaseDocInfo(*g_minerIDs, *pubKeyOpt);
+                if (!docinfo)
+                    throw std::runtime_error("Miner-id from MinerID Generator is not in the minerid database.");
+
+                g_BlockDatarefTracker->set_current_minerid(*pubKeyOpt);
+            }
+            if (!pubKeyOpt) {
+                throw std::runtime_error ("Ignoring authch messages until this node has mined a block containing a miner_info document\n");
+            }
+        } catch (const std::exception& e) {
+            LogPrint(BCLog::MINERID, strprintf("Ignoring authch messages until this node has mined a block containing a miner_info document. %s\n", e.what()));
             return true;
         }
+
         CPubKey pubKey = pubKeyOpt.value();
 
         // Create the DER-encoded signature of the expected minimal size.
@@ -2000,12 +2030,12 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
             using namespace rpc::client;
             if (!g_pWebhookClient) {
                 // we log unconditionally because we already checked that we do have a minerid.
-                LogPrintf("No authentication client for minerid authentication instantiated");
+                LogPrintf("No authentication client for minerid authentication instantiated\n");
                 // we return true because we still want to connect, but unauthenticated instead.
                 return true;
             } else {
                 LogPrint(BCLog::MINERID, "sending signature request to MinerID Generator\n");
-                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config) };
+                RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
                 using HTTPRequest = rpc::client::HTTPRequest;
                 auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateMinerIdGeneratorSigningRequest(
                         rpcConfig,
@@ -2019,8 +2049,8 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
                 if (!r)
                     throw std::runtime_error("Signature creation has not returned from the MinerID Generator.");
                 const UniValue& uv = r->GetBody();
-                if (!uv.isObject())
-                    throw std::runtime_error("Signature creation from MinerID Generator has wrong type. Should be string.");
+                if (!uv.isObject() || !uv.exists("signature"))
+                    throw std::runtime_error("JSON error, object containing a string with key name \"signature\" expected");
                 std::string signedHex = uv["signature"].get_str();
                 vSign = ParseHex(signedHex);
             }
@@ -2036,10 +2066,10 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
             PushMessage(pfrom,
                 msgMaker.Make(NetMsgType::AUTHRESP, vPubKey, nClientNonce, vSign));
         // Add a log message.
-        LogPrint(BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "Sent authresp message (nPubKeyLen: %d, vPubKey: %s, nClientNonce: %d, nSignLen: %d, vSign: %s), to peer=%d\n",
             vPubKey.size(), HexStr(vPubKey).c_str(), nClientNonce, vSign.size(), HexStr(vSign).c_str(), pfrom->id);
     } catch(std::exception& e) {
-        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authch: (%s); disconnecting\n", pfrom->id, e.what());
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "peer=%d Failed to process authch: (%s)\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, msgMaker
             .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
 	    // We still connect if authentication failed.
@@ -2548,7 +2578,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
 
     auto index = mapBlockIndex.Get(req.blockhash);
     if(!index) {
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
 
@@ -2561,7 +2591,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         // might maliciously send lots of getblocktxn requests to trigger
         // expensive disk reads, because it will require the peer to
         // actually receive all the data read from disk over the network.
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep",
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n",
                  pfrom->id, MAX_BLOCKTXN_DEPTH);
         CInv inv;
         inv.type = MSG_BLOCK;
@@ -2575,7 +2605,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     auto block_stream_reader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
     if (!block_stream_reader)
     {
-        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
     // Number of transactions in block
@@ -2590,7 +2620,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         if (txn_idx >= num_txn_in_block)
         {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
             return;
         }
 
@@ -2847,7 +2877,7 @@ public:
         }
         catch(...)
         {
-            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.");
+            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase/miner-info txns failed.\n");
         }
 
         if(coinbaseAndProof)

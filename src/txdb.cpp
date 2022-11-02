@@ -156,7 +156,8 @@ std::optional<CoinImpl> CoinsDB::DBGetCoin(const COutPoint &outpoint, uint64_t m
                         coin->GetTxOut().nValue,
                         *actualScriptSize,
                         coin->GetHeight(),
-                        coin->IsCoinBase()}};
+                        coin->IsCoinBase(),
+                        coin->IsConfiscation()}};
             }
 
             return coin;
@@ -362,7 +363,8 @@ std::optional<CoinImpl> CCoinsViewDBCursor::GetCoin(uint64_t maxScriptSize) cons
                     coin->GetTxOut().nValue,
                     *actualScriptSize,
                     coin->GetHeight(),
-                    coin->IsCoinBase()}};
+                    coin->IsCoinBase(),
+                    coin->IsConfiscation()}};
         }
 
         return coin;
@@ -529,7 +531,8 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
                             coinFromCache->GetTxOut().nValue,
                             coinFromCache->GetScriptSize(),
                             coinFromCache->GetHeight(),
-                            coinFromCache->IsCoinBase()};
+                            coinFromCache->IsCoinBase(),
+                            coinFromCache->IsConfiscation()};
                 }
             }
             if(!mFetchingCoins.count(outpoint))
@@ -600,7 +603,8 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
                 coinFromView->GetTxOut().nValue,
                 coinFromView->GetScriptSize(),
                 coinFromView->GetHeight(),
-                coinFromView->IsCoinBase()});
+                coinFromView->IsCoinBase(),
+                coinFromView->IsConfiscation()});
 
         return coinFromView;
     }

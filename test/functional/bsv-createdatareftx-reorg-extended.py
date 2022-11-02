@@ -84,7 +84,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         scriptPubKeys = []
         for b in brfcDatas:
-            script = CScript([OP_FALSE, OP_RETURN, bytearray([0xAC, 0x1E, 0xED, 0x99]),datarefToScript(b)])
+            script = CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), bytearray([0x0]) ,datarefToScript(b)])
             scriptPubKeys.append (bytes_to_hex_str(script))
 
         txid = node.createdatareftx(scriptPubKeys)

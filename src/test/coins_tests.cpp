@@ -171,9 +171,23 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
         SER_DISK, CLIENT_VERSION);
     CoinWithScript c1 = DataStreamToCoinWithScript(ss1);
     BOOST_CHECK_EQUAL(c1.IsCoinBase(), false);
+    BOOST_CHECK_EQUAL(c1.IsConfiscation(), false);
     BOOST_CHECK_EQUAL(c1.GetHeight(), 203998U);
     BOOST_CHECK_EQUAL(c1.GetTxOut().nValue, Amount(60000000000LL));
     BOOST_CHECK_EQUAL(HexStr(c1.GetTxOut().scriptPubKey),
+                      HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex(
+                          "816115944e077fe7c803cfa57f29b36bf87c1d35"))))));
+
+    // Good example - confiscation
+    CDataStream ss1a(
+        ParseHex("8eff97f23c835800816115944e077fe7c803cfa57f29b36bf87c1d35"),
+        SER_DISK, CLIENT_VERSION);
+    CoinWithScript c1a = DataStreamToCoinWithScript(ss1a);
+    BOOST_CHECK_EQUAL(c1a.IsCoinBase(), false);
+    BOOST_CHECK_EQUAL(c1a.IsConfiscation(), true);
+    BOOST_CHECK_EQUAL(c1a.GetHeight(), 203998U);
+    BOOST_CHECK_EQUAL(c1a.GetTxOut().nValue, Amount(60000000000LL));
+    BOOST_CHECK_EQUAL(HexStr(c1a.GetTxOut().scriptPubKey),
                       HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex(
                           "816115944e077fe7c803cfa57f29b36bf87c1d35"))))));
 
@@ -183,6 +197,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
         SER_DISK, CLIENT_VERSION);
     CoinWithScript c2 = DataStreamToCoinWithScript(ss2);
     BOOST_CHECK_EQUAL(c2.IsCoinBase(), true);
+    BOOST_CHECK_EQUAL(c2.IsConfiscation(), false);
     BOOST_CHECK_EQUAL(c2.GetHeight(), 120891);
     BOOST_CHECK_EQUAL(c2.GetTxOut().nValue, Amount(110397LL));
     BOOST_CHECK_EQUAL(HexStr(c2.GetTxOut().scriptPubKey),
@@ -193,9 +208,36 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     CDataStream ss3(ParseHex("000006"), SER_DISK, CLIENT_VERSION);
     CoinWithScript c3 = DataStreamToCoinWithScript(ss3);
     BOOST_CHECK_EQUAL(c3.IsCoinBase(), false);
+    BOOST_CHECK_EQUAL(c3.IsConfiscation(), false);
     BOOST_CHECK_EQUAL(c3.GetHeight(), 0);
     BOOST_CHECK_EQUAL(c3.GetTxOut().nValue, Amount(0));
     BOOST_CHECK_EQUAL(c3.GetTxOut().scriptPubKey.size(), 0);
+
+    // Smallest possible example - confiscation
+    CDataStream ss3a(ParseHex("8efefeff000006"), SER_DISK, CLIENT_VERSION);
+    CoinWithScript c3a = DataStreamToCoinWithScript(ss3a);
+    BOOST_CHECK_EQUAL(c3a.IsCoinBase(), false);
+    BOOST_CHECK_EQUAL(c3a.IsConfiscation(), true);
+    BOOST_CHECK_EQUAL(c3a.GetHeight(), 0);
+    BOOST_CHECK_EQUAL(c3a.GetTxOut().nValue, Amount(0));
+    BOOST_CHECK_EQUAL(c3a.GetTxOut().scriptPubKey.size(), 0);
+
+    // Upper limit example - coinbase+confiscation, max height, all bits above bit32 set and ignored
+    CDataStream ss3b(ParseHex("80fefefefefefefefe7f0006"), SER_DISK, CLIENT_VERSION);
+    CoinWithScript c3b = DataStreamToCoinWithScript(ss3b);
+    BOOST_CHECK_EQUAL(c3b.IsCoinBase(), true);
+    BOOST_CHECK_EQUAL(c3b.IsConfiscation(), true);
+    BOOST_CHECK_EQUAL(c3b.GetHeight(), 0x7fffffff);
+    BOOST_CHECK_EQUAL(c3b.GetTxOut().nValue, Amount(0));
+    BOOST_CHECK_EQUAL(c3b.GetTxOut().scriptPubKey.size(), 0);
+
+    // VARINT storing height+flags does not fit in uint64
+    try {
+        CDataStream ss3c(ParseHex("80fefefefefefefeff000006"), SER_DISK, CLIENT_VERSION);
+        CoinWithScript c3c = DataStreamToCoinWithScript(ss3c);
+        BOOST_CHECK_MESSAGE(false, "We should have thrown");
+    } catch (const std::exception &e) {
+    }
 
     // scriptPubKey that ends beyond the end of the stream
     CDataStream ss4(ParseHex("000007"), SER_DISK, CLIENT_VERSION);
@@ -243,7 +285,7 @@ static void SetCoinValue(const Amount value, CCoinsCacheEntry &coin, char flags)
         coin =
             CCoinsCacheEntry(
                 CoinImpl::FromCoinWithScript(
-                    CoinWithScript::MakeOwning(std::move(out), 1, false) ),
+                    CoinWithScript::MakeOwning(std::move(out), 1, false, false) ),
                 static_cast<uint8_t>(flags));
         assert(!coin.GetCoin().IsSpent());
     }
@@ -413,7 +455,7 @@ BOOST_AUTO_TEST_CASE(coin_spend) {
 
 void CheckAddCoinBase(Amount base_value, Amount cache_value,
                       Amount modify_value, Amount expected_value,
-                      char cache_flags, char expected_flags, bool coinbase) {
+                      char cache_flags, char expected_flags, bool coinbase, bool confiscation=false) {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
 
     Amount result_value;
@@ -422,7 +464,7 @@ void CheckAddCoinBase(Amount base_value, Amount cache_value,
         CTxOut output;
         output.nValue = modify_value;
         test.cache->GetCoin( OUTPOINT ); // make sure that coin is preloaded if it already exists
-        test.cache->AddCoin(OUTPOINT, CoinWithScript::MakeOwning(std::move(output), 1, coinbase),
+        test.cache->AddCoin(OUTPOINT, CoinWithScript::MakeOwning(std::move(output), 1, coinbase, confiscation),
                            coinbase, GlobalConfig::GetConfig().GetGenesisActivationHeight());
         test.cache->SelfTest();
         GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
@@ -464,23 +506,35 @@ BOOST_AUTO_TEST_CASE(coin_add) {
         CheckAddCoinBase(ABSENT, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
         CheckAddCoinBase(PRUNED, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
         CheckAddCoinBase(VALUE1, ABSENT, VALUE3, FAIL, NO_ENTRY, NO_ENTRY, false);
+        // Same as above for confiscation coins
+        CheckAddCoinBase(ABSENT, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false, true);
+        CheckAddCoinBase(PRUNED, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false, true);
+        CheckAddCoinBase(VALUE1, ABSENT, VALUE3, FAIL, NO_ENTRY, NO_ENTRY, false, true);
     }
     CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY | FRESH, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY | FRESH, false, true); // checks for normal (non-coinbase) coins are also repeated for confiscation coins
     CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, FRESH, DIRTY | FRESH, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, FRESH, DIRTY | FRESH, false, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, FRESH, DIRTY | FRESH, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY, DIRTY, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY, DIRTY, false, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY, DIRTY, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY | FRESH, DIRTY | FRESH, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY | FRESH, DIRTY | FRESH, false, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY | FRESH, DIRTY | FRESH, true);
     CheckAddCoin(VALUE2, VALUE3, FAIL, 0, NO_ENTRY, false);
+    CheckAddCoin(VALUE2, VALUE3, FAIL, 0, NO_ENTRY, false, true);
     CheckAddCoin(VALUE2, VALUE3, VALUE3, 0, DIRTY, true);
     CheckAddCoin(VALUE2, VALUE3, FAIL, FRESH, NO_ENTRY, false);
+    CheckAddCoin(VALUE2, VALUE3, FAIL, FRESH, NO_ENTRY, false, true);
     CheckAddCoin(VALUE2, VALUE3, VALUE3, FRESH, DIRTY | FRESH, true);
     CheckAddCoin(VALUE2, VALUE3, FAIL, DIRTY, NO_ENTRY, false);
+    CheckAddCoin(VALUE2, VALUE3, FAIL, DIRTY, NO_ENTRY, false, true);
     CheckAddCoin(VALUE2, VALUE3, VALUE3, DIRTY, DIRTY, true);
     CheckAddCoin(VALUE2, VALUE3, FAIL, DIRTY | FRESH, NO_ENTRY, false);
+    CheckAddCoin(VALUE2, VALUE3, FAIL, DIRTY | FRESH, NO_ENTRY, false, true);
     CheckAddCoin(VALUE2, VALUE3, VALUE3, DIRTY | FRESH, DIRTY | FRESH, true);
 }
 
@@ -621,7 +675,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
             CScript scr(OP_RETURN);
             CTxOut txo(Amount(123), scr);
             script_small_size = txo.scriptPubKey.size(); // remember size of small script for later
-            span.AddCoin(COutPoint(txId, 0), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false), false, 0); // UTXO is not coinbase
+            span.AddCoin(COutPoint(txId, 0), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
         }
 
         {
@@ -630,7 +684,27 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
             txo.nValue = Amount(456);
             txo.scriptPubKey = CScript(std::vector<uint8_t>(1024*1024, 0xde));
             script_big_size = txo.scriptPubKey.size(); // remember size of big script for later
-            span.AddCoin(COutPoint(txId, 1), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false), false, 0); // UTXO is not coinbase
+            span.AddCoin(COutPoint(txId, 1), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
+        }
+
+        // Two confiscation outputs that are otherwise the same as outputs 0,1 above.
+        // These are used to check that value of confiscation flag is available regardless of script size and
+        // is properly passed through whole UTXO chain (view, span, cache, db).
+        {
+            // Output 2 - small locking script confiscation
+            CScript scr(OP_RETURN);
+            CTxOut txo(Amount(123), scr);
+            script_small_size = txo.scriptPubKey.size(); // remember size of small script for later
+            span.AddCoin(COutPoint(txId, 2), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, true), false, 0); // UTXO is confiscation
+        }
+
+        {
+            // Output 3 - big locking script confiscation
+            CTxOut txo;
+            txo.nValue = Amount(456);
+            txo.scriptPubKey = CScript(std::vector<uint8_t>(1024*1024, 0xde));
+            script_big_size = txo.scriptPubKey.size(); // remember size of big script for later
+            span.AddCoin(COutPoint(txId, 3), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, true), false, 0); // UTXO is confiscation
         }
 
         // And flush them to provider
@@ -648,6 +722,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         auto c0 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 0));
         BOOST_TEST(c0.has_value());
         BOOST_TEST(c0->GetTxOut().nValue == Amount(123)); // check that we got the correct output
+        BOOST_TEST(!c0->IsConfiscation());
         BOOST_TEST(c0->GetTxOut().scriptPubKey.size()==script_small_size);
     }
 
@@ -656,7 +731,26 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         auto c1 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 1));
         BOOST_TEST(c1.has_value());
         BOOST_TEST(c1->GetTxOut().nValue == Amount(456)); // check that we got the correct output
+        BOOST_TEST(!c1->IsConfiscation());
         BOOST_TEST(c1->GetTxOut().scriptPubKey.size()==script_big_size);
+    }
+
+    {
+        // Get output 2 from DB
+        auto c2 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 2));
+        BOOST_TEST(c2.has_value());
+        BOOST_TEST(c2->GetTxOut().nValue == Amount(123)); // check that we got the correct output
+        BOOST_TEST(c2->IsConfiscation());
+        BOOST_TEST(c2->GetTxOut().scriptPubKey.size()==script_small_size);
+    }
+
+    {
+        // Get output 3 from DB
+        auto c3 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 3));
+        BOOST_TEST(c3.has_value());
+        BOOST_TEST(c3->GetTxOut().nValue == Amount(456)); // check that we got the correct output
+        BOOST_TEST(c3->IsConfiscation());
+        BOOST_TEST(c3->GetTxOut().scriptPubKey.size()==script_big_size);
     }
 
     //
@@ -668,6 +762,19 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
         BOOST_TEST(c0.has_value());
         BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(!c0->IsConfiscation());
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_small_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_small_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+    }
+
+    {
+        // Get output 2 from DB with script regardless of its size
+        provider.SizeOverride(script_small_size);
+        auto c2 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 2));
+        BOOST_TEST(c2.has_value());
+        BOOST_TEST(c2->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(c2->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_small_size);
         BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_small_size);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
@@ -679,6 +786,19 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
         BOOST_TEST(c0.has_value());
         BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(!c0->IsConfiscation());
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+    }
+
+    {
+        // Get output 2 from DB without script (even if it is a very small one)
+        provider.SizeOverride( {} );
+        auto c2 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 2));
+        BOOST_TEST(c2.has_value());
+        BOOST_TEST(c2->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(c2->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
         BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
@@ -690,6 +810,19 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
         BOOST_TEST(c1.has_value());
         BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(!c1->IsConfiscation());
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_big_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_big_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+    }
+
+    {
+        // Get output 3 from DB with script regardless of its size
+        provider.SizeOverride(script_big_size);
+        auto c3 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 3));
+        BOOST_TEST(c3.has_value());
+        BOOST_TEST(c3->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(c3->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_big_size);
         BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_big_size);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
@@ -701,6 +834,19 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
         BOOST_TEST(c1.has_value());
         BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(!c1->IsConfiscation());
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+    }
+
+    {
+        // Get output 3 from DB without script
+        provider.SizeOverride( {} );
+        auto c3 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 3));
+        BOOST_TEST(c3.has_value());
+        BOOST_TEST(c3->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(c3->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
         BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
@@ -887,7 +1033,7 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
             txo.scriptPubKey = script_template;
             secondary.AddCoin(
                 COutPoint{txId, i},
-                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false),
+                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false),
                 false,
                 0); // UTXO is not coinbase
 
@@ -1064,7 +1210,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
             auto size = memusage::DynamicUsage(txo.scriptPubKey);
             secondary.AddCoin(
                 COutPoint{txId, i},
-                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false),
+                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false),
                 false,
                 0); // UTXO is not coinbase
 

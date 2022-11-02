@@ -37,6 +37,23 @@ namespace
         return txns;
     }
 
+    void makeConfiscationTransactions(std::vector<CMutableTransaction>& txns)
+    {
+        for(auto& tx: txns)
+        {
+            CTxOut out0(
+                Amount(0LL),
+                // The following script in first output makes this a confiscation transaction with valid contents.
+                CScript() << OP_FALSE << OP_RETURN << std::vector<std::uint8_t>{'c', 'f', 't', 'x'} << std::vector<std::uint8_t>{1, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+            );
+            tx.vout.insert(tx.vout.begin(), out0);
+            for(auto& txin: tx.vin)
+            {
+                txin.scriptSig = CScript();
+            }
+        }
+    }
+
     void writeTransactionsToMemoryPool(
         const std::vector<CMutableTransaction>& txns,
         mining::CJournalChangeSetPtr& journal,
@@ -50,23 +67,40 @@ namespace
         }
     }
 
-    size_t freezeEachNthTransaction(const std::vector<CMutableTransaction>& txns, size_t step)
+    size_t freezeEachNthTransaction(const std::vector<CMutableTransaction>& txns, size_t step, std::size_t input_index=1)
     {
         size_t frozenCount = 0;
         auto& db = CFrozenTXODB::Instance();
 
         for(size_t i=0; i < txns.size(); i += step)
         {
-            assert(txns[i].vin.size() > 1);
+            assert(txns[i].vin.size() > input_index);
 
-            auto result = db.FreezeTXOConsensus(txns[i].vin[1].prevout, {{0}}, false);
+            auto result = db.FreezeTXOConsensus(txns[i].vin[input_index].prevout, {{0}}, false);
             BOOST_CHECK(result == CFrozenTXODB::FreezeTXOResult::OK);
             CFrozenTXODB::FrozenTXOData ftd = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
-            BOOST_CHECK(db.GetFrozenTXOData(txns[i].vin[1].prevout, ftd));
+            BOOST_CHECK(db.GetFrozenTXOData(txns[i].vin[input_index].prevout, ftd));
             ++frozenCount;
         }
 
         return frozenCount;
+    }
+
+    size_t whitelistEachNthTransaction(const std::vector<CMutableTransaction>& txns, size_t start, size_t step, int eah)
+    {
+        size_t whitelistedCount = 0;
+        auto& db = CFrozenTXODB::Instance();
+
+        for(size_t i=start; i < txns.size(); i += step)
+        {
+            auto result = db.WhitelistTx(eah, CTransaction(txns[i]));
+            BOOST_CHECK(result == CFrozenTXODB::WhitelistTxResult::OK);
+            auto whitelistedTxData = CFrozenTXODB::WhitelistedTxData::Create_Uninitialized();
+            BOOST_CHECK(db.IsTxWhitelisted(txns[i].GetId(), whitelistedTxData) && whitelistedTxData.enforceAtHeight==eah);
+            ++whitelistedCount;
+        }
+
+        return whitelistedCount;
     }
 }
 
@@ -84,6 +118,30 @@ BOOST_AUTO_TEST_CASE(mempool_RemoveFrozen)
     testPool.RemoveFrozen(nullChangeSet);
 
     BOOST_CHECK_EQUAL(testPool.Size(), txns.size() - frozenCount);
+
+
+    // Check that confiscation transactions are removed from mempool if they are not whitelisted.
+    auto ctxns = generateNRandomTransactions(100);
+    makeConfiscationTransactions(ctxns);
+
+    auto initialMempoolSize = testPool.Size();
+    writeTransactionsToMemoryPool(ctxns, nullChangeSet, testPool);
+    BOOST_CHECK_EQUAL(testPool.Size(), initialMempoolSize + ctxns.size());
+
+    freezeEachNthTransaction(ctxns, 3, 0);
+    freezeEachNthTransaction(ctxns, 3, 1); // Both inputs are consensus frozen in every 3rd confiscation transaction so that they can be confiscated.
+    whitelistEachNthTransaction(ctxns, 0,6, 2); // Every 6th confiscation transaction (starting from 0) is whitelisted at height 2 (which is higher than mempool's height).
+    auto num_valid_ctxs=whitelistEachNthTransaction(ctxns, 3,6, 1); // Every 6th confiscation transaction (starting from 3) is whitelisted at height 1 (which is mempool's height).
+
+    testPool.RemoveInvalidCTXs(nullChangeSet);
+
+    // Only every 6th confiscation transaction staring from 3 is whitelisted at mempool's height,
+    // which makes it valid and should therefore stay in mempool.
+    BOOST_CHECK_EQUAL(testPool.Size(), initialMempoolSize + num_valid_ctxs);
+    for(size_t i=3; i<ctxns.size(); i+=6)
+    {
+        BOOST_CHECK( testPool.Exists(ctxns[i].GetId()) );
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

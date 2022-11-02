@@ -262,7 +262,7 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions[0].vout[1].nValue = 50 * CENT;
     dummyTransactions[0].vout[1].scriptPubKey
         << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
-    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), 0, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), false, 0, 0);
 
     dummyTransactions[1].vout.resize(2);
     dummyTransactions[1].vout[0].nValue = 21 * CENT;
@@ -271,7 +271,7 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions[1].vout[1].nValue = 22 * CENT;
     dummyTransactions[1].vout[1].scriptPubKey =
         GetScriptForDestination(key[3].GetPubKey().GetID());
-    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), 0, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), false, 0, 0);
 
     return dummyTransactions;
 }
@@ -477,7 +477,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         CTxOut out;
         out.nValue = Amount(1000);
         out.scriptPubKey = scriptPubKey;
-        coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false));
+        coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false, false));
     }
 
     for (size_t i = 0; i < mtx.vin.size(); i++) {
@@ -944,7 +944,7 @@ SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCach
     else
         dummyTransactions[0].vout[1].scriptPubKey << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
 
-    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), height, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[0]), false, height, 0);
 
     dummyTransactions[1].vout.resize(2);
     dummyTransactions[1].vout[0].nValue = 21 * CENT;
@@ -953,7 +953,7 @@ SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCach
     dummyTransactions[1].vout[1].nValue = 22 * CENT;
     dummyTransactions[1].vout[1].scriptPubKey =
             GetScriptForDestination(key[3].GetPubKey().GetID());
-    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), height, 0);
+    AddCoins(coinsRet, CTransaction(dummyTransactions[1]), false, height, 0);
     return dummyTransactions;
 }
 
