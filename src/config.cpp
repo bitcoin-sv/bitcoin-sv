@@ -134,6 +134,7 @@ void GlobalConfig::Reset()
     data->p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
     data->streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     data->banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+    data->blockTxnMaxPercent = DEFAULT_BLOCK_TXN_MAX_PERCENT;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1473,6 +1474,25 @@ bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
 unsigned int GlobalConfig::GetBanScoreThreshold() const
 {
     return data->banScoreThreshold;
+}
+
+bool GlobalConfig::SetBlockTxnMaxPercent(unsigned int percent, std::string* err)
+{
+    if(percent > 100)
+    {
+        if (err)
+        {
+            *err = "Max percentage of blocktxn transactions in a request must be between 0 and 100.";
+        }
+        return false;
+    }
+
+    data->blockTxnMaxPercent = percent;
+    return true;
+}
+unsigned int GlobalConfig::GetBlockTxnMaxPercent() const
+{
+    return data->blockTxnMaxPercent;
 }
 
 // RPC parameters

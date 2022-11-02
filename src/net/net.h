@@ -121,6 +121,11 @@ static const unsigned int MICROS_PER_SECOND = 1000000;
 static const unsigned int TXN_REREQUEST_INTERVAL = 1 * 60 * MICROS_PER_SECOND;
 /** Time until transaction request expiry (10 minutes) */
 static const unsigned int TXN_EXPIRY_INTERVAL = 10 * TXN_REREQUEST_INTERVAL;
+/** Default max perentage of txns we will return for a getblocktxn request.
+* If the peer asks for a greater of txns from a block than this, we will respond
+* with the full block rather than a blocktxn response.
+**/
+static const unsigned int DEFAULT_BLOCK_TXN_MAX_PERCENT = 99;
 
 // Force DNS seed use ahead of UAHF fork, to ensure peers are found
 // as long as seeders are working.
@@ -260,6 +265,12 @@ public:
     std::unique_ptr<CForwardAsyncReadonlyStream> MoveData() {return std::move(mData);}
     const uint256& Hash() const {return mHash;}
     size_t Size() const {return mSize;}
+
+    size_t GetEstimatedMemoryUsage() const
+    {
+        size_t dataUsage { mData? mData->GetEstimatedMaxMemoryUsage() : 0 };
+        return sizeof(*this) + dataUsage;
+    }
 
 private:
     std::string mCommand {};

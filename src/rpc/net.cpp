@@ -91,6 +91,7 @@ static UniValue getpeerinfo(const Config &config,
             "    \"bytesrecv\": n,            (numeric) The total bytes received\n"
             "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
             "    \"recvsize\": n,             (numeric) Current size of queued messages for receiving\n"
+            "    \"sendmemory\": n,           (numeric) Estimate of current memory usage of queued messages for sending\n"
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
             "    \"unpausesend\": true|false, (boolean) Have we temporarily unpaused sending\n"
             "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
@@ -105,6 +106,7 @@ static UniValue getpeerinfo(const Config &config,
             "          \"bytesrecv\": n,      (numeric) The total bytes received\n"
             "          \"sendsize\": n,       (numeric) Current size of queued messages for sending\n"
             "          \"recvsize\": n,       (numeric) Current size of queued messages for receiving\n"
+            "          \"sendmemory\": n,     (numeric) Estimate of current memory usage of queued messages for sending\n"
             "          \"spotrecvbw\": n,     (numeric) The spot average download bandwidth over this stream (bytes/sec)\n"
             "          \"minuterecvbw\": n    (numeric) The 1 minute average download bandwidth over this stream (bytes/sec)\n"
             "          \"pauserecv\": true|false, (boolean) Are we paused for receiving\n"
@@ -190,6 +192,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("lastrecv", stats.associationStats.nLastRecv));
         obj.push_back(Pair("sendsize", stats.associationStats.nSendSize));
         obj.push_back(Pair("recvsize", stats.associationStats.nRecvSize));
+        obj.push_back(Pair("sendmemory", stats.associationStats.nSendMemory));
         obj.push_back(Pair("pausesend", stats.fPauseSend));
         obj.push_back(Pair("unpausesend", stats.fUnpauseSend));
         obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
@@ -208,6 +211,7 @@ static UniValue getpeerinfo(const Config &config,
             streamDetails.push_back(Pair("bytesrecv", streamStats.nRecvBytes));
             streamDetails.push_back(Pair("sendsize", streamStats.nSendSize));
             streamDetails.push_back(Pair("recvsize", streamStats.nRecvSize));
+            streamDetails.push_back(Pair("sendmemory", streamStats.nSendMemory));
             streamDetails.push_back(Pair("spotrecvbw", streamStats.nSpotBytesPerSec));
             streamDetails.push_back(Pair("minuterecvbw", streamStats.nMinuteBytesPerSec));
             streamDetails.push_back(Pair("pauserecv", streamStats.fPauseRecv));

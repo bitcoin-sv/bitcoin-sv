@@ -7,6 +7,7 @@
 #define BITCOIN_STREAMS_H
 
 #include "cfile_util.h"
+#include "consensus/consensus.h"
 #include "serialize.h"
 #include "support/allocators/zeroafterfree.h"
 
@@ -716,6 +717,10 @@ public:
      * is still being prepared and will be returned on next call to Read.
      */
     virtual CSpan ReadAsync(size_t maxSize) = 0;
+
+    // Estimate our maximum memory usage. If this can't be accurately known
+    // it should try to be a worst case estimate.
+    virtual size_t GetEstimatedMaxMemoryUsage() const = 0;
 };
 
 /**
@@ -861,6 +866,9 @@ public:
     bool EndOfStream() const override {return mSize == mConsumed;}
     CSpan ReadAsync(size_t maxSize) override
     {
+        // Apply a limit to the size our internal read buffer can grow to
+        maxSize = std::min(maxSize, mMaxBufferSize);
+
         // it's not feasible to try and read 0 bytes
         assert(maxSize > 0);
 
@@ -898,9 +906,17 @@ public:
         }
     }
 
+    size_t GetEstimatedMaxMemoryUsage() const override
+    {
+        // The best we can do is assume the worst case where the caller to ReadAsync
+        // will grow our buffer to the maximum allowed size.
+        return sizeof(*this) + std::min(mSize, mMaxBufferSize);
+    }
+
 private:
     size_t mSize;
     std::vector<uint8_t> mBuffer;
+    static constexpr size_t mMaxBufferSize = ONE_MEBIBYTE * 10;
     size_t mConsumed = 0u;
     size_t mPendingReadSize = 0u;
 };
@@ -930,6 +946,11 @@ public:
         {
             return {};
         }
+    }
+
+    size_t GetEstimatedMaxMemoryUsage() const override
+    {
+        return sizeof(*this) + mData.capacity();
     }
 
 private:
@@ -962,6 +983,11 @@ public:
         {
             return {};
         }
+    }
+
+    size_t GetEstimatedMaxMemoryUsage() const override
+    {
+        return sizeof(*this) + mData->capacity();
     }
 
 private:

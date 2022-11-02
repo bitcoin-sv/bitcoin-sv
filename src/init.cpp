@@ -638,6 +638,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-listen", _("Accept connections from outside (default: "
                                     "1 if no -proxy or -connect/-noconnect)"));
+    strUsage +=
+        HelpMessageOpt("-maxblocktxnpercent=<n>",
+        strprintf(_("Maximum perentage of txns from a block we will respond to a getblocktxn request "
+                    "with a blocktxn response. Larger than this we will just respond with the entire block "
+                    "(default: %u)"),
+            DEFAULT_BLOCK_TXN_MAX_PERCENT));
     strUsage += HelpMessageOpt(
         "-maxconnections=<n>",
         strprintf(_("Maintain at most <n> connections to peers (default: %u)"),
@@ -2394,6 +2400,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBanScoreThreshold(gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockTxnMaxPercent(gArgs.GetArg("-maxblocktxnpercent", DEFAULT_BLOCK_TXN_MAX_PERCENT), &err)) {
         return InitError(err);
     }
 

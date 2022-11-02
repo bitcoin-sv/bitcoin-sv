@@ -104,6 +104,8 @@ class Stream
 
     // Get current send queue size
     uint64_t GetSendQueueSize() const;
+    // Get current estimated send queue memory usage
+    uint64_t GetSendQeueMemoryUsage() const;
 
     // Get/Set stream type
     StreamType GetStreamType() const { return mStreamType; }
