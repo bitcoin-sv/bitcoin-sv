@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txn_recent_rejects.h"
+#include <mutex>
 
 CTxnRecentRejects::CTxnRecentRejects() {
     // Create a bloom filter

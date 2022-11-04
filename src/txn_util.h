@@ -8,6 +8,7 @@
 
 #include <shared_mutex>
 #include <unordered_set>
+#include <mutex>
 
 /**
  * A class for tracking TxIds.
