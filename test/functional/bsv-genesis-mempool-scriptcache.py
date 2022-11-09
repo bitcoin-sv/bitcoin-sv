@@ -98,7 +98,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         def on_reject(conn, msg):
             if (msg.message == b'block'):
                 rejected_blocks.append(msg)
-                assert_equal(msg.reason, b'blk-bad-inputs')
+                assert(msg.reason.startswith(b'blk-bad-inputs'))
 
             if msg.message == b'tx':
                 rejected_txs.append(msg)

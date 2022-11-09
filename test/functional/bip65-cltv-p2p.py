@@ -162,8 +162,7 @@ class BIP65Test(BitcoinTestFramework):
             assert_equal(node0.last_message["reject"].data, block.sha256)
             if node0.last_message["reject"].code == REJECT_INVALID:
                 # Generic rejection when a block is invalid
-                assert_equal(
-                    node0.last_message["reject"].reason, b'blk-bad-inputs')
+                assert(node0.last_message["reject"].reason.startswith(b'blk-bad-inputs'))
             else:
                 assert b'Negative locktime' in node0.last_message["reject"].reason
 
