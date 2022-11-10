@@ -747,7 +747,7 @@ private:
     /** Transaction tracker/propagator */
     std::shared_ptr<CTxnPropagator> mTxnPropagator {};
 
-    CThreadPool<CQueueAdaptor> mThreadPool { "ConnmanPool" };
+    CThreadPool<CQueueAdaptor> mThreadPool { true, "ConnmanPool" };
 
     /** Transaction validator */
     std::shared_ptr<CTxnValidator> mTxnValidator {};

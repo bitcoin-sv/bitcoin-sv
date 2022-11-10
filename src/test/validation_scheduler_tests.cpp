@@ -163,7 +163,7 @@ namespace{
             return results;
         };
 
-        CThreadPool<CDualQueueAdaptor> threadPool {"TestPool", 8, 8 };
+        CThreadPool<CDualQueueAdaptor> threadPool { false, "TestPool", 8, 8 };
 
         void RunTest(const std::vector<CMutableTransaction>& txsToValidate,
                              const std::vector<std::vector<std::vector<size_t>>>& expectedVariants) {

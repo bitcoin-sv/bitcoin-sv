@@ -517,7 +517,7 @@ bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
 
 CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databaseCacheSize, size_t maxNumberOfThreadsForCalculations)
     :cacheSizeBytes(0), merkleTreeStore(CMerkleTreeStore(storePath, databaseCacheSize)),
-    merkleTreeThreadPool(std::make_unique<CThreadPool<CQueueAdaptor>>("MerkleTreeThreadPool", maxNumberOfThreadsForCalculations))
+    merkleTreeThreadPool(std::make_unique<CThreadPool<CQueueAdaptor>>(true, "MerkleTreeThreadPool", maxNumberOfThreadsForCalculations))
 {
     LogPrintf("Using up to %u additional threads for Merkle tree computation\n", maxNumberOfThreadsForCalculations - 1);
 

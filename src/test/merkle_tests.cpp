@@ -208,7 +208,7 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
      */
     int minBatchSize = 4096;
     // Initialize thread pool using 3 threads
-    std::unique_ptr<CThreadPool<CQueueAdaptor>> pMerkleTreeThreadPool = std::make_unique<CThreadPool<CQueueAdaptor>>("MerkleTreeThreadPoolTest", 3);
+    std::unique_ptr<CThreadPool<CQueueAdaptor>> pMerkleTreeThreadPool = std::make_unique<CThreadPool<CQueueAdaptor>>(false, "MerkleTreeThreadPoolTest", 3);
     for (int numberOfTransactions = 2*minBatchSize + 1; numberOfTransactions <= (2*minBatchSize + 1000); ++numberOfTransactions)
     {
         CBlock block;
