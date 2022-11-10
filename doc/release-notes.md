@@ -7,21 +7,25 @@ This pages contains notes for specific features of the release. It is aimed at p
     *   2.1 [Security Features](#security-features)
         *   2.1.1 [Miner ID Key Storage](#miner-id-key-storage)
     *   2.2 [New RPCs](#new-rpcs)
+    *   2.3 [Configuration Options](#configuration-options)
 *   3 [revokemid P2P message format](#revokemid-p2p-message-format)
-    *   3.1 [Config Options](#config-options)
 *   4 [gethdrsen and hdrsen P2P messages](#gethdrsen-and-hdrsen-p2p-messages)
     *   4.1 [Usage guidance](#usage-guidance)
 *   5 [Authenticated Connections](#authenticated-connections)
-    *   5.1 [authch P2P message format](#authch-p2p-message-format)
-    *   5.2 [authresp P2P message format](#authresp-p2p-message-format)
-    *   5.3 [getdata message](#getdata-message)
-        *   5.3.1 [Inventory vector new type](#inventory-vector-new-type)
-        *   5.3.2 [datareftx P2P message](#datareftx-p2p-message)
-            *   5.3.2.1 [The merkle\_proof](#the-merkle_proof)
-    *   5.4 [Deprecated version P2P Message Fields](#deprecated-version-p2p-message-fields)
-*   6 [Removed config setting](#removed-config-setting)
+    *   5.1 [Configuration Options](#configuration-options-1)
+    *   5.2 [authch P2P message format](#authch-p2p-message-format)
+    *   5.3 [authresp P2P message format](#authresp-p2p-message-format)
+    *   5.4 [getdata message](#getdata-message)
+        *   5.4.1 [Inventory vector new type](#inventory-vector-new-type)
+        *   5.4.2 [datareftx P2P message](#datareftx-p2p-message)
+            *   5.4.2.1 [The merkle\_proof](#the-merkle_proof)
+    *   5.5 [Deprecated version P2P Message Fields](#deprecated-version-p2p-message-fields)
+*   6 [Removed configuration settings](#removed-configuration-settings)
 *   7 [Selfish Mining](#selfish-mining)
-*   8 [Support for DARA](#support-for-dara)
+*   8 [Support for the Data Asset Recovery Alert (DARA)](#support-for-the-data-asset-recovery-alert-dara)
+    *   8.1 [New RPCs](#new-rpcs-1)
+    *   8.2 [Modified RPCs](#modified-rpcs)
+    *   8.3 [New configuration options](#new-configuration-options)
 *   9 [leveldb](#leveldb)
 *   10 [Time locked transactions](#time-locked-transactions)
 *   11 [Safe-mode](#safe-mode)
@@ -36,10 +40,9 @@ The 1.0.13 node release is a recommended upgrade from version 1.0.11.
 Main features of this upgrade are
 
 *   Miner ID specification v1.0 support.  
-    
 *   Authenticated Connections handshake.
 *   Enhanced P2P hdrsen message.
-*   DARA support
+*   The Data Asset Recovery Alert support (DARA).
 
 To take full advantage of Miner ID features, this release should be run in conjunction with Miner ID Generator 1.0.
 
@@ -99,11 +102,20 @@ RPCs used by a mining node's operator:
 6.  **datarefindexdump** - returns details for all currently stored miner-info and data-ref transactions from the dataRef index.
 7.  **datareftxndelete** - deletes the specified miner-info or data-ref transaction from the dataRef index.
 
-RPCs used by DARA functionality:
+Configuration Options
+---------------------
 
-1.  **addToConfiscationTxidWhitelist** \- adds a list of txids, of transactions to be whitelisted, as confiscation transactions.
-2.  **clearConfiscationWhitelist** \- removes all txid and txo entries from confiscation whitelist.
-3.  **queryConfiscationTxidWhitelist** \- returns an array containing information about whitelisted confiscation transactions.
+Parameters to control the miner ID database are:
+
+*   _\-minerid_ \- Enable or disable the miner ID database (default: true).  
+    
+*   _\-mineridcachesize_ \- Cache size to use for the miner ID database (default: 1MB).  
+    
+*   _\-mineridreputation\_m_ - Miners who identify themselves using miner ID can accumulate certain privileges over time by gaining a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. This parameter sets the M value for that test. (default: 28).  
+    
+*   _\-mineridreputation\_n_ - This parameter sets the N value for the above test. (default: 2016)
+*   _\-mineridreputation\_mscale_ - Miners who lose their good reputation can in some circumstances recover that reputation, but at the cost of a temporarily increased M of N block target. This parameter determines how much to scale the base M value in such cases. (default: 1.5).  
+    
 
 revokemid P2P message format
 ============================
@@ -117,21 +129,6 @@ A _revokemid_ P2P message is used to notify other nodes that a miner ID has been
 | 33  | minerId | uint8\_t\[33\] | The miner's current _minerId_ ECDSA (secp256k1) public key represented in compressed form as a 33 byte hex string. It is required to verify the second signature defined in the _revocationMessageSig_ field. |
 | 33  | revocationMessage | uint8\_t\[33\] | Revocation message to be signed to certify the legitimate miner who wants to revoke past reputation<br><br>The field contains the compromised minerId public key (in the case of complete revocation it is the minerId public key defined by the initial Miner ID document). |
 | variable | revocationMessageSig | uint8\_t\[\] | The field defines two different signatures on the`Hash256(revocationMessage)`message digest.<br><br>`sig1 := Sign(Hash256(revocationMessage), priv_revocationKey)`, where_priv\_revocationKey_is the private key associated with the_revocationKey_public key  <br>`sig2 := Sign(Hash256(revocationMessage), priv_minerId)`, where_priv\_minerId_is the private key associated with the miner's current_minerId_public key<br><br>`sig1`and`sig2`are 70-73 byte hex strings<br><br>`sig1_length := sig1.length()`  <br>`sig2_length := sig2.length()`<br><br>`msgsig_part1 :=concat(sig1_length, sig1)`  <br>`msgsig_part2 :=concat(sig2_length, sig2)`<br><br>`revocationMessageSig := concat(msgsig_part1, msgsig_part2)`, where the data layout is:`sig1_length\|sig1\|sig2_length\|sig2`<br><br>The above concatenations are done on the hex encoded bytes. |
-
-Config Options
---------------
-
-Parameters to control the miner ID database are:
-
-*   _\-minerid_ \- Enable or disable the miner ID database (default: true).  
-    
-*   _\-mineridcachesize_ \- Cache size to use for the miner ID database (default: 1MB).  
-    
-*   _\-mineridreputation\_m_ - Miners who identify themselves using miner ID can accumulate certain privileges over time by gaining a good reputation. A good reputation is gained by having mined M of the last N blocks on the current chain. This parameter sets the M value for that test. (default: 28).  
-    
-*   _\-mineridreputation\_n_ - This parameter sets the N value for the above test. (default: 2016)
-*   _\-mineridreputation\_mscale_ - Miners who lose their good reputation can in some circumstances recover that reputation, but at the cost of a temporarily increased M of N block target. This parameter determines how much to scale the base M value in such cases. (default: 1.5).  
-    
 
 gethdrsen and hdrsen P2P messages
 =================================
@@ -171,6 +168,14 @@ Authenticated Connections
 =========================
 
 An authentication challenge/response test is now performed between mining nodes when a connection is first established. If the nodes pass the challenge/response tests, the standard connection is elevated to an authenticated conenction. Two new P2P messages have been defined for this purpose.
+
+Configuration Options
+---------------------
+
+Parameters required to enable communication between the Node and the MID Generator are:
+
+*   _\-mineridgeneratorurl_ - sets URL for communicating with the miner ID generator. Required to setup authenticated connections. For example: [http://127.0.0.1:9002](http://127.0.0.1:9002).
+*   _\-mineridgeneratoralias_ - sets an alias used to identify our current miner ID in the generator. Required to setup authenticated connections.
 
 authch P2P message format
 -------------------------
@@ -239,8 +244,8 @@ Deprecated version P2P Message Fields
 
 The _addr\_from_ field in the version P2P message have been deprecated. This value is now directly extracted at the socket level.
 
-Removed config setting
-======================
+Removed configuration settings
+==============================
 
 The config setting -_allowunsolicitedaddr_ has been removed.
 
@@ -258,14 +263,51 @@ New parameters have been added:
 
   
 
-Support for DARA
-================
+Support for the Data Asset Recovery Alert (DARA)
+================================================
 
 This release supports code for the reassignment of digital assets. 
 
 A confiscation transaction is identified by the first transaction output being an OP\_RETURN output which adopts the confiscation transaction protocol (See [https://github.com/bitcoin-sv-specs/protocol/tree/master/updates](https://github.com/bitcoin-sv-specs/protocol/tree/master/updates)) and contains a reference to identify the related ConfiscationOrder document. The complete Court order document is not embedded in the OP\_RETURN data of the confiscation transaction because not all blockchains support a large payload. For example, the default data carrier size on BTC is 80 bytes.
 
-Please refer to [https://bitcoinsv.io](https://bitcoinsv.io) for more details
+**Highlights of the feature**
+
+1.  Introduces support for confiscation transactions, which when explicitly whitelisted can spend consensus frozen TXOs without providing unlocking scripts.
+2.  Outputs of a confiscation transaction can only be spent when they mature (CONFISCATION\_MATURITY = 1000 blocks), similar to coinbase outputs.  
+    A flag to indicate that an output was created by a confiscation transaction is stored in the UTXO database and block undo files by the 32nd bit in the existing value that stores _height + is\_coinbase_ and is serialized as the VARINT data type. If this flag is set to 0,  the serialized value is exactly the same as before, which makes it backward compatible. However, if this flag is set to 1, the serialized value cannot be read by the previous versions of the node because it no longer fits in a 32 bit integer as was expected in previous versions. This is detected as a serialization exception, which results in stopping the node.
+3.  Downgrading to the previous versions of the node is only possible if all of the following is true:
+    1.  There are no confiscation transactions in blocks on the active chain.  
+        If there are, these blocks will be incorrectly detected as invalid or the node will not work correctly due to the UTXO database incompatibilities.
+    2.  There are no whitelisted confiscation transactions in the database.  
+        If there are, their records in the database will result in an incorrect handling of consensus frozen TXOs.  
+        Before downgrading all whitelisted transactions should be removed from the database by calling _clearConfiscationWhitelist_ RPC function.
+
+Please refer to [https://bitcoinsv.io](https://bitcoinsv.io) for more details.
+
+New RPCs
+--------
+
+RPCs used by DARA functionality:
+
+1.  **addToConfiscationTxidWhitelist** \- adds a list of txids, of transactions to be whitelisted, as confiscation transactions.
+2.  **clearConfiscationWhitelist** \- removes all txid and txo entries from confiscation whitelist.
+3.  **queryConfiscationTxidWhitelist** \- returns an array containing information about whitelisted confiscation transactions.
+
+Modified RPCs
+-------------
+
+RPCs modified by DARA functionality:
+
+1.  **clearBlacklists** - a new optional parameter _keepExistingPolicyEntries_ is added.
+2.  **gettxout** - a new data field _confiscation_ (a boolean flag) is added to the result to indicate if the given output is created by a confiscation transaction.
+
+New configuration options
+-------------------------
+
+Configuration options added by DARA functionality:
+
+*   _\-enableassumewhitelistedblockdepth_ - assumes confiscation transaction to be whitelisted if it is in block that is at least as deep under tip as specified by option _assumewhitelistedblockdepth_ (default: false).
+*   _\-assumewhitelistedblockdepth_ - sets minimal depth of block under tip at which confiscation transaction is assumed to be whitelisted (default: 6).
 
 leveldb
 =======
