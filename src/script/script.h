@@ -13,6 +13,7 @@
 #include "span.h"
 #include "opcodes.h"
 
+#include <array>
 #include <cassert>
 #include <climits>
 #include <cstdint>
