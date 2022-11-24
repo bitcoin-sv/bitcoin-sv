@@ -167,11 +167,10 @@ inline bool MoneyRange(const Amount nValue) {
 class CFeeRate {
 private:
     // unit is satoshis-per-1,000-bytes
-    Amount nSatoshisPerK;
+    Amount nSatoshisPerK {0};
 
 public:
-    /** Fee rate of 0 satoshis per kB */
-    CFeeRate() : nSatoshisPerK(0) {}
+    CFeeRate () = default;
     explicit CFeeRate(const Amount _nSatoshisPerK)
         : nSatoshisPerK(_nSatoshisPerK) {}
     /**
@@ -179,7 +178,6 @@ public:
      * exceed (2^63 - 1)
      */
     CFeeRate(const Amount nFeePaid, size_t nBytes);
-    CFeeRate(const CFeeRate &other) = default;
     /**
      * Return the fee in satoshis for the given size in bytes.
      */
