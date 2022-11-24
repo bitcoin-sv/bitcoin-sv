@@ -6323,11 +6323,20 @@ void PruneBlockFilesManual(int32_t nManualPruneHeight) {
 
 
 bool CheckDiskSpace(uint64_t nAdditionalBytes) {
-    uint64_t nFreeBytesAvailable = fs::space(GetDataDir()).available;
+    fs::path datadir = GetDataDir();
+    auto space = fs::space(datadir);
 
     // Check for nMinDiskSpace bytes (currently 50MB)
-    if (nFreeBytesAvailable < nMinDiskSpace + nAdditionalBytes) {
-        return AbortNode("Disk space is low!", _("Error: Disk space is low!"));
+    if (space.available < nMinDiskSpace + nAdditionalBytes) {
+        std::string msg = strprintf("Disk space is low for directory '%s'! "
+                                    "Available:%lu, required: mindiskspace:%lu + additionalbytes:%lu, free:%lu, capacity:%lu",
+                                    datadir.string(),
+                                    space.available,
+                                    nMinDiskSpace,
+                                    nAdditionalBytes,
+                                    space.free,
+                                    space.capacity);
+        return AbortNode(msg, _(strprintf("Error:%s", msg).c_str()));
     }
 
     return true;

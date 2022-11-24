@@ -209,7 +209,9 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const CMerkleTree& 
     uint64_t diskFreeBytesAvailable = fs::space(merkleStorePath).available;
     if (diskFreeBytesAvailable < (nMinDiskSpace + merkleTreeSizeBytes))
     {
-        return error("StoreMerkleTree: Disk space is low (%u bytes available), Merkle Trees will not be written.", diskFreeBytesAvailable);
+        return error("StoreMerkleTree: Disk space is low (%lu bytes available for directory '%s' %lu required), "
+                     "Merkle Trees will not be written.",
+                     diskFreeBytesAvailable, merkleStorePath.string(), (nMinDiskSpace + merkleTreeSizeBytes));
     }
 
     // Mark index as out of sync when writing to data files
