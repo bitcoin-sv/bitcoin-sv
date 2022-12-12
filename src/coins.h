@@ -747,6 +747,78 @@ public:
         return true;
     }
 
+    /**
+    * Call the given method with the supplied arguments using a thread pool,
+    * and also pass in a single shard to each thread.
+    *
+    * NOTE: This method should only be called on a freshly created CCoinsViewCache
+    * containing no local changes to its cached coins (or if not, it must be called
+    * with the number of requested threads == 1).
+    */
+    template<typename Callable, typename... Args>
+    auto RunSharded(uint16_t num, Callable&& call, Args&&... args)
+        -> std::vector<typename std::invoke_result<Callable, uint16_t, Shard&, Args...>::type> 
+    {
+        assert(mThreadId == std::this_thread::get_id());
+        assert(mShards.size() == 1);
+
+        // List of Callable results
+        using ResultType = typename std::invoke_result<Callable, uint16_t, Shard&, Args...>::type;
+        std::vector<ResultType> results {};
+
+        // How many threads requested?
+        if(num > 1)
+        {
+            // RAII class to ensure we always recombine the shards when we leave this method.
+            // Must be declared above the thread pool so it's destroyed after.
+            class ShardsRAII
+            {
+              public:
+                ShardsRAII(std::vector<Shard>& shards) : mShards{shards} {}
+                ~ShardsRAII()
+                {
+                    // Re-fold shards back into a single coherent cache
+                    while(mShards.size() > 1)
+                    {
+                        Shard& shard { mShards.back() };
+                        auto shardCache { shard.GetCache().MoveOutCoins() };
+                        mShards[0].GetCache().BatchWriteUnchecked(shardCache);
+                        mShards.pop_back();
+                    }
+                }
+              private:
+                std::vector<Shard>& mShards;
+            } foldShards {mShards};
+
+            // Create shards
+            while(mShards.size() < num)
+            {
+                mShards.emplace_back(mView);
+            }
+
+            // Run Callable using thread pool
+            CThreadPool<CQueueAdaptor> pool { false, "RunSharded", num };
+            std::vector<std::future<ResultType>> threadResults {};
+            for(uint16_t i = 0; i < num; ++i)
+            {
+                threadResults.push_back(make_task(pool, call, i, std::ref(mShards[i]), std::forward<Args>(args)...));
+            }
+
+            // Collect results
+            for(auto& res : threadResults)
+            {
+                results.push_back(res.get());
+            }
+        }
+        else
+        {
+            // Run Callable just in this thread
+            results.push_back(call(0, std::ref(mShards[0]), std::forward<Args>(args)...));
+        }
+
+        return results;
+    }
+
 private:
 
     inline static CCoinsViewEmpty mViewEmpty;
