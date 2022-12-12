@@ -3519,6 +3519,12 @@ private:
         // Make space for all but the coinbase
         blockundo.vtxundo.resize(block.vtx.size() - 1);
 
+        // Cache all inputs
+        int64_t startCacheTime { GetTimeMicros() };
+        view.CacheInputs(block.vtx);
+        int64_t cacheTime { GetTimeMicros() - startCacheTime };
+        LogPrint(BCLog::BENCH, "        - Cache: %.2fms\n", 0.001 * cacheTime);
+
         // Validate
         int64_t validateStartTime { GetTimeMicros() };
         std::vector<bool> results { view.RunSharded(numGroups,

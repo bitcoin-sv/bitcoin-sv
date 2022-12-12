@@ -72,6 +72,11 @@ public:
         return TestAccessCoinsCache::GetRawCacheCoins(mCache);
     }
 
+    void DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
+    {
+        CoinsDB::DBCacheAllInputs(txns);
+    }
+
 protected:
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
     {
@@ -1511,6 +1516,72 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
             BOOST_REQUIRE(span.GetCoin({txid, 1}));
             BOOST_CHECK(! span.GetCoin({txid, 1})->IsSpent());
         }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(cache_all_inputs, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    pcoinsTip.reset();
+
+    // Create some txns whose inputs we will add to the coins DB later
+    constexpr uint16_t NumTxns {8};
+    std::vector<CTransactionRef> txns {};
+    for(int i = 0; i < NumTxns; ++i)
+    {
+        CMutableTransaction txn {};
+        txn.vin.resize(1);
+        txn.vin[0].prevout = COutPoint{GetRandHash(), 0};
+        txn.vin[0].scriptSig << OP_RETURN;
+        txns.push_back(MakeTransactionRef(txn));
+    }
+
+    // Hash and height of a block that contains unspent transactions
+    uint256 blockHash { GetRandHash() };
+    uint32_t blockHeight {1};
+
+    //
+    // Add sample UTXOs to database
+    //
+    {
+        CCoinsProviderTest provider {1024};
+
+        {
+            TestCoinsSpanCache span { provider };
+            span.SetBestBlock(blockHash);
+
+            for(const auto& txn : txns)
+            {
+                CScript scr { OP_RETURN };
+                CTxOut txo { Amount{123}, scr };
+                span.AddCoin(txn->vin[0].prevout, CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
+            }
+
+            BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), txns.size());
+
+            // And flush them to provider
+            BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
+        }
+
+        // Flush sample UTXOs to DB
+        BOOST_TEST(provider.Flush());
+    }
+
+    // Create fresh coins DB
+    CCoinsProviderTest provider {1024};
+
+    // None of our created coins will be cached yet
+    for(const auto& txn : txns)
+    {
+        BOOST_CHECK(! provider.HaveCoinInCache(txn->vin[0].prevout));
+    }
+
+    // Cache them all (Except the first in the list, which the function expects to be coinbase)
+    provider.DBCacheAllInputs(txns);
+    for(size_t i = 1; i < txns.size(); ++i)
+    {
+        BOOST_CHECK(provider.HaveCoinInCache(txns[i]->vin[0].prevout));
     }
 }
 

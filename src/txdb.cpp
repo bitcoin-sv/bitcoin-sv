@@ -486,6 +486,75 @@ size_t CoinsDB::DynamicMemoryUsage() const {
     return mCache.DynamicMemoryUsage();
 }
 
+void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
+{
+    // Sort inputs; leveldb seems to prefer it that way
+    auto Sort = [](const COutPoint& out1, const COutPoint& out2)
+    {
+        if(out1.GetTxId() == out2.GetTxId())
+        {
+            return out1.GetN() < out2.GetN();
+        }
+        return out1.GetTxId() < out2.GetTxId();
+    };
+
+    std::vector<COutPoint> allInputs {};
+    for(size_t i = 1; i < txns.size(); ++i)
+    {
+        for(const auto& in: txns[i]->vin)
+        {
+            allInputs.push_back(in.prevout);
+        }
+    }
+    // FIXME: Consider using parallel sort when it beconmes available
+    std::sort(allInputs.begin(), allInputs.end(), Sort);
+
+    std::unique_lock lock { mCoinsViewCacheMtx };
+
+    for(const auto& outpoint : allInputs)
+    {
+        std::optional<CoinImpl> coinFromCache { mCache.FetchCoin(outpoint) };
+
+        // If we don't have it in the cache, or we do have it but it's unspent without the script loaded
+        if(!coinFromCache.has_value() || (!coinFromCache->IsSpent() && !coinFromCache->HasScript()))
+        {
+            std::optional<CoinImpl> coinFromView { DBGetCoin(outpoint, std::numeric_limits<uint64_t>::max()) };
+            if(coinFromView.has_value())
+            {
+                assert(coinFromView->HasScript());
+
+                if(coinFromCache.has_value())
+                {
+                    if(hasSpaceForScript(coinFromView->GetScriptSize()))
+                    {
+                        mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value()));
+                    }
+                }
+                else
+                {
+                    if(hasSpaceForScript(coinFromView->GetScriptSize()))
+                    {
+                        mCache.AddCoin(outpoint, std::move(coinFromView.value()));
+                    }
+                    else
+                    {
+                        mCache.AddCoin(
+                            outpoint,
+                            CoinImpl {
+                                coinFromView->GetTxOut().nValue,
+                                coinFromView->GetScriptSize(),
+                                coinFromView->GetHeight(),
+                                coinFromView->IsCoinBase(),
+                                coinFromView->IsConfiscation()
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
 std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
     std::optional<CoinImpl> coinFromCache;
     size_t maxScriptLoadingSize = 0;

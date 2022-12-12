@@ -57,6 +57,11 @@ using namespace mining;
             return mDBView.GetCoin(outpoint, maxScriptSize);
         }
 
+        void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override
+        {
+            mDBView.CacheAllCoins(txns);
+        }
+
         std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
         {
             auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
@@ -2055,6 +2060,11 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
     }
 
     return mDBView.GetCoin(outpoint, maxScriptSize);
+}
+
+void CCoinsViewMemPool::CacheAllCoins(const std::vector<CTransactionRef>& txns) const
+{
+    mDBView.CacheAllCoins(txns);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {

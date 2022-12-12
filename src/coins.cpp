@@ -205,7 +205,7 @@ std::optional<CoinImpl> CCoinsViewCache::Shard::GetCoin(const COutPoint& outpoin
                     coinFromView->GetScriptSize(),
                     coinFromView->GetHeight(),
                     coinFromView->IsCoinBase(),
-                    coinFromCache->IsConfiscation() }
+                    coinFromView->IsConfiscation() }
             );
         }
         else
@@ -226,6 +226,11 @@ CCoinsViewCache::CCoinsViewCache(const ICoinsView& view)
 {
     // 1 shard by default
     mShards.emplace_back(mView);
+}
+
+void CCoinsViewCache::CacheInputs(const std::vector<CTransactionRef>& txns)
+{
+    mView->CacheAllCoins(txns);
 }
 
 size_t CCoinsViewCache::DynamicMemoryUsage() const

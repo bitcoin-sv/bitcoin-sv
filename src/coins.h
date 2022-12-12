@@ -386,6 +386,9 @@ protected:
     //! don't want to support polymorphic destruction.
     ~ICoinsView() = default;
 
+    //! Load all coins spent by the given transactions into the cache.
+    virtual void CacheAllCoins(const std::vector<CTransactionRef>& txns) const = 0;
+
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const = 0;
 
@@ -404,6 +407,7 @@ protected:
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:
+    void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override {}
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override { return {}; }
     uint256 GetBestBlock() const override { return {}; }
 
@@ -629,6 +633,9 @@ public:
     CCoinsViewCache(CCoinsViewCache&&) = delete;
     CCoinsViewCache& operator=(CCoinsViewCache&&) = delete;
 
+    // Cache all inputs to the given transactions
+    void CacheInputs(const std::vector<CTransactionRef>& txns);
+
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
@@ -778,6 +785,7 @@ public:
                 ~ShardsRAII()
                 {
                     // Re-fold shards back into a single coherent cache
+                    int64_t startFoldTime { GetTimeMicros() };
                     while(mShards.size() > 1)
                     {
                         Shard& shard { mShards.back() };
@@ -785,6 +793,8 @@ public:
                         mShards[0].GetCache().BatchWriteUnchecked(shardCache);
                         mShards.pop_back();
                     }
+                    int64_t foldTime { GetTimeMicros() - startFoldTime };
+                    LogPrint(BCLog::BENCH, "        - Fold Shards: %.2fms\n", 0.001 * foldTime);
                 }
               private:
                 std::vector<Shard>& mShards;

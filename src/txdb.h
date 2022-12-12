@@ -185,6 +185,9 @@ private:
     std::vector<uint256> GetHeadBlocks() const;
     bool DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
 
+    // Read all inputs from the DB and cache
+    void DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const;
+
     /**
      * A mutex that guarantees that coins from cache will not be removed and
      * more importantly loaded coin scripts will not be removed until all read
@@ -296,6 +299,11 @@ public:
         : mDB{db}
     {
         mDB.ReadLock( mLock );
+    }
+
+    void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override
+    {
+        mDB.DBCacheAllInputs(txns);
     }
 
     // If found return basic coin info without script loaded
