@@ -38,13 +38,13 @@ struct CoinsDBSpan::UnitTestAccess<coins_tests_uid> : public CoinsDBSpan
 {
     using CoinsDBSpan::CoinsDBSpan;
 
-    CCoinsMap& GetRawCacheCoins() { return TestAccessCoinsCache::GetRawCacheCoins(mCache); }
-    size_t& GetCachedCoinsUsage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mCache); }
+    CCoinsMap& GetRawCacheCoins() { return TestAccessCoinsCache::GetRawCacheCoins(mShards[0].GetCache()); }
+    size_t& GetCachedCoinsUsage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mShards[0].GetCache()); }
 
     void BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlockIn)
     {
-        mCache.BatchWrite(mapCoins);
-        hashBlock = hashBlockIn;
+        mShards[0].GetCache().BatchWrite(mapCoins);
+        SetBestBlock(hashBlockIn);
     }
 };
 using TestCoinsSpanCache = CoinsDBSpan::UnitTestAccess<coins_tests_uid>;

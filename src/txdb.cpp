@@ -725,6 +725,7 @@ std::optional<Coin> CoinsDB::GetCoinByTxId(const TxId& txid) const
 auto CoinsDBSpan::TryFlush() -> WriteState
 {
     assert(mThreadId == std::this_thread::get_id());
+    assert(mShards.size() == 1);
 
     if (!mDB.TryWriteLock( mView.mLock ))
     {
@@ -739,7 +740,7 @@ auto CoinsDBSpan::TryFlush() -> WriteState
     std::unique_ptr<WPUSMutex::Lock, decltype(revertToReadLock)> guard{&mView.mLock, revertToReadLock};
 
     return
-        mDB.BatchWrite(mView.mLock, hashBlock, mCache.MoveOutCoins())
+        mDB.BatchWrite(mView.mLock, GetBestBlock(), mShards[0].GetCache().MoveOutCoins())
         ? WriteState::ok
         : WriteState::error;
 }
