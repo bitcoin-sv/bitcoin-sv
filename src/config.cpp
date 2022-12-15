@@ -77,6 +77,7 @@ void GlobalConfig::Reset()
     data->mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
 
     data->mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+    data->mPerBlockTxnValidatorThreadsCount = DEFAULT_TXNCHECK_THREADS;
     data->mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     data->mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
     data->maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
@@ -121,6 +122,7 @@ void GlobalConfig::Reset()
     data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
     data->minBlocksToKeep = DEFAULT_MIN_BLOCKS_TO_KEEP;
+    data->blockValidationTxBatchSize = DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE;
 
     // Block download
     data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
@@ -633,7 +635,8 @@ int GlobalConfig::GetMaxConcurrentAsyncTasksPerNode() const
 
 bool GlobalConfig::SetBlockScriptValidatorsParams(
     int maxParallelBlocks,
-    int perValidatorThreadsCount,
+    int perValidatorScriptThreadsCount,
+    int perValidatorTxnThreadsCount,
     int perValidatorThreadMaxBatchSize,
     std::string* error)
 {
@@ -660,33 +663,50 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
     }
 
     {
-        int scriptThreadsCount {1};
-        if (perValidatorThreadsCount < 0 || perValidatorThreadsCount > MAX_SCRIPTCHECK_THREADS)
+        if (perValidatorScriptThreadsCount < 0 || perValidatorScriptThreadsCount > MAX_TXNSCRIPTCHECK_THREADS)
         {
             if(error)
             {
                 *error =
                     strprintf(
                         _("Per block script validation threads count must be at "
-                          "least 0 and at most %d"), MAX_SCRIPTCHECK_THREADS);
+                          "least 0 and at most %d"), MAX_TXNSCRIPTCHECK_THREADS);
             }
 
             return false;
         }
-        // perValidatorThreadsCount==0 means autodetect
-        else if (perValidatorThreadsCount == 0)
+        // perValidatorScriptThreadsCount==0 means autodetect
+        else if (perValidatorScriptThreadsCount == 0)
         {
             // There's no observable benefit from using more than 8 cores for
             // just parallel script validation
             constexpr int defaultScriptMaxThreads {8};
-            scriptThreadsCount = std::clamp(GetNumCores(), 0, defaultScriptMaxThreads);
-        }
-        else
-        {
-            scriptThreadsCount = perValidatorThreadsCount;
+            perValidatorScriptThreadsCount = std::clamp(GetNumCores(), 0, defaultScriptMaxThreads);
         }
 
-        data->mPerBlockScriptValidatorThreadsCount = scriptThreadsCount;
+        data->mPerBlockScriptValidatorThreadsCount = perValidatorScriptThreadsCount;
+    }
+
+    {
+        if (perValidatorTxnThreadsCount < 0 || perValidatorTxnThreadsCount > MAX_TXNSCRIPTCHECK_THREADS)
+        {
+            if(error)
+            {
+                *error =
+                    strprintf(
+                        _("Per block transaction validation threads count must be at "
+                          "least 0 and at most %d"), MAX_TXNSCRIPTCHECK_THREADS);
+            }
+
+            return false;
+        }
+        // perValidatorTxnThreadsCount==0 means autodetect
+        else if (perValidatorTxnThreadsCount == 0)
+        {
+            perValidatorTxnThreadsCount = std::clamp(GetNumCores(), 0, MAX_TXNSCRIPTCHECK_THREADS);
+        }
+
+        data->mPerBlockTxnValidatorThreadsCount = perValidatorTxnThreadsCount;
     }
 
     {
@@ -713,6 +733,11 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
 int GlobalConfig::GetMaxParallelBlocks() const
 {
     return data->mMaxParallelBlocks;
+}
+
+int GlobalConfig::GetPerBlockTxnValidatorThreadsCount() const
+{
+    return data->mPerBlockTxnValidatorThreadsCount;
 }
 
 int GlobalConfig::GetPerBlockScriptValidatorThreadsCount() const
@@ -885,6 +910,25 @@ bool GlobalConfig::SetPTVTaskScheduleStrategy(std::string strategy, std::string 
 PTVTaskScheduleStrategy GlobalConfig::GetPTVTaskScheduleStrategy() const
 {
     return data->mPTVTaskScheduleStrategy;
+}
+
+bool GlobalConfig::SetBlockValidationTxBatchSize(int64_t size, std::string* err)
+{
+    if(size <= 0)
+    {
+        if(err)
+        {
+            *err = "Block validation transaction batch size must be greater than 0.";
+        }
+        return false;
+    }
+
+    data->blockValidationTxBatchSize = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetBlockValidationTxBatchSize() const
+{
+    return data->blockValidationTxBatchSize;
 }
 
 /**
@@ -2227,6 +2271,11 @@ int DummyConfig::GetMaxConcurrentAsyncTasksPerNode() const
 int DummyConfig::GetMaxParallelBlocks() const
 {
     return DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+}
+
+int DummyConfig::GetPerBlockTxnValidatorThreadsCount() const
+{
+    return DEFAULT_SCRIPTCHECK_THREADS;
 }
 
 int DummyConfig::GetPerBlockScriptValidatorThreadsCount() const

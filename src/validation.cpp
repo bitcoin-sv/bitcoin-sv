@@ -3491,8 +3491,8 @@ private:
         }
 
         // Setup for parallel txn validation if required
-        size_t maxThreads { parallelTxnValidation? std::thread::hardware_concurrency() : 1UL };
-        constexpr size_t batchSize { 100 };
+        size_t maxThreads { parallelTxnValidation? static_cast<size_t>(config.GetPerBlockTxnValidatorThreadsCount()) : 1UL };
+        uint64_t batchSize { config.GetBlockValidationTxBatchSize() };
         size_t numThreads { block.vtx.size() / batchSize };
         numThreads = std::clamp(numThreads, 1UL, maxThreads);
 

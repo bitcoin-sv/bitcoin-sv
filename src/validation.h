@@ -103,10 +103,14 @@ static const unsigned int DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD = 60;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 
-/** Maximum number of script-checking threads allowed */
-static const int MAX_SCRIPTCHECK_THREADS = 64;
-/** -threadsperblock default (number of script-checking threads, 0 = auto) */
+/** Maximum number of block script/txn checking threads allowed */
+static const int MAX_TXNSCRIPTCHECK_THREADS = 64;
+/** -threadsperblock default (number of block script-checking threads, 0 = auto) */
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
+/** -txnthreadsperblock default (number of block txn-checking threads, 0 = auto) */
+static const int DEFAULT_TXNCHECK_THREADS = 0;
+/** Default batch size for PTV during block validation */
+static const unsigned DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE = 100;
 /** Number of blocks that can be requested at any given time from a single peer.
  */
 static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;

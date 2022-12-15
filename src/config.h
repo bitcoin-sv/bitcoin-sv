@@ -65,8 +65,12 @@ public:
     virtual int32_t GetGenesisActivationHeight() const = 0;
     virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
     virtual int GetMaxParallelBlocks() const = 0;
+    virtual int GetPerBlockTxnValidatorThreadsCount() const = 0;
     virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
     virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
+
+    virtual uint64_t GetBlockValidationTxBatchSize() const = 0;
+
     virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
     virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
@@ -210,7 +214,8 @@ public:
         std::string* error = nullptr) = 0;
     virtual bool SetBlockScriptValidatorsParams(
         int maxParallelBlocks,
-        int perValidatorThreadsCount,
+        int perValidatorScriptThreadsCount,
+        int perValidatorTxnThreadsCount,
         int perValidatorThreadMaxBatchSize,
         std::string* error = nullptr) = 0;
     virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
@@ -253,6 +258,7 @@ public:
     virtual bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) = 0;
 
     virtual bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) = 0;
+    virtual bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) = 0;
 
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
@@ -430,10 +436,12 @@ public:
 
     bool SetBlockScriptValidatorsParams(
         int maxParallelBlocks,
-        int perValidatorThreadsCount,
+        int perValidatorScriptThreadsCount,
+        int perValidatorTxnThreadsCount,
         int perValidatorThreadMaxBatchSize,
         std::string* error = nullptr) override;
     int GetMaxParallelBlocks() const override;
+    int GetPerBlockTxnValidatorThreadsCount() const override;
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
 
@@ -551,6 +559,8 @@ public:
 
     bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override;
     int32_t GetMinBlocksToKeep() const override;
+    bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) override;
+    uint64_t GetBlockValidationTxBatchSize() const override;
 
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
@@ -728,6 +738,7 @@ private:
         int mMaxConcurrentAsyncTasksPerNode;
 
         int mMaxParallelBlocks;
+        int mPerBlockTxnValidatorThreadsCount;
         int mPerBlockScriptValidatorThreadsCount;
         int mPerBlockScriptValidationMaxBatchSize;
 
@@ -787,6 +798,7 @@ private:
         InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
         int32_t minBlocksToKeep;
+        uint64_t blockValidationTxBatchSize;
 
         // Block download
         uint64_t blockStallingMinDownloadSpeed;
@@ -994,7 +1006,8 @@ public:
 
     bool SetBlockScriptValidatorsParams(
         int maxParallelBlocks,
-        int perValidatorThreadsCount,
+        int perValidatorScriptThreadsCount,
+        int perValidatorTxnThreadsCount,
         int perValidatorThreadMaxBatchSize,
         std::string* error = nullptr) override
     {
@@ -1003,6 +1016,7 @@ public:
         return false;
     }
     int GetMaxParallelBlocks() const override;
+    int GetPerBlockTxnValidatorThreadsCount() const override;
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
     bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr)  override { return true; }
@@ -1273,6 +1287,8 @@ public:
 
     bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override { return true; }
     int32_t GetMinBlocksToKeep() const override { return DEFAULT_MIN_BLOCKS_TO_KEEP; }
+    bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) override { return true; }
+    uint64_t GetBlockValidationTxBatchSize() const override { return DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE; }
 
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }

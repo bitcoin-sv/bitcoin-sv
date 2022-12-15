@@ -64,6 +64,11 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     noui_connect();
     testConfig.Reset(); // make sure that we start every test with a clean config
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    testConfig.SetBlockScriptValidatorsParams(
+        DEFAULT_SCRIPT_CHECK_POOL_SIZE,
+        DEFAULT_SCRIPTCHECK_THREADS,
+        DEFAULT_TXNCHECK_THREADS,
+        DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE);
 
     // Use a temporary datadir that we don't inadvertently create the default one.
     ClearDatadirCache();
