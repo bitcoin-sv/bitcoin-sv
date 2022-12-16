@@ -660,15 +660,8 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
     }
 
     {
-        // perValidatorThreadsCount==0 means autodetect,
-        // but nScriptCheckThreads==0 means no concurrency
-        if (perValidatorThreadsCount == 0)
-        {
-            perValidatorThreadsCount =
-                std::clamp(GetNumCores(), 0, MAX_SCRIPTCHECK_THREADS);
-        }
-        else if (perValidatorThreadsCount < 0
-            || perValidatorThreadsCount > MAX_SCRIPTCHECK_THREADS)
+        int scriptThreadsCount {1};
+        if (perValidatorThreadsCount < 0 || perValidatorThreadsCount > MAX_SCRIPTCHECK_THREADS)
         {
             if(error)
             {
@@ -680,8 +673,20 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
 
             return false;
         }
+        // perValidatorThreadsCount==0 means autodetect
+        else if (perValidatorThreadsCount == 0)
+        {
+            // There's no observable benefit from using more than 8 cores for
+            // just parallel script validation
+            constexpr int defaultScriptMaxThreads {8};
+            scriptThreadsCount = std::clamp(GetNumCores(), 0, defaultScriptMaxThreads);
+        }
+        else
+        {
+            scriptThreadsCount = perValidatorThreadsCount;
+        }
 
-        data->mPerBlockScriptValidatorThreadsCount = perValidatorThreadsCount;
+        data->mPerBlockScriptValidatorThreadsCount = scriptThreadsCount;
     }
 
     {
