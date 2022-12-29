@@ -1312,6 +1312,8 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                     try
                     {
                         std::string s = range_header.second;
+                        assert(s.find("bytes=") == 0);
+                        s.erase(0, 6);
                         std::string delimiter = "-";
                         std::string rs_s = s.substr(0, s.find(delimiter));
                         s.erase(0, s.find(delimiter) + delimiter.length());

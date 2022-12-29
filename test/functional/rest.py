@@ -263,7 +263,7 @@ class RESTTest (BitcoinTestFramework):
 
         # get binary block with range
         response = http_get_call_with_headers(
-            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': '10-29'}, True)
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10-29'}, True)
         assert_equal(response_str[10:30], response.read())
         assert_equal(response.status, 200)
         assert_equal(int(response.getheader('content-length')), 20)
