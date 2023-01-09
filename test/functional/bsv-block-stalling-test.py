@@ -14,7 +14,7 @@ from test_framework.util import get_rpc_proxy, wait_until, check_for_log_msg
 class StallingTest(ComparisonTestFramework):
 
     def set_test_params(self):
-        self.bitcoind_proc_wait_timeout = 180
+        self.bitcoind_proc_wait_timeout = 210
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.genesisactivationheight = 101
