@@ -390,7 +390,7 @@ static void FindNextBlocksToDownload(
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->GetHeight(), nWindowEnd + 1);
     NodeId waitingfor = -1;
 
-    const int32_t nDownloadHeightThreshold = chainActive.Height() + 10;
+    const int32_t nDownloadHeightThreshold = chainActive.Height() + config.GetBlockDownloadLowerWindow();
 
     // Lambda to record a block we should fetch
     auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor, nDownloadHeightThreshold](const CBlockIndex* pindex)
@@ -406,6 +406,7 @@ static void FindNextBlocksToDownload(
             return false;
         }
 
+        // A further limit on how far ahead we download blocks to reduce disk usage
         if (pindex->GetHeight() > nDownloadHeightThreshold) {
             return false;
         }
