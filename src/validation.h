@@ -141,8 +141,13 @@ static const int MAX_BLOCKTXN_DEPTH = 10;
  * peer, but increase the potential degree of disordering of blocks on disk
  * (which make reindexing and in the future perhaps pruning harder). We'll
  * probably want to make this a per-peer adaptive value at some point.
+ *
+ * The lower window size is a further restriction on how many blocks ahead we
+ * will download for nodes with pruning enabled. Without this it becomes very
+ * hard to hit the pruning target in the presence of big blocks.
  */
 static const unsigned int DEFAULT_BLOCK_DOWNLOAD_WINDOW = 1024;
+static const unsigned int DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW = 10;
 /** Time to wait (in seconds) between writing blocks/block index to disk. */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */

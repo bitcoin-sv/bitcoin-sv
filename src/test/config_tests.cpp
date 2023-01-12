@@ -329,6 +329,17 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK(!config.SetBlockDownloadWindow(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadWindow(-1, &err));
 
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW);
+    BOOST_CHECK(config.SetBlockDownloadLowerWindow(2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW);
+    BOOST_CHECK(!config.SetBlockDownloadLowerWindow(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadLowerWindow(-1, &err));
+    BOOST_CHECK(config.SetBlockDownloadLowerWindow(config.GetBlockDownloadWindow(), &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), config.GetBlockDownloadWindow());
+    BOOST_CHECK(!config.SetBlockDownloadLowerWindow(config.GetBlockDownloadWindow() + 1, &err));
+    BOOST_CHECK(config.SetBlockDownloadWindow(config.GetBlockDownloadLowerWindow() - 1, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), config.GetBlockDownloadLowerWindow());
+
     BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
     BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err));
     BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), 2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);

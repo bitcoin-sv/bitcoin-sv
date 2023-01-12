@@ -585,6 +585,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt("-blockdownloadwindow=<n>",
             strprintf(_("Size of block download window before considering we may be stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
+        strUsage += HelpMessageOpt("-blockdownloadlowerwindow=<n>",
+            strprintf(_("A further lower limit on the download window (above) to help the node hit the pruning target (if enabled). "
+            "If pruning is NOT enabled then this will default to the same as the blockdownloadwindow. An operator may choose to "
+            "reduce this value even if pruning is not enabled which will result in the node using less disk space during IBD but "
+            "at the possible cost of a slower IBD time. Conversely, an operator of a pruned node may choose to increase this value "
+            "to reduce the time it takes to perform IBD but at the cost of possibly exceeding the pruning target at times. "
+            "(default if pruning enabled: %u, default if pruning not enabled: %u)"),
+                DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW, DEFAULT_BLOCK_DOWNLOAD_WINDOW));
         strUsage += HelpMessageOpt("-blockdownloadslowfetchtimeout=<n>",
             strprintf(_("Number of seconds to wait for a block to be received before triggering "
                         "a slow fetch timeout (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT));
@@ -2374,6 +2382,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBlockDownloadWindow(gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW), &err)) {
+        return InitError(err);
+    }
+    int64_t defaultBlockDownloadLowerWindow { gArgs.GetArg("-prune", 0)? DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW : config.GetBlockDownloadWindow() };
+    if(std::string err; !config.SetBlockDownloadLowerWindow(gArgs.GetArg("-blockdownloadlowerwindow", defaultBlockDownloadLowerWindow), &err)) {
         return InitError(err);
     }
     if(std::string err; !config.SetBlockDownloadSlowFetchTimeout(gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT), &err)) {

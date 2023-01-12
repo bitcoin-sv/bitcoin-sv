@@ -124,6 +124,7 @@ void GlobalConfig::Reset()
     data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
     data->blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
     data->blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    data->blockDownloadLowerWindow = DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW;
     data->blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
     data->blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
     data->blockDownloadTimeoutBase = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE;
@@ -1331,11 +1332,37 @@ bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
     }
 
     data->blockDownloadWindow = window;
+
+    // Lower download window must not be > than full window
+    if(data->blockDownloadLowerWindow > data->blockDownloadWindow)
+    {
+        data->blockDownloadLowerWindow = data->blockDownloadWindow;
+    }
+
     return true;
 }
 int64_t GlobalConfig::GetBlockDownloadWindow() const
 {
     return data->blockDownloadWindow;
+}
+
+bool GlobalConfig::SetBlockDownloadLowerWindow(int64_t window, std::string* err)
+{
+    if(window <= 0 || window > data->blockDownloadWindow)
+    {
+        if(err)
+        {
+            *err = "Block download lower window must be greater than 0 and less than or equal to the full download window.";
+        }
+        return false;
+    }
+
+    data->blockDownloadLowerWindow = window;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadLowerWindow() const
+{
+    return data->blockDownloadLowerWindow;
 }
 
 bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err)
