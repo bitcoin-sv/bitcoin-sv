@@ -2,7 +2,7 @@
 name: "bitcoin-sv-1.0.14-linux"
 enable_cache: true
 suites:
-- "bionic"
+- "focal"
 architectures:
 - "amd64"
 packages:
