@@ -13,7 +13,7 @@ packages:
 - "ca-certificates"
 - "curl"
 - "faketime"
-- "g++-8"
+- "g++-10"
 - "git"
 - "libtool"
 - "pkg-config"
@@ -58,10 +58,10 @@ script: |
   function create_per-host_faketime_wrappers {
   for i in $HOSTS; do
     for prog in ${FAKETIME_HOST_PROGS}; do
-        if which ${i}-${prog}-8
+        if which ${i}-${prog}-10
         then
             echo '#!/usr/bin/env bash' > ${WRAP_DIR}/${i}-${prog}
-            echo "REAL=\`which -a ${i}-${prog}-8 | grep -v ${WRAP_DIR}/${i}-${prog} | head -1\`" >> ${WRAP_DIR}/${i}-${prog}
+            echo "REAL=\`which -a ${i}-${prog}-10 | grep -v ${WRAP_DIR}/${i}-${prog} | head -1\`" >> ${WRAP_DIR}/${i}-${prog}
             echo 'export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1' >> ${WRAP_DIR}/${i}-${prog}
             echo "export FAKETIME=\"$1\"" >> ${WRAP_DIR}/${i}-${prog}
             echo "\$REAL \$@" >> ${WRAP_DIR}/${i}-${prog}
@@ -92,7 +92,7 @@ script: |
   rm -f ${WRAP_DIR}/${prog}
   cat << EOF > ${WRAP_DIR}/${prog}
   #!/usr/bin/env bash
-  REAL="`which -a ${prog}-8 | grep -v ${WRAP_DIR}/${prog} | head -1`"
+  REAL="`which -a ${prog}-10 | grep -v ${WRAP_DIR}/${prog} | head -1`"
   for var in "\$@"
   do
     if [ "\$var" = "-m32" ]; then
