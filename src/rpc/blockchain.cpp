@@ -1285,6 +1285,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
 
     uint64_t offset;
     uint64_t contentLen;
+    std::string totalLen = "*";
     std::unique_ptr<CForwardReadonlyStream> stream;
 
     switch (rf)
@@ -1313,16 +1314,20 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                     {
                         throw block_parse_error("Invalid Range parameter, start > end");
                     }
-                    if (rs >= metadata.diskDataSize)
-                    {
-                        throw block_parse_error("Invalid Range parameter, start >= data_size");
+                    contentLen = re - rs + 1;
+
+                    if (hasDiskBlockMetaData) {
+                        if (rs >= metadata.diskDataSize)
+                        {
+                            throw block_parse_error("Invalid Range parameter, start >= data_size");
+                        }
+
+                        offset = rs;
+
+                        uint64_t remain = metadata.diskDataSize - offset;
+                        contentLen = std::min(remain, contentLen);
+                        totalLen = std::to_string(metadata.diskDataSize);
                     }
-
-                    offset = rs;
-
-                    uint64_t remain = metadata.diskDataSize - offset;
-                    contentLen = std::min(remain, re - rs + 1);
-                    std::string totalLen = hasDiskBlockMetaData ? std::to_string(metadata.diskDataSize) : "*";
 
                     req.WriteHeader("Content-Length", std::to_string(contentLen));
                     req.WriteHeader("Content-Range", "bytes " + std::to_string(offset) + "-" + 
@@ -1408,7 +1413,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
             req.WriteReplyChunk(HexStr(begin, begin + chunk.Size()));
         }
 
-        if (!hasDiskBlockMetaData)
+        if (!hasDiskBlockMetaData && !hasRangeHeader)
         {
             hasher.Write(chunk.Begin(), chunk.Size());
             metadata.diskDataSize += chunk.Size();

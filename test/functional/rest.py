@@ -275,11 +275,6 @@ class RESTTest (BitcoinTestFramework):
             url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=29-10'}, True)
         assert_equal(response.status, 404)
 
-        # range out of data size
-        response = http_get_call_with_headers(
-            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=0-999999'}, True)
-        assert_equal(response.status, 404)
-
         # invalid format
         response = http_get_call_with_headers(
             url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': '10-29'}, True)
