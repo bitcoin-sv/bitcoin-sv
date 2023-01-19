@@ -2496,7 +2496,7 @@ static bool ProcessGetBlocks(
         // If pruning, don't inv blocks unless we have on disk and are
         // likely to still have for some reasonable time window (1 hour)
         // that block relay might require.
-        const int nPrunedBlocksLikelyToHave = MIN_BLOCKS_TO_KEEP - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
+        const int nPrunedBlocksLikelyToHave = config.GetMinBlocksToKeep() - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
         if(fPruneMode &&
             (!pindex->getStatus().hasData() ||
              pindex->GetHeight() <=

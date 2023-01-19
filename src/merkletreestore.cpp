@@ -116,9 +116,12 @@ void CMerkleTreeStore::AddNewDataNL(const uint256& newBlockHash, const int32_t n
     diskUsage += writtenDataInBytes;
 }
 
-bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight)
+bool CMerkleTreeStore::PruneDataFilesNL(const Config& config, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight)
 {
     AssertLockHeld(cs_merkleTreeStore);
+
+    const uint64_t maxDiskSpace { config.GetMaxMerkleTreeDiskSpace() };
+
     if (!newDataSizeInBytesToAdd || (diskUsage + newDataSizeInBytesToAdd) <= maxDiskSpace)
     {
         //No need to prune if no data is being added or disk space limit is kept
@@ -144,12 +147,11 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
      */
     std::vector<uint256> blockHashesOfMerkleTreesRemoved;
     std::vector<int> suffixesOfDataFilesRemoved;
-    int32_t numberOfLatestBlocksToKeep = static_cast<int32_t>(MIN_BLOCKS_TO_KEEP);
     auto pruningCandidate = fileInfoMap.cbegin();
     while ((diskUsage + newDataSizeInBytesToAdd) > maxDiskSpace && pruningCandidate != fileInfoMap.cend())
     {
-        // We don't want to prune data files that contain merkle trees from latest MIN_BLOCKS_TO_KEEP blocks
-        if ((chainHeight - pruningCandidate->second.greatestBlockHeight) > numberOfLatestBlocksToKeep)
+        // We don't want to prune data files that contain merkle trees from unpruned recent blocks
+        if ((chainHeight - pruningCandidate->second.greatestBlockHeight) > config.GetMinBlocksToKeep())
         {
             boost::system::error_code errorCode;
             int removeFileWithSuffix = pruningCandidate->first;
@@ -200,7 +202,7 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const CMerkleTree& 
     uint64_t merkleTreeSizeBytes = ::GetSerializeSize(merkleTreeIn, SER_DISK, CLIENT_VERSION);
     
     // Prune data files if needed, to stay below the disk usage limit
-    if (!PruneDataFilesNL(config.GetMaxMerkleTreeDiskSpace(), merkleTreeSizeBytes, chainHeight))
+    if (!PruneDataFilesNL(config, merkleTreeSizeBytes, chainHeight))
     {
         return error("StoreMerkleTree: Merkle Tree of size %u will not be written to keep disk size hard limit", merkleTreeSizeBytes);
     }
