@@ -271,9 +271,13 @@ extern bool fHavePruned;
 extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
-/** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of
- * chainActive.Tip() will not be pruned. */
+/** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of chainActive.Tip() will not be pruned. */
 static const int32_t MIN_BLOCKS_TO_KEEP = 288;
+
+/** Default value for minimum number of blocks to keep */
+static const int32_t DEFAULT_MIN_BLOCKS_TO_KEEP = 288;
+/** Lowest value of MIN_BLOCKS_TO_KEEP */
+static const int32_t MIN_MIN_BLOCKS_TO_KEEP = 6;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;

@@ -521,6 +521,20 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               "Setting the target size too low will not affect pruning function, "
               "but will not guarantee block files size staying under the threshold at all times. "),
             MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, MIN_BLOCKS_TO_KEEP));
+
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-pruneminblockstokeep=<n>",
+            strprintf(
+                _("Set the minimum number of most recent blocks to keep when pruning. "
+                  "WARNING: Changing this value could cause unexpected problems with reorgs, "
+                  "safe-mode activation and other functions; use at your own risk. "
+                  "It should only be used for a limited time to help a node with very limited "
+                  "disk space make progress downloading the blockchain "
+                  "(default: %d, minimum value: %d)."), DEFAULT_MIN_BLOCKS_TO_KEEP, MIN_MIN_BLOCKS_TO_KEEP)
+        );
+    }
+
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
@@ -2505,6 +2519,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                   "files.\n",
                   nPruneTarget / ONE_MEBIBYTE);
         fPruneMode = true;
+    }
+
+    if(std::string err; !config.SetMinBlocksToKeep(gArgs.GetArg("-pruneminblockstokeep", DEFAULT_MIN_BLOCKS_TO_KEEP), &err)) {
+        return InitError(err);
     }
 
     if(std::string err; !config.SetMaxStdTxnValidationDuration(

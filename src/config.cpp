@@ -120,6 +120,8 @@ void GlobalConfig::Reset()
     data->enableAssumeWhitelistedBlockDepth = DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH;
     data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
+    data->minBlocksToKeep = DEFAULT_MIN_BLOCKS_TO_KEEP;
+
     // Block download
     data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
     data->blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
@@ -1279,6 +1281,25 @@ int16_t GlobalConfig::GetSafeModeWebhookPort() const
 std::string GlobalConfig::GetSafeModeWebhookPath() const
 {
     return data->safeModeWebhookPath;
+}
+
+bool GlobalConfig::SetMinBlocksToKeep(int32_t minblocks, std::string* err)
+{
+    if(minblocks < MIN_MIN_BLOCKS_TO_KEEP)
+    {
+        if(err)
+        {
+            *err = "Minimum blocks to keep must be >= " + std::to_string(MIN_MIN_BLOCKS_TO_KEEP);
+        }
+        return false;
+    }
+
+    data->minBlocksToKeep = minblocks;
+    return true;
+}
+int32_t GlobalConfig::GetMinBlocksToKeep() const
+{
+    return data->minBlocksToKeep;
 }
 
 // Block download

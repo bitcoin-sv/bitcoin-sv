@@ -101,6 +101,8 @@ public:
     virtual bool GetEnableAssumeWhitelistedBlockDepth() const = 0;
     virtual int32_t GetAssumeWhitelistedBlockDepth() const = 0;
 
+    virtual int32_t GetMinBlocksToKeep() const = 0;
+
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
     virtual int64_t GetBlockStallingTimeout() const = 0;
@@ -249,6 +251,8 @@ public:
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
     virtual void SetEnableAssumeWhitelistedBlockDepth(bool enabled) = 0;
     virtual bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) = 0;
+
+    virtual bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) = 0;
 
     // Block download
     virtual bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) = 0;
@@ -545,6 +549,9 @@ public:
     bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) override;
     int32_t GetAssumeWhitelistedBlockDepth() const override;
 
+    bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override;
+    int32_t GetMinBlocksToKeep() const override;
+
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override;
     uint64_t GetBlockStallingMinDownloadSpeed() const override;
@@ -778,6 +785,8 @@ private:
         std::set<std::string> invalidTxSinks;
         int64_t invalidTxFileSinkSize;
         InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
+
+        int32_t minBlocksToKeep;
 
         // Block download
         uint64_t blockStallingMinDownloadSpeed;
@@ -1261,6 +1270,9 @@ public:
     bool GetEnableAssumeWhitelistedBlockDepth() const override { return DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH; }
     bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) override { return true; }
     int32_t GetAssumeWhitelistedBlockDepth() const override { return DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH; }
+
+    bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override { return true; }
+    int32_t GetMinBlocksToKeep() const override { return DEFAULT_MIN_BLOCKS_TO_KEEP; }
 
     // Block download
     bool SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err = nullptr) override { return true; }
