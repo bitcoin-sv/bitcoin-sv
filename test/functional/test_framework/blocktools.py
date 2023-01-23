@@ -5,16 +5,16 @@
 """Utilities for manipulating blocks and transactions."""
 from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.comptool import TestInstance
+from .cdefs import (MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, ONE_MEGABYTE,
+                    MAX_TX_SIZE_POLICY_BEFORE_GENESIS, DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
 from .mininode import *
 from .script import CScript, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160, OP_0
-from .util import assert_equal, assert_raises_rpc_error, hash256
-from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
+from .util import assert_equal, assert_raises_rpc_error, hash256, satoshi_round, hex_str_to_bytes
 
 from collections import deque
+from decimal import Decimal
 
 # Create a block (with regtest difficulty)
-
-
 def create_block(hashprev, coinbase, nTime=None):
     block = CBlock()
     if nTime is None:
@@ -28,6 +28,36 @@ def create_block(hashprev, coinbase, nTime=None):
     block.hashMerkleRoot = block.calc_merkle_root()
     block.calc_sha256()
     return block
+
+# Mine a block of the specified size
+def mine_block_of_size(node, size, utxos=None, fee=Decimal("0.00001"), genesisActivated=True):
+    utxos = utxos if utxos is not None else []
+    if not utxos:
+        utxos.extend(node.listunspent())
+    while size > 0:
+        utxo = utxos.pop()
+        if utxo['amount'] < fee:
+            continue
+
+        addr = node.getnewaddress()
+        inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
+        outputs = {}
+        change = utxo['amount'] - fee
+        outputs[addr] = satoshi_round(change)
+
+        rawtx = node.createrawtransaction(inputs, outputs)
+        largetx = CTransaction()
+        largetx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
+
+        maxtxnsize = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS if genesisActivated else DEFAULT_MAX_TX_SIZE_POLICY_BEFORE_GENESIS
+        maxtxnsize -= 180 # Existing txn size
+        txnsize = maxtxnsize if size >= maxtxnsize else size
+        largetx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0] * txnsize)])))
+        size -= txnsize
+
+        signed = node.signrawtransaction(ToHex(largetx))
+        node.sendrawtransaction(signed["hex"], True)
+    node.generate(1)
 
 # Do incorrect POW for block
 def solve_bad(block):
