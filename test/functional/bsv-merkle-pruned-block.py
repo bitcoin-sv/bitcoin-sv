@@ -10,7 +10,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.comptool import TestInstance
 from test_framework.util import satoshi_round, Decimal, sync_blocks
 from test_framework.blocktools import CTxIn, COutPoint, msg_tx, assert_equal, assert_raises_rpc_error, merkle_root_from_merkle_proof
-from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE, MIN_BLOCKS_TO_KEEP
+from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE, DEFAULT_MIN_BLOCKS_TO_KEEP
 from test_framework.script import CScript, CTransaction, CTxOut, OP_TRUE
 from test_framework.mininode import FromHex, CBlock, msg_gethdrsen
 
@@ -121,14 +121,14 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         rootHash = merkle_root_from_merkle_proof(int(bigBlock["tx"][0],16), bigBlockHdr["merkleproof"])
         assert_equal(rootHash, int(bigBlock["merkleroot"],16))
 
-        # Need to mine at least MIN_BLOCKS_TO_KEEP additional blocks (min number of unpruned blocks) so we can prune our big blocks
-        for i in range(MIN_BLOCKS_TO_KEEP + 100):
+        # Need to mine at least DEFAULT_MIN_BLOCKS_TO_KEEP additional blocks (min number of unpruned blocks) so we can prune our big blocks
+        for i in range(DEFAULT_MIN_BLOCKS_TO_KEEP + 100):
             block(7000 + i, version=10) # NOTE: Must use higher block version since chain will be past BIP-65 activation height
             test.blocks_and_transactions.append([self.chain.tip, True])
             self.chain.save_spendable_output()
         yield test
 
-        # We now have total 1 + 1100 + 10 big blocks + MIN_BLOCKS_TO_KEEP + 100 blocks
+        # We now have total 1 + 1100 + 10 big blocks + DEFAULT_MIN_BLOCKS_TO_KEEP + 100 blocks
         # Let's prune blocks up to height 1130 to also prune 10 big blocks
         node.pruneblockchain(1130)
         # Check that block is really pruned

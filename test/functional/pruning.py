@@ -19,7 +19,7 @@ from test_framework.util import *
 from decimal import Decimal
 import time
 import os
-from test_framework.cdefs import MIN_BLOCKS_TO_KEEP, ONE_MEGABYTE
+from test_framework.cdefs import DEFAULT_MIN_BLOCKS_TO_KEEP, ONE_MEGABYTE
 
 # Rescans start at the earliest block up to 2 hours before a key timestamp, so
 # the manual prune RPC avoids pruning blocks in the same window to be
@@ -344,7 +344,7 @@ class PruneTest(BitcoinTestFramework):
 
         # height=1000 should not prune anything more, because tip-288 is in
         # blk00002.dat.
-        prune(1000, 1001 - MIN_BLOCKS_TO_KEEP)
+        prune(1000, 1001 - DEFAULT_MIN_BLOCKS_TO_KEEP)
         if not has_block(2):
             raise AssertionError(
                 "blk00002.dat is still there, should be pruned by now")
