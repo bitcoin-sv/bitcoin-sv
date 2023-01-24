@@ -1477,10 +1477,10 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
     std::pair<bool, std::string> range_header = req.GetHeader("Range");
     bool hasRangeHeader = range_header.first;
 
-    uint64_t offset;
-    uint64_t contentLen;
+    uint64_t offset {0};
+    uint64_t contentLen {0};
     std::string totalLen = "*";
-    std::unique_ptr<CForwardReadonlyStream> stream;
+    std::unique_ptr<CForwardReadonlyStream> stream {nullptr};
 
     switch (rf)
     {
@@ -1497,8 +1497,13 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                     }
                     s.erase(0, 6);
                     std::string delimiter = "-";
-                    std::string rs_s = s.substr(0, s.find(delimiter));
-                    s.erase(0, s.find(delimiter) + delimiter.length());
+                    std::string::size_type delimiterPos = s.find(delimiter);
+                    if(delimiterPos == std::string::npos)
+                    {
+                        throw block_parse_error("Invalid Range header format, bytes delimiter not found");
+                    }
+                    std::string rs_s = s.substr(0, delimiterPos);
+                    s.erase(0, delimiterPos + delimiter.length());
                     std::string re_s = s;
 
                     uint64_t rs = std::stoll(rs_s);
@@ -1509,14 +1514,14 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                         throw block_parse_error("Invalid Range parameter, start > end");
                     }
                     contentLen = re - rs + 1;
+                    offset = rs;
 
-                    if (hasDiskBlockMetaData) {
+                    if (hasDiskBlockMetaData)
+                    {
                         if (rs >= metadata.diskDataSize)
                         {
                             throw block_parse_error("Invalid Range parameter, start >= data_size");
                         }
-
-                        offset = rs;
 
                         uint64_t remain = metadata.diskDataSize - offset;
                         contentLen = std::min(remain, contentLen);
@@ -1527,10 +1532,18 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                     req.WriteHeader("Content-Range", "bytes " + std::to_string(offset) + "-" + 
                         std::to_string(contentLen - 1) + "/" + totalLen);
                 }
-                catch (...) {
-                    throw block_parse_error("Invalid Range parameter.");
+                catch (const block_parse_error&)
+                {
+                    // Rethrow
+                    throw;
                 }
-            } else {
+                catch (...)
+                {
+                    throw block_parse_error("Invalid Range parameter");
+                }
+            }
+            else
+            {
                 if (hasDiskBlockMetaData)
                 {
                     req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));

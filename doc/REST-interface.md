@@ -24,6 +24,8 @@ For full TX query capability, one must enable the transaction index via "txindex
 
 Given a block hash: returns a block, in binary, hex-encoded binary or JSON formats.
 
+When requesting a binary format block there is also basic support for the HTTP Range header, for example: `Range: bytes=1024-2048`
+
 With the /notxdetails/ option JSON response will only contain the transaction hash instead of the complete transaction details. The option only affects the JSON response.
 
 #### Blockheaders

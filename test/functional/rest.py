@@ -279,7 +279,9 @@ class RESTTest (BitcoinTestFramework):
         response = http_get_call_with_headers(
             url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': '10-29'}, True)
         assert_equal(response.status, 404)
-
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10'}, True)
+        assert_equal(response.status, 404)
 
         # compare with block header
         response_header = http_get_call(
