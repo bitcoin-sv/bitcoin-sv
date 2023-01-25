@@ -620,7 +620,7 @@ void Misbehaving(NodeId pnode, int howmuch, const std::string &reason) {
         return;
     }
     state->nMisbehavior += howmuch;
-    int banscore = gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD);
+    int64_t banscore = GlobalConfig::GetConfig().GetBanScoreThreshold();
     if (state->nMisbehavior >= banscore &&
         state->nMisbehavior - howmuch < banscore) {
         LogPrintf(
@@ -1695,7 +1695,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             if (config.IsClientUABanned(cleanSubVer))
             {
                 LogPrint(BCLog::NETCONN, "Client UA is banned (%s) peer=%d\n", cleanSubVer, pfrom->id);
-                Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+                Misbehaving(pfrom, config.GetBanScoreThreshold(), "invalid-UA");
                 return false;
             }
         }
