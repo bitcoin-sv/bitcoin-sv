@@ -2450,6 +2450,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetMultistreamsEnabled(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetWhitelistRelay(gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY), &err)) {
+        return InitError(err);
+    }
 
     // RPC parameters
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {

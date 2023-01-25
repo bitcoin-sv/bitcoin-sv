@@ -398,6 +398,10 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), DEFAULT_STREAMS_ENABLED);
     BOOST_CHECK(config.SetMultistreamsEnabled(!DEFAULT_STREAMS_ENABLED));
     BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), !DEFAULT_STREAMS_ENABLED);
+
+    BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), DEFAULT_WHITELISTRELAY);
+    BOOST_CHECK(config.SetWhitelistRelay(!DEFAULT_WHITELISTRELAY));
+    BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), !DEFAULT_WHITELISTRELAY);
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)

@@ -2371,7 +2371,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
     // Allow whitelisted peers to send data other than blocks in blocks only
     // mode if whitelistrelay is true
-    if(pfrom->fWhitelisted && gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY)) {
+    if(pfrom->fWhitelisted && config.GetWhitelistRelay()) {
         fBlocksOnly = false;
     }
 
@@ -3122,8 +3122,7 @@ static void ProcessTxMessage(const Config& config,
     // Stop processing the transaction early if we are in blocks only mode and
     // peer is either not whitelisted or whitelistrelay is off
     if (!fRelayTxes &&
-        (!pfrom->fWhitelisted ||
-         !gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY))) {
+        (!pfrom->fWhitelisted || !config.GetWhitelistRelay())) {
         LogPrint(BCLog::NETMSGVERB,
                 "transaction sent in violation of protocol peer=%d\n",
                  pfrom->id);
