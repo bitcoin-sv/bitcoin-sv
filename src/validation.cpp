@@ -3601,9 +3601,9 @@ bool FlushStateToDisk(
             if (fPruneMode && (fCheckForPruning || nManualPruneHeight > 0) &&
                 !fReindex) {
                 if (nManualPruneHeight > 0) {
-                    pBlockFileInfoStore->FindFilesToPruneManual(setFilesToPrune, nManualPruneHeight);
+                    pBlockFileInfoStore->FindFilesToPruneManual(GlobalConfig::GetConfig(), setFilesToPrune, nManualPruneHeight);
                 } else {
-                    pBlockFileInfoStore->FindFilesToPrune(setFilesToPrune,
+                    pBlockFileInfoStore->FindFilesToPrune(GlobalConfig::GetConfig(), setFilesToPrune,
                                      chainparams.PruneAfterHeight());
                     fCheckForPruning = false;
                 }
@@ -5979,11 +5979,11 @@ static bool AcceptBlock(const Config& config,
             : true);
     // Blocks that are too out-of-order needlessly limit the effectiveness of
     // pruning, because pruning will not delete block files that contain any
-    // blocks which are too close in height to the tip.  Apply this test
+    // blocks which are too close in height to the tip. Apply this test
     // regardless of whether pruning is enabled; it should generally be safe to
     // not process unrequested blocks.
     bool fTooFarAhead =
-        (pindex->GetHeight() > (chainActive.Height() + MIN_BLOCKS_TO_KEEP));
+        (pindex->GetHeight() > (chainActive.Height() + config.GetMinBlocksToKeep()));
 
     // TODO: Decouple this function from the block download logic by removing
     // fRequested

@@ -520,7 +520,21 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               "Note: Currently achievable prune target is ~100GB (mainnet). "
               "Setting the target size too low will not affect pruning function, "
               "but will not guarantee block files size staying under the threshold at all times. "),
-            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, MIN_BLOCKS_TO_KEEP));
+            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, config.GetMinBlocksToKeep()));
+
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-pruneminblockstokeep=<n>",
+            strprintf(
+                _("Set the minimum number of most recent blocks to keep when pruning. "
+                  "WARNING: Changing this value could cause unexpected problems with reorgs, "
+                  "safe-mode activation and other functions; use at your own risk. "
+                  "It should only be used for a limited time to help a node with very limited "
+                  "disk space make progress downloading the blockchain "
+                  "(default: %d, minimum value: %d)."), DEFAULT_MIN_BLOCKS_TO_KEEP, MIN_MIN_BLOCKS_TO_KEEP)
+        );
+    }
+
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
@@ -2507,6 +2521,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         fPruneMode = true;
     }
 
+    if(std::string err; !config.SetMinBlocksToKeep(gArgs.GetArg("-pruneminblockstokeep", DEFAULT_MIN_BLOCKS_TO_KEEP), &err)) {
+        return InitError(err);
+    }
+
     if(std::string err; !config.SetMaxStdTxnValidationDuration(
         gArgs.GetArg(
             "-maxstdtxvalidationduration",
@@ -3495,10 +3513,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                 uiInterface.InitMessage(_("Verifying blocks..."));
                 if (fHavePruned &&
                     gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) >
-                        MIN_BLOCKS_TO_KEEP) {
+                        config.GetMinBlocksToKeep()) {
                     LogPrintf("Prune: pruned datadir may not have more than %d "
                               "blocks; only checking available blocks\n",
-                              MIN_BLOCKS_TO_KEEP);
+                              config.GetMinBlocksToKeep());
                 }
 
                 {

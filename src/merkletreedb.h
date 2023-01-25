@@ -33,7 +33,7 @@ struct MerkleTreeDiskPosition
  * Because one data file can store multiple Merkle Trees, greatestBlockHeight will
  * contain height of a block that is greatest among all Merkle Trees stored in this
  * data file. This is needed to prevent pruning of this data file because we want to
- * keep Merkle Trees from the latest MIN_BLOCKS_TO_KEEP blocks.
+ * keep Merkle Trees from the latest configured minimum number of blocks to keep.
  */
 struct MerkleTreeFileInfo
 {

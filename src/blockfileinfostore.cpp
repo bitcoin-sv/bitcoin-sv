@@ -171,8 +171,11 @@ void CBlockFileInfoStore::ClearFileInfo(int fileNumber)
  * Calculate the block/rev files to delete based on height specified by user
  * with RPC command pruneblockchain
  */
-void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
-    int32_t nManualPruneHeight) {
+void CBlockFileInfoStore::FindFilesToPruneManual(
+    const Config& config,
+    std::set<int> &setFilesToPrune,
+    int32_t nManualPruneHeight)
+{
     assert(fPruneMode && nManualPruneHeight > 0);
 
     LOCK2(cs_main, cs_LastBlockFile);
@@ -181,11 +184,11 @@ void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
     }
 
     // last block to prune is the lesser of (user-specified height,
-    // MIN_BLOCKS_TO_KEEP from the tip)
+    // configured minimum blocks to keep from the tip)
     int32_t nLastBlockWeCanPrune =
-        (chainActive.Tip()->GetHeight() < MIN_BLOCKS_TO_KEEP) ?
+        (chainActive.Tip()->GetHeight() < config.GetMinBlocksToKeep()) ?
         nManualPruneHeight :
-        std::min(nManualPruneHeight, chainActive.Tip()->GetHeight() - MIN_BLOCKS_TO_KEEP);
+        std::min(nManualPruneHeight, chainActive.Tip()->GetHeight() - config.GetMinBlocksToKeep());
     int count = 0;
     for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
         if (vinfoBlockFile[fileNumber].Size() == 0 ||
@@ -221,8 +224,11 @@ void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
  * @param[out]   setFilesToPrune   The set of file indices that can be unlinked
  * will be returned
  */
-void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
-    int32_t nPruneAfterHeight) {
+void CBlockFileInfoStore::FindFilesToPrune(
+    const Config& config,
+    std::set<int> &setFilesToPrune,
+    int32_t nPruneAfterHeight)
+{
     LOCK2(cs_main, cs_LastBlockFile);
     if (chainActive.Tip() == nullptr || nPruneTarget == 0) {
         return;
@@ -232,7 +238,7 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
     }
 
     int32_t nLastBlockWeCanPrune =
-        chainActive.Tip()->GetHeight() - MIN_BLOCKS_TO_KEEP;
+        chainActive.Tip()->GetHeight() - config.GetMinBlocksToKeep();
     uint64_t nCurrentUsage = pBlockFileInfoStore->CalculateCurrentUsage();
     // We don't check to prune until after we've allocated new space for files,
     // so we should leave a buffer under our target to account for another
@@ -257,7 +263,7 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
             }
 
             // don't prune files that could have a block within
-            // MIN_BLOCKS_TO_KEEP of the main chain's tip but keep scanning
+            // configured minimum number of blocks to keep of the main chain's tip but keep scanning
             if (vinfoBlockFile[fileNumber].HeightLast() > nLastBlockWeCanPrune) {
                 continue;
             }

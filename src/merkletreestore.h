@@ -23,8 +23,8 @@ typedef std::map<int, MerkleTreeFileInfo> MerkleTreeFileInfoMap;
  * We also keep disk size and biggest block height for each data file on a disk.
  " The maximum total size of all files is limited and can be configured with -maxmerkletreediskspace.
  * Before we save Merkle Tree to a data file we need to prune older data files if we reach disk size limitation.
- * Data files that contain one of the latest 288 Merkle Trees (MIN_BLOCKS_TO_KEEP) are not pruned. That is why we
- * need to keep the biggest block height for each data file.
+ * Data files that contain Merkle Trees from one of the configured minimum number of recent blocks to keep
+ * are not pruned. That is why we need to keep the biggest block height for each data file.
  * Every time we need to prune and/or write data to disk, we synchronize MerkleTree data files state to leveldb.
  */
 class CMerkleTreeStore
@@ -101,12 +101,12 @@ private:
     /*
      * If adding new data of size newDataSizeInBytesToAdd causes to go over the limit (configured with
      * -maxmerkletreediskspace), this function removes older data files to release more disk space.
-     * chainHeight should be set to current chain height to prevent pruning of last MIN_BLOCKS_TO_KEEP
-     * Merkle Trees.
+     * chainHeight should be set to current chain height to prevent pruning of Merkle Trees from still kept
+     * recent blocks.
      * Returns false if newDataSizeInBytesToAdd still causes disk size to go over the limit even after
      * the purge. 
      */
-    bool PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight);
+    bool PruneDataFilesNL(const Config& config, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight);
 
     /**
      * Clears Merkle Trees index and sets it back to initial state.
@@ -203,7 +203,7 @@ public:
      * with -maxmerkletreememcachesize parameter. Function takes config to retrieve configured limitations
      * and blockIndex needed to read and/or create related Merkle Tree. Additionally, currentChainHeight
      * must be set to height of an active chain. This is needed during purging of Merkle tree data files
-     * to prevent removal of last MIN_BLOCKS_TO_KEEP Merkle trees.
+     * to prevent removal of Merkle trees from unpruned recent blocks.
      * Returns null if block could not be read from disk to create a Merkle Tree.
      */
     CMerkleTreeRef GetMerkleTree(const Config& config, const CBlockIndex& blockIndex, const int32_t currentChainHeight);
