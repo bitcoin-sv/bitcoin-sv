@@ -3057,7 +3057,7 @@ void preloadChainStateThreadFunction()
         int stillLoadedPercent = (int) vm2.vmtouch_check(path);
 
         if (stillLoadedPercent < 90) {
-            LogPrintf("WARNING: Only %d %% of data still present in memory after preloading. Increae amount of free RAM to get the benefits of preloading\n", stillLoadedPercent);
+            LogPrintf("WARNING: Only %d %% of data still present in memory after preloading. Increase amount of free RAM to get the benefits of preloading\n", stillLoadedPercent);
         }
 
     }   catch(const std::runtime_error& ex) {
