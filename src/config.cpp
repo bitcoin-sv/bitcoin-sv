@@ -140,6 +140,7 @@ void GlobalConfig::Reset()
     data->streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     data->banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
     data->blockTxnMaxPercent = DEFAULT_BLOCK_TXN_MAX_PERCENT;
+    data->multistreamsEnabled = DEFAULT_STREAMS_ENABLED;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1527,7 +1528,7 @@ int64_t GlobalConfig::GetBlockDownloadTimeoutPerPeer() const
     return data->blockDownloadTimeoutPerPeer;
 }
 
-// P2P Parameters
+// P2P parameters
 bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 {
     if(timeout <= 0)
@@ -1590,6 +1591,16 @@ bool GlobalConfig::SetBlockTxnMaxPercent(unsigned int percent, std::string* err)
 unsigned int GlobalConfig::GetBlockTxnMaxPercent() const
 {
     return data->blockTxnMaxPercent;
+}
+
+bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* err)
+{
+    data->multistreamsEnabled = enabled;
+    return true;
+}
+bool GlobalConfig::GetMultistreamsEnabled() const
+{
+    return data->multistreamsEnabled;
 }
 
 // RPC parameters

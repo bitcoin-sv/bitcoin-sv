@@ -123,6 +123,7 @@ public:
     virtual int64_t GetStreamSendRateLimit() const = 0;
     virtual unsigned int GetBanScoreThreshold() const = 0;
     virtual unsigned int GetBlockTxnMaxPercent() const = 0;
+    virtual bool GetMultistreamsEnabled() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -276,6 +277,7 @@ public:
     virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
     virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
     virtual bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) = 0;
+    virtual bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -591,6 +593,8 @@ public:
     unsigned int GetBanScoreThreshold() const override;
     bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override;
     unsigned int GetBlockTxnMaxPercent() const override;
+    bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) override;
+    bool GetMultistreamsEnabled() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -819,6 +823,7 @@ private:
         unsigned int recvInvQueueFactor;
         unsigned int banScoreThreshold;
         unsigned int blockTxnMaxPercent;
+        bool multistreamsEnabled;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1319,6 +1324,8 @@ public:
     unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
     bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override { return true; }
     unsigned int GetBlockTxnMaxPercent() const override { return DEFAULT_BLOCK_TXN_MAX_PERCENT; }
+    bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) override { return true; }
+    bool GetMultistreamsEnabled() const override { return DEFAULT_STREAMS_ENABLED; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }

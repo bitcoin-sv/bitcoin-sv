@@ -206,7 +206,7 @@ void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectI
             PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
         }
         else {
-            if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+            if(GlobalConfig::GetConfig().GetMultistreamsEnabled()) {
                 pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
             }
             PushNodeVersion(pnode, connman, GetTime());
@@ -1709,7 +1709,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
         if(!vRecv.empty()) {
             try {
                 vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-                if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                if(config.GetMultistreamsEnabled()) {
                     // Decode received association ID
                     AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
                     if(recvdAssocID) {

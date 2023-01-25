@@ -394,6 +394,10 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), 2 * DEFAULT_BANSCORE_THRESHOLD);
     BOOST_CHECK(!config.SetBanScoreThreshold(0, &err));
     BOOST_CHECK(!config.SetBanScoreThreshold(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), DEFAULT_STREAMS_ENABLED);
+    BOOST_CHECK(config.SetMultistreamsEnabled(!DEFAULT_STREAMS_ENABLED));
+    BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), !DEFAULT_STREAMS_ENABLED);
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)
