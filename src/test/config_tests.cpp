@@ -402,6 +402,10 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), DEFAULT_WHITELISTRELAY);
     BOOST_CHECK(config.SetWhitelistRelay(!DEFAULT_WHITELISTRELAY));
     BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), !DEFAULT_WHITELISTRELAY);
+
+    BOOST_CHECK_EQUAL(config.GetWhitelistForceRelay(), DEFAULT_WHITELISTFORCERELAY);
+    BOOST_CHECK(config.SetWhitelistForceRelay(!DEFAULT_WHITELISTFORCERELAY));
+    BOOST_CHECK_EQUAL(config.GetWhitelistForceRelay(), !DEFAULT_WHITELISTFORCERELAY);
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)

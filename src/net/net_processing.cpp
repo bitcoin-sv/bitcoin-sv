@@ -3162,11 +3162,7 @@ static void ProcessTxMessage(const Config& config,
         // even if they were already in the mempool or rejected from it
         // due to policy, allowing the node to function as a gateway for
         // nodes hidden behind it.
-        bool fWhiteListForceRelay {
-                gArgs.GetBoolArg("-whitelistforcerelay",
-                                DEFAULT_WHITELISTFORCERELAY)
-        };
-        if (pfrom->fWhitelisted && fWhiteListForceRelay) {
+        if (pfrom->fWhitelisted && config.GetWhitelistForceRelay()) {
             RelayTransaction(*ptx, connman);
             LogPrint(BCLog::TXNVAL,
                     "%s: Force relaying tx %s from whitelisted peer=%d\n",
@@ -5437,9 +5433,8 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     // -whitelistforcerelay
     if (pto->nVersion >= FEEFILTER_VERSION &&
         gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER) &&
-        !(pto->fWhitelisted &&
-          gArgs.GetBoolArg("-whitelistforcerelay",
-                           DEFAULT_WHITELISTFORCERELAY))) {
+        !(pto->fWhitelisted && config.GetWhitelistForceRelay()))
+    {
         MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
         Amount currentFilter =
             mempool

@@ -125,6 +125,7 @@ public:
     virtual unsigned int GetBlockTxnMaxPercent() const = 0;
     virtual bool GetMultistreamsEnabled() const = 0;
     virtual bool GetWhitelistRelay() const = 0;
+    virtual bool GetWhitelistForceRelay() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -280,6 +281,7 @@ public:
     virtual bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) = 0;
     virtual bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) = 0;
     virtual bool SetWhitelistRelay(bool relay, std::string* err = nullptr) = 0;
+    virtual bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -599,6 +601,8 @@ public:
     bool GetMultistreamsEnabled() const override;
     bool SetWhitelistRelay(bool relay, std::string* err = nullptr) override;
     bool GetWhitelistRelay() const override;
+    bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) override;
+    bool GetWhitelistForceRelay() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -829,6 +833,7 @@ private:
         unsigned int blockTxnMaxPercent;
         bool multistreamsEnabled;
         bool whitelistRelay;
+        bool whitelistForceRelay;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1333,6 +1338,8 @@ public:
     bool GetMultistreamsEnabled() const override { return DEFAULT_STREAMS_ENABLED; }
     bool SetWhitelistRelay(bool relay, std::string* err = nullptr) override { return true; }
     bool GetWhitelistRelay() const override { return DEFAULT_WHITELISTRELAY; }
+    bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) override { return true; }
+    bool GetWhitelistForceRelay() const override { return DEFAULT_WHITELISTFORCERELAY; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }

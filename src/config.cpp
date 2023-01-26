@@ -142,6 +142,7 @@ void GlobalConfig::Reset()
     data->blockTxnMaxPercent = DEFAULT_BLOCK_TXN_MAX_PERCENT;
     data->multistreamsEnabled = DEFAULT_STREAMS_ENABLED;
     data->whitelistRelay = DEFAULT_WHITELISTRELAY;
+    data->whitelistForceRelay = DEFAULT_WHITELISTFORCERELAY;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1612,6 +1613,16 @@ bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* err)
 bool GlobalConfig::GetWhitelistRelay() const
 {
     return data->whitelistRelay;
+}
+
+bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* err)
+{
+    data->whitelistForceRelay = relay;
+    return true;
+}
+bool GlobalConfig::GetWhitelistForceRelay() const
+{
+    return data->whitelistForceRelay;
 }
 
 // RPC parameters
