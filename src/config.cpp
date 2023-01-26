@@ -143,6 +143,7 @@ void GlobalConfig::Reset()
     data->multistreamsEnabled = DEFAULT_STREAMS_ENABLED;
     data->whitelistRelay = DEFAULT_WHITELISTRELAY;
     data->whitelistForceRelay = DEFAULT_WHITELISTFORCERELAY;
+    data->rejectMempoolRequest = DEFAULT_REJECTMEMPOOLREQUEST;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1623,6 +1624,16 @@ bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* err)
 bool GlobalConfig::GetWhitelistForceRelay() const
 {
     return data->whitelistForceRelay;
+}
+
+bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* err)
+{
+    data->rejectMempoolRequest = reject;
+    return true;
+}
+bool GlobalConfig::GetRejectMempoolRequest() const
+{
+    return data->rejectMempoolRequest;
 }
 
 // RPC parameters

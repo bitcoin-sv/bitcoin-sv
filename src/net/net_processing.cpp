@@ -3871,11 +3871,12 @@ static void ProcessGetAddrMessage(const CNodePtr& pfrom,
 /**
 * Process mempool message.
 */
-static void ProcessMempoolMessage(const CNodePtr& pfrom,
+static void ProcessMempoolMessage(const Config& config,
+                                  const CNodePtr& pfrom,
                                   CDataStream& vRecv,
                                   CConnman& connman)
 {
-    if (gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST) && !pfrom->fWhitelisted) {
+    if (config.GetRejectMempoolRequest() && !pfrom->fWhitelisted) {
         LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
                  pfrom->GetId());
         pfrom->fDisconnect = true;
@@ -4516,7 +4517,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::MEMPOOL) {
-        ProcessMempoolMessage(pfrom, vRecv, connman);
+        ProcessMempoolMessage(config, pfrom, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::PING) {
