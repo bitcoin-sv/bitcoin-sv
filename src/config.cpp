@@ -146,6 +146,7 @@ void GlobalConfig::Reset()
     data->rejectMempoolRequest = DEFAULT_REJECTMEMPOOLREQUEST;
     data->dropMessageTest = std::nullopt;
     data->invalidChecksumInterval = DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS;
+    data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1679,6 +1680,25 @@ bool GlobalConfig::SetInvalidChecksumInterval(int64_t val, std::string* err)
 unsigned int GlobalConfig::GetInvalidChecksumInterval() const
 {
     return data->invalidChecksumInterval;
+}
+
+bool GlobalConfig::SetInvalidChecksumFreq(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Invalid checksum frequency must be >= 0";
+        }
+        return false;
+    }
+
+    data->invalidChecksumFreq = static_cast<unsigned int>(val);
+    return true;
+}
+unsigned int GlobalConfig::GetInvalidChecksumFreq() const
+{
+    return data->invalidChecksumFreq;
 }
 
 // RPC parameters

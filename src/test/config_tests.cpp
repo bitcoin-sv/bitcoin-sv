@@ -426,6 +426,12 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), 2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
     BOOST_CHECK(config.SetInvalidChecksumInterval(0, &err));
     BOOST_CHECK(!config.SetInvalidChecksumInterval(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+    BOOST_CHECK(config.SetInvalidChecksumFreq(2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY, &err));
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), 2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+    BOOST_CHECK(config.SetInvalidChecksumFreq(0, &err));
+    BOOST_CHECK(!config.SetInvalidChecksumFreq(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)

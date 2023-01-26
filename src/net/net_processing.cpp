@@ -4716,10 +4716,9 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                         // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
                         state->dInvalidChecksumFrequency = 0;
                     }
-                    unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-                    if (state->dInvalidChecksumFrequency > checkSumFreq){
+                    if (state->dInvalidChecksumFrequency > config.GetInvalidChecksumFreq()) {
                         // MisbehavingNode if the count goes above some chosen value 
-                        // 100 conseqitive invalid checksums received with less than 500ms between them
+                        // 100 consecutive invalid checksums received with less than 500ms between them
                         Misbehaving(pfrom, 1, "Invalid Checksum activity");
                         LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
                     }
