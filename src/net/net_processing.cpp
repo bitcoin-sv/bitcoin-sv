@@ -4382,7 +4382,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
              SanitizeString(strCommand), vRecv.size(), pfrom->id);
-    if (gArgs.IsArgSet("-dropmessagestest") && GetRand(gArgs.GetArg("-dropmessagestest", 0)) == 0) {
+    if (config.DoDropMessageTest() && GetRand(config.GetDropMessageTest()) == 0) {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
         return true;
     }

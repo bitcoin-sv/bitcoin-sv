@@ -2459,6 +2459,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetRejectMempoolRequest(gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST), &err)) {
         return InitError(err);
     }
+    if(gArgs.IsArgSet("-dropmessagestest")) {
+        if(std::string err; !config.SetDropMessageTest(gArgs.GetArg("-dropmessagestest", 0), &err)) {
+            return InitError(err);
+        }
+    }
 
     // RPC parameters
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {

@@ -127,6 +127,8 @@ public:
     virtual bool GetWhitelistRelay() const = 0;
     virtual bool GetWhitelistForceRelay() const = 0;
     virtual bool GetRejectMempoolRequest() const = 0;
+    virtual bool DoDropMessageTest() const = 0;
+    virtual uint64_t GetDropMessageTest() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -284,6 +286,7 @@ public:
     virtual bool SetWhitelistRelay(bool relay, std::string* err = nullptr) = 0;
     virtual bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) = 0;
     virtual bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) = 0;
+    virtual bool SetDropMessageTest(int64_t val, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -607,6 +610,9 @@ public:
     bool GetWhitelistForceRelay() const override;
     bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) override;
     bool GetRejectMempoolRequest() const override;
+    bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override;
+    bool DoDropMessageTest() const override;
+    uint64_t GetDropMessageTest() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -839,6 +845,7 @@ private:
         bool whitelistRelay;
         bool whitelistForceRelay;
         bool rejectMempoolRequest;
+        std::optional<uint64_t> dropMessageTest;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1347,6 +1354,9 @@ public:
     bool GetWhitelistForceRelay() const override { return DEFAULT_WHITELISTFORCERELAY; }
     bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) override { return true; }
     bool GetRejectMempoolRequest() const override { return DEFAULT_REJECTMEMPOOLREQUEST; }
+    bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override { return true; }
+    bool DoDropMessageTest() const override { return false; }
+    uint64_t GetDropMessageTest() const override { return 0; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }

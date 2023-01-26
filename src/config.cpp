@@ -144,6 +144,7 @@ void GlobalConfig::Reset()
     data->whitelistRelay = DEFAULT_WHITELISTRELAY;
     data->whitelistForceRelay = DEFAULT_WHITELISTFORCERELAY;
     data->rejectMempoolRequest = DEFAULT_REJECTMEMPOOLREQUEST;
+    data->dropMessageTest = std::nullopt;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1634,6 +1635,30 @@ bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* err)
 bool GlobalConfig::GetRejectMempoolRequest() const
 {
     return data->rejectMempoolRequest;
+}
+
+bool GlobalConfig::SetDropMessageTest(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Drop message test value must be >= 0";
+        }
+        data->dropMessageTest = std::nullopt;
+        return false;
+    }
+
+    data->dropMessageTest = static_cast<uint64_t>(val);
+    return true;
+}
+bool GlobalConfig::DoDropMessageTest() const
+{
+    return data->dropMessageTest.has_value();
+}
+uint64_t GlobalConfig::GetDropMessageTest() const
+{
+    return data->dropMessageTest.value();
 }
 
 // RPC parameters

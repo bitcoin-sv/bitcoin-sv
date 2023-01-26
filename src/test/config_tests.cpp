@@ -410,6 +410,16 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetRejectMempoolRequest(), DEFAULT_REJECTMEMPOOLREQUEST);
     BOOST_CHECK(config.SetRejectMempoolRequest(!DEFAULT_REJECTMEMPOOLREQUEST));
     BOOST_CHECK_EQUAL(config.GetRejectMempoolRequest(), !DEFAULT_REJECTMEMPOOLREQUEST);
+
+    BOOST_CHECK(! config.DoDropMessageTest());
+    BOOST_CHECK(config.SetDropMessageTest(1));
+    BOOST_CHECK(config.DoDropMessageTest());
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1);
+    BOOST_CHECK(config.SetDropMessageTest(0));
+    BOOST_CHECK(config.DoDropMessageTest());
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0);
+    BOOST_CHECK(! config.SetDropMessageTest(-1));
+    BOOST_CHECK(! config.DoDropMessageTest());
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)
