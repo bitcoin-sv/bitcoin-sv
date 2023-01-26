@@ -880,6 +880,9 @@ public:
 
     std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk() const;
 
+    std::unique_ptr<CForwardReadonlyStream> StreamSyncPartialBlockFromDisk(
+                            uint64_t offset, uint64_t length) const;
+
     friend class CDiskBlockIndex;
 
     /**

@@ -1471,26 +1471,83 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                                        CBlockIndex& blockIndex, const std::string& rpcReqId,
                                        bool processedInBatch, const RetFormat& rf)
 {
-    auto stream = blockIndex.StreamSyncBlockFromDisk();
-    if (!stream) 
-    {
-        // Block not found on disk. This could be because we have the block
-        // header in our index but don't have the block (for example if a
-        // non-whitelisted node sends us an unrequested long chain of valid
-        // blocks, we add the headers to our index, but don't accept the block).
-        throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
-    }
-
     CDiskBlockMetaData metadata = blockIndex.GetDiskBlockMetaData();
     bool hasDiskBlockMetaData = !metadata.diskDataHash.IsNull();
+    
+    std::pair<bool, std::string> range_header = req.GetHeader("Range");
+    bool hasRangeHeader = range_header.first;
+
+    uint64_t offset {0};
+    uint64_t contentLen {0};
+    std::string totalLen = "*";
+    std::unique_ptr<CForwardReadonlyStream> stream {nullptr};
 
     switch (rf)
     {
         case RF_BINARY:
         {
-            if (hasDiskBlockMetaData)
+            if (hasRangeHeader)
             {
-                req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+                try
+                {
+                    std::string s = range_header.second;
+                    if (s.find("bytes=") != 0)
+                    {
+                        throw block_parse_error("Invalid Range header format, should starts with 'bytes='");
+                    }
+                    s.erase(0, 6);
+                    std::string delimiter = "-";
+                    std::string::size_type delimiterPos = s.find(delimiter);
+                    if(delimiterPos == std::string::npos)
+                    {
+                        throw block_parse_error("Invalid Range header format, bytes delimiter not found");
+                    }
+                    std::string rs_s = s.substr(0, delimiterPos);
+                    s.erase(0, delimiterPos + delimiter.length());
+                    std::string re_s = s;
+
+                    uint64_t rs = std::stoll(rs_s);
+                    uint64_t re = std::stoll(re_s);
+
+                    if (rs > re)
+                    {
+                        throw block_parse_error("Invalid Range parameter, start > end");
+                    }
+                    contentLen = re - rs + 1;
+                    offset = rs;
+
+                    if (hasDiskBlockMetaData)
+                    {
+                        if (rs >= metadata.diskDataSize)
+                        {
+                            throw block_parse_error("Invalid Range parameter, start >= data_size");
+                        }
+
+                        uint64_t remain = metadata.diskDataSize - offset;
+                        contentLen = std::min(remain, contentLen);
+                        totalLen = std::to_string(metadata.diskDataSize);
+                    }
+
+                    req.WriteHeader("Content-Length", std::to_string(contentLen));
+                    req.WriteHeader("Content-Range", "bytes " + std::to_string(offset) + "-" + 
+                        std::to_string(contentLen - 1) + "/" + totalLen);
+                }
+                catch (const block_parse_error&)
+                {
+                    // Rethrow
+                    throw;
+                }
+                catch (...)
+                {
+                    throw block_parse_error("Invalid Range parameter");
+                }
+            }
+            else
+            {
+                if (hasDiskBlockMetaData)
+                {
+                    req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+                }
             }
             req.WriteHeader("Content-Type", "application/octet-stream");
             break;
@@ -1519,13 +1576,34 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
 
     if (!processedInBatch)
     {
-        req.StartWritingChunks(HTTP_OK);
+        if (hasRangeHeader) {
+            req.StartWritingChunks(HTTP_PARTIAL_CONTENT);
+        } else {
+            req.StartWritingChunks(HTTP_OK);
+        }
     }
 
     // RPC requests have additional layer around the actual response 
     if (!rpcReqId.empty())
     {
         req.WriteReplyChunk("{\"result\": \"");
+    }
+
+    if (hasRangeHeader)
+    {
+        stream = blockIndex.StreamSyncPartialBlockFromDisk(offset, contentLen);
+    }
+    else
+    {
+        stream = blockIndex.StreamSyncBlockFromDisk();
+    }
+    if (!stream) 
+    {
+        // Block not found on disk. This could be because we have the block
+        // header in our index but don't have the block (for example if a
+        // non-whitelisted node sends us an unrequested long chain of valid
+        // blocks, we add the headers to our index, but don't accept the block).
+        throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
     }
 
     CHash256 hasher;
@@ -1542,7 +1620,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
             req.WriteReplyChunk(HexStr(begin, begin + chunk.Size()));
         }
 
-        if (!hasDiskBlockMetaData)
+        if (!hasDiskBlockMetaData && !hasRangeHeader)
         {
             hasher.Write(chunk.Begin(), chunk.Size());
             metadata.diskDataSize += chunk.Size();

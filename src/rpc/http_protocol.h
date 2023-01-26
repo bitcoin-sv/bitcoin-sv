@@ -8,6 +8,7 @@
 // HTTP status codes
 enum HTTPStatusCode {
     HTTP_OK = 200,
+    HTTP_PARTIAL_CONTENT = 206,
     HTTP_BAD_REQUEST = 400,
     HTTP_UNAUTHORIZED = 401,
     HTTP_FORBIDDEN = 403,
