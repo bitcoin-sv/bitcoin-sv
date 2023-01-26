@@ -147,6 +147,7 @@ void GlobalConfig::Reset()
     data->dropMessageTest = std::nullopt;
     data->invalidChecksumInterval = DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS;
     data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
+    data->feeFilter = DEFAULT_FEEFILTER;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1699,6 +1700,16 @@ bool GlobalConfig::SetInvalidChecksumFreq(int64_t val, std::string* err)
 unsigned int GlobalConfig::GetInvalidChecksumFreq() const
 {
     return data->invalidChecksumFreq;
+}
+
+bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* err)
+{
+    data->feeFilter = feefilter;
+    return true;
+}
+bool GlobalConfig::GetFeeFilter() const
+{
+    return data->feeFilter;
 }
 
 // RPC parameters

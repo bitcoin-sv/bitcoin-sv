@@ -5430,8 +5430,7 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     //
     // We don't want white listed peers to filter txs to us if we have
     // -whitelistforcerelay
-    if (pto->nVersion >= FEEFILTER_VERSION &&
-        gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER) &&
+    if (pto->nVersion >= FEEFILTER_VERSION && config.GetFeeFilter() &&
         !(pto->fWhitelisted && config.GetWhitelistForceRelay()))
     {
         MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();

@@ -432,6 +432,10 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), 2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY);
     BOOST_CHECK(config.SetInvalidChecksumFreq(0, &err));
     BOOST_CHECK(!config.SetInvalidChecksumFreq(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetFeeFilter(), DEFAULT_FEEFILTER);
+    BOOST_CHECK(config.SetFeeFilter(!DEFAULT_FEEFILTER));
+    BOOST_CHECK_EQUAL(config.GetFeeFilter(), !DEFAULT_FEEFILTER);
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)
