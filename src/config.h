@@ -129,6 +129,7 @@ public:
     virtual bool GetRejectMempoolRequest() const = 0;
     virtual bool DoDropMessageTest() const = 0;
     virtual uint64_t GetDropMessageTest() const = 0;
+    virtual unsigned int GetInvalidChecksumInterval() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -287,6 +288,7 @@ public:
     virtual bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) = 0;
     virtual bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) = 0;
     virtual bool SetDropMessageTest(int64_t val, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -613,6 +615,8 @@ public:
     bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override;
     bool DoDropMessageTest() const override;
     uint64_t GetDropMessageTest() const override;
+    bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) override;
+    unsigned int GetInvalidChecksumInterval() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -846,6 +850,7 @@ private:
         bool whitelistForceRelay;
         bool rejectMempoolRequest;
         std::optional<uint64_t> dropMessageTest;
+        unsigned int invalidChecksumInterval;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1357,6 +1362,8 @@ public:
     bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override { return true; }
     bool DoDropMessageTest() const override { return false; }
     uint64_t GetDropMessageTest() const override { return 0; }
+    bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) override { return true; }
+    unsigned int GetInvalidChecksumInterval() const override { return DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }

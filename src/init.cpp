@@ -2464,6 +2464,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             return InitError(err);
         }
     }
+    if(std::string err; !config.SetInvalidChecksumInterval(gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS), &err)) {
+        return InitError(err);
+    }
 
     // RPC parameters
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {

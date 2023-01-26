@@ -420,6 +420,12 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0);
     BOOST_CHECK(! config.SetDropMessageTest(-1));
     BOOST_CHECK(! config.DoDropMessageTest());
+
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+    BOOST_CHECK(config.SetInvalidChecksumInterval(2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS, &err));
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), 2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+    BOOST_CHECK(config.SetInvalidChecksumInterval(0, &err));
+    BOOST_CHECK(!config.SetInvalidChecksumInterval(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)
