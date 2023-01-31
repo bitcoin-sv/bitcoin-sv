@@ -17,30 +17,11 @@ import re
 import sys
 import os
 
-# Debian 8.11 (Jessie) has:
-#
-# - g++ version 4.9.2 (https://packages.debian.org/search?suite=default&section=all&arch=any&searchon=names&keywords=g%2B%2B)
-# - libc version 2.19.18 (https://packages.debian.org/search?suite=default&section=all&arch=any&searchon=names&keywords=libc6)
-# - libstdc++ version 4.8.4 (https://packages.debian.org/search?suite=default&section=all&arch=any&searchon=names&keywords=libstdc%2B%2B6)
-#
-# Ubuntu 14.04 (Trusty Tahr) has:
-#
-# - g++ version 4.8.2 (https://packages.ubuntu.com/search?suite=trusty&section=all&arch=any&keywords=g%2B%2B&searchon=names)
-# - libc version 2.19.0 (https://packages.ubuntu.com/search?suite=trusty&section=all&arch=any&keywords=libc6&searchon=names)
-# - libstdc++ version 4.8.2 (https://packages.ubuntu.com/search?suite=trusty&section=all&arch=any&keywords=libstdc%2B%2B&searchon=names)
-#
-# Taking the minimum of these as our target.
-#
-# According to GNU ABI document (http://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html) this corresponds to:
-#   GCC 4.8.0: GCC_4.8.0
-#   GCC 4.8.0: GLIBCXX_3.4.18, CXXABI_1.3.7
-#   (glibc)    GLIBC_2_19
-#
 MAX_VERSIONS = {
-    'GCC':          (8,0,0),
+    'GCC':          (12,0,0),
     'CXXABI':       (1,3,7),
     'GLIBCXX':      (3,4,18),
-    'GLIBC':        (2,25),
+    'GLIBC':        (2,30),
     'LIBATOMIC':    (1,0)
 }
 # See here for a description of _IO_stdin_used:
@@ -67,18 +48,11 @@ ALLOWED_LIBRARIES = {
     'libatomic.so.1',
     'ld-linux-x86-64.so.2',  # 64-bit dynamic linker
     'ld-linux.so.2',  # 32-bit dynamic linker
-    'ld-linux-aarch64.so.1', # 64-bit ARM dynamic linker
-    'ld-linux-armhf.so.3', # 32-bit ARM dynamic linker
-    'ld-linux-riscv64-lp64d.so.1', # 64-bit RISC-V dynamic linker
     'libdl.so.2' # programming interface to dynamic linker
 }
 
 ARCH_MIN_GLIBC_VER = {
-'80386':  (2,1),
 'X86-64': (2,2,5),
-'ARM':    (2,4),
-'AArch64':(2,17),
-'RISC-V': (2,27)
 }
 
 class CPPFilt(object):
