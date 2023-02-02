@@ -254,6 +254,9 @@ AC_ARG_ENABLE([werror],
 AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-Werror],[CXXFLAG_WERROR="-Werror"],[CXXFLAG_WERROR=""])
 
+# Placeholder for linking with tbb as and when it becomes required
+#AC_CHECK_LIB([tbb], [main],TBB_LIBS=-ltbb, AC_MSG_NOTICE(libtbb not available.))
+
 if test "x$enable_asan" = xyes; then
 	enable_debug=yes
   use_asm=no
@@ -1302,6 +1305,7 @@ AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
 AC_SUBST(AIO_LIBS)
+AC_SUBST(TBB_LIBS)
 AC_SUBST(HAVE_BUILTIN_PREFETCH)
 AC_SUBST(HAVE_MM_PREFETCH)
 AC_SUBST(HAVE_STRONG_GETAUXVAL)
