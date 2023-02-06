@@ -326,6 +326,7 @@ add_library(common
 	txhasher.h
 	txmempool.h
 	txn_double_spend_detector.h
+    txn_grouper.h
 	txn_sending_details.h
 	txn_util.h
 	txn_validation_config.h
@@ -539,6 +540,8 @@ add_library(server
 	txmempoolevictioncandidates.cpp
 	txmempoolevictioncandidates.h
 	txn_double_spend_detector.cpp
+    txn_grouper.cpp
+    txn_grouper.h
 	txn_handlers.h
 	txn_propagator.cpp
 	txn_propagator.h
