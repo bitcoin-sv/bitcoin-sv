@@ -631,7 +631,7 @@ void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
 
 CConnman::CAsyncTaskPool::CAsyncTaskPool(const Config& config)
     : mPool{
-        "CAsyncTaskPool",
+        true, "CAsyncTaskPool",
         // +1 so that we have more async threads than there are block checker
         // queues so that a better block can terminate one of the existing
         // blocked block check queues on exhaustion
@@ -2381,7 +2381,7 @@ CConnman::CConnman(
     : config(&configIn)
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
-    , mValidatorThreadPool{"TxnValidatorPool",
+    , mValidatorThreadPool{true, "TxnValidatorPool",
          static_cast<size_t>(gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs())),
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDSHandler{configIn}

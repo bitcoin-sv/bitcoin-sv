@@ -103,10 +103,14 @@ static const unsigned int DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD = 60;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 
-/** Maximum number of script-checking threads allowed */
-static const int MAX_SCRIPTCHECK_THREADS = 64;
-/** -threadsperblock default (number of script-checking threads, 0 = auto) */
+/** Maximum number of block script/txn checking threads allowed */
+static const int MAX_TXNSCRIPTCHECK_THREADS = 64;
+/** -threadsperblock default (number of block script-checking threads, 0 = auto) */
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
+/** -txnthreadsperblock default (number of block txn-checking threads, 0 = auto) */
+static const int DEFAULT_TXNCHECK_THREADS = 0;
+/** Default batch size for PTV during block validation */
+static const unsigned DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE = 100;
 /** Number of blocks that can be requested at any given time from a single peer.
  */
 static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
@@ -852,9 +856,9 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled,
  * inputs
  * @see CTransaction::FetchInputs
  */
-uint64_t GetP2SHSigOpCount(const Config &config, 
-                           const CTransaction &tx,
-                           const CCoinsViewCache &mapInputs,
+uint64_t GetP2SHSigOpCount(const Config& config, 
+                           const CTransaction& tx,
+                           const ICoinsViewCache& mapInputs,
                            bool& sigOpCountError);
 
 /**
@@ -865,9 +869,9 @@ uint64_t GetP2SHSigOpCount(const Config &config,
  * @param[in] checkP2SH  check if it is P2SH and include signature operation of the redeem scripts
  * @return Total signature operation cost of tx
  */
-uint64_t GetTransactionSigOpCount(const Config &config, 
-                                  const CTransaction &tx,
-                                  const CCoinsViewCache &inputs,
+uint64_t GetTransactionSigOpCount(const Config& config, 
+                                  const CTransaction& tx,
+                                  const ICoinsViewCache& inputs,
                                   bool checkP2SH, 
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError);
@@ -917,7 +921,7 @@ std::optional<bool> CheckInputs(
     bool consensus,
     const CTransaction& tx,
     CValidationState& state,
-    const CCoinsViewCache& view,
+    const ICoinsViewCache& view,
     bool fScriptChecks,
     const uint32_t flags,
     bool sigCacheStore,
@@ -927,9 +931,9 @@ std::optional<bool> CheckInputs(
     std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight);
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
-                 CTxUndo &txundo, int32_t nHeight);
+void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs, int32_t nHeight);
+void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs,
+                 CTxUndo& txundo, int32_t nHeight);
 
 /** Transaction validation functions */
 
@@ -944,8 +948,8 @@ namespace Consensus {
  * amounts). This does not modify the UTXO set. This does not check scripts and
  * sigs. Preconditions: tx.IsCoinBase() is false.
  */
-bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
+bool CheckTxInputs(const CTransaction& tx, CValidationState& state,
+                   const ICoinsViewCache& inputs, int32_t nSpendHeight,
                    CFrozenTXOCheck& frozenTXOCheck);
 
 } // namespace Consensus
@@ -1154,7 +1158,7 @@ extern CBlockTreeDB *pblocktree;
  * cs_main)
  * This is also true for mempool checks.
  */
-std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
+std::pair<int32_t,int> GetSpendHeightAndMTP(const ICoinsViewCache& inputs);
 
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for

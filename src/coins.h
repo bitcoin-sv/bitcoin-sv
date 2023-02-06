@@ -11,6 +11,7 @@
 #include "hash.h"
 #include "memusage.h"
 #include "serialize.h"
+#include "task_helpers.h"
 #include "txhasher.h"
 #include "uint256.h"
 
@@ -20,6 +21,7 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <type_traits>
 
 class CoinWithScript;
 
@@ -370,8 +372,7 @@ public:
     size_t DynamicMemoryUsage() const { return coin.DynamicMemoryUsage(); }
 };
 
-typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher>
-    CCoinsMap;
+using CCoinsMap = std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher>;
 
 /**
  * UTXO coins view interface.
@@ -384,6 +385,9 @@ protected:
     //! As we use CCoinsViews polymorphically, have protected destructor as we
     //! don't want to support polymorphic destruction.
     ~ICoinsView() = default;
+
+    //! Load all coins spent by the given transactions into the cache.
+    virtual void CacheAllCoins(const std::vector<CTransactionRef>& txns) const = 0;
 
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const = 0;
@@ -403,6 +407,7 @@ protected:
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:
+    void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override {}
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override { return {}; }
     uint256 GetBestBlock() const override { return {}; }
 
@@ -444,6 +449,7 @@ public:
     bool SpendCoin(const COutPoint& outpoint);
     void Uncache(const std::vector<COutPoint>& vOutpoints);
     void BatchWrite(CCoinsMap& mapCoins);
+    void BatchWriteUnchecked(CCoinsMap& mapCoins);
 
     const CoinImpl& ReplaceWithCoinWithScript(const COutPoint& outpoint, CoinImpl&& newCoin)
     {
@@ -467,6 +473,25 @@ private:
     mutable size_t cachedCoinsUsage{0};
 };
 
+// Interface for CoinsViewCache and CoinsViewCache::Shard
+class ICoinsViewCache
+{
+public:
+    virtual ~ICoinsViewCache() = default;
+
+    virtual bool HaveCoin(const COutPoint& outpoint) const = 0;
+    virtual std::optional<Coin> GetCoin(const COutPoint& outpoint) const = 0;
+    virtual std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const = 0;
+    virtual Amount GetValueIn(const CTransaction& tx) const = 0;
+    virtual bool HaveInputs(const CTransaction& tx) const = 0;
+    virtual std::optional<bool> HaveInputsLimited(const CTransaction& tx, size_t maxCachedCoinsUsage) const = 0;
+    virtual size_t DynamicMemoryUsage() const = 0;
+    virtual uint256 GetBestBlock() const = 0;
+
+    virtual void AddCoin(const COutPoint& outpoint, CoinWithScript&& coin, bool potential_overwrite, int32_t genesisActivationHeight) = 0;
+    virtual bool SpendCoin(const COutPoint& outpoint, CoinWithScript* moveto = nullptr) = 0;
+};
+
 /**
  * A cached coins view that is expected to be used from only one thread.
  *
@@ -476,17 +501,131 @@ private:
  * - owning coins without script that were spent with through SpendCoin()
  * - owning coins with script added to this cache through AddCoin()
  */
-class CCoinsViewCache
+class CCoinsViewCache : public ICoinsViewCache
 {
-protected:
-    /**
-     * Make mutable so that we can "fill the cache" even from Get-methods
-     * declared as "const".
-     */
-    mutable uint256 hashBlock;
-    mutable CoinsStore mCache;
-
 public:
+
+    /**
+     * A shard within the cache.
+     *
+     * The cache is made up of a number of independent shards, each of which
+     * can be operated on by a single thread. At the end of a multi-threaded
+     * operation all shards should be folded back into a single cache.
+     */
+    class Shard : public ICoinsViewCache
+    {
+      public:
+        Shard(const ICoinsView* view) : mView{view} {}
+
+        // Does the given coin exist in this shard
+        bool HaveCoin(const COutPoint& outpoint) const override;
+
+        // If found return basic coin info without script loaded
+        std::optional<Coin> GetCoin(const COutPoint& outpoint) const override;
+
+        /**
+         * Return coin with script loaded
+         *
+         * It will return either:
+         * - a non owning coin pointing to the coin stored in view hierarchy cache
+         * - an owning coin if there is not enough space for coin in cache
+         * - nothing if coin is not found
+         *
+         * Non owning coins must be released before view goes out of scope
+         */
+        std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const override;
+
+        /**
+         * Add a coin. Set potential_overwrite to true if a non-pruned version may
+         * already exist.
+         * genesisActivationHeight parameter is used to check if Genesis upgrade rules
+         * are in effect for this coin. It is required to correctly determine if coin is unspendable.
+         *
+         * NOTE: It is possible that a coin already exists in the underlying view
+         *       therefore it is required by the caller that it has already called
+         *       GetCoin() on the same view instance beforehand. This enables
+         *       correct handling of overrides - checked more thoroughly if DEBUG
+         *       macro is enabled during compilation (enable_debug flag).
+         *       This is not performed inside the function as it causes a slow
+         *       additional access to database for every non existent coin
+         *       (something that should already be checked by external code).
+         */
+        void AddCoin(const COutPoint& outpoint, CoinWithScript&& coin,
+                     bool potential_overwrite, int32_t genesisActivationHeight) override;
+
+        /**
+         * Spend a coin. Pass moveto in order to get the deleted data.
+         * If no unspent output exists for the passed outpoint, this call has no
+         * effect.
+         */
+        bool SpendCoin(const COutPoint& outpoint, CoinWithScript* moveto = nullptr) override;
+
+        /**
+         * Amount of bitcoins coming in to a transaction
+         * Note that lightweight clients may not know anything besides the hash of
+         * previous transactions, so may not be able to calculate this.
+         *
+         * @param[in] tx    transaction for which we are checking input total
+         * @return  Sum of value of all inputs (scriptSigs)
+         */
+        Amount GetValueIn(const CTransaction& tx) const override;
+
+        /**
+         * Check whether all prevouts of the transaction are present in the UTXO
+         * set represented by this view
+         */
+        bool HaveInputs(const CTransaction& tx) const override;
+
+        /**
+         * Same as HaveInputs but with addition of limiting cache size
+         * If cache size exceeeds limit it returns nullopt
+         */
+        std::optional<bool> HaveInputsLimited(const CTransaction& tx, size_t maxCachedCoinsUsage) const override;
+
+        // Calculate the size of the shard cache (in bytes)
+        size_t DynamicMemoryUsage() const override;
+
+        // Get/Set our best block
+        uint256 GetBestBlock() const override;
+        void SetBestBlock(const uint256& block);
+
+        // Access our cache
+        const CoinsStore& GetCache() const { return mCache; }
+        CoinsStore& GetCache() { return mCache; }
+
+      private:
+
+        /**
+         * The function returns a CoinImpl object:
+         * - If a non owning coin is in cache it is returned (non owning coin points
+         *   to underlying view cache entry) and is guaranteed to have a loaded
+         *   script
+         * - If an owning coin is in cache:
+         *   + If requiresScript is false an owning coin without script is returned
+         *   + If requiresScript is true a GetCoin() is called on underlying view
+         * - If coin is not in cache GetCoin() is called on underlying view
+         *
+         * Call to underlying view returns:
+         * - Owning coin without script:
+         *   + Owning coin without script is stored in cache
+         *   + Another owning coin is returned
+         * - Owning coin with script:
+         *   + Owning coin without script is stored in cache
+         *   + Owning coin with script is returned
+         * - Non owning coin (guaranteed to contain script):
+         *   + Non owning coin is stored in cache
+         *   + Another non owning coin is returned
+         */
+        std::optional<CoinImpl> GetCoin(const COutPoint& outpoint, bool requiresScript) const;
+
+        // Mutable so we can fill the cache even from const Get methods
+        mutable CoinsStore mCache {};
+        mutable uint256 mHashBlock {};
+
+        // The underlying view onto the DB
+        const ICoinsView* mView {nullptr};
+    };
+
     explicit CCoinsViewCache(const ICoinsView& view);
 
     CCoinsViewCache(const CCoinsViewCache&) = delete;
@@ -494,23 +633,17 @@ public:
     CCoinsViewCache(CCoinsViewCache&&) = delete;
     CCoinsViewCache& operator=(CCoinsViewCache&&) = delete;
 
+    // Cache all inputs to the given transactions
+    void CacheInputs(const std::vector<CTransactionRef>& txns);
+
     //! Calculate the size of the cache (in bytes)
-    size_t DynamicMemoryUsage() const;
-    bool HaveCoin(const COutPoint &outpoint) const;
+    size_t DynamicMemoryUsage() const override;
+    bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
 
     // If found return basic coin info without script loaded
-    std::optional<Coin> GetCoin(const COutPoint& outpoint) const
-    {
-        auto coinData = GetCoin(outpoint, 0);
-        if(coinData.has_value())
-        {
-            return Coin{coinData.value()};
-        }
-
-        return {};
-    }
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const override;
 
     // Return coin with script loaded
     //
@@ -520,18 +653,7 @@ public:
     // * nothing if coin is not found
     //
     // Non owning coins must be released before view goes out of scope
-    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
-    {
-        auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
-        if(coinData.has_value())
-        {
-            assert(coinData->HasScript());
-
-            return std::move(coinData.value());
-        }
-
-        return {};
-    }
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const override;
 
     /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may
@@ -549,14 +671,14 @@ public:
      *       (something that should already be checked by external code).
      */
     void AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
-                 bool potential_overwrite, int32_t genesisActivationHeight);
+                 bool potential_overwrite, int32_t genesisActivationHeight) override;
 
     /**
      * Spend a coin. Pass moveto in order to get the deleted data.
      * If no unspent output exists for the passed outpoint, this call has no
      * effect.
      */
-    bool SpendCoin(const COutPoint &outpoint, CoinWithScript *moveto = nullptr);
+    bool SpendCoin(const COutPoint &outpoint, CoinWithScript *moveto = nullptr) override;
 
     /**
      * Amount of bitcoins coming in to a transaction
@@ -566,15 +688,15 @@ public:
      * @param[in] tx    transaction for which we are checking input total
      * @return  Sum of value of all inputs (scriptSigs)
      */
-    Amount GetValueIn(const CTransaction &tx) const;
+    Amount GetValueIn(const CTransaction &tx) const override;
 
     //! Check whether all prevouts of the transaction are present in the UTXO
     //! set represented by this view
-    bool HaveInputs(const CTransaction &tx) const;
+    bool HaveInputs(const CTransaction &tx) const override;
 
     //! Same as HaveInputs but with addition of limiting cache size
     //! If result is std::nullopt
-    std::optional<bool> HaveInputsLimited(const CTransaction &tx, size_t maxCachedCoinsUsage) const;
+    std::optional<bool> HaveInputsLimited(const CTransaction &tx, size_t maxCachedCoinsUsage) const override;
 
     /**
      * Detach provider - this function expects that view won't be used until
@@ -592,6 +714,7 @@ public:
     void ForceDetach()
     {
         assert(mThreadId == std::this_thread::get_id());
+        assert(mShards.size() == 1);
         if(mView != &mViewEmpty)
         {
             GetBestBlock();
@@ -613,6 +736,7 @@ public:
     bool TryReattach()
     {
         assert(mThreadId == std::this_thread::get_id());
+        assert(mShards.size() == 1);
         if(mView == mSourceView)
         {
             return true;
@@ -630,39 +754,99 @@ public:
         return true;
     }
 
-private:
     /**
-     * The function returns a CoinImpl object:
-     * - If a non owning coin is in cache it is returned (non owning coin points
-     *   to underlying view cache entry) and is guaranteed to have a loaded
-     *   script
-     * - If an owning coin is in cache:
-     *   + If requiresScript is false an owning coin without script is returned
-     *   + If requiresScript is true a GetCoin() is called on underlying view
-     * - If coin is not in cache GetCoin() is called on underlying view
-     *
-     * Call to underlying view returns:
-     * - Owning coin without script:
-     *   + Owning coin without script is stored in cache
-     *   + Another owning coin is returned
-     * - Owning coin with script:
-     *   + Owning coin without script is stored in cache
-     *   + Owning coin with script is returned
-     * - Non owning coin (guaranteed to contain script):
-     *   + Non owning coin is stored in cache
-     *   + Another non owning coin is returned
-     */
-    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, bool requiresScript) const;
+    * Call the given method with the supplied arguments using a thread pool,
+    * and also pass in a single shard to each thread.
+    *
+    * NOTE: This method should only be called on a freshly created CCoinsViewCache
+    * containing no local changes to its cached coins (or if not, it must be called
+    * with the number of requested threads == 1).
+    */
+    template<typename Callable, typename... Args>
+    auto RunSharded(uint16_t num, Callable&& call, Args&&... args)
+        -> std::vector<typename std::invoke_result<Callable, uint16_t, Shard&, Args...>::type> 
+    {
+        assert(mThreadId == std::this_thread::get_id());
+        assert(mShards.size() == 1);
+
+        // List of Callable results
+        using ResultType = typename std::invoke_result<Callable, uint16_t, Shard&, Args...>::type;
+        std::vector<ResultType> results {};
+
+        // How many threads requested?
+        if(num > 1)
+        {
+            // RAII class to ensure we always recombine the shards when we leave this method.
+            // Must be declared above the thread pool so it's destroyed after.
+            class ShardsRAII
+            {
+              public:
+                ShardsRAII(std::vector<Shard>& shards) : mShards{shards} {}
+                ~ShardsRAII()
+                {
+                    // Re-fold shards back into a single coherent cache
+                    int64_t startFoldTime { GetTimeMicros() };
+                    while(mShards.size() > 1)
+                    {
+                        Shard& shard { mShards.back() };
+                        auto shardCache { shard.GetCache().MoveOutCoins() };
+                        mShards[0].GetCache().BatchWriteUnchecked(shardCache);
+                        mShards.pop_back();
+                    }
+                    int64_t foldTime { GetTimeMicros() - startFoldTime };
+                    LogPrint(BCLog::BENCH, "        - Fold Shards: %.2fms\n", 0.001 * foldTime);
+                }
+              private:
+                std::vector<Shard>& mShards;
+            } foldShards {mShards};
+
+            // Create shards
+            while(mShards.size() < num)
+            {
+                mShards.emplace_back(mView);
+            }
+
+            // Run Callable using thread pool
+            CThreadPool<CQueueAdaptor> pool { false, "RunSharded", num };
+            std::vector<std::future<ResultType>> threadResults {};
+            for(uint16_t i = 0; i < num; ++i)
+            {
+                threadResults.push_back(make_task(pool, call, i, std::ref(mShards[i]), std::forward<Args>(args)...));
+            }
+
+            // Collect results
+            for(auto& res : threadResults)
+            {
+                results.push_back(res.get());
+            }
+        }
+        else
+        {
+            // Run Callable just in this thread
+            results.push_back(call(0, std::ref(mShards[0]), std::forward<Args>(args)...));
+        }
+
+        return results;
+    }
+
+private:
 
     inline static CCoinsViewEmpty mViewEmpty;
 
 protected:
+
     // variable is only used for asserts to make sure that users are not using
     // it in an unsupported way - from more than one thread
     std::thread::id mThreadId;
 
     const ICoinsView* mSourceView; // can't be null but must be a pointer for lazy binding
     const ICoinsView* mView;
+
+    /**
+     * Make mutable so that we can "fill the cache" even from Get-methods
+     * declared as "const".
+     */
+    mutable std::vector<Shard> mShards {};
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.
@@ -672,7 +856,11 @@ protected:
 // an addition is an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, bool fConfiscation, int32_t nHeight, int32_t genesisActivationHeight,
+void AddCoins(ICoinsViewCache& cache,
+              const CTransaction& tx,
+              bool fConfiscation,
+              int32_t nHeight,
+              int32_t genesisActivationHeight,
               bool check = false);
 
 #endif // BITCOIN_COINS_H

@@ -1399,6 +1399,8 @@ public:
 
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override;
 
+    void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override;
+
 protected:
     uint256 GetBestBlock() const override;
 

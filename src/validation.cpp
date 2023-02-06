@@ -49,6 +49,7 @@
 #include "timedata.h"
 #include "tinyformat.h"
 #include "txdb.h"
+#include "txn_grouper.h"
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "ui_interface.h"
@@ -167,7 +168,7 @@ const CBlockIndex *pindexBestInvalid;
  * and all ancestors) and as good as our current tip or better. Entries may be
  * failed, though, and pruning nodes may be missing the data for the block.
  */
-std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates;
+std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates;
 /**
  * All pairs A->B, where A (or one of its ancestors) misses transactions, but B
  * has transactions. Pruned nodes may have entries where B is missing data.
@@ -456,10 +457,11 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled,
     return nSigOps;
 }
 
-uint64_t GetP2SHSigOpCount(const Config &config,
-                           const CTransaction &tx,
-                           const CCoinsViewCache &inputs,
-                           bool& sigOpCountError) {
+uint64_t GetP2SHSigOpCount(const Config& config,
+                           const CTransaction& tx,
+                           const ICoinsViewCache& inputs,
+                           bool& sigOpCountError)
+{
     sigOpCountError = false;
     if (tx.IsCoinBase()) {
         return 0;
@@ -488,12 +490,13 @@ uint64_t GetP2SHSigOpCount(const Config &config,
     return nSigOps;
 }
 
-uint64_t GetTransactionSigOpCount(const Config &config, 
-                                  const CTransaction &tx,
-                                  const CCoinsViewCache &inputs,
+uint64_t GetTransactionSigOpCount(const Config& config, 
+                                  const CTransaction& tx,
+                                  const ICoinsViewCache& inputs,
                                   bool checkP2SH,
                                   bool isGenesisEnabled, 
-                                  bool& sigOpCountError) {
+                                  bool& sigOpCountError)
+{
     sigOpCountError = false;
     uint64_t nSigOps = GetSigOpCountWithoutP2SH(tx, isGenesisEnabled, sigOpCountError);
     if (sigOpCountError) {
@@ -2454,8 +2457,9 @@ static void InvalidBlockFound(const Config& config,
     }
 }
 
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
-                 CTxUndo &txundo, int32_t nHeight) {
+void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs,
+                 CTxUndo& txundo, int32_t nHeight)
+{
     // Mark inputs spent.
     if (!tx.IsCoinBase()) {
         txundo.vprevout.reserve(tx.vin.size());
@@ -2471,7 +2475,8 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
     AddCoins(inputs, tx, CFrozenTXOCheck::IsConfiscationTx(tx), nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
 }
 
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight) {
+void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs, int32_t nHeight)
+{
     CTxUndo txundo;
     UpdateCoins(tx, inputs, txundo, nHeight);
 }
@@ -2492,15 +2497,17 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
             &error);
 }
 
-std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
+std::pair<int32_t,int> GetSpendHeightAndMTP(const ICoinsViewCache& inputs)
+{
     const CBlockIndex* pindexPrev = mapBlockIndex.Get(inputs.GetBestBlock());
     return { pindexPrev->GetHeight() + 1, pindexPrev->GetMedianTimePast() };
 }
 
 namespace Consensus {
-bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
-                   CFrozenTXOCheck& frozenTXOCheck) {
+bool CheckTxInputs(const CTransaction& tx, CValidationState& state,
+                   const ICoinsViewCache& inputs, int32_t nSpendHeight,
+                   CFrozenTXOCheck& frozenTXOCheck)
+{
     // This doesn't trigger the DoS code on purpose; if it did, it would make it
     // easier for an attacker to attempt to split the network.
     if (!inputs.HaveInputs(tx)) {
@@ -2738,7 +2745,7 @@ std::optional<bool> CheckInputs(
     bool consensus,
     const CTransaction& tx,
     CValidationState& state,
-    const CCoinsViewCache& inputs,
+    const ICoinsViewCache& inputs,
     bool fScriptChecks,
     const uint32_t flags,
     bool sigCacheStore,
@@ -2930,6 +2937,7 @@ class BlockConnector
 public:
     BlockConnector(
         bool parallelBlockValidation_,
+        bool parallelTxnValidation_,
         const Config& config_,
         const CBlock& block_,
         CValidationState& state_,
@@ -2947,6 +2955,7 @@ public:
     , mostWorkOnChain{ mostWorkOnChain_ }
     , fJustCheck{ fJustCheck_ }
     , parallelBlockValidation{ parallelBlockValidation_ }
+    , parallelTxnValidation{ parallelTxnValidation_ }
     {}
 
     bool Connect( const task::CCancellationToken& token )
@@ -3056,9 +3065,7 @@ public:
 
         CBlockUndo blockundo;
 
-        size_t nInputs = 0;
-
-        std::vector<std::pair<uint256, CDiskTxPos>> vPos;
+        std::atomic_size_t nInputs = 0;
 
         int64_t nTime4; // This is set inside scope below
 
@@ -3090,7 +3097,7 @@ public:
                 CCoinsViewCache& mView;
             } csGuard{ view };
 
-            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo, mostWorkBlockHeight ))
+            if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight ))
             {
                 return false;
             }
@@ -3102,7 +3109,7 @@ public:
         }
         else
         {
-            if (!checkScripts( token, nTime2, vPos, nInputs, blockundo, mostWorkBlockHeight ))
+            if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight ))
             {
                 return false;
             }
@@ -3152,8 +3159,24 @@ public:
             }
         }
 
-        if (fTxIndex && !pblocktree->WriteTxIndex(vPos)) {
-            return AbortNode(state, "Failed to write transaction index");
+        if (fTxIndex)
+        {
+            // Calculate transaction indexing information
+            std::vector<std::pair<uint256, CDiskTxPos>> vPos {};
+            vPos.reserve(block.vtx.size());
+
+            CDiskTxPos pos { pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()) };
+            for(const auto& txn : block.vtx)
+            {
+                vPos.push_back(std::make_pair(txn->GetId(), pos));
+                pos = { pos, pos.TxOffset() + ::GetSerializeSize(*txn, SER_DISK, CLIENT_VERSION) };
+            }
+
+            // Write it out
+            if(!pblocktree->WriteTxIndex(vPos))
+            {
+                return AbortNode(state, "Failed to write transaction index");
+            }
         }
 
         if (parallelBlockValidation)
@@ -3185,15 +3208,183 @@ public:
     }
 
 private:
+
+    using ScriptChecker = checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
+
+    bool BlockValidateTxns(size_t shardNum,
+                           CCoinsViewCache::Shard& shard,
+                           const std::vector<TxnGrouper::UPtrTxnGroup>& groups,
+                           const task::CCancellationToken& token,
+                           ScriptChecker& control,
+                           CBlockIndex* pindex,
+                           CFrozenTXOCheck& frozenTXOCheck,
+                           CBlockUndo& blockundo,
+                           std::vector<CValidationState>& states,
+                           std::vector<Amount>& fees,
+                           std::atomic_size_t& nInputs,
+                           std::atomic_uint64_t& nSigOpsCount,
+                           const int nLockTimeFlags,
+                           const uint32_t flags,
+                           const bool isGenesisEnabled,
+                           const bool fScriptChecks,
+                           const uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                           const uint64_t nMaxSigOpsCountConsensusBeforeGenesis)
+    {
+        const TxnGrouper::UPtrTxnGroup& group { groups[shardNum] };
+        CValidationState& state { states[shardNum] };
+        Amount& nFees { fees[shardNum] };
+
+        // If this group of txns is significantly larger than the smallest other group,
+        // it probably makes sense to use parallel script validation here.
+        // "significantly larger" is (by experiment) set to 8 times.
+        constexpr unsigned smallestGroupMultiplier {8};
+        const auto& smallestGroup { std::min_element(groups.begin(), groups.end(),
+            [](const auto& g1, const auto& g2)
+            {
+                return g1->size() < g2->size();
+            }
+        ) };
+        size_t smallestGroupSize { (*smallestGroup)->size() };
+        bool parallelScriptChecks { groups.size() == 1 || group->size() >= (smallestGroupMultiplier * smallestGroupSize) };
+
+        for(const auto& txnAndIndex : *group)
+        {
+            const CTransaction& tx { *txnAndIndex.mTxn };
+
+            CScopedInvalidTxSenderBlock dumper(
+                g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr,
+                txnAndIndex.mTxn, pindex, state);
+
+            nInputs += tx.vin.size();
+
+            if (!tx.IsCoinBase()) {
+                if (!shard.HaveInputs(tx)) {
+                    return state.DoS(
+                        100, error("ConnectBlock(): inputs missing/spent"),
+                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                }
+
+                // Check that transaction is BIP68 final BIP68 lock checks (as
+                // opposed to nLockTime checks) must be in ConnectBlock because they
+                // require the UTXO set.
+                std::vector<int32_t> prevheights(tx.vin.size());
+                for (size_t j = 0; j < tx.vin.size(); j++) {
+                    prevheights[j] = shard.GetCoin(tx.vin[j].prevout)->GetHeight();
+                }
+
+                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
+                    return state.DoS(
+                        100, error("ConnectBlock(): contains a non-BIP68-final transaction"),
+                        REJECT_INVALID, "bad-txns-nonfinal");
+                }
+            }
+
+            // After Genesis we don't count sigops when connecting blocks
+            if (!isGenesisEnabled) {
+                // GetTransactionSigOpCount counts 2 types of sigops:
+                // * legacy (always)
+                // * p2sh (when P2SH enabled)
+                bool sigOpCountError;
+                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, shard, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
+                if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
+                }
+
+                nSigOpsCount += txSigOpsCount;
+                if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
+                    return state.DoS(100, error("ConnectBlock(): too many sigops"),
+                        REJECT_INVALID, "bad-blk-sigops");
+                }
+            }
+
+            if (!tx.IsCoinBase()) {
+                Amount fee = shard.GetValueIn(tx) - tx.GetValueOut();
+                nFees += fee;
+
+                // Don't cache results if we're actually connecting blocks (still
+                // consult the cache, though).
+                bool fCacheResults = fJustCheck;
+
+                std::vector<CScriptCheck> vChecks;
+
+                auto res =
+                    CheckInputs(
+                        token,
+                        config,
+                        true,
+                        tx,
+                        state,
+                        shard,
+                        fScriptChecks,
+                        flags,
+                        fCacheResults,
+                        fCacheResults,
+                        PrecomputedTransactionData(tx),
+                        frozenTXOCheck,
+                        &vChecks);
+                if (!res.has_value())
+                {
+                    // With current implementation this can never happen as providing vChecks
+                    // as parameter skips the path that checks the cancellation token
+                    throw CBlockValidationCancellation{};
+                }
+                else if (!res.value())
+                {
+                    if (state.GetRejectCode() == REJECT_SOFT_CONSENSUS_FREEZE)
+                    {
+                        softConsensusFreeze(
+                            *pindex,
+                            config.GetSoftConsensusFreezeDuration() );
+                    }
+
+                    return error("ConnectBlock(): CheckInputs on %s failed with %s",
+                                 tx.GetId().ToString(), FormatStateMessage(state));
+                }
+
+                if(fScriptChecks)
+                {
+                    if(parallelScriptChecks)
+                    {
+                        control.Add(vChecks);
+                    }
+                    else
+                    {
+                        for(auto& check : vChecks)
+                        {
+                            if(auto scriptRes = check(token); !scriptRes.has_value())
+                            {
+                                throw CBlockValidationCancellation {};
+                            }
+                            else if(!scriptRes.value())
+                            {
+                                return state.DoS(100, false, REJECT_INVALID,
+                                   strprintf("blk-bad-inputs (%s)", ScriptErrorString(check.GetScriptError())));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if(tx.IsCoinBase())
+            {
+                UpdateCoins(tx, shard, pindex->GetHeight());
+            }
+            else
+            {
+                UpdateCoins(tx, shard, blockundo.vtxundo[txnAndIndex.mIndex - 1], pindex->GetHeight());
+            }
+        }
+
+        return true;
+    }
+
     bool checkScripts(
         const task::CCancellationToken& token,
         int64_t nTime2,
-        std::vector<std::pair<uint256, CDiskTxPos>>& vPos,
-        size_t& nInputs,
+        std::atomic_size_t& nInputs,
         CBlockUndo& blockundo,
         std::int32_t mostWorkBlockHeight )
     {
-        vPos.reserve(block.vtx.size());
         blockundo.vtxundo.reserve(block.vtx.size() - 1);
 
         const Consensus::Params& consensusParams =
@@ -3209,7 +3400,7 @@ private:
         uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
         std::vector<int32_t> prevheights;
         const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
-        uint64_t nSigOpsCount = 0;
+        std::atomic_uint64_t nSigOpsCount = 0;
         Amount nFees(0);
 
         // Sigops counting. We need to do it again because of P2SH.
@@ -3259,16 +3450,11 @@ private:
         std::optional<task::CCancellationToken> checkPoolToken;
 
         // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
-        using NullScriptChecker =
-            checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
-
-        auto control =
+        using NullScriptChecker = ScriptChecker;
+        ScriptChecker control =
             fScriptChecks
             ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
             : NullScriptChecker{};
-
-        CDiskTxPos pos(pindex->GetBlockPos(),
-                       GetSizeOfCompactSize(block.vtx.size()));
 
         CFrozenTXOCheck frozenTXOCheck{ *pindex };
         if( config.GetEnableAssumeWhitelistedBlockDepth() )
@@ -3304,118 +3490,80 @@ private:
             //       with non-whitelisted confiscation transaction is mined.
         }
 
-        for (size_t i = 0; i < block.vtx.size(); i++) {
-            auto& txRef = block.vtx[i];
-            const CTransaction &tx = *txRef;
+        // Setup for parallel txn validation if required
+        size_t maxThreads { parallelTxnValidation? static_cast<size_t>(config.GetPerBlockTxnValidatorThreadsCount()) : 1UL };
+        uint64_t batchSize { config.GetBlockValidationTxBatchSize() };
+        size_t numThreads { block.vtx.size() / batchSize };
+        numThreads = std::clamp(numThreads, 1UL, maxThreads);
 
-            CScopedInvalidTxSenderBlock dumper(
-                g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr,
-                txRef, pindex, state);
-
-            nInputs += tx.vin.size();
-
-            if (!tx.IsCoinBase()) {
-                if (!view.HaveInputs(tx)) {
-                    return state.DoS(
-                        100, error("ConnectBlock(): inputs missing/spent"),
-                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
-                }
-
-                // Check that transaction is BIP68 final BIP68 lock checks (as
-                // opposed to nLockTime checks) must be in ConnectBlock because they
-                // require the UTXO set.
-                prevheights.resize(tx.vin.size());
-                for (size_t j = 0; j < tx.vin.size(); j++) {
-                    prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
-                }
-
-                if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
-                    return state.DoS(
-                        100, error("%s: contains a non-BIP68-final transaction",
-                                   __func__),
-                        REJECT_INVALID, "bad-txns-nonfinal");
-                }
+        int64_t startGroupTime { GetTimeMicros() };
+        TxnGrouper grouper {};
+        const std::vector<TxnGrouper::UPtrTxnGroup> txnGroups { grouper.GetNumGroups(block.vtx, numThreads, batchSize) };
+        int64_t groupTime { GetTimeMicros() - startGroupTime };
+        size_t numGroups { txnGroups.size() };
+        std::stringstream groupSizesStr {};
+        for(size_t i = 0; i < numGroups; ++i)
+        {
+            if(i > 0)
+            {
+                groupSizesStr << ",";
             }
-
-            // After Genesis we don't count sigops when connecting blocks
-            if (!isGenesisEnabled){
-                // GetTransactionSigOpCount counts 2 types of sigops:
-                // * legacy (always)
-                // * p2sh (when P2SH enabled)
-                bool sigOpCountError;
-                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
-                if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
-                    return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
-                }
-
-                nSigOpsCount += txSigOpsCount;
-                if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
-                    return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                        REJECT_INVALID, "bad-blk-sigops");
-                }
-            }
-
-            if (!tx.IsCoinBase()) {
-                Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
-                nFees += fee;
-
-                // Don't cache results if we're actually connecting blocks (still
-                // consult the cache, though).
-                bool fCacheResults = fJustCheck;
-
-                std::vector<CScriptCheck> vChecks;
-
-                auto res =
-                    CheckInputs(
-                        token,
-                        config,
-                        true,
-                        tx,
-                        state,
-                        view,
-                        fScriptChecks,
-                        flags,
-                        fCacheResults,
-                        fCacheResults,
-                        PrecomputedTransactionData(tx),
-                        frozenTXOCheck,
-                        &vChecks);
-                if (!res.has_value())
-                {
-                    // With current implementation this can never happen as providing
-                    // vChecks as parameter skips the path that checks the cancellation
-                    // token
-                    throw CBlockValidationCancellation{};
-                }
-                else if (!res.value())
-                {
-                    if (state.GetRejectCode() == REJECT_SOFT_CONSENSUS_FREEZE)
-                    {
-                        softConsensusFreeze(
-                            *pindex,
-                            config.GetSoftConsensusFreezeDuration() );
-                    }
-
-                    return error("ConnectBlock(): CheckInputs on %s failed with %s",
-                                 tx.GetId().ToString(), FormatStateMessage(state));
-                }
-
-                if(fScriptChecks)
-                {
-                    control.Add(vChecks);
-                }
-            }
-
-            CTxUndo undoDummy;
-            if (i > 0) {
-                blockundo.vtxundo.push_back(CTxUndo());
-            }
-            UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(),
-                        pindex->GetHeight());
-
-            vPos.push_back(std::make_pair(tx.GetId(), pos));
-            pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
+            groupSizesStr << txnGroups[i]->size();
         }
+        LogPrint(BCLog::BENCH, "        - Group %ld transactions into %d groups of sizes [%s]: %.2fms\n",
+            block.vtx.size(), numGroups, groupSizesStr.str(), 0.001 * groupTime);
+
+        std::vector<CValidationState> states(numGroups);
+        std::vector<Amount> allFees(numGroups);
+
+        // Make space for all but the coinbase
+        blockundo.vtxundo.resize(block.vtx.size() - 1);
+
+        // Cache all inputs
+        int64_t startCacheTime { GetTimeMicros() };
+        view.CacheInputs(block.vtx);
+        int64_t cacheTime { GetTimeMicros() - startCacheTime };
+        LogPrint(BCLog::BENCH, "        - Cache: %.2fms\n", 0.001 * cacheTime);
+
+        // Validate
+        int64_t validateStartTime { GetTimeMicros() };
+        std::vector<bool> results { view.RunSharded(numGroups,
+            std::bind(&BlockConnector::BlockValidateTxns, this, std::placeholders::_1, std::placeholders::_2,
+                std::cref(txnGroups),
+                std::cref(token),
+                std::ref(control),
+                pindex,
+                std::ref(frozenTXOCheck),
+                std::ref(blockundo),
+                std::ref(states),
+                std::ref(allFees),
+                std::ref(nInputs),
+                std::ref(nSigOpsCount),
+                nLockTimeFlags,
+                flags,
+                isGenesisEnabled,
+                fScriptChecks,
+                maxTxSigOpsCountConsensusBeforeGenesis,
+                nMaxSigOpsCountConsensusBeforeGenesis
+            )
+        )};
+
+        // Check results
+        for(const auto& s : states)
+        {
+            if(!s.IsValid())
+            {
+                // Just return details of first failure
+                state = s;
+                return false;
+            }
+        }
+
+        // Total up fees
+        nFees = std::accumulate(allFees.begin(), allFees.end(), Amount{0});
+
+        int64_t validateTime { GetTimeMicros() - validateStartTime };
+        LogPrint(BCLog::BENCH, "        - Validate %ld transactions: %.2fms\n", block.vtx.size(), 0.001 * validateTime);
 
         if (parallelBlockValidation)
         {
@@ -3444,7 +3592,6 @@ private:
                 g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
             }
             return result;
-
         }
 
         if(checkPoolToken)
@@ -3529,6 +3676,7 @@ private:
     const arith_uint256& mostWorkOnChain;
     bool fJustCheck;
     bool parallelBlockValidation;
+    bool parallelTxnValidation;
 };
 
 /**
@@ -3553,6 +3701,7 @@ private:
 static bool ConnectBlock(
     const task::CCancellationToken& token,
     bool parallelBlockValidation,
+    bool parallelTxnValidation,
     const Config &config,
     const CBlock &block,
     CValidationState &state,
@@ -3564,6 +3713,7 @@ static bool ConnectBlock(
 {
     BlockConnector connector{
         parallelBlockValidation,
+        parallelTxnValidation,
         config,
         block,
         state,
@@ -4020,6 +4170,7 @@ static bool ConnectTip(
             ConnectBlock(
                 token,
                 parallelBlockValidation,
+                true,
                 config,
                 blockConnecting,
                 state,
@@ -6252,7 +6403,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
     }
     auto source = task::CCancellationSource::Make();
 
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, indexDummy.get(), viewNew, chainActive.Height(), indexDummy->GetChainWork(), true))
+    if (!ConnectBlock(source->GetToken(), false, true, config, block, state, indexDummy.get(), viewNew, chainActive.Height(), indexDummy->GetChainWork(), true))
     {
         return false;
     }
@@ -6618,7 +6769,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                     pindex->GetHeight(), pindex->GetBlockHash().ToString());
             }
             auto source = task::CCancellationSource::Make();
-            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, chainActive.Height(), pindex->GetChainWork()))
+            if (!ConnectBlock(source->GetToken(), false, false, config, block, state, pindex, coins, chainActive.Height(), pindex->GetChainWork()))
             {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",

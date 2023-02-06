@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_SUITE(TestThreadPool)
 // Test basic non-prioritised thread pool handling
 BOOST_AUTO_TEST_CASE(NonPrioritised)
 {
-    CThreadPool<CQueueAdaptor> pool { "TestPool", 4 };
+    CThreadPool<CQueueAdaptor> pool { false, "TestPool", 4 };
     BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
     BOOST_CHECK_EQUAL(Counter, 0);
 
@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
 {
     // Scenario 1: test basic, specified priorities
     // Single threaded pool for reproducable task execution ordering
-    CThreadPool<CPriorityQueueAdaptor> pool { "TestPool", 1 };
+    CThreadPool<CPriorityQueueAdaptor> pool { false, "TestPool", 1 };
     // Make sure nothing starts executing until we have queued everything
     pool.pause();
     BOOST_CHECK(pool.paused());
@@ -140,7 +140,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
 BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase1)
 {
     Counter = 0;
-    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 4, 1 };
+    CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 4, 1 };
     BOOST_CHECK_EQUAL(pool.getPoolSize(), 5);
     BOOST_CHECK_EQUAL(Counter, 0);
 
@@ -177,7 +177,7 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase1)
 BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase2)
 {
     Counter = 0;
-    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 1, 4 };
+    CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 1, 4 };
     BOOST_CHECK_EQUAL(pool.getPoolSize(), 5);
     BOOST_CHECK_EQUAL(Counter, 0);
 
@@ -214,7 +214,7 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase2)
 BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase3)
 {
     Counter = 0;
-    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 0, 4 };
+    CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 0, 4 };
     BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
     BOOST_CHECK_EQUAL(Counter, 0);
 
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase3)
 BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase4)
 {
     Counter = 0;
-    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 4, 0 };
+    CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 4, 0 };
     BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
     BOOST_CHECK_EQUAL(Counter, 0);
 
@@ -263,7 +263,6 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase4)
     // Should have run 6 tasks
     BOOST_CHECK_EQUAL(Counter, Increment * results.size());
 }
-
 
 BOOST_AUTO_TEST_SUITE_END()
 

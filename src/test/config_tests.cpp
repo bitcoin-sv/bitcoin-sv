@@ -714,4 +714,26 @@ BOOST_AUTO_TEST_CASE(prune_config_test)
     BOOST_CHECK(! config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP - 1));
 }
 
+BOOST_AUTO_TEST_CASE(tx_validation)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetBlockValidationTxBatchSize(), DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE);
+    BOOST_CHECK(config.SetBlockValidationTxBatchSize(DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockValidationTxBatchSize(), DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2);
+    BOOST_CHECK(! config.SetBlockValidationTxBatchSize(0, &err));
+    BOOST_CHECK(! config.SetBlockValidationTxBatchSize(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), DEFAULT_SCRIPTCHECK_THREADS);
+    BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), DEFAULT_TXNCHECK_THREADS);
+    BOOST_CHECK(config.SetBlockScriptValidatorsParams(1, 2, 0, 1, &err));
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), 2);
+    BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), GetNumCores());
+    BOOST_CHECK(config.SetBlockScriptValidatorsParams(1, 0, 2, 1, &err));
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), GetNumCores());
+    BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), 2);
+    BOOST_CHECK(! config.SetBlockScriptValidatorsParams(1, -1, -1, 1, &err));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -335,7 +335,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
-        frozen_block_block_checked_log_string = f"ConnectBlock {frozen_block.hash} failed \\(blk-bad-inputs, parallel script check failed \\(code 16\\)\\)"
+        frozen_block_block_checked_log_string = f"ConnectBlock {frozen_block.hash} failed \\(blk-bad-inputs"
         assert( not node.check_log(frozen_block_block_checked_log_string) )
         self._mine_and_send_block(None, node, False, last_valid_block.hash)
         assert( node.check_log(frozen_block_block_checked_log_string) )

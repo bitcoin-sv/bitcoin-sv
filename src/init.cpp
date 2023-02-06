@@ -462,8 +462,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-threadsperblock=<n>",
         strprintf(_("Set the number of script verification threads used when "
                     "validating single block (0 to %d, 0 = auto, default: %d)"),
-                  MAX_SCRIPTCHECK_THREADS,
+                  MAX_TXNSCRIPTCHECK_THREADS,
                   DEFAULT_SCRIPTCHECK_THREADS));
+    strUsage += HelpMessageOpt(
+        "-txnthreadsperblock=<n>",
+        strprintf(_("Set the number of transaction verification threads used when "
+                    "validating single block (0 to %d, 0 = auto, default: %d)"),
+                  MAX_TXNSCRIPTCHECK_THREADS,
+                  DEFAULT_TXNCHECK_THREADS));
     strUsage +=
         HelpMessageOpt(
             "-scriptvalidatormaxbatchsize=<n>",
@@ -1331,6 +1337,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     /** TxnValidator */
     strUsage += HelpMessageGroup(_("TxnValidator options:"));
     strUsage += HelpMessageOpt(
+        "-blockvalidationtxbatchsize=<n>",
+        strprintf(_("Set the minimum batch size for groups of txns to be validated in parallel during block validation "
+                    "(default: %d)"),
+            DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE));
+    strUsage += HelpMessageOpt(
         "-numstdtxvalidationthreads=<n>",
         strprintf(_("Set the number of 'High' priority threads used to validate standard txns (dynamically calculated default: %d)"),
             GetNumHighPriorityValidationThrs())) ;
@@ -2144,6 +2155,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string error; !config.SetBlockScriptValidatorsParams(
         gArgs.GetArg("-maxparallelblocks", DEFAULT_SCRIPT_CHECK_POOL_SIZE),
         gArgs.GetArg("-threadsperblock", DEFAULT_SCRIPTCHECK_THREADS),
+        gArgs.GetArg("-txnthreadsperblock", DEFAULT_TXNCHECK_THREADS),
         gArgs.GetArg("-scriptvalidatormaxbatchsize", DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE),
         &error))
     {
@@ -2370,6 +2382,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                 return InitError(err);
             }
         }
+    }
+
+    if(std::string err; !config.SetBlockValidationTxBatchSize(gArgs.GetArg("-blockvalidationtxbatchsize", DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE), &err)) {
+        return InitError(err);
     }
 
     // Safe mode activation
@@ -3153,8 +3169,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     g_MempoolDatarefTracker = std::make_unique<mining::MempoolDatarefTracker>();
     g_BlockDatarefTracker = mining::make_from_dir();
 
-    LogPrintf("Using %u threads for script verification\n",
-              config.GetPerBlockScriptValidatorThreadsCount());
+    LogPrintf("Using %u threads for block transaction verification\n", config.GetPerBlockTxnValidatorThreadsCount());
+    LogPrintf("Using %u threads for script verification\n", config.GetPerBlockScriptValidatorThreadsCount());
     InitScriptCheckQueues(config, threadGroup);
 
     // Late configuration for globaly constructed objects

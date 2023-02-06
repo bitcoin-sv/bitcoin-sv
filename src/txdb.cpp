@@ -482,26 +482,91 @@ CoinsDB::CoinsDB(
 {}
 
 size_t CoinsDB::DynamicMemoryUsage() const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    std::shared_lock lock { mCoinsViewCacheMtx };
     return mCache.DynamicMemoryUsage();
 }
 
-std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
-    auto erase =
-        [this](const COutPoint* outpoint)
+void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
+{
+    // Sort inputs; leveldb seems to prefer it that way
+    auto Sort = [](const COutPoint& out1, const COutPoint& out2)
+    {
+        if(out1.GetTxId() == out2.GetTxId())
         {
-            std::unique_lock lock{ mCoinsViewCacheMtx };
-            mFetchingCoins.erase(*outpoint);
-        };
-    std::unique_ptr<const COutPoint, decltype(erase)> guard{&outpoint, erase};
+            return out1.GetN() < out2.GetN();
+        }
+        return out1.GetTxId() < out2.GetTxId();
+    };
 
+    std::vector<COutPoint> allInputs {};
+    for(size_t i = 1; i < txns.size(); ++i)
+    {
+        for(const auto& in: txns[i]->vin)
+        {
+            allInputs.push_back(in.prevout);
+        }
+    }
+    // FIXME: Consider using parallel sort when it beconmes available
+    std::sort(allInputs.begin(), allInputs.end(), Sort);
+
+    std::unique_lock lock { mCoinsViewCacheMtx };
+
+    for(const auto& outpoint : allInputs)
+    {
+        std::optional<CoinImpl> coinFromCache { mCache.FetchCoin(outpoint) };
+
+        // If we don't have it in the cache, or we do have it but it's unspent without the script loaded
+        if(!coinFromCache.has_value() || (!coinFromCache->IsSpent() && !coinFromCache->HasScript()))
+        {
+            std::optional<CoinImpl> coinFromView { DBGetCoin(outpoint, std::numeric_limits<uint64_t>::max()) };
+            if(coinFromView.has_value())
+            {
+                assert(coinFromView->HasScript());
+
+                if(coinFromCache.has_value())
+                {
+                    if(hasSpaceForScript(coinFromView->GetScriptSize()))
+                    {
+                        mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value()));
+                    }
+                }
+                else
+                {
+                    if(hasSpaceForScript(coinFromView->GetScriptSize()))
+                    {
+                        mCache.AddCoin(outpoint, std::move(coinFromView.value()));
+                    }
+                    else
+                    {
+                        mCache.AddCoin(
+                            outpoint,
+                            CoinImpl {
+                                coinFromView->GetTxOut().nValue,
+                                coinFromView->GetScriptSize(),
+                                coinFromView->GetHeight(),
+                                coinFromView->IsCoinBase(),
+                                coinFromView->IsConfiscation()
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
     std::optional<CoinImpl> coinFromCache;
     size_t maxScriptLoadingSize = 0;
+
+    // Scope guard must protect the scope until the end of the cache insertion
+    // below the infinite while loop if it is instantiated inside that loop!
+    std::optional<FetchingCoins::ScopeGuard> fetchCoinsGuard;
 
     while(true)
     {
         {
-            std::unique_lock lock { mCoinsViewCacheMtx };
+            std::shared_lock lock { mCoinsViewCacheMtx };
 
             coinFromCache = mCache.FetchCoin(outpoint);
 
@@ -509,20 +574,14 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
             {
                 if (coinFromCache->IsSpent())
                 {
-                    guard.release();
-
                     return {};
                 }
                 else if (coinFromCache->HasScript())
                 {
-                    guard.release();
-
                     return coinFromCache;
                 }
                 else if(maxScriptSize < coinFromCache->GetScriptSize())
                 {
-                    guard.release();
-
                     // make a copy since we will swap the cached value on script load
                     // and we want the child view to re-request the coin from us
                     // at that point to preserve thread safety
@@ -535,16 +594,38 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
                             coinFromCache->IsConfiscation()};
                 }
             }
-            if(!mFetchingCoins.count(outpoint))
-            {
-                mFetchingCoins.insert(outpoint);
 
-                // it can happen that we'll get multiple requests and unnecessarily
-                // load more scripts than needed but that should be rare enough
-                maxScriptLoadingSize = getMaxScriptLoadingSize(maxScriptSize);
+            // Scoped guard prevents race to mCoinsViewCacheMtx unique lock as reader threads
+            // shouldn't get to it before the writer thread has the chance to write it into
+            // the cache (the first thread that manages the insert)
+            // We have to grab it under mCoinsViewCacheMtx being locked since
+            // we need the guarantee that TryInsert won't accidentally cause
+            // a race condition that would go to the database more than once
+            // so the flow is:
+            // T1: shared locks mCoinsViewCacheMtx
+            // T1: doesn't find the coin and grabs the fetch guard
+            // T2: shared locks mCoinsViewCacheMtx
+            // T2: doesn't find the coin and can't obtain fetch guard
+            // T1: releases shared lock of mCoinsViewCacheMtx
+            // T2: still can't obtain fetch guard
+            // T1: obtains exclusive lock of mCoinsViewCacheMtx after all
+            //     other threads left this shared lock scope
+            // T1: writes to cache or fails to fetch coin
+            // T1: releases exclusive lock of mCoinsViewCacheMtx
+            // T2: shared locks mCoinsViewCacheMtx
+            // T2: is guaranteed to either get the coin (if it exists) from the
+            //     cache above or obtain fetch coins guard and re-try DB fetch
+            //     of coin that is guaranteed not to be in the cache
+            fetchCoinsGuard = mFetchingCoins.TryInsert(outpoint);
+        }
 
-                break;
-            }
+        if (fetchCoinsGuard.has_value())
+        {
+            // it can happen that we'll get multiple requests and unnecessarily
+            // load more scripts than needed but that should be rare enough
+            maxScriptLoadingSize = getMaxScriptLoadingSize(maxScriptSize);
+
+            break;
         }
 
         // All but the first reader will end up here. Give the initial thread a
@@ -580,9 +661,6 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
 
     std::unique_lock lock { mCoinsViewCacheMtx };
 
-    mFetchingCoins.erase(outpoint);
-    guard.release();
-
     if (coinFromCache.has_value())
     {
         assert(coinFromView->HasScript());
@@ -616,12 +694,12 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
 }
 
 bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    std::shared_lock lock { mCoinsViewCacheMtx };
     return mCache.FetchCoin(outpoint).has_value();
 }
 
 uint256 CoinsDB::GetBestBlock() const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    std::shared_lock lock { mCoinsViewCacheMtx };
     if (hashBlock.IsNull()) {
         hashBlock = DBGetBestBlock();
     }
@@ -672,7 +750,7 @@ void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)
 }
 
 unsigned int CoinsDB::GetCacheSize() const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    std::shared_lock lock { mCoinsViewCacheMtx };
     return mCache.CachedCoinsCount();
 }
 
@@ -716,6 +794,7 @@ std::optional<Coin> CoinsDB::GetCoinByTxId(const TxId& txid) const
 auto CoinsDBSpan::TryFlush() -> WriteState
 {
     assert(mThreadId == std::this_thread::get_id());
+    assert(mShards.size() == 1);
 
     if (!mDB.TryWriteLock( mView.mLock ))
     {
@@ -730,7 +809,7 @@ auto CoinsDBSpan::TryFlush() -> WriteState
     std::unique_ptr<WPUSMutex::Lock, decltype(revertToReadLock)> guard{&mView.mLock, revertToReadLock};
 
     return
-        mDB.BatchWrite(mView.mLock, hashBlock, mCache.MoveOutCoins())
+        mDB.BatchWrite(mView.mLock, GetBestBlock(), mShards[0].GetCache().MoveOutCoins())
         ? WriteState::ok
         : WriteState::error;
 }

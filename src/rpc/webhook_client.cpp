@@ -19,7 +19,7 @@ namespace rpc::client
 std::unique_ptr<WebhookClient> g_pWebhookClient {nullptr};
 
 WebhookClient::WebhookClient(const Config& config)
-: mSubmitPool { "WebhookClient", config.GetWebhookClientNumThreads() } 
+: mSubmitPool { true, "WebhookClient", config.GetWebhookClientNumThreads() } 
 {
 }
 
