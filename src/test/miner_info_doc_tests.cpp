@@ -133,7 +133,7 @@ namespace
         doc = accumulate(first,
                          last,
                          doc,
-                         [&first_pass](auto& doc, const auto& x) {
+                         [&first_pass](auto&& doc, const auto& x) {
                              const auto& [name, type, value] = x;
                              if(first_pass)
                                  first_pass = false;

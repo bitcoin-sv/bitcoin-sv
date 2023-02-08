@@ -1052,7 +1052,7 @@ inline size_t ser_size(T f, T l, size_t init)
     return std::accumulate(f,
                            l,
                            init,
-                           [](auto& total, const auto& ip) {
+                           [](auto&& total, const auto& ip) {
                                return total += ser_size(ip);
                            });
 }
