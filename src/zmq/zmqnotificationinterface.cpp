@@ -28,6 +28,27 @@ CZMQNotificationInterface::~CZMQNotificationInterface() {
     }
 }
 
+void CZMQNotificationInterface::RegisterValidationInterface()
+{   
+    CMainSignals& sigs { GetMainSignals() };
+
+    using namespace boost::placeholders;
+    slotConnections.push_back(sigs.TransactionAddedToMempool.connect(boost::bind(&CZMQNotificationInterface::TransactionAddedToMempool, this, _1)));
+    slotConnections.push_back(sigs.TransactionAddedToMempool.connect(boost::bind(&CZMQNotificationInterface::TransactionAdded, this, _1)));
+    slotConnections.push_back(sigs.TransactionRemovedFromMempool.connect(boost::bind(&CZMQNotificationInterface::TransactionRemovedFromMempool, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.TransactionRemovedFromMempoolBlock.connect(boost::bind(&CZMQNotificationInterface::TransactionRemovedFromMempoolBlock, this, _1, _2)));
+    slotConnections.push_back(sigs.BlockConnected.connect(boost::bind(&CZMQNotificationInterface::BlockConnected, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.BlockConnected2.connect(boost::bind(&CZMQNotificationInterface::BlockConnected2, this, _1, _2)));
+    slotConnections.push_back(sigs.BlockDisconnected.connect(boost::bind(&CZMQNotificationInterface::BlockDisconnected, this, _1)));
+    slotConnections.push_back(sigs.UpdatedBlockTip.connect(boost::bind(&CZMQNotificationInterface::UpdatedBlockTip, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.InvalidTxMessageZMQ.connect(boost::bind(&CZMQNotificationInterface::InvalidTxMessageZMQ, this, _1)));
+}
+
+void CZMQNotificationInterface::UnregisterValidationInterface()
+{   
+    slotConnections.clear();
+}
+
 CZMQNotificationInterface *CZMQNotificationInterface::Create() {
     CZMQNotificationInterface *notificationInterface = nullptr;
     std::map<std::string, CZMQNotifierFactory> factories;

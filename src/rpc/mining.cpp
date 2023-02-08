@@ -790,9 +790,20 @@ public:
     uint256 hash;
     bool found;
     CValidationState state;
+    boost::signals2::scoped_connection slotConnection {};
 
     submitblock_StateCatcher(const uint256 &hashIn)
         : hash(hashIn), found(false), state() {}
+
+    void RegisterValidationInterface() override
+    {
+        using namespace boost::placeholders;
+        slotConnection = GetMainSignals().BlockChecked.connect(boost::bind(&submitblock_StateCatcher::BlockChecked, this, _1, _2));
+    }
+    void UnregisterValidationInterface() override
+    {
+        slotConnection.disconnect();
+    }
 
 protected:
     void BlockChecked(const CBlock &block,
@@ -837,9 +848,9 @@ UniValue processBlock(
     }
 
     submitblock_StateCatcher sc(block.GetHash());
-    RegisterValidationInterface(&sc);
+    sc.RegisterValidationInterface();
     bool fAccepted = performBlockOperation(config, blockptr);
-    UnregisterValidationInterface(&sc);
+    sc.UnregisterValidationInterface();
     if (fBlockPresent) {
         if (fAccepted && !sc.found) {
             return "duplicate-inconclusive";

@@ -675,6 +675,9 @@ private:
     // the next block comes in
     uint256 hashPrevBestCoinbase;
 
+    // Signal slot connections
+    std::vector<boost::signals2::scoped_connection> slotConnections {};
+
 public:
     const CChainParams &chainParams;
     /*
@@ -876,21 +879,32 @@ public:
     void MarkDirty();
     bool AddToWallet(const CWalletTx &wtxIn, bool fFlushOnClose = true);
     bool LoadToWallet(const CWalletTx &wtxIn);
+
+    // ValidationInterface
+    void RegisterValidationInterface() override;
+    void UnregisterValidationInterface() override;
     void TransactionAddedToMempool(const CTransactionRef &tx) override;
-    void
-    BlockConnected(const std::shared_ptr<const CBlock> &pblock,
-                   const CBlockIndex *pindex,
-                   const std::vector<CTransactionRef> &vtxConflicted) override;
-    void
-    BlockDisconnected(const std::shared_ptr<const CBlock> &pblock) override;
+    void BlockConnected(const std::shared_ptr<const CBlock> &pblock,
+                        const CBlockIndex *pindex,
+                        const std::vector<CTransactionRef> &vtxConflicted) override;
+    void BlockDisconnected(const std::shared_ptr<const CBlock> &pblock) override;
+    void ResendWalletTransactions(int64_t nBestBlockTime, CConnman *connman) override;
+    void SetBestChain(const CBlockLocator &loc) override;
+    void Inventory(const uint256 &hash) override {
+        LOCK(cs_wallet);
+        std::map<uint256, int>::iterator mi = mapRequestCount.find(hash);
+        if (mi != mapRequestCount.end()) {
+            (*mi).second++;
+        }
+    }
+    void GetScriptForMining(std::shared_ptr<CReserveScript> &script) override;
+
     bool AddToWalletIfInvolvingMe(const CTransactionRef &tx,
                                   const CBlockIndex *pIndex, int posInBlock,
                                   bool fUpdate);
     const CBlockIndex *ScanForWalletTransactions(const CBlockIndex *pindexStart,
                                            bool fUpdate = false);
     void ReacceptWalletTransactions();
-    void ResendWalletTransactions(int64_t nBestBlockTime,
-                                  CConnman *connman) override;
     // ResendWalletTransactionsBefore may only be called if
     // fBroadcastTransactions!
     std::vector<uint256> ResendWalletTransactionsBefore(int64_t nTime,
@@ -992,7 +1006,6 @@ public:
     bool IsAllFromMe(const CTransaction &tx, const isminefilter &filter) const;
     Amount GetCredit(const CTransaction &tx, const isminefilter &filter) const;
     Amount GetChange(const CTransaction &tx) const;
-    void SetBestChain(const CBlockLocator &loc) override;
 
     DBErrors LoadWallet(bool &fFirstRunRet);
     DBErrors ZapWalletTx(std::vector<CWalletTx> &vWtx);
@@ -1005,16 +1018,6 @@ public:
     bool DelAddressBook(const CTxDestination &address);
 
     const std::string &GetAccountName(const CScript &scriptPubKey) const;
-
-    void Inventory(const uint256 &hash) override {
-        LOCK(cs_wallet);
-        std::map<uint256, int>::iterator mi = mapRequestCount.find(hash);
-        if (mi != mapRequestCount.end()) {
-            (*mi).second++;
-        }
-    }
-
-    void GetScriptForMining(std::shared_ptr<CReserveScript> &script) override;
 
     unsigned int GetKeyPoolSize() {
         // set{Ex,In}ternalKeyPool

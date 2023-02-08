@@ -30,9 +30,13 @@ bool SetInvBroadcastDelay(const int64_t& nDelayMillisecs);
 class PeerLogicValidation final : public CValidationInterface {
 private:
     CConnman *connman;
+    std::vector<boost::signals2::scoped_connection> slotConnections {};
 
 public:
     PeerLogicValidation(CConnman *connmanIn);
+
+    void RegisterValidationInterface() override;
+    void UnregisterValidationInterface() override;
 
     void
     BlockConnected(const std::shared_ptr<const CBlock> &pblock,

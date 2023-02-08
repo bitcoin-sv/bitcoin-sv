@@ -21,14 +21,14 @@ WalletTestingSetup::WalletTestingSetup(const std::string &chainName)
         new CWalletDBWrapper(&bitdb, "wallet_test.dat"));
     pwalletMain = new CWallet(Params(), std::move(dbw));
     pwalletMain->LoadWallet(fFirstRun);
-    RegisterValidationInterface(pwalletMain);
+    pwalletMain->RegisterValidationInterface();
 
     RegisterWalletRPCCommands(tableRPC);
     RegisterDumpRPCCommands(tableRPC);
 }
 
 WalletTestingSetup::~WalletTestingSetup() {
-    UnregisterValidationInterface(pwalletMain);
+    pwalletMain->UnregisterValidationInterface();
     delete pwalletMain;
     pwalletMain = nullptr;
 

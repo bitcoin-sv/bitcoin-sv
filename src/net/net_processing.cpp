@@ -653,6 +653,22 @@ PeerLogicValidation::PeerLogicValidation(CConnman *connmanIn)
     : connman(connmanIn)
 {}
 
+void PeerLogicValidation::RegisterValidationInterface()
+{
+    CMainSignals& sigs { GetMainSignals() };
+
+    using namespace boost::placeholders;
+    slotConnections.push_back(sigs.BlockConnected.connect(boost::bind(&PeerLogicValidation::BlockConnected, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.UpdatedBlockTip.connect(boost::bind(&PeerLogicValidation::UpdatedBlockTip, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.BlockChecked.connect(boost::bind(&PeerLogicValidation::BlockChecked, this, _1, _2)));
+    slotConnections.push_back(sigs.NewPoWValidBlock.connect(boost::bind(&PeerLogicValidation::NewPoWValidBlock, this, _1, _2)));
+}
+
+void PeerLogicValidation::UnregisterValidationInterface()
+{
+    slotConnections.clear();
+}
+
 void PeerLogicValidation::BlockConnected(
     const std::shared_ptr<const CBlock> &pblock, const CBlockIndex *pindex,
     const std::vector<CTransactionRef> &vtxConflicted) {
