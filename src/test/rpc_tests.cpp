@@ -148,8 +148,8 @@ BOOST_AUTO_TEST_CASE(rpc_getinfo)
     BOOST_CHECK_NO_THROW(
         r = CallRPC("getinfo");
     );
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxBlockSize);
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int64(), static_cast<int64_t>(Params().GetDefaultBlockSizeParams().maxBlockSize));
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int64(), static_cast<int64_t>(Params().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter));
 }
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams) {
@@ -766,8 +766,8 @@ BOOST_AUTO_TEST_CASE(http_requests)
 
         auto queryRequest { rpc::client::HTTPRequest::CreateDSEndpointQueryRequest(clientConfig, "abcdef") };
         BOOST_CHECK(queryRequest.GetCommand() == RequestCmdType::GET);
-        BOOST_CHECK_EQUAL(queryRequest.GetContents().size(), 0);
-        BOOST_CHECK_EQUAL(queryRequest.GetContentsSize(), 0);
+        BOOST_CHECK_EQUAL(queryRequest.GetContents().size(), 0U);
+        BOOST_CHECK_EQUAL(queryRequest.GetContentsSize(), 0U);
         BOOST_CHECK_EQUAL(queryRequest.GetContentsFD().Get(), -1);
         BOOST_CHECK_EQUAL(queryRequest.GetEndpoint(), "/dsnt/1/query/abcdef");
 
@@ -781,11 +781,11 @@ BOOST_AUTO_TEST_CASE(http_requests)
         ) };
         BOOST_CHECK(submitRequest.GetCommand() == RequestCmdType::POST);
         BOOST_CHECK_EQUAL(submitRequest.GetEndpoint(), "/dsnt/1/submit?txid=abcdef&n=0&ctxid=fedcba&cn=1");
-        BOOST_CHECK_EQUAL(submitRequest.GetContents().size(), 0);
-        BOOST_CHECK_EQUAL(submitRequest.GetContentsSize(), 50);
+        BOOST_CHECK_EQUAL(submitRequest.GetContents().size(), 0U);
+        BOOST_CHECK_EQUAL(submitRequest.GetContentsSize(), 50U);
         BOOST_CHECK_EQUAL(submitRequest.GetContentsFD().Get(), 1);
         auto headers { submitRequest.GetHeaders() };
-        BOOST_CHECK_EQUAL(headers.size(), 1);
+        BOOST_CHECK_EQUAL(headers.size(), 1U);
         BOOST_CHECK_EQUAL(headers[0].first, "Content-Type");
         BOOST_CHECK_EQUAL(headers[0].second, "application/octet-stream");
 
@@ -806,7 +806,7 @@ BOOST_AUTO_TEST_CASE(http_requests)
         BOOST_CHECK_EQUAL(strContents, "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
         BOOST_CHECK_EQUAL(rpcRequest.GetContentsSize(), strContents.size());
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
-        BOOST_CHECK_EQUAL(rpcRequest.GetHeaders().size(), 0);
+        BOOST_CHECK_EQUAL(rpcRequest.GetHeaders().size(), 0U);
     }
 
     {
@@ -822,7 +822,7 @@ BOOST_AUTO_TEST_CASE(http_requests)
         auto rpcRequest {  rpc::client::HTTPRequest::CreateMinerIdGeneratorSigningRequest(clientConfig, alias, hash.ToString()) };
         BOOST_CHECK(rpcRequest.GetCommand() == RequestCmdType::GET);
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), endpoint.str());
-        BOOST_CHECK_EQUAL(rpcRequest.GetContents().size(), 0);
+        BOOST_CHECK_EQUAL(rpcRequest.GetContents().size(), 0U);
     }
 }
 

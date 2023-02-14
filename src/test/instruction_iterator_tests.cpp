@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(decode_instruction_tests)
             span<const uint8_t>{script.data(), script.size()});
         BOOST_CHECK_EQUAL(exp_status, status);
         BOOST_CHECK_EQUAL(exp_opcode, opcode);
-        BOOST_CHECK_EQUAL(exp_offset, offset);
+        BOOST_CHECK_EQUAL(exp_offset, static_cast<unsigned char>(offset));
         BOOST_CHECK_EQUAL(exp_len, len);
     }
 }
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
 
     // check op++
     auto n = std::distance(it_begin, it_end);
-    BOOST_CHECK_EQUAL(expected.size(), n);
+    BOOST_CHECK_EQUAL(expected.size(), static_cast<unsigned>(n));
 
     for(size_t i{0}; i < expected.size(); ++i, ++it_begin)
     {
@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(too_short_two_instructions)
 
     // check op++
     auto n = std::distance(it_begin, it_end);
-    BOOST_CHECK_EQUAL(expected.size(), n);
+    BOOST_CHECK_EQUAL(expected.size(), static_cast<unsigned>(n));
 
     for(size_t i{0}; i < expected.size(); ++i, ++it_begin)
     {

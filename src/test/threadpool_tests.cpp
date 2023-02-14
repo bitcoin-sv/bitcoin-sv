@@ -47,8 +47,8 @@ BOOST_AUTO_TEST_SUITE(TestThreadPool)
 BOOST_AUTO_TEST_CASE(NonPrioritised)
 {
     CThreadPool<CQueueAdaptor> pool { false, "TestPool", 4 };
-    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
-    BOOST_CHECK_EQUAL(Counter, 0);
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4U);
+    BOOST_CHECK_EQUAL(Counter, 0U);
 
     // Submit some tasks to the queue
     std::vector<std::future<void>> results {};
@@ -87,7 +87,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     // Make sure nothing starts executing until we have queued everything
     pool.pause();
     BOOST_CHECK(pool.paused());
-    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 0);
+    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 0U);
 
     // Each task will add a result to this vector
     std::vector<std::string> taskResults {};
@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     results.push_back(make_task(pool, CTask::Priority::Medium, [&taskResults](){ taskResults.push_back("Medium"); }));
     results.push_back(make_task(pool, CTask::Priority::High, [&taskResults](){ taskResults.push_back("High"); }));
     results.push_back(make_task(pool, 10, [&taskResults](){ taskResults.push_back("VeryHigh"); }));
-    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 4);
+    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 4U);
 
     // Wait for all tasks to complete
     pool.run();
@@ -111,7 +111,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     }
 
     BOOST_CHECK(taskResults == expectedResults);
-    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 0);
+    BOOST_CHECK_EQUAL(pool.getTaskDepth(), 0U);
 
     taskResults.clear();
     expectedResults.clear();
@@ -141,8 +141,8 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase1)
 {
     Counter = 0;
     CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 4, 1 };
-    BOOST_CHECK_EQUAL(pool.getPoolSize(), 5);
-    BOOST_CHECK_EQUAL(Counter, 0);
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 5U);
+    BOOST_CHECK_EQUAL(Counter, 0U);
 
     // Submit some tasks to the queue
     std::vector<std::future<void>> results {};
@@ -178,8 +178,8 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase2)
 {
     Counter = 0;
     CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 1, 4 };
-    BOOST_CHECK_EQUAL(pool.getPoolSize(), 5);
-    BOOST_CHECK_EQUAL(Counter, 0);
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 5U);
+    BOOST_CHECK_EQUAL(Counter, 0U);
 
     // Submit some tasks to the queue
     std::vector<std::future<void>> results {};
@@ -215,8 +215,8 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase3)
 {
     Counter = 0;
     CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 0, 4 };
-    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
-    BOOST_CHECK_EQUAL(Counter, 0);
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4U);
+    BOOST_CHECK_EQUAL(Counter, 0U);
 
     // Submit some tasks to the queue
     std::vector<std::future<void>> results {};
@@ -242,8 +242,8 @@ BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase4)
 {
     Counter = 0;
     CThreadPool<CDualQueueAdaptor> pool { false, "TestPool", 4, 0 };
-    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
-    BOOST_CHECK_EQUAL(Counter, 0);
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4U);
+    BOOST_CHECK_EQUAL(Counter, 0U);
 
     // Submit some tasks to the queue
     std::vector<std::future<void>> results {};

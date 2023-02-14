@@ -236,9 +236,9 @@ BOOST_AUTO_TEST_CASE(default_construction)
 {
     MerkleProof mp;
     BOOST_CHECK_EQUAL(0, mp.Flags());
-    BOOST_CHECK_EQUAL(0, mp.Index());
+    BOOST_CHECK_EQUAL(0U, mp.Index());
     BOOST_CHECK(mp.empty());
-    BOOST_CHECK_EQUAL(0, mp.size());
+    BOOST_CHECK_EQUAL(0U, mp.size());
     const uint256 target;
     BOOST_CHECK(target == mp.Target());
 
@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(txid_construction)
     BOOST_CHECK_EQUAL(index, mp.Index());
     BOOST_CHECK(target == mp.Target());
     BOOST_CHECK(!mp.empty());
-    BOOST_CHECK_EQUAL(1, mp.size());
+    BOOST_CHECK_EQUAL(1U, mp.size());
     
     BOOST_CHECK(!contains_tx(mp));
     BOOST_CHECK(contains_txid(mp));
@@ -277,7 +277,7 @@ BOOST_AUTO_TEST_CASE(tx_construction)
     BOOST_CHECK_EQUAL(index, mp.Index());
     BOOST_CHECK(target == mp.Target());
     BOOST_CHECK(!mp.empty());
-    BOOST_CHECK_EQUAL(1, mp.size());
+    BOOST_CHECK_EQUAL(1U, mp.size());
 }
 
 BOOST_AUTO_TEST_CASE(deserialize_txid)
@@ -411,8 +411,8 @@ BOOST_AUTO_TEST_CASE(deserialize_std_example)
     ss >> actual;
    
     BOOST_CHECK_EQUAL(0, actual.Flags());
-    BOOST_CHECK_EQUAL(12, actual.Index());
-    BOOST_CHECK_EQUAL(5, actual.size());
+    BOOST_CHECK_EQUAL(12U, actual.Index());
+    BOOST_CHECK_EQUAL(5U, actual.size());
     
     //const MerkleProof expected{};
     //BOOST_CHECK_EQUAL(expected, actual);
@@ -547,7 +547,7 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
     BOOST_CHECK_EQUAL(
         json["target"].get_str(),
         "ebea82c40a534011e25c6114a87475847e0451fcd68e6d2e98bda5db96b81219");
-    BOOST_CHECK_EQUAL(json["nodes"].get_array().size(), 7);
+    BOOST_CHECK_EQUAL(json["nodes"].get_array().size(), 7U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

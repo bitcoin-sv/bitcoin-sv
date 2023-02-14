@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
 {
     using namespace std::chrono_literals;
    
-    constexpr auto nElements{5};
+    constexpr unsigned nElements{5};
     CThreadSafeQueue<int> theQueue(nElements, 1);
     theQueue.ReplaceContent(std::initializer_list<int>{0, 1, 2, 3, 4});
     BOOST_CHECK(get_Size(theQueue) == nElements);
@@ -252,13 +252,13 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
     CThreadSafeQueue<int> collectingQueue;
     std::vector<std::future<void>> outs;
 
-    constexpr auto nThreads{nElements + 3}; 
+    constexpr unsigned nThreads{nElements + 3}; 
     std::array<std::promise<void>, nThreads> ready;
     std::promise<void> go;
     std::shared_future<void> sf{go.get_future()};
 
     // getting one value from eight threads and pushing them to the collectingQueue
-    for(int i = 0; i < nThreads; ++i)
+    for(unsigned i = 0; i < nThreads; ++i)
     {
         auto f = std::async(std::launch::async, 
             [&theQueue, &collectingQueue, &sf](std::promise<void>* ready){ 

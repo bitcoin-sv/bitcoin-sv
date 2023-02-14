@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(block)
         ++itemCounter;
     } while(!stream.EndOfStream());
 
-    BOOST_REQUIRE_EQUAL(itemCounter, 3);
+    BOOST_REQUIRE_EQUAL(itemCounter, 3U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

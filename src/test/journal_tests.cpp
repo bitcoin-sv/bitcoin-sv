@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
 
     // Check journal initial state
     CJournalPtr journal { builder->getCurrentJournal() };
-    BOOST_CHECK_EQUAL(journal->size(), 0);
+    BOOST_CHECK_EQUAL(journal->size(), 0U);
     BOOST_CHECK_EQUAL(journal->getLastInvalidatingTime(), 0);
     BOOST_CHECK(journal->getCurrent());
 
@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     changeSet->addOperation(CJournalChangeSet::Operation::ADD, singletxn);
     BOOST_CHECK(changeSet->getTailAppendOnly());
     changeSet.reset();
-    BOOST_CHECK_EQUAL(journal->size(), 1);
+    BOOST_CHECK_EQUAL(journal->size(), 1U);
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(singletxn));
     BOOST_CHECK_EQUAL(CJournalTester{journal}.checkTxnOrdering(singletxn, singletxn), CJournalTester::TxnOrder::DUPLICATETX);
 
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     }
     BOOST_CHECK(changeSet->getTailAppendOnly());
     changeSet.reset();
-    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 4);
+    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 4U);
     for(const auto& [ op, txn ] : ops)
     {
         // supresses unused parameter warning
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     }
     BOOST_CHECK(!changeSet->getTailAppendOnly());
     changeSet.reset();
-    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 2);
+    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 2U);
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(singletxn));
     BOOST_CHECK(!CJournalTester{journal}.checkTxnExists(ops[0].second));
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(ops[1].second));
@@ -195,7 +195,7 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
 
     // Journal is empty to start with
     CJournalPtr journal { builder->getCurrentJournal() };
-    BOOST_CHECK_EQUAL(journal->size(), 0);
+    BOOST_CHECK_EQUAL(journal->size(), 0U);
 
     // Populate with some initial txns
     using OpList = std::vector<std::pair<CJournalChangeSet::Operation, CJournalEntry>>;
@@ -211,7 +211,7 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
         changeSet->addOperation(op, txn);
     }
     changeSet.reset();
-    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 4);
+    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 4U);
     BOOST_CHECK(journal->getCurrent());
  
     // Apply a reorg with a mix of additions and removals
@@ -234,7 +234,7 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
     journal = builder->getCurrentJournal();
     BOOST_CHECK(journal->getCurrent());
 
-    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 3);
+    BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 3U);
     BOOST_CHECK(!CJournalTester{journal}.checkTxnExists(singletxn));
     BOOST_CHECK(!CJournalTester{journal}.checkTxnExists(ops[0].second));
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(ops[1].second));
@@ -252,7 +252,7 @@ BOOST_AUTO_TEST_CASE(TestJournalCheckToposort)
 
     // Journal is empty to start with
     CJournalPtr journal { builder->getCurrentJournal() };
-    BOOST_CHECK_EQUAL(journal->size(), 0);
+    BOOST_CHECK_EQUAL(journal->size(), 0U);
 
     // zero transactions
     {
@@ -403,7 +403,6 @@ BOOST_AUTO_TEST_CASE(TestJournalCheckToposort)
         auto changeSet = reorg(builder.get(), {add(txn3), add(txn2), add(txn1)});
         BOOST_CHECK(!changeSet->CheckTopoSort());
     }
-
 }
 
 BOOST_AUTO_TEST_SUITE_END()

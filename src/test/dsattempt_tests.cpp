@@ -37,19 +37,19 @@ BOOST_AUTO_TEST_CASE(CallbackMsg)
         std::string ip {"127.0.0.1"};
         DSCallbackMsg ipv4_callback(0x01, {ip}, {0,3});
         BOOST_CHECK_EQUAL(ipv4_callback.GetVersionByte(), 0x01);
-        BOOST_CHECK_EQUAL(ipv4_callback.GetProtocolVersion(), 1);
+        BOOST_CHECK_EQUAL(ipv4_callback.GetProtocolVersion(), 1U);
 
         auto addrs { ipv4_callback.GetAddresses() };
-        BOOST_REQUIRE_EQUAL(addrs.size(), 1);
+        BOOST_REQUIRE_EQUAL(addrs.size(), 1U);
         CNetAddr addr {};
         addr.SetRaw(NET_IPV4, addrs[0].data());
         BOOST_CHECK_EQUAL(addr.ToStringIP(), ip);
         BOOST_CHECK_EQUAL(DSCallbackMsg::IPAddrToString(addrs[0]), ip);
 
         auto inputs { ipv4_callback.GetInputs() };
-        BOOST_REQUIRE_EQUAL(inputs.size(), 2);
-        BOOST_CHECK_EQUAL(inputs[0], 0);
-        BOOST_CHECK_EQUAL(inputs[1], 3);
+        BOOST_REQUIRE_EQUAL(inputs.size(), 2U);
+        BOOST_CHECK_EQUAL(inputs[0], 0U);
+        BOOST_CHECK_EQUAL(inputs[1], 3U);
     );
 
     // Test creation of callback message from IPv6 address
@@ -57,10 +57,10 @@ BOOST_AUTO_TEST_CASE(CallbackMsg)
         std::string ip {"::1"};
         DSCallbackMsg ipv6_callback(0x81, {ip}, {0});
         BOOST_CHECK_EQUAL(ipv6_callback.GetVersionByte(), 0x81);
-        BOOST_CHECK_EQUAL(ipv6_callback.GetProtocolVersion(), 1);
+        BOOST_CHECK_EQUAL(ipv6_callback.GetProtocolVersion(), 1U);
 
         auto addrs { ipv6_callback.GetAddresses() };
-        BOOST_REQUIRE_EQUAL(addrs.size(), 1);
+        BOOST_REQUIRE_EQUAL(addrs.size(), 1U);
         CNetAddr addr {};
         addr.SetRaw(NET_IPV6, addrs[0].data());
         BOOST_CHECK_EQUAL(addr.ToStringIP(), ip);
@@ -102,7 +102,7 @@ BOOST_AUTO_TEST_CASE(CallbackEnabledTransaction)
     // Check recognition of callback enabled transaction
     auto [ enabled, output ] = TxnHasDSNotificationOutput(tx);
     BOOST_CHECK(enabled);
-    BOOST_CHECK_EQUAL(output, 1);
+    BOOST_CHECK_EQUAL(output, 1U);
 
     // Check extraction and parsing of callback message from output
     BOOST_CHECK_NO_THROW(

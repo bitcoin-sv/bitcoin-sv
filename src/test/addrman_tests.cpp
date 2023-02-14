@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(addrman_select) {
     for (int i = 0; i < 20; ++i) {
         ports.insert(addrman.Select().GetPort());
     }
-    BOOST_CHECK_EQUAL(ports.size(), 3);
+    BOOST_CHECK_EQUAL(ports.size(), 3U);
 }
 
 BOOST_AUTO_TEST_CASE(addrman_new_collisions) {

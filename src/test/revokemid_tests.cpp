@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE(default_construction)
     RevokeMid msg {};
 
     // Check all fields null
-    BOOST_CHECK_EQUAL(msg.GetVersion(), 0);
+    BOOST_CHECK_EQUAL(msg.GetVersion(), 0U);
     BOOST_CHECK(! msg.GetRevocationKey().IsValid());
     BOOST_CHECK(! msg.GetMinerId().IsValid());
     BOOST_CHECK(! msg.GetRevocationMessage().IsValid());
@@ -105,11 +105,11 @@ BOOST_AUTO_TEST_CASE(key_construction)
 
         // Check field sizes and contents
         BOOST_CHECK(msg.GetRevocationKey().IsValid());
-        BOOST_CHECK_EQUAL(msg.GetEncodedRevocationKey().size(), 33);
+        BOOST_CHECK_EQUAL(msg.GetEncodedRevocationKey().size(), 33U);
         BOOST_CHECK(msg.GetMinerId().IsValid());
-        BOOST_CHECK_EQUAL(msg.GetEncodedMinerId().size(), 33);
+        BOOST_CHECK_EQUAL(msg.GetEncodedMinerId().size(), 33U);
         BOOST_CHECK(msg.GetRevocationMessage().IsValid());
-        BOOST_CHECK_EQUAL(msg.GetEncodedRevocationMessage().size(), 33);
+        BOOST_CHECK_EQUAL(msg.GetEncodedRevocationMessage().size(), 33U);
 
         size_t sig1Size { msg.GetSig1().size() };
         size_t sig2Size { msg.GetSig2().size() };

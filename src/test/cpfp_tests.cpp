@@ -727,7 +727,7 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
                            block_hash,
                            vtx,
                            GlobalConfig::GetConfig());
-    BOOST_CHECK_EQUAL(0, mempool.Size());
+    BOOST_CHECK_EQUAL(0U, mempool.Size());
 
     test_validator::notifications_type
         expected{{child_txid,

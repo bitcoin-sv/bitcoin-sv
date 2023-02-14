@@ -130,9 +130,9 @@ BOOST_AUTO_TEST_CASE(intarg) {
     BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-mega", 11), 7000000);
     BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-giga", 11), 7000000000);
     ResetArgs("-kibibyte=7kiB -mebibyte=7MiB -gibibyte=0.5GiB");
-    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-kibibyte", 11), 7* ONE_KIBIBYTE);
-    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-mebibyte", 11), 7* ONE_MEBIBYTE);
-    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-gibibyte", 11), 0.5* ONE_GIBIBYTE);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-kibibyte", 11), 7* static_cast<int64_t>(ONE_KIBIBYTE));
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-mebibyte", 11), 7* static_cast<int64_t>(ONE_MEBIBYTE));
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-gibibyte", 11), 0.5* static_cast<int64_t>(ONE_GIBIBYTE));
     ResetArgs("-foo -bar");
     BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7, 10), 70);
     BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7, 1000), 7000);

@@ -111,11 +111,11 @@ BOOST_AUTO_TEST_CASE(independent_groups)
 
         // Check numbered groups handling
         const auto& numGroups_1_1 { grouper.GetNumGroups(vtx, 1, 1) };
-        BOOST_CHECK_EQUAL(numGroups_1_1.size(), 1);
+        BOOST_CHECK_EQUAL(numGroups_1_1.size(), 1U);
         BOOST_CHECK_EQUAL(CountTxnsInGroups(numGroups_1_1), vtx.size());
 
         const auto& numGroups_2_1 { grouper.GetNumGroups(vtx, 2, 1) };
-        BOOST_CHECK_EQUAL(numGroups_2_1.size(), 2);
+        BOOST_CHECK_EQUAL(numGroups_2_1.size(), 2U);
         BOOST_CHECK_EQUAL(CountTxnsInGroups(numGroups_2_1), vtx.size());
 
         const auto& numGroups_num_1 { grouper.GetNumGroups(vtx, NumTxns, 1) };
@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(independent_groups)
         BOOST_CHECK_EQUAL(CountTxnsInGroups(numGroups_num_2), vtx.size());
 
         const auto& numGroups_num_num { grouper.GetNumGroups(vtx, NumTxns, NumTxns) };
-        BOOST_CHECK_EQUAL(numGroups_num_num.size(), 1);
+        BOOST_CHECK_EQUAL(numGroups_num_num.size(), 1U);
         BOOST_CHECK_EQUAL(CountTxnsInGroups(numGroups_num_num), vtx.size());
     }
 }
@@ -277,7 +277,7 @@ BOOST_AUTO_TEST_CASE(corner_cases)
         const auto& groups { grouper.GetGroups(vtx) };
 
         // 2 groups; a single txn and the 2 duplicates together
-        BOOST_CHECK_EQUAL(groups.size(), 2);
+        BOOST_CHECK_EQUAL(groups.size(), 2U);
 
         // Total number of txns across all constructed groups should match the number passed in
         BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());

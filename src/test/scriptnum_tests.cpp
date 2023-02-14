@@ -402,15 +402,15 @@ BOOST_AUTO_TEST_CASE(to_size_t_limited)
 {
     //constexpr size_t size_t_min{std::numeric_limits<size_t>::min()}; // This causes compiler error ons MSVC when invoking CScriptNum constructor due to narrowing conversion
     static_assert(std::numeric_limits<size_t>::min() == 0);
-    constexpr int64_t size_t_min{ 0 };
+    constexpr size_t size_t_min{ 0 };
 
     constexpr size_t size_t_max{static_cast<size_t>(std::numeric_limits<int32_t>::max()) };
 
     BOOST_CHECK_EQUAL(size_t_min, CScriptNum{size_t_min}.to_size_t_limited());
-    BOOST_CHECK_EQUAL(1, CScriptNum{1}.to_size_t_limited());
+    BOOST_CHECK_EQUAL(1U, CScriptNum{1}.to_size_t_limited());
 
     BOOST_CHECK_EQUAL(size_t_min, CScriptNum{bint{size_t_min}}.to_size_t_limited());
-    BOOST_CHECK_EQUAL(1, CScriptNum{bint{1}}.to_size_t_limited());
+    BOOST_CHECK_EQUAL(1U, CScriptNum{bint{1}}.to_size_t_limited());
     BOOST_CHECK_EQUAL(size_t_max, CScriptNum{bint{size_t_max}}.to_size_t_limited());
 }
 

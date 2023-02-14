@@ -240,7 +240,7 @@ BOOST_AUTO_TEST_CASE(iterator_ordering) {
         else
             seek_start = 0x80;
         it->Seek((uint8_t)seek_start);
-        for (int x = seek_start; x < 256; ++x) {
+        for (unsigned x = seek_start; x < 256; ++x) {
             uint8_t key;
             uint32_t value;
             BOOST_CHECK(it->Valid());
@@ -321,11 +321,11 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
         sprintf(buf, "%d", seek_start);
         StringContentsSerializer seek_key(buf);
         it->Seek(seek_key);
-        for (int x = seek_start; x < 10; ++x) {
-            for (int y = 0; y < 10; y++) {
+        for (unsigned x = seek_start; x < 10; ++x) {
+            for (unsigned y = 0; y < 10; y++) {
                 sprintf(buf, "%d", x);
                 std::string exp_key(buf);
-                for (int z = 0; z < y; z++)
+                for (unsigned z = 0; z < y; z++)
                     exp_key += exp_key;
                 StringContentsSerializer key;
                 uint32_t value;

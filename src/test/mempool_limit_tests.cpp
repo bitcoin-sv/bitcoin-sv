@@ -18,7 +18,7 @@ namespace {
     mining::CJournalChangeSetPtr nullChangeSet{nullptr};
 
     // large enough count to control integer rounding errors in fractions
-    constexpr int N_PRIMARY = 50;
+    constexpr unsigned N_PRIMARY = 50;
     // fixed size transactions so we can correlate sizes and counts
     // large enough transactions so we are not dominated by index ram usage
     constexpr int TX_SIZE = 1000;
@@ -175,7 +175,7 @@ namespace {
         BOOST_TEST(entries.for_primary().count() == entries.that(are(in_primary)).count());
         BOOST_TEST(entries.for_secondary().count() == entries.that(are(in_secondary)).count());
         BOOST_TEST(pool.DynamicMemoryUsage() > entries.size());
-        BOOST_TEST(pool.GetDiskUsage() == 0);
+        BOOST_TEST(pool.GetDiskUsage() == 0U);
         BOOST_TEST(pool.SecondaryMempoolUsage() >= entries.for_secondary().size());
         return entries;
     }
@@ -205,9 +205,9 @@ BOOST_AUTO_TEST_CASE(PrimaryBelowLimitAllInRamSecondaryBelowLimit)
     sync(testPool);
 
     BOOST_TEST(entries.count() == entries.that(are(in_memory)).count());
-    BOOST_TEST(entries.that(are(on_disk)).count() == 0);
+    BOOST_TEST(entries.that(are(on_disk)).count() == 0U);
     BOOST_TEST(testPool.DynamicMemoryUsage() == poolTotal);
-    BOOST_TEST(testPool.GetDiskUsage() == 0);
+    BOOST_TEST(testPool.GetDiskUsage() == 0U);
     BOOST_TEST(testPool.SecondaryMempoolUsage() == poolSecondary);
 }
 
@@ -229,11 +229,11 @@ BOOST_AUTO_TEST_CASE(PrimaryBelowLimitAllInRamSecondaryAboveLimit)
     BOOST_TEST(entries.that(are(in_pool)).count() > entries.for_primary().count());
     BOOST_TEST(entries.that(are(in_pool)).count() <= entries.for_primary().count() + entries.for_secondary().count()/3);
     BOOST_TEST(entries.that(are(in_memory)).count() = entries.that(are(in_pool)).count());
-    BOOST_TEST(entries.that(are(on_disk)).count() == 0);
+    BOOST_TEST(entries.that(are(on_disk)).count() == 0U);
     BOOST_TEST(entries.for_secondary().that(are(in_memory)).count() >= N_PRIMARY / 10);
     BOOST_TEST(entries.for_secondary().that(are(in_memory)).count() <= 2 * N_PRIMARY / 10 + 3);
     BOOST_TEST(testPool.DynamicMemoryUsage() <= poolTotal - entries.for_secondary().that(are_not(in_pool)).size());
-    BOOST_TEST(testPool.GetDiskUsage() == 0);
+    BOOST_TEST(testPool.GetDiskUsage() == 0U);
     BOOST_TEST(testPool.SecondaryMempoolUsage() >= entries.for_secondary().that(are(in_pool)).size());
     BOOST_TEST(testPool.SecondaryMempoolUsage() < poolSecondary);
 }
@@ -256,7 +256,7 @@ BOOST_AUTO_TEST_CASE(PrimaryBelowLimitAllOnDiskSecondaryBelowLimit)
     sync(testPool);
 
     BOOST_TEST(entries.that(are(in_pool)).count() == entries.count());
-    BOOST_TEST(entries.that(are(in_memory)).count() == 0);
+    BOOST_TEST(entries.that(are(in_memory)).count() == 0U);
     BOOST_TEST(entries.that(are(on_disk)).count() == entries.count());
     BOOST_TEST(testPool.DynamicMemoryUsage() == poolTotal);
     BOOST_TEST(testPool.GetDiskUsage() >= entries.size());
@@ -281,7 +281,7 @@ BOOST_AUTO_TEST_CASE(PrimaryBelowLimitAllOnDiskSecondaryAboveLimit)
 
     BOOST_TEST(entries.that(are(in_pool)).count() > entries.for_primary().count());
     BOOST_TEST(entries.that(are(in_pool)).count() <= entries.for_primary().count() + entries.for_secondary().count()/3);
-    BOOST_TEST(entries.that(are(in_memory)).count() == 0);
+    BOOST_TEST(entries.that(are(in_memory)).count() == 0U);
     BOOST_TEST(entries.that(are(on_disk)).count() == entries.that(are(in_pool)).count());
     BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() >= N_PRIMARY / 10);
     BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() <= 3 * N_PRIMARY / 10);
@@ -361,8 +361,8 @@ BOOST_AUTO_TEST_CASE(PrimaryAtLimitAllInRam)
 
     BOOST_TEST(entries.that(are(in_memory)).count() == entries.count());
     BOOST_TEST(testPool.DynamicMemoryUsage() == limitTotal);
-    BOOST_TEST(testPool.GetDiskUsage() == 0);
-    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0);
+    BOOST_TEST(testPool.GetDiskUsage() == 0U);
+    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0U);
 }
 
 BOOST_AUTO_TEST_CASE(PrimaryAtLimitAllOnDisk)
@@ -382,7 +382,7 @@ BOOST_AUTO_TEST_CASE(PrimaryAtLimitAllOnDisk)
     BOOST_TEST(entries.that(are(on_disk)).count() == entries.count());
     BOOST_TEST(testPool.DynamicMemoryUsage() == limitTotal);
     BOOST_TEST(testPool.GetDiskUsage() >= entries.size());
-    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0);
+    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0U);
 }
 
 BOOST_AUTO_TEST_CASE(PrimaryAtLimitThirdOnDiskSecondaryGone)
@@ -405,7 +405,7 @@ BOOST_AUTO_TEST_CASE(PrimaryAtLimitThirdOnDiskSecondaryGone)
     BOOST_TEST(entries.that(are(on_disk)).count() >= ((N_PRIMARY * 1) / 3));
     BOOST_TEST(testPool.DynamicMemoryUsage() <= poolTotal - entries.that(are_not(in_pool)).size());
     BOOST_TEST(testPool.GetDiskUsage() >= entries.that(are(on_disk)).size());
-    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0);
+    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0U);
 }
 
 BOOST_AUTO_TEST_CASE(PrimaryAboveLimitInRamSecondaryGone)
@@ -424,11 +424,11 @@ BOOST_AUTO_TEST_CASE(PrimaryAboveLimitInRamSecondaryGone)
 
     BOOST_TEST(entries.that(are(in_pool)).count() >= (N_PRIMARY * 2) / 3);
     BOOST_TEST(entries.that(are(in_memory)).count() >= N_PRIMARY / 3);
-    BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() == 0);
+    BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() == 0U);
     BOOST_TEST(testPool.DynamicMemoryUsage() <= limitTotal);
     BOOST_TEST(testPool.DynamicMemoryUsage() > entries.that(are(in_pool)).size());
-    BOOST_TEST(testPool.GetDiskUsage() == 0);
-    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0);
+    BOOST_TEST(testPool.GetDiskUsage() == 0U);
+    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0U);
 }
 
 BOOST_AUTO_TEST_CASE(PrimaryAboveLimitAllOnDiskSecondaryGone)
@@ -446,12 +446,12 @@ BOOST_AUTO_TEST_CASE(PrimaryAboveLimitAllOnDiskSecondaryGone)
     sync(testPool);
 
     BOOST_TEST(entries.that(are(in_pool)).count() >= (N_PRIMARY * 2) / 3);
-    BOOST_TEST(entries.that(are(in_memory)).count() == 0);
-    BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() == 0);
+    BOOST_TEST(entries.that(are(in_memory)).count() == 0U);
+    BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() == 0U);
     BOOST_TEST(testPool.DynamicMemoryUsage() <= limitTotal);
     BOOST_TEST(testPool.DynamicMemoryUsage() > entries.that(are(in_pool)).size());
     BOOST_TEST(testPool.GetDiskUsage() >= entries.that(are(on_disk)).size());
-    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0);
+    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0U);
 }
 
 BOOST_AUTO_TEST_CASE(PrimaryAboveLimitThirdOnDiskSecondaryGone)
@@ -470,11 +470,11 @@ BOOST_AUTO_TEST_CASE(PrimaryAboveLimitThirdOnDiskSecondaryGone)
 
     BOOST_TEST(entries.that(are(in_pool)).count() >= (N_PRIMARY * 2) / 3);
     BOOST_TEST(entries.that(are(in_memory)).count() < (N_PRIMARY * 4) / 9);
-    BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() == 0);
+    BOOST_TEST(entries.for_secondary().that(are(in_pool)).count() == 0U);
     BOOST_TEST(testPool.DynamicMemoryUsage() <= limitTotal);
     BOOST_TEST(testPool.DynamicMemoryUsage() > entries.that(are(in_pool)).size());
     BOOST_TEST(testPool.GetDiskUsage() >= entries.that(are(on_disk)).size());
-    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0);
+    BOOST_TEST(testPool.SecondaryMempoolUsage() == 0U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

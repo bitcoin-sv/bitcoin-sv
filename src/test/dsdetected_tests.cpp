@@ -187,7 +187,7 @@ BOOST_AUTO_TEST_CASE(CreationSerialisation)
     blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
     blocks.push_back(DSDetected::BlockDetails{headers, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 2);
+    BOOST_CHECK_EQUAL(msg.size(), 2U);
     {
         CDataStream ss{SER_NETWORK, 0};
         ss << msg;
@@ -684,13 +684,13 @@ BOOST_AUTO_TEST_CASE(validate_fork_count)
     std::vector<CBlockHeader> headers_1{CBlockHeader{}};
     blocks.push_back(DSDetected::BlockDetails{headers_1, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 1);
+    BOOST_CHECK_EQUAL(msg.size(), 1U);
     BOOST_CHECK(!ValidateForkCount(msg));
 
     std::vector<CBlockHeader> headers_2{CBlockHeader{}};
     blocks.push_back(DSDetected::BlockDetails{headers_2, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 2);
+    BOOST_CHECK_EQUAL(msg.size(), 2U);
     BOOST_CHECK(ValidateForkCount(msg));
 }
 
@@ -757,7 +757,7 @@ BOOST_AUTO_TEST_CASE(common_ancestor)
     blocks.push_back(DSDetected::BlockDetails{headers_2, CreateMerkleProof()});
 
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 2);
+    BOOST_CHECK_EQUAL(msg.size(), 2U);
 
     BOOST_CHECK(ValidateCommonAncestor(msg));
 
@@ -767,7 +767,7 @@ BOOST_AUTO_TEST_CASE(common_ancestor)
     std::vector<CBlockHeader> headers_3{h};
     blocks.push_back(DSDetected::BlockDetails{headers_3, CreateMerkleProof()});
     UnitTestAccess::SetBlockList(msg, blocks);
-    BOOST_CHECK_EQUAL(msg.size(), 3);
+    BOOST_CHECK_EQUAL(msg.size(), 3U);
 
     BOOST_CHECK(!ValidateCommonAncestor(msg));
 }

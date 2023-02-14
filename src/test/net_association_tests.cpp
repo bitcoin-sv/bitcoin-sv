@@ -24,11 +24,11 @@ namespace
         BOOST_CHECK_EQUAL(stats.streamType, enum_cast<std::string>(StreamType::GENERAL));
         BOOST_CHECK_EQUAL(stats.nLastSend, 0);
         BOOST_CHECK_EQUAL(stats.nLastRecv, 0);
-        BOOST_CHECK_EQUAL(stats.nSendBytes, 0);
-        BOOST_CHECK_EQUAL(stats.nSendSize, 0);
-        BOOST_CHECK_EQUAL(stats.nRecvBytes, 0);
-        BOOST_CHECK_EQUAL(stats.nMinuteBytesPerSec, 0);
-        BOOST_CHECK_EQUAL(stats.nSpotBytesPerSec, 0);
+        BOOST_CHECK_EQUAL(stats.nSendBytes, 0U);
+        BOOST_CHECK_EQUAL(stats.nSendSize, 0U);
+        BOOST_CHECK_EQUAL(stats.nRecvBytes, 0U);
+        BOOST_CHECK_EQUAL(stats.nMinuteBytesPerSec, 0U);
+        BOOST_CHECK_EQUAL(stats.nSpotBytesPerSec, 0U);
         BOOST_CHECK_EQUAL(stats.fPauseRecv, false);
     }
 
@@ -66,18 +66,18 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
     stream.CopyStats(stats);
     CheckInitialStreamStats(stats);
 
-    BOOST_CHECK_EQUAL(stream.GetSendQueueSize(), 0);
-    BOOST_CHECK_EQUAL(stream.GetSendQeueMemoryUsage(), 0);
+    BOOST_CHECK_EQUAL(stream.GetSendQueueSize(), 0U);
+    BOOST_CHECK_EQUAL(stream.GetSendQeueMemoryUsage(), 0U);
     AverageBandwidth abw { stream.GetAverageBandwidth() };
-    BOOST_CHECK_EQUAL(abw.first, 0);
-    BOOST_CHECK_EQUAL(abw.second, 0);
+    BOOST_CHECK_EQUAL(abw.first, 0U);
+    BOOST_CHECK_EQUAL(abw.second, 0U);
 
     // Update avg bandwidth calcs
     std::this_thread::sleep_for(std::chrono::seconds(1));
     stream.AvgBandwithCalc();
     abw = stream.GetAverageBandwidth();
-    BOOST_CHECK_EQUAL(abw.first, 0);
-    BOOST_CHECK_EQUAL(abw.second, 1);
+    BOOST_CHECK_EQUAL(abw.first, 0U);
+    BOOST_CHECK_EQUAL(abw.second, 1U);
 }
 
 // Basic association testing only without a real network connection
@@ -97,39 +97,39 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
 
     AssociationStats stats {};
     association.CopyStats(stats);
-    BOOST_CHECK_EQUAL(stats.streamStats.size(), 1);
+    BOOST_CHECK_EQUAL(stats.streamStats.size(), 1U);
     CheckInitialStreamStats(stats.streamStats[0]);
     BOOST_CHECK_EQUAL(stats.nLastSend, 0);
     BOOST_CHECK_EQUAL(stats.nLastRecv, 0);
     BOOST_CHECK_EQUAL(stats.addr.ToString(), "1.192.176.160:8333");
-    BOOST_CHECK_EQUAL(stats.nAvgBandwidth, 0);
-    BOOST_CHECK_EQUAL(stats.nSendBytes, 0);
-    BOOST_CHECK_EQUAL(stats.nRecvBytes, 0);
-    BOOST_CHECK_EQUAL(stats.nSendSize, 0);
+    BOOST_CHECK_EQUAL(stats.nAvgBandwidth, 0U);
+    BOOST_CHECK_EQUAL(stats.nSendBytes, 0U);
+    BOOST_CHECK_EQUAL(stats.nRecvBytes, 0U);
+    BOOST_CHECK_EQUAL(stats.nSendSize, 0U);
     BOOST_CHECK_EQUAL(stats.assocID, AssociationID::NULL_ID_STR);
     for(const auto& cmdTot : stats.mapSendBytesPerMsgCmd)
     {
-        BOOST_CHECK_EQUAL(cmdTot.second, 0);
+        BOOST_CHECK_EQUAL(cmdTot.second, 0U);
     }
     for(const auto& cmdTot : stats.mapRecvBytesPerMsgCmd)
     {
-        BOOST_CHECK_EQUAL(cmdTot.second, 0);
+        BOOST_CHECK_EQUAL(cmdTot.second, 0U);
     }
 
-    BOOST_CHECK_EQUAL(association.GetTotalSendQueueSize(), 0);
-    BOOST_CHECK_EQUAL(association.GetTotalSendQueueMemoryUsage(), 0);
-    BOOST_CHECK_EQUAL(association.GetAverageBandwidth(), 0);
+    BOOST_CHECK_EQUAL(association.GetTotalSendQueueSize(), 0U);
+    BOOST_CHECK_EQUAL(association.GetTotalSendQueueMemoryUsage(), 0U);
+    BOOST_CHECK_EQUAL(association.GetAverageBandwidth(), 0U);
     AverageBandwidth abw { association.GetAverageBandwidth(StreamType::GENERAL) };
-    BOOST_CHECK_EQUAL(abw.first, 0);
-    BOOST_CHECK_EQUAL(abw.second, 0);
+    BOOST_CHECK_EQUAL(abw.first, 0U);
+    BOOST_CHECK_EQUAL(abw.second, 0U);
 
     // Update avg bandwidth calcs
     std::this_thread::sleep_for(std::chrono::seconds(1));
     association.AvgBandwithCalc();
-    BOOST_CHECK_EQUAL(association.GetAverageBandwidth(), 0);
+    BOOST_CHECK_EQUAL(association.GetAverageBandwidth(), 0U);
     abw = association.GetAverageBandwidth(StreamType::GENERAL);
-    BOOST_CHECK_EQUAL(abw.first, 0);
-    BOOST_CHECK_EQUAL(abw.second, 1);
+    BOOST_CHECK_EQUAL(abw.first, 0U);
+    BOOST_CHECK_EQUAL(abw.second, 1U);
 }
 
 // Test AssociationID
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(TestAssociationID)
     BOOST_CHECK(uuidAID.ToString() != uuidAID2.ToString());
     BOOST_CHECK(!(uuidAID == uuidAID2));
     std::vector<uint8_t> uuidAIDBytes { uuidAID.GetBytes() };
-    BOOST_CHECK_EQUAL(uuidAIDBytes.size(), 17);
+    BOOST_CHECK_EQUAL(uuidAIDBytes.size(), 17U);
     BOOST_CHECK_EQUAL(uuidAIDBytes[0], static_cast<uint8_t>(AssociationID::IDType::UUID));
 
     // Regenerate an ID from the raw bytes

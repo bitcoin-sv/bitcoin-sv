@@ -101,7 +101,7 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
                        BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0} 
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
                        BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
@@ -290,7 +290,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
                        BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
@@ -353,7 +353,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         else
         {
             BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, error);
-            BOOST_CHECK_EQUAL(1, stack.size());
+            BOOST_CHECK_EQUAL(1U, stack.size());
             auto frame = stack.front();
             auto actual =
                 frame.empty()
@@ -461,7 +461,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
                 BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_script_error, error);
-        BOOST_CHECK_EQUAL(status.value() ? 1 : 2, stack.size());
+        BOOST_CHECK_EQUAL(status.value() ? 1U : 2U, stack.size());
     }
 }
 
@@ -505,7 +505,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(op.size(), stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
                                       end(op));
@@ -652,7 +652,7 @@ BOOST_AUTO_TEST_CASE(op_size)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(2, stack.size());
+        BOOST_CHECK_EQUAL(2U, stack.size());
         const auto expected{stack.front().size()};
         const auto actual{bsv::deserialize(begin(stack.at(1)), end(stack.at(1)))};
         BOOST_CHECK_EQUAL(expected, actual);
@@ -691,7 +691,7 @@ BOOST_AUTO_TEST_CASE(op_pick)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(4, stack.size());
+        BOOST_CHECK_EQUAL(4U, stack.size());
         if(op_code == OP_2)
             BOOST_CHECK(stack.at(3).empty());
         else
@@ -730,7 +730,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(3, stack.size());
+        BOOST_CHECK_EQUAL(3U, stack.size());
 
         if(op_code == OP_0)
         {
@@ -791,7 +791,7 @@ BOOST_AUTO_TEST_CASE(op_split)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(2, stack.size());
+        BOOST_CHECK_EQUAL(2U, stack.size());
         BOOST_CHECK_EQUAL(2 - i, stack.at(1).size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(1)), end(stack.at(1)),
                                       begin(rhs), end(rhs));
@@ -842,8 +842,8 @@ BOOST_AUTO_TEST_CASE(op_lshift)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
-        BOOST_CHECK_EQUAL(2, stack.front().size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
+        BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(expected), end(expected));
     }
@@ -891,8 +891,8 @@ BOOST_AUTO_TEST_CASE(op_rshift)
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
-        BOOST_CHECK_EQUAL(2, stack.front().size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
+        BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(expected), end(expected));
     }
@@ -918,7 +918,7 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
                           [](const auto n) { return n != 0; })};
-    BOOST_CHECK_EQUAL(distance(begin(values), it), values.size() - 1);
+    BOOST_CHECK_EQUAL(distance(begin(values), it), static_cast<int64_t>(values.size() - 1));
     BOOST_CHECK_EQUAL(1, values[values.size() - 1]);
 }
 
@@ -1002,7 +1002,7 @@ BOOST_AUTO_TEST_CASE(op_checksig)
 
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
         const auto stack_0{stack.at(0)};
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
                                       begin(exp_stack_top), end(exp_stack_top));
