@@ -221,7 +221,7 @@ target_include_directories(test_bitcoin
 		${OPENSSL_INCLUDE_DIR}
 )
 
-find_package(Boost 1.58 REQUIRED unit_test_framework)
+find_package(Boost 1.74 REQUIRED unit_test_framework)
 
 target_link_libraries(
 	test_bitcoin
