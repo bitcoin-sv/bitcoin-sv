@@ -639,7 +639,7 @@ public:
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const;
+    uint256 GetBestBlock() const override;
     void SetBestBlock(const uint256 &hashBlock);
 
     // If found return basic coin info without script loaded

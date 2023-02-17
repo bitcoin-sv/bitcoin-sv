@@ -731,7 +731,7 @@ BOOST_AUTO_TEST_CASE(tx_validation)
     BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), 2);
     BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), GetNumCores());
     BOOST_CHECK(config.SetBlockScriptValidatorsParams(1, 0, 2, 1, &err));
-    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), GetNumCores());
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), std::clamp(GetNumCores(), 0, 8));
     BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), 2);
     BOOST_CHECK(! config.SetBlockScriptValidatorsParams(1, -1, -1, 1, &err));
 }
