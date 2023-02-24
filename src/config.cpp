@@ -148,6 +148,7 @@ void GlobalConfig::Reset()
     data->invalidChecksumInterval = DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS;
     data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
     data->feeFilter = DEFAULT_FEEFILTER;
+    data->maxAddNodeConnections = DEFAULT_MAX_ADDNODE_CONNECTIONS;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1711,6 +1712,27 @@ bool GlobalConfig::GetFeeFilter() const
 {
     return data->feeFilter;
 }
+
+
+bool GlobalConfig::SetMaxAddNodeConnections(int16_t max, std::string* err)
+{
+    if(max < 0)
+    {
+        if(err)
+        {
+            *err = "Maximum addnode connection limit must be >= 0";
+        }
+        return false;
+    }
+
+    data->maxAddNodeConnections = max;
+    return true;
+}
+uint16_t GlobalConfig::GetMaxAddNodeConnections() const
+{
+    return data->maxAddNodeConnections;
+}
+
 
 // RPC parameters
 bool GlobalConfig::SetWebhookClientNumThreads(int64_t num, std::string* err)
