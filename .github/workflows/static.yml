@@ -63,3 +63,4 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Pages
+[![.github/workflows/static.yml](https://github.com/Master-url-web-et/bitcoin-sv/actions/workflows/static.yml/badge.svg?branch=master)](https://github.com/Master-url-web-et/bitcoin-sv/actions/workflows/static.yml)
