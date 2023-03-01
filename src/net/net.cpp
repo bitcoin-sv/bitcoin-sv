@@ -2001,6 +2001,8 @@ void CConnman::ThreadOpenAddedConnections() {
         }
     }
 
+    const bool isRegTest { GlobalConfig::GetConfig().GetChainParams().IsRegTest() };
+
     while (true) {
         CSemaphoreGrant grant(semAddnode);
         std::vector<AddedNodeInfo> vInfo = GetAddedNodeInfo();
@@ -2027,9 +2029,15 @@ void CConnman::ThreadOpenAddedConnections() {
                 }
             }
         }
-        // Retry every 60 seconds if a connection was attempted, otherwise two
-        // seconds.
-        if (!interruptNet.sleep_for(std::chrono::seconds(tried ? 60 : 2))) {
+
+        // If we're on regtest always just sleep 1 second, otherwise
+        // retry every 60 seconds if a connection was attempted or two
+        // seconds if not.
+        unsigned sleepTime {1};
+        if (!isRegTest) {
+            sleepTime = tried ? 60 : 2;
+        }
+        if (!interruptNet.sleep_for(std::chrono::seconds(sleepTime))) {
             return;
         }
     }

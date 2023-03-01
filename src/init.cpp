@@ -666,6 +666,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-listen", _("Accept connections from outside (default: "
                                     "1 if no -proxy or -connect/-noconnect)"));
+    strUsage += HelpMessageOpt(
+        "-maxaddnodeconnections=<n>",
+        strprintf(_("Maximum number of additional outgoing connections to maintain that have been added "
+                    "via addnode (default: %u)"), DEFAULT_MAX_ADDNODE_CONNECTIONS));
     strUsage +=
         HelpMessageOpt("-maxblocktxnpercent=<n>",
         strprintf(_("Maximum perentage of txns from a block we will respond to a getblocktxn request "
@@ -2016,18 +2020,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     nMaxConnections = std::max(nUserMaxConnections, 0);
 
     // Trim requested connection counts, to fit into system limitations
+    if(std::string err; !config.SetMaxAddNodeConnections(gArgs.GetArg("-maxaddnodeconnections", DEFAULT_MAX_ADDNODE_CONNECTIONS), &err)) {
+        return InitError(err);
+    }
+    uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
     nMaxConnections =
         std::max(std::min(nMaxConnections,
-                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS -
-                                MAX_ADDNODE_CONNECTIONS)),
+                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
                  0);
-    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS +
-                                   MAX_ADDNODE_CONNECTIONS);
+    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
     nMaxConnections =
-        std::min(nFD - MIN_CORE_FILEDESCRIPTORS - MAX_ADDNODE_CONNECTIONS,
-                 nMaxConnections);
+        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
 
     if (nMaxConnections < nUserMaxConnections) {
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
@@ -3741,7 +3746,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     connOptions.nMaxConnections = nMaxConnections;
     connOptions.nMaxOutbound =
         std::min(MAX_OUTBOUND_CONNECTIONS, connOptions.nMaxConnections);
-    connOptions.nMaxAddnode = MAX_ADDNODE_CONNECTIONS;
+    connOptions.nMaxAddnode = config.GetMaxAddNodeConnections();
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;

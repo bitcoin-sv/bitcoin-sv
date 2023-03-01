@@ -436,6 +436,12 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetFeeFilter(), DEFAULT_FEEFILTER);
     BOOST_CHECK(config.SetFeeFilter(!DEFAULT_FEEFILTER));
     BOOST_CHECK_EQUAL(config.GetFeeFilter(), !DEFAULT_FEEFILTER);
+
+    BOOST_CHECK_EQUAL(config.GetMaxAddNodeConnections(), DEFAULT_MAX_ADDNODE_CONNECTIONS);
+    BOOST_CHECK(config.SetMaxAddNodeConnections(2 * DEFAULT_MAX_ADDNODE_CONNECTIONS, &err));
+    BOOST_CHECK_EQUAL(config.GetMaxAddNodeConnections(), 2 * DEFAULT_MAX_ADDNODE_CONNECTIONS);
+    BOOST_CHECK(config.SetMaxAddNodeConnections(0, &err));
+    BOOST_CHECK(! config.SetMaxAddNodeConnections(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)

@@ -132,6 +132,7 @@ public:
     virtual unsigned int GetInvalidChecksumInterval() const = 0;
     virtual unsigned int GetInvalidChecksumFreq() const = 0;
     virtual bool GetFeeFilter() const = 0;
+    virtual uint16_t GetMaxAddNodeConnections() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -293,6 +294,7 @@ public:
     virtual bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) = 0;
     virtual bool SetInvalidChecksumFreq(int64_t val, std::string* err = nullptr) = 0;
     virtual bool SetFeeFilter(bool feefilter, std::string* err = nullptr) = 0;
+    virtual bool SetMaxAddNodeConnections(int16_t max, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -625,6 +627,8 @@ public:
     unsigned int GetInvalidChecksumFreq() const override;
     bool SetFeeFilter(bool feefilter, std::string* err = nullptr) override;
     bool GetFeeFilter() const override;
+    bool SetMaxAddNodeConnections(int16_t max, std::string* err = nullptr) override;
+    uint16_t GetMaxAddNodeConnections() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -861,6 +865,7 @@ private:
         unsigned int invalidChecksumInterval;
         unsigned int invalidChecksumFreq;
         bool feeFilter;
+        uint16_t maxAddNodeConnections;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1378,6 +1383,8 @@ public:
     unsigned int GetInvalidChecksumFreq() const override { return DEFAULT_INVALID_CHECKSUM_FREQUENCY; }
     bool SetFeeFilter(bool feefilter, std::string* err = nullptr) override { return true; }
     bool GetFeeFilter() const override { return DEFAULT_FEEFILTER; }
+    bool SetMaxAddNodeConnections(int16_t max, std::string* err = nullptr) override { return true; }
+    uint16_t GetMaxAddNodeConnections() const override { return DEFAULT_MAX_ADDNODE_CONNECTIONS; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }
