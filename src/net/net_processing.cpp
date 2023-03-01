@@ -206,7 +206,7 @@ void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectI
             PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
         }
         else {
-            if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+            if(GlobalConfig::GetConfig().GetMultistreamsEnabled()) {
                 pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
             }
             PushNodeVersion(pnode, connman, GetTime());
@@ -620,7 +620,7 @@ void Misbehaving(NodeId pnode, int howmuch, const std::string &reason) {
         return;
     }
     state->nMisbehavior += howmuch;
-    int banscore = gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD);
+    int64_t banscore = GlobalConfig::GetConfig().GetBanScoreThreshold();
     if (state->nMisbehavior >= banscore &&
         state->nMisbehavior - howmuch < banscore) {
         LogPrintf(
@@ -1695,7 +1695,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             if (config.IsClientUABanned(cleanSubVer))
             {
                 LogPrint(BCLog::NETCONN, "Client UA is banned (%s) peer=%d\n", cleanSubVer, pfrom->id);
-                Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+                Misbehaving(pfrom, config.GetBanScoreThreshold(), "invalid-UA");
                 return false;
             }
         }
@@ -1709,7 +1709,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
         if(!vRecv.empty()) {
             try {
                 vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-                if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                if(config.GetMultistreamsEnabled()) {
                     // Decode received association ID
                     AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
                     if(recvdAssocID) {
@@ -2371,7 +2371,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
     // Allow whitelisted peers to send data other than blocks in blocks only
     // mode if whitelistrelay is true
-    if(pfrom->fWhitelisted && gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY)) {
+    if(pfrom->fWhitelisted && config.GetWhitelistRelay()) {
         fBlocksOnly = false;
     }
 
@@ -3122,8 +3122,7 @@ static void ProcessTxMessage(const Config& config,
     // Stop processing the transaction early if we are in blocks only mode and
     // peer is either not whitelisted or whitelistrelay is off
     if (!fRelayTxes &&
-        (!pfrom->fWhitelisted ||
-         !gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY))) {
+        (!pfrom->fWhitelisted || !config.GetWhitelistRelay())) {
         LogPrint(BCLog::NETMSGVERB,
                 "transaction sent in violation of protocol peer=%d\n",
                  pfrom->id);
@@ -3163,11 +3162,7 @@ static void ProcessTxMessage(const Config& config,
         // even if they were already in the mempool or rejected from it
         // due to policy, allowing the node to function as a gateway for
         // nodes hidden behind it.
-        bool fWhiteListForceRelay {
-                gArgs.GetBoolArg("-whitelistforcerelay",
-                                DEFAULT_WHITELISTFORCERELAY)
-        };
-        if (pfrom->fWhitelisted && fWhiteListForceRelay) {
+        if (pfrom->fWhitelisted && config.GetWhitelistForceRelay()) {
             RelayTransaction(*ptx, connman);
             LogPrint(BCLog::TXNVAL,
                     "%s: Force relaying tx %s from whitelisted peer=%d\n",
@@ -3876,11 +3871,12 @@ static void ProcessGetAddrMessage(const CNodePtr& pfrom,
 /**
 * Process mempool message.
 */
-static void ProcessMempoolMessage(const CNodePtr& pfrom,
+static void ProcessMempoolMessage(const Config& config,
+                                  const CNodePtr& pfrom,
                                   CDataStream& vRecv,
                                   CConnman& connman)
 {
-    if (gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST) && !pfrom->fWhitelisted) {
+    if (config.GetRejectMempoolRequest() && !pfrom->fWhitelisted) {
         LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
                  pfrom->GetId());
         pfrom->fDisconnect = true;
@@ -4386,7 +4382,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
              SanitizeString(strCommand), vRecv.size(), pfrom->id);
-    if (gArgs.IsArgSet("-dropmessagestest") && GetRand(gArgs.GetArg("-dropmessagestest", 0)) == 0) {
+    if (config.DoDropMessageTest() && GetRand(config.GetDropMessageTest()) == 0) {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
         return true;
     }
@@ -4521,7 +4517,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::MEMPOOL) {
-        ProcessMempoolMessage(pfrom, vRecv, connman);
+        ProcessMempoolMessage(config, pfrom, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::PING) {
@@ -4712,8 +4708,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                 if (state){
                     auto curTime = std::chrono::system_clock::now();
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
-                    unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
-                    std::chrono::milliseconds checksumInterval(interval); 
+                    std::chrono::milliseconds checksumInterval(config.GetInvalidChecksumInterval()); 
                     if (duration < std::chrono::milliseconds(checksumInterval).count()){
                         ++ state->dInvalidChecksumFrequency;
                     }
@@ -4721,10 +4716,9 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                         // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
                         state->dInvalidChecksumFrequency = 0;
                     }
-                    unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-                    if (state->dInvalidChecksumFrequency > checkSumFreq){
+                    if (state->dInvalidChecksumFrequency > config.GetInvalidChecksumFreq()) {
                         // MisbehavingNode if the count goes above some chosen value 
-                        // 100 conseqitive invalid checksums received with less than 500ms between them
+                        // 100 consecutive invalid checksums received with less than 500ms between them
                         Misbehaving(pfrom, 1, "Invalid Checksum activity");
                         LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
                     }
@@ -5436,11 +5430,9 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     //
     // We don't want white listed peers to filter txs to us if we have
     // -whitelistforcerelay
-    if (pto->nVersion >= FEEFILTER_VERSION &&
-        gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER) &&
-        !(pto->fWhitelisted &&
-          gArgs.GetBoolArg("-whitelistforcerelay",
-                           DEFAULT_WHITELISTFORCERELAY))) {
+    if (pto->nVersion >= FEEFILTER_VERSION && config.GetFeeFilter() &&
+        !(pto->fWhitelisted && config.GetWhitelistForceRelay()))
+    {
         MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
         Amount currentFilter =
             mempool

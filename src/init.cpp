@@ -2447,6 +2447,32 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetBlockTxnMaxPercent(gArgs.GetArg("-maxblocktxnpercent", DEFAULT_BLOCK_TXN_MAX_PERCENT), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetMultistreamsEnabled(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWhitelistRelay(gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWhitelistForceRelay(gArgs.GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetRejectMempoolRequest(gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST), &err)) {
+        return InitError(err);
+    }
+    if(gArgs.IsArgSet("-dropmessagestest")) {
+        if(std::string err; !config.SetDropMessageTest(gArgs.GetArg("-dropmessagestest", 0), &err)) {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetInvalidChecksumInterval(gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetInvalidChecksumFreq(gArgs.GetArg("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetFeeFilter(gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER), &err)) {
+        return InitError(err);
+    }
 
     // RPC parameters
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {

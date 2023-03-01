@@ -123,6 +123,15 @@ public:
     virtual int64_t GetStreamSendRateLimit() const = 0;
     virtual unsigned int GetBanScoreThreshold() const = 0;
     virtual unsigned int GetBlockTxnMaxPercent() const = 0;
+    virtual bool GetMultistreamsEnabled() const = 0;
+    virtual bool GetWhitelistRelay() const = 0;
+    virtual bool GetWhitelistForceRelay() const = 0;
+    virtual bool GetRejectMempoolRequest() const = 0;
+    virtual bool DoDropMessageTest() const = 0;
+    virtual uint64_t GetDropMessageTest() const = 0;
+    virtual unsigned int GetInvalidChecksumInterval() const = 0;
+    virtual unsigned int GetInvalidChecksumFreq() const = 0;
+    virtual bool GetFeeFilter() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -276,6 +285,14 @@ public:
     virtual bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) = 0;
     virtual bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) = 0;
     virtual bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) = 0;
+    virtual bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) = 0;
+    virtual bool SetWhitelistRelay(bool relay, std::string* err = nullptr) = 0;
+    virtual bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) = 0;
+    virtual bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) = 0;
+    virtual bool SetDropMessageTest(int64_t val, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidChecksumFreq(int64_t val, std::string* err = nullptr) = 0;
+    virtual bool SetFeeFilter(bool feefilter, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -591,6 +608,23 @@ public:
     unsigned int GetBanScoreThreshold() const override;
     bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override;
     unsigned int GetBlockTxnMaxPercent() const override;
+    bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) override;
+    bool GetMultistreamsEnabled() const override;
+    bool SetWhitelistRelay(bool relay, std::string* err = nullptr) override;
+    bool GetWhitelistRelay() const override;
+    bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) override;
+    bool GetWhitelistForceRelay() const override;
+    bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) override;
+    bool GetRejectMempoolRequest() const override;
+    bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override;
+    bool DoDropMessageTest() const override;
+    uint64_t GetDropMessageTest() const override;
+    bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) override;
+    unsigned int GetInvalidChecksumInterval() const override;
+    bool SetInvalidChecksumFreq(int64_t val, std::string* err = nullptr) override;
+    unsigned int GetInvalidChecksumFreq() const override;
+    bool SetFeeFilter(bool feefilter, std::string* err = nullptr) override;
+    bool GetFeeFilter() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -819,6 +853,14 @@ private:
         unsigned int recvInvQueueFactor;
         unsigned int banScoreThreshold;
         unsigned int blockTxnMaxPercent;
+        bool multistreamsEnabled;
+        bool whitelistRelay;
+        bool whitelistForceRelay;
+        bool rejectMempoolRequest;
+        std::optional<uint64_t> dropMessageTest;
+        unsigned int invalidChecksumInterval;
+        unsigned int invalidChecksumFreq;
+        bool feeFilter;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
@@ -1319,6 +1361,23 @@ public:
     unsigned int GetBanScoreThreshold() const override { return DEFAULT_BANSCORE_THRESHOLD; }
     bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override { return true; }
     unsigned int GetBlockTxnMaxPercent() const override { return DEFAULT_BLOCK_TXN_MAX_PERCENT; }
+    bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) override { return true; }
+    bool GetMultistreamsEnabled() const override { return DEFAULT_STREAMS_ENABLED; }
+    bool SetWhitelistRelay(bool relay, std::string* err = nullptr) override { return true; }
+    bool GetWhitelistRelay() const override { return DEFAULT_WHITELISTRELAY; }
+    bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) override { return true; }
+    bool GetWhitelistForceRelay() const override { return DEFAULT_WHITELISTFORCERELAY; }
+    bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) override { return true; }
+    bool GetRejectMempoolRequest() const override { return DEFAULT_REJECTMEMPOOLREQUEST; }
+    bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override { return true; }
+    bool DoDropMessageTest() const override { return false; }
+    uint64_t GetDropMessageTest() const override { return 0; }
+    bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) override { return true; }
+    unsigned int GetInvalidChecksumInterval() const override { return DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS; }
+    bool SetInvalidChecksumFreq(int64_t val, std::string* err = nullptr) override { return true; }
+    unsigned int GetInvalidChecksumFreq() const override { return DEFAULT_INVALID_CHECKSUM_FREQUENCY; }
+    bool SetFeeFilter(bool feefilter, std::string* err = nullptr) override { return true; }
+    bool GetFeeFilter() const override { return DEFAULT_FEEFILTER; }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override { return true; }

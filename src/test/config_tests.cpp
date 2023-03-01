@@ -394,6 +394,48 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), 2 * DEFAULT_BANSCORE_THRESHOLD);
     BOOST_CHECK(!config.SetBanScoreThreshold(0, &err));
     BOOST_CHECK(!config.SetBanScoreThreshold(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), DEFAULT_STREAMS_ENABLED);
+    BOOST_CHECK(config.SetMultistreamsEnabled(!DEFAULT_STREAMS_ENABLED));
+    BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), !DEFAULT_STREAMS_ENABLED);
+
+    BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), DEFAULT_WHITELISTRELAY);
+    BOOST_CHECK(config.SetWhitelistRelay(!DEFAULT_WHITELISTRELAY));
+    BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), !DEFAULT_WHITELISTRELAY);
+
+    BOOST_CHECK_EQUAL(config.GetWhitelistForceRelay(), DEFAULT_WHITELISTFORCERELAY);
+    BOOST_CHECK(config.SetWhitelistForceRelay(!DEFAULT_WHITELISTFORCERELAY));
+    BOOST_CHECK_EQUAL(config.GetWhitelistForceRelay(), !DEFAULT_WHITELISTFORCERELAY);
+
+    BOOST_CHECK_EQUAL(config.GetRejectMempoolRequest(), DEFAULT_REJECTMEMPOOLREQUEST);
+    BOOST_CHECK(config.SetRejectMempoolRequest(!DEFAULT_REJECTMEMPOOLREQUEST));
+    BOOST_CHECK_EQUAL(config.GetRejectMempoolRequest(), !DEFAULT_REJECTMEMPOOLREQUEST);
+
+    BOOST_CHECK(! config.DoDropMessageTest());
+    BOOST_CHECK(config.SetDropMessageTest(1));
+    BOOST_CHECK(config.DoDropMessageTest());
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1);
+    BOOST_CHECK(config.SetDropMessageTest(0));
+    BOOST_CHECK(config.DoDropMessageTest());
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0);
+    BOOST_CHECK(! config.SetDropMessageTest(-1));
+    BOOST_CHECK(! config.DoDropMessageTest());
+
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+    BOOST_CHECK(config.SetInvalidChecksumInterval(2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS, &err));
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), 2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+    BOOST_CHECK(config.SetInvalidChecksumInterval(0, &err));
+    BOOST_CHECK(!config.SetInvalidChecksumInterval(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+    BOOST_CHECK(config.SetInvalidChecksumFreq(2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY, &err));
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), 2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+    BOOST_CHECK(config.SetInvalidChecksumFreq(0, &err));
+    BOOST_CHECK(!config.SetInvalidChecksumFreq(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetFeeFilter(), DEFAULT_FEEFILTER);
+    BOOST_CHECK(config.SetFeeFilter(!DEFAULT_FEEFILTER));
+    BOOST_CHECK_EQUAL(config.GetFeeFilter(), !DEFAULT_FEEFILTER);
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)

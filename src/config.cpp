@@ -140,6 +140,14 @@ void GlobalConfig::Reset()
     data->streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     data->banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
     data->blockTxnMaxPercent = DEFAULT_BLOCK_TXN_MAX_PERCENT;
+    data->multistreamsEnabled = DEFAULT_STREAMS_ENABLED;
+    data->whitelistRelay = DEFAULT_WHITELISTRELAY;
+    data->whitelistForceRelay = DEFAULT_WHITELISTFORCERELAY;
+    data->rejectMempoolRequest = DEFAULT_REJECTMEMPOOLREQUEST;
+    data->dropMessageTest = std::nullopt;
+    data->invalidChecksumInterval = DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS;
+    data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
+    data->feeFilter = DEFAULT_FEEFILTER;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1527,7 +1535,7 @@ int64_t GlobalConfig::GetBlockDownloadTimeoutPerPeer() const
     return data->blockDownloadTimeoutPerPeer;
 }
 
-// P2P Parameters
+// P2P parameters
 bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 {
     if(timeout <= 0)
@@ -1590,6 +1598,118 @@ bool GlobalConfig::SetBlockTxnMaxPercent(unsigned int percent, std::string* err)
 unsigned int GlobalConfig::GetBlockTxnMaxPercent() const
 {
     return data->blockTxnMaxPercent;
+}
+
+bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* err)
+{
+    data->multistreamsEnabled = enabled;
+    return true;
+}
+bool GlobalConfig::GetMultistreamsEnabled() const
+{
+    return data->multistreamsEnabled;
+}
+
+bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* err)
+{
+    data->whitelistRelay = relay;
+    return true;
+}
+bool GlobalConfig::GetWhitelistRelay() const
+{
+    return data->whitelistRelay;
+}
+
+bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* err)
+{
+    data->whitelistForceRelay = relay;
+    return true;
+}
+bool GlobalConfig::GetWhitelistForceRelay() const
+{
+    return data->whitelistForceRelay;
+}
+
+bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* err)
+{
+    data->rejectMempoolRequest = reject;
+    return true;
+}
+bool GlobalConfig::GetRejectMempoolRequest() const
+{
+    return data->rejectMempoolRequest;
+}
+
+bool GlobalConfig::SetDropMessageTest(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Drop message test value must be >= 0";
+        }
+        data->dropMessageTest = std::nullopt;
+        return false;
+    }
+
+    data->dropMessageTest = static_cast<uint64_t>(val);
+    return true;
+}
+bool GlobalConfig::DoDropMessageTest() const
+{
+    return data->dropMessageTest.has_value();
+}
+uint64_t GlobalConfig::GetDropMessageTest() const
+{
+    return data->dropMessageTest.value();
+}
+
+bool GlobalConfig::SetInvalidChecksumInterval(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Invalid checksum interval must be >= 0";
+        }
+        return false;
+    }
+
+    data->invalidChecksumInterval = static_cast<unsigned int>(val);
+    return true;
+}
+unsigned int GlobalConfig::GetInvalidChecksumInterval() const
+{
+    return data->invalidChecksumInterval;
+}
+
+bool GlobalConfig::SetInvalidChecksumFreq(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Invalid checksum frequency must be >= 0";
+        }
+        return false;
+    }
+
+    data->invalidChecksumFreq = static_cast<unsigned int>(val);
+    return true;
+}
+unsigned int GlobalConfig::GetInvalidChecksumFreq() const
+{
+    return data->invalidChecksumFreq;
+}
+
+bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* err)
+{
+    data->feeFilter = feefilter;
+    return true;
+}
+bool GlobalConfig::GetFeeFilter() const
+{
+    return data->feeFilter;
 }
 
 // RPC parameters

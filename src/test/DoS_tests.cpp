@@ -91,14 +91,15 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
     BOOST_CHECK(connman->IsBanned(addr2));
 }
 
-BOOST_AUTO_TEST_CASE(DoS_banscore) {
-    const Config &config = GlobalConfig::GetConfig();
+BOOST_AUTO_TEST_CASE(DoS_banscore)
+{
+    auto& config { GlobalConfig::GetModifiableGlobalConfig() };
     std::atomic<bool> interruptDummy(false);
 
     CConnman::CAsyncTaskPool asyncTaskPool{config};
     connman->ClearBanned();
     // because 11 is my favorite number.
-    gArgs.ForceSetArg("-banscore", "111");
+    config.SetBanScoreThreshold(111);
     CAddress addr1(ip(0xa0b0c001), NODE_NONE);
     CNodePtr dummyNode1 =
         CNode::Make(
@@ -125,7 +126,6 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
     Misbehaving(dummyNode1->GetId(), 1, "");
     SendMessages(config, dummyNode1, *connman, interruptDummy);
     BOOST_CHECK(connman->IsBanned(addr1));
-    gArgs.ForceSetArg("-banscore", std::to_string(DEFAULT_BANSCORE_THRESHOLD));
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime) {
