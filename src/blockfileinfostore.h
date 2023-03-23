@@ -30,10 +30,12 @@ public:
         CDiskBlockPos &pos, uint64_t nAddSize, int32_t nHeight,
         uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
 
-    void FindFilesToPrune(std::set<int> &setFilesToPrune,
+    void FindFilesToPrune(const Config& config,
+        std::set<int> &setFilesToPrune,
         int32_t nPruneAfterHeight);
 
-    void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
+    void FindFilesToPruneManual(const Config& config,
+        std::set<int> &setFilesToPrune,
         int32_t nManualPruneHeight);
 
     bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,

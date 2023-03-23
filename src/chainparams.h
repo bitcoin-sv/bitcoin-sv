@@ -101,6 +101,8 @@ public:
     bool DisableBIP30Checks() const { return fDisableBIP30Checks; }
     bool CanDisableBIP30Checks() const { return fCanDisableBIP30Checks; }
 
+    bool IsRegTest() const { return fIsRegTest; }
+
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
     CChainParams() {}
@@ -122,6 +124,7 @@ protected:
     bool fTestBlockCandidateValidity;
     bool fDisableBIP30Checks;
     bool fCanDisableBIP30Checks;
+    bool fIsRegTest;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
     DefaultBlockSizeParams defaultBlockSizeParams;

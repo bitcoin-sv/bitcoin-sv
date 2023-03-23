@@ -7,6 +7,7 @@
 #define BITCOIN_STREAMS_H
 
 #include "cfile_util.h"
+#include "consensus/consensus.h"
 #include "serialize.h"
 #include "support/allocators/zeroafterfree.h"
 
@@ -19,6 +20,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <set>
 #include <string>
 #include <utility>
@@ -715,6 +717,10 @@ public:
      * is still being prepared and will be returned on next call to Read.
      */
     virtual CSpan ReadAsync(size_t maxSize) = 0;
+
+    // Estimate our maximum memory usage. If this can't be accurately known
+    // it should try to be a worst case estimate.
+    virtual size_t GetEstimatedMaxMemoryUsage() const = 0;
 };
 
 /**
@@ -860,6 +866,9 @@ public:
     bool EndOfStream() const override {return mSize == mConsumed;}
     CSpan ReadAsync(size_t maxSize) override
     {
+        // Apply a limit to the size our internal read buffer can grow to
+        maxSize = std::min(maxSize, mMaxBufferSize);
+
         // it's not feasible to try and read 0 bytes
         assert(maxSize > 0);
 
@@ -897,9 +906,17 @@ public:
         }
     }
 
+    size_t GetEstimatedMaxMemoryUsage() const override
+    {
+        // The best we can do is assume the worst case where the caller to ReadAsync
+        // will grow our buffer to the maximum allowed size.
+        return sizeof(*this) + std::min(mSize, mMaxBufferSize);
+    }
+
 private:
     size_t mSize;
     std::vector<uint8_t> mBuffer;
+    static constexpr size_t mMaxBufferSize = ONE_MEBIBYTE * 10;
     size_t mConsumed = 0u;
     size_t mPendingReadSize = 0u;
 };
@@ -929,6 +946,11 @@ public:
         {
             return {};
         }
+    }
+
+    size_t GetEstimatedMaxMemoryUsage() const override
+    {
+        return sizeof(*this) + mData.capacity();
     }
 
 private:
@@ -963,9 +985,61 @@ public:
         }
     }
 
+    size_t GetEstimatedMaxMemoryUsage() const override
+    {
+        return sizeof(*this) + mData->capacity();
+    }
+
 private:
     std::shared_ptr<const std::vector<uint8_t>> mData;
     size_t mConsumed = 0u;
 };
+
+constexpr size_t cmpt_ser_size(size_t n)
+{
+      if(n < 0xfd)
+          return 1;        
+      else if(n <= 0xffff)
+          return 3;
+      else if(n <= 0xffff'ffff)
+          return 5;
+      else if(n <= 0xffff'ffff'ffff'ffff)
+          return 9;
+      else                    
+          assert(false);
+}
+
+template<typename T>
+inline constexpr size_t ser_size(const T&)
+{
+    return sizeof(T);
+}
+
+inline size_t ser_size(const std::string& s) { return s.size(); }
+
+template<typename T>
+inline size_t ser_size(const std::vector<T>& v)
+{ 
+    return sizeof(typename std::vector<T>::value_type) * v.size();
+}
+
+inline constexpr size_t ser_size(){ return 0; }
+
+template<typename T, typename... Ts>
+inline size_t ser_size(const T& a, const Ts&... args)
+{
+    return ser_size(a) + ser_size(args...);
+}
+
+template<typename T>
+inline size_t ser_size(T f, T l, size_t init)
+{
+    return std::accumulate(f,
+                           l,
+                           init,
+                           [](auto& total, const auto& ip) {
+                               return total += ser_size(ip);
+                           });
+}
 
 #endif // BITCOIN_STREAMS_H

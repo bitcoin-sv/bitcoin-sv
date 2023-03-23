@@ -87,7 +87,6 @@ bool fRelayTxes = true;
 CCriticalSection cs_mapLocalHost;
 std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
-std::atomic_size_t CSendQueueBytes::nTotalSendQueuesBytes = 0;
 
 CCriticalSection cs_invQueries;
 std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
@@ -632,7 +631,7 @@ void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
 
 CConnman::CAsyncTaskPool::CAsyncTaskPool(const Config& config)
     : mPool{
-        "CAsyncTaskPool",
+        true, "CAsyncTaskPool",
         // +1 so that we have more async threads than there are block checker
         // queues so that a better block can terminate one of the existing
         // blocked block check queues on exhaustion
@@ -2002,6 +2001,8 @@ void CConnman::ThreadOpenAddedConnections() {
         }
     }
 
+    const bool isRegTest { GlobalConfig::GetConfig().GetChainParams().IsRegTest() };
+
     while (true) {
         CSemaphoreGrant grant(semAddnode);
         std::vector<AddedNodeInfo> vInfo = GetAddedNodeInfo();
@@ -2028,9 +2029,15 @@ void CConnman::ThreadOpenAddedConnections() {
                 }
             }
         }
-        // Retry every 60 seconds if a connection was attempted, otherwise two
-        // seconds.
-        if (!interruptNet.sleep_for(std::chrono::seconds(tried ? 60 : 2))) {
+
+        // If we're on regtest always just sleep 1 second, otherwise
+        // retry every 60 seconds if a connection was attempted or two
+        // seconds if not.
+        unsigned sleepTime {1};
+        if (!isRegTest) {
+            sleepTime = tried ? 60 : 2;
+        }
+        if (!interruptNet.sleep_for(std::chrono::seconds(sleepTime))) {
             return;
         }
     }
@@ -2382,7 +2389,7 @@ CConnman::CConnman(
     : config(&configIn)
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
-    , mValidatorThreadPool{"TxnValidatorPool",
+    , mValidatorThreadPool{true, "TxnValidatorPool",
          static_cast<size_t>(gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs())),
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDSHandler{configIn}

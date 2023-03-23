@@ -21,7 +21,7 @@ class JournalingBlockAssembler : public BlockAssembler
   public:
 
     // Default config values
-    static constexpr uint64_t DEFAULT_MAX_SLOT_TRANSACTIONS {20000};
+    static constexpr uint64_t DEFAULT_MAX_SLOT_TRANSACTIONS {25000};
     static constexpr bool DEFAULT_NEW_BLOCK_FILL {false};
     static constexpr unsigned DEFAULT_THROTTLE_THRESHOLD {100};
     static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {100};

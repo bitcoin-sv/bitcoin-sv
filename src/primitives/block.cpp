@@ -4,9 +4,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "primitives/block.h"
+
+#include <numeric>
+
 #include "crypto/common.h"
 #include "hash.h"
 #include "script/script_num.h"
+#include "streams.h"
 #include "tinyformat.h"
 
 uint256 CBlockHeader::GetHash() const {
@@ -70,4 +74,17 @@ int32_t CBlock::GetHeightFromCoinbase()
     copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
     CScriptNum coinbaseHeight(heightScript, false, numlen);
     return coinbaseHeight.getint();
+}
+
+size_t ser_size(const CBlock& block)
+{
+    size_t total{sizeof(CBlockHeader)};
+    total += cmpt_ser_size(block.vtx.size());
+    return std::accumulate(block.cbegin(),
+                           block.cend(),
+                           total,
+                           [](auto total, const auto& sp_tx) {
+                               total += ser_size(*sp_tx);
+                               return total;
+                           });
 }

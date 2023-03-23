@@ -266,7 +266,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                            label=f"Waiting for block with tx {tx.hash[8]}... and reject reason '{reason}' to be rejected " + label)
                 if reason:
                     self.log.info(f"Expect the block {loghash(block.hash)} to be rejected")
-                    assert rejects[0].reason == reason, f"mismatching rejection reason: got {rejects[0].reason} expected {reason}"
+                    assert rejects[0].reason.startswith(reason), f"mismatching rejection reason: got {rejects[0].reason} expected {reason}"
 
     def _new_block_check_accept(self, connection, txs=[], label="", remove_accepted_block=False):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())

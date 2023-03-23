@@ -329,6 +329,17 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK(!config.SetBlockDownloadWindow(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadWindow(-1, &err));
 
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW);
+    BOOST_CHECK(config.SetBlockDownloadLowerWindow(2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW);
+    BOOST_CHECK(!config.SetBlockDownloadLowerWindow(0, &err));
+    BOOST_CHECK(!config.SetBlockDownloadLowerWindow(-1, &err));
+    BOOST_CHECK(config.SetBlockDownloadLowerWindow(config.GetBlockDownloadWindow(), &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), config.GetBlockDownloadWindow());
+    BOOST_CHECK(!config.SetBlockDownloadLowerWindow(config.GetBlockDownloadWindow() + 1, &err));
+    BOOST_CHECK(config.SetBlockDownloadWindow(config.GetBlockDownloadLowerWindow() - 1, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), config.GetBlockDownloadLowerWindow());
+
     BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
     BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err));
     BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), 2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
@@ -383,6 +394,54 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), 2 * DEFAULT_BANSCORE_THRESHOLD);
     BOOST_CHECK(!config.SetBanScoreThreshold(0, &err));
     BOOST_CHECK(!config.SetBanScoreThreshold(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), DEFAULT_STREAMS_ENABLED);
+    BOOST_CHECK(config.SetMultistreamsEnabled(!DEFAULT_STREAMS_ENABLED));
+    BOOST_CHECK_EQUAL(config.GetMultistreamsEnabled(), !DEFAULT_STREAMS_ENABLED);
+
+    BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), DEFAULT_WHITELISTRELAY);
+    BOOST_CHECK(config.SetWhitelistRelay(!DEFAULT_WHITELISTRELAY));
+    BOOST_CHECK_EQUAL(config.GetWhitelistRelay(), !DEFAULT_WHITELISTRELAY);
+
+    BOOST_CHECK_EQUAL(config.GetWhitelistForceRelay(), DEFAULT_WHITELISTFORCERELAY);
+    BOOST_CHECK(config.SetWhitelistForceRelay(!DEFAULT_WHITELISTFORCERELAY));
+    BOOST_CHECK_EQUAL(config.GetWhitelistForceRelay(), !DEFAULT_WHITELISTFORCERELAY);
+
+    BOOST_CHECK_EQUAL(config.GetRejectMempoolRequest(), DEFAULT_REJECTMEMPOOLREQUEST);
+    BOOST_CHECK(config.SetRejectMempoolRequest(!DEFAULT_REJECTMEMPOOLREQUEST));
+    BOOST_CHECK_EQUAL(config.GetRejectMempoolRequest(), !DEFAULT_REJECTMEMPOOLREQUEST);
+
+    BOOST_CHECK(! config.DoDropMessageTest());
+    BOOST_CHECK(config.SetDropMessageTest(1));
+    BOOST_CHECK(config.DoDropMessageTest());
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1);
+    BOOST_CHECK(config.SetDropMessageTest(0));
+    BOOST_CHECK(config.DoDropMessageTest());
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0);
+    BOOST_CHECK(! config.SetDropMessageTest(-1));
+    BOOST_CHECK(! config.DoDropMessageTest());
+
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+    BOOST_CHECK(config.SetInvalidChecksumInterval(2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS, &err));
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), 2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+    BOOST_CHECK(config.SetInvalidChecksumInterval(0, &err));
+    BOOST_CHECK(!config.SetInvalidChecksumInterval(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+    BOOST_CHECK(config.SetInvalidChecksumFreq(2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY, &err));
+    BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), 2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+    BOOST_CHECK(config.SetInvalidChecksumFreq(0, &err));
+    BOOST_CHECK(!config.SetInvalidChecksumFreq(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetFeeFilter(), DEFAULT_FEEFILTER);
+    BOOST_CHECK(config.SetFeeFilter(!DEFAULT_FEEFILTER));
+    BOOST_CHECK_EQUAL(config.GetFeeFilter(), !DEFAULT_FEEFILTER);
+
+    BOOST_CHECK_EQUAL(config.GetMaxAddNodeConnections(), DEFAULT_MAX_ADDNODE_CONNECTIONS);
+    BOOST_CHECK(config.SetMaxAddNodeConnections(2 * DEFAULT_MAX_ADDNODE_CONNECTIONS, &err));
+    BOOST_CHECK_EQUAL(config.GetMaxAddNodeConnections(), 2 * DEFAULT_MAX_ADDNODE_CONNECTIONS);
+    BOOST_CHECK(config.SetMaxAddNodeConnections(0, &err));
+    BOOST_CHECK(! config.SetMaxAddNodeConnections(-1, &err));
 }
 
 BOOST_AUTO_TEST_CASE(safe_mode_config)
@@ -692,5 +751,37 @@ BOOST_AUTO_TEST_CASE(banned_clientua_test)
     BOOST_CHECK(!config.IsClientUABanned(userAgent()));
 }
 
+BOOST_AUTO_TEST_CASE(prune_config_test)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetMinBlocksToKeep(), DEFAULT_MIN_BLOCKS_TO_KEEP);
+    BOOST_CHECK(config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP));
+    BOOST_CHECK_EQUAL(config.GetMinBlocksToKeep(), MIN_MIN_BLOCKS_TO_KEEP);
+    BOOST_CHECK(! config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP - 1));
+}
+
+BOOST_AUTO_TEST_CASE(tx_validation)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetBlockValidationTxBatchSize(), DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE);
+    BOOST_CHECK(config.SetBlockValidationTxBatchSize(DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2, &err));
+    BOOST_CHECK_EQUAL(config.GetBlockValidationTxBatchSize(), DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2);
+    BOOST_CHECK(! config.SetBlockValidationTxBatchSize(0, &err));
+    BOOST_CHECK(! config.SetBlockValidationTxBatchSize(-1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), DEFAULT_SCRIPTCHECK_THREADS);
+    BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), DEFAULT_TXNCHECK_THREADS);
+    BOOST_CHECK(config.SetBlockScriptValidatorsParams(1, 2, 0, 1, &err));
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), 2);
+    BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), GetNumCores());
+    BOOST_CHECK(config.SetBlockScriptValidatorsParams(1, 0, 2, 1, &err));
+    BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), std::clamp(GetNumCores(), 0, 8));
+    BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), 2);
+    BOOST_CHECK(! config.SetBlockScriptValidatorsParams(1, -1, -1, 1, &err));
+}
 
 BOOST_AUTO_TEST_SUITE_END()

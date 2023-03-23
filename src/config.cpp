@@ -77,6 +77,7 @@ void GlobalConfig::Reset()
     data->mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
 
     data->mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+    data->mPerBlockTxnValidatorThreadsCount = DEFAULT_TXNCHECK_THREADS;
     data->mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     data->mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
     data->maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
@@ -120,10 +121,14 @@ void GlobalConfig::Reset()
     data->enableAssumeWhitelistedBlockDepth = DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH;
     data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
+    data->minBlocksToKeep = DEFAULT_MIN_BLOCKS_TO_KEEP;
+    data->blockValidationTxBatchSize = DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE;
+
     // Block download
     data->blockStallingMinDownloadSpeed = DEFAULT_MIN_BLOCK_STALLING_RATE;
     data->blockStallingTimeout = DEFAULT_BLOCK_STALLING_TIMEOUT;
     data->blockDownloadWindow = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    data->blockDownloadLowerWindow = DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW;
     data->blockDownloadSlowFetchTimeout = DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
     data->blockDownloadMaxParallelFetch = DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
     data->blockDownloadTimeoutBase = DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE;
@@ -134,6 +139,16 @@ void GlobalConfig::Reset()
     data->p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
     data->streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
     data->banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+    data->blockTxnMaxPercent = DEFAULT_BLOCK_TXN_MAX_PERCENT;
+    data->multistreamsEnabled = DEFAULT_STREAMS_ENABLED;
+    data->whitelistRelay = DEFAULT_WHITELISTRELAY;
+    data->whitelistForceRelay = DEFAULT_WHITELISTFORCERELAY;
+    data->rejectMempoolRequest = DEFAULT_REJECTMEMPOOLREQUEST;
+    data->dropMessageTest = std::nullopt;
+    data->invalidChecksumInterval = DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS;
+    data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
+    data->feeFilter = DEFAULT_FEEFILTER;
+    data->maxAddNodeConnections = DEFAULT_MAX_ADDNODE_CONNECTIONS;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -629,7 +644,8 @@ int GlobalConfig::GetMaxConcurrentAsyncTasksPerNode() const
 
 bool GlobalConfig::SetBlockScriptValidatorsParams(
     int maxParallelBlocks,
-    int perValidatorThreadsCount,
+    int perValidatorScriptThreadsCount,
+    int perValidatorTxnThreadsCount,
     int perValidatorThreadMaxBatchSize,
     std::string* error)
 {
@@ -656,28 +672,50 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
     }
 
     {
-        // perValidatorThreadsCount==0 means autodetect,
-        // but nScriptCheckThreads==0 means no concurrency
-        if (perValidatorThreadsCount == 0)
-        {
-            perValidatorThreadsCount =
-                std::clamp(GetNumCores(), 0, MAX_SCRIPTCHECK_THREADS);
-        }
-        else if (perValidatorThreadsCount < 0
-            || perValidatorThreadsCount > MAX_SCRIPTCHECK_THREADS)
+        if (perValidatorScriptThreadsCount < 0 || perValidatorScriptThreadsCount > MAX_TXNSCRIPTCHECK_THREADS)
         {
             if(error)
             {
                 *error =
                     strprintf(
                         _("Per block script validation threads count must be at "
-                          "least 0 and at most %d"), MAX_SCRIPTCHECK_THREADS);
+                          "least 0 and at most %d"), MAX_TXNSCRIPTCHECK_THREADS);
             }
 
             return false;
         }
+        // perValidatorScriptThreadsCount==0 means autodetect
+        else if (perValidatorScriptThreadsCount == 0)
+        {
+            // There's no observable benefit from using more than 8 cores for
+            // just parallel script validation
+            constexpr int defaultScriptMaxThreads {8};
+            perValidatorScriptThreadsCount = std::clamp(GetNumCores(), 0, defaultScriptMaxThreads);
+        }
 
-        data->mPerBlockScriptValidatorThreadsCount = perValidatorThreadsCount;
+        data->mPerBlockScriptValidatorThreadsCount = perValidatorScriptThreadsCount;
+    }
+
+    {
+        if (perValidatorTxnThreadsCount < 0 || perValidatorTxnThreadsCount > MAX_TXNSCRIPTCHECK_THREADS)
+        {
+            if(error)
+            {
+                *error =
+                    strprintf(
+                        _("Per block transaction validation threads count must be at "
+                          "least 0 and at most %d"), MAX_TXNSCRIPTCHECK_THREADS);
+            }
+
+            return false;
+        }
+        // perValidatorTxnThreadsCount==0 means autodetect
+        else if (perValidatorTxnThreadsCount == 0)
+        {
+            perValidatorTxnThreadsCount = std::clamp(GetNumCores(), 0, MAX_TXNSCRIPTCHECK_THREADS);
+        }
+
+        data->mPerBlockTxnValidatorThreadsCount = perValidatorTxnThreadsCount;
     }
 
     {
@@ -704,6 +742,11 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
 int GlobalConfig::GetMaxParallelBlocks() const
 {
     return data->mMaxParallelBlocks;
+}
+
+int GlobalConfig::GetPerBlockTxnValidatorThreadsCount() const
+{
+    return data->mPerBlockTxnValidatorThreadsCount;
 }
 
 int GlobalConfig::GetPerBlockScriptValidatorThreadsCount() const
@@ -876,6 +919,25 @@ bool GlobalConfig::SetPTVTaskScheduleStrategy(std::string strategy, std::string 
 PTVTaskScheduleStrategy GlobalConfig::GetPTVTaskScheduleStrategy() const
 {
     return data->mPTVTaskScheduleStrategy;
+}
+
+bool GlobalConfig::SetBlockValidationTxBatchSize(int64_t size, std::string* err)
+{
+    if(size <= 0)
+    {
+        if(err)
+        {
+            *err = "Block validation transaction batch size must be greater than 0.";
+        }
+        return false;
+    }
+
+    data->blockValidationTxBatchSize = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetBlockValidationTxBatchSize() const
+{
+    return data->blockValidationTxBatchSize;
 }
 
 /**
@@ -1279,6 +1341,25 @@ std::string GlobalConfig::GetSafeModeWebhookPath() const
     return data->safeModeWebhookPath;
 }
 
+bool GlobalConfig::SetMinBlocksToKeep(int32_t minblocks, std::string* err)
+{
+    if(minblocks < MIN_MIN_BLOCKS_TO_KEEP)
+    {
+        if(err)
+        {
+            *err = "Minimum blocks to keep must be >= " + std::to_string(MIN_MIN_BLOCKS_TO_KEEP);
+        }
+        return false;
+    }
+
+    data->minBlocksToKeep = minblocks;
+    return true;
+}
+int32_t GlobalConfig::GetMinBlocksToKeep() const
+{
+    return data->minBlocksToKeep;
+}
+
 // Block download
 bool GlobalConfig::SetBlockStallingMinDownloadSpeed(int64_t min, std::string* err)
 {
@@ -1330,11 +1411,37 @@ bool GlobalConfig::SetBlockDownloadWindow(int64_t window, std::string* err)
     }
 
     data->blockDownloadWindow = window;
+
+    // Lower download window must not be > than full window
+    if(data->blockDownloadLowerWindow > data->blockDownloadWindow)
+    {
+        data->blockDownloadLowerWindow = data->blockDownloadWindow;
+    }
+
     return true;
 }
 int64_t GlobalConfig::GetBlockDownloadWindow() const
 {
     return data->blockDownloadWindow;
+}
+
+bool GlobalConfig::SetBlockDownloadLowerWindow(int64_t window, std::string* err)
+{
+    if(window <= 0 || window > data->blockDownloadWindow)
+    {
+        if(err)
+        {
+            *err = "Block download lower window must be greater than 0 and less than or equal to the full download window.";
+        }
+        return false;
+    }
+
+    data->blockDownloadLowerWindow = window;
+    return true;
+}
+int64_t GlobalConfig::GetBlockDownloadLowerWindow() const
+{
+    return data->blockDownloadLowerWindow;
 }
 
 bool GlobalConfig::SetBlockDownloadSlowFetchTimeout(int64_t timeout, std::string* err)
@@ -1429,7 +1536,7 @@ int64_t GlobalConfig::GetBlockDownloadTimeoutPerPeer() const
     return data->blockDownloadTimeoutPerPeer;
 }
 
-// P2P Parameters
+// P2P parameters
 bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 {
     if(timeout <= 0)
@@ -1474,6 +1581,158 @@ unsigned int GlobalConfig::GetBanScoreThreshold() const
 {
     return data->banScoreThreshold;
 }
+
+bool GlobalConfig::SetBlockTxnMaxPercent(unsigned int percent, std::string* err)
+{
+    if(percent > 100)
+    {
+        if (err)
+        {
+            *err = "Max percentage of blocktxn transactions in a request must be between 0 and 100.";
+        }
+        return false;
+    }
+
+    data->blockTxnMaxPercent = percent;
+    return true;
+}
+unsigned int GlobalConfig::GetBlockTxnMaxPercent() const
+{
+    return data->blockTxnMaxPercent;
+}
+
+bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* err)
+{
+    data->multistreamsEnabled = enabled;
+    return true;
+}
+bool GlobalConfig::GetMultistreamsEnabled() const
+{
+    return data->multistreamsEnabled;
+}
+
+bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* err)
+{
+    data->whitelistRelay = relay;
+    return true;
+}
+bool GlobalConfig::GetWhitelistRelay() const
+{
+    return data->whitelistRelay;
+}
+
+bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* err)
+{
+    data->whitelistForceRelay = relay;
+    return true;
+}
+bool GlobalConfig::GetWhitelistForceRelay() const
+{
+    return data->whitelistForceRelay;
+}
+
+bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* err)
+{
+    data->rejectMempoolRequest = reject;
+    return true;
+}
+bool GlobalConfig::GetRejectMempoolRequest() const
+{
+    return data->rejectMempoolRequest;
+}
+
+bool GlobalConfig::SetDropMessageTest(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Drop message test value must be >= 0";
+        }
+        data->dropMessageTest = std::nullopt;
+        return false;
+    }
+
+    data->dropMessageTest = static_cast<uint64_t>(val);
+    return true;
+}
+bool GlobalConfig::DoDropMessageTest() const
+{
+    return data->dropMessageTest.has_value();
+}
+uint64_t GlobalConfig::GetDropMessageTest() const
+{
+    return data->dropMessageTest.value();
+}
+
+bool GlobalConfig::SetInvalidChecksumInterval(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Invalid checksum interval must be >= 0";
+        }
+        return false;
+    }
+
+    data->invalidChecksumInterval = static_cast<unsigned int>(val);
+    return true;
+}
+unsigned int GlobalConfig::GetInvalidChecksumInterval() const
+{
+    return data->invalidChecksumInterval;
+}
+
+bool GlobalConfig::SetInvalidChecksumFreq(int64_t val, std::string* err)
+{
+    if(val < 0)
+    {
+        if(err)
+        {
+            *err = "Invalid checksum frequency must be >= 0";
+        }
+        return false;
+    }
+
+    data->invalidChecksumFreq = static_cast<unsigned int>(val);
+    return true;
+}
+unsigned int GlobalConfig::GetInvalidChecksumFreq() const
+{
+    return data->invalidChecksumFreq;
+}
+
+bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* err)
+{
+    data->feeFilter = feefilter;
+    return true;
+}
+bool GlobalConfig::GetFeeFilter() const
+{
+    return data->feeFilter;
+}
+
+
+bool GlobalConfig::SetMaxAddNodeConnections(int16_t max, std::string* err)
+{
+    if(max < 0)
+    {
+        if(err)
+        {
+            *err = "Maximum addnode connection limit must be >= 0";
+        }
+        return false;
+    }
+
+    data->maxAddNodeConnections = max;
+    return true;
+}
+uint16_t GlobalConfig::GetMaxAddNodeConnections() const
+{
+    return data->maxAddNodeConnections;
+}
+
 
 // RPC parameters
 bool GlobalConfig::SetWebhookClientNumThreads(int64_t num, std::string* err)
@@ -2154,6 +2413,11 @@ int DummyConfig::GetMaxConcurrentAsyncTasksPerNode() const
 int DummyConfig::GetMaxParallelBlocks() const
 {
     return DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+}
+
+int DummyConfig::GetPerBlockTxnValidatorThreadsCount() const
+{
+    return DEFAULT_SCRIPTCHECK_THREADS;
 }
 
 int DummyConfig::GetPerBlockScriptValidatorThreadsCount() const

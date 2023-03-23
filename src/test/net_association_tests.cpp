@@ -67,6 +67,7 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
     CheckInitialStreamStats(stats);
 
     BOOST_CHECK_EQUAL(stream.GetSendQueueSize(), 0);
+    BOOST_CHECK_EQUAL(stream.GetSendQeueMemoryUsage(), 0);
     AverageBandwidth abw { stream.GetAverageBandwidth() };
     BOOST_CHECK_EQUAL(abw.first, 0);
     BOOST_CHECK_EQUAL(abw.second, 0);
@@ -116,6 +117,7 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
     }
 
     BOOST_CHECK_EQUAL(association.GetTotalSendQueueSize(), 0);
+    BOOST_CHECK_EQUAL(association.GetTotalSendQueueMemoryUsage(), 0);
     BOOST_CHECK_EQUAL(association.GetAverageBandwidth(), 0);
     AverageBandwidth abw { association.GetAverageBandwidth(StreamType::GENERAL) };
     BOOST_CHECK_EQUAL(abw.first, 0);

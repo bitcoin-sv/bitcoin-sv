@@ -184,6 +184,7 @@ add_test_to_suite(bitcoin test_bitcoin
     time_locked_mempool_tests.cpp
 	ttor_tests.cpp
 	transaction_tests.cpp
+    txn_grouper_tests.cpp
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp
 	undo_tests.cpp

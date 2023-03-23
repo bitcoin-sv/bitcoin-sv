@@ -180,8 +180,8 @@ class CThreadPool final
   public:
 
     // Constructor
-    CThreadPool(const std::string& owner, size_t numThreads = std::thread::hardware_concurrency());
-    CThreadPool(const std::string& owner, size_t numHighPriorityThrs, size_t numLowPriorityThrs);
+    CThreadPool(bool logMsgs, const std::string& owner, size_t numThreads = std::thread::hardware_concurrency());
+    CThreadPool(bool logMsgs, const std::string& owner, size_t numHighPriorityThrs, size_t numLowPriorityThrs);
 
     // Destructor
     ~CThreadPool();
@@ -228,6 +228,7 @@ class CThreadPool final
 
     // Owner string for logging
     const std::string mOwnerStr {};
+    bool mLogMsgs {true};
 
 };
 

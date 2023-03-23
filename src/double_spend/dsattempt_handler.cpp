@@ -79,8 +79,8 @@ DSAttemptHandler::DSAttemptHandler(const Config& config)
 : mConfig { config },
   mTxnsNotified { config.GetDoubleSpendTxnRemember() },
   mServerBlacklist { config.GetDoubleSpendEndpointBlacklistSize() },
-  mFastThreadPool { "DSAttemptHandlerFast", GetNumThreads(config, true) },
-  mSlowThreadPool { "DSAttemptHandlerSlow", GetNumThreads(config, false) }
+  mFastThreadPool { true, "DSAttemptHandlerFast", GetNumThreads(config, true) },
+  mSlowThreadPool { true, "DSAttemptHandlerSlow", GetNumThreads(config, false) }
 {
 }
 

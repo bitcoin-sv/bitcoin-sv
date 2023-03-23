@@ -353,7 +353,7 @@ bool InitHTTPServer(Config &config) {
 
     int rpcThreads = std::max(static_cast<long>(gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS)), 1L);
     LogPrintf("HTTP: creating work queue with %d threads\n", rpcThreads);
-    pWorkQueue = std::make_unique<CThreadPool<CQueueAdaptor>>("HTTPServer", rpcThreads);
+    pWorkQueue = std::make_unique<CThreadPool<CQueueAdaptor>>(true, "HTTPServer", rpcThreads);
 
     return true;
 }
@@ -548,9 +548,9 @@ CService HTTPRequest::GetPeer() {
     CService peer;
     if (con) {
         // evhttp retains ownership over returned address string
-        const char *address = "";
+        char * address = nullptr;
         uint16_t port = 0;
-        evhttp_connection_get_peer(con, (char **)&address, &port);
+        evhttp_connection_get_peer(con, &address, &port);
         peer = LookupNumeric(address, port);
     }
     return peer;

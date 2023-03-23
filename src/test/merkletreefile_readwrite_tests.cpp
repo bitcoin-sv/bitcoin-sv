@@ -151,8 +151,8 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
         uint256 merkleRoot = merkleTree.GetMerkleRoot();
         BOOST_CHECK(merkleRoot == BlockMerkleRoot(block));
         // For later checks, save block hashes, their merkle roots, hashes and indices of one of the transactions
-        // We save last MIN_BLOCKS_TO_KEEP blocks that for sure were not pruned
-        if (i > (numberOfBlocks - static_cast<int32_t>(MIN_BLOCKS_TO_KEEP)))
+        // We save last number of blocks that for sure were not pruned
+        if (i > (numberOfBlocks - testConfig.GetMinBlocksToKeep()))
         {
             StoreTestData(block, merkleTree.GetMerkleRoot(), writtenDataToCheck);
         }

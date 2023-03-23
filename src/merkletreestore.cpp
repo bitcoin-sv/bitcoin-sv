@@ -116,9 +116,12 @@ void CMerkleTreeStore::AddNewDataNL(const uint256& newBlockHash, const int32_t n
     diskUsage += writtenDataInBytes;
 }
 
-bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight)
+bool CMerkleTreeStore::PruneDataFilesNL(const Config& config, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight)
 {
     AssertLockHeld(cs_merkleTreeStore);
+
+    const uint64_t maxDiskSpace { config.GetMaxMerkleTreeDiskSpace() };
+
     if (!newDataSizeInBytesToAdd || (diskUsage + newDataSizeInBytesToAdd) <= maxDiskSpace)
     {
         //No need to prune if no data is being added or disk space limit is kept
@@ -144,12 +147,11 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
      */
     std::vector<uint256> blockHashesOfMerkleTreesRemoved;
     std::vector<int> suffixesOfDataFilesRemoved;
-    int32_t numberOfLatestBlocksToKeep = static_cast<int32_t>(MIN_BLOCKS_TO_KEEP);
     auto pruningCandidate = fileInfoMap.cbegin();
     while ((diskUsage + newDataSizeInBytesToAdd) > maxDiskSpace && pruningCandidate != fileInfoMap.cend())
     {
-        // We don't want to prune data files that contain merkle trees from latest MIN_BLOCKS_TO_KEEP blocks
-        if ((chainHeight - pruningCandidate->second.greatestBlockHeight) > numberOfLatestBlocksToKeep)
+        // We don't want to prune data files that contain merkle trees from unpruned recent blocks
+        if ((chainHeight - pruningCandidate->second.greatestBlockHeight) > config.GetMinBlocksToKeep())
         {
             boost::system::error_code errorCode;
             int removeFileWithSuffix = pruningCandidate->first;
@@ -200,7 +202,7 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const CMerkleTree& 
     uint64_t merkleTreeSizeBytes = ::GetSerializeSize(merkleTreeIn, SER_DISK, CLIENT_VERSION);
     
     // Prune data files if needed, to stay below the disk usage limit
-    if (!PruneDataFilesNL(config.GetMaxMerkleTreeDiskSpace(), merkleTreeSizeBytes, chainHeight))
+    if (!PruneDataFilesNL(config, merkleTreeSizeBytes, chainHeight))
     {
         return error("StoreMerkleTree: Merkle Tree of size %u will not be written to keep disk size hard limit", merkleTreeSizeBytes);
     }
@@ -209,7 +211,9 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const CMerkleTree& 
     uint64_t diskFreeBytesAvailable = fs::space(merkleStorePath).available;
     if (diskFreeBytesAvailable < (nMinDiskSpace + merkleTreeSizeBytes))
     {
-        return error("StoreMerkleTree: Disk space is low (%u bytes available), Merkle Trees will not be written.", diskFreeBytesAvailable);
+        return error("StoreMerkleTree: Disk space is low (%lu bytes available for directory '%s' %lu required), "
+                     "Merkle Trees will not be written.",
+                     diskFreeBytesAvailable, merkleStorePath.string(), (nMinDiskSpace + merkleTreeSizeBytes));
     }
 
     // Mark index as out of sync when writing to data files
@@ -513,7 +517,7 @@ bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
 
 CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databaseCacheSize, size_t maxNumberOfThreadsForCalculations)
     :cacheSizeBytes(0), merkleTreeStore(CMerkleTreeStore(storePath, databaseCacheSize)),
-    merkleTreeThreadPool(std::make_unique<CThreadPool<CQueueAdaptor>>("MerkleTreeThreadPool", maxNumberOfThreadsForCalculations))
+    merkleTreeThreadPool(std::make_unique<CThreadPool<CQueueAdaptor>>(true, "MerkleTreeThreadPool", maxNumberOfThreadsForCalculations))
 {
     LogPrintf("Using up to %u additional threads for Merkle tree computation\n", maxNumberOfThreadsForCalculations - 1);
 

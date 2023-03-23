@@ -25,6 +25,7 @@ from test_framework.blocktools import ChainManager, prepare_init_chain
 # Forth case is special because we are requesting the newest block. Download limitations for whitelisted peers do not apply.
 
 class MaxSendQueuesBytesTest(BitcoinTestFramework):
+
     def set_test_params(self):
         self.setup_clean_chain = True
         self.chain = ChainManager()
@@ -33,6 +34,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         self.headerSize = 24
         self.num_peers = 15
         self.excessiveblocksize = 5 * ONE_MEGABYTE
+        self.msgOverhead = 512 # Allow for additional memory overhead of queued messages
 
     # Request block "block" from all nodes.
     def requestBlocks(self, test_nodes, block):
@@ -100,7 +102,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         self.stop_node(0)
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factormaxsendqueuesbytes=num_peers.
-        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize), 
+        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead), 
                 "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500',
                 '-maxsendbuffer=1000']
         with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers", 0,

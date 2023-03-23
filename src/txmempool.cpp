@@ -57,6 +57,11 @@ using namespace mining;
             return mDBView.GetCoin(outpoint, maxScriptSize);
         }
 
+        void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override
+        {
+            mDBView.CacheAllCoins(txns);
+        }
+
         std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
         {
             auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
@@ -1905,7 +1910,6 @@ void CTxMemPool::ApplyDeltasNL(
         const uint256& hash,
         Amount &nFeeDelta) const 
 {
-
     const auto pos = mapDeltas.find(hash);
     if (pos == mapDeltas.end()) {
         return;
@@ -1915,25 +1919,36 @@ void CTxMemPool::ApplyDeltasNL(
 
 void CTxMemPool::prioritiseTransactionNL(
     const uint256& hash,
-    const Amount nFeeDelta) {
-
+    const Amount nFeeDelta)
+{
     auto& delta = mapDeltas[hash];
     delta = std::min(MAX_MONEY, delta + nFeeDelta); // do not allow bigger delta than MAX_MONEY
     txiter it = mapTx.find(hash);
-    if (it != mapTx.end()) {
+    if (it != mapTx.end())
+    {
         mapTx.modify(it, update_fee_delta(delta));
         TrackEntryModified(it);
-        auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::UNKNOWN); // TODO: add new update reason (PRIORITY?)
 
-        setEntriesTopoSorted entries;
-        entries.insert(it);
+        // Ensure CPFP groups maintain correct average fee calculations across the group
+        auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::PRIORITISATION);
+        setEntriesTopoSorted entries {it};
 
         if(it->IsInPrimaryMempool())
         {
-            entries = RemoveFromPrimaryMempoolNL(entries, *changeSet, false);
+            // If this txn is a member of a CPFP group in the main mempool, disband and recreate the group
+            // with accurately calculated new fees.
+            // Also, if we're reducing the fees on any txn in the main mempool then remove and re-add it
+            // because it may no longer be in the primary pool.
+            if(it->IsCPFPGroupMember() || nFeeDelta < Amount{0})
+            {
+                entries = RemoveFromPrimaryMempoolNL(entries, *changeSet, false);
+                TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet, false);
+            }
         }
-        
-        TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet, false);
+        else
+        {
+            TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet, false);
+        }
     }
 }
 
@@ -2045,6 +2060,11 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
     }
 
     return mDBView.GetCoin(outpoint, maxScriptSize);
+}
+
+void CCoinsViewMemPool::CacheAllCoins(const std::vector<CTransactionRef>& txns) const
+{
+    mDBView.CacheAllCoins(txns);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {

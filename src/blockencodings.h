@@ -113,6 +113,8 @@ public:
     }
 };
 
+size_t ser_size(const BlockTransactions&); 
+
 // Dumb serialization/storage-helper for CBlockHeaderAndShortTxIDs and
 // PartiallyDownloadedBlock
 struct PrefilledTransaction {

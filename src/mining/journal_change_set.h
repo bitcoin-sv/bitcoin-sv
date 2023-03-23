@@ -27,7 +27,8 @@ enum class JournalUpdateReason
     NEW_BLOCK,
     REORG,
     INIT,
-    RESET
+    RESET,
+    PRIORITISATION
 };
 /// Enable enum_cast for JournalUpdateReason, so we can log informatively
 const enumTableT<JournalUpdateReason>& enumTable(JournalUpdateReason);

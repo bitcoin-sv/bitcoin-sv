@@ -38,13 +38,14 @@ struct CoinsDBSpan::UnitTestAccess<coins_tests_uid> : public CoinsDBSpan
 {
     using CoinsDBSpan::CoinsDBSpan;
 
-    CCoinsMap& GetRawCacheCoins() { return TestAccessCoinsCache::GetRawCacheCoins(mCache); }
-    size_t& GetCachedCoinsUsage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mCache); }
+    CCoinsMap& GetRawCacheCoins() { return TestAccessCoinsCache::GetRawCacheCoins(mShards[0].GetCache()); }
+    size_t& GetCachedCoinsUsage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mShards[0].GetCache()); }
+    const std::vector<Shard>& GetShards() const { return mShards; }
 
     void BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlockIn)
     {
-        mCache.BatchWrite(mapCoins);
-        hashBlock = hashBlockIn;
+        mShards[0].GetCache().BatchWrite(mapCoins);
+        SetBestBlock(hashBlockIn);
     }
 };
 using TestCoinsSpanCache = CoinsDBSpan::UnitTestAccess<coins_tests_uid>;
@@ -69,6 +70,11 @@ public:
     CCoinsMap& GetRawCacheCoins()
     {
         return TestAccessCoinsCache::GetRawCacheCoins(mCache);
+    }
+
+    void DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
+    {
+        CoinsDB::DBCacheAllInputs(txns);
     }
 
 protected:
@@ -1384,6 +1390,198 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
         BOOST_TEST(coin.has_value() == false);
         auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
         BOOST_TEST(coin_with_script.has_value() == false);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    pcoinsTip.reset();
+
+    // Create some txn IDs we will add to the coins DB later
+    constexpr uint16_t NumThreads {8};
+    using TxIdArray = std::array<uint256, NumThreads>;
+    TxIdArray txIds {};
+    for(int i = 0; i < NumThreads; ++i)
+    {
+        txIds[i] = GetRandHash();
+    }
+
+    // Hash and height of a block that contains unspent transactions
+    uint256 blockHash { GetRandHash() };
+    uint32_t blockHeight {1};
+
+    //
+    // Add sample UTXOs to database
+    //
+    CCoinsProviderTest provider {1024};
+
+    {
+        TestCoinsSpanCache span { provider };
+        span.SetBestBlock(blockHash);
+
+        for(const auto& txId : txIds)
+        {
+            CScript scr { OP_RETURN };
+            CTxOut txo { Amount{123}, scr };
+            span.AddCoin(COutPoint{txId, 0}, CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
+        }
+
+        BOOST_REQUIRE_EQUAL(span.GetShards().size(), 1);
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), txIds.size());
+
+        // And flush them to provider
+        BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0);
+    }
+
+    // Flush sample UTXOs to DB
+    BOOST_TEST(provider.Flush());
+
+    TxIdArray newTxIds {};
+    {
+        TestCoinsSpanCache span { provider };
+        span.SetBestBlock(blockHash);
+
+        // A lambda to call sharded which will receive the shard index, the shard itself, and additional test arguments
+        auto shardedTarget = [blockHeight](uint16_t shardIndex,
+                                           CCoinsViewCache::Shard& shard,
+                                           const TxIdArray& txIds,
+                                           TxIdArray& newTxIds)
+        {
+            // Check coin exists via shard
+            const COutPoint spendCoin { txIds[shardIndex], 0 };
+            BOOST_CHECK(shard.HaveCoin(spendCoin));
+
+            // Spend coin via shard
+            BOOST_CHECK(shard.SpendCoin(spendCoin));
+            BOOST_CHECK(! shard.HaveCoin(spendCoin));
+
+            // Create 2 new coins
+            uint256 newTxId { GetRandHash() };
+            newTxIds[shardIndex] = newTxId;
+            COutPoint newCoin1 { newTxId, 0 };
+            COutPoint newCoin2 { newTxId, 1 };
+            CScript scr { OP_RETURN };
+            {
+                CTxOut txo { Amount{123}, scr };
+                shard.AddCoin(newCoin1, CoinWithScript::MakeOwning(std::move(txo), blockHeight + 1, false, false), false, 0);
+            }
+            {
+                CTxOut txo { Amount{123}, scr };
+                shard.AddCoin(newCoin2, CoinWithScript::MakeOwning(std::move(txo), blockHeight + 1, false, false), false, 0);
+            }
+            BOOST_CHECK(shard.HaveCoin(newCoin1));
+            BOOST_CHECK(shard.HaveCoin(newCoin2));
+
+            return true;
+        };
+
+        BOOST_CHECK_EQUAL(span.GetShards().size(), 1);
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0);
+
+        auto results = span.RunSharded(NumThreads, shardedTarget, std::cref(txIds), std::ref(newTxIds));
+
+        BOOST_CHECK_EQUAL(span.GetShards().size(), 1);
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), newTxIds.size() * 3);  // The original coin and the 2 new created coins
+
+        for(const auto& txId : newTxIds)
+        {
+            BOOST_CHECK(span.HaveCoin(COutPoint{txId, 0}));
+            BOOST_CHECK(span.HaveCoin(COutPoint{txId, 1}));
+        }
+
+        // And flush to provider
+        BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0);
+    }
+
+    // Flush sample UTXOs to DB
+    BOOST_TEST(provider.Flush());
+
+    {
+        // Check we can see expected coins
+        TestCoinsSpanCache span { provider };
+        span.SetBestBlock(blockHash);
+
+        for(const auto& txid : txIds)
+        {
+            BOOST_CHECK(! span.GetCoin({txid, 0}));
+        }
+        for(const auto& txid : newTxIds)
+        {
+            BOOST_REQUIRE(span.GetCoin({txid, 0}));
+            BOOST_CHECK(! span.GetCoin({txid, 0})->IsSpent());
+            BOOST_REQUIRE(span.GetCoin({txid, 1}));
+            BOOST_CHECK(! span.GetCoin({txid, 1})->IsSpent());
+        }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(cache_all_inputs, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    pcoinsTip.reset();
+
+    // Create some txns whose inputs we will add to the coins DB later
+    constexpr uint16_t NumTxns {8};
+    std::vector<CTransactionRef> txns {};
+    for(int i = 0; i < NumTxns; ++i)
+    {
+        CMutableTransaction txn {};
+        txn.vin.resize(1);
+        txn.vin[0].prevout = COutPoint{GetRandHash(), 0};
+        txn.vin[0].scriptSig << OP_RETURN;
+        txns.push_back(MakeTransactionRef(txn));
+    }
+
+    // Hash and height of a block that contains unspent transactions
+    uint256 blockHash { GetRandHash() };
+    uint32_t blockHeight {1};
+
+    //
+    // Add sample UTXOs to database
+    //
+    {
+        CCoinsProviderTest provider {1024};
+
+        {
+            TestCoinsSpanCache span { provider };
+            span.SetBestBlock(blockHash);
+
+            for(const auto& txn : txns)
+            {
+                CScript scr { OP_RETURN };
+                CTxOut txo { Amount{123}, scr };
+                span.AddCoin(txn->vin[0].prevout, CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
+            }
+
+            BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), txns.size());
+
+            // And flush them to provider
+            BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
+        }
+
+        // Flush sample UTXOs to DB
+        BOOST_TEST(provider.Flush());
+    }
+
+    // Create fresh coins DB
+    CCoinsProviderTest provider {1024};
+
+    // None of our created coins will be cached yet
+    for(const auto& txn : txns)
+    {
+        BOOST_CHECK(! provider.HaveCoinInCache(txn->vin[0].prevout));
+    }
+
+    // Cache them all (Except the first in the list, which the function expects to be coinbase)
+    provider.DBCacheAllInputs(txns);
+    for(size_t i = 1; i < txns.size(); ++i)
+    {
+        BOOST_CHECK(provider.HaveCoinInCache(txns[i]->vin[0].prevout));
     }
 }
 

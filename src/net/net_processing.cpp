@@ -206,7 +206,7 @@ void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectI
             PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
         }
         else {
-            if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+            if(GlobalConfig::GetConfig().GetMultistreamsEnabled()) {
                 pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
             }
             PushNodeVersion(pnode, connman, GetTime());
@@ -390,7 +390,7 @@ static void FindNextBlocksToDownload(
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->GetHeight(), nWindowEnd + 1);
     NodeId waitingfor = -1;
 
-    const int32_t nDownloadHeightThreshold = chainActive.Height() + 10;
+    const int32_t nDownloadHeightThreshold = chainActive.Height() + config.GetBlockDownloadLowerWindow();
 
     // Lambda to record a block we should fetch
     auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor, nDownloadHeightThreshold](const CBlockIndex* pindex)
@@ -406,6 +406,7 @@ static void FindNextBlocksToDownload(
             return false;
         }
 
+        // A further limit on how far ahead we download blocks to reduce disk usage
         if (pindex->GetHeight() > nDownloadHeightThreshold) {
             return false;
         }
@@ -619,7 +620,7 @@ void Misbehaving(NodeId pnode, int howmuch, const std::string &reason) {
         return;
     }
     state->nMisbehavior += howmuch;
-    int banscore = gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD);
+    int64_t banscore = GlobalConfig::GetConfig().GetBanScoreThreshold();
     if (state->nMisbehavior >= banscore &&
         state->nMisbehavior - howmuch < banscore) {
         LogPrintf(
@@ -1010,9 +1011,15 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     }
 }
 
-static bool rejectIfMaxDownloadExceeded(uint64_t maxSendQueuesBytes, CSerializedNetMsg &msg, bool isMostRecentBlock, const CNodePtr& pfrom, CConnman &connman) {
-
-    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
+static bool rejectIfMaxDownloadExceeded(
+    const Config& config,
+    const CSerializedNetMsg& msg,
+    bool isMostRecentBlock,
+    const CNodePtr& pfrom,
+    CConnman& connman)
+{
+    uint64_t maxSendQueuesBytes { config.GetMaxSendQueuesBytes() };
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesMemory() + msg.GetEstimatedMemoryUsage() + CMessageHeader::GetHeaderSizeForPayload(msg.Size());
     if (totalSize > maxSendQueuesBytes) {
 
         if (!isMostRecentBlock) {
@@ -1044,7 +1051,7 @@ static bool rejectIfMaxDownloadExceeded(uint64_t maxSendQueuesBytes, CSerialized
 }
 
 static bool SendCompactBlock(
-    uint64_t maxSendQueuesBytes,
+    const Config& config,
     bool isMostRecentBlock,
     const CNodePtr& node,
     CConnman& connman,
@@ -1053,7 +1060,7 @@ static bool SendCompactBlock(
 {
     CSerializedNetMsg compactBlockMsg =
         msgMaker.Make(NetMsgType::CMPCTBLOCK, cmpctblock);
-    if (rejectIfMaxDownloadExceeded(maxSendQueuesBytes, compactBlockMsg, isMostRecentBlock, node, connman)) {
+    if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, node, connman)) {
         return false;
     }
     connman.PushMessage(node, std::move(compactBlockMsg));
@@ -1062,7 +1069,7 @@ static bool SendCompactBlock(
 }
 
 static void SendBlock(
-    uint64_t maxSendQueuesBytes,
+    const Config& config,
     bool isMostRecentBlock,
     const CNodePtr& pfrom,
     CBlockIndex::BlockStreamAndMetaData data,
@@ -1075,7 +1082,7 @@ static void SendBlock(
             std::move(data.stream)
         };
 
-    if (rejectIfMaxDownloadExceeded(maxSendQueuesBytes, blockMsg, isMostRecentBlock, pfrom, connman)) {
+    if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
         return;
     }
 
@@ -1132,9 +1139,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
     std::vector<CInv> vNotFound;
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    // maxSendQueuesBytes is stored here to keep the same value throughout the whole execution even if 
-    // it is changed via RPC calls and to avoid locking/unlocking mutex too many times.
-    uint64_t maxSendQueuesBytes = config.GetMaxSendQueuesBytes();
+
     LOCK(cs_main);
 
     while (it != pfrom->vRecvGetData.end()) {
@@ -1236,7 +1241,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         if (data.stream)
                         {
                             SendBlock(
-                                maxSendQueuesBytes,
+                                config,
                                 isMostRecentBlock,
                                 pfrom,
                                 std::move(data),
@@ -1257,7 +1262,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             }
                             if (sendMerkleBlock) {
                                 CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
-                                if (rejectIfMaxDownloadExceeded(maxSendQueuesBytes, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
+                                if (rejectIfMaxDownloadExceeded(config, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
                                     break;
                                 }
                                 connman.PushMessage(pfrom, std::move(merkleBlockMsg));
@@ -1299,7 +1304,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             if (reader)
                             {
                                 bool sent = SendCompactBlock(
-                                    maxSendQueuesBytes,
+                                    config,
                                     isMostRecentBlock,
                                     pfrom,
                                     connman,
@@ -1317,7 +1322,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             if (data.stream)
                             {
                                 SendBlock(
-                                    maxSendQueuesBytes,
+                                    config,
                                     isMostRecentBlock,
                                     pfrom,
                                     std::move(data),
@@ -1423,24 +1428,6 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
         connman.PushMessage(pfrom,
                             msgMaker.Make(NetMsgType::NOTFOUND, vNotFound));
     }
-}
-
-inline static void SendBlockTransactions(const CBlock &block,
-                                         const BlockTransactionsRequest &req,
-                                         const CNodePtr& pfrom, CConnman &connman) {
-    BlockTransactions resp(req);
-    for (size_t i = 0; i < req.indices.size(); i++) {
-        if (req.indices[i] >= block.vtx.size()) {
-            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
-            return;
-        }
-        resp.txn[i] = block.vtx[req.indices[i]];
-    }
-
-    const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    connman.PushMessage(pfrom,
-                        msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
 /**
@@ -1708,7 +1695,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             if (config.IsClientUABanned(cleanSubVer))
             {
                 LogPrint(BCLog::NETCONN, "Client UA is banned (%s) peer=%d\n", cleanSubVer, pfrom->id);
-                Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+                Misbehaving(pfrom, config.GetBanScoreThreshold(), "invalid-UA");
                 return false;
             }
         }
@@ -1722,7 +1709,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
         if(!vRecv.empty()) {
             try {
                 vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-                if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                if(config.GetMultistreamsEnabled()) {
                     // Decode received association ID
                     AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
                     if(recvdAssocID) {
@@ -2384,7 +2371,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
     // Allow whitelisted peers to send data other than blocks in blocks only
     // mode if whitelistrelay is true
-    if(pfrom->fWhitelisted && gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY)) {
+    if(pfrom->fWhitelisted && config.GetWhitelistRelay()) {
         fBlocksOnly = false;
     }
 
@@ -2509,7 +2496,7 @@ static bool ProcessGetBlocks(
         // If pruning, don't inv blocks unless we have on disk and are
         // likely to still have for some reasonable time window (1 hour)
         // that block relay might require.
-        const int nPrunedBlocksLikelyToHave = MIN_BLOCKS_TO_KEEP - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
+        const int nPrunedBlocksLikelyToHave = config.GetMinBlocksToKeep() - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
         if(fPruneMode &&
             (!pindex->getStatus().hasData() ||
              pindex->GetHeight() <=
@@ -2554,6 +2541,143 @@ static void ProcessGetBlocksMessage(
     }
 }
  
+namespace
+{
+
+// Interface for classes to fetch BlockTxn transactions
+class BlockTransactionReader
+{
+  public:
+    virtual ~BlockTransactionReader() = default;
+
+    virtual size_t GetNumTxnsInBlock() const = 0;
+
+    // Return transaction at index from block. Subsequent calls
+    // must be for indexes higher than the previous call.
+    virtual CTransactionRef GetTransactionIndex(size_t index) = 0;
+};
+
+// Fetch BlockTxn transactions from a block file
+class DiskBlockTransactionReader : public BlockTransactionReader
+{
+  public:
+    DiskBlockTransactionReader(std::unique_ptr<CBlockStreamReader<CFileReader>> reader)
+        : BlockTransactionReader{}, mReader{std::move(reader)},
+          mNumTxnsInBlock{mReader->GetRemainingTransactionsCount()}
+    {}
+
+    size_t GetNumTxnsInBlock() const override { return mNumTxnsInBlock; }
+
+    CTransactionRef GetTransactionIndex(size_t index) override
+    {
+        if(index >= mNumTxnsInBlock)
+        {
+            throw std::runtime_error("Index out-of-bounds");
+        }
+
+        // Transaction indexes in request are assumed to be sorted in ascending order without duplicates.
+        // This must always be true since indexes are differentially encoded in getblocktxn P2P message.
+        assert(index >= mNumTxnsRead);
+
+        // Read from block stream until we get to the transaction with requested index.
+        for(; mNumTxnsRead <= index; ++mNumTxnsRead)
+        {
+            assert(! mReader->EndOfStream()); // We should never get pass the end of stream since we checked transaction index above.
+            auto* tx_ptr = mReader->ReadTransaction_NoThrow();
+            (void)tx_ptr; // not used except for assert
+            assert(tx_ptr); // Reading block should not fail
+        }
+
+        // CBlockStreamReader object now holds transaction with requested index.
+        // Take ownership of transaction object and store transaction reference in the response.
+        return mReader->GetLastTransactionRef();
+    }
+
+  private:
+
+    std::unique_ptr<CBlockStreamReader<CFileReader>> mReader {nullptr};
+    size_t mNumTxnsInBlock {0};
+    size_t mNumTxnsRead {0};
+};
+
+// Fetch BlockTxn transactions from the cached latest block
+class CachedBlockTransactionReader : public BlockTransactionReader
+{
+  public:
+    CachedBlockTransactionReader(const CBlock& block)
+        : BlockTransactionReader{}, mBlock{block}
+    {}
+
+    size_t GetNumTxnsInBlock() const override { return mBlock.vtx.size(); }
+
+    CTransactionRef GetTransactionIndex(size_t index) override
+    {
+        if(index >= mBlock.vtx.size())
+        {
+            throw std::runtime_error("Index out-of-bounds");
+        }
+
+        return mBlock.vtx[index];
+    }
+
+  private:
+
+    const CBlock& mBlock;
+};
+
+void SendBlockTransactions(const Config& config,
+                           const CNodePtr& pfrom,
+                           const CChainParams& chainparams,
+                           const std::atomic<bool>& interruptMsgProc,
+                           const BlockTransactionsRequest& req,
+                           BlockTransactionReader& reader,
+                           bool mostRecentBlock,
+                           CConnman& connman)
+{
+    // If the peer wants more than the configured % of txns in the original block, just stream them the whole thing
+    size_t numTxnsRequested { req.indices.size() };
+    size_t numTxnsInBlock { reader.GetNumTxnsInBlock() };
+    if(numTxnsInBlock > 0)
+    {
+        double percentRequested { (static_cast<double>(numTxnsRequested) / numTxnsInBlock) * 100 };
+        unsigned maxPercent { config.GetBlockTxnMaxPercent() };
+        if(percentRequested > maxPercent)
+        {
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn wanting %f%% of txns "
+                "which is more than the configured max of %d%%. Responding with full block\n",
+                pfrom->id, percentRequested, maxPercent);
+            CInv inv { MSG_BLOCK, req.blockhash };
+            pfrom->vRecvGetData.push_back(inv);
+            ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
+            return;
+        }
+    }
+
+    BlockTransactions resp {req};
+    for(size_t i = 0; i < req.indices.size(); i++)
+    {
+        try
+        {
+            resp.txn[i] = reader.GetTransactionIndex(req.indices[i]);
+        }
+        catch(const std::exception&)
+        {
+            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
+            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
+            return;
+        }
+    }
+
+    const CNetMsgMaker msgMaker { pfrom->GetSendVersion() };
+    CSerializedNetMsg msg { msgMaker.Make(NetMsgType::BLOCKTXN, resp) };
+    if(! rejectIfMaxDownloadExceeded(config, msg, mostRecentBlock, pfrom, connman))
+    {
+        connman.PushMessage(pfrom, std::move(msg));
+    }
+}
+
+}
+
 /**
 * Process getblocktxn message.
 */
@@ -2564,20 +2688,23 @@ static void ProcessGetBlockTxnMessage(const Config& config,
                                       CDataStream& vRecv,
                                       CConnman& connman)
 {
-    BlockTransactionsRequest req;
+    BlockTransactionsRequest req {};
     vRecv >> req;
 
-    std::shared_ptr<const CBlock> recent_block =
-        mostRecentBlock.GetBlockIfMatch(req.blockhash);
-    if(recent_block) {
-        SendBlockTransactions(*recent_block, req, pfrom, connman);
+    // See if we can serve this request from the last received cached block
+    std::shared_ptr<const CBlock> recent_block { mostRecentBlock.GetBlockIfMatch(req.blockhash) };
+    if(recent_block)
+    {
+        std::unique_ptr<BlockTransactionReader> blockReader { std::make_unique<CachedBlockTransactionReader>(*recent_block) };
+        SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, *blockReader, true, connman);
         return;
     }
 
     LOCK(cs_main);
 
     auto index = mapBlockIndex.Get(req.blockhash);
-    if(!index) {
+    if(!index)
+    {
         LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
@@ -2591,60 +2718,24 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         // might maliciously send lots of getblocktxn requests to trigger
         // expensive disk reads, because it will require the peer to
         // actually receive all the data read from disk over the network.
-        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n",
-                 pfrom->id, MAX_BLOCKTXN_DEPTH);
-        CInv inv;
-        inv.type = MSG_BLOCK;
-        inv.hash = req.blockhash;
+        LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block > %i deep\n", pfrom->id, MAX_BLOCKTXN_DEPTH);
+        CInv inv { MSG_BLOCK, req.blockhash };
         pfrom->vRecvGetData.push_back(inv);
         ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman, interruptMsgProc);
         return;
     }
 
     // Create stream reader object that will be used to read block from disk.
-    auto block_stream_reader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
-    if (!block_stream_reader)
+    auto blockStreamReader = index->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
+    if(!blockStreamReader)
     {
         LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have\n", pfrom->id);
         return;
     }
-    // Number of transactions in block
-    const std::size_t num_txn_in_block { block_stream_reader->GetRemainingTransactionsCount() };
 
-    BlockTransactions resp(req);
-
-    std::size_t num_txn_read=0; // Number of transactions that were already read from block stream
-    for(std::size_t i=0; i<req.indices.size(); ++i)
-    {
-        const std::size_t txn_idx { req.indices[i] };
-        if (txn_idx >= num_txn_in_block)
-        {
-            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn with out-of-bounds tx indices\n", pfrom->id);
-            return;
-        }
-
-        // Transaction indexes in request are assumed to be sorted in ascending order without duplicates.
-        // This must always be true since indexes are differentially encoded in getblocktxn P2P message.
-        assert(txn_idx>=num_txn_read);
-
-        // Read from block stream until we get to the transaction with requested index.
-        for(; num_txn_read<=txn_idx; ++num_txn_read)
-        {
-            assert(!block_stream_reader->EndOfStream()); // We should never get pass the end of stream since we checked transaction index above.
-            auto* tx_ptr = block_stream_reader->ReadTransaction_NoThrow();
-            (void)tx_ptr; // not used except for assert
-            assert(tx_ptr); // Reading block should not fail
-        }
-
-        // CBlockStreamReader object now holds transaction with requested index.
-        // Take ownership of transaction object and store transaction reference in the response.
-        resp.txn[i] = block_stream_reader->GetLastTransactionRef();
-    }
-
-    const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    connman.PushMessage(pfrom,
-        msgMaker.Make(NetMsgType::BLOCKTXN, std::move(resp)));
+    std::unique_ptr<BlockTransactionReader> blockReader { std::make_unique<DiskBlockTransactionReader>(std::move(blockStreamReader)) };
+    bool isTip { req.blockhash == chainActive.Tip()->GetBlockHash() };
+    SendBlockTransactions(config, pfrom, chainparams, interruptMsgProc, req, *blockReader, isTip, connman);
 }
 
 
@@ -3031,8 +3122,7 @@ static void ProcessTxMessage(const Config& config,
     // Stop processing the transaction early if we are in blocks only mode and
     // peer is either not whitelisted or whitelistrelay is off
     if (!fRelayTxes &&
-        (!pfrom->fWhitelisted ||
-         !gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY))) {
+        (!pfrom->fWhitelisted || !config.GetWhitelistRelay())) {
         LogPrint(BCLog::NETMSGVERB,
                 "transaction sent in violation of protocol peer=%d\n",
                  pfrom->id);
@@ -3072,11 +3162,7 @@ static void ProcessTxMessage(const Config& config,
         // even if they were already in the mempool or rejected from it
         // due to policy, allowing the node to function as a gateway for
         // nodes hidden behind it.
-        bool fWhiteListForceRelay {
-                gArgs.GetBoolArg("-whitelistforcerelay",
-                                DEFAULT_WHITELISTFORCERELAY)
-        };
-        if (pfrom->fWhitelisted && fWhiteListForceRelay) {
+        if (pfrom->fWhitelisted && config.GetWhitelistForceRelay()) {
             RelayTransaction(*ptx, connman);
             LogPrint(BCLog::TXNVAL,
                     "%s: Force relaying tx %s from whitelisted peer=%d\n",
@@ -3785,11 +3871,12 @@ static void ProcessGetAddrMessage(const CNodePtr& pfrom,
 /**
 * Process mempool message.
 */
-static void ProcessMempoolMessage(const CNodePtr& pfrom,
+static void ProcessMempoolMessage(const Config& config,
+                                  const CNodePtr& pfrom,
                                   CDataStream& vRecv,
                                   CConnman& connman)
 {
-    if (gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST) && !pfrom->fWhitelisted) {
+    if (config.GetRejectMempoolRequest() && !pfrom->fWhitelisted) {
         LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
                  pfrom->GetId());
         pfrom->fDisconnect = true;
@@ -4295,7 +4382,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
              SanitizeString(strCommand), vRecv.size(), pfrom->id);
-    if (gArgs.IsArgSet("-dropmessagestest") && GetRand(gArgs.GetArg("-dropmessagestest", 0)) == 0) {
+    if (config.DoDropMessageTest() && GetRand(config.GetDropMessageTest()) == 0) {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
         return true;
     }
@@ -4430,7 +4517,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::MEMPOOL) {
-        ProcessMempoolMessage(pfrom, vRecv, connman);
+        ProcessMempoolMessage(config, pfrom, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::PING) {
@@ -4621,8 +4708,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                 if (state){
                     auto curTime = std::chrono::system_clock::now();
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
-                    unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
-                    std::chrono::milliseconds checksumInterval(interval); 
+                    std::chrono::milliseconds checksumInterval(config.GetInvalidChecksumInterval()); 
                     if (duration < std::chrono::milliseconds(checksumInterval).count()){
                         ++ state->dInvalidChecksumFrequency;
                     }
@@ -4630,10 +4716,9 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                         // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
                         state->dInvalidChecksumFrequency = 0;
                     }
-                    unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-                    if (state->dInvalidChecksumFrequency > checkSumFreq){
+                    if (state->dInvalidChecksumFrequency > config.GetInvalidChecksumFreq()) {
                         // MisbehavingNode if the count goes above some chosen value 
-                        // 100 conseqitive invalid checksums received with less than 500ms between them
+                        // 100 consecutive invalid checksums received with less than 500ms between them
                         Misbehaving(pfrom, 1, "Invalid Checksum activity");
                         LogPrint(BCLog::NETMSG, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
                     }
@@ -4944,7 +5029,7 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
                     assert(!"cannot load block from disk");
                 }
                 SendCompactBlock(
-                    config.GetMaxSendQueuesBytes(),
+                    config,
                     true,
                     pto,
                     connman,
@@ -5345,11 +5430,9 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     //
     // We don't want white listed peers to filter txs to us if we have
     // -whitelistforcerelay
-    if (pto->nVersion >= FEEFILTER_VERSION &&
-        gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER) &&
-        !(pto->fWhitelisted &&
-          gArgs.GetBoolArg("-whitelistforcerelay",
-                           DEFAULT_WHITELISTFORCERELAY))) {
+    if (pto->nVersion >= FEEFILTER_VERSION && config.GetFeeFilter() &&
+        !(pto->fWhitelisted && config.GetWhitelistForceRelay()))
+    {
         MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
         Amount currentFilter =
             mempool

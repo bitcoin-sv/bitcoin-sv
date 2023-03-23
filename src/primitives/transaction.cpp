@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
+#include "streams.h"
 
 std::string COutPoint::ToString() const {
     return strprintf("COutPoint(%s, %u)", txid.ToString().substr(0, 10), n);
@@ -143,5 +144,30 @@ std::pair<bool, size_t> TxnHasDSNotificationOutput(const CTransaction& txn)
     }
 
     return { false, 0 };
+}
+
+size_t ser_size(const CTransaction& tx) 
+{
+    auto total{sizeof(tx.nVersion) + 
+               cmpt_ser_size(tx.vin.size()) +
+               cmpt_ser_size(tx.vout.size()) +
+               sizeof(tx.nLockTime)};
+    total = ser_size(tx.vin.cbegin(), tx.vin.cend(), total);
+    return ser_size(tx.vout.cbegin(), tx.vout.cend(), total);
+}
+
+size_t ser_size(const CTxIn& input)
+{
+    return sizeof(COutPoint) +
+           cmpt_ser_size(input.scriptSig.size()) +
+           input.scriptSig.size() +
+           sizeof(input.nSequence);
+}
+
+size_t ser_size(const CTxOut& op)
+{
+    return sizeof(op.nValue) +
+           cmpt_ser_size(op.scriptPubKey.size()) +
+           op.scriptPubKey.size();
 }
 

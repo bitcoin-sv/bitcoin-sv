@@ -462,8 +462,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-threadsperblock=<n>",
         strprintf(_("Set the number of script verification threads used when "
                     "validating single block (0 to %d, 0 = auto, default: %d)"),
-                  MAX_SCRIPTCHECK_THREADS,
+                  MAX_TXNSCRIPTCHECK_THREADS,
                   DEFAULT_SCRIPTCHECK_THREADS));
+    strUsage += HelpMessageOpt(
+        "-txnthreadsperblock=<n>",
+        strprintf(_("Set the number of transaction verification threads used when "
+                    "validating single block (0 to %d, 0 = auto, default: %d)"),
+                  MAX_TXNSCRIPTCHECK_THREADS,
+                  DEFAULT_TXNCHECK_THREADS));
     strUsage +=
         HelpMessageOpt(
             "-scriptvalidatormaxbatchsize=<n>",
@@ -520,7 +526,21 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
               "Note: Currently achievable prune target is ~100GB (mainnet). "
               "Setting the target size too low will not affect pruning function, "
               "but will not guarantee block files size staying under the threshold at all times. "),
-            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, MIN_BLOCKS_TO_KEEP));
+            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE, config.GetMinBlocksToKeep()));
+
+    if(showDebug) {
+        strUsage += HelpMessageOpt(
+            "-pruneminblockstokeep=<n>",
+            strprintf(
+                _("Set the minimum number of most recent blocks to keep when pruning. "
+                  "WARNING: Changing this value could cause unexpected problems with reorgs, "
+                  "safe-mode activation and other functions; use at your own risk. "
+                  "It should only be used for a limited time to help a node with very limited "
+                  "disk space make progress downloading the blockchain "
+                  "(default: %d, minimum value: %d)."), DEFAULT_MIN_BLOCKS_TO_KEEP, MIN_MIN_BLOCKS_TO_KEEP)
+        );
+    }
+
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
@@ -585,6 +605,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt("-blockdownloadwindow=<n>",
             strprintf(_("Size of block download window before considering we may be stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
+        strUsage += HelpMessageOpt("-blockdownloadlowerwindow=<n>",
+            strprintf(_("A further lower limit on the download window (above) to help the node hit the pruning target (if enabled). "
+            "If pruning is NOT enabled then this will default to the same as the blockdownloadwindow. An operator may choose to "
+            "reduce this value even if pruning is not enabled which will result in the node using less disk space during IBD but "
+            "at the possible cost of a slower IBD time. Conversely, an operator of a pruned node may choose to increase this value "
+            "to reduce the time it takes to perform IBD but at the cost of possibly exceeding the pruning target at times. "
+            "(default if pruning enabled: %u, default if pruning not enabled: %u)"),
+                DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW, DEFAULT_BLOCK_DOWNLOAD_WINDOW));
         strUsage += HelpMessageOpt("-blockdownloadslowfetchtimeout=<n>",
             strprintf(_("Number of seconds to wait for a block to be received before triggering "
                         "a slow fetch timeout (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT));
@@ -638,6 +666,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-listen", _("Accept connections from outside (default: "
                                     "1 if no -proxy or -connect/-noconnect)"));
+    strUsage += HelpMessageOpt(
+        "-maxaddnodeconnections=<n>",
+        strprintf(_("Maximum number of additional outgoing connections to maintain that have been added "
+                    "via addnode (default: %u)"), DEFAULT_MAX_ADDNODE_CONNECTIONS));
+    strUsage +=
+        HelpMessageOpt("-maxblocktxnpercent=<n>",
+        strprintf(_("Maximum perentage of txns from a block we will respond to a getblocktxn request "
+                    "with a blocktxn response. Larger than this we will just respond with the entire block "
+                    "(default: %u)"),
+            DEFAULT_BLOCK_TXN_MAX_PERCENT));
     strUsage += HelpMessageOpt(
         "-maxconnections=<n>",
         strprintf(_("Maintain at most <n> connections to peers (default: %u)"),
@@ -1302,6 +1340,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     /** TxnValidator */
     strUsage += HelpMessageGroup(_("TxnValidator options:"));
+    strUsage += HelpMessageOpt(
+        "-blockvalidationtxbatchsize=<n>",
+        strprintf(_("Set the minimum batch size for groups of txns to be validated in parallel during block validation "
+                    "(default: %d)"),
+            DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE));
     strUsage += HelpMessageOpt(
         "-numstdtxvalidationthreads=<n>",
         strprintf(_("Set the number of 'High' priority threads used to validate standard txns (dynamically calculated default: %d)"),
@@ -1977,18 +2020,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     nMaxConnections = std::max(nUserMaxConnections, 0);
 
     // Trim requested connection counts, to fit into system limitations
+    if(std::string err; !config.SetMaxAddNodeConnections(gArgs.GetArg("-maxaddnodeconnections", DEFAULT_MAX_ADDNODE_CONNECTIONS), &err)) {
+        return InitError(err);
+    }
+    uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
     nMaxConnections =
         std::max(std::min(nMaxConnections,
-                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS -
-                                MAX_ADDNODE_CONNECTIONS)),
+                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
                  0);
-    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS +
-                                   MAX_ADDNODE_CONNECTIONS);
+    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
     nMaxConnections =
-        std::min(nFD - MIN_CORE_FILEDESCRIPTORS - MAX_ADDNODE_CONNECTIONS,
-                 nMaxConnections);
+        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
 
     if (nMaxConnections < nUserMaxConnections) {
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
@@ -2116,6 +2160,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string error; !config.SetBlockScriptValidatorsParams(
         gArgs.GetArg("-maxparallelblocks", DEFAULT_SCRIPT_CHECK_POOL_SIZE),
         gArgs.GetArg("-threadsperblock", DEFAULT_SCRIPTCHECK_THREADS),
+        gArgs.GetArg("-txnthreadsperblock", DEFAULT_TXNCHECK_THREADS),
         gArgs.GetArg("-scriptvalidatormaxbatchsize", DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE),
         &error))
     {
@@ -2344,6 +2389,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
+    if(std::string err; !config.SetBlockValidationTxBatchSize(gArgs.GetArg("-blockvalidationtxbatchsize", DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE), &err)) {
+        return InitError(err);
+    }
+
     // Safe mode activation
     if(gArgs.IsArgSet("-safemodewebhookurl")) {
         if(std::string err; !config.SetSafeModeWebhookURL(gArgs.GetArg("-safemodewebhookurl", ""), &err)) {
@@ -2370,6 +2419,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetBlockDownloadWindow(gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW), &err)) {
         return InitError(err);
     }
+    int64_t defaultBlockDownloadLowerWindow { gArgs.GetArg("-prune", 0)? DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW : config.GetBlockDownloadWindow() };
+    if(std::string err; !config.SetBlockDownloadLowerWindow(gArgs.GetArg("-blockdownloadlowerwindow", defaultBlockDownloadLowerWindow), &err)) {
+        return InitError(err);
+    }
     if(std::string err; !config.SetBlockDownloadSlowFetchTimeout(gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT), &err)) {
         return InitError(err);
     }
@@ -2394,6 +2447,35 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetBanScoreThreshold(gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetBlockTxnMaxPercent(gArgs.GetArg("-maxblocktxnpercent", DEFAULT_BLOCK_TXN_MAX_PERCENT), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMultistreamsEnabled(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWhitelistRelay(gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWhitelistForceRelay(gArgs.GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetRejectMempoolRequest(gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST), &err)) {
+        return InitError(err);
+    }
+    if(gArgs.IsArgSet("-dropmessagestest")) {
+        if(std::string err; !config.SetDropMessageTest(gArgs.GetArg("-dropmessagestest", 0), &err)) {
+            return InitError(err);
+        }
+    }
+    if(std::string err; !config.SetInvalidChecksumInterval(gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetInvalidChecksumFreq(gArgs.GetArg("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetFeeFilter(gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER), &err)) {
         return InitError(err);
     }
 
@@ -2484,6 +2566,10 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                   "files.\n",
                   nPruneTarget / ONE_MEBIBYTE);
         fPruneMode = true;
+    }
+
+    if(std::string err; !config.SetMinBlocksToKeep(gArgs.GetArg("-pruneminblockstokeep", DEFAULT_MIN_BLOCKS_TO_KEEP), &err)) {
+        return InitError(err);
     }
 
     if(std::string err; !config.SetMaxStdTxnValidationDuration(
@@ -2718,8 +2804,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                                           gArgs.GetArg("-minminingtxfee", "")));
         }
         mempool.SetBlockMinTxFee(CFeeRate(n));
-    } else {
-        return InitError("-minminingtxfee is mandatory");
     }
 
     if(gArgs.IsArgSet("-rollingminfeeratehalflife"))
@@ -3020,7 +3104,7 @@ void preloadChainStateThreadFunction()
         int stillLoadedPercent = (int) vm2.vmtouch_check(path);
 
         if (stillLoadedPercent < 90) {
-            LogPrintf("WARNING: Only %d %% of data still present in memory after preloading. Increae amount of free RAM to get the benefits of preloading\n", stillLoadedPercent);
+            LogPrintf("WARNING: Only %d %% of data still present in memory after preloading. Increase amount of free RAM to get the benefits of preloading\n", stillLoadedPercent);
         }
 
     }   catch(const std::runtime_error& ex) {
@@ -3116,8 +3200,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     g_MempoolDatarefTracker = std::make_unique<mining::MempoolDatarefTracker>();
     g_BlockDatarefTracker = mining::make_from_dir();
 
-    LogPrintf("Using %u threads for script verification\n",
-              config.GetPerBlockScriptValidatorThreadsCount());
+    LogPrintf("Using %u threads for block transaction verification\n", config.GetPerBlockTxnValidatorThreadsCount());
+    LogPrintf("Using %u threads for script verification\n", config.GetPerBlockScriptValidatorThreadsCount());
     InitScriptCheckQueues(config, threadGroup);
 
     // Late configuration for globaly constructed objects
@@ -3476,10 +3560,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                 uiInterface.InitMessage(_("Verifying blocks..."));
                 if (fHavePruned &&
                     gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) >
-                        MIN_BLOCKS_TO_KEEP) {
+                        config.GetMinBlocksToKeep()) {
                     LogPrintf("Prune: pruned datadir may not have more than %d "
                               "blocks; only checking available blocks\n",
-                              MIN_BLOCKS_TO_KEEP);
+                              config.GetMinBlocksToKeep());
                 }
 
                 {
@@ -3662,7 +3746,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     connOptions.nMaxConnections = nMaxConnections;
     connOptions.nMaxOutbound =
         std::min(MAX_OUTBOUND_CONNECTIONS, connOptions.nMaxConnections);
-    connOptions.nMaxAddnode = MAX_ADDNODE_CONNECTIONS;
+    connOptions.nMaxAddnode = config.GetMaxAddNodeConnections();
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;

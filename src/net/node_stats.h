@@ -18,6 +18,7 @@ public:
     uint64_t nRecvBytes;
     uint64_t nSendSize;
     uint64_t nRecvSize;
+    uint64_t nSendMemory;
     uint64_t nSpotBytesPerSec;
     uint64_t nMinuteBytesPerSec;
     bool fPauseRecv;
@@ -37,6 +38,7 @@ public:
     uint64_t nRecvBytes;
     uint64_t nSendSize;
     uint64_t nRecvSize;
+    uint64_t nSendMemory;
     uint64_t nAvgBandwidth;
 
     std::vector<StreamStats> streamStats;

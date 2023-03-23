@@ -82,6 +82,8 @@ class Association
 
     // Get current total send queue size
     uint64_t GetTotalSendQueueSize() const;
+    // Get current total send queue estimated memory usage
+    uint64_t GetTotalSendQueueMemoryUsage() const;
 
     // Update average bandwidth measurements
     void AvgBandwithCalc();
