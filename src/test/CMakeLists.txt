@@ -148,6 +148,7 @@ add_test_to_suite(bitcoin test_bitcoin
     net_message_maker_tests.cpp
     net_association_tests.cpp
 	net_tests.cpp
+    net_message_tests.cpp
 	netbase_tests.cpp
 	object_stream_deserialization_tests.cpp
 	opcode_tests.cpp

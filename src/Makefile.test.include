@@ -122,6 +122,7 @@ BITCOIN_TESTS =\
   test/msg_parser_buffer_tests.cpp \
   test/multisig_tests.cpp \
   test/net_association_tests.cpp \
+  test/net_message_tests.cpp \
   test/net_message_maker_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
