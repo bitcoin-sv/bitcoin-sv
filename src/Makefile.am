@@ -178,7 +178,13 @@ BITCOIN_CORE_H = \
   net/association_id.h \
   net/authconn.h \
   net/block_download_tracker.h \
+  net/block_parser.h \
+  net/blocktxn_parser.h \
+  net/cmpct_size.h \
+  net/cmpctblock_parser.h \
+  net/fixed_len_multi_parser.h \
   net/fixed_len_parser.h \
+  net/msg_buffer.h \
   net/msg_parser.h \
   net/msg_parser_buffer.h \
   net/net.h \
@@ -188,15 +194,10 @@ BITCOIN_CORE_H = \
   net/net_processing.h \
   net/net_types.h \
   net/node_state.h \
+  net/node_stats.h \
   net/parser_utils.h \
   net/prefilled_tx_parser.h \
   net/p2p_msg_lengths.h \
-  net/node_stats.h \
-  net/block_parser.h \
-  net/blocktxn_parser.h \
-  net/cmpct_size.h \
-  net/cmpctblock_parser.h \
-  net/fixed_len_multi_parser.h \
   net/send_queue_bytes.h \
   net/single_seg_parser.h \
   net/stream.h \
@@ -373,6 +374,7 @@ libbitcoin_server_a_SOURCES = \
   net/cmpctblock_parser.cpp \
   net/fixed_len_multi_parser.cpp \
   net/fixed_len_parser.cpp \
+  net/msg_buffer.cpp \
   net/msg_parser_buffer.cpp \
   net/net.cpp \
   net/net_message.cpp \
