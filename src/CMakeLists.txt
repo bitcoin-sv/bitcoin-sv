@@ -332,6 +332,8 @@ add_library(common
 	txn_validation_config.h
 	txn_validation_data.h
 	txn_validation_result.h
+    unique_array.h
+    unique_array.cpp
 	validation.h
 	version.h
 	versionbits.h

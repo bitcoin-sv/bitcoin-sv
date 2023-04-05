@@ -263,6 +263,7 @@ BITCOIN_CORE_H = \
   txn_validator.h \
   ui_interface.h \
   undo.h \
+  unique_array.h \
   util.h \
   utilmoneystr.h \
   utiltime.h \
@@ -397,6 +398,7 @@ libbitcoin_server_a_SOURCES = \
   txn_recent_rejects.cpp \
   txn_validator.cpp \
   ui_interface.cpp \
+  unique_array.cpp \
   validation.cpp \
   validationinterface.cpp \
   vmtouch.cpp \
