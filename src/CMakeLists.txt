@@ -277,6 +277,7 @@ add_library(common
 	net/netbase.cpp
 	net/netbase.h
 	net/node_stats.h
+    net/array_parser.h
 	net/send_queue_bytes.h
 	net/stream.h
 	net/stream_policy.h

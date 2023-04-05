@@ -173,6 +173,7 @@ BITCOIN_CORE_H = \
   mining/journal_change_set.h \
   mining/journal_entry.h \
   mining/journaling_block_assembler.h \
+  net/array_parser.h \
   net/association.h \
   net/association_id.h \
   net/authconn.h \
