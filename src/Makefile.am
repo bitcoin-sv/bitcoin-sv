@@ -179,6 +179,7 @@ BITCOIN_CORE_H = \
   net/authconn.h \
   net/block_download_tracker.h \
   net/fixed_len_parser.h \
+  net/msg_parser.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \

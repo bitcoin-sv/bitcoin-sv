@@ -279,6 +279,7 @@ add_library(common
     net/fixed_len_multi_parser.cpp
     net/fixed_len_parser.h
     net/fixed_len_parser.cpp
+    net/msg_parser.h
     net/parser_utils.h
     net/single_seg_parser.h
     net/single_seg_parser.cpp
