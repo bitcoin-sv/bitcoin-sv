@@ -99,6 +99,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp
+    fixed_len_parser_tests.cpp
 	frozentxo_db_tests.cpp
 	frozentxo_mempool_tests.cpp
 	frozentxo_tests.cpp

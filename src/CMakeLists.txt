@@ -267,6 +267,8 @@ add_library(common
 	net/association.h
 	net/association_id.h
 	net/authconn.h
+    net/fixed_len_parser.h
+    net/fixed_len_parser.cpp
 	net/net.h
 	net/net_message.h
 	net/net_types.h

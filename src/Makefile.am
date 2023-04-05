@@ -177,6 +177,7 @@ BITCOIN_CORE_H = \
   net/association_id.h \
   net/authconn.h \
   net/block_download_tracker.h \
+  net/fixed_len_parser.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \
@@ -354,6 +355,7 @@ libbitcoin_server_a_SOURCES = \
   net/association.cpp \
   net/association_id.cpp \
   net/block_download_tracker.cpp \
+  net/fixed_len_parser.cpp \
   net/net.cpp \
   net/net_message.cpp \
   net/net_processing.cpp \
