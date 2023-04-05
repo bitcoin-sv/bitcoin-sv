@@ -1009,6 +1009,21 @@ constexpr size_t cmpt_ser_size(size_t n)
           assert(false);
 }
 
+constexpr size_t cmpt_deser_size(uint8_t n)
+{
+    if(n < 0xfd)
+        return 1;
+    else if(n == 0xfd)
+        return 3;
+    else if(n == 0xfe)
+        return 5;
+    else
+    {
+        assert(n == 0xff);
+        return 9;
+    }
+}
+
 template<typename T>
 inline constexpr size_t ser_size(const T&)
 {
