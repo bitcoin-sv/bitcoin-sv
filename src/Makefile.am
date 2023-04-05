@@ -180,6 +180,7 @@ BITCOIN_CORE_H = \
   net/block_download_tracker.h \
   net/fixed_len_parser.h \
   net/msg_parser.h \
+  net/msg_parser_buffer.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \
@@ -372,6 +373,7 @@ libbitcoin_server_a_SOURCES = \
   net/cmpctblock_parser.cpp \
   net/fixed_len_multi_parser.cpp \
   net/fixed_len_parser.cpp \
+  net/msg_parser_buffer.cpp \
   net/net.cpp \
   net/net_message.cpp \
   net/net_processing.cpp \

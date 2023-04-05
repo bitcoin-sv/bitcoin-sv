@@ -280,6 +280,8 @@ add_library(common
     net/fixed_len_parser.h
     net/fixed_len_parser.cpp
     net/msg_parser.h
+    net/msg_parser_buffer.h
+    net/msg_parser_buffer.cpp
     net/parser_utils.h
     net/single_seg_parser.h
     net/single_seg_parser.cpp
