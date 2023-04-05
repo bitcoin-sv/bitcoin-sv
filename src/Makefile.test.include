@@ -125,6 +125,8 @@ BITCOIN_TESTS =\
   test/object_stream_deserialization_tests.cpp \
   test/opcode_tests.cpp \
   test/pmt_tests.cpp \
+  test/prefilled_tx_parser_tests.cpp \
+  test/prefilled_txs_parser_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
   test/protocol_tests.cpp \

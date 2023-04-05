@@ -186,6 +186,7 @@ BITCOIN_CORE_H = \
   net/net_processing.h \
   net/net_types.h \
   net/node_state.h \
+  net/prefilled_tx_parser.h \
   net/p2p_msg_lengths.h \
   net/node_stats.h \
   net/block_parser.h \
@@ -371,6 +372,7 @@ libbitcoin_server_a_SOURCES = \
   net/net_message.cpp \
   net/net_processing.cpp \
   net/node_state.cpp \
+  net/prefilled_tx_parser.cpp \
   net/single_seg_parser.cpp \
   net/stream.cpp \
   net/stream_policy.cpp \

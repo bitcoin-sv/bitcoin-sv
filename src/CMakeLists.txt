@@ -287,6 +287,8 @@ add_library(common
 	net/netbase.cpp
 	net/netbase.h
 	net/node_stats.h
+    net/prefilled_tx_parser.h
+    net/prefilled_tx_parser.cpp
     net/p2p_msg_lengths.h
     net/array_parser.h
 	net/send_queue_bytes.h
