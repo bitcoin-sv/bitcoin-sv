@@ -88,3 +88,17 @@ size_t ser_size(const CBlock& block)
                                return total;
                            });
 }
+
+std::ostream& operator<<(std::ostream& os, const CBlockHeader& header)
+{
+    os << "CBlockHeader: "
+       << "\n\tnVersion: " << header.nVersion
+       << "\n\thashPrevBlock: " << header.hashPrevBlock
+       << "\n\thashMerkleRoot: " << header.hashPrevBlock
+       << "\n\tnTime: " << header.nTime
+       << "\n\tnBits: " << header.nBits
+       << "\n\tnNonce: " << header.nNonce;
+    return os;
+}
+
+
