@@ -186,6 +186,7 @@ BITCOIN_CORE_H = \
   net/net_processing.h \
   net/net_types.h \
   net/node_state.h \
+  net/p2p_msg_lengths.h \
   net/node_stats.h \
   net/block_parser.h \
   net/blocktxn_parser.h \
