@@ -198,6 +198,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	transaction_tests.cpp
     txn_grouper_tests.cpp
     tx_parser_tests.cpp
+    txs_parser_tests.cpp
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp
 	undo_tests.cpp
