@@ -167,6 +167,7 @@ BITCOIN_TESTS =\
   test/ttor_tests.cpp \
   test/transaction_tests.cpp \
   test/txn_grouper_tests.cpp \
+  test/tx_parser_tests.cpp \
   test/txvalidationcache_tests.cpp \
   test/uint256_tests.cpp \
   test/undo_tests.cpp \

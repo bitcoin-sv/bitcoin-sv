@@ -279,6 +279,8 @@ add_library(common
 	net/stream.h
 	net/stream_policy.h
 	net/stream_policy_factory.h
+    net/tx_parser.h
+    net/tx_parser.cpp
 	orphan_txns.h
 	policy/policy.h
 	pow.h
