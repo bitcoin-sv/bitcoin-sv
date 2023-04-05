@@ -44,6 +44,7 @@ BITCOIN_TESTS =\
   test/blockindex_with_descendants_tests.cpp \
   test/blockmaxsize_tests.cpp \
   test/block_parser_tests.cpp \
+  test/blocktxn_parser_tests.cpp \
   test/blockstatus_tests.cpp \
   test/blockvalidationstatus_tests.cpp \
   test/bloom_tests.cpp \

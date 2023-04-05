@@ -68,6 +68,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	block_index_mutex_distribution_tests.cpp
 	block_info_tests.cpp
     block_parser_tests.cpp
+    blocktxn_parser_tests.cpp
 	blockindex_with_descendants_tests.cpp
 	blockmaxsize_tests.cpp
 	blockfile_reading_tests.cpp

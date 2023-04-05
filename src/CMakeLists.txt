@@ -269,6 +269,8 @@ add_library(common
 	net/authconn.h
     net/block_parser.cpp
     net/block_parser.h
+    net/blocktxn_parser.cpp
+    net/blocktxn_parser.h
     net/fixed_len_parser.h
     net/fixed_len_parser.cpp
     net/single_seg_parser.h
