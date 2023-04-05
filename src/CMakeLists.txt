@@ -273,6 +273,8 @@ add_library(common
     net/blocktxn_parser.h
     net/cmpct_size.h
     net/cmpct_size.cpp
+    net/cmpctblock_parser.cpp
+    net/cmpctblock_parser.h
     net/fixed_len_multi_parser.h
     net/fixed_len_multi_parser.cpp
     net/fixed_len_parser.h

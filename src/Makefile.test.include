@@ -54,6 +54,7 @@ BITCOIN_TESTS =\
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
   test/check_selfish_mining_tests.cpp \
+  test/cmpctblock_parser_tests.cpp \
   test/cmpct_size_tests.cpp \
   test/coins_tests.cpp \
   test/write_preferring_upgradable_mutex_tests.cpp \
