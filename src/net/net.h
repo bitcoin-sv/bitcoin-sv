@@ -197,12 +197,12 @@ struct NodeConnectInfo
 class CGetBlockMessageRequest
 {
 public:
-    CGetBlockMessageRequest(CDataStream& vRecv)
+    CGetBlockMessageRequest(msg_buffer& vRecv)
         : mRequestTime{std::chrono::system_clock::now()}
     {
         vRecv >> mLocator >> mHashStop;
     }
-
+    
     auto GetRequestTime() const
         -> const std::chrono::time_point<std::chrono::system_clock>&
     {

@@ -9,6 +9,7 @@
 #include <hash.h>
 #include <protocol.h>
 #include <streams.h>
+#include "msg_buffer.h"
 
 #include <stdexcept>
 
@@ -18,7 +19,7 @@ private:
     mutable uint256 data_hash {};
 
     // Incoming data stream
-    CDataStream dataBuff;
+    msg_buffer dataBuff;
 
     // Message header
     CMessageHeader hdr;
@@ -45,7 +46,7 @@ public:
     const CMessageHeader& GetHeader() const { return hdr; }
     int64_t GetTime() const { return nTime; }
     void SetTime(int64_t time) { nTime = time; }
-    CDataStream& GetData() { return dataBuff; }
+    msg_buffer& GetData() { return dataBuff; }
     uint64_t GetTotalLength() const;
 
     void SetVersion(int nVersionIn) {
@@ -53,6 +54,7 @@ public:
     }
 
     uint64_t Read(const Config& config, const char* pch, uint64_t nBytes);
+    uint64_t Read(const Config&, const uint8_t* pch, uint64_t nBytes);
 };
 
 /**
