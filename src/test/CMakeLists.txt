@@ -165,6 +165,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	sighashtype_tests.cpp
 	sigopcount_tests.cpp
 	sigutil.cpp
+    single_seg_parser_tests.cpp
 	skiplist_tests.cpp
 	streams_tests.cpp
 	stream_serialization_tests.cpp

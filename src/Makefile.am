@@ -189,6 +189,7 @@ BITCOIN_CORE_H = \
   net/node_stats.h \
   net/block_parser.h \
   net/send_queue_bytes.h \
+  net/single_seg_parser.h \
   net/stream.h \
   net/stream_policy.h \
   net/stream_policy_factory.h \
@@ -363,6 +364,7 @@ libbitcoin_server_a_SOURCES = \
   net/net_message.cpp \
   net/net_processing.cpp \
   net/node_state.cpp \
+  net/single_seg_parser.cpp \
   net/stream.cpp \
   net/stream_policy.cpp \
   net/stream_policy_factory.cpp \
