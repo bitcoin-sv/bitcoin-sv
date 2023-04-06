@@ -9,6 +9,7 @@
 #include <numeric>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include "cmpct_size.h"
 #include "span.h"
