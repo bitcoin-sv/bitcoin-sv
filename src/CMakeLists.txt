@@ -267,6 +267,26 @@ add_library(common
 	net/association.h
 	net/association_id.h
 	net/authconn.h
+    net/block_parser.cpp
+    net/block_parser.h
+    net/blocktxn_parser.cpp
+    net/blocktxn_parser.h
+    net/cmpct_size.h
+    net/cmpct_size.cpp
+    net/cmpctblock_parser.cpp
+    net/cmpctblock_parser.h
+    net/fixed_len_multi_parser.h
+    net/fixed_len_multi_parser.cpp
+    net/fixed_len_parser.h
+    net/fixed_len_parser.cpp
+    net/msg_buffer.h
+    net/msg_buffer.cpp
+    net/msg_parser.h
+    net/msg_parser_buffer.h
+    net/msg_parser_buffer.cpp
+    net/parser_utils.h
+    net/single_seg_parser.h
+    net/single_seg_parser.cpp
 	net/net.h
 	net/net_message.h
 	net/net_types.h
@@ -275,10 +295,16 @@ add_library(common
 	net/netbase.cpp
 	net/netbase.h
 	net/node_stats.h
+    net/prefilled_tx_parser.h
+    net/prefilled_tx_parser.cpp
+    net/p2p_msg_lengths.h
+    net/array_parser.h
 	net/send_queue_bytes.h
 	net/stream.h
 	net/stream_policy.h
 	net/stream_policy_factory.h
+    net/tx_parser.h
+    net/tx_parser.cpp
 	orphan_txns.h
 	policy/policy.h
 	pow.h
@@ -332,6 +358,8 @@ add_library(common
 	txn_validation_config.h
 	txn_validation_data.h
 	txn_validation_result.h
+    unique_array.h
+    unique_array.cpp
 	validation.h
 	version.h
 	versionbits.h

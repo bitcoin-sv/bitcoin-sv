@@ -43,6 +43,8 @@ BITCOIN_TESTS =\
   test/block_info_tests.cpp \
   test/blockindex_with_descendants_tests.cpp \
   test/blockmaxsize_tests.cpp \
+  test/block_parser_tests.cpp \
+  test/blocktxn_parser_tests.cpp \
   test/blockstatus_tests.cpp \
   test/blockvalidationstatus_tests.cpp \
   test/bloom_tests.cpp \
@@ -52,6 +54,8 @@ BITCOIN_TESTS =\
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
   test/check_selfish_mining_tests.cpp \
+  test/cmpctblock_parser_tests.cpp \
+  test/cmpct_size_tests.cpp \
   test/coins_tests.cpp \
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
@@ -76,6 +80,8 @@ BITCOIN_TESTS =\
   test/enum_cast_tests.cpp \
   test/eviction_candidates_tracker_tests.cpp \
   test/excessiveblock_tests.cpp \
+  test/fixed_len_multi_parser_tests.cpp \
+  test/fixed_len_parser_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
   test/instruction_iterator_tests.cpp \
@@ -112,14 +118,19 @@ BITCOIN_TESTS =\
   test/miner_info_ref_tests.cpp \
   test/miner_tests.cpp \
   test/minerid_tests.cpp \
+  test/msg_buffer_tests.cpp \
+  test/msg_parser_buffer_tests.cpp \
   test/multisig_tests.cpp \
   test/net_association_tests.cpp \
+  test/net_message_tests.cpp \
   test/net_message_maker_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
   test/object_stream_deserialization_tests.cpp \
   test/opcode_tests.cpp \
   test/pmt_tests.cpp \
+  test/prefilled_tx_parser_tests.cpp \
+  test/prefilled_txs_parser_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
   test/protocol_tests.cpp \
@@ -142,6 +153,7 @@ BITCOIN_TESTS =\
   test/sigopcount_tests.cpp \
   test/sigutil.cpp \
   test/sigutil.h \
+  test/single_seg_parser_tests.cpp \
   test/skiplist_tests.cpp \
   test/streams_tests.cpp \
   test/stream_serialization_tests.cpp \
@@ -167,9 +179,12 @@ BITCOIN_TESTS =\
   test/ttor_tests.cpp \
   test/transaction_tests.cpp \
   test/txn_grouper_tests.cpp \
+  test/txs_parser_tests.cpp \
+  test/tx_parser_tests.cpp \
   test/txvalidationcache_tests.cpp \
   test/uint256_tests.cpp \
   test/undo_tests.cpp \
+  test/unique_array_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/validation_scheduler_tests.cpp \

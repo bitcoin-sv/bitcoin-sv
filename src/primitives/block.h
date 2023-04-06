@@ -78,6 +78,8 @@ inline bool operator!=(const CBlockHeader& a, const CBlockHeader& b)
     return !(a == b);
 }
 
+std::ostream& operator<<(std::ostream&, const CBlockHeader&);
+
 class CBlock : public CBlockHeader 
 {
 public:

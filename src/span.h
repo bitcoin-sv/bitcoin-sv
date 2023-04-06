@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cassert>
 
 namespace bsv
 {
@@ -46,10 +47,22 @@ namespace bsv
         constexpr reference back() const { return p_[size() - 1]; }
         constexpr reference operator[](size_t n) const { return p_[n]; }
 
+        constexpr span first(size_t count) const
+        {
+            assert(count <= size());
+            return span{p_, count};
+        };
+
         constexpr span last(size_t count) const
         {
             assert(count <= size());
             return span{p_ + size() - count, count};
+        };
+        
+        constexpr span subspan(size_t offset) const
+        {
+            assert(offset <= size());
+            return span{p_ + offset, n_ - offset};
         };
     };
 }

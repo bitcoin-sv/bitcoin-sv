@@ -236,7 +236,7 @@ CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn,
 }
 
 // Read data and deserialise ourselves as we go
-uint64_t CMessageHeader::Read(const char* pch, uint64_t numBytes, CDataStream& buff)
+ uint64_t CMessageHeader::Read(const char* pch, uint64_t numBytes, msg_buffer& buff)
 {
     // Must only be called for an incomplete header
     assert(!Complete());
@@ -251,7 +251,7 @@ uint64_t CMessageHeader::Read(const char* pch, uint64_t numBytes, CDataStream& b
     if(buff.size() == requiredLength)
     {
         // We have all the basic header data, check if we also need more for extended fields
-        if(! IsExtended() && strncmp(buff.data() + CMessageFields::BASIC_COMMAND_OFFSET, NetMsgType::EXTMSG, strlen(NetMsgType::EXTMSG)) == 0)
+        if(! IsExtended() && strncmp(reinterpret_cast<const char*>(buff.data()) + CMessageFields::BASIC_COMMAND_OFFSET, NetMsgType::EXTMSG, strlen(NetMsgType::EXTMSG)) == 0)
         {
             extendedFields = CExtendedMessageHeader {};
         }
