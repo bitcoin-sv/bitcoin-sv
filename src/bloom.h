@@ -43,10 +43,10 @@ enum bloomflags {
  */
 class CBloomFilter {
 private:
-    std::vector<uint8_t> vData;
-    unsigned int nHashFuncs;
-    unsigned int nTweak;
-    uint8_t nFlags;
+    std::vector<uint8_t> vData {};
+    unsigned int nHashFuncs {0};
+    unsigned int nTweak {0};
+    uint8_t nFlags {0};
 
     unsigned int Hash(unsigned int nHashNum, const std::vector<uint8_t> &vDataToHash) const;
 
@@ -71,7 +71,7 @@ public:
       * 1.18
      **/
     CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,uint8_t nFlagsIn);
-    CBloomFilter() : nHashFuncs(0), nTweak(0), nFlags(0) { return;}
+    CBloomFilter() = default;
 
     ADD_SERIALIZE_METHODS
 
