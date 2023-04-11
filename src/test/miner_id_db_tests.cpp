@@ -427,7 +427,7 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
             const CTransaction& coinbase { blockReader->ReadTransaction() };
 
             const CScript& pubKey { coinbase.vout[0].scriptPubKey };
-            const auto it { next(pubKey.begin_instructions(), 3) };
+            const auto it { std::next(pubKey.begin_instructions(), 3) };
             BOOST_REQUIRE(it);
 
             // Parse the JSON and look for the minerContact information
