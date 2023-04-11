@@ -18,6 +18,12 @@
     // -Wmaybe-uninitialized warning flag is disabled here because it gives false alarms in this class due to _union.indirect variable.
     // _union.indirect is always used after _size becomes larger than N. When this happens, _union.indirect is set for the first time.
     GCC_WARNINGS_IGNORE(-Wmaybe-uninitialized);
+    #ifdef __GNUC__
+        #if __GNUC__ >= 12
+        // GCC 12 also includes this warning under -Wuninitialized
+        GCC_WARNINGS_IGNORE(-Wuninitialized)
+        #endif
+    #endif
 #endif
 
 /**
