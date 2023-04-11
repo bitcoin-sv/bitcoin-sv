@@ -62,7 +62,7 @@ public:
         READWRITE(txval);
     }
 
-    bool operator==(const CSerializeMethodsTestSingle &rhs) {
+    bool operator==(const CSerializeMethodsTestSingle &rhs) const {
         return intval == rhs.intval && boolval == rhs.boolval &&
                stringval == rhs.stringval &&
                strcmp(charstrval, rhs.charstrval) == 0 && *txval == *rhs.txval;

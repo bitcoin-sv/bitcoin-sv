@@ -126,8 +126,8 @@ class CJournal final
         void reset();
 
         Index& operator++();
-        bool operator==(const Index& that) { return (mCurrItem == that.mCurrItem); }
-        bool operator!=(const Index& that) { return !(*this == that); }
+        bool operator==(const Index& that) const { return (mCurrItem == that.mCurrItem); }
+        bool operator!=(const Index& that) const { return !(*this == that); }
 
       private:
 
