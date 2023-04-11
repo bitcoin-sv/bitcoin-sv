@@ -339,6 +339,7 @@ add_library(common
 	support/allocators/zeroafterfree.h
 	task.h
 	task_helpers.h
+	taskcancellation.cpp
 	taskcancellation.h
 	thread_safe_queue.h
 	threadpool.h
@@ -389,6 +390,8 @@ add_library(bitcoinconsensus
 	script/script.cpp
 	script/script_error.cpp
 	script/script_num.cpp
+    taskcancellation.cpp
+    taskcancellation.h
 )
 
 target_link_libraries(bitcoinconsensus common)

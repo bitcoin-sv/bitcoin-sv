@@ -411,6 +411,7 @@ libbitcoin_server_a_SOURCES = \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
+  taskcancellation.cpp \
   timedata.cpp \
   time_locked_mempool.cpp \
   txdb.cpp \
@@ -525,6 +526,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.h \
   serialize.h \
   span.h \
+  taskcancellation.h \
+  taskcancellation.cpp \
   tinyformat.h \
   uint256.h \
   utilstrencodings.cpp \
