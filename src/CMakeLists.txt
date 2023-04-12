@@ -369,7 +369,8 @@ add_library(common
 	write_preferring_upgradable_mutex.h
 )
 
-target_link_libraries(common util secp256k1)
+target_include_directories(common PRIVATE secp256k1/include)
+target_link_libraries(common util secp256k1_static)
 
 # libbitcoinconsensus
 add_library(bitcoinconsensus
@@ -394,6 +395,7 @@ target_link_libraries(bitcoinconsensus common)
 target_include_directories(bitcoinconsensus
 	PRIVATE
 		${OPENSSL_INCLUDE_DIR}
+        secp256k1/include
 )
 
 # Bitcoin server facilities

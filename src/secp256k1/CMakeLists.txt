@@ -27,7 +27,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # We do not use CMake's BUILD_SHARED_LIBS option.
-option(SECP256K1_BUILD_SHARED "Build shared library." ON)
+option(SECP256K1_BUILD_SHARED "Build shared library." OFF)
 option(SECP256K1_BUILD_STATIC "Build static library." ON)
 if(NOT SECP256K1_BUILD_SHARED AND NOT SECP256K1_BUILD_STATIC)
   message(FATAL_ERROR "At least one of SECP256K1_BUILD_SHARED and SECP256K1_BUILD_STATIC must be enabled.")
@@ -38,13 +38,13 @@ if(SECP256K1_ENABLE_MODULE_ECDH)
   add_definitions(-DENABLE_MODULE_ECDH=1)
 endif()
 
-option(SECP256K1_ENABLE_MODULE_RECOVERY "Enable ECDSA pubkey recovery module." OFF)
+option(SECP256K1_ENABLE_MODULE_RECOVERY "Enable ECDSA pubkey recovery module." ON)
 if(SECP256K1_ENABLE_MODULE_RECOVERY)
   add_definitions(-DENABLE_MODULE_RECOVERY=1)
 endif()
 
-option(SECP256K1_ENABLE_MODULE_EXTRAKEYS "Enable extrakeys module." ON)
-option(SECP256K1_ENABLE_MODULE_SCHNORRSIG "Enable schnorrsig module." ON)
+option(SECP256K1_ENABLE_MODULE_EXTRAKEYS "Enable extrakeys module." OFF)
+option(SECP256K1_ENABLE_MODULE_SCHNORRSIG "Enable schnorrsig module." OFF)
 if(SECP256K1_ENABLE_MODULE_SCHNORRSIG)
   set(SECP256K1_ENABLE_MODULE_EXTRAKEYS ON)
   add_definitions(-DENABLE_MODULE_SCHNORRSIG=1)
@@ -208,7 +208,7 @@ set(CMAKE_C_VISIBILITY_PRESET hidden)
 # Ask CTest to create a "check" target (e.g., make check) as alias for the "test" target.
 # CTEST_TEST_TARGET_ALIAS is not documented but supposed to be user-facing.
 # See: https://gitlab.kitware.com/cmake/cmake/-/commit/816c9d1aa1f2b42d40c81a991b68c96eb12b6d2
-set(CTEST_TEST_TARGET_ALIAS check)
+#set(CTEST_TEST_TARGET_ALIAS check)
 include(CTest)
 # We do not use CTest's BUILD_TESTING because a single toggle for all tests is too coarse for our needs.
 mark_as_advanced(BUILD_TESTING)
