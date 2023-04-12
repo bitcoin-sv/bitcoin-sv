@@ -293,7 +293,7 @@ bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild,
     }
     memcpy(ccChild.begin(), vout.data() + 32, 32);
     memcpy((uint8_t *)keyChild.begin(), begin(), 32);
-    bool ret = secp256k1_ec_privkey_tweak_add(
+    bool ret = secp256k1_ec_seckey_tweak_add(
         secp256k1_context_sign.get(), (uint8_t*)keyChild.begin(), vout.data());
     keyChild.fCompressed = true;
     keyChild.fValid = ret;
