@@ -6,10 +6,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <type_traits>
 #include <utility>
-
-#include "span.h"
 
 // Type erased class that is constructed/implemented with a parser object
 // appropriate to the message defined in the p2p message header command field. 
@@ -21,8 +20,8 @@ class msg_parser
         // bytes_read - number of bytes read (will read any bytes that it can)
         // bytes_reqd - number of further bytes required (as many as it knows accurately)
         // (0, 0) indicates that the parser cannot accept any further input
-        virtual std::pair<size_t, size_t> operator()(bsv::span<const uint8_t>) = 0;
-        virtual size_t read(size_t read_pos, bsv::span<uint8_t>) = 0;
+        virtual std::pair<size_t, size_t> operator()(std::span<const uint8_t>) = 0;
+        virtual size_t read(size_t read_pos, std::span<uint8_t>) = 0;
         virtual size_t size() const = 0;
 
         virtual void clear() = 0;
@@ -43,12 +42,12 @@ class msg_parser
         msg_parser_model(U&& u):object_{std::forward<U>(u)}
         {}
 
-        std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s) override
+        std::pair<size_t, size_t> operator()(std::span<const uint8_t> s) override
         {
             return object_(s); 
         }
 
-        size_t read(size_t read_pos, bsv::span<uint8_t> s) override
+        size_t read(size_t read_pos, std::span<uint8_t> s) override
         {
             return object_.read(read_pos, s);
         }
@@ -79,12 +78,12 @@ public:
     msg_parser(msg_parser&&) = default;
     msg_parser& operator=(msg_parser&&) = default;
 
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s)
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s)
     {
         return (*pimpl_)(s);
     }
 
-    size_t read(size_t read_pos, bsv::span<uint8_t> s) { return pimpl_->read(read_pos, s); }
+    size_t read(size_t read_pos, std::span<uint8_t> s) { return pimpl_->read(read_pos, s); }
     size_t size() const { return pimpl_->size(); }
 
     void clear() { return pimpl_->clear(); }

@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE(parse_empty_input)
     prefilled_txs_parser parser;
 
     vector<uint8_t> ip;
-    bsv::span s{ip.data(), 0};
+    std::span s{ip.data(), 0};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(0, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
@@ -125,7 +125,7 @@ BOOST_AUTO_TEST_CASE(parse_count_0)
     prefilled_txs_parser parser;
     vector<uint8_t> ip;
     ip.push_back(0);
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -140,7 +140,7 @@ BOOST_AUTO_TEST_CASE(parse_count_1)
     const size_t index{42};
     ip.push_back(index);
     ip.insert(ip.cend(), tx.cbegin(), tx.cend());
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);

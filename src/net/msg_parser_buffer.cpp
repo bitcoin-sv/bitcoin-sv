@@ -4,11 +4,11 @@
 
 #include "msg_parser_buffer.h"
 
+#include <cassert>
 #include <iostream>
 #include <numeric>
 
 using namespace std;
-using namespace bsv;
 
 // Always read all the bytes of input, by the parser or into the buffer.
 void msg_parser_buffer::operator()(span<const uint8_t> s)

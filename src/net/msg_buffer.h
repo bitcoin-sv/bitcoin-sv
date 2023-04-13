@@ -61,9 +61,9 @@ public:
     bool header_complete() const { return payload_len_.has_value(); }
 
     void read(char* pch, size_t nSize);
-    void read(bsv::span<uint8_t> s);
+    void read(std::span<uint8_t> s);
     void write(const char* p, size_t nSize);
-    void write(bsv::span<const uint8_t>);
+    void write(std::span<const uint8_t>);
 
     template <typename T>
     msg_buffer& operator<<(const T& obj)

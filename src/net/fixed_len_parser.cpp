@@ -7,7 +7,7 @@
 using namespace std;
 
 std::pair<size_t, size_t> fixed_len_parser::operator()(
-    const bsv::span<const uint8_t> s)
+    const span<const uint8_t> s)
 {
     const auto capacity{buffer_.capacity()};
     const auto delta{capacity - buffer_.size()};

@@ -10,7 +10,6 @@
 #include <utility>
 
 using namespace std;
-using namespace bsv;
 
 BOOST_AUTO_TEST_SUITE(msg_parser_buffer_tests)
 
@@ -26,7 +25,7 @@ public:
         max_size_{max_size}
     {}
 
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s)
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s)
     {
         if(v_.size() >= max_size_)
             return make_pair(0, 0);
@@ -43,7 +42,7 @@ public:
                          remainder ? N : 0);
     }
 
-    size_t read(size_t read_pos, bsv::span<uint8_t>)
+    size_t read(size_t read_pos, std::span<uint8_t>)
     {
         assert(false);
         return 0;
@@ -188,7 +187,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
     
     for(size_t i{}; i < in.size(); ++i)
     {
-        buffer(bsv::span{in.data() + i, 1});
+        buffer(std::span{in.data() + i, 1});
         const auto remainder{(i + 1) % 10};
         BOOST_CHECK_EQUAL(remainder, buffer.buffer_size());
         BOOST_CHECK_EQUAL(remainder ? 10 : 0, buffer.buffer_size_reqd());
@@ -208,7 +207,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_n_bytes)
     const size_t inc{11};
     for(size_t i{}; i < in.size(); i += inc)
     {
-        buffer(bsv::span{in.data() + i, inc});
+        buffer(std::span{in.data() + i, inc});
         const auto remainder{(i + 1) % 10};
         BOOST_CHECK_EQUAL(remainder, buffer.buffer_size());
         BOOST_CHECK_EQUAL(buffer.buffer_size_reqd() ? 10 : 0, buffer.buffer_size_reqd());
@@ -225,7 +224,7 @@ BOOST_AUTO_TEST_CASE(parse_buffer_size)
         return v;
     }()};
 
-    bsv::span s{in.data(), in.size()};
+    std::span s{in.data(), in.size()};
     constexpr size_t n{3};
     constexpr size_t m{14};
     constexpr size_t q{20};
@@ -250,12 +249,12 @@ BOOST_AUTO_TEST_CASE(parse_buffer_size)
 
 struct always_0_parser
 {
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t>)
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t>)
     {
         return std::make_pair(0, 0);
     }
 
-    size_t read(size_t read_pos, bsv::span<uint8_t>)
+    size_t read(size_t read_pos, std::span<uint8_t>)
     {
         assert(false);
         return 0;
@@ -278,7 +277,7 @@ BOOST_AUTO_TEST_CASE(overflow_on_nothing_read_or_reqd)
     msg_parser_buffer buffer{make_unique<msg_parser>(always_0_parser{})};
     vector<uint8_t> v(42, 42);
 
-    const bsv::span s{v.data(), v.size()};
+    const std::span s{v.data(), v.size()};
     buffer(s);
     BOOST_CHECK_EQUAL(v.size(), buffer.buffer_size());
     BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());

@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "protocol.h"
-#include "span.h"
 #include "net/net_message.h"
 #include "net/p2p_msg_lengths.h"
 
@@ -211,7 +210,7 @@ BOOST_AUTO_TEST_CASE(write_read_block_msg)
 {
     msg_buffer buff{type, version};
     const auto msg_header{make_msg_header("block")};
-    buff.write(bsv::span{msg_header.data(), msg_header.size()});
+    buff.write(std::span{msg_header.data(), msg_header.size()});
 
     vector<uint8_t> header(msg_header_len);
     buff.read(span{header.data(), header.size()});

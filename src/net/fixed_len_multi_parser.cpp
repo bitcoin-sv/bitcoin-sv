@@ -23,7 +23,6 @@
 #include "util.h"
 
 using namespace std;
-using namespace bsv;
 
 std::pair<size_t, size_t> fixed_len_multi_parser::parse_count(span<const uint8_t> s)
 {
@@ -100,7 +99,7 @@ size_t fixed_len_multi_parser::size() const
     return size_;
 }
     
-size_t fixed_len_multi_parser::read(size_t read_pos, bsv::span<uint8_t> s)
+size_t fixed_len_multi_parser::read(size_t read_pos, std::span<uint8_t> s)
 {
     return ::read(*this, read_pos, s);
 }

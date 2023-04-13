@@ -8,8 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
-
-#include "span.h"
+#include <span>
 
 // vector-like wrapper around a unique_ptr to an array of uint8_t's
 class unique_array
@@ -25,7 +24,7 @@ public:
 
     unique_array() = default;
     explicit unique_array(size_t);
-    explicit unique_array(bsv::span<const uint8_t>);
+    explicit unique_array(std::span<const uint8_t>);
     ~unique_array() = default;
 
     unique_array(unique_array&&) noexcept;
@@ -52,7 +51,7 @@ public:
 
     void push_back(const value_type&);
 
-    void append(const bsv::span<const uint8_t>);
+    void append(const std::span<const uint8_t>);
     void append(const value_type*, size_t);
 
     template<typename InputIt>
@@ -81,5 +80,5 @@ private:
     void reallocate(size_t);
 };
 
-size_t read(const unique_array&, size_t read_pos, bsv::span<uint8_t>);
+size_t read(const unique_array&, size_t read_pos, std::span<uint8_t>);
 

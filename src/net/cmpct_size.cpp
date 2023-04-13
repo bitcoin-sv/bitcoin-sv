@@ -7,7 +7,6 @@
 #include "stream.h"
 
 using namespace std;
-using namespace bsv;
 
 std::pair<size_t, uint64_t> parse_compact_size(const span<const uint8_t> s)
 {

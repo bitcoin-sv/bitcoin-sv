@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(fixed)
         // msg < arb_len
         fixed_len_parser parser{arbitary_len};
         constexpr size_t n{1};
-        const bsv::span s{msg.data(), arbitary_len - n};
+        const std::span s{msg.data(), arbitary_len - n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(arbitary_len - n, bytes_read);
         BOOST_CHECK_EQUAL(n, bytes_reqd);
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(fixed)
     {
         // msg == arb_len
         fixed_len_parser parser{arbitary_len};
-        const bsv::span s{msg.data(), arbitary_len};
+        const std::span s{msg.data(), arbitary_len};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(arbitary_len, bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE(fixed)
     {
         // msg > arb_len
         fixed_len_parser parser{arbitary_len};
-        const bsv::span s{msg.data(), arbitary_len + 1};
+        const std::span s{msg.data(), arbitary_len + 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(arbitary_len, bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE(byte_by_byte)
     fixed_len_parser parser{arbitary_len};
     for(size_t i{}; i < arbitary_len; ++i)
     {
-        const bsv::span s{msg.data() + i, 1};
+        const std::span s{msg.data() + i, 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(1, bytes_read);
         BOOST_CHECK_EQUAL(arbitary_len - i - 1, bytes_reqd);

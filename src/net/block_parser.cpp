@@ -9,7 +9,7 @@
 using namespace std;
 
 std::pair<size_t, size_t> block_parser::operator()(
-    const bsv::span<const uint8_t> s)
+    const std::span<const uint8_t> s)
 {
     const auto [hbytes_read, hbytes_reqd]{header_parser_(s)};
     if(hbytes_reqd)
@@ -23,7 +23,7 @@ std::pair<size_t, size_t> block_parser::operator()(
     return make_pair(total_bytes_read, bytes_reqd);
 }
 
-size_t block_parser::read(size_t read_pos, bsv::span<uint8_t> s)
+size_t block_parser::read(size_t read_pos, std::span<uint8_t> s)
 {
     const size_t total_parser_size{header_parser_.size() +
                                    txs_parser_.size()};

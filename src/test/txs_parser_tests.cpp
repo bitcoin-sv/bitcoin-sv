@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // empty range
         const size_t n{};
-        bsv::span s{txs.data(), n};
+        std::span s{txs.data(), n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(0, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx_count
         const size_t n{var_int_len_1};
-        bsv::span s{txs.data(), n};
+        std::span s{txs.data(), n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_read);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
@@ -154,7 +154,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // version
         const size_t n{bsv::version_len};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
@@ -167,7 +167,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // ip count 
         const size_t n{var_int_len_1};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1, bytes_reqd);
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 1 upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_1};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1 + bsv::seq_len, bytes_reqd);
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 1 post script len
         const size_t n{script_len_1 + bsv::seq_len};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1,
@@ -207,7 +207,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 2 upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_3};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_2 + bsv::seq_len, bytes_reqd);
@@ -220,7 +220,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 2 post script len
         const size_t n{script_len_2 + bsv::seq_len};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd); // <- output count
@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, op_count
         const size_t n{var_int_len_1};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -246,7 +246,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, output 1 upto script len  
         const size_t n{bsv::value_len + var_int_len_1};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1, bytes_reqd);
@@ -259,7 +259,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, output 1 post script len
         const size_t n{script_len_1};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, output 2 all of it
         const size_t n{bsv::value_len + var_int_len_3 + script_len_2};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::locktime_len, bytes_reqd);
@@ -285,7 +285,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, locktime
         const size_t n{bsv::locktime_len};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx2 
         const size_t n{tx2_len};
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -331,7 +331,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
 BOOST_AUTO_TEST_CASE(txs_parser_1_pass)
 {
     txs_parser parser;
-    bsv::span s{txs.data(), txs.size()};
+    std::span s{txs.data(), txs.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(txs.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -346,8 +346,8 @@ BOOST_AUTO_TEST_CASE(txs_parser_2_pass)
     txs_parser parser;
 
     constexpr size_t split_pos{20};
-    const auto [bytes_read, bytes_reqd] = parser(bsv::span{txs.data(), split_pos});
-    parser(bsv::span{txs.data() + bytes_read, txs.size() - bytes_read});
+    const auto [bytes_read, bytes_reqd] = parser(std::span{txs.data(), split_pos});
+    parser(std::span{txs.data() + bytes_read, txs.size() - bytes_read});
 
     constexpr size_t exp_n_tx{3};
     BOOST_CHECK_EQUAL(exp_n_tx, parser.segment_count());
@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_as_reqd)
     size_t passes{};
     while(total_bytes_read < txs.size())
     {
-        bsv::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)
@@ -410,7 +410,7 @@ BOOST_AUTO_TEST_CASE(parse_0_tx_count)
 BOOST_AUTO_TEST_CASE(read_txs)
 {
     txs_parser parser;
-    bsv::span s{txs.data(), txs.size()};
+    std::span s{txs.data(), txs.size()};
     parser(s);
     BOOST_CHECK_EQUAL(3, parser.segment_count());
     BOOST_CHECK_EQUAL(txs.size(), parser.size());
@@ -419,20 +419,20 @@ BOOST_AUTO_TEST_CASE(read_txs)
 
     vector<uint8_t> out_0(parser[0].size());
     size_t read_pos{};
-    total_bytes_read += read(parser, read_pos, bsv::span{out_0.data(), out_0.size()});
+    total_bytes_read += read(parser, read_pos, std::span{out_0.data(), out_0.size()});
     BOOST_CHECK_EQUAL(2, out_0[0]);
     BOOST_CHECK_EQUAL(0, parser[0].size());
     BOOST_CHECK_EQUAL(txs.size(), parser.size());
     
     vector<uint8_t> out_1(parser[1].size());
     read_pos += parser[0].size();
-    total_bytes_read += read(parser, read_pos, bsv::span{out_1.data(), out_1.size()});
+    total_bytes_read += read(parser, read_pos, std::span{out_1.data(), out_1.size()});
     BOOST_CHECK_EQUAL(3, out_1[0]);
     BOOST_CHECK_EQUAL(0, parser[1].size());
     
     vector<uint8_t> out_2(parser[2].size());
     read_pos += parser[1].size();
-    total_bytes_read += read(parser, read_pos, bsv::span{out_2.data(), out_2.size()});
+    total_bytes_read += read(parser, read_pos, std::span{out_2.data(), out_2.size()});
     BOOST_CHECK_EQUAL(11, out_2[0]);
     BOOST_CHECK_EQUAL(0, parser[2].size());
 
@@ -443,12 +443,12 @@ BOOST_AUTO_TEST_CASE(read_txs)
 BOOST_AUTO_TEST_CASE(read_all)
 {
     txs_parser parser;
-    bsv::span s{txs.data(), txs.size()};
+    std::span s{txs.data(), txs.size()};
     parser(s);
     BOOST_CHECK_EQUAL(txs.size(), size(parser));
 
     vector<uint8_t> out(txs.size());
-    const auto bytes_read = read(parser, 0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = read(parser, 0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(out.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(txs.cbegin(), txs.cend(),
                                   out.cbegin(), out.cend());
@@ -458,7 +458,7 @@ BOOST_AUTO_TEST_CASE(read_all)
 BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 {
     txs_parser parser;
-    bsv::span s{txs.data(), txs.size()};
+    std::span s{txs.data(), txs.size()};
     parser(s);
 
     const size_t out_size{txs.size()};
@@ -466,7 +466,7 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
     size_t total_bytes_read{};
     for(size_t i{}; i < out.size(); ++i)
     {
-        total_bytes_read += read(parser, i, bsv::span{out.data() + i, 1});
+        total_bytes_read += read(parser, i, std::span{out.data() + i, 1});
     }
     BOOST_CHECK_EQUAL(out.size(), total_bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(txs.cbegin(), txs.cend(),
@@ -476,11 +476,11 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
 {
     txs_parser parser;
-    bsv::span s{txs.data(), txs.size()};
+    std::span s{txs.data(), txs.size()};
     parser(s);
 
     vector<uint8_t> out(txs.size() + 1);
-    const size_t bytes_read = read(parser, 0, bsv::span{out.data(), out.size()});
+    const size_t bytes_read = read(parser, 0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(txs.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(txs.cbegin(), txs.cend(),
                                   out.cbegin(), out.cend() - 1);

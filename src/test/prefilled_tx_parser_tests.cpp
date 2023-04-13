@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_SUITE(prefilled_tx_parser_tests)
 BOOST_AUTO_TEST_CASE(parse_empty_input)
 {
     vector<uint8_t> ip;
-    bsv::span s{ip.data(), 0};
+    std::span s{ip.data(), 0};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(0, bytes_read);
@@ -125,7 +125,7 @@ BOOST_AUTO_TEST_CASE(parse_empty_input)
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_3)
 {
     vector<uint8_t> ip{0xfd};
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(0, bytes_read);
@@ -136,7 +136,7 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_3)
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_5)
 {
     vector<uint8_t> ip{0xfe};
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(0, bytes_read);
@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_5)
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_9)
 {
     vector<uint8_t> ip{0xff};
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(0, bytes_read);
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_9)
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_1)
 {
     vector<uint8_t> ip{42};
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(1, bytes_read);
@@ -173,7 +173,7 @@ BOOST_AUTO_TEST_CASE(parse_in_one_pass)
     const size_t index{42};
     ip.push_back(index);
     ip.insert(ip.end(), tx.cbegin(), tx.cend());
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd); 
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     size_t passes{};
     while(total_bytes_read < ip.size())
     {
-        bsv::span s{ip.data() + offset, n};
+        std::span s{ip.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)

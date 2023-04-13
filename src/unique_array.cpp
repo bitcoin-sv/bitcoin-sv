@@ -5,6 +5,7 @@
 #include "unique_array.h"
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -18,7 +19,7 @@ unique_array::unique_array(size_t n):
     cap_(n)
 {}
 
-unique_array::unique_array(bsv::span<const uint8_t> s)
+unique_array::unique_array(std::span<const uint8_t> s)
     : p_{make_unique<value_type[]>(s.size())},
       cap_{s.size()},
       size_{s.size()}
@@ -70,7 +71,7 @@ void unique_array::push_back(const value_type& v)
     append(&v, 1);
 }
 
-void unique_array::append(const bsv::span<const uint8_t> s)
+void unique_array::append(const std::span<const uint8_t> s)
 {
     append(s.data(), s.size());
 }
@@ -107,7 +108,7 @@ void unique_array::reset()
     cap_ = 0;
 }
 
-size_t read(const unique_array& a, size_t read_pos, bsv::span<uint8_t> s)
+size_t read(const unique_array& a, size_t read_pos, std::span<uint8_t> s)
 {
     if(a.empty())
         return 0;

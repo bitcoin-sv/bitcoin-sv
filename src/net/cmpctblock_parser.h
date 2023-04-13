@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <utility>
 
 #include "fixed_len_parser.h"
@@ -12,7 +13,6 @@
 #include "p2p_msg_lengths.h"
 #include "array_parser.h"
 #include "prefilled_tx_parser.h"
-#include "span.h"
 
 // Parses a p2p cmpctblock message into a header, a collection of shortid
 // segments (each containing 1,000 shortids) and a collection of prefilled_tx
@@ -25,8 +25,8 @@ class cmpctblock_parser
     array_parser<prefilled_tx_parser> pftxs_parser_;
 
 public:
-    [[nodiscard]] std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s);
-    [[nodiscard]] size_t read(size_t read_pos, bsv::span<uint8_t>);
+    [[nodiscard]] std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
+    [[nodiscard]] size_t read(size_t read_pos, std::span<uint8_t>);
     [[nodiscard]] size_t size() const;
     void clear();
 };

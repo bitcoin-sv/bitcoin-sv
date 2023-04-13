@@ -7,11 +7,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
 #include "p2p_msg_lengths.h"
-#include "span.h"
 #include "unique_array.h"
 
 // Parses a sequence of bytes into multiple segments, each of which contains a fixed number
@@ -28,7 +28,7 @@ public:
         seg_size_{fixed_len * fixed_lengths_per_seg}
     {}
 
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s);
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
     std::optional<uint64_t> count() const { return n_; }
 
@@ -44,7 +44,7 @@ public:
     auto begin() { return segments_.begin(); }
     auto end() { return segments_.end(); }
 
-    size_t read(size_t read_pos, bsv::span<uint8_t>);
+    size_t read(size_t read_pos, std::span<uint8_t>);
 
     auto segment_count() const { return segments_.size(); }
     std::pair<ptrdiff_t, size_t>  seg_offset(size_t read_pos) const;
@@ -53,7 +53,7 @@ public:
     void clear() { segments_.clear(); size_ = 0;}
 
 private:
-    std::pair<size_t, size_t> parse_count(bsv::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_count(std::span<const uint8_t>);
     void init_cum_lengths() const;
     
     std::optional<uint64_t> n_{};

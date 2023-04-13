@@ -4,6 +4,7 @@
 
 #include "tx_parser.h"
 
+#include <cassert>
 #include <iostream>
 #include <numeric>
 

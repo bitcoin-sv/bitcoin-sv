@@ -8,10 +8,10 @@
 #include <cstdint>
 #include <iosfwd>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
-#include "span.h"
 #include "unique_array.h"
 
 // Parses a p2p message into a segment containing a single tx.
@@ -34,7 +34,7 @@ public:
         complete
     };
 
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s);
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
     size_t buffer_size() const;
     size_t size() const;
@@ -46,15 +46,15 @@ public:
     friend std::ostream& operator<<(std::ostream&, const state&);
 
 private:
-    std::pair<size_t, size_t> parse_tx_count(bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_version(bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_ip_count(bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_inputs(bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_input(const bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_op_count(bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_outputs(bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_output(const bsv::span<const uint8_t>);
-    std::pair<size_t, size_t> parse_locktime(bsv::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_tx_count(std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_version(std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_ip_count(std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_inputs(std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_input(const std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_op_count(std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_outputs(std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_output(const std::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_locktime(std::span<const uint8_t>);
 
     state state_{state::version};
 
