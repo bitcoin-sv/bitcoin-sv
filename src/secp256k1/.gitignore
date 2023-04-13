@@ -53,3 +53,6 @@ build-aux/test-driver
 build-aux/ar-lib
 src/stamp-h1
 libsecp256k1.pc
+secp256k1-config.h
+secp256k1-config.h.in
+stamp-h1
