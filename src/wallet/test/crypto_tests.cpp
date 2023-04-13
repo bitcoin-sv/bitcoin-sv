@@ -172,13 +172,13 @@ public:
         // with the last byte also being zeroed out.
         if (vchDecrypted1 != vchDecrypted2 &&
             vchDecrypted1.size() >= AES_BLOCK_SIZE &&
-            ( SSLeay() == 0x100010afL || SSLeay() == 0x30000000L )) {
+            ( SSLeay() == 0x100010afL || SSLeay() >= 0x30000000L )) {
             for (CKeyingMaterial::iterator it =
                      vchDecrypted1.end() - AES_BLOCK_SIZE;
                  it != vchDecrypted1.end() - 1; it++)
                 *it = 0;
 
-            if ( SSLeay() == 0x30000000L )
+            if ( SSLeay() >= 0x30000000L )
                 vchDecrypted1.back() = 0;
         }
 

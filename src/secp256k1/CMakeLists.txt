@@ -1,191 +1,297 @@
-# Copyright (c) 2017 The Bitcoin developers
-# Copyright (c) 2019 Bitcoin Association
-# Distributed under the Open BSV software license, see the accompanying file LICENSE.
+cmake_minimum_required(VERSION 3.13)
 
-cmake_minimum_required(VERSION 3.5)
-project(secp256k1)
-
-# libsecp256k1 use a different set of flags.
-if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
-	set_property(DIRECTORY PROPERTY COMPILE_OPTIONS
-		-pedantic
-		-Wshadow
-		-Wno-unused-function
-		-Wno-nonnull
-		-Wno-overlength-strings
-		$<$<COMPILE_LANGUAGE:C>:-std=c89>
-		$<$<COMPILE_LANGUAGE:C>:-Wno-long-long>
-	)
-elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
-	set_property(DIRECTORY PROPERTY COMPILE_OPTIONS
-		/D_CRT_SECURE_NO_WARNINGS
-		/wd4244
-		/wd4267
-	)
+if(CMAKE_VERSION VERSION_GREATER 3.14)
+  # MSVC runtime library flags are selected by the CMAKE_MSVC_RUNTIME_LIBRARY abstraction.
+  cmake_policy(SET CMP0091 NEW)
+  # MSVC warning flags are not in CMAKE_<LANG>_FLAGS by default.
+  cmake_policy(SET CMP0092 NEW)
 endif()
 
-# Default visibility is hidden on all targets.
-set(CMAKE_C_VISIBILITY_PRESET hidden)
+# The package (a.k.a. release) version is based on semantic versioning 2.0.0 of
+# the API. All changes in experimental modules are treated as
+# backwards-compatible and therefore at most increase the minor version.
+project(libsecp256k1 VERSION 0.3.1 LANGUAGES C)
 
-include_directories(
-	.
-	src
-	# For the config
-	${CMAKE_CURRENT_BINARY_DIR}/src
+# The library version is based on libtool versioning of the ABI. The set of
+# rules for updating the version can be found here:
+# https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+# All changes in experimental modules are treated as if they don't affect the
+# interface and therefore only increase the revision.
+set(${PROJECT_NAME}_LIB_VERSION_CURRENT 2)
+set(${PROJECT_NAME}_LIB_VERSION_REVISION 1)
+set(${PROJECT_NAME}_LIB_VERSION_AGE 0)
+
+set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_EXTENSIONS OFF)
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
+# We do not use CMake's BUILD_SHARED_LIBS option.
+option(SECP256K1_BUILD_SHARED "Build shared library." OFF)
+option(SECP256K1_BUILD_STATIC "Build static library." ON)
+if(NOT SECP256K1_BUILD_SHARED AND NOT SECP256K1_BUILD_STATIC)
+  message(FATAL_ERROR "At least one of SECP256K1_BUILD_SHARED and SECP256K1_BUILD_STATIC must be enabled.")
+endif()
+
+option(SECP256K1_ENABLE_MODULE_ECDH "Enable ECDH module." ON)
+if(SECP256K1_ENABLE_MODULE_ECDH)
+  add_definitions(-DENABLE_MODULE_ECDH=1)
+endif()
+
+option(SECP256K1_ENABLE_MODULE_RECOVERY "Enable ECDSA pubkey recovery module." ON)
+if(SECP256K1_ENABLE_MODULE_RECOVERY)
+  add_definitions(-DENABLE_MODULE_RECOVERY=1)
+endif()
+
+option(SECP256K1_ENABLE_MODULE_EXTRAKEYS "Enable extrakeys module." OFF)
+option(SECP256K1_ENABLE_MODULE_SCHNORRSIG "Enable schnorrsig module." OFF)
+if(SECP256K1_ENABLE_MODULE_SCHNORRSIG)
+  set(SECP256K1_ENABLE_MODULE_EXTRAKEYS ON)
+  add_definitions(-DENABLE_MODULE_SCHNORRSIG=1)
+endif()
+if(SECP256K1_ENABLE_MODULE_EXTRAKEYS)
+  add_definitions(-DENABLE_MODULE_EXTRAKEYS=1)
+endif()
+
+option(SECP256K1_USE_EXTERNAL_DEFAULT_CALLBACKS "Enable external default callback functions." OFF)
+if(SECP256K1_USE_EXTERNAL_DEFAULT_CALLBACKS)
+  add_definitions(-DUSE_EXTERNAL_DEFAULT_CALLBACKS=1)
+endif()
+
+set(SECP256K1_ECMULT_WINDOW_SIZE "AUTO" CACHE STRING "Window size for ecmult precomputation for verification, specified as integer in range [2..24]. \"AUTO\" is a reasonable setting for desktop machines (currently 15). [default=AUTO]")
+set_property(CACHE SECP256K1_ECMULT_WINDOW_SIZE PROPERTY STRINGS "AUTO" 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24)
+include(CheckStringOptionValue)
+check_string_option_value(SECP256K1_ECMULT_WINDOW_SIZE)
+if(SECP256K1_ECMULT_WINDOW_SIZE STREQUAL "AUTO")
+  set(SECP256K1_ECMULT_WINDOW_SIZE 15)
+endif()
+add_definitions(-DECMULT_WINDOW_SIZE=${SECP256K1_ECMULT_WINDOW_SIZE})
+
+set(SECP256K1_ECMULT_GEN_PREC_BITS "AUTO" CACHE STRING "Precision bits to tune the precomputed table size for signing, specified as integer 2, 4 or 8. \"AUTO\" is a reasonable setting for desktop machines (currently 4). [default=AUTO]")
+set_property(CACHE SECP256K1_ECMULT_GEN_PREC_BITS PROPERTY STRINGS "AUTO" 2 4 8)
+check_string_option_value(SECP256K1_ECMULT_GEN_PREC_BITS)
+if(SECP256K1_ECMULT_GEN_PREC_BITS STREQUAL "AUTO")
+  set(SECP256K1_ECMULT_GEN_PREC_BITS 4)
+endif()
+add_definitions(-DECMULT_GEN_PREC_BITS=${SECP256K1_ECMULT_GEN_PREC_BITS})
+
+set(SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY "OFF" CACHE STRING "Test-only override of the (autodetected by the C code) \"widemul\" setting. Legal values are: \"OFF\", \"int128_struct\", \"int128\" or \"int64\". [default=OFF]")
+set_property(CACHE SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY PROPERTY STRINGS "OFF" "int128_struct" "int128" "int64")
+check_string_option_value(SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY)
+if(SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY)
+  string(TOUPPER "${SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY}" widemul_upper_value)
+  add_definitions(-DUSE_FORCE_WIDEMUL_${widemul_upper_value}=1)
+endif()
+mark_as_advanced(FORCE SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY)
+
+set(SECP256K1_ASM "AUTO" CACHE STRING "Assembly optimizations to use: \"AUTO\", \"OFF\", \"x86_64\" or \"arm\" (experimental). [default=AUTO]")
+set_property(CACHE SECP256K1_ASM PROPERTY STRINGS "AUTO" "OFF" "x86_64" "arm")
+check_string_option_value(SECP256K1_ASM)
+if(SECP256K1_ASM STREQUAL "arm")
+  enable_language(ASM)
+  add_definitions(-DUSE_EXTERNAL_ASM=1)
+elseif(SECP256K1_ASM)
+  include(Check64bitAssembly)
+  check_64bit_assembly()
+  if(HAS_64BIT_ASM)
+    set(SECP256K1_ASM "x86_64")
+    add_definitions(-DUSE_ASM_X86_64=1)
+  elseif(SECP256K1_ASM STREQUAL "AUTO")
+    set(SECP256K1_ASM "OFF")
+  else()
+    message(FATAL_ERROR "x86_64 assembly optimization requested but not available.")
+  endif()
+endif()
+
+option(SECP256K1_EXPERIMENTAL "Allow experimental configuration options." OFF)
+if(NOT SECP256K1_EXPERIMENTAL)
+  if(SECP256K1_ASM STREQUAL "arm")
+    message(FATAL_ERROR "ARM assembly optimization is experimental. Use -DSECP256K1_EXPERIMENTAL=ON to allow.")
+  endif()
+endif()
+
+set(SECP256K1_VALGRIND "AUTO" CACHE STRING "Build with extra checks for running inside Valgrind. [default=AUTO]")
+set_property(CACHE SECP256K1_VALGRIND PROPERTY STRINGS "AUTO" "OFF" "ON")
+check_string_option_value(SECP256K1_VALGRIND)
+if(SECP256K1_VALGRIND)
+  find_package(Valgrind MODULE)
+  if(Valgrind_FOUND)
+    set(SECP256K1_VALGRIND ON)
+    include_directories(${Valgrind_INCLUDE_DIR})
+    add_definitions(-DVALGRIND)
+  elseif(SECP256K1_VALGRIND STREQUAL "AUTO")
+    set(SECP256K1_VALGRIND OFF)
+  else()
+    message(FATAL_ERROR "Valgrind support requested but valgrind/memcheck.h header not available.")
+  endif()
+endif()
+
+option(SECP256K1_BUILD_BENCHMARK "Build benchmarks." ON)
+option(SECP256K1_BUILD_TESTS "Build tests." ON)
+option(SECP256K1_BUILD_EXHAUSTIVE_TESTS "Build exhaustive tests." ON)
+option(SECP256K1_BUILD_CTIME_TESTS "Build constant-time tests." ${SECP256K1_VALGRIND})
+option(SECP256K1_BUILD_EXAMPLES "Build examples." OFF)
+
+# Redefine configuration flags.
+# We leave assertions on, because they are only used in the examples, and we want them always on there.
+if(MSVC)
+  string(REGEX REPLACE "/DNDEBUG[ \t\r\n]*" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "/DNDEBUG[ \t\r\n]*" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+  string(REGEX REPLACE "/DNDEBUG[ \t\r\n]*" "" CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL}")
+else()
+  string(REGEX REPLACE "-DNDEBUG[ \t\r\n]*" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REGEX REPLACE "-DNDEBUG[ \t\r\n]*" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+  string(REGEX REPLACE "-DNDEBUG[ \t\r\n]*" "" CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL}")
+  # Prefer -O2 optimization level. (-O3 is CMake's default for Release for many compilers.)
+  string(REGEX REPLACE "-O3[ \t\r\n]*" "-O2" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+endif()
+
+# Define custom "Coverage" build type.
+set(CMAKE_C_FLAGS_COVERAGE "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O0 -DCOVERAGE=1 --coverage" CACHE STRING
+  "Flags used by the C compiler during \"Coverage\" builds."
+  FORCE
+)
+set(CMAKE_EXE_LINKER_FLAGS_COVERAGE "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} --coverage" CACHE STRING
+  "Flags used for linking binaries during \"Coverage\" builds."
+  FORCE
+)
+set(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO} --coverage" CACHE STRING
+  "Flags used by the shared libraries linker during \"Coverage\" builds."
+  FORCE
+)
+mark_as_advanced(
+  CMAKE_C_FLAGS_COVERAGE
+  CMAKE_EXE_LINKER_FLAGS_COVERAGE
+  CMAKE_SHARED_LINKER_FLAGS_COVERAGE
 )
 
-# The library
-add_library(secp256k1 src/secp256k1.c)
-target_include_directories(secp256k1 PUBLIC include)
+if(CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo" "Release" "Debug" "MinSizeRel" "Coverage")
+endif()
 
-# We need to link in GMP
-find_package(GMP)
-if(GMP_FOUND)
-	target_include_directories(secp256k1 PUBLIC ${GMP_INCLUDE_DIR})
-	target_link_libraries(secp256k1 ${GMP_LIBRARY})
-	set(USE_NUM_GMP 1)
-	set(USE_FIELD_INV_NUM 1)
-	set(USE_SCALAR_INV_NUM 1)
+get_property(cached_cmake_build_type CACHE CMAKE_BUILD_TYPE PROPERTY TYPE)
+if(cached_cmake_build_type)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY
+    STRINGS "RelWithDebInfo" "Release" "Debug" "MinSizeRel" "Coverage"
+  )
+endif()
+
+set(default_build_type "RelWithDebInfo")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to \"${default_build_type}\" as none was specified")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+include(TryAddCompileOption)
+if(MSVC)
+  try_add_compile_option(/W2)
+  try_add_compile_option(/wd4146)
 else()
-	set(USE_NUM_NONE 1)
-	set(USE_FIELD_INV_BUILTIN 1)
-	set(USE_SCALAR_INV_BUILTIN 1)
+  try_add_compile_option(-pedantic)
+  try_add_compile_option(-Wall)
+  try_add_compile_option(-Wcast-align)
+  try_add_compile_option(-Wcast-align=strict)
+  try_add_compile_option(-Wconditional-uninitialized)
+  try_add_compile_option(-Wextra)
+  try_add_compile_option(-Wnested-externs)
+  try_add_compile_option(-Wno-long-long)
+  try_add_compile_option(-Wno-overlength-strings)
+  try_add_compile_option(-Wno-unused-function)
+  try_add_compile_option(-Wreserved-identifier)
+  try_add_compile_option(-Wshadow)
+  try_add_compile_option(-Wstrict-prototypes)
+  try_add_compile_option(-Wundef)
 endif()
 
-# We check if amd64 asm is supported.
-include(CheckCSourceCompiles)
-check_c_source_compiles("
-	#include <stdint.h>
-	int main() {
-		uint64_t a = 11, tmp;
-		__asm__ __volatile__(\"movq \$0x100000000,%1; mulq %%rsi\" : \"+a\"(a) : \"S\"(tmp) : \"cc\", \"%rdx\");
-		return 0;
-	}
-" USE_ASM_X86_64)
+set(CMAKE_C_VISIBILITY_PRESET hidden)
 
-# We make sure __int128 is defined
-include(CheckTypeSize)
-check_type_size(__int128 SIZEOF___INT128)
-if(SIZEOF___INT128 EQUAL 16)
-	set(HAVE___INT128 1)
+# Ask CTest to create a "check" target (e.g., make check) as alias for the "test" target.
+# CTEST_TEST_TARGET_ALIAS is not documented but supposed to be user-facing.
+# See: https://gitlab.kitware.com/cmake/cmake/-/commit/816c9d1aa1f2b42d40c81a991b68c96eb12b6d2
+#set(CTEST_TEST_TARGET_ALIAS check)
+include(CTest)
+# We do not use CTest's BUILD_TESTING because a single toggle for all tests is too coarse for our needs.
+mark_as_advanced(BUILD_TESTING)
+if(SECP256K1_BUILD_BENCHMARK OR SECP256K1_BUILD_TESTS OR SECP256K1_BUILD_EXHAUSTIVE_TESTS OR SECP256K1_BUILD_CTIME_TESTS OR SECP256K1_BUILD_EXAMPLES)
+  enable_testing()
+endif()
+
+add_subdirectory(src)
+if(SECP256K1_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+message("\n")
+message("secp256k1 configure summary")
+message("===========================")
+message("Build artifacts:")
+message("  shared library ...................... ${SECP256K1_BUILD_SHARED}")
+message("  static library ...................... ${SECP256K1_BUILD_STATIC}")
+message("Optional modules:")
+message("  ECDH ................................ ${SECP256K1_ENABLE_MODULE_ECDH}")
+message("  ECDSA pubkey recovery ............... ${SECP256K1_ENABLE_MODULE_RECOVERY}")
+message("  extrakeys ........................... ${SECP256K1_ENABLE_MODULE_EXTRAKEYS}")
+message("  schnorrsig .......................... ${SECP256K1_ENABLE_MODULE_SCHNORRSIG}")
+message("Parameters:")
+message("  ecmult window size .................. ${SECP256K1_ECMULT_WINDOW_SIZE}")
+message("  ecmult gen precision bits ........... ${SECP256K1_ECMULT_GEN_PREC_BITS}")
+message("Optional features:")
+message("  assembly optimization ............... ${SECP256K1_ASM}")
+message("  external callbacks .................. ${SECP256K1_USE_EXTERNAL_DEFAULT_CALLBACKS}")
+if(SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY)
+  message("  wide multiplication (test-only) ..... ${SECP256K1_TEST_OVERRIDE_WIDE_MULTIPLY}")
+endif()
+message("Optional binaries:")
+message("  benchmark ........................... ${SECP256K1_BUILD_BENCHMARK}")
+message("  noverify_tests ...................... ${SECP256K1_BUILD_TESTS}")
+set(tests_status "${SECP256K1_BUILD_TESTS}")
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+  set(tests_status OFF)
+endif()
+message("  tests ............................... ${tests_status}")
+message("  exhaustive tests .................... ${SECP256K1_BUILD_EXHAUSTIVE_TESTS}")
+message("  ctime_tests ......................... ${SECP256K1_BUILD_CTIME_TESTS}")
+message("  examples ............................ ${SECP256K1_BUILD_EXAMPLES}")
+message("")
+if(CMAKE_CROSSCOMPILING)
+  set(cross_status "TRUE, for ${CMAKE_SYSTEM_NAME}, ${CMAKE_SYSTEM_PROCESSOR}")
 else()
-	# If we do not support __int128, we should be falling back
-	# on 32bits implementations for field and scalar.
+  set(cross_status "FALSE")
 endif()
-
-if (MSVC)
-	# MSVC compiler does not support inline assembly nor __int128. Use C implementation, but fail with error for other compilers
-	set(USE_FIELD_10X26 1)
-	set(USE_SCALAR_8X32 1)
+message("Cross compiling ....................... ${cross_status}")
+message("Valgrind .............................. ${SECP256K1_VALGRIND}")
+get_directory_property(definitions COMPILE_DEFINITIONS)
+string(REPLACE ";" " " definitions "${definitions}")
+message("Preprocessor defined macros ........... ${definitions}")
+message("C compiler ............................ ${CMAKE_C_COMPILER}")
+message("CFLAGS ................................ ${CMAKE_C_FLAGS}")
+get_directory_property(compile_options COMPILE_OPTIONS)
+string(REPLACE ";" " " compile_options "${compile_options}")
+message("Compile options ....................... " ${compile_options})
+if(DEFINED CMAKE_BUILD_TYPE)
+  message("Build type:")
+  message(" - CMAKE_BUILD_TYPE ................... ${CMAKE_BUILD_TYPE}")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" build_type)
+  message(" - CFLAGS ............................. ${CMAKE_C_FLAGS_${build_type}}")
+  message(" - LDFLAGS for executables ............ ${CMAKE_EXE_LINKER_FLAGS_${build_type}}")
+  message(" - LDFLAGS for shared libraries ....... ${CMAKE_SHARED_LINKER_FLAGS_${build_type}}")
 else()
-	# Detect if we are on a 32 or 64 bits plateform and chose
-	# scalar and filed implementation accordingly
-	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-		# 64 bits implementationr require either __int128 or asm support.
-		if (HAVE___INT128 OR USE_ASM_X86_64)
-			set(USE_SCALAR_4X64 1)
-			set(USE_FIELD_5X52 1)
-		else()
-			message(SEND_ERROR "Compiler does not support __int128 or insline assembly")
-		endif()
-	else()
-		set(USE_SCALAR_8X32 1)
-		set(USE_FIELD_10X26 1)
-	endif()
+  message("Available configurations .............. ${CMAKE_CONFIGURATION_TYPES}")
+  message("RelWithDebInfo configuration:")
+  message(" - CFLAGS ............................. ${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  message(" - LDFLAGS for executables ............ ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}")
+  message(" - LDFLAGS for shared libraries ....... ${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
+  message("Debug configuration:")
+  message(" - CFLAGS ............................. ${CMAKE_C_FLAGS_DEBUG}")
+  message(" - LDFLAGS for executables ............ ${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+  message(" - LDFLAGS for shared libraries ....... ${CMAKE_SHARED_LINKER_FLAGS_DEBUG}")
 endif()
-
-# Executable internal to secp256k1 need to have the HAVE_CONFIG_H define set.
-# For convenience, we wrap this into a function.
-function(link_secp256k1_internal NAME)
-	target_link_libraries(${NAME} secp256k1)
-	target_compile_definitions(${NAME} PRIVATE HAVE_CONFIG_H SECP256K1_BUILD)
-endfunction(link_secp256k1_internal)
-
-# Phony target to build benchmarks
-if (NOT MSVC)
-	add_custom_target(bench-secp256k1)
-	add_dependencies(check bench-secp256k1)
+message("\n")
+if(SECP256K1_EXPERIMENTAL)
+  message(
+    "  ******\n"
+    "  WARNING: experimental build\n"
+    "  Experimental features do not have stable APIs or properties, and may not be safe for production use.\n"
+    "  ******\n"
+  )
 endif()
-
-function(add_secp256k1_bench NAME)
-	# benchmark tests use non-portable time related functions. Only include them in non MSVC build:
-	if (NOT MSVC)
-		add_executable(${NAME} EXCLUDE_FROM_ALL ${ARGN})
-		link_secp256k1_internal(${NAME})
-		add_dependencies(bench-secp256k1 ${NAME})
-	endif()
-endfunction(add_secp256k1_bench)
-
-# Recovery module
-option(SECP256K1_ENABLE_MODULE_RECOVERY "Build libsecp256k1's recovery module" ON)
-if(SECP256K1_ENABLE_MODULE_RECOVERY)
-	set(ENABLE_MODULE_RECOVERY 1)
-	add_secp256k1_bench(bench_recover src/bench_recover.c)
-endif()
-
-# ECDH module
-option(SECP256K1_ENABLE_MODULE_ECDH "Build libsecp256k1's ECDH module" OFF)
-if(SECP256K1_ENABLE_MODULE_ECDH)
-	set(ENABLE_MODULE_ECDH 1)
-	add_secp256k1_bench(bench_ecdh src/bench_ecdh.c)
-endif()
-
-# MultiSet module
-option(SECP256K1_ENABLE_MODULE_MULTISET "Build libsecp256k1's MULTISET module" ON)
-if(SECP256K1_ENABLE_MODULE_MULTISET)
-    set(ENABLE_MODULE_MULTISET 1)
-	add_secp256k1_bench(bench_multiset src/bench_multiset.c)
-endif()
-
-# Enable secp256k1's efficiently computable endomorphism
-option(SECP256K1_ENABLE_ENDOMORPHISM "Enable secp256k1's efficiently computable endomorphism" ON)
-if(SECP256K1_ENABLE_ENDOMORPHISM)
-	set(USE_ENDOMORPHISM 1)
-endif()
-
-
-
-# Static precomputation for eliptic curve mutliplication
-option(SECP256K1_ECMULT_STATIC_PRECOMPUTATION "Precompute libsecp256k1's eliptic curve mutliplication tables" ON)
-if(SECP256K1_ECMULT_STATIC_PRECOMPUTATION)
-	set(USE_ECMULT_STATIC_PRECOMPUTATION 1)
-
-	include(NativeExecutable)
-	add_native_executable(gen_context src/gen_context.c)
-
-	add_custom_command(
-		OUTPUT src/ecmult_static_context.h
-		COMMAND gen_context
-	)
-
-	target_sources(secp256k1 PRIVATE src/ecmult_static_context.h)
-endif()
-
-# Generate the config
-configure_file(src/libsecp256k1-config.h.cmake.in src/libsecp256k1-config.h ESCAPE_QUOTES)
-target_compile_definitions(secp256k1 PRIVATE HAVE_CONFIG_H SECP256K1_BUILD)
-
-# Tests
-option(SECP256K1_BUILD_TEST "Build secp256k1's unit tests" ON)
-if(SECP256K1_BUILD_TEST)
-	include(TestSuite)
-	create_test_suite(secp256k1)
-
-	function(create_secp256k1_test NAME FILES)
-		add_test_to_suite(secp256k1 ${NAME} EXCLUDE_FROM_ALL ${FILES})
-		link_secp256k1_internal(${NAME})
-	endfunction()
-
-	create_secp256k1_test(secp256k1_tests src/tests.c)
-	target_compile_definitions(secp256k1_tests PRIVATE VERIFY)
-
-	create_secp256k1_test(exhaustive_tests src/tests_exhaustive.c)
-	# This should not be enabled at the same time as coverage is.
-	# TODO: support coverage.
-	target_compile_definitions(exhaustive_tests PRIVATE VERIFY)
-endif(SECP256K1_BUILD_TEST)
-
-# Benchmarks
-add_secp256k1_bench(bench_verify src/bench_verify.c)
-add_secp256k1_bench(bench_sign src/bench_sign.c)
-add_secp256k1_bench(bench_internal src/bench_internal.c)
