@@ -21,6 +21,7 @@ AC_INIT([libsecp256k1],m4_join([.], _PKG_VERSION_MAJOR, _PKG_VERSION_MINOR, _PKG
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
+AC_CONFIG_HEADERS([secp256k1-config.h])
 AC_CANONICAL_HOST
 
 # Require Automake 1.11.2 for AM_PROG_AR
