@@ -411,6 +411,7 @@ libbitcoin_server_a_SOURCES = \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
+  taskcancellation.cpp \
   timedata.cpp \
   time_locked_mempool.cpp \
   txdb.cpp \
@@ -525,6 +526,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.h \
   serialize.h \
   span.h \
+  taskcancellation.h \
+  taskcancellation.cpp \
   tinyformat.h \
   uint256.h \
   utilstrencodings.cpp \
@@ -639,7 +642,8 @@ bitcoind_LDADD += \
   $(EVENT_PTHREADS_LIBS) \
   $(EVENT_LIBS) \
   $(ZMQ_LIBS) \
-  $(AIO_LIBS)
+  $(AIO_LIBS) \
+  $(TBB_LIBS)
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp

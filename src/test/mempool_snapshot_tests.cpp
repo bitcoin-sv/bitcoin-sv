@@ -154,7 +154,7 @@ BOOST_AUTO_TEST_CASE(PoolSnapshotTest)
 
     // Check that all transaction IDs exist in the pool's lookup table.
     std::set<uint256> hashes;
-    BOOST_CHECK_EQUAL(hashes.size(), 0);
+    BOOST_CHECK_EQUAL(hashes.size(), 0U);
     for (const auto tx : allTxs) {
         hashes.emplace(tx->GetId());
     }
@@ -166,10 +166,10 @@ BOOST_AUTO_TEST_CASE(PoolSnapshotTest)
     // Check that all hashes are unique.
     for (const auto& entry : slice) {
         const auto key = entry.GetTxId();
-        BOOST_CHECK_EQUAL(1, hashes.count(key));
+        BOOST_CHECK_EQUAL(1U, hashes.count(key));
         BOOST_CHECK_NO_THROW(hashes.erase(key));
     }
-    BOOST_CHECK_EQUAL(hashes.size(), 0);
+    BOOST_CHECK_EQUAL(hashes.size(), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(InvalidTxIdTest)
@@ -178,31 +178,31 @@ BOOST_AUTO_TEST_CASE(InvalidTxIdTest)
         const auto slice = testPool.GetTxSnapshot(TxN.GetId(), SINGLE);
         BOOST_CHECK(!slice);
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(slice.cbegin() == slice.cend());
     }{
         const auto slice = testPool.GetTxSnapshot(TxN.GetId(), TX_WITH_ANCESTORS);
         BOOST_CHECK(!slice);
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(slice.cbegin() == slice.cend());
     }{
         const auto slice = testPool.GetTxSnapshot(TxN.GetId(), ONLY_ANCESTORS);
         BOOST_CHECK(!slice);
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(slice.cbegin() == slice.cend());
     }{
         const auto slice = testPool.GetTxSnapshot(TxN.GetId(), TX_WITH_DESCENDANTS);
         BOOST_CHECK(!slice);
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(slice.cbegin() == slice.cend());
     }{
         const auto slice = testPool.GetTxSnapshot(TxN.GetId(), ONLY_DESCENDANTS);
         BOOST_CHECK(!slice);
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(slice.cbegin() == slice.cend());
     }
 }
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(SingleTest)
         const auto slice = testPool.GetTxSnapshot(Tx1.GetId(), SINGLE);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK( slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(SingleTest)
         const auto slice = testPool.GetTxSnapshot(Tx5.GetId(), SINGLE);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK( slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx3.GetId()));
@@ -265,7 +265,7 @@ BOOST_AUTO_TEST_CASE(SingleTest)
         const auto slice = testPool.GetTxSnapshot(Tx8.GetId(), SINGLE);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -296,7 +296,7 @@ BOOST_AUTO_TEST_CASE(TxWithAncestorsTest)
         const auto slice = testPool.GetTxSnapshot(Tx2.GetId(), TX_WITH_ANCESTORS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -322,7 +322,7 @@ BOOST_AUTO_TEST_CASE(TxWithAncestorsTest)
         const auto slice = testPool.GetTxSnapshot(Tx6.GetId(), TX_WITH_ANCESTORS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 2);
+        BOOST_CHECK_EQUAL(slice.size(), 2U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -348,7 +348,7 @@ BOOST_AUTO_TEST_CASE(TxWithAncestorsTest)
         const auto slice = testPool.GetTxSnapshot(Tx9.GetId(), TX_WITH_ANCESTORS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 4);
+        BOOST_CHECK_EQUAL(slice.size(), 4U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -379,7 +379,7 @@ BOOST_AUTO_TEST_CASE(OnlyAncestorsTest)
         const auto slice = testPool.GetTxSnapshot(Tx2.GetId(), ONLY_ANCESTORS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -405,7 +405,7 @@ BOOST_AUTO_TEST_CASE(OnlyAncestorsTest)
         const auto slice = testPool.GetTxSnapshot(Tx6.GetId(), ONLY_ANCESTORS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -431,7 +431,7 @@ BOOST_AUTO_TEST_CASE(OnlyAncestorsTest)
         const auto slice = testPool.GetTxSnapshot(Tx9.GetId(), ONLY_ANCESTORS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 3);
+        BOOST_CHECK_EQUAL(slice.size(), 3U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -462,7 +462,7 @@ BOOST_AUTO_TEST_CASE(TxWithDescendantsTest)
         const auto slice = testPool.GetTxSnapshot(Tx3.GetId(), TX_WITH_DESCENDANTS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 3);
+        BOOST_CHECK_EQUAL(slice.size(), 3U);
         BOOST_CHECK( slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx3.GetId()));
@@ -488,7 +488,7 @@ BOOST_AUTO_TEST_CASE(TxWithDescendantsTest)
         const auto slice = testPool.GetTxSnapshot(Tx7.GetId(), TX_WITH_DESCENDANTS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 2);
+        BOOST_CHECK_EQUAL(slice.size(), 2U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -514,7 +514,7 @@ BOOST_AUTO_TEST_CASE(TxWithDescendantsTest)
         const auto slice = testPool.GetTxSnapshot(Tx9.GetId(), TX_WITH_DESCENDANTS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -545,7 +545,7 @@ BOOST_AUTO_TEST_CASE(OnlyDescendantsTest)
         const auto slice = testPool.GetTxSnapshot(Tx3.GetId(), ONLY_DESCENDANTS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 2);
+        BOOST_CHECK_EQUAL(slice.size(), 2U);
         BOOST_CHECK( slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK( slice.TxIdExists(Tx3.GetId()));
@@ -571,7 +571,7 @@ BOOST_AUTO_TEST_CASE(OnlyDescendantsTest)
         const auto slice = testPool.GetTxSnapshot(Tx7.GetId(), ONLY_DESCENDANTS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(!slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 1);
+        BOOST_CHECK_EQUAL(slice.size(), 1U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));
@@ -597,7 +597,7 @@ BOOST_AUTO_TEST_CASE(OnlyDescendantsTest)
         const auto slice = testPool.GetTxSnapshot(Tx9.GetId(), ONLY_DESCENDANTS);
         BOOST_CHECK(slice.IsValid());
         BOOST_CHECK(slice.empty());
-        BOOST_CHECK_EQUAL(slice.size(), 0);
+        BOOST_CHECK_EQUAL(slice.size(), 0U);
         BOOST_CHECK(!slice.TxIdExists(Tx1.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx2.GetId()));
         BOOST_CHECK(!slice.TxIdExists(Tx3.GetId()));

@@ -742,7 +742,7 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
     }
 
     // Make sure that we got correct median past time.
-    BOOST_REQUIRE_EQUAL(chainActive.Tip()->GetMedianTimePast(), medianPastTime);
+    BOOST_REQUIRE_EQUAL(chainActive.Tip()->GetMedianTimePast(), static_cast<int32_t>(medianPastTime));
 
 
     BOOST_REQUIRE(mining::g_miningFactory.get() == nullptr);
@@ -751,7 +751,6 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
 
     {
         LOCK(cs_main);
-
         chainActive.SetTip(nullptr); // cleanup
     }
 }
@@ -799,7 +798,7 @@ void Test_JournalingBlockAssembler_Construction(TestingSetup& testingSetup)
     std::unique_ptr<CBlockTemplate> bt { mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev) };
     BOOST_REQUIRE(bt);
     BOOST_REQUIRE(bt->GetBlockRef());
-    BOOST_CHECK_EQUAL(bt->GetBlockRef()->vtx.size(), 1);
+    BOOST_CHECK_EQUAL(bt->GetBlockRef()->vtx.size(), 1U);
 }
 
 void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)

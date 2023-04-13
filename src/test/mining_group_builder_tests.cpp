@@ -118,10 +118,10 @@ namespace
 
         // Ensure txid is in builders map
         const auto& txnMap { BuilderAccess::GetTxns(builder) };
-        BOOST_CHECK_EQUAL(txnMap.count(txid), 1);
+        BOOST_CHECK_EQUAL(txnMap.count(txid), 1U);
         // Ensure group is in builders map
         const auto& groupMap { BuilderAccess::GetGroups(builder) };
-        BOOST_CHECK_EQUAL(groupMap.count(groupID), 1);
+        BOOST_CHECK_EQUAL(groupMap.count(groupID), 1U);
 
         // Check txn is in (just this) group
         unsigned count {0};
@@ -146,16 +146,16 @@ BOOST_AUTO_TEST_CASE(TestNewGroupID)
 {
     // Group IDs start at 0
     TxnGroupBuilder builder {};
-    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 0);
-    BOOST_CHECK_EQUAL(BuilderAccess::NewGroupID(builder), 0);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 1);
-    BOOST_CHECK_EQUAL(BuilderAccess::NewGroupID(builder), 1);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 0U);
+    BOOST_CHECK_EQUAL(BuilderAccess::NewGroupID(builder), 0U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 1U);
+    BOOST_CHECK_EQUAL(BuilderAccess::NewGroupID(builder), 1U);
 
     // Check rolling over limit of uint64_t works (unlikely to ever happen)
     BuilderAccess::GetGroups(builder).insert({0, TxnGroup{0, NewTxn()}});
     BuilderAccess::GetNextGroupID(builder) = std::numeric_limits<TxnGroupID>::max();
     BOOST_CHECK_EQUAL(BuilderAccess::NewGroupID(builder), std::numeric_limits<TxnGroupID>::max());
-    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 1);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 1U);
 }
 
 BOOST_AUTO_TEST_CASE(TestStandaloneTxn)
@@ -168,15 +168,15 @@ BOOST_AUTO_TEST_CASE(TestStandaloneTxn)
     // Add a single standalone txn
     CJournalEntry txnJournalEntry1 { NewTxn() };
     TxnGroupID groupID1 { builder.AddTxn(txnJournalEntry1) };
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 1);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 1U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1U);
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry1, groupID1));
 
     // Add another single standalone txn
     CJournalEntry txnJournalEntry2 { NewTxn() };
     TxnGroupID groupID2 { builder.AddTxn(txnJournalEntry2) };
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 2);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 2);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 2U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 2U);
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry2, groupID2));
     BOOST_CHECK(! CheckTxnInGroup(builder, txnJournalEntry2, groupID1));
     BOOST_CHECK(! CheckTxnInGroup(builder, txnJournalEntry1, groupID2));
@@ -184,8 +184,8 @@ BOOST_AUTO_TEST_CASE(TestStandaloneTxn)
     // Add a single txn that spends an existing txn
     CJournalEntry txnJournalEntry3 { NewTxn({txnJournalEntry1.getTxn()}) };
     TxnGroupID groupID3 { builder.AddTxn(txnJournalEntry3) };
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 3);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 2);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 3U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 2U);
     BOOST_CHECK_EQUAL(groupID1, groupID3);
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry3, groupID3));
     BOOST_CHECK(! CheckTxnInGroup(builder, txnJournalEntry3, groupID2));
@@ -194,16 +194,16 @@ BOOST_AUTO_TEST_CASE(TestStandaloneTxn)
     // Add a single txn that spends multiple existing txns
     CJournalEntry txnJournalEntry4 { NewTxn({txnJournalEntry2.getTxn(), txnJournalEntry3.getTxn()}) };
     TxnGroupID groupID4 { builder.AddTxn(txnJournalEntry4) };
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 4);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 4U);
     // Txn4 depends on all other txns, so everything should now be in a single group
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1U);
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry4, groupID4));
 
     // Clear and reset
     builder.Clear();
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 0);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 0);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 0);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 0U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 0U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetNextGroupID(builder), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(TestGroupTxn)
@@ -220,8 +220,8 @@ BOOST_AUTO_TEST_CASE(TestGroupTxn)
     TxnGroupID groupID1 { builder.AddTxn(txnJournalEntry1) };
     TxnGroupID groupID2 { builder.AddTxn(txnJournalEntry2) };
     TxnGroupID groupID3 { builder.AddTxn(txnJournalEntry3) };
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 3);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 3);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 3U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 3U);
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry1, groupID1));
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry2, groupID2));
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry3, groupID3));
@@ -231,8 +231,8 @@ BOOST_AUTO_TEST_CASE(TestGroupTxn)
     CJournalEntry txnGroup1Add2 { NewTxn() };
     groupID1 = builder.AddTxn(txnGroup1Add1, groupID1);
     groupID1 = builder.AddTxn(txnGroup1Add2, groupID1);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 5);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 3);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 5U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 3U);
     BOOST_CHECK(CheckTxnInGroup(builder, txnGroup1Add1, groupID1));
     BOOST_CHECK(CheckTxnInGroup(builder, txnGroup1Add2, groupID1));
     BOOST_CHECK(CheckTxnInGroup(builder, txnJournalEntry1, groupID1));
@@ -245,8 +245,8 @@ BOOST_AUTO_TEST_CASE(TestGroupTxn)
     groupID2 = builder.AddTxn(txnGroup2Add1, groupID2);
     groupID2 = builder.AddTxn(txnGroup2Add2, groupID2);
     groupID2 = builder.AddTxn(txnGroup2Add3, groupID2);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 8);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 2);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 8U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 2U);
     BOOST_CHECK(CheckTxnInGroup(builder, txnGroup2Add1, groupID2));
     BOOST_CHECK(CheckTxnInGroup(builder, txnGroup2Add2, groupID2));
     BOOST_CHECK(CheckTxnInGroup(builder, txnGroup2Add3, groupID2));
@@ -256,8 +256,8 @@ BOOST_AUTO_TEST_CASE(TestGroupTxn)
 
     // Test group removal
     BOOST_CHECK_NO_THROW(builder.RemoveGroup(groupID2));
-    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 1);
-    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 1U);
+    BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1U);
     BOOST_CHECK_THROW(auto group = builder.GetGroup(groupID2), std::runtime_error);
 }
 
@@ -274,21 +274,21 @@ BOOST_AUTO_TEST_CASE(TestSelfishDetection)
     TxnGroupID groupID1 { builder.AddTxn(NewTxn()) };
     TxnGroupID groupID2 { builder.AddTxn(NewTxn()) };
     groupID2 = builder.AddTxn(NewTxn(), groupID2);
-    BOOST_CHECK_EQUAL(builder.GetGroup(groupID1).size(), 1);
-    BOOST_CHECK_EQUAL(builder.GetGroup(groupID2).size(), 2);
+    BOOST_CHECK_EQUAL(builder.GetGroup(groupID1).size(), 1U);
+    BOOST_CHECK_EQUAL(builder.GetGroup(groupID2).size(), 2U);
 
     // Add a txn on the selfish cutoff
     SetMockTime(selfishTime);
     TxnGroupID groupID3 { builder.AddTxn(NewTxn()) };
-    BOOST_CHECK_EQUAL(builder.GetGroup(groupID1).size(), 1);
+    BOOST_CHECK_EQUAL(builder.GetGroup(groupID1).size(), 1U);
 
     // Add some txns after the selfish cutoff
     SetMockTime(selfishTime + 1);
     TxnGroupID groupID4 { builder.AddTxn(NewTxn()) };
     TxnGroupID groupID5 { builder.AddTxn(NewTxn()) };
     groupID5 = builder.AddTxn(NewTxn(), groupID5);
-    BOOST_CHECK_EQUAL(builder.GetGroup(groupID4).size(), 1);
-    BOOST_CHECK_EQUAL(builder.GetGroup(groupID5).size(), 2);
+    BOOST_CHECK_EQUAL(builder.GetGroup(groupID4).size(), 1U);
+    BOOST_CHECK_EQUAL(builder.GetGroup(groupID5).size(), 2U);
 
     // Put time to current time and check selfish detection
     SetMockTime(GetSystemTimeInSeconds());
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(TestSelfishDetection)
 
     // Add a non-selfish txn to a selfish group and check that makes the whole group non-selfish
     groupID2 = builder.AddTxn(NewTxn(), groupID2);
-    BOOST_CHECK_EQUAL(builder.GetGroup(groupID2).size(), 3);
+    BOOST_CHECK_EQUAL(builder.GetGroup(groupID2).size(), 3U);
     BOOST_CHECK(! builder.GetGroup(groupID2).IsSelfish(config));
 }
 

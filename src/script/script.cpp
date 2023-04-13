@@ -99,7 +99,7 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     // get the last item that the scriptSig
     // pushes onto the stack:
     bsv::span<const uint8_t> data;
-    const bool valid_script = all_of(scriptSig.begin_instructions(), scriptSig.end_instructions(),
+    const bool valid_script = std::all_of(scriptSig.begin_instructions(), scriptSig.end_instructions(),
             [&data](const auto& inst)
             {
                 if((inst.opcode() > OP_16) || (inst.opcode() == OP_INVALIDOPCODE))  

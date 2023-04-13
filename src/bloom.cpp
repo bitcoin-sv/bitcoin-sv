@@ -32,18 +32,17 @@
  * formulas.
  */
 CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweakIn, uint8_t nFlagsIn)
-    : vData(MAX_BLOOM_FILTER_SIZE)
-    , nHashFuncs(MAX_HASH_FUNCS)
-    , nTweak(nTweakIn)
-    , nFlags(nFlagsIn)
+    : nHashFuncs {MAX_HASH_FUNCS}
+    , nTweak {nTweakIn}
+    , nFlags {nFlagsIn}
 {
-    if (nFPRate <= 0 || nFPRate > 1.18){
+    if (nFPRate <= 0 || nFPRate > 1.18) {
         LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!\n", nFPRate);
         throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
-    vData.resize (std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
+    vData.resize(std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
     nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
-    return ;
+    return;
 }
 
 inline unsigned int

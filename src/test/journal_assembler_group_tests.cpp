@@ -136,51 +136,51 @@ BOOST_AUTO_TEST_CASE(TestJournalAddGroup)
 
     // empty journal and block
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 0);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 0);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 0U);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 0U);
 
     // add a transaction
     NewChangeSet(builder, 1);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1U);
 
 
     // add more transactions than will fit in the block
     NewChangeSet(builder, maxUserTxns);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U + maxUserTxns);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), maxUserTxns);
 
     // remove some stuff from journal
     PretendTransactionsMinedElsewhere(builder, std::move(block), maxUserTxns);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1U);
 
     // add a group that will fit in the block
     NewChangeSet(builder, maxUserTxns - 4, 1);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns - 4);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1 + maxUserTxns - 4);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U + maxUserTxns - 4);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1U + maxUserTxns - 4);
 
     // add a group that will just fit in the block
     NewChangeSet(builder, 3, 2);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns - 4 + 3);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1 + maxUserTxns - 4 + 3);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U + maxUserTxns - 4 + 3);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1U + maxUserTxns - 4 + 3);
 
     // remove stuff from journal
     PretendTransactionsMinedElsewhere(builder, std::move(block), maxUserTxns - 1);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1U);
 
     // add a group that will just not fit in the block
     NewChangeSet(builder, maxUserTxns, 3);
     block = CreateBlock();
-    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns);
-    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
+    BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1U + maxUserTxns);
+    BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1U);
 
     // remove one transaction from journal, now the group should fit
     PretendTransactionsMinedElsewhere(builder, std::move(block), 1);

@@ -2,10 +2,10 @@
 # Copyright (c) 2019-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.9)
 project(BitcoinSV)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # Default visibility is hidden on all targets.
 set(CMAKE_C_VISIBILITY_PRESET hidden)
@@ -198,7 +198,7 @@ endfunction(prepend)
 
 prepend(BOOST_LIBRARIES "Boost::" ${BOOST_PACKAGES_REQUIRED})
 
-find_package(Boost 1.59 REQUIRED ${BOOST_PACKAGES_REQUIRED})
+find_package(Boost 1.74 REQUIRED ${BOOST_PACKAGES_REQUIRED})
 target_link_libraries(util univalue crypto ${BOOST_LIBRARIES})
 
 # Make sure boost uses std::atomic (it doesn't before 1.63)
@@ -339,6 +339,7 @@ add_library(common
 	support/allocators/zeroafterfree.h
 	task.h
 	task_helpers.h
+	taskcancellation.cpp
 	taskcancellation.h
 	thread_safe_queue.h
 	threadpool.h
@@ -389,6 +390,8 @@ add_library(bitcoinconsensus
 	script/script.cpp
 	script/script_error.cpp
 	script/script_num.cpp
+    taskcancellation.cpp
+    taskcancellation.h
 )
 
 target_link_libraries(bitcoinconsensus common)

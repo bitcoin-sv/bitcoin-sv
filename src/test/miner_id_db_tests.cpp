@@ -427,7 +427,7 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
             const CTransaction& coinbase { blockReader->ReadTransaction() };
 
             const CScript& pubKey { coinbase.vout[0].scriptPubKey };
-            const auto it { next(pubKey.begin_instructions(), 3) };
+            const auto it { std::next(pubKey.begin_instructions(), 3) };
             BOOST_REQUIRE(it);
 
             // Parse the JSON and look for the minerContact information
@@ -506,13 +506,13 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
 
     // Check we've got the expected number of blocks
     CBlockIndex* tip { chainActive.Tip() };
-    BOOST_CHECK_EQUAL(tip->GetHeight(), INITIAL_NUM_BLOCKS);
+    BOOST_CHECK_EQUAL(tip->GetHeight(), static_cast<int32_t>(INITIAL_NUM_BLOCKS));
 
     // Check miner ID db contains the expected miner details
     auto dbCheckLambda = [this](const MinerIdDatabase& minerid_db)
     {
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2U);
 
         // Check miner UUId entry for Miner1
         const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
@@ -541,7 +541,7 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         BOOST_CHECK(! miner1Key2Details.mCoinbaseDoc.GetDataRefs());
 
         // Check recent block details for Miner1
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
         BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
 
         // Check miner UUId entry for Miner2
@@ -563,16 +563,16 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         // Check datarefs for Miner2
         BOOST_REQUIRE(miner2Key1Details.mCoinbaseDoc.GetDataRefs());
         const auto& datarefs { miner2Key1Details.mCoinbaseDoc.GetDataRefs() };
-        BOOST_REQUIRE_EQUAL(datarefs->size(), 2);
+        BOOST_REQUIRE_EQUAL(datarefs->size(), 2U);
         BOOST_CHECK_EQUAL(datarefs.value()[0].txid, dataRefTxns[0]->GetId());
-        BOOST_CHECK_EQUAL(datarefs.value()[0].brfcIds.size(), 1);
+        BOOST_CHECK_EQUAL(datarefs.value()[0].brfcIds.size(), 1U);
         BOOST_CHECK_EQUAL(datarefs.value()[0].brfcIds[0], dataRefTxnBrfcIds[0]);
         BOOST_CHECK_EQUAL(datarefs.value()[1].txid, dataRefTxns[1]->GetId());
-        BOOST_CHECK_EQUAL(datarefs.value()[1].brfcIds.size(), 1);
+        BOOST_CHECK_EQUAL(datarefs.value()[1].brfcIds.size(), 1U);
         BOOST_CHECK_EQUAL(datarefs.value()[1].brfcIds[0], dataRefTxnBrfcIds[1]);
 
         // Check recent block details for Miner2
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
         BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner2")));
     };
 
@@ -614,14 +614,14 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
         CreateAndProcessBlock({}, baseDocument, signature);
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2U);
 
         const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         CBlockIndex* expectedLastBlock { chainActive.Tip() };
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner1Details.second.mLastBlock);
         miner1LastBlockId = miner1Details.second.mLastBlock;
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1IdPubKey2.GetHash());
     }
 
@@ -635,14 +635,14 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
         forkBlock = CreateAndProcessBlock(forkBlock.GetHash(), baseDocument, signature);
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
 
         const auto& miner3Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner3") };
         CBlockIndex* expectedLastBlock { chainActive.Tip() };
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner3Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 3);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
         BOOST_CHECK_EQUAL(miner3Details.second.mLatestMinerId, miner3IdPubKey1.GetHash());
     }
 
@@ -651,20 +651,20 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
         UniValue baseDocument { CreateValidCoinbaseDocument(miner1IdKey2, chainActive.Height(), HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), vctxid, "Miner1", {}) };
         auto signature { CreateSignatureStaticCoinbaseDocument(miner1IdKey2, baseDocument) };
         CBlock forkBlock { CreateAndProcessBlock(miner1LastBlockId, baseDocument, signature) };
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3); // Won't see new blocks from Miner1 until reorg happens
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U); // Won't see new blocks from Miner1 until reorg happens
         baseDocument = CreateValidCoinbaseDocument(miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), vctxid, "Miner1", {});
         signature = CreateSignatureStaticCoinbaseDocument(miner1IdKey2, baseDocument);
         forkBlock = CreateAndProcessBlock(forkBlock.GetHash(), baseDocument, signature);
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
 
         const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         CBlockIndex* expectedLastBlock { chainActive.Tip() };
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner1Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 6);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 0);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 6U);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 0U);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1IdPubKey2.GetHash());
     }
 }
@@ -678,8 +678,8 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
     UnitTestAccess::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2U);
 
     // Check miner IDs for Miner2
     auto checkIds = [&minerid_db](unsigned numRotations, const CPubKey& currentPubKey, const CPubKey* prevPubKey)
@@ -760,45 +760,45 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     UnitTestAccess::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
     auto blocksList { UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db) };
     size_t blockListStartSize { INITIAL_NUM_BLOCKS + 1 };   // Mined blocks + Genesis
     BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize);
     BOOST_CHECK_EQUAL(blocksList[0].mHeight, 0);
-    BOOST_CHECK_EQUAL(blocksList[blockListStartSize - 1].mHeight, blockListStartSize - 1);
+    BOOST_CHECK_EQUAL(blocksList[blockListStartSize - 1].mHeight, static_cast<int32_t>(blockListStartSize - 1));
 
     // Mine an additional block for each of Miner1, Miner2, Miner3
     {
         UniValue baseDocument { CreateValidCoinbaseDocument(miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), vctxid, "Miner1", {}) };
         std::vector<uint8_t> signature { CreateSignatureStaticCoinbaseDocument(miner1IdKey2, baseDocument) };
         CreateAndProcessBlock({}, baseDocument, signature);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
         blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
         BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize + 1);
-        BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 1 - 1].mHeight, blockListStartSize + 1 - 1);
+        BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 1 - 1].mHeight, static_cast<int32_t>(blockListStartSize + 1 - 1));
     }
 
     {
         UniValue baseDocument { CreateValidCoinbaseDocument(miner2IdKey1, chainActive.Height() + 1, HexStr(miner2IdPubKey1), HexStr(miner2IdPubKey1), vctxid, "Miner2", {}) };
         std::vector<uint8_t> signature { CreateSignatureStaticCoinbaseDocument(miner2IdKey1, baseDocument) };
         CreateAndProcessBlock({}, baseDocument, signature);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 2);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 2U);
         blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
         BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize + 2);
-        BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 2 - 1].mHeight, blockListStartSize + 2 - 1);
+        BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 2 - 1].mHeight, static_cast<int32_t>(blockListStartSize + 2 - 1));
     }
 
     {
         UniValue baseDocument { CreateValidCoinbaseDocument(miner3IdKey1, chainActive.Height() + 1, HexStr(miner3IdPubKey1), HexStr(miner3IdPubKey1), vctxid, "Miner3", {}) };
         std::vector<uint8_t> signature { CreateSignatureStaticCoinbaseDocument(miner3IdKey1, baseDocument) };
         CreateAndProcessBlock({}, baseDocument, signature);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 1);
+        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 1U);
         blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
         BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize + 3);
-        BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 3 - 1].mHeight, blockListStartSize + 3 - 1);
+        BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 3 - 1].mHeight, static_cast<int32_t>(blockListStartSize + 3 - 1));
     }
 
     // Calculate how many additional blocks we need to mine to overflow the configured number of blocks to track
@@ -813,7 +813,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
     BOOST_REQUIRE_EQUAL(blocksList.size(), GlobalConfig::GetConfig().GetMinerIdReputationN());
     BOOST_CHECK_EQUAL(blocksList.front().mHeight, 0);
-    BOOST_CHECK_EQUAL(blocksList.back().mHeight, GlobalConfig::GetConfig().GetMinerIdReputationN() - 1);
+    BOOST_CHECK_EQUAL(blocksList.back().mHeight, static_cast<int32_t>(GlobalConfig::GetConfig().GetMinerIdReputationN() - 1));
 
     // And now take us over the limit
     UniValue baseDocument { CreateValidCoinbaseDocument(miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), vctxid, "Miner1", {}) };
@@ -822,7 +822,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
     BOOST_REQUIRE_EQUAL(blocksList.size(), GlobalConfig::GetConfig().GetMinerIdReputationN());
     BOOST_CHECK_EQUAL(blocksList.front().mHeight, 1);
-    BOOST_CHECK_EQUAL(blocksList.back().mHeight, GlobalConfig::GetConfig().GetMinerIdReputationN());
+    BOOST_CHECK_EQUAL(blocksList.back().mHeight, static_cast<int32_t>(GlobalConfig::GetConfig().GetMinerIdReputationN()));
 }
 
 // Test processing of an invalid block

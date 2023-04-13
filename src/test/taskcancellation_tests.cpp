@@ -143,7 +143,7 @@ BOOST_AUTO_TEST_CASE(cancellation_after_500ms_budget)
 
 void busy_wait(std::chrono::milliseconds delay) {
     using clock = task::thread_clock;
-    volatile size_t jiffies = 0;
+    std::atomic_size_t jiffies = 0;
     auto end = clock::now() + delay;
     while (clock::now() < end) {
         ++jiffies;

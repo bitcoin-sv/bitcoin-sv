@@ -73,8 +73,6 @@ namespace bsv
     }
 
     class instruction_iterator
-        : public std::iterator<std::forward_iterator_tag, instruction>
-
     {
         span<const uint8_t> span_;
         bool valid_{};
@@ -87,6 +85,12 @@ namespace bsv
         }
 
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = instruction;
+        using difference_type = std::ptrdiff_t;
+        using pointer = instruction*;
+        using reference = instruction&;
+
         constexpr instruction_iterator(span<const uint8_t> s) noexcept : 
             span_{s} 
         {

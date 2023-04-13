@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(exception)
                 auto chunk = stream.Read(5);
 
                 BOOST_REQUIRE_EQUAL(chunk.Begin(), static_cast<decltype(chunk.Begin())>(nullptr));
-                BOOST_REQUIRE_EQUAL(chunk.Size(), 0);
+                BOOST_REQUIRE_EQUAL(chunk.Size(), 0U);
                 BOOST_REQUIRE_EQUAL(stream.EndOfStream(), false);
             }
             while(std::chrono::steady_clock::now() - start < 5s);
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(known_size_input_async_reader)
         SerializeAsyncStream(stream, 4096u)};
 
     // check that we really did at least a couple of skipps
-    BOOST_REQUIRE_GT(skipCount, 2);
+    BOOST_REQUIRE_GT(skipCount, 2U);
 
     BOOST_REQUIRE_EQUAL_COLLECTIONS(
         serializedData.begin(), serializedData.end(),

@@ -96,9 +96,9 @@ BOOST_AUTO_TEST_CASE(test_for_exposition)
     BOOST_CHECK_THROW(ParseScript("OP_15"), std::runtime_error);
     BOOST_CHECK_THROW(ParseScript("OP_16"), std::runtime_error);
     const CScript delimiters{ParseScript("1 2\t3\n4")};
-    BOOST_CHECK_EQUAL(4, delimiters.size());
+    BOOST_CHECK_EQUAL(4U, delimiters.size());
     const CScript add{ParseScript("OP_ADD ADD")};
-    BOOST_CHECK_EQUAL(2, add.size());
+    BOOST_CHECK_EQUAL(2U, add.size());
 
     BOOST_CHECK_THROW(ParseScript("OP_ADDx"), std::runtime_error);
     BOOST_CHECK_THROW(ParseScript("OP_2OP_ADD"), std::runtime_error);

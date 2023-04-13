@@ -185,12 +185,12 @@ BOOST_AUTO_TEST_CASE(basic) {
             for(auto* item=blocks.Root(); item!=nullptr; item=item->Next())
             {
                 // Each block must only be visited once
-                BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->GetVersion()), 0);
+                BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->GetVersion()), 0U);
 
                 if(item->BlockIndex() != root_block)
                 {
                     // Parent of each block (except the root) must have been visited before
-                    BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->GetPrev()->GetVersion()), 1);
+                    BOOST_REQUIRE_EQUAL(result.count(item->BlockIndex()->GetPrev()->GetVersion()), 1U);
                 }
 
                 result.insert(item->BlockIndex()->GetVersion());
@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(large) {
     }
 
     // Sanity check that we created all blocks we intended
-    BOOST_REQUIRE_EQUAL( b.mapBlockIndex.size(), N );
+    BOOST_REQUIRE_EQUAL( b.mapBlockIndex.size(), static_cast<uint32_t>(N) );
 
     using clock = std::chrono::steady_clock;
 

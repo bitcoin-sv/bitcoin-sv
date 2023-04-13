@@ -608,21 +608,21 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     BOOST_CHECK_EQUAL(testTx1.groupingData()->fee, tx1it->GetFee());
     BOOST_CHECK_EQUAL(testTx1.groupingData()->feeDelta, tx1it->GetFeeDelta());
     BOOST_CHECK_EQUAL(testTx1.groupingData()->size, tx1it->GetTxSize());
-    BOOST_CHECK_EQUAL(testTx1.groupingData()->ancestorsCount, 0);
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->ancestorsCount, 0U);
 
     CTestTxMemPoolEntry testTx2(const_cast<CTxMemPoolEntry&>(*tx2it));
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->fee, tx2it->GetFee());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->feeDelta, tx2it->GetFeeDelta());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->size, tx2it->GetTxSize());
-    BOOST_CHECK_EQUAL(testTx2.groupingData()->ancestorsCount, 0);
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->ancestorsCount, 0U);
 
     CTestTxMemPoolEntry testTx3(const_cast<CTxMemPoolEntry&>(*tx3it));
     BOOST_CHECK(!tx3it->IsInPrimaryMempool());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->fee, tx1it->GetFee() + tx2it->GetFee() + tx3it->GetFee());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->size, tx1it->GetTxSize() + tx2it->GetTxSize() + tx3it->GetTxSize());
-    BOOST_CHECK_EQUAL(testTx3.groupingData()->ancestorsCount, 2);
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->ancestorsCount, 2U);
 }
 
 BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
@@ -655,7 +655,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry1access(const_cast<CTxMemPoolEntry&>(*tx1it));
     const auto& group1data = entry1access.groupingData();
     BOOST_REQUIRE(group1data.has_value());
-    BOOST_CHECK_EQUAL(group1data->ancestorsCount, 0); // exact
+    BOOST_CHECK_EQUAL(group1data->ancestorsCount, 0U); // exact
 
     CMutableTransaction tx2 = CMutableTransaction();
     tx2.vin.resize(1);
@@ -671,7 +671,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry2access(const_cast<CTxMemPoolEntry&>(*tx2it));
     const auto& group2data = entry2access.groupingData();
     BOOST_REQUIRE(group2data.has_value());
-    BOOST_CHECK_EQUAL(group2data->ancestorsCount, 1); // exact
+    BOOST_CHECK_EQUAL(group2data->ancestorsCount, 1U); // exact
 
     CMutableTransaction tx3 = CMutableTransaction();
     tx3.vin.resize(1);
@@ -687,7 +687,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry3access(const_cast<CTxMemPoolEntry&>(*tx3it));
     const auto& group3data = entry3access.groupingData();
     BOOST_REQUIRE(group3data.has_value());
-    BOOST_CHECK_EQUAL(group3data->ancestorsCount, 1); // exact
+    BOOST_CHECK_EQUAL(group3data->ancestorsCount, 1U); // exact
 
     CMutableTransaction tx4 = CMutableTransaction();
     tx4.vin.resize(3);
@@ -711,7 +711,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry4access(const_cast<CTxMemPoolEntry&>(*tx4it));
     const auto& group4data = entry4access.groupingData();
     BOOST_REQUIRE(group4data.has_value());
-    BOOST_CHECK_EQUAL(group4data->ancestorsCount, 5); // not exact
+    BOOST_CHECK_EQUAL(group4data->ancestorsCount, 5U); // not exact
 
     // Pull everything into the primary mempool as a group.
     CMutableTransaction tx5 = CMutableTransaction();
@@ -737,9 +737,9 @@ BOOST_AUTO_TEST_CASE(ReorgWithTransactionsOnDisk)
     CTxMemPool testPool;
     CTxMemPoolTestAccess testPoolAccess{testPool};
 
-    const auto beforeCount = 31;
+    const auto beforeCount = 31U;
     uint64_t beforeSize = 0;
-    const auto afterCount = 29;
+    const auto afterCount = 29U;
 
     const auto before = GetABunchOfEntries(beforeCount, 33000);
     const auto after = GetABunchOfEntries(afterCount, 34000);
@@ -757,8 +757,8 @@ BOOST_AUTO_TEST_CASE(ReorgWithTransactionsOnDisk)
 
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), beforeCount + afterCount);
-    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
-    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0U);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0U);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 
     // Write half of the pool to disk

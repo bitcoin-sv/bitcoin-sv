@@ -34,14 +34,7 @@ namespace task
             : mSource{std::move(source)}
         {/**/}
 
-        bool IsCanceled() const
-        {
-            return
-                std::any_of(
-                    mSource.begin(),
-                    mSource.end(),
-                    [](auto source){ return source->IsCanceled(); });
-        }
+        bool IsCanceled() const;
 
         static CCancellationToken JoinToken(
             const CCancellationToken& token1,

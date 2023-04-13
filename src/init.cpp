@@ -188,7 +188,7 @@ void Shutdown() {
     }
 #endif
     MapPort(false);
-    UnregisterValidationInterface(peerLogic.get());
+    peerLogic->UnregisterValidationInterface();
     peerLogic.reset();
 
     rpc::client::g_pWebhookClient.reset();
@@ -239,7 +239,7 @@ void Shutdown() {
     {
         LOCK(cs_zmqNotificationInterface);
         if (pzmqNotificationInterface) {
-            UnregisterValidationInterface(pzmqNotificationInterface);
+            pzmqNotificationInterface->UnregisterValidationInterface();
             delete pzmqNotificationInterface;
             pzmqNotificationInterface = nullptr;
         }
@@ -3272,7 +3272,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelayMillisecs));
         }
     }
-    RegisterValidationInterface(peerLogic.get());
+    peerLogic->RegisterValidationInterface();
     RegisterNodeSignals(GetNodeSignals());
 
     if (gArgs.IsArgSet("-onlynet")) {
@@ -3393,7 +3393,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         LOCK(cs_zmqNotificationInterface);
         pzmqNotificationInterface = CZMQNotificationInterface::Create();
         if (pzmqNotificationInterface) {
-            RegisterValidationInterface(pzmqNotificationInterface);
+            pzmqNotificationInterface->RegisterValidationInterface();
         }
     }
 #endif

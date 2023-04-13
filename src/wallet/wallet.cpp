@@ -4207,7 +4207,7 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
 
     LogPrintf(" wallet      %15dms\n", GetTimeMillis() - nStart);
 
-    RegisterValidationInterface(walletInstance);
+    walletInstance->RegisterValidationInterface();
 
     // Try to top up keypool. No-op if the wallet is locked.
     walletInstance->TopUpKeyPool();
@@ -4478,6 +4478,25 @@ bool CWallet::ParameterInteraction() {
 
 bool CWallet::BackupWallet(const std::string &strDest) {
     return dbw->Backup(strDest);
+}
+
+void CWallet::RegisterValidationInterface()
+{   
+    CMainSignals& sigs { GetMainSignals() };
+
+    using namespace boost::placeholders;
+    slotConnections.push_back(sigs.TransactionAddedToMempool.connect(boost::bind(&CWallet::TransactionAddedToMempool, this, _1)));
+    slotConnections.push_back(sigs.BlockConnected.connect(boost::bind(&CWallet::BlockConnected, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.BlockDisconnected.connect(boost::bind(&CWallet::BlockDisconnected, this, _1)));
+    slotConnections.push_back(sigs.Broadcast.connect(boost::bind(&CWallet::ResendWalletTransactions, this, _1, _2)));
+    slotConnections.push_back(sigs.SetBestChain.connect(boost::bind(&CWallet::SetBestChain, this, _1)));
+    slotConnections.push_back(sigs.Inventory.connect(boost::bind(&CWallet::Inventory, this, _1)));
+    slotConnections.push_back(sigs.ScriptForMining.connect(boost::bind(&CWallet::GetScriptForMining, this, _1)));
+}
+
+void CWallet::UnregisterValidationInterface()
+{   
+    slotConnections.clear();
 }
 
 CKeyPool::CKeyPool() {

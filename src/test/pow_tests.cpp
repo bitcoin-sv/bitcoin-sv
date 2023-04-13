@@ -44,7 +44,7 @@ BOOST_AUTO_TEST_CASE(get_next_work) {
     TestAccessCBlockIndex::SetHeight( pindexLast, 32255 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
-        0x1d00d86a);
+        0x1d00d86aU);
 }
 
 /* Test the constraint on the upper bound for next work */
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit) {
     TestAccessCBlockIndex::SetHeight( pindexLast, 2015 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
-        0x1d00ffff);
+        0x1d00ffffU);
 }
 
 /* Test the constraint on the lower bound for actual time taken */
@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual) {
     TestAccessCBlockIndex::SetHeight( pindexLast, 68543 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
-        0x1c0168fd);
+        0x1c0168fdU);
 }
 
 /* Test the constraint on the upper bound for actual time taken */
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual) {
     TestAccessCBlockIndex::SetHeight( pindexLast, 46367 );
     BOOST_CHECK_EQUAL(
         CalculateNextWorkRequired(pindexLast, nLastRetargetTime, config),
-        0x1d00e1fd);
+        0x1d00e1fdU);
 }
 
 BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
@@ -370,7 +370,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0fe7b1);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0fe7b1U);
 
     // If we dramatically shorten block production, difficulty increases faster.
     for (size_t j = 0; j < 20; ++j)
@@ -397,7 +397,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0db19f);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0db19fU);
 
     // We start to emit blocks significantly slower. The first block has no
     // impact.
@@ -410,7 +410,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     nBits = GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0d9222);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0d9222U);
 
     // If we dramatically slow down block production, difficulty decreases.
     for (size_t j = 0; j < 93; ++j)
@@ -438,7 +438,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c2f13b9);
+    BOOST_CHECK_EQUAL(nBits, 0x1c2f13b9U);
 
     // Due to the window of time being bounded, next block's difficulty actually
     // gets harder.
@@ -449,7 +449,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
             nBits,
             blockIndexStore) );
     nBits = GetNextCashWorkRequired(blocks.Tip(), &blkHeaderDummy, config);
-    BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bf);
+    BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bfU);
 
     // And goes down again. It takes a while due to the window being bounded and
     // the skewed block causes 2 blocks to get out of the window.
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1d00ffff);
+    BOOST_CHECK_EQUAL(nBits, 0x1d00ffffU);
 
     // Once the difficulty reached the minimum allowed level, it doesn't get any
     // easier.

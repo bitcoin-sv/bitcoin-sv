@@ -17,10 +17,10 @@ BOOST_AUTO_TEST_CASE(limitedstack_push_test) {
         valtype vtype;
         vtype.push_back(0xab);
         LimitedStack limitedStack(100);
-        int push_count = 3;
+        unsigned push_count = 3;
 
         // Push back
-        for (int i = 0; i < push_count; i++) {
+        for (unsigned i = 0; i < push_count; i++) {
             limitedStack.push_back(vtype);
         }
 
@@ -34,11 +34,11 @@ BOOST_AUTO_TEST_CASE(limitedstack_insert_test) {
     ////////// LimitedStack Insert check //////////
     {
         LimitedStack limitedStack(100);
-        BOOST_CHECK_EQUAL(limitedStack.size(), 0);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 0U);
 
         limitedStack.push_back({0xab}); // There needs to be at least one element for insert method to work.
 
-        BOOST_CHECK_EQUAL(limitedStack.size(), 1);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 1U);
         BOOST_CHECK_EQUAL(limitedStack.getCombinedStackSize(), limitedStack.size()*LimitedVector::ELEMENT_OVERHEAD + 1);
 
         LimitedVector limitedVector = limitedStack.stacktop(-1);
@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(limitedstack_insert_test) {
         limitedStack.insert(-1, limitedVector);
         limitedStack.insert(-1, limitedVector);
 
-        BOOST_CHECK_EQUAL(limitedStack.size(), 3);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 3U);
         BOOST_CHECK_EQUAL(limitedStack.getCombinedStackSize(), (limitedStack.size()*LimitedVector::ELEMENT_OVERHEAD) + 3);
         BOOST_CHECK_THROW(limitedStack.insert(-1, limitedVector), std::runtime_error);
     }
@@ -58,11 +58,11 @@ BOOST_AUTO_TEST_CASE(limitedstack_erase_test) {
     {
         LimitedStack limitedStack({{0xab}, {0xcd}, {0xef}, {0xab}}, 200);
 
-        BOOST_CHECK_EQUAL(limitedStack.size(), 4);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 4U);
 
         limitedStack.erase(-3, -1);
 
-        BOOST_CHECK_EQUAL(limitedStack.size(), 2);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 2U);
         BOOST_CHECK_EQUAL(limitedStack.at(0).GetElement().at(0), 0xab);
         BOOST_CHECK_EQUAL(limitedStack.at(1).GetElement().at(0), 0xab);
     }
@@ -70,10 +70,10 @@ BOOST_AUTO_TEST_CASE(limitedstack_erase_test) {
     ////////// LimitedStack erase(int index) check //////////
     {
         LimitedStack limitedStack({{0xab}, {0xcd}, {0xef}, {0xab}}, 200);
-        BOOST_CHECK_EQUAL(limitedStack.size(), 4);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 4U);
         limitedStack.erase(-3);
 
-        BOOST_CHECK_EQUAL(limitedStack.size(), 3);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 3U);
         BOOST_CHECK_EQUAL(limitedStack.at(0).GetElement().at(0), 0xab);
         BOOST_CHECK_EQUAL(limitedStack.at(1).GetElement().at(0), 0xef);
         BOOST_CHECK_EQUAL(limitedStack.at(2).GetElement().at(0), 0xab);
@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(limitedstack_empty_test) {
         LimitedStack limitedStack(200);
         BOOST_CHECK_EQUAL(limitedStack.empty(), true);
         limitedStack.push_back({0xab});
-        BOOST_CHECK_EQUAL(limitedStack.size(), 1);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 1U);
         BOOST_CHECK_EQUAL(limitedStack.empty(), false);
     }
 }
@@ -120,7 +120,7 @@ BOOST_AUTO_TEST_CASE(limitedstack_swap_test) {
         valtype vtype;
         LimitedStack limitedStack(100);
 
-        BOOST_CHECK_EQUAL(limitedStack.size(), 0);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 0U);
 
         limitedStack.push_back({0xab});
         limitedStack.push_back({0xcd});
@@ -181,7 +181,7 @@ BOOST_AUTO_TEST_CASE(limitedstack_movetoptostack_test) {
         BOOST_CHECK_EQUAL(limitedStack_child.at(1).GetElement().at(1), 0xcd);
 
         BOOST_CHECK_EQUAL(limitedStack_child.getCombinedStackSize(), 2 * (limitedStack_child.size() + LimitedVector::ELEMENT_OVERHEAD));
-        BOOST_CHECK_EQUAL(limitedStack_parent.size(), 0);
+        BOOST_CHECK_EQUAL(limitedStack_parent.size(), 0U);
     }
 }
 
@@ -203,7 +203,7 @@ BOOST_AUTO_TEST_CASE(limitedstack_movetovaltypes_test) {
         BOOST_CHECK_EQUAL(valtypeVector[0][1], vtype0.at(1));
         BOOST_CHECK_EQUAL(valtypeVector[1][0], vtype1.at(0));
         BOOST_CHECK_EQUAL(valtypeVector[1][1], vtype1.at(1));
-        BOOST_CHECK_EQUAL(limitedStack.size(), 0);
+        BOOST_CHECK_EQUAL(limitedStack.size(), 0U);
     }
 }
 
@@ -219,7 +219,7 @@ BOOST_AUTO_TEST_CASE(limitedvector_append_test) {
         limitedStack.push_back(vtype);
 
         LimitedVector &limitedVector1 = limitedStack.stacktop(-2);
-        int size_before = limitedVector1.size();
+        size_t size_before = limitedVector1.size();
         LimitedVector limitedVector2 = limitedStack.stacktop(-1);
 
         limitedVector1.append(limitedVector2);
@@ -238,7 +238,7 @@ BOOST_AUTO_TEST_CASE(limitedvector_padright_test) {
         {
             valtype vtype;
             LimitedStack limitedStack(100);
-            int pad_size = 10;
+            unsigned pad_size = 10;
             limitedStack.push_back({});
             LimitedVector &limitedVector = limitedStack.stacktop(-1);
             size_t size_before = limitedVector.size();
@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(limitedvector_padright_test) {
         // Pad < size
         {
             LimitedStack limitedStack(100);
-            int pad_size = 10;
+            unsigned pad_size = 10;
             valtype vtype(pad_size + 2, 0xcd);
 
             limitedStack.push_back(vtype);
