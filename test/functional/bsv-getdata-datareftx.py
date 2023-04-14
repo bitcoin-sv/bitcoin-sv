@@ -10,8 +10,6 @@ from test_framework.util import create_confirmed_utxos, wait_until, assert_equal
 from test_framework.comptool import mininode_lock
 from decimal import Decimal
 
-from bip32utils import BIP32Key
-
 import copy
 import ecdsa
 import os
