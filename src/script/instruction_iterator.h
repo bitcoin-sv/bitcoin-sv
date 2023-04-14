@@ -7,7 +7,11 @@
 #include <tuple>
 
 #include "instruction.h"
+
+#include <span>
 #include <string_view>
+
+using namespace std;
 
 namespace bsv
 {
@@ -153,7 +157,7 @@ namespace bsv
         }
     };
 
-    inline std::string_view to_sv(bsv::span<const uint8_t> s)
+    inline std::string_view to_sv(std::span<const uint8_t> s)
     {
         return std::string_view{reinterpret_cast<const char*>(s.data()),
                                 s.size()};

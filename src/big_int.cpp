@@ -522,7 +522,7 @@ std::vector<uint8_t> bsv::bint::serialize() const
     return result;
 }
 
-bsv::bint bsv::bint::deserialize(bsv::span<const uint8_t> s)
+bsv::bint bsv::bint::deserialize(span<const uint8_t> s)
 {
     const auto size{s.size()};
     vector<uint8_t> tmp(size + length_in_bytes);

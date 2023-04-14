@@ -5,12 +5,12 @@
 #pragma once
 
 #include <iosfwd>
+#include <span>
 #include <variant>
 
 #include "univalue.h"
 
 #include "miner_id/miner_info_error.h"
-#include "span.h"
 #include "uint256.h"
 
 class key_set
@@ -128,9 +128,9 @@ inline bool operator!=(const miner_info_doc& a, const miner_info_doc& b)
 
 std::string to_json(const miner_info_doc&);
 
-using mi_doc_sig = std::tuple<std::string_view, miner_info_doc, bsv::span<const uint8_t>>;
+using mi_doc_sig = std::tuple<std::string_view, miner_info_doc, std::span<const uint8_t>>;
 std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
-    bsv::span<const uint8_t> script);
+    std::span<const uint8_t> script);
 
 std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     std::string_view miner_info_doc);

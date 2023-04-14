@@ -14,13 +14,12 @@
 #include "primitives/block.h"
 #include "pubkey.h"
 #include "script/instruction_iterator.h"
-#include "span.h"
 
 using namespace std;
 
 miner_info::miner_info(string_view raw_mi_doc,
                        const miner_info_doc& mi_doc,
-                       bsv::span<const uint8_t> sig,
+                       std::span<const uint8_t> sig,
                        const uint256& txid)
     : raw_mi_doc_{raw_mi_doc},
       mi_doc_{mi_doc},
@@ -116,7 +115,7 @@ std::optional<miner_info_error> verify(const CBlock& block,
     if(mmr_pbh_hash != expected_mmr_pbh_hash)
         return miner_info_error::block_bind_hash_mismatch; 
 
-    const bsv::span<const uint8_t> sig{bb.data(), bb.size()};
+    const std::span<const uint8_t> sig{bb.data(), bb.size()};
     
     const CPubKey pubKey{ParseHex(key.c_str())};
     if(!pubKey.Verify(uint256{mmr_pbh_hash}, sig))
@@ -183,7 +182,7 @@ bool is_der_signature(const std::string& s)
     return is_der_signature(s.c_str());
 }
 
-bool is_der_signature(const bsv::span<const uint8_t> script)
+bool is_der_signature(const std::span<const uint8_t> script)
 {
     return script.size() >= 69 && script.size() <= 72;
 }
@@ -226,7 +225,7 @@ std::variant<bool, miner_info_error> VerifyDataObject(const string_view sv)
     return verify_data_obj(uv);
 }
 
-std::variant<bool, miner_info_error> VerifyDataScript(const bsv::span<const uint8_t> script)
+std::variant<bool, miner_info_error> VerifyDataScript(const std::span<const uint8_t> script)
 {
     assert(IsMinerInfo(script)); // programming error in calling code if false
 

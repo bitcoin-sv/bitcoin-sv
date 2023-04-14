@@ -10,12 +10,11 @@
 #include "logging.h"
 #include "primitives/block.h"
 #include "script/instruction_iterator.h"
-#include "span.h"
 
 using namespace std;
 
-block_bind::block_bind(const bsv::span<const uint8_t> mmr_pbh_hash,
-                       const bsv::span<const uint8_t> sig):
+block_bind::block_bind(const std::span<const uint8_t> mmr_pbh_hash,
+                       const std::span<const uint8_t> sig):
     mmr_pbh_hash_{mmr_pbh_hash.begin(), mmr_pbh_hash.end()},
     sig_{sig.begin(), sig.end()}
 {}
@@ -37,7 +36,7 @@ std::ostream& operator<<(std::ostream& os, const block_bind& bb)
     return os;
 }
     
-miner_info_ref::miner_info_ref(const bsv::span<const uint8_t> txid,
+miner_info_ref::miner_info_ref(const std::span<const uint8_t> txid,
                                const block_bind& bb)
     : txid_{txid.begin(), txid.end()},
       block_bind_(bb)
@@ -59,7 +58,7 @@ std::ostream& operator<<(std::ostream& os, const miner_info_ref& mir)
 }
 
 std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
-    const bsv::span<const uint8_t> script)
+    const std::span<const uint8_t> script)
 {
     assert(IsMinerInfo(script));
     

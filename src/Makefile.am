@@ -525,7 +525,6 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
-  span.h \
   taskcancellation.h \
   taskcancellation.cpp \
   tinyformat.h \

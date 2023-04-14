@@ -432,7 +432,7 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
 
             // Parse the JSON and look for the minerContact information
             UniValue document {};
-            const std::string_view staticCd { to_sv(it->operand()) };
+            const std::string_view staticCd { bsv::to_sv(it->operand()) };
             BOOST_REQUIRE(document.read(staticCd.data(), staticCd.size()));
             const auto& contact { document["minerContact"] };
             BOOST_REQUIRE(contact.isObject());

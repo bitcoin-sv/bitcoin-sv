@@ -13,7 +13,6 @@
 #include "pubkey.h"
 #include "script/instruction_iterator.h"
 #include "script/script.h"
-#include "span.h"
 #include "uint256.h"
 #include "univalue.h"
 
@@ -438,7 +437,7 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
 
 
 std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
-    const bsv::span<const uint8_t> script)
+    const std::span<const uint8_t> script)
 {
     assert(IsMinerInfo(script)); // programming error if false in calling code
 
@@ -480,7 +479,7 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
     if(!is_der_signature(it->operand()))
         return miner_info_error::invalid_sig_len;
 
-    bsv::span<const uint8_t> sig{it->operand()};
+    std::span<const uint8_t> sig{it->operand()};
 
     return make_tuple(doc, get<miner_info_doc>(var_miner_info_doc), sig);   
 }

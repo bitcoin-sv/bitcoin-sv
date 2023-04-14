@@ -15,7 +15,7 @@
 using bsv::bint;
 using namespace std;
 
-CScriptNum::CScriptNum(bsv::span<const uint8_t> span,
+CScriptNum::CScriptNum(span<const uint8_t> span,
                        bool fRequireMinimal,
                        const size_t nMaxNumSize,
                        const bool big_int)

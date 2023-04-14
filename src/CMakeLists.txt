@@ -333,7 +333,6 @@ add_library(common
 	script/standard.cpp
 	script/standard.h
 	script_config.h
-	span.h
 	streams.h
 	support/allocators/secure.h
 	support/allocators/zeroafterfree.h

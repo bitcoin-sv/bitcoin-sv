@@ -4,11 +4,10 @@
 #pragma once
 
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#include "span.h"
 
 struct bignum_st;
 
@@ -69,7 +68,7 @@ namespace bsv
         friend std::size_t to_size_t_limited(const bint&);
 
         std::vector<uint8_t> serialize() const;
-        static bint deserialize(bsv::span<const uint8_t>);
+        static bint deserialize(std::span<const uint8_t>);
 
     private:
         int spaceship_operator(

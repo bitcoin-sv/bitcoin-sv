@@ -62,16 +62,17 @@ public:
 
     public:
         typedef Diff difference_type;
-        typedef T value_type;
+        using element_type = T;
         typedef T *pointer;
         typedef T &reference;
-        typedef std::random_access_iterator_tag iterator_category;
+        using iterator_category = std::contiguous_iterator_tag;
         iterator() : ptr(nullptr) {}
         iterator(T *ptr_) : ptr(ptr_) {}
         T &operator*() const { return *ptr; }
         T *operator->() const { return ptr; }
-        T &operator[](size_type pos) { return ptr[pos]; }
-        const T &operator[](size_type pos) const { return ptr[pos]; }
+        T &operator[](difference_type pos) { return ptr[pos]; }
+        T& operator[](difference_type pos) const { return ptr[pos]; }
+
         iterator &operator++() {
             ptr++;
             return *this;
@@ -93,13 +94,13 @@ public:
         difference_type friend operator-(iterator a, iterator b) {
             return (&(*a) - &(*b));
         }
-        iterator operator+(size_type n) { return iterator(ptr + n); }
-        iterator &operator+=(size_type n) {
+        iterator operator+(difference_type n) const { return iterator(ptr + n); }
+        iterator& operator+=(difference_type n) {
             ptr += n;
             return *this;
         }
-        iterator operator-(size_type n) { return iterator(ptr - n); }
-        iterator &operator-=(size_type n) {
+        iterator operator-(difference_type n) const { return iterator(ptr - n); }
+        iterator& operator-=(difference_type n) {
             ptr -= n;
             return *this;
         }
@@ -109,7 +110,13 @@ public:
         bool operator<=(iterator x) const { return ptr <= x.ptr; }
         bool operator>(iterator x) const { return ptr > x.ptr; }
         bool operator<(iterator x) const { return ptr < x.ptr; }
-    };
+
+        friend iterator operator+(difference_type n, const iterator& it)
+        {
+            return iterator{it.ptr + n};
+        }
+  };
+  static_assert(std::contiguous_iterator<iterator>);
 
     class reverse_iterator {
         T *ptr;
@@ -153,10 +160,10 @@ public:
 
     public:
         typedef Diff difference_type;
-        typedef const T value_type;
+        using element_type = T;
         typedef const T *pointer;
         typedef const T &reference;
-        typedef std::random_access_iterator_tag iterator_category;
+        using iterator_category = std::contiguous_iterator_tag; 
         const_iterator() : ptr(nullptr) {}
         const_iterator(const T *ptr_) : ptr(ptr_) {}
         const_iterator(iterator x) : ptr(&(*x)) {}
@@ -184,17 +191,17 @@ public:
         difference_type friend operator-(const_iterator a, const_iterator b) {
             return (&(*a) - &(*b));
         }
-        const_iterator operator+(size_type n) {
+        const_iterator operator+(difference_type n) const {
             return const_iterator(ptr + n);
         }
-        const_iterator &operator+=(size_type n) {
+        const_iterator &operator+=(difference_type n) {
             ptr += n;
             return *this;
         }
-        const_iterator operator-(size_type n) {
+        const_iterator operator-(difference_type n) const {
             return const_iterator(ptr - n);
         }
-        const_iterator &operator-=(size_type n) {
+        const_iterator &operator-=(difference_type n) {
             ptr -= n;
             return *this;
         }
@@ -204,7 +211,13 @@ public:
         bool operator<=(const_iterator x) const { return ptr <= x.ptr; }
         bool operator>(const_iterator x) const { return ptr > x.ptr; }
         bool operator<(const_iterator x) const { return ptr < x.ptr; }
+
+        friend const_iterator operator+(difference_type n, const const_iterator& it)
+        {
+            return const_iterator{it.ptr + n};
+        }
     };
+    static_assert(std::contiguous_iterator<const_iterator>);
 
     class const_reverse_iterator {
         const T *ptr;

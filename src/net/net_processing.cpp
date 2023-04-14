@@ -2977,7 +2977,7 @@ public:
                 // See if this coinbase contains a miner-info reference
                 if(g_dataRefIndex && coinbaseAndProof->txn->vout.size() > 1)
                 {
-                    const bsv::span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
+                    const span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
                     if(IsMinerInfo(script))
                     {
                         const auto& mir { ParseMinerInfoRef(script) };
