@@ -14,6 +14,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
+option(BUILD_BITCOIN_UPNP "Activate the UPnP functionality" OFF)
 
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
@@ -634,6 +635,14 @@ endif()
 if(BUILD_BITCOIN_ZMQ)
 	add_subdirectory(zmq)
 	target_link_libraries(server zmq)
+endif()
+
+# UPnP
+if(BUILD_BITCOIN_UPNP)
+    find_package(MiniUPnP REQUIRED)
+    target_include_directories(server PRIVATE ${UPNP_INCLUDE_DIR})
+    target_link_libraries(server ${UPNP_LIBRARY})
+    add_compile_definitions(USE_UPNP=0)
 endif()
 
 # RPC client support
