@@ -11,8 +11,6 @@ from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than, p2p_port, wait_until, sync_blocks
 
-from bip32utils import BIP32Key
-import ecdsa
 import time
 import os
 
@@ -55,7 +53,6 @@ class SendHdrsEnTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.extra_args = [['-genesisactivationheight=1']]*2 # Genesis must be activated so that we can send large transactions
-        self.curve = ecdsa.SECP256k1
 
         # Setup miner ID keys and a single revocation key
         self.minerIdKey = MinerIdKeys("01")

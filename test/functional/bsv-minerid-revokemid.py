@@ -8,9 +8,6 @@ from test_framework.util import create_confirmed_utxos, wait_until
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from decimal import Decimal
 
-from bip32utils import BIP32Key
-
-import ecdsa
 import os
 import time
 
@@ -33,7 +30,6 @@ class RevokeMid(BitcoinTestFramework):
         self.num_nodes = 3
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
-        self.curve = ecdsa.SECP256k1
 
         # Setup miner ID keys
         self.minerIdKeys = []
