@@ -7,9 +7,8 @@
 #include <cassert>
 #include <cstdint>
 #include <iterator>
+#include <span>
 #include <vector>
-
-#include "span.h"
 
 namespace bsv
 {
@@ -95,7 +94,7 @@ namespace bsv
         return negative ? -result : result;
     }
 
-    inline bool IsMinimallyEncoded(bsv::span<const uint8_t> span,
+    inline bool IsMinimallyEncoded(std::span<const uint8_t> span,
                                    size_t nMaxNumSize)
     {
         const size_t size = span.size();

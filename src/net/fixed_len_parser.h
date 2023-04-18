@@ -5,9 +5,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <utility>
 
-#include "span.h"
 #include "unique_array.h"
 
 class fixed_len_parser
@@ -18,7 +18,7 @@ public:
     explicit fixed_len_parser(size_t n):buffer_{n}
     {}
 
-    std::pair<size_t, size_t> operator()(const bsv::span<const uint8_t>);
+    std::pair<size_t, size_t> operator()(const std::span<const uint8_t>);
 
     unique_array buffer() && { return std::move(buffer_); }
 

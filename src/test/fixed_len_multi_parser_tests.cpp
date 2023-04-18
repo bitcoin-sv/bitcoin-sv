@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(parse_empty_input)
 {
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
     vector<uint8_t> ip;
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(0, bytes_read);
     BOOST_CHECK_EQUAL(1, bytes_reqd);
@@ -37,7 +37,7 @@ BOOST_AUTO_TEST_CASE(parse_zero_count)
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
     vector<uint8_t> ip;
     ip.push_back(0);
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(1, bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(parse_count_only)
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
     vector<uint8_t> ip;
     ip.push_back(2);
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(1, bytes_read);
     BOOST_CHECK_EQUAL(2 * sid_len, bytes_reqd);
@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_1_seg_1)
     const vector<uint8_t> ip{make_msg(1)};
     const size_t sids_per_seg{1};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_2_seg_1)
     const vector<uint8_t> ip{make_msg(2)};
     const size_t sids_per_seg{1};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_2_seg_2)
     const vector<uint8_t> ip{make_msg(2)};
     const size_t sids_per_seg{2};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_3_seg_2)
     const vector<uint8_t> ip{make_msg(3)};
     const size_t sids_per_seg{2};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -125,7 +125,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_200_seg_100)
     const vector<uint8_t> ip{make_msg(200)};
     const size_t sids_per_seg{100};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -148,7 +148,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_70117_seg_100_1_pass)
 
     const size_t sids_per_seg{100};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    const bsv::span s{ip.data(), ip.size()};
+    const std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -175,7 +175,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_70117_seg_100)
     size_t total_bytes_read{};
     constexpr size_t split{65423};
 
-    const bsv::span s{ip.data(), split};
+    const std::span s{ip.data(), split};
     const auto [bytes_read, bytes_reqd] = parser(s);
     total_bytes_read += bytes_read;
     BOOST_CHECK_EQUAL(split, bytes_read);
@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_70117_seg_100)
     BOOST_CHECK_EQUAL(110, parser.segment_count());
     BOOST_CHECK_EQUAL(split, total_bytes_read);
     
-    const bsv::span s2{ip.data() + split, ip.size() - split};
+    const std::span s2{ip.data() + split, ip.size() - split};
     const auto [bytes_read_2, bytes_reqd_2] = parser(s2);
     total_bytes_read += bytes_read_2;
     BOOST_CHECK_EQUAL(ip.size()-split, bytes_read_2);
@@ -201,7 +201,7 @@ BOOST_AUTO_TEST_CASE(parse_only_counted_bytes)
 
     const size_t sids_per_seg{1};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    bsv::span s{ip.data(), ip.size()};
+    std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size()-6, bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(parse_part_msg)
     const vector<uint8_t> ip{make_msg(4)};
     const size_t sids_per_seg{2};
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    bsv::span s{ip.data(), ip.size() - 1};
+    std::span s{ip.data(), ip.size() - 1};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size() - sid_len, bytes_read);
     BOOST_CHECK_EQUAL(sid_len, bytes_reqd);
@@ -257,7 +257,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
     {
         // size(mcci_msg) < mcci_msg.size()
         fixed_len_multi_parser parser{sid_len, sids_per_seg};
-        bsv::span s{mcci_msg.data(), mcci_msg.size() - 1};
+        std::span s{mcci_msg.data(), mcci_msg.size() - 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(mcci_msg.size() - sid_len, bytes_read);
         BOOST_CHECK_EQUAL(sid_len, bytes_reqd);
@@ -267,7 +267,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
     {
         // size(mcci_msg) == mcci_msg.size()
         fixed_len_multi_parser parser{sid_len, sids_per_seg};
-        bsv::span s{mcci_msg.data(), mcci_msg.size()};
+        std::span s{mcci_msg.data(), mcci_msg.size()};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(mcci_msg.size(), bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -279,7 +279,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
         fixed_len_multi_parser parser{sid_len, sids_per_seg};
         vector<uint8_t> ip{mcci_msg.cbegin(), mcci_msg.cend()};
         ip.insert(ip.cend(), 6, 42); // extra shortid that shouldn't get parsed
-        bsv::span s{ip.data(), ip.size()};
+        std::span s{ip.data(), ip.size()};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(ip.size() - 6, bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 
     for(size_t i{}; i < mcci_msg.size(); ++i)
     {
-        bsv::span s{mcci_msg.data() + i, 1};
+        std::span s{mcci_msg.data() + i, 1};
         parser(s);
     }
 
@@ -306,8 +306,6 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 
 BOOST_AUTO_TEST_CASE(parse_as_reqd)
 {
-    using namespace bsv;
-
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
     size_t total_bytes_read{};
     size_t offset{};
@@ -338,12 +336,12 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
 BOOST_AUTO_TEST_CASE(read_all)
 {
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    bsv::span s{mcci_msg.data(), mcci_msg.size()};
+    std::span s{mcci_msg.data(), mcci_msg.size()};
     parser(s);
     BOOST_CHECK_EQUAL(mcci_msg.size(), size(parser));
 
     vector<uint8_t> out(mcci_msg.size());
-    const auto bytes_read = read(parser, 0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = read(parser, 0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(mcci_msg.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(mcci_msg.cbegin(), mcci_msg.cend(),
                                   out.cbegin(), out.cend());
@@ -353,11 +351,11 @@ BOOST_AUTO_TEST_CASE(read_all)
 BOOST_AUTO_TEST_CASE(read_empty_span)
 {
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    bsv::span s{mcci_msg.data(), mcci_msg.size()};
+    std::span s{mcci_msg.data(), mcci_msg.size()};
     parser(s);
 
     vector<uint8_t> out(mcci_msg.size());
-    const auto bytes_read = read(parser, 0, bsv::span{out.data(), 0});
+    const auto bytes_read = read(parser, 0, std::span{out.data(), 0});
     BOOST_CHECK_EQUAL(0, bytes_read);
 }
 
@@ -365,14 +363,14 @@ BOOST_AUTO_TEST_CASE(read_empty_parser)
 {
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
     vector<uint8_t> out(mcci_msg.size());
-    const auto bytes_read = read(parser, 0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = read(parser, 0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(0, bytes_read);
 }
 
 BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 {
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    bsv::span s{mcci_msg.data(), mcci_msg.size()};
+    std::span s{mcci_msg.data(), mcci_msg.size()};
     parser(s);
 
     vector<uint8_t> out(mcci_msg.size());
@@ -389,12 +387,12 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
 {
     fixed_len_multi_parser parser{sid_len, sids_per_seg};
-    bsv::span s{mcci_msg.data(), mcci_msg.size()};
+    std::span s{mcci_msg.data(), mcci_msg.size()};
     parser(s);
     BOOST_CHECK_EQUAL(mcci_msg.size(), size(parser));
 
     vector<uint8_t> out(mcci_msg.size() + 1);
-    const auto bytes_read = read(parser, 0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = read(parser, 0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(mcci_msg.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(mcci_msg.cbegin(), mcci_msg.cend(),
                                   out.cbegin(), out.cend() - 1);
@@ -404,12 +402,12 @@ BOOST_AUTO_TEST_CASE(read_reset_check)
 {
     constexpr size_t seg_size{25};
     fixed_len_multi_parser parser{sid_len, seg_size};
-    bsv::span s{mcci_msg.data(), mcci_msg.size()};
+    std::span s{mcci_msg.data(), mcci_msg.size()};
     parser(s);
     BOOST_CHECK_EQUAL(mcci_msg.size(), size(parser));
 
     vector<uint8_t> out(mcci_msg.size());
-    const auto bytes_read = read(parser, 0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = read(parser, 0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(mcci_msg.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(mcci_msg.cbegin(), mcci_msg.cend(),
                                   out.cbegin(), out.cend());

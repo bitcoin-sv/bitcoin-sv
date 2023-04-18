@@ -6,13 +6,12 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <utility>
-
-#include "span.h"
 
 // Requires s.data() is the start of a compact_size 
 // Returns:
 // bytes_read == 0, bytes_reqd
 // bytes_read > 0, value
-std::pair<size_t, uint64_t> parse_compact_size(const bsv::span<const uint8_t>);
+std::pair<size_t, uint64_t> parse_compact_size(const std::span<const uint8_t>);
 

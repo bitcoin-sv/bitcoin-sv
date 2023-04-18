@@ -56,7 +56,7 @@ public:
     // only for logging purposes. Also set staticDocumentJson_ and
     // signatureStaticDocument_ if validation was successful.
     bool SetStaticCoinbaseDocument(const UniValue& coinbaseDocumentData,
-                                   const bsv::span<const uint8_t> signature,
+                                   const std::span<const uint8_t> signature,
                                    const COutPoint& tx_out,
                                    int32_t blockHeight);
 
@@ -64,7 +64,7 @@ public:
     // only if it is valid (if method returns true). Parameter tx_out is used
     // only for logging purposes.
     bool SetDynamicCoinbaseDocument(const UniValue& coinbaseDocumentData,
-                                    const bsv::span<const uint8_t> signature,
+                                    const std::span<const uint8_t> signature,
                                     const COutPoint& tx_out,
                                     int32_t blockHeight);
 
@@ -85,7 +85,7 @@ std::optional<MinerId> FindMinerId(const CBlock& block, int32_t blockHeight);
 
 bool parseCoinbaseDocument(MinerId&,
                            const std::string_view coinbaseDocumentDataJson,
-                           const bsv::span<const uint8_t> signatureBytes,
+                           const std::span<const uint8_t> signatureBytes,
                            const COutPoint& tx_out,
                            int32_t blockHeight,
                            bool dynamic);

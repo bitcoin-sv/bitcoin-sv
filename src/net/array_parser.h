@@ -4,15 +4,16 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
 #include "cmpct_size.h"
-#include "span.h"
 #include "unique_array.h"
 
 // Parses a counted collection of msg parts into a vector of unique_array objects
@@ -22,7 +23,7 @@ template<typename T>
 class array_parser
 {
 public:
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s);
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
     std::optional<uint64_t> seg_count() const { return n_; }
 
@@ -46,7 +47,7 @@ public:
     void clear() { segments_.clear(); size_ = 0;}
 
 private:
-    std::pair<size_t, size_t> parse_seg_count(bsv::span<const uint8_t>);
+    std::pair<size_t, size_t> parse_seg_count(std::span<const uint8_t>);
 
     void init_cum_lengths() const;
     
@@ -63,7 +64,7 @@ private:
 };
 
 template<typename T>
-inline std::pair<size_t, size_t> array_parser<T>::parse_seg_count(bsv::span<const uint8_t> s)
+inline std::pair<size_t, size_t> array_parser<T>::parse_seg_count(std::span<const uint8_t> s)
 {
     using namespace std;
 
@@ -81,7 +82,7 @@ inline std::pair<size_t, size_t> array_parser<T>::parse_seg_count(bsv::span<cons
     
 // return bytes_read, bytes_required
 template<typename T>
-inline std::pair<size_t, size_t> array_parser<T>::operator()(bsv::span<const uint8_t> s)
+inline std::pair<size_t, size_t> array_parser<T>::operator()(std::span<const uint8_t> s)
 {
     using namespace std;
 

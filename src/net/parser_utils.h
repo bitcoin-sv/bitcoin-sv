@@ -5,16 +5,15 @@
 #pragma once
 
 #include <cstddef>
+#include <span>
 #include <utility>
-
-#include "span.h"
 
 // reads from a parser and if it reaches the end of a parser's 
 // segment resets the segment.
 // Preconditions
 // 0 <= read_pos < total size of all parser segments
 template<typename T>
-[[nodiscard]] size_t read(T& parser, size_t read_pos, bsv::span<uint8_t> s)
+[[nodiscard]] size_t read(T& parser, size_t read_pos, std::span<uint8_t> s)
 {
     if(parser.empty())
         return 0;

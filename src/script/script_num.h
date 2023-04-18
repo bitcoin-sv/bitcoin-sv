@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "big_int.h"
-#include "span.h"
 
 class scriptnum_overflow_error : public std::overflow_error
 {
@@ -50,7 +49,7 @@ public:
     CScriptNum():m_value(0){}
     explicit CScriptNum(const int64_t& n) : m_value(n) {}
     explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
-    explicit CScriptNum(bsv::span<const uint8_t>,
+    explicit CScriptNum(std::span<const uint8_t>,
                         bool fRequireMinimal,
                         const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE,
                         bool big_int = false);

@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
     {
         // size(block_msg) < block_header_len
         block_parser parser;
-        bsv::span s{block_msg.data(), block_header_len - 1};
+        std::span s{block_msg.data(), block_header_len - 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(block_header_len - 1, bytes_read);
         BOOST_CHECK_EQUAL(1, bytes_reqd);
@@ -61,7 +61,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
     {
         // size(block_msg) == block_header_len
         block_parser parser;
-        bsv::span s{block_msg.data(), block_header_len};
+        std::span s{block_msg.data(), block_header_len};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(block_header_len, bytes_read);
         BOOST_CHECK_EQUAL(1, bytes_reqd);
@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
     {
         // size(block_msg) > block_header_len
         block_parser parser;
-        bsv::span s{block_msg.data(), block_msg.size()};
+        std::span s{block_msg.data(), block_msg.size()};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(block_msg.size(), bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -81,8 +81,6 @@ BOOST_AUTO_TEST_CASE(parse_all)
 
 BOOST_AUTO_TEST_CASE(parse_as_reqd)
 {
-    using namespace bsv;
-
     block_parser parser;
     size_t total_bytes_read{};
     size_t offset{};
@@ -116,7 +114,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 
     for(size_t i{}; i < block_msg.size(); ++i)
     {
-        bsv::span s{block_msg.data() + i, 1};
+        std::span s{block_msg.data() + i, 1};
         parser(s);
     }
 
@@ -126,7 +124,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 BOOST_AUTO_TEST_CASE(read_all)
 {
     block_parser parser;
-    bsv::span s{block_msg.data(), block_msg.size()};
+    std::span s{block_msg.data(), block_msg.size()};
     const auto [read, reqd] = parser(s);
     BOOST_CHECK_EQUAL(block_msg.size(), read);
     BOOST_CHECK_EQUAL(0, reqd);
@@ -134,7 +132,7 @@ BOOST_AUTO_TEST_CASE(read_all)
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
 
     vector<uint8_t> out(block_msg.size());
-    const auto bytes_read = parser.read(0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = parser.read(0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(out.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), block_msg.cend(),
                                   out.cbegin(), out.cend());
@@ -144,7 +142,7 @@ BOOST_AUTO_TEST_CASE(read_all)
 BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 {
     block_parser parser;
-    bsv::span s{block_msg.data(), block_msg.size()};
+    std::span s{block_msg.data(), block_msg.size()};
     const auto [read, reqd] = parser(s);
     BOOST_CHECK_EQUAL(block_msg.size(), read);
     BOOST_CHECK_EQUAL(0, reqd);
@@ -153,7 +151,7 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
     vector<uint8_t> out(block_msg.size());
     for(size_t i{}; i < block_msg.size(); ++i)
     {
-        total_bytes_read += parser.read(i, bsv::span{out.data()+i, 1});
+        total_bytes_read += parser.read(i, std::span{out.data()+i, 1});
     }
     BOOST_CHECK_EQUAL(out.size(), total_bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), block_msg.cend(),
@@ -163,14 +161,14 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
 {
     block_parser parser;
-    bsv::span s{block_msg.data(), block_msg.size()};
+    std::span s{block_msg.data(), block_msg.size()};
     const auto [read, reqd] = parser(s);
     BOOST_CHECK_EQUAL(block_msg.size(), read);
     BOOST_CHECK_EQUAL(0, reqd);
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
 
     vector<uint8_t> out(block_msg.size() + 1);
-    const auto bytes_read = parser.read(0, bsv::span{out.data(), out.size()});
+    const auto bytes_read = parser.read(0, std::span{out.data(), out.size()});
     BOOST_CHECK_EQUAL(out.size()-1, bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), block_msg.cend(),
                                   out.cbegin(), out.cend() - 1);

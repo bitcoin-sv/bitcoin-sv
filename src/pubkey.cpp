@@ -173,11 +173,11 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
 bool CPubKey::Verify(const uint256& hash,
                      const std::vector<uint8_t>& vchSig) const
 {
-    return Verify(hash, bsv::span<const uint8_t>{vchSig.data(), vchSig.size()});
+    return Verify(hash, std::span<const uint8_t>{vchSig.data(), vchSig.size()});
 }
 
 bool CPubKey::Verify(const uint256& hash,
-                     const bsv::span<const uint8_t> signature) const
+                     const std::span<const uint8_t> signature) const
 {
     if(!IsValid())
         return false;

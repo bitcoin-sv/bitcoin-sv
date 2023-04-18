@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // empty range
         const size_t n{};
-        bsv::span s{tx.data(), n};
+        std::span s{tx.data(), n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(0, bytes_read);
         BOOST_CHECK_EQUAL(version_len, bytes_reqd);
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // version
         const size_t n{bsv::version_len};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
@@ -148,7 +148,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // ip count 
         const size_t n{var_int_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1, bytes_reqd);
@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1 + bsv::seq_len, bytes_reqd);
@@ -173,7 +173,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // post script len
         const size_t n{script_len_1 + bsv::seq_len};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1,
@@ -187,7 +187,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // tx, input 2 upto script len 1 
         const size_t n{outpoint_len + var_int_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(0, bytes_read);
         BOOST_CHECK_EQUAL(outpoint_len + var_int_len_3, bytes_reqd);
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // script len 
         const size_t n{bsv::outpoint_len + var_int_len_3};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_2 + bsv::seq_len, bytes_reqd);
@@ -212,7 +212,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // post script len
         const size_t n{script_len_2 + bsv::seq_len};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1,
@@ -226,7 +226,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_5};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_3 + bsv::seq_len, bytes_reqd);
@@ -238,7 +238,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // post script len
         const size_t n{script_len_3 + bsv::seq_len};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1,
@@ -252,7 +252,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_9};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_4 + bsv::seq_len, bytes_reqd);
@@ -264,7 +264,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // post script len
         const size_t n{script_len_4 + bsv::seq_len};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd); // <- output count
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     // op_count
     {
         const size_t n{var_int_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -289,7 +289,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len  
         const size_t n{bsv::value_len + var_int_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1, bytes_reqd);
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // post script len
         const size_t n{script_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -314,7 +314,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len 1 
         const size_t n{bsv::value_len + var_int_len_1};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(0, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_3, bytes_reqd);
@@ -326,7 +326,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // post script len 
         const size_t n{bsv::value_len + var_int_len_3 + script_len_2};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -339,7 +339,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len 
         const size_t n{bsv::value_len + var_int_len_5 + script_len_3};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -352,7 +352,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // upto script len 
         const size_t n{bsv::value_len + var_int_len_9 + script_len_4};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::locktime_len, bytes_reqd);
@@ -364,7 +364,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
     {
         // locktime
         const size_t n{bsv::locktime_len};
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -384,7 +384,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
 BOOST_AUTO_TEST_CASE(tx_parser_1_pass)
 {
     tx_parser parser;
-    bsv::span s{tx.data(), tx.size()};
+    std::span s{tx.data(), tx.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(tx.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -397,8 +397,8 @@ BOOST_AUTO_TEST_CASE(tx_parser_2_pass)
     tx_parser parser;
 
     constexpr size_t split_pos{20};
-    const auto [bytes_read, bytes_reqd] = parser(bsv::span{tx.data(), split_pos});
-    parser(bsv::span{tx.data() + bytes_read, tx.size() - bytes_read});
+    const auto [bytes_read, bytes_reqd] = parser(std::span{tx.data(), split_pos});
+    parser(std::span{tx.data() + bytes_read, tx.size() - bytes_read});
     BOOST_CHECK_EQUAL(0, parser.buffer_size());
     BOOST_CHECK_EQUAL(tx.size(), parser.size());
 }
@@ -412,7 +412,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_as_reqd)
     size_t passes{};
     while(total_bytes_read < tx.size())
     {
-        bsv::span s{tx.data() + offset, n};
+        std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)

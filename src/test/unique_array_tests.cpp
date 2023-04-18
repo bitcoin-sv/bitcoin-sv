@@ -12,7 +12,6 @@
 #include "unique_array.h"
 
 using namespace std;
-using namespace bsv;
 
 BOOST_AUTO_TEST_SUITE(unique_array_tests)
 
@@ -27,7 +26,7 @@ BOOST_AUTO_TEST_CASE(default_construction)
 BOOST_AUTO_TEST_CASE(span_construction)
 {
     std::vector<uint8_t> v{1, 2, 3};
-    unique_array a{bsv::span<const uint8_t>{v.data(), v.size()}};
+    unique_array a{std::span<const uint8_t>{v.data(), v.size()}};
     BOOST_CHECK(!a.empty());
     BOOST_CHECK_EQUAL(3, a.capacity());
     BOOST_CHECK_EQUAL(3, a.size());

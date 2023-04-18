@@ -99,7 +99,7 @@ namespace
 
     bool verify(const string_view msg,
                 const vector<uint8_t>& pub_key,
-                const bsv::span<const uint8_t> sig)
+                const std::span<const uint8_t> sig)
     {
         std::vector<uint8_t> hash(CSHA256::OUTPUT_SIZE);
         hash_sha256(msg, hash.data());
@@ -117,7 +117,7 @@ MinerId::MinerId(const miner_info& minerInfo)
 
 bool MinerId::SetStaticCoinbaseDocument(
     const UniValue& document,
-    const bsv::span<const uint8_t> signatureBytes,
+    const std::span<const uint8_t> signatureBytes,
     const COutPoint& tx_out,
     const int32_t blockHeight)
 {
@@ -299,7 +299,7 @@ bool MinerId::SetStaticCoinbaseDocument(
 
 bool MinerId::SetDynamicCoinbaseDocument(
     const UniValue& document,
-    const bsv::span<const uint8_t> signatureBytes,
+    const std::span<const uint8_t> signatureBytes,
     const COutPoint& tx_out,
     const int32_t blockHeight)
 {
@@ -433,7 +433,7 @@ bool MinerId::SetDynamicCoinbaseDocument(
 
 bool parseCoinbaseDocument(MinerId& minerId,
                            const std::string_view coinbaseDocumentDataJson,
-                           const bsv::span<const uint8_t> signatureBytes,
+                           const std::span<const uint8_t> signatureBytes,
                            const COutPoint& tx_out,
                            int32_t blockHeight,
                            bool dynamic)
@@ -472,7 +472,7 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
 {
     MinerId minerId {};
 
-    const bsv::span<const uint8_t> script { tx.vout[i].scriptPubKey };
+    const std::span<const uint8_t> script { tx.vout[i].scriptPubKey };
 
     // MinerId coinbase documents starts at 7th byte of the output message
     bsv::instruction_iterator it{script.last(script.size() - 7)};
@@ -496,7 +496,7 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
                  i);
         return {};
     }
-    const std::string_view static_cd{to_sv(it->operand())};
+    const std::string_view static_cd{bsv::to_sv(it->operand())};
 
     if(!++it)
     {
@@ -544,7 +544,7 @@ static std::optional<MinerId> ExtractMinerId(const CTransaction& tx, size_t i, i
                      i);
             return {};
         }
-        const string_view dynamic_cd{to_sv(it->operand())};
+        const string_view dynamic_cd{bsv::to_sv(it->operand())};
 
         if(!++it)
         {
@@ -582,7 +582,7 @@ std::optional<MinerId> FindMinerId(const CBlock& block, int32_t blockHeight)
         // minerId
         for(size_t i = 0; i < tx.vout.size(); i++)
         {
-            const bsv::span<const uint8_t> script{tx.vout[i].scriptPubKey};
+            const std::span<const uint8_t> script{tx.vout[i].scriptPubKey};
             // OP_FALSE OP_RETURN 0x04 0xAC1EED88 OP_PUSHDATA Coinbase Document
             if(IsMinerId(script))
             {

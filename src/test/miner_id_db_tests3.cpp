@@ -928,7 +928,7 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
             bool containsMinerId {false};
             for(size_t i = 0; i < tx->vout.size(); i++)
             {
-                const bsv::span<const uint8_t> script { tx->vout[i].scriptPubKey };
+                const span<const uint8_t> script { tx->vout[i].scriptPubKey };
                 if(IsMinerId(script) || IsMinerInfo(script))
                 {
                     containsMinerId = true;

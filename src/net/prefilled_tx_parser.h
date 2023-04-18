@@ -5,9 +5,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <utility>
 
-#include "span.h"
 #include "tx_parser.h"
 
 // Parses a prefilled tx as defined in the HeaderAndShortIDs section of a
@@ -18,7 +18,7 @@ class prefilled_tx_parser
     unique_array buffer_;
 
 public:
-    std::pair<size_t, size_t> operator()(bsv::span<const uint8_t> s);
+    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     std::size_t size() const;
     
     unique_array buffer() &&;

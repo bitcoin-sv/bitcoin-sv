@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
 
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
-    parser(bsv::span{v.data(), v.size()});
+    parser(std::span{v.data(), v.size()});
     BOOST_CHECK_EQUAL(42, parser.size());
 }
 
@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_xvalue)
 
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
-    parser(bsv::span{v.data(), v.size()});
+    parser(std::span{v.data(), v.size()});
     BOOST_CHECK_EQUAL(42, parser.size());
 }
 
@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_prvalue)
 
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
-    parser(bsv::span{v.data(), v.size()});
+    parser(std::span{v.data(), v.size()});
     BOOST_CHECK_EQUAL(42, parser.size());
 }
             
@@ -75,7 +75,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_ptr)
     
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
-    (*parser)(bsv::span{v.data(), v.size()});
+    (*parser)(std::span{v.data(), v.size()});
     BOOST_CHECK_EQUAL(42, parser->size());
 }
 
@@ -124,7 +124,7 @@ static const std::vector<uint8_t> large_txs = []
 BOOST_AUTO_TEST_CASE(parse_large_outputs)
 {
     single_seg_parser parser;
-    bsv::span s{large_txs.data(), large_txs.size()};
+    std::span s{large_txs.data(), large_txs.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     //BOOST_CHECK_EQUAL(large_txs.size(), bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_reqd);

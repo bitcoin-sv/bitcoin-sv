@@ -10,7 +10,6 @@
 #include "net/cmpct_size.h"
 
 using namespace std;
-using namespace bsv;
 
 BOOST_AUTO_TEST_SUITE(parser_compact_size_tests)
 
