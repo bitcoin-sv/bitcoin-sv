@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-1.0.14-linux"
+name: "bitcoin-sv-1.0.15-linux"
 enable_cache: true
 suites:
 - "focal"
