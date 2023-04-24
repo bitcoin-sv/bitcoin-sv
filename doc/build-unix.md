@@ -230,6 +230,18 @@ sudo echo '/usr/local/lib' > /etc/ld.so.conf.d/local.conf
 sudo ldconfig
 ```
 
+**NOTE:** If you now have multiple versions of boost installed on your build
+system (for example; if you have an old version installed from a package and
+another version installed manually under */usr/local* as instructed above) you
+may encounter errors when trying to build bitcoind if the linker first
+encounters the older, incorrect version of the boost libraries. To solve this,
+you must either uninstall the old boost packages, or explicitly tell the bitcoin
+configure script where to look for the correct new version of boost:
+
+```bash
+./configure --with-boost=/usr/local
+```
+
 ### miniupnpc
 
 [miniupnpc](http://miniupnp.free.fr/) may be used for UPnP port mapping. It can be downloaded from [here](
