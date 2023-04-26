@@ -173,10 +173,20 @@ BITCOIN_CORE_H = \
   mining/journal_change_set.h \
   mining/journal_entry.h \
   mining/journaling_block_assembler.h \
+  net/array_parser.h \
   net/association.h \
   net/association_id.h \
   net/authconn.h \
   net/block_download_tracker.h \
+  net/block_parser.h \
+  net/blocktxn_parser.h \
+  net/cmpct_size.h \
+  net/cmpctblock_parser.h \
+  net/fixed_len_multi_parser.h \
+  net/fixed_len_parser.h \
+  net/msg_buffer.h \
+  net/msg_parser.h \
+  net/msg_parser_buffer.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \
@@ -185,10 +195,15 @@ BITCOIN_CORE_H = \
   net/net_types.h \
   net/node_state.h \
   net/node_stats.h \
+  net/parser_utils.h \
+  net/prefilled_tx_parser.h \
+  net/p2p_msg_lengths.h \
   net/send_queue_bytes.h \
+  net/single_seg_parser.h \
   net/stream.h \
   net/stream_policy.h \
   net/stream_policy_factory.h \
+  net/tx_parser.h \
   net/validation_scheduler.h \
   netmessagemaker.h \
   noui.h \
@@ -263,6 +278,7 @@ BITCOIN_CORE_H = \
   txn_validator.h \
   ui_interface.h \
   undo.h \
+  unique_array.h \
   util.h \
   utilmoneystr.h \
   utiltime.h \
@@ -352,13 +368,24 @@ libbitcoin_server_a_SOURCES = \
   net/association.cpp \
   net/association_id.cpp \
   net/block_download_tracker.cpp \
+  net/block_parser.cpp \
+  net/blocktxn_parser.cpp \
+  net/cmpct_size.cpp \
+  net/cmpctblock_parser.cpp \
+  net/fixed_len_multi_parser.cpp \
+  net/fixed_len_parser.cpp \
+  net/msg_buffer.cpp \
+  net/msg_parser_buffer.cpp \
   net/net.cpp \
   net/net_message.cpp \
   net/net_processing.cpp \
   net/node_state.cpp \
+  net/prefilled_tx_parser.cpp \
+  net/single_seg_parser.cpp \
   net/stream.cpp \
   net/stream_policy.cpp \
   net/stream_policy_factory.cpp \
+  net/tx_parser.cpp \
   net/validation_scheduler.cpp \
   noui.cpp \
   orphan_txns.cpp \
@@ -384,6 +411,7 @@ libbitcoin_server_a_SOURCES = \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
+  taskcancellation.cpp \
   timedata.cpp \
   time_locked_mempool.cpp \
   txdb.cpp \
@@ -397,6 +425,7 @@ libbitcoin_server_a_SOURCES = \
   txn_recent_rejects.cpp \
   txn_validator.cpp \
   ui_interface.cpp \
+  unique_array.cpp \
   validation.cpp \
   validationinterface.cpp \
   vmtouch.cpp \
@@ -496,7 +525,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
-  span.h \
+  taskcancellation.h \
+  taskcancellation.cpp \
   tinyformat.h \
   uint256.h \
   utilstrencodings.cpp \
@@ -611,7 +641,8 @@ bitcoind_LDADD += \
   $(EVENT_PTHREADS_LIBS) \
   $(EVENT_LIBS) \
   $(ZMQ_LIBS) \
-  $(AIO_LIBS)
+  $(AIO_LIBS) \
+  $(TBB_LIBS)
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp

@@ -417,9 +417,9 @@ bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
     int maxSuffix = 0;
     for (fs::directory_iterator it(merkleStorePath); it != fs::directory_iterator(); ++it)
     {
-        std::string merkleDataFileBaseName = fs::basename(it->path());
+        std::string merkleDataFileBaseName = it->path().stem().string();
         std::smatch merkleDataFileBaseNameMatch;
-        if (!fs::is_directory(*it) && fs::extension(*it) == ".dat" && std::regex_search(merkleDataFileBaseName, merkleDataFileBaseNameMatch, merkleDataFileBaseNameRegEx))
+        if (!fs::is_directory(*it) && it->path().extension() == ".dat" && std::regex_search(merkleDataFileBaseName, merkleDataFileBaseNameMatch, merkleDataFileBaseNameRegEx))
         {
             int currentFileSuffix = 0;
             try

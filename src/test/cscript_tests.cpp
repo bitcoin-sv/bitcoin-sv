@@ -68,25 +68,25 @@ BOOST_AUTO_TEST_CASE(GetOp2)
 BOOST_AUTO_TEST_CASE(OpCount_tests)
 {
     uint8_t a[] = {OP_1, OP_2, OP_2};
-    BOOST_CHECK_EQUAL(0, CountOp(a, OP_0));
-    BOOST_CHECK_EQUAL(1, CountOp(a, OP_1));
-    BOOST_CHECK_EQUAL(2, CountOp(a, OP_2));
+    BOOST_CHECK_EQUAL(0U, CountOp(a, OP_0));
+    BOOST_CHECK_EQUAL(1U, CountOp(a, OP_1));
+    BOOST_CHECK_EQUAL(2U, CountOp(a, OP_2));
 
     array<uint8_t, 3> arr;
     copy(begin(a), end(a), begin(arr));
-    BOOST_CHECK_EQUAL(0, CountOp(arr, OP_0));
-    BOOST_CHECK_EQUAL(1, CountOp(arr, OP_1));
-    BOOST_CHECK_EQUAL(2, CountOp(arr, OP_2));
+    BOOST_CHECK_EQUAL(0U, CountOp(arr, OP_0));
+    BOOST_CHECK_EQUAL(1U, CountOp(arr, OP_1));
+    BOOST_CHECK_EQUAL(2U, CountOp(arr, OP_2));
 
     vector<uint8_t> v{begin(arr), end(arr)};
-    BOOST_CHECK_EQUAL(0, CountOp(v, OP_0));
-    BOOST_CHECK_EQUAL(1, CountOp(v, OP_1));
-    BOOST_CHECK_EQUAL(2, CountOp(v, OP_2));
+    BOOST_CHECK_EQUAL(0U, CountOp(v, OP_0));
+    BOOST_CHECK_EQUAL(1U, CountOp(v, OP_1));
+    BOOST_CHECK_EQUAL(2U, CountOp(v, OP_2));
 
     CScript script{begin(v), end(v)};
-    BOOST_CHECK_EQUAL(0, CountOp(script, OP_0));
-    BOOST_CHECK_EQUAL(1, CountOp(script, OP_1));
-    BOOST_CHECK_EQUAL(2, CountOp(script, OP_2));
+    BOOST_CHECK_EQUAL(0U, CountOp(script, OP_0));
+    BOOST_CHECK_EQUAL(1U, CountOp(script, OP_1));
+    BOOST_CHECK_EQUAL(2U, CountOp(script, OP_2));
 }
 
 BOOST_AUTO_TEST_CASE(GetSigOpCount)

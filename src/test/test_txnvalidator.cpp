@@ -50,7 +50,7 @@ namespace {
         CMutableTransaction spend_txn;
         spend_txn.nVersion = 1;
         spend_txn.nLockTime = ++dummyLockTime;
-        BOOST_REQUIRE_LE(nInputs, fundTxn.vout.size());
+        BOOST_REQUIRE_LE(static_cast<size_t>(nInputs), fundTxn.vout.size());
         spend_txn.vin.resize(nInputs);
         auto funds = Amount { 0 };
         for (int input = 0; input < nInputs; ++input) {
@@ -382,7 +382,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == true);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
-        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1U);
         BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
     }
 
@@ -395,7 +395,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == true);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
-        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1U);
         BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
     }
 
@@ -408,7 +408,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == true);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
-        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1U);
         BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
     }
 
@@ -455,7 +455,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == false);
         BOOST_CHECK(state.IsMempoolConflictDetected() == true);
-        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1U);
         BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
     }
 }
@@ -483,7 +483,7 @@ BOOST_AUTO_TEST_CASE(validation_state_collided_with_tx)
 
     BOOST_CHECK(state.IsDoubleSpendDetected() == false);
     BOOST_CHECK(state.IsMempoolConflictDetected() == false);
-    BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 0);
+    BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 0U);
 
     std::vector<CTransactionRef> added;
 
@@ -521,7 +521,7 @@ BOOST_AUTO_TEST_CASE(validation_state_collided_with_tx)
     state.ClearCollidedWithTx();
     BOOST_CHECK(state.IsDoubleSpendDetected() == true);
     BOOST_CHECK(state.IsMempoolConflictDetected() == true);
-    BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 0);
+    BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 0U);
 }
 
 /**
@@ -532,7 +532,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
     // Test all sources.
     for (const auto& txsource: vTxSources) {
         ProcessTxnsSynchApi(testConfig, pool, doubleSpend2Txns, txsource);
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
     // Test: Txns from p2p with a pointer to a dummy node.
     {
@@ -552,7 +552,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
                 "",
                 true);
         ProcessTxnsSynchApi(testConfig, pool, doubleSpend2Txns, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
 }
 
@@ -562,7 +562,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
     // Test all sources.
     for (const auto& txsource: vTxSources) {
         mRejectedTxns = ProcessTxnsSynchBatchApi(testConfig, pool, doubleSpend10Txns, txsource);
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
         // There should be no insufficient fee txns returned.
         BOOST_REQUIRE(!mRejectedTxns.second.size());
         // Check an expected number of invalid txns returned.
@@ -595,7 +595,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
                 "",
                 true);
         mRejectedTxns = ProcessTxnsSynchBatchApi(testConfig, pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
         // There should be no insufficient fee txns returned.
         BOOST_REQUIRE(!mRejectedTxns.second.size());
         // Check an expected number of invalid txns returned.
@@ -625,13 +625,13 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_asynch_api) {
     // Test all sources.
     for (const auto& txsource: vTxSources) {
         ProcessTxnsAsynchApi(testConfig, pool, doubleSpend10Txns, txsource);
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
     // Test: Txns from p2p with a pointer to a dummy node.
     {
         auto pDummyNode = DummyNode(testConfig);
         ProcessTxnsAsynchApi(testConfig, pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
 }
 
@@ -659,7 +659,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
     txnValidator->newTransaction(txnsInputs);
     BOOST_CHECK(txnValidator->GetTransactionsInQueueCount() < txns.size());
     BOOST_CHECK(txnValidator->GetStdQueueMemUsage() <= 1*ONE_MEBIBYTE);
-    BOOST_CHECK_EQUAL(txnValidator->GetNonStdQueueMemUsage(), 0);
+    BOOST_CHECK_EQUAL(txnValidator->GetNonStdQueueMemUsage(), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
@@ -677,7 +677,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
     for (const auto& txsource: vTxSources) {
         result = ProcessTxnSynchApi(testConfig, pool, spendtx_nValue_OutOfRange, txsource);
         BOOST_CHECK(!result.IsValid());
-        BOOST_CHECK_EQUAL(pool.Size(), 0);
+        BOOST_CHECK_EQUAL(pool.Size(), 0U);
     }
 }
 
@@ -710,7 +710,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
         // Non transaction should be accepted due to nValue (value out of range).
-        BOOST_CHECK_EQUAL(pool.Size(), 0);
+        BOOST_CHECK_EQUAL(pool.Size(), 0U);
     }
     // Case2:
     // Send the same txns again (with valid nValue).
@@ -718,7 +718,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
     {
         txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, doubleSpend10Txns));
         txnValidator->waitForEmptyQueue();
-        BOOST_CHECK_EQUAL(pool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
 }
 
@@ -788,10 +788,10 @@ BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
         }
 
         BOOST_CHECK_EQUAL(pool.Size(), 1 + oldPoolSize);
-        BOOST_CHECK_EQUAL(counts.GetStdQueueCount(), 0);
-        BOOST_CHECK_EQUAL(counts.GetProcessingQueueCount(), 0);
-        BOOST_CHECK_EQUAL(counts.GetNonStdQueueCount(), 1);
-        BOOST_CHECK_EQUAL(txnValidator->getOrphanTxnsPtr()->getTxnsNumber(), 1);
+        BOOST_CHECK_EQUAL(counts.GetStdQueueCount(), 0U);
+        BOOST_CHECK_EQUAL(counts.GetProcessingQueueCount(), 0U);
+        BOOST_CHECK_EQUAL(counts.GetNonStdQueueCount(), 1U);
+        BOOST_CHECK_EQUAL(txnValidator->getOrphanTxnsPtr()->getTxnsNumber(), 1U);
         break;
     }
 }

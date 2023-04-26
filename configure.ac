@@ -2,7 +2,7 @@ dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
 define(_CLIENT_VERSION_MINOR, 0)
-define(_CLIENT_VERSION_REVISION, 14)
+define(_CLIENT_VERSION_REVISION, 15)
 define(_CLIENT_VERSION_BUILD, 0)
 define(_COPYRIGHT_YEAR, 2023)
 define(_COPYRIGHT_HOLDERS,[The %s Association])
@@ -52,8 +52,8 @@ case $host in
      lt_cv_deplibs_check_method="pass_all"
   ;;
 esac
-dnl Require C++17 compiler (no GNU extensions)
-AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory], [nodefault])
+dnl Require C++20 compiler (no GNU extensions)
+AX_CXX_COMPILE_STDCXX([20], [noext], [mandatory], [nodefault])
 dnl Check if -latomic is required for <std::atomic>
 CHECK_ATOMIC
 
@@ -253,6 +253,9 @@ AC_ARG_ENABLE([werror],
 
 AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-Werror],[CXXFLAG_WERROR="-Werror"],[CXXFLAG_WERROR=""])
+
+# Placeholder for linking with tbb as and when it becomes required
+#AC_CHECK_LIB([tbb], [main],TBB_LIBS=-ltbb, AC_MSG_NOTICE(libtbb not available.))
 
 if test "x$enable_asan" = xyes; then
 	enable_debug=yes
@@ -861,7 +864,7 @@ fi
 if test x$use_boost = xyes; then
 
 dnl Minimum required Boost version
-define(MINIMUM_REQUIRED_BOOST, 1.59.0)
+define(MINIMUM_REQUIRED_BOOST, 1.74.0)
 
 dnl Check for boost libs
 AX_BOOST_BASE([MINIMUM_REQUIRED_BOOST])
@@ -1302,6 +1305,7 @@ AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
 AC_SUBST(AIO_LIBS)
+AC_SUBST(TBB_LIBS)
 AC_SUBST(HAVE_BUILTIN_PREFETCH)
 AC_SUBST(HAVE_MM_PREFETCH)
 AC_SUBST(HAVE_STRONG_GETAUXVAL)
@@ -1342,6 +1346,7 @@ if test x$need_bundled_univalue = xyes; then
 fi
 
 ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery --enable-module-multiset --disable-jni"
+ac_configure_args="${ac_configure_args} --disable-module-schnorrsig --disable-module-extrakeys"
 AC_CONFIG_SUBDIRS([src/secp256k1])
 
 AC_OUTPUT

@@ -34,7 +34,8 @@ BOOST_AUTO_TEST_CASE(excessiveblock_rpc) {
     BOOST_CHECK_NO_THROW(CallRPC("setexcessiveblock 0"));
     UniValue result{};
     BOOST_CHECK_NO_THROW(result = CallRPC("getexcessiveblock"););
-    BOOST_CHECK_EQUAL(find_value(result.get_obj(), "excessiveBlockSize").get_int64(), Params().GetDefaultBlockSizeParams().maxBlockSize);
+    BOOST_CHECK_EQUAL(static_cast<uint64_t>(find_value(result.get_obj(), "excessiveBlockSize").get_int64()),
+        Params().GetDefaultBlockSizeParams().maxBlockSize);
 
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1000"), std::runtime_error);

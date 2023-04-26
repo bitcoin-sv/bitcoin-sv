@@ -15,7 +15,7 @@ BOOST_AUTO_TEST_CASE(add_remove)
 {
     // Create a blacklist of 3 strings
     TimeLimitedBlacklist<std::string> blacklist { 3 };
-    BOOST_CHECK_EQUAL(blacklist.GetMaxSize(), 3);
+    BOOST_CHECK_EQUAL(blacklist.GetMaxSize(), 3U);
     const std::string item1 { "Item1" };
     const std::string item2 { "Item2" };
     const std::string item3 { "Item3" };

@@ -7,7 +7,11 @@
 #include <tuple>
 
 #include "instruction.h"
+
+#include <span>
 #include <string_view>
+
+using namespace std;
 
 namespace bsv
 {
@@ -73,8 +77,6 @@ namespace bsv
     }
 
     class instruction_iterator
-        : public std::iterator<std::forward_iterator_tag, instruction>
-
     {
         span<const uint8_t> span_;
         bool valid_{};
@@ -87,6 +89,12 @@ namespace bsv
         }
 
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = instruction;
+        using difference_type = std::ptrdiff_t;
+        using pointer = instruction*;
+        using reference = instruction&;
+
         constexpr instruction_iterator(span<const uint8_t> s) noexcept : 
             span_{s} 
         {
@@ -149,7 +157,7 @@ namespace bsv
         }
     };
 
-    inline std::string_view to_sv(bsv::span<const uint8_t> s)
+    inline std::string_view to_sv(std::span<const uint8_t> s)
     {
         return std::string_view{reinterpret_cast<const char*>(s.data()),
                                 s.size()};

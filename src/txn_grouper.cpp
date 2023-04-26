@@ -3,6 +3,9 @@
 
 #include "txn_grouper.h"
 
+#include <algorithm>
+#include <list>
+
 // Walk the dependency graph building groups of related transactions
 auto TxnGrouper::GetGroups(const std::vector<CTransactionRef>& vtx) -> std::vector<UPtrTxnGroup>
 {

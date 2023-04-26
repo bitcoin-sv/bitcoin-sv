@@ -1,8 +1,6 @@
 Contributing to Bitcoin SV
 ===========================
 
-Thank you for your interest.
+As the ecosystem continues to grow and more people realise the power of Bitcoin, we welcome contributions.
 
-At this stage in the development of Bitcoin SV we are not
-accepting contributions to the project. We expect to change
-this policy soon.
+Thank you for your interest in Bitcoin.

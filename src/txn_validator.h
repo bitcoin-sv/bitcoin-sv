@@ -63,11 +63,6 @@ class CTxnValidator final
      */
 	struct CIntermediateResult final
 	{
-        // Defaults
-        CIntermediateResult(CIntermediateResult&&) = default;
-        CIntermediateResult(const CIntermediateResult&) = default;
-        CIntermediateResult& operator=(CIntermediateResult&&) = default;
-        CIntermediateResult& operator=(const CIntermediateResult&) = default;
         // Txns accepted by the mempool and not removed from there.
         TxInputDataSPtrVec mAcceptedTxns {};
         // Low priority txns detected during processing.

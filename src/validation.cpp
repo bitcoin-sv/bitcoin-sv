@@ -4039,22 +4039,20 @@ class ConnectTrace {
 private:
     std::vector<PerBlockConnectTrace> blocksConnected;
     CTxMemPool &pool;
+    boost::signals2::scoped_connection slotConnection {};
     bool mTracingPoolEntryRemovedEvents = false;
 
     void ConnectToPoolEntryRemovedEvent()
     {
         using namespace boost::placeholders;
         mTracingPoolEntryRemovedEvents = true;
-        pool.NotifyEntryRemoved.connect(
-            boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
+        slotConnection = pool.NotifyEntryRemoved.connect(boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
     }
 
     void DisconnectFromPoolEntryRemovedEvent()
     {
-        using namespace boost::placeholders;
         mTracingPoolEntryRemovedEvents = false;
-        pool.NotifyEntryRemoved.disconnect(
-            boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
+        slotConnection.disconnect();
     }
 
 public:

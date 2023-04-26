@@ -5,12 +5,12 @@
 #pragma once
 
 #include <iosfwd>
+#include <span>
 #include <variant>
 
 #include "univalue.h"
 
 #include "uint256.h"
-#include "span.h"
 #include "miner_id/miner_info_error.h"
 #include "miner_id/miner_info_doc.h"
 
@@ -22,7 +22,7 @@ bool is_compressed_key(const std::string&);
 
 bool is_der_signature(const char*);
 bool is_der_signature(const std::string&);
-bool is_der_signature(const bsv::span<const uint8_t>);
+bool is_der_signature(const std::span<const uint8_t>);
 
 class miner_info
 {
@@ -34,7 +34,7 @@ class miner_info
 public:
     miner_info(std::string_view raw_mi_doc,
                const miner_info_doc&, 
-               bsv::span<const uint8_t> sig,
+               std::span<const uint8_t> sig,
                const uint256& txid);
 
     std::string_view raw_mi_doc() const { return raw_mi_doc_; }
@@ -57,6 +57,6 @@ std::optional<miner_info_error> verify(const CBlock&,
                                        const block_bind&,
                                        const std::string& key);
 
-std::variant<bool, miner_info_error> VerifyDataScript(const bsv::span<const uint8_t>);
+std::variant<bool, miner_info_error> VerifyDataScript(const std::span<const uint8_t>);
 std::variant<bool, miner_info_error> VerifyDataObject(const std::string_view json);
 

@@ -5,7 +5,6 @@
 #pragma once
 
 #include "script.h"
-#include "span.h"
 
 #include <iostream>
 
@@ -23,7 +22,7 @@ namespace bsv
     {
         opcodetype opcode_{OP_INVALIDOPCODE};
         int8_t offset_{};
-        using operand_type = bsv::span<const uint8_t>;
+        using operand_type = std::span<const uint8_t>;
         operand_type operand_{};
 
     public:

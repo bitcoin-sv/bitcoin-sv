@@ -1,51 +1,59 @@
-# Bitcoin SV Node software – v1.0.14 Release
+# Bitcoin SV Node software – v1.0.15 Release
 
 Overview
 ========
 
-The 1.0.14 node release is a recommended upgrade from version 1.0.13.
+The 1.0.15 node release is a recommended upgrade from version 1.0.14.
 
-Headline Item in 1.0.14
------------------------
+Headline Items in 1.0.15
+========================
 
-1.  Node Freezing issue resolution (increased responsiveness)
+1. Memory usage optimisations.
+2. Build updates:
+    1. C++ v20.
+    2. Ubuntu 20.04 LTS.
+    3. CentOS 9.
+3. STN Network reset.
 
-Detailed features of 1.0.14
----------------------------
+Detailed features of 1.0.15
+===========================
 
-*   Parallel transaction validation (PTV) during block validation.
+Memory Usage Optimisations
+--------------------------
+
+In this release we have updated the software to reduce peak memory consumption during the receipt of large p2p messages - specifically **block**, **blocktxn** and **cmpctblock** messages.
+
+Build Updates
+-------------
+
+In this release we have updated the tooling used to build the node software and the target operating systems supported by the pre-built node binaries. This has the following main consequences:
+
+### Pre-built binaries
+
+The pre-built binaries will run on the following supported platforms:
+
+* **Ubuntu 20.04 LTS** (or later).
+* **Debian 11** bullseye (or later).
+* **Centos 9** (or later).
+
+Running the node on different or older versions of Linux is still possible but will require manually building from source.
+
+This release has also been updated to use the latest upstream version **0.3.1** of the **secp256k1** library.
+
+### Building from source
+
+Building the node software from source requires at least version **10.2** of the **GCC compiler** and at least version **1.74** of the **Boost libraries**.
+
+See the instructions in [build-unix.md](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/build-unix.md) for a detailed description on how to build from source, or alternatively see the provided docker images [here](https://hub.docker.com/r/bitcoinsv/bitcoin-sv-src/) of suitable build environments already setup (scripts to generate the docker images can be found [here](https://github.com/bitcoin-sv/docker-sv-src)).
 
 Other items:
+------------
 
-*   Fixes to unit / functional tests.
-*   A fix to reduce the memory used by the node when responding to **getblocktxn** requests and to better track the memory usage across P2P message queues.
-*   An improvement to how the node handles prioritising an existing transaction via the **sendrawtransaction** RPC which may have unnecessarily resulted in the next block template returned from the journaling block assembler containing fewer transactions than it could.
-*   The log message if the node runs out of disk space has been extended to give more information.
-*   Some build warnings and failures on newer platforms and compilers have been fixed.
-*   Bump OpenSSL version used by the Gitian build to 1.1.1t.
-*   Make the maximum number of P2P **addnode** peers configurable.
-*   Optimise locking code related to **rollingMinimumFeeRate**.
-
-Community contribution submitted to Github:
-
-*   RPC REST requests to fetch a binary block now have basic HTTP range header request support. For example; **Range: bytes=1024-2048**
-*   Log message clarification around free RAM
-
-PTV during block validation
----------------------------
-
-This change allows the node to fully take advantage of all available cores during block validation. Tests on 8, 16 and 32 core machines have shown it reduces block validation times, makes the node more responsive, and improves scalability. It also helps slightly reduce initial block download times.
-
-Most users will not need to do anything to do anything to take full advantage of this change, however the following configuration options have been added to control the behaviour:
-
-*   **\-blockvalidationtxbatchsize**: Sets the minimum batch size for groups of transactions to be validated in parallel. For example; if this is set to 100 on an 8 core machine, and an incoming block contains 500 transactions then those transactions will be validated in 5 parallel batches of 100. A 1000 transaction block would be validated in 8 parallel batches of 125.
-*   **\-txnthreadsperblock**: Sets the number of transaction validation threads used to validate a single bock. Defaults to the number of cores available on the machine, but can be raised or lowered if required.
+* The Scaling Test Network (**STN**) has been reset at block height eight. This block has hash **0000000074230d332b2ed9d87af3ad817b6f2616c154372311c9b2e4f386c24c**.
 
 Other new or modified configuration options
 -------------------------------------------
 
-An addition to any previously mentioned changes, the following node configuration options have either been introduced or changed:
+* \-_**maxconnections**_ has been removed.
+* \-_**maxoutboundconnections**_ has been added (default=8).
 
-*   **\-blockdownloadlowerwindow**: A new option to further limit the block download window size during IBD in order to help the node hit any configured pruning target. If pruning is not enabled then this will default to the same as the standard block download window size. An operator may choose to reduce this value even if pruning is not enabled which will result in the node using less disk space during IBD but at the possible cost of a longer IBD time. Conversely, an operator of a pruned node may choose to increase this value to reduce the time it takes to perform IBD but at the possible cost of exceeding the pruning target at times.
-*   **\-pruneminblockstokeep**: An advanced option to override the minimum number of last blocks a node will keep on disk. Normally this should not be changed, but this option allows an operator to temporarily reduce this from the default value of 288 blocks in combination with the **\-prune** option if they need to really restrict the amount of space taken up by block data.
-*   **\-maxaddnodeconnections**: A new option to set the maximum number of peers that can be connected to with the **addnode** configuration option or RPC command. This limit was previously hard-coded to 8.

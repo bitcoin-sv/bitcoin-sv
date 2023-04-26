@@ -5,10 +5,10 @@
 #pragma once
 
 #include <iosfwd>
+#include <span>
 #include <variant>
 
 #include "uint256.h"
-#include "span.h"
 #include "miner_id/miner_info_error.h"
 
 class block_bind
@@ -17,8 +17,8 @@ class block_bind
     std::vector<uint8_t> sig_;
 
 public:
-    block_bind(const bsv::span<const uint8_t> mmr_pbh_hash_,
-               const bsv::span<const uint8_t> sig);
+    block_bind(const std::span<const uint8_t> mmr_pbh_hash_,
+               const std::span<const uint8_t> sig);
 
     const uint256& mmr_pbh_hash() const { return mmr_pbh_hash_; }
     
@@ -42,7 +42,7 @@ class miner_info_ref
     block_bind block_bind_;
 
   public:
-    miner_info_ref(bsv::span<const uint8_t> txid, const block_bind&);
+    miner_info_ref(std::span<const uint8_t> txid, const block_bind&);
 
     const uint256& txid() const { return txid_; }
     const block_bind& blockbind() const { return block_bind_; }
@@ -57,6 +57,6 @@ inline bool operator!=(const miner_info_ref& a, const miner_info_ref& b)
 }
 
 std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
-    const bsv::span<const uint8_t> script);
+    const std::span<const uint8_t> script);
 
 

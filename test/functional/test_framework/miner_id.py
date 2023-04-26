@@ -15,7 +15,7 @@ Usage:
 import json
 import ecdsa
 from pathlib import Path
-from bip32utils import BIP32Key, BIP32_HARDEN
+from bip32utils import BIP32Key
 from io import BytesIO
 from .mininode import sha256, hex_str_to_bytes, bytes_to_hex_str, ser_uint256, COutPoint, ToHex, CTransaction
 from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_TRUE, OP_RETURN, CTxOut
@@ -31,14 +31,9 @@ class MinerIdKeys:
             hexseed
         self._curve = ecdsa.SECP256k1
         self._bip32_minerId_root = BIP32Key.fromEntropy(bytes.fromhex(hexseed))
-        self._bip32_minerId_child = self._bip32_minerId_root.ChildKey(44+BIP32_HARDEN)\
-            .ChildKey(BIP32_HARDEN)\
-            .ChildKey(BIP32_HARDEN)\
-            .ChildKey(0)\
-            .ChildKey(0)
-        self._privateKey = self._bip32_minerId_child.ExtendedKey()
-        self._privateKeyBinary = self._bip32_minerId_child.PrivateKey()
-        self._publicKey = self._bip32_minerId_child.PublicKey()
+        self._privateKey = self._bip32_minerId_root.ExtendedKey()
+        self._privateKeyBinary = self._bip32_minerId_root.PrivateKey()
+        self._publicKey = self._bip32_minerId_root.PublicKey()
         self._signingKey = ecdsa.SigningKey.from_string(self._privateKeyBinary, curve=self._curve)
         self._verifyingKey = self._signingKey.get_verifying_key().to_string("compressed")
 

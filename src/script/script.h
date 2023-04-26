@@ -10,7 +10,6 @@
 #include "crypto/common.h"
 #include "prevector.h"
 #include "serialize.h"
-#include "span.h"
 #include "opcodes.h"
 
 #include <array>
@@ -19,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -294,16 +294,17 @@ public:
         CScriptBase().swap(*this);
     }
 };
+static_assert(std::ranges::range<CScript>);
 
 std::ostream &operator<<(std::ostream &, const CScript &);
 std::string to_string(const CScript&);
 
-bool IsP2SH(bsv::span<const uint8_t>);
-bool IsDSNotification(bsv::span<const uint8_t>);
-bool IsDustReturnScript(bsv::span<const uint8_t> script);
-bool IsMinerId(bsv::span<const uint8_t> script);
+bool IsP2SH(std::span<const uint8_t>);
+bool IsDSNotification(std::span<const uint8_t>);
+bool IsDustReturnScript(std::span<const uint8_t> script);
+bool IsMinerId(std::span<const uint8_t> script);
 
-constexpr bool IsMinerInfo(const bsv::span<const uint8_t> script)
+constexpr bool IsMinerInfo(const std::span<const uint8_t> script)
 {
     constexpr std::array<uint8_t, 4> protocol_id{0x60, 0x1d, 0xfa, 0xce};
     return script.size() >= 7 && 
@@ -316,7 +317,7 @@ constexpr bool IsMinerInfo(const bsv::span<const uint8_t> script)
            script[6] == protocol_id[3];
 }
 
-size_t CountOp(bsv::span<const uint8_t>, opcodetype);
+size_t CountOp(std::span<const uint8_t>, opcodetype);
 
 class CReserveScript {
 public:

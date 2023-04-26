@@ -8,9 +8,9 @@
 
 #include "hash.h"
 #include "serialize.h"
-#include "span.h"
 #include "uint256.h"
 
+#include <span>
 #include <stdexcept>
 #include <vector>
 
@@ -137,7 +137,7 @@ public:
      * If this public key is not fully valid, the return value will be false.
      */
     bool Verify(const uint256& hash, const std::vector<uint8_t>& vchSig) const;
-    bool Verify(const uint256& hash, const bsv::span<const uint8_t> sig) const;
+    bool Verify(const uint256& hash, const std::span<const uint8_t> sig) const;
 
     /**
      * Check whether a signature is normalized (lower-S).

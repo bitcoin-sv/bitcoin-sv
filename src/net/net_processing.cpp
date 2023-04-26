@@ -563,10 +563,14 @@ private:
 
 } // namespace
 
-// Forward declarion of ProcessMessage
-static bool ProcessMessage(const Config& config, const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, int64_t nTimeReceived, const CChainParams& chainparams, CConnman& connman,
-    const std::atomic<bool>& interruptMsgProc);
+static bool ProcessMessage(const Config& config,
+                           const CNodePtr& pfrom,
+                           const std::string& strCommand,
+                           msg_buffer& vRecv,
+                           int64_t nTimeReceived,
+                           const CChainParams& chainparams,
+                           CConnman& connman,
+                           const std::atomic<bool>& interruptMsgProc);
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     // Try to obtain an access to the node's state data.
@@ -648,6 +652,22 @@ static void Misbehaving(const CNodePtr& node, int howmuch, const std::string &re
 PeerLogicValidation::PeerLogicValidation(CConnman *connmanIn)
     : connman(connmanIn)
 {}
+
+void PeerLogicValidation::RegisterValidationInterface()
+{
+    CMainSignals& sigs { GetMainSignals() };
+
+    using namespace boost::placeholders;
+    slotConnections.push_back(sigs.BlockConnected.connect(boost::bind(&PeerLogicValidation::BlockConnected, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.UpdatedBlockTip.connect(boost::bind(&PeerLogicValidation::UpdatedBlockTip, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.BlockChecked.connect(boost::bind(&PeerLogicValidation::BlockChecked, this, _1, _2)));
+    slotConnections.push_back(sigs.NewPoWValidBlock.connect(boost::bind(&PeerLogicValidation::NewPoWValidBlock, this, _1, _2)));
+}
+
+void PeerLogicValidation::UnregisterValidationInterface()
+{
+    slotConnections.clear();
+}
 
 void PeerLogicValidation::BlockConnected(
     const std::shared_ptr<const CBlock> &pblock, const CBlockIndex *pindex,
@@ -1433,7 +1453,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
 /**
 * Process reject messages.
 */
-static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
+static void ProcessRejectMessage(msg_buffer& vRecv, const CNodePtr& pfrom)
 {
     if(LogAcceptCategory(BCLog::NETMSG))
     {
@@ -1474,8 +1494,10 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 /**
 * Process createstream messages.
 */
-static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman)
+static bool ProcessCreateStreamMessage(const CNodePtr& pfrom,
+                                       const std::string& strCommand,
+                                       msg_buffer& vRecv,
+                                       CConnman& connman)
 {
     // Check we haven't already received either a createstream or a version message
     if(pfrom->nVersion != 0)
@@ -1549,8 +1571,10 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
 /**
 * Process streamack messages.
 */
-static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman)
+static bool ProcessStreamAckMessage(const CNodePtr& pfrom,
+                                    const std::string& strCommand,
+                                    msg_buffer& vRecv,
+                                    CConnman& connman)
 {
     // Can't receive streamacks over an established connection
     if(pfrom->nVersion != 0)
@@ -1614,8 +1638,11 @@ static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& st
 /**
 * Process version messages.
 */
-static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman, const Config& config)
+static bool ProcessVersionMessage(const CNodePtr& pfrom,
+                                  const std::string& strCommand,
+                                  msg_buffer& vRecv,
+                                  CConnman& connman,
+                                  const Config& config)
 {
     // Each connection can only send one version message
     if(pfrom->nVersion != 0) {
@@ -1928,8 +1955,12 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 /**
 * Process authch message.
 */
-static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
-    const std::string& strCommand, CDataStream& vRecv, CConnman& connman)
+static bool ProcessAuthChMessage(const Config& config,
+                                 const CNodePtr& pfrom,
+                                 const CNetMsgMaker& msgMaker,
+                                 const std::string& strCommand,
+                                 msg_buffer& vRecv,
+                                 CConnman& connman)
 {
     // Skip the message if the AuthConn has already been established.
     if (pfrom->fAuthConnEstablished) {
@@ -2068,8 +2099,10 @@ static bool ProcessAuthChMessage(const Config& config, const CNodePtr& pfrom, co
 /**
 * Process authresp messages.
 */
-static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman)
+static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
+                                   const std::string& strCommand,
+                                   msg_buffer& vRecv,
+                                   CConnman& connman)
 {
     // Skip the message if the AuthConn has already been established.
     if (pfrom->fAuthConnEstablished) {
@@ -2186,8 +2219,10 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom, const std::string& str
 /**
 * Process peer address message.
 */
-static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& interruptMsgProc,
-    CDataStream& vRecv, CConnman& connman)
+static bool ProcessAddrMessage(const CNodePtr& pfrom,
+                               const std::atomic<bool>& interruptMsgProc,
+                               msg_buffer& vRecv,
+                               CConnman& connman)
 {
     std::vector<CAddress> vAddr;
     vRecv >> vAddr;
@@ -2332,7 +2367,7 @@ static void ProcessSendHdrsEnMessage(const CNodePtr& pfrom)
 /**
 * Process send compact message.
 */
-static void ProcessSendCompactMessage(const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessSendCompactMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 {
     bool fAnnounceUsingCMPCTBLOCK = false;
     uint64_t nCMPCTBLOCKVersion = 0;
@@ -2361,7 +2396,7 @@ static void ProcessSendCompactMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 static void ProcessInvMessage(const CNodePtr& pfrom,
                               const CNetMsgMaker& msgMaker,
                               const std::atomic<bool>& interruptMsgProc,
-                              CDataStream& vRecv,
+                              msg_buffer& vRecv,
                               CConnman& connman,
                               const Config &config)
 {
@@ -2433,7 +2468,7 @@ static void ProcessGetDataMessage(const Config& config,
                                   const CNodePtr& pfrom,
                                   const CChainParams& chainparams,
                                   const std::atomic<bool>& interruptMsgProc,
-                                  CDataStream& vRecv,
+                                  msg_buffer& vRecv,
                                   CConnman& connman)
 {
     std::vector<CInv> vInv;
@@ -2521,11 +2556,10 @@ static bool ProcessGetBlocks(
     return true;
 }
 
-static void ProcessGetBlocksMessage(
-    const Config& config,
-    const CNodePtr& pfrom,
-    const CChainParams& chainparams,
-    CDataStream& vRecv)
+static void ProcessGetBlocksMessage(const Config& config,
+                                    const CNodePtr& pfrom,
+                                    const CChainParams& chainparams,
+                                    msg_buffer& vRecv)
 {
     pfrom->mGetBlockMessageRequest = {vRecv};
     if(ProcessGetBlocks(config, pfrom, chainparams, *pfrom->mGetBlockMessageRequest))
@@ -2540,7 +2574,7 @@ static void ProcessGetBlocksMessage(
             " waiting as a candidate. Deferring getblocks reply.\n");
     }
 }
- 
+
 namespace
 {
 
@@ -2685,7 +2719,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
                                       const CNodePtr& pfrom,
                                       const CChainParams& chainparams,
                                       const std::atomic<bool>& interruptMsgProc,
-                                      CDataStream& vRecv,
+                                      msg_buffer& vRecv,
                                       CConnman& connman)
 {
     BlockTransactionsRequest req {};
@@ -2781,7 +2815,7 @@ std::optional<const CBlockIndex*> GetFirstBlockIndexFromLocatorNL(const CBlockLo
 */
 static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
                                      const CNetMsgMaker& msgMaker,
-                                     CDataStream& vRecv,
+                                     msg_buffer& vRecv,
                                      CConnman& connman)
 {
     CBlockLocator locator;
@@ -2943,7 +2977,7 @@ public:
                 // See if this coinbase contains a miner-info reference
                 if(g_dataRefIndex && coinbaseAndProof->txn->vout.size() > 1)
                 {
-                    const bsv::span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
+                    const span<const uint8_t> script { coinbaseAndProof->txn->vout[1].scriptPubKey };
                     if(IsMinerInfo(script))
                     {
                         const auto& mir { ParseMinerInfoRef(script) };
@@ -3003,7 +3037,7 @@ public:
  */
 static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
                                              const CNetMsgMaker& msgMaker,
-                                             CDataStream& vRecv,
+                                             msg_buffer& vRecv,
                                              CConnman& connman,
                                              const Config& config)
 {
@@ -3116,7 +3150,7 @@ static void ProcessTxMessage(const Config& config,
                              const CNodePtr& pfrom,
                              const CNetMsgMaker& msgMaker,
                              const std::string& strCommand,
-                             CDataStream& vRecv,
+                             msg_buffer& vRecv,
                              CConnman& connman)
 {
     // Stop processing the transaction early if we are in blocks only mode and
@@ -3176,9 +3210,12 @@ static void ProcessTxMessage(const Config& config,
 /**
 * Process headers message.
 */
-static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
-    const CNetMsgMaker& msgMaker, const CChainParams& chainparams, CDataStream& vRecv,
-    CConnman& connman)
+static bool ProcessHeadersMessage(const Config& config,
+                                  const CNodePtr& pfrom,
+                                  const CNetMsgMaker& msgMaker,
+                                  const CChainParams& chainparams,
+                                  msg_buffer& vRecv,
+                                  CConnman& connman)
 {
     std::vector<CBlockHeader> headers;
 
@@ -3379,12 +3416,15 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
 
     return true;
 }
- 
+
 /**
 * Process block txn message.
 */
-static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
-    const CNetMsgMaker& msgMaker, CDataStream& vRecv, CConnman& connman)
+static void ProcessBlockTxnMessage(const Config& config,
+                                   const CNodePtr& pfrom,
+                                   const CNetMsgMaker& msgMaker,
+                                   msg_buffer& vRecv,
+                                   CConnman& connman)
 {
     BlockTransactions resp;
     vRecv >> resp;
@@ -3497,9 +3537,15 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
 /**
 * Process compact block message.
 */
-static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfrom,
-    const CNetMsgMaker& msgMaker, const std::string& strCommand, const CChainParams& chainparams,
-    const std::atomic<bool>& interruptMsgProc, int64_t nTimeReceived, CDataStream& vRecv,
+static bool ProcessCompactBlockMessage(
+    const Config& config,
+    const CNodePtr& pfrom,
+    const CNetMsgMaker& msgMaker,
+    const std::string& strCommand,
+    const CChainParams& chainparams,
+    const std::atomic<bool>& interruptMsgProc,
+    int64_t nTimeReceived,
+    msg_buffer& vRecv,
     CConnman& connman)
 {
     CBlockHeaderAndShortTxIDs cmpctblock;
@@ -3558,12 +3604,12 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
     // dummy (empty) BLOCKTXN message, to re-use the logic there in
     // completing processing of the putative block (without cs_main).
     bool fProcessBLOCKTXN = false;
-    CDataStream blockTxnMsg(SER_NETWORK, PROTOCOL_VERSION);
+    msg_buffer blockTxnMsg(SER_NETWORK, PROTOCOL_VERSION);
 
     // If we end up treating this as a plain headers message, call that as
     // well without cs_main.
     bool fRevertToHeaderProcessing = false;
-    CDataStream vHeadersMsg(SER_NETWORK, PROTOCOL_VERSION);
+    msg_buffer vHeadersMsg(SER_NETWORK, PROTOCOL_VERSION);
 
     // Keep a CBlock for "optimistic" compactblock reconstructions (see below)
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -3773,12 +3819,14 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 /**
 * Process block message.
 */
-static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv,
-    CConnman& connman)
+static void ProcessBlockMessage(const Config& config,
+                                const CNodePtr& pfrom,
+                                msg_buffer& vRecv,
+                                CConnman& connman)
 {
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
-
+    
     LogPrint(BCLog::NETMSG, "received block %s peer=%d\n", pblock->GetHash().ToString(), pfrom->id);
 
     // Process all blocks from whitelisted peers, even if not requested,
@@ -3835,7 +3883,7 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
 * Process getaddr message.
 */
 static void ProcessGetAddrMessage(const CNodePtr& pfrom,
-                                  CDataStream& vRecv,
+                                  msg_buffer& vRecv,
                                   CConnman& connman)
 {
     // This asymmetric behavior for inbound and outbound connections was
@@ -3873,7 +3921,7 @@ static void ProcessGetAddrMessage(const CNodePtr& pfrom,
 */
 static void ProcessMempoolMessage(const Config& config,
                                   const CNodePtr& pfrom,
-                                  CDataStream& vRecv,
+                                  msg_buffer& vRecv,
                                   CConnman& connman)
 {
     if (config.GetRejectMempoolRequest() && !pfrom->fWhitelisted) {
@@ -3904,8 +3952,10 @@ static void ProcessMempoolMessage(const Config& config,
 /**
 * Process ping message.
 */
-static void ProcessPingMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
-    CDataStream& vRecv, CConnman& connman)
+static void ProcessPingMessage(const CNodePtr& pfrom,
+                               const CNetMsgMaker& msgMaker,
+                               msg_buffer& vRecv,
+                               CConnman& connman)
 {
     if(pfrom->nVersion > BIP0031_VERSION) {
         uint64_t nonce = 0;
@@ -3931,11 +3981,13 @@ static void ProcessPingMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMak
 /**
 * Process pong message.
 */
-static void ProcessPongMessage(const CNodePtr& pfrom, int64_t nTimeReceived, CDataStream& vRecv)
+static void ProcessPongMessage(const CNodePtr& pfrom,
+                               int64_t nTimeReceived,
+                               msg_buffer& vRecv)
 {
     int64_t pingUsecEnd = nTimeReceived;
     uint64_t nonce = 0;
-    size_t nAvail = vRecv.in_avail();
+    size_t nAvail = vRecv.size();
     bool bPingFinished = false;
     std::string sProblem;
 
@@ -4005,7 +4057,7 @@ static void ProcessPongMessage(const CNodePtr& pfrom, int64_t nTimeReceived, CDa
 /**
 * Process filter load message.
 */
-static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessFilterLoadMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 {
     CBloomFilter filter;
     vRecv >> filter;
@@ -4024,7 +4076,7 @@ static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process filter add message.
 */
-static void ProcessFilterAddMessage(const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessFilterAddMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 {
     std::vector<uint8_t> vData;
     vRecv >> vData;
@@ -4044,7 +4096,7 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process filter clear message.
 */
-static void ProcessFilterClearMessage(const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessFilterClearMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 {
     LOCK(pfrom->cs_filter);
     if(pfrom->GetLocalServices() & NODE_BLOOM) {
@@ -4056,7 +4108,7 @@ static void ProcessFilterClearMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process fee filter message.
 */
-static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessFeeFilterMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 {
     Amount newFeeFilter(0);
     vRecv >> newFeeFilter;
@@ -4074,8 +4126,11 @@ static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process protoconf message.
 */
-static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, CConnman& connman,
-                                    const std::string& strCommand, const Config &config)
+static bool ProcessProtoconfMessage(const CNodePtr& pfrom,
+                                    msg_buffer& vRecv,
+                                    CConnman& connman,
+                                    const std::string& strCommand,
+                                    const Config& config)
 {
     if (pfrom->protoconfReceived) {
         pfrom->fDisconnect = true;
@@ -4209,7 +4264,7 @@ static bool ValidateForkHeight(const DSDetected& msg, const int64_t max_fork_dis
 * Proces revokemid message.
 */
 static void ProcessRevokeMidMessage(const CNodePtr& pfrom,
-                                    CDataStream& vRecv,
+                                    msg_buffer& vRecv,
                                     CConnman& connman,
                                     const CNetMsgMaker& msgMaker)
 {
@@ -4260,7 +4315,7 @@ static void ProcessRevokeMidMessage(const CNodePtr& pfrom,
 */
 static void ProcessDoubleSpendMessage(const Config& config,
                                       const std::shared_ptr<CNode>& pfrom,
-                                      CDataStream& vRecv,
+                                      msg_buffer& vRecv,
                                       CConnman& connman,
                                       const CNetMsgMaker& msgMaker)
 {
@@ -4374,10 +4429,13 @@ static void ProcessDoubleSpendMessage(const Config& config,
 /**
 * Process next message.
 */
-static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
-                           const std::string& strCommand, CDataStream& vRecv,
+static bool ProcessMessage(const Config& config,
+                           const CNodePtr& pfrom,
+                           const std::string& strCommand,
+                           msg_buffer& vRecv,
                            int64_t nTimeReceived,
-                           const CChainParams& chainparams, CConnman& connman,
+                           const CChainParams& chainparams,
+                           CConnman& connman,
                            const std::atomic<bool>& interruptMsgProc)
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
@@ -4737,7 +4795,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         if (interruptMsgProc) {
             return false;
         }
-        if (!pfrom->vRecvGetData.empty()) {
+        if(!pfrom->vRecvGetData.empty()) {
             fMoreWork = true;
         }
     }

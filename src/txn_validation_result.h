@@ -13,9 +13,6 @@
  */
 class CTxnValResult {
   public:
-    CTxnValResult() = default;
-    ~CTxnValResult() = default;
-
     CValidationState mState {};
     TxInputDataSPtr mTxInputData {nullptr};
     std::vector<COutPoint> mCoinsToUncache {};

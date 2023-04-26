@@ -6,6 +6,8 @@
 #include "utiltime.h"
 #include "validation.h"
 
+#include <atomic>
+
 // Sanity test: this should loop ten times, and
 // min/max/average should be close to 100ms.
 static void Sleep100ms(benchmark::State &state) {
@@ -19,9 +21,8 @@ BENCHMARK(Sleep100ms);
 // Extremely fast-running benchmark:
 #include <cmath>
 
-volatile double sum = 0.0; // volatile, global so not optimized away
-
 static void Trig(benchmark::State &state) {
+    std::atomic<double> sum {0.0};  // atomic so not optimised away
     double d = 0.01;
     while (state.KeepRunning()) {
         sum += sin(d);

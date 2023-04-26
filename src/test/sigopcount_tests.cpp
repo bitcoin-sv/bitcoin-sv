@@ -440,19 +440,19 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
     BOOST_CHECK(testConfig.SetMaxTxSigOpsCountPolicy(20500, &error));
     BOOST_CHECK_EQUAL(error,"");
     maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500U);
     
     /* Case 6: Policy is applied with too big value - previous value must not be changed */
     BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(static_cast<int64_t>(MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS) + 1, &error));
     BOOST_CHECK(error.find("Policy value for maximum allowed number of signature operations per transaction must not exceed limit of") != std::string::npos);
     maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500U);
 
     /* Case 7: Policy is applied with negative value - previous value must not be changed */
     BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(-123, &error));
     BOOST_CHECK_EQUAL(error, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0");
     maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

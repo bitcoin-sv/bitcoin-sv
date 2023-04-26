@@ -106,10 +106,10 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_happy_case)
     constexpr auto mmr_pbh_hash_first{txid_first + txid_len + 1};
     constexpr auto hash_len{32};
     constexpr auto sig_first{mmr_pbh_hash_first + hash_len + 1};
-    const block_bind expected_bb{bsv::span{&script[mmr_pbh_hash_first], hash_len},
-                                 bsv::span{&script[sig_first], sig_len}};
+    const block_bind expected_bb{span{&script[mmr_pbh_hash_first], hash_len},
+                                 span{&script[sig_first], sig_len}};
 
-    const miner_info_ref expected_mir{bsv::span{&script[txid_first], txid_len}, expected_bb};
+    const miner_info_ref expected_mir{span{&script[txid_first], txid_len}, expected_bb};
     BOOST_CHECK_EQUAL(expected_mir, get<miner_info_ref>(status));
 }
 

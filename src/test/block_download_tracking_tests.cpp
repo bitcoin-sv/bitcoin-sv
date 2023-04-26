@@ -79,14 +79,14 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     const CNodeStatePtr nodeState3 { GetState(pDummyNode3->id).get() };
     // Check initial node states
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0);
-    BOOST_CHECK_EQUAL(nodeState1->rejects.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0U);
+    BOOST_CHECK_EQUAL(nodeState1->rejects.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 0);
-    BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 0U);
+    BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState3->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 0);
-    BOOST_CHECK_EQUAL(nodeState3->rejects.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 0U);
+    BOOST_CHECK_EQUAL(nodeState3->rejects.size(), 0U);
 
     // Block tracker and tester
     BlockDownloadTracker blockTracker {};
@@ -94,10 +94,10 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
 
     // Initial block tracking state
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 0);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 0U);
     std::vector<BlockDownloadTracker::InFlightBlock> blockDetails { blockTracker.GetBlockDetails(RandomBlockID()) };
-    BOOST_CHECK_EQUAL(blockDetails.size(), 0);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 0U);
     BOOST_CHECK(! blockTracker.IsOnlyBlockInFlight(blockIDs[0]));
 
     // Add tracked block1 from node1
@@ -110,14 +110,14 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(! blockTracker.IsInFlight({blockID, pDummyNode2->id}));
     BOOST_CHECK(blockTracker.IsOnlyBlockInFlight(blockID));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 1);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 1);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 1);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 1U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 1U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 1);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 1U);
     BOOST_CHECK_EQUAL(blockDetails[0].block.GetNode(), pDummyNode1->id);
     BOOST_CHECK_EQUAL(blockDetails[0].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1U);
 
     // Add tracked block2 from node2
     blockID = blockIDs[1];
@@ -126,14 +126,14 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(blockTracker.IsInFlight(blockID));
     BOOST_CHECK(blockTracker.IsInFlight(blockSource));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 2);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 2);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 2U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 1);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 1U);
     BOOST_CHECK_EQUAL(blockDetails[0].block.GetNode(), pDummyNode2->id);
     BOOST_CHECK_EQUAL(blockDetails[0].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 1U);
     BOOST_CHECK(! blockTracker.IsOnlyBlockInFlight(blockID));
 
     // Add tracked block3 from node3
@@ -143,14 +143,14 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(blockTracker.IsInFlight(blockID));
     BOOST_CHECK(blockTracker.IsInFlight(blockSource));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 3);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 3);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 3U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 1);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 1U);
     BOOST_CHECK_EQUAL(blockDetails[0].block.GetNode(), pDummyNode3->id);
     BOOST_CHECK_EQUAL(blockDetails[0].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(nodeState3->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 1U);
 
     // Also track block1 from node2
     blockID = blockIDs[0];
@@ -160,18 +160,18 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(blockTracker.IsInFlight({blockID, pDummyNode1->id}));
     BOOST_CHECK(blockTracker.IsInFlight({blockID, pDummyNode2->id}));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 3);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 4);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 4U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 2);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 2U);
     BOOST_CHECK_EQUAL(blockDetails[0].block.GetNode(), pDummyNode1->id);
     BOOST_CHECK_EQUAL(blockDetails[0].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(blockDetails[1].block.GetNode(), pDummyNode2->id);
     BOOST_CHECK_EQUAL(blockDetails[1].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1U);
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 2);
-    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 2);
+    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 2U);
     BOOST_CHECK(**pit == *(blockDetails[1].queuedBlockIt));
 
     {
@@ -197,18 +197,18 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     pit = nullptr;
     blockTracker.MarkBlockAsInFlight(config, {blockID, pDummyNode1->id}, nodeState1, *pindex, &pit);
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 3);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 4);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 4U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 2);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 2U);
     BOOST_CHECK_EQUAL(blockDetails[0].block.GetNode(), pDummyNode1->id);
     BOOST_CHECK_EQUAL(blockDetails[0].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(blockDetails[1].block.GetNode(), pDummyNode2->id);
     BOOST_CHECK_EQUAL(blockDetails[1].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1U);
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 2);
-    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 2);
+    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 2U);
     BOOST_CHECK(**pit == *(blockDetails[0].queuedBlockIt));
 
     // Mark block1 as received from node2 and valid
@@ -221,17 +221,17 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(blockTracker.IsInFlight({blockID, pDummyNode1->id}));
     BOOST_CHECK(! blockTracker.IsInFlight(blockSource));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 3);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 3);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 3U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 3U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 1);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 1U);
     BOOST_CHECK_EQUAL(blockDetails[0].block.GetNode(), pDummyNode1->id);
     BOOST_CHECK_EQUAL(blockDetails[0].queuedBlockIt->hash, blockID);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 1U);
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 1);
-    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 1);
-    BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 1U);
+    BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0U);
 
     // Mark block2 as received from node2 and valid
     blockID = blockIDs[1];
@@ -241,13 +241,13 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(! blockTracker.IsInFlight(blockID));
     BOOST_CHECK(! blockTracker.IsInFlight(blockSource));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 2);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 2);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 2U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 0);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 0);
-    BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 0U);
+    BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0U);
 
     // Mark block3 as received from node3 and invalid
     blockID = blockIDs[2];
@@ -258,13 +258,13 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(! blockTracker.IsInFlight(blockID));
     BOOST_CHECK(! blockTracker.IsInFlight(blockSource));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 1);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 1);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 1);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 1U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 1U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 0);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState3->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 0);
-    BOOST_CHECK_EQUAL(nodeState3->rejects.size(), 1);
+    BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 0U);
+    BOOST_CHECK_EQUAL(nodeState3->rejects.size(), 1U);
 
     // Mark block1 as failed from node1
     blockID = blockIDs[0];
@@ -273,13 +273,13 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(! blockTracker.IsInFlight(blockID));
     BOOST_CHECK(! blockTracker.IsInFlight(blockSource));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 0);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 0U);
     blockDetails = blockTracker.GetBlockDetails(blockID);
-    BOOST_CHECK_EQUAL(blockDetails.size(), 0);
+    BOOST_CHECK_EQUAL(blockDetails.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0);
-    BOOST_CHECK_EQUAL(nodeState1->rejects.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0U);
+    BOOST_CHECK_EQUAL(nodeState1->rejects.size(), 0U);
 
     // Request block3 & block4 from node1, but now they're too busy
     BOOST_CHECK(nodeState1->CanSend());
@@ -290,17 +290,17 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(blockTracker.IsInFlight(blockIDs[3]));
     BOOST_CHECK(blockTracker.IsInFlight({blockIDs[3], pDummyNode1->id}));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 1);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2U);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 2);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 2);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 2U);
     blockTracker.PeerTooBusy(pDummyNode1->id);
     BOOST_CHECK(! nodeState1->CanSend());
     BOOST_CHECK(! blockTracker.IsInFlight(blockIDs[2]));
     BOOST_CHECK(! blockTracker.IsInFlight(blockIDs[3]));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0U);
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 0);
-    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0);
+    BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0U);
 
     // Request block4 from node2 and node3 and mark as received from both
     blockID = blockIDs[3];
@@ -310,8 +310,8 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(blockTracker.IsInFlight({blockID, pDummyNode2->id}));
     BOOST_CHECK(blockTracker.IsInFlight({blockID, pDummyNode3->id}));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 2);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 1);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 2U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 1U);
     blockTracker.MarkBlockAsReceived({blockID, pDummyNode2->id}, true, nodeState2);
     BOOST_CHECK(tester.CheckBlockSource({blockID, pDummyNode2->id}));
     blockTracker.MarkBlockAsReceived({blockID, pDummyNode3->id}, true, nodeState3);
@@ -323,8 +323,8 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     BOOST_CHECK(! blockTracker.IsInFlight({blockID, pDummyNode2->id}));
     BOOST_CHECK(! blockTracker.IsInFlight({blockID, pDummyNode3->id}));
     BOOST_CHECK_EQUAL(tester.GetPeersWithValidatedDownloadsCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0);
-    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 0);
+    BOOST_CHECK_EQUAL(tester.GetTrackedBlockCount(), 0U);
+    BOOST_CHECK_EQUAL(tester.GetUniqueBlockCount(), 0U);
 
     // Tidy up nodes (and check asserts)
     {

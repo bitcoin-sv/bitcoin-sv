@@ -133,7 +133,7 @@ namespace
         doc = accumulate(first,
                          last,
                          doc,
-                         [&first_pass](auto& doc, const auto& x) {
+                         [&first_pass](auto&& doc, const auto& x) {
                              const auto& [name, type, value] = x;
                              if(first_pass)
                                  first_pass = false;
@@ -1064,7 +1064,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_with_datarefs_happy_case)
     const auto& mi_doc = get<miner_info_doc>(var_mi_doc);
 
     const auto& data_refs = mi_doc.data_refs();
-    BOOST_CHECK_EQUAL(1, data_refs.size());
+    BOOST_CHECK_EQUAL(1U, data_refs.size());
 
     const vector<string> expected_brfcids{"brfcid_1", "brfcid_2"};
     const vector<data_ref> expected{

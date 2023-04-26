@@ -646,11 +646,21 @@ namespace
     {
         test_validator()
         {
-            RegisterValidationInterface(this);
+            RegisterValidationInterface();
         }
         ~test_validator()
         {
-            UnregisterValidationInterface(this);
+            UnregisterValidationInterface();
+        }
+
+        void RegisterValidationInterface() override
+        {
+            using namespace boost::placeholders;
+            slotConnection = GetMainSignals().TransactionRemovedFromMempool.connect(boost::bind(&test_validator::TransactionRemovedFromMempool, this, _1, _2, _3));
+        }
+        void UnregisterValidationInterface() override
+        {
+            slotConnection.disconnect();
         }
 
         void TransactionRemovedFromMempool(
@@ -666,6 +676,7 @@ namespace
                                        std::optional<CTransactionConflictData>>;
         using notifications_type = std::vector<value_type>;
         notifications_type notifications_;
+        boost::signals2::scoped_connection slotConnection {};
     };
 }
 
@@ -716,7 +727,7 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
                            block_hash,
                            vtx,
                            GlobalConfig::GetConfig());
-    BOOST_CHECK_EQUAL(0, mempool.Size());
+    BOOST_CHECK_EQUAL(0U, mempool.Size());
 
     test_validator::notifications_type
         expected{{child_txid,

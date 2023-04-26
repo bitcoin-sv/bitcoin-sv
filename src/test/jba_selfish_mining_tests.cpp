@@ -229,32 +229,32 @@ BOOST_FIXTURE_TEST_CASE(NoSelfishNoThrottling, SetupJBAChain)
     BOOST_REQUIRE(jba);
 
     // Initial block creation; nothing in the mempool or the journal
-    BOOST_CHECK_EQUAL(mempool.Size(), 0);
+    BOOST_CHECK_EQUAL(mempool.Size(), 0U);
     BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(coinbaseScriptPubKey, pindexPrev));
     BlockAssembler::BlockStats blockStats { jba->getLastBlockStats() };
-    BOOST_CHECK_EQUAL(blockStats.txCount, 0);
+    BOOST_CHECK_EQUAL(blockStats.txCount, 0U);
     BOOST_CHECK(! JBAAccess::GetEnteredThrottling(*jba));
 
     // Add a single standalone txn
     BOOST_CHECK(AddSingleTransaction());
     BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(coinbaseScriptPubKey, pindexPrev));
     blockStats = jba->getLastBlockStats();
-    BOOST_CHECK_EQUAL(blockStats.txCount, 1);
+    BOOST_CHECK_EQUAL(blockStats.txCount, 1U);
     BOOST_CHECK(! JBAAccess::GetEnteredThrottling(*jba));
 
     // Add a small CPFP group
     BOOST_CHECK(AddCPFPTransactions(3));
     BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(coinbaseScriptPubKey, pindexPrev));
     blockStats = jba->getLastBlockStats();
-    BOOST_CHECK_EQUAL(blockStats.txCount, 4);
+    BOOST_CHECK_EQUAL(blockStats.txCount, 4U);
     BOOST_CHECK(! JBAAccess::GetEnteredThrottling(*jba));
 
     // Accept the block and check JBA isn't throttling for new block
     CreateAndProcessBlock(jba);
-    BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockTxCount(), 5);
+    BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockTxCount(), 5U);
     BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(coinbaseScriptPubKey, pindexPrev));
     blockStats = jba->getLastBlockStats();
-    BOOST_CHECK_EQUAL(blockStats.txCount, 0);
+    BOOST_CHECK_EQUAL(blockStats.txCount, 0U);
     BOOST_CHECK(! JBAAccess::GetEnteredThrottling(*jba));
 }
 
@@ -326,7 +326,7 @@ BOOST_FIXTURE_TEST_CASE(NoSelfishJustThrottling, SetupJBAChain)
     BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockTxCount(), INITIAL_TXN_BATCH_SIZE + 2 + COINBASE_TXN);
     BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(coinbaseScriptPubKey, pindexPrev));
     blockStats = jba->getLastBlockStats();
-    BOOST_CHECK_EQUAL(blockStats.txCount, 1);
+    BOOST_CHECK_EQUAL(blockStats.txCount, 1U);
     BOOST_CHECK(! JBAAccess::GetEnteredThrottling(*jba));
 
 
@@ -458,9 +458,9 @@ BOOST_FIXTURE_TEST_CASE(SelfishAndThrottling, SetupJBAChain)
     unsigned int NON_SELFISH_CPFP_GROUP_SIZE {2};
     BOOST_CHECK(AddCPFPTransactions(NON_SELFISH_CPFP_GROUP_SIZE, nullptr, nonSelfishCPFPTxns));
 
-    BOOST_CHECK_EQUAL(selfishSingleTxns.size(), 9);
-    BOOST_CHECK_EQUAL(selfishCPFPTxns.size(), 6);
-    BOOST_CHECK_EQUAL(nonSelfishCPFPTxns.size(), 2);
+    BOOST_CHECK_EQUAL(selfishSingleTxns.size(), 9U);
+    BOOST_CHECK_EQUAL(selfishCPFPTxns.size(), 6U);
+    BOOST_CHECK_EQUAL(nonSelfishCPFPTxns.size(), 2U);
 
 
     // JBA will take 7 txns then enter throttling
@@ -613,7 +613,7 @@ BOOST_FIXTURE_TEST_CASE(SelfishAndThrottling, SetupJBAChain)
                                                             SELFISH_CPFP_GROUP_SIZE + 1 + COINBASE_TXN);
     BOOST_CHECK(pblocktemplate = jba->CreateNewBlock(coinbaseScriptPubKey, pindexPrev));
     blockStats = jba->getLastBlockStats();
-    BOOST_CHECK_EQUAL(blockStats.txCount, 0);
+    BOOST_CHECK_EQUAL(blockStats.txCount, 0U);
     BOOST_CHECK(! JBAAccess::GetEnteredThrottling(*jba));
 }
 

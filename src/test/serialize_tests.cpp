@@ -62,7 +62,7 @@ public:
         READWRITE(txval);
     }
 
-    bool operator==(const CSerializeMethodsTestSingle &rhs) {
+    bool operator==(const CSerializeMethodsTestSingle &rhs) const {
         return intval == rhs.intval && boolval == rhs.boolval &&
                stringval == rhs.stringval &&
                strcmp(charstrval, rhs.charstrval) == 0 && *txval == *rhs.txval;
@@ -96,18 +96,18 @@ BOOST_AUTO_TEST_CASE(sizes) {
     BOOST_CHECK_EQUAL(sizeof(char), GetSerializeSize(bool(0), 0));
 
     // Sanity-check GetSerializeSize and c++ type matching
-    BOOST_CHECK_EQUAL(GetSerializeSize(char(0), 0), 1);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int8_t(0), 0), 1);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint8_t(0), 0), 1);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int16_t(0), 0), 2);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint16_t(0), 0), 2);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int32_t(0), 0), 4);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint32_t(0), 0), 4);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int64_t(0), 0), 8);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint64_t(0), 0), 8);
-    BOOST_CHECK_EQUAL(GetSerializeSize(float(0), 0), 4);
-    BOOST_CHECK_EQUAL(GetSerializeSize(double(0), 0), 8);
-    BOOST_CHECK_EQUAL(GetSerializeSize(bool(0), 0), 1);
+    BOOST_CHECK_EQUAL(GetSerializeSize(char(0), 0), 1U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int8_t(0), 0), 1U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint8_t(0), 0), 1U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int16_t(0), 0), 2U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint16_t(0), 0), 2U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int32_t(0), 0), 4U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint32_t(0), 0), 4U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int64_t(0), 0), 8U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint64_t(0), 0), 8U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(float(0), 0), 4U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(double(0), 0), 8U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(bool(0), 0), 1U);
 }
 
 BOOST_AUTO_TEST_CASE(floats_conversion) {
@@ -120,12 +120,12 @@ BOOST_AUTO_TEST_CASE(floats_conversion) {
     BOOST_CHECK_EQUAL(ser_uint32_to_float(0x40800000), 4.0F);
     BOOST_CHECK_EQUAL(ser_uint32_to_float(0x44444444), 785.066650390625F);
 
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.0F), 0x00000000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.5F), 0x3f000000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(1.0F), 0x3f800000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(2.0F), 0x40000000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(4.0F), 0x40800000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(785.066650390625F), 0x44444444);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.0F), 0x00000000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.5F), 0x3f000000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(1.0F), 0x3f800000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(2.0F), 0x40000000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(4.0F), 0x40800000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(785.066650390625F), 0x44444444U);
 }
 
 BOOST_AUTO_TEST_CASE(doubles_conversion) {
@@ -393,39 +393,39 @@ BOOST_AUTO_TEST_CASE(noncanonical) {
 BOOST_AUTO_TEST_CASE(insert_delete) {
     // Test inserting/deleting bytes.
     CDataStream ss(SER_DISK, 0);
-    BOOST_CHECK_EQUAL(ss.size(), 0);
+    BOOST_CHECK_EQUAL(ss.size(), 0U);
 
     ss.write("\x00\x01\x02\xff", 4);
-    BOOST_CHECK_EQUAL(ss.size(), 4);
+    BOOST_CHECK_EQUAL(ss.size(), 4U);
 
     char c = (char)11;
 
     // Inserting at beginning/end/middle:
     ss.insert(ss.begin(), c);
-    BOOST_CHECK_EQUAL(ss.size(), 5);
+    BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[0], c);
     BOOST_CHECK_EQUAL(ss[1], 0);
 
     ss.insert(ss.end(), c);
-    BOOST_CHECK_EQUAL(ss.size(), 6);
+    BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
     BOOST_CHECK_EQUAL(ss[5], c);
 
     ss.insert(ss.begin() + 2, c);
-    BOOST_CHECK_EQUAL(ss.size(), 7);
+    BOOST_CHECK_EQUAL(ss.size(), 7U);
     BOOST_CHECK_EQUAL(ss[2], c);
 
     // Delete at beginning/end/middle
     ss.erase(ss.begin());
-    BOOST_CHECK_EQUAL(ss.size(), 6);
+    BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[0], 0);
 
     ss.erase(ss.begin() + ss.size() - 1);
-    BOOST_CHECK_EQUAL(ss.size(), 5);
+    BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
 
     ss.erase(ss.begin() + 1);
-    BOOST_CHECK_EQUAL(ss.size(), 4);
+    BOOST_CHECK_EQUAL(ss.size(), 4U);
     BOOST_CHECK_EQUAL(ss[0], 0);
     BOOST_CHECK_EQUAL(ss[1], 1);
     BOOST_CHECK_EQUAL(ss[2], 2);
@@ -434,7 +434,7 @@ BOOST_AUTO_TEST_CASE(insert_delete) {
     // Make sure GetAndClear does the right thing:
     CSerializeData d;
     ss.GetAndClear(d);
-    BOOST_CHECK_EQUAL(ss.size(), 0);
+    BOOST_CHECK_EQUAL(ss.size(), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(class_methods) {
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE(map_set_serialise) {
 
         // Serialise
         CDataStream ss(SER_DISK, 0);
-        BOOST_CHECK_EQUAL(ss.size(), 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
         ss << testMap;
 
         // Deserialise
@@ -495,7 +495,7 @@ BOOST_AUTO_TEST_CASE(map_set_serialise) {
 
         // Serialise
         CDataStream ss(SER_DISK, 0);
-        BOOST_CHECK_EQUAL(ss.size(), 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
         ss << testMap;
 
         // Deserialise
@@ -510,7 +510,7 @@ BOOST_AUTO_TEST_CASE(map_set_serialise) {
 
         // Serialise
         CDataStream ss(SER_DISK, 0);
-        BOOST_CHECK_EQUAL(ss.size(), 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
         ss << testSet;
 
         // Deserialise
@@ -525,7 +525,7 @@ BOOST_AUTO_TEST_CASE(map_set_serialise) {
 
         // Serialise
         CDataStream ss(SER_DISK, 0);
-        BOOST_CHECK_EQUAL(ss.size(), 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
         ss << testSet;
 
         // Deserialise
@@ -541,7 +541,7 @@ BOOST_AUTO_TEST_CASE(optional_serialise) {
 
         // Serialise
         CDataStream ss(SER_DISK, 0);
-        BOOST_CHECK_EQUAL(ss.size(), 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
         ss << testOpt;
 
         // Deserialise
@@ -555,7 +555,7 @@ BOOST_AUTO_TEST_CASE(optional_serialise) {
 
         // Serialise
         CDataStream ss(SER_DISK, 0);
-        BOOST_CHECK_EQUAL(ss.size(), 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
         ss << testOpt;
 
         // Deserialise
@@ -572,82 +572,82 @@ BOOST_AUTO_TEST_SUITE(ser_size_tests)
 
 BOOST_AUTO_TEST_CASE(no_args_ser_size)
 {
-    BOOST_CHECK_EQUAL(0, ser_size());
+    BOOST_CHECK_EQUAL(0U, ser_size());
 }
 
 BOOST_AUTO_TEST_CASE(txin_ser_size)
 {
-    BOOST_CHECK_EQUAL(41, ser_size(CTxIn{}));
+    BOOST_CHECK_EQUAL(41U, ser_size(CTxIn{}));
 
     const CTxIn cin;
-    BOOST_CHECK_EQUAL(41, ser_size(cin));
+    BOOST_CHECK_EQUAL(41U, ser_size(cin));
     
     CTxIn in;
-    BOOST_CHECK_EQUAL(41, ser_size(in));
+    BOOST_CHECK_EQUAL(41U, ser_size(in));
 
     const std::vector<uint8_t> v(0xfd);
     CScript s{v.cbegin(), v.cend()};
     in.scriptSig = s;
-    BOOST_CHECK_EQUAL(296, ser_size(in));
+    BOOST_CHECK_EQUAL(296U, ser_size(in));
 }
 
 BOOST_AUTO_TEST_CASE(txout_ser_size)
 {
-    BOOST_CHECK_EQUAL(9, ser_size(CTxOut{}));
+    BOOST_CHECK_EQUAL(9U, ser_size(CTxOut{}));
 
     const CTxOut cout;
-    BOOST_CHECK_EQUAL(9, ser_size(cout));
+    BOOST_CHECK_EQUAL(9U, ser_size(cout));
 
     CTxOut out;
-    BOOST_CHECK_EQUAL(9, ser_size(out));
+    BOOST_CHECK_EQUAL(9U, ser_size(out));
     
     const std::vector<uint8_t> v(0xfd);
     CScript s{v.cbegin(), v.cend()};
     out.scriptPubKey = s;
-    BOOST_CHECK_EQUAL(264, ser_size(out));
+    BOOST_CHECK_EQUAL(264U, ser_size(out));
 }
 
 BOOST_AUTO_TEST_CASE(tx_ser_size)
 {
-    BOOST_CHECK_EQUAL(10, ser_size(CTransaction{}));
+    BOOST_CHECK_EQUAL(10U, ser_size(CTransaction{}));
 
     const CTransaction ctx;
-    BOOST_CHECK_EQUAL(10, ser_size(ctx));
+    BOOST_CHECK_EQUAL(10U, ser_size(ctx));
 
     CTransaction tx0;
-    BOOST_CHECK_EQUAL(10, ser_size(tx0));
+    BOOST_CHECK_EQUAL(10U, ser_size(tx0));
     
     CMutableTransaction mtx1;
     mtx1.vin.resize(1);
     mtx1.vout.resize(1);
     CTransaction tx1{mtx1};
-    BOOST_CHECK_EQUAL(60, ser_size(tx1));
+    BOOST_CHECK_EQUAL(60U, ser_size(tx1));
    
     CMutableTransaction mtx2;
     mtx2.vin.resize(0xfd);
     mtx2.vout.resize(0xfd);
     CTransaction tx2{mtx2};
-    BOOST_CHECK_EQUAL(12'664, ser_size(tx2));
+    BOOST_CHECK_EQUAL(12'664U, ser_size(tx2));
 }
 
 BOOST_AUTO_TEST_CASE(btx_ser_size)
 {
-    BOOST_CHECK_EQUAL(33, ser_size(BlockTransactions{}));
+    BOOST_CHECK_EQUAL(33U, ser_size(BlockTransactions{}));
 
     const BlockTransactions cbtxs;
-    BOOST_CHECK_EQUAL(33, ser_size(cbtxs));
+    BOOST_CHECK_EQUAL(33U, ser_size(cbtxs));
 
     BlockTransactions btxs0;
-    BOOST_CHECK_EQUAL(33, ser_size(btxs0));
+    BOOST_CHECK_EQUAL(33U, ser_size(btxs0));
 
     BlockTransactions btxs1;
     btxs1.txn.push_back(std::make_shared<const CTransaction>());
-    BOOST_CHECK_EQUAL(43, ser_size(btxs1));
+    BOOST_CHECK_EQUAL(43U, ser_size(btxs1));
 
     BlockTransactions btxs2;
     for(int i{}; i<0xfd; ++i)
         btxs2.txn.push_back(std::make_shared<const CTransaction>());
-    BOOST_CHECK_EQUAL(2'565, ser_size(btxs2));
+    BOOST_CHECK_EQUAL(2'565U, ser_size(btxs2));
 }
 
 BOOST_AUTO_TEST_CASE(cinv_ser_size)

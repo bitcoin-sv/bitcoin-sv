@@ -98,8 +98,8 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     // This is a pay-to-script-hash scriptPubKey;
     // get the last item that the scriptSig
     // pushes onto the stack:
-    bsv::span<const uint8_t> data;
-    const bool valid_script = all_of(scriptSig.begin_instructions(), scriptSig.end_instructions(),
+    span<const uint8_t> data;
+    const bool valid_script = std::all_of(scriptSig.begin_instructions(), scriptSig.end_instructions(),
             [&data](const auto& inst)
             {
                 if((inst.opcode() > OP_16) || (inst.opcode() == OP_INVALIDOPCODE))  
@@ -118,26 +118,26 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     }
     else
     {
-        /// ... and return its opcount:
-        CScript subscript(data.begin(), data.end());
+        // ... and return its opcount:
+        CScript subscript(data.data(), data.data() + data.size());
         return subscript.GetSigOpCount(true, isGenesisEnabled, sigOpCountError);
     }
 }
 
-bool IsP2SH(const bsv::span<const uint8_t> script) {
+bool IsP2SH(const span<const uint8_t> script) {
     // Extra-fast test for pay-to-script-hash CScripts:
     return script.size() == 23 && script[0] == OP_HASH160 &&
            script[1] == 0x14 && script[22] == OP_EQUAL;
 }
 
 // Quick test for double-spend enabled OP_RETURN script
-bool IsDSNotification(bsv::span<const uint8_t> script) {
+bool IsDSNotification(span<const uint8_t> script) {
     // OP_FALSE OP_RETURN OP_PUSHDATA 0x64736e74 OP_PUSHDATA Callback Msg
     return script.size() >= 11 && script[0] == OP_FALSE && script[1] == OP_RETURN && script[2] == 0x04 &&
        script[3] == 0x64 && script[4] == 0x73 && script[5] == 0x6e && script[6] == 0x74;
 }
 
-bool IsDustReturnScript(const bsv::span<const uint8_t> script)
+bool IsDustReturnScript(const span<const uint8_t> script)
 {
     // OP_FALSE, OP_RETURN, OP_PUSHDATA, 'dust'
     static constexpr std::array<uint8_t, 7> dust_return = {0x00,0x6a,0x04,0x64,0x75,0x73,0x74};
@@ -154,7 +154,7 @@ bool IsDustReturnScript(const bsv::span<const uint8_t> script)
  * data consistent with the chosen PUSHDATA). This should be done on the
  * call-site.
  */
-bool IsMinerId(const bsv::span<const uint8_t> script)
+bool IsMinerId(const span<const uint8_t> script)
 {
     constexpr std::array<uint8_t, 4> protocol_id{0xac, 0x1e, 0xed, 0x88};
     return script.size() >= 8 && 
@@ -203,13 +203,13 @@ CScript &CScript::operator<<(const CScriptNum &b) {
 
 bsv::instruction_iterator CScript::begin_instructions() const
 {
-    return bsv::instruction_iterator{bsv::span<const uint8_t>{data(), size()}};
+    return bsv::instruction_iterator{span<const uint8_t>{data(), size()}};
 }
 
 bsv::instruction_iterator CScript::end_instructions() const
 {
     return bsv::instruction_iterator{
-        bsv::span<const uint8_t>{data() + size(), 0}};
+        span<const uint8_t>{data() + size(), 0}};
 }
 
 std::ostream& operator<<(std::ostream& os, const CScript& script)
@@ -231,7 +231,7 @@ std::string to_string(const CScript& s)
     return oss.str();
 }
 
-size_t CountOp(const bsv::span<const uint8_t> s, const opcodetype opcode)
+size_t CountOp(const span<const uint8_t> s, const opcodetype opcode)
 {
     using namespace bsv;
     instruction_iterator first{s};

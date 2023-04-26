@@ -6,6 +6,7 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <cstdint>
 #include <vector>
 
 using namespace std;
@@ -97,10 +98,10 @@ BOOST_AUTO_TEST_CASE(decode_instruction_tests)
     {
         const CScript script(begin(ip), end(ip));
         const auto [status, opcode, offset, len] = decode_instruction(
-            span<const uint8_t>{script.data(), script.size()});
+            std::span<const uint8_t>{script.data(), script.size()});
         BOOST_CHECK_EQUAL(exp_status, status);
         BOOST_CHECK_EQUAL(exp_opcode, opcode);
-        BOOST_CHECK_EQUAL(exp_offset, offset);
+        BOOST_CHECK_EQUAL(exp_offset, static_cast<unsigned char>(offset));
         BOOST_CHECK_EQUAL(exp_len, len);
     }
 }
@@ -130,12 +131,12 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
                                     {OP_DUP, 0, ip.data() + 22, 0}
                                 };
 
-    instruction_iterator it_begin{span{ip.data(), ip.size()}};
-    instruction_iterator it_end{span{ip.data() + ip.size(), 0}};
+    instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
+    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}};
 
     // check op++
     auto n = std::distance(it_begin, it_end);
-    BOOST_CHECK_EQUAL(expected.size(), n);
+    BOOST_CHECK_EQUAL(expected.size(), static_cast<unsigned>(n));
 
     for(size_t i{0}; i < expected.size(); ++i, ++it_begin)
     {
@@ -157,8 +158,8 @@ BOOST_AUTO_TEST_CASE(too_short_single_instruction)
                             OP_PUSHDATA4, 1, 0, 0, 0, //42, <- not enough data
                          };
 
-    instruction_iterator it_begin{span{ip.data(), ip.size()}};
-    instruction_iterator it_end{span{ip.data() + ip.size(), 0}};
+    instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
+    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}};
 
     // check op++
     auto n = std::distance(it_begin, it_end);
@@ -179,12 +180,12 @@ BOOST_AUTO_TEST_CASE(too_short_two_instructions)
                                     {OP_INVALIDOPCODE, 0, ip.data() + 7, 0},
                                 };
 
-    instruction_iterator it_begin{span{ip.data(), ip.size()}};
-    instruction_iterator it_end{span{ip.data() + ip.size(), 0}};
+    instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
+    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}};
 
     // check op++
     auto n = std::distance(it_begin, it_end);
-    BOOST_CHECK_EQUAL(expected.size(), n);
+    BOOST_CHECK_EQUAL(expected.size(), static_cast<unsigned>(n));
 
     for(size_t i{0}; i < expected.size(); ++i, ++it_begin)
     {

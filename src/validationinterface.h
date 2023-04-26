@@ -26,14 +26,15 @@ class uint256;
 
 // These functions dispatch to one or all registered wallets
 
-/** Register a wallet to receive updates from core */
-void RegisterValidationInterface(CValidationInterface *pwalletIn);
-/** Unregister a wallet from core */
-void UnregisterValidationInterface(CValidationInterface *pwalletIn);
 /** Unregister all wallets from core */
 void UnregisterAllValidationInterfaces();
 
 class CValidationInterface {
+public:
+    // Register / unregister this wallet
+    virtual void RegisterValidationInterface() = 0;
+    virtual void UnregisterValidationInterface() = 0;
+
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindexNew,
                                  const CBlockIndex *pindexFork,
@@ -58,8 +59,6 @@ protected:
     // This function is called only when there is an active ZMQ subscription of invalid transacion ("-zmqpubinvalidtx")
     virtual void InvalidTxMessageZMQ(std::string_view message) {};
 
-    friend void ::RegisterValidationInterface(CValidationInterface *);
-    friend void ::UnregisterValidationInterface(CValidationInterface *);
     friend void ::UnregisterAllValidationInterfaces();
 };
 

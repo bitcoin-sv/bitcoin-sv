@@ -10,7 +10,7 @@
 BOOST_AUTO_TEST_SUITE(mining_candidates)
 
 BOOST_AUTO_TEST_CASE(add_remove_candidates) {
-    constexpr int NUM_CANDIDATES = 250;
+    constexpr unsigned NUM_CANDIDATES = 250;
     std::set<MiningCandidateId> idsSet;
 
     // Make dummy coinbase and block
@@ -22,8 +22,8 @@ BOOST_AUTO_TEST_CASE(add_remove_candidates) {
     CMiningCandidateManager manager;
     MiningCandidateId first;
     MiningCandidateId fiftythird;
-    BOOST_CHECK_EQUAL(0, manager.Size());
-    for(int i = 0; i < NUM_CANDIDATES; i++) {
+    BOOST_CHECK_EQUAL(0U, manager.Size());
+    for(unsigned i = 0; i < NUM_CANDIDATES; i++) {
         CMiningCandidateRef ref = manager.Create(block);
         BOOST_CHECK(ref != nullptr);
         if (ref != nullptr) {

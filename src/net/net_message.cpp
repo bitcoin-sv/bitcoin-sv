@@ -22,6 +22,9 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
                 {
                     throw BanPeer { "Oversized header detected" };
                 }
+
+                dataBuff.command(hdr.GetCommand());
+                dataBuff.payload_len(hdr.GetPayloadLength());
             }
 
             return numRead;
@@ -44,6 +47,11 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
     }
 
     return nCopy;
+}
+
+uint64_t CNetMessage::Read(const Config& config, const uint8_t* p, uint64_t nBytes)
+{
+    return Read(config, reinterpret_cast<const char*>(p), nBytes);
 }
 
 const uint256& CNetMessage::GetMessageHash() const

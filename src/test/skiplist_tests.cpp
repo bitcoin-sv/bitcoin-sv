@@ -151,12 +151,12 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         // Entries 1 through 11 (inclusive) go back one step each.
         for (unsigned int i = 1; i < 12 && i < locator.vHave.size() - 1; i++) {
             BOOST_CHECK_EQUAL(blockIndexStore.Get( locator.vHave[i] )->GetHeight(),
-                              tip->GetHeight() - i);
+                              tip->GetHeight() - static_cast<int32_t>(i));
         }
 
         // The further ones (excluding the last one) go back with exponential
         // steps.
-        unsigned int dist = 2;
+        int32_t dist = 2;
         for (unsigned int i = 12; i < locator.vHave.size() - 1; i++) {
             BOOST_CHECK_EQUAL(blockIndexStore.Get( locator.vHave[i - 1] )->GetHeight() -
                               blockIndexStore.Get( locator.vHave[i] )->GetHeight(),

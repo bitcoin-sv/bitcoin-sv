@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     CoinWithScript c1 = DataStreamToCoinWithScript(ss1);
     BOOST_CHECK_EQUAL(c1.IsCoinBase(), false);
     BOOST_CHECK_EQUAL(c1.IsConfiscation(), false);
-    BOOST_CHECK_EQUAL(c1.GetHeight(), 203998U);
+    BOOST_CHECK_EQUAL(c1.GetHeight(), 203998);
     BOOST_CHECK_EQUAL(c1.GetTxOut().nValue, Amount(60000000000LL));
     BOOST_CHECK_EQUAL(HexStr(c1.GetTxOut().scriptPubKey),
                       HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex(
@@ -191,7 +191,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     CoinWithScript c1a = DataStreamToCoinWithScript(ss1a);
     BOOST_CHECK_EQUAL(c1a.IsCoinBase(), false);
     BOOST_CHECK_EQUAL(c1a.IsConfiscation(), true);
-    BOOST_CHECK_EQUAL(c1a.GetHeight(), 203998U);
+    BOOST_CHECK_EQUAL(c1a.GetHeight(), 203998);
     BOOST_CHECK_EQUAL(c1a.GetTxOut().nValue, Amount(60000000000LL));
     BOOST_CHECK_EQUAL(HexStr(c1a.GetTxOut().scriptPubKey),
                       HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex(
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     BOOST_CHECK_EQUAL(c3.IsConfiscation(), false);
     BOOST_CHECK_EQUAL(c3.GetHeight(), 0);
     BOOST_CHECK_EQUAL(c3.GetTxOut().nValue, Amount(0));
-    BOOST_CHECK_EQUAL(c3.GetTxOut().scriptPubKey.size(), 0);
+    BOOST_CHECK_EQUAL(c3.GetTxOut().scriptPubKey.size(), 0U);
 
     // Smallest possible example - confiscation
     CDataStream ss3a(ParseHex("8efefeff000006"), SER_DISK, CLIENT_VERSION);
@@ -226,7 +226,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     BOOST_CHECK_EQUAL(c3a.IsConfiscation(), true);
     BOOST_CHECK_EQUAL(c3a.GetHeight(), 0);
     BOOST_CHECK_EQUAL(c3a.GetTxOut().nValue, Amount(0));
-    BOOST_CHECK_EQUAL(c3a.GetTxOut().scriptPubKey.size(), 0);
+    BOOST_CHECK_EQUAL(c3a.GetTxOut().scriptPubKey.size(), 0U);
 
     // Upper limit example - coinbase+confiscation, max height, all bits above bit32 set and ignored
     CDataStream ss3b(ParseHex("80fefefefefefefefe7f0006"), SER_DISK, CLIENT_VERSION);
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     BOOST_CHECK_EQUAL(c3b.IsConfiscation(), true);
     BOOST_CHECK_EQUAL(c3b.GetHeight(), 0x7fffffff);
     BOOST_CHECK_EQUAL(c3b.GetTxOut().nValue, Amount(0));
-    BOOST_CHECK_EQUAL(c3b.GetTxOut().scriptPubKey.size(), 0);
+    BOOST_CHECK_EQUAL(c3b.GetTxOut().scriptPubKey.size(), 0U);
 
     // VARINT storing height+flags does not fit in uint64
     try {
@@ -793,8 +793,8 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         BOOST_TEST(c0.has_value());
         BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
         BOOST_TEST(!c0->IsConfiscation());
-        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
     }
 
@@ -805,8 +805,8 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         BOOST_TEST(c2.has_value());
         BOOST_TEST(c2->GetAmount() == Amount(123)); // check that we got the correct output
         BOOST_TEST(c2->IsConfiscation());
-        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
     }
 
@@ -841,8 +841,8 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         BOOST_TEST(c1.has_value());
         BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
         BOOST_TEST(!c1->IsConfiscation());
-        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
     }
 
@@ -853,8 +853,8 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         BOOST_TEST(c3.has_value());
         BOOST_TEST(c3->GetAmount() == Amount(456)); // check that we got the correct output
         BOOST_TEST(c3->IsConfiscation());
-        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
         BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
     }
 }
@@ -1011,7 +1011,7 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
 
     // Dynamic memory usage of the scripts
     std::uint32_t script_memory_usage = memusage::DynamicUsage(script_template);
-    BOOST_TEST(script_memory_usage != 0);
+    BOOST_TEST(script_memory_usage != 0U);
 
     std::uint32_t coins_count = 5;
 
@@ -1183,7 +1183,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
     // Dynamic memory usage of the scripts
     std::uint32_t script_memory_usage = memusage::DynamicUsage(script_template);
-    BOOST_TEST(script_memory_usage != 0);
+    BOOST_TEST(script_memory_usage != 0U);
 
     std::uint32_t coins_count = 5;
 
@@ -1428,12 +1428,12 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
             span.AddCoin(COutPoint{txId, 0}, CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
         }
 
-        BOOST_REQUIRE_EQUAL(span.GetShards().size(), 1);
+        BOOST_REQUIRE_EQUAL(span.GetShards().size(), 1U);
         BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), txIds.size());
 
         // And flush them to provider
         BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
-        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0);
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0U);
     }
 
     // Flush sample UTXOs to DB
@@ -1478,12 +1478,12 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
             return true;
         };
 
-        BOOST_CHECK_EQUAL(span.GetShards().size(), 1);
-        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0);
+        BOOST_CHECK_EQUAL(span.GetShards().size(), 1U);
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0U);
 
         auto results = span.RunSharded(NumThreads, shardedTarget, std::cref(txIds), std::ref(newTxIds));
 
-        BOOST_CHECK_EQUAL(span.GetShards().size(), 1);
+        BOOST_CHECK_EQUAL(span.GetShards().size(), 1U);
         BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), newTxIds.size() * 3);  // The original coin and the 2 new created coins
 
         for(const auto& txId : newTxIds)
@@ -1494,7 +1494,7 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
 
         // And flush to provider
         BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
-        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0);
+        BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0U);
     }
 
     // Flush sample UTXOs to DB

@@ -242,7 +242,7 @@ BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend) {
     BOOST_CHECK(chainActive.Tip()->GetBlockHash() == block.GetHash());
     // spends[1] should have been removed from the mempool when the block with
     // spends[0] is accepted:
-    BOOST_CHECK_EQUAL(mempool.Size(), 0);
+    BOOST_CHECK_EQUAL(mempool.Size(), 0U);
 }
 
 
@@ -359,7 +359,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                     frozenTXOCheckTransaction,
                     &scriptchecks).value());
 
-            BOOST_CHECK_EQUAL(scriptchecks.size(), 1);
+            BOOST_CHECK_EQUAL(scriptchecks.size(), 1U);
 
             // Test that CheckInputs returns true iff cleanstack-enforcing flags are
             // not present. Don't add these checks to the cache, so that we can test
@@ -592,7 +592,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 &scriptchecks).value());
         // Should get 2 script checks back -- caching is on a whole-transaction
         // basis.
-        BOOST_CHECK_EQUAL(scriptchecks.size(), 2);
+        BOOST_CHECK_EQUAL(scriptchecks.size(), 2U);
     }
 }
 

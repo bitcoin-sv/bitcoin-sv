@@ -268,26 +268,26 @@ BOOST_AUTO_TEST_CASE(max_stack_size) {
     std::string reason;
 
     BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(0, 0));
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), INT64_MAX);
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), INT64_MAX);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), static_cast<uint64_t>(INT64_MAX));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), static_cast<uint64_t>(INT64_MAX));
 
     BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(0, DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS));
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), INT64_MAX);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), static_cast<uint64_t>(INT64_MAX));
     BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS);
 
     BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(1000000, 0, &reason));
 
     BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(200000000, DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS));
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), 200000000);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), 200000000U);
     BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS);
 
     BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(500, 600, &reason));
 
     BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(600, 500));
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(false, true), INT64_MAX);
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(false, false), INT64_MAX);
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), 600);
-    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), 500);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(false, true), static_cast<uint64_t>(INT64_MAX));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(false, false), static_cast<uint64_t>(INT64_MAX));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), 600U);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), 500U);
 
     BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(-1, -2));
 }
@@ -574,15 +574,15 @@ BOOST_AUTO_TEST_CASE(dsattempt_config)
     BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointBlacklistSize(), 2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE);
     BOOST_CHECK(!config.SetDoubleSpendEndpointBlacklistSize(-1, &err));
 
-    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 0);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 0U);
     BOOST_CHECK(config.SetDoubleSpendEndpointSkipList("127.0.0.1", &err));
-    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 1);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 1U);
     BOOST_CHECK(config.SetDoubleSpendEndpointSkipList("127.0.0.1,::1", &err));
-    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 2);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 2U);
     BOOST_CHECK(config.SetDoubleSpendEndpointSkipList("127.0.0.1 , ::1", &err));
-    BOOST_REQUIRE_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 2);
-    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("127.0.0.1"), 1);
-    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("::1"), 1);
+    BOOST_REQUIRE_EQUAL(config.GetDoubleSpendEndpointSkipList().size(), 2U);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("127.0.0.1"), 1U);
+    BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointSkipList().count("::1"), 1U);
 
     BOOST_CHECK_EQUAL(config.GetDoubleSpendEndpointMaxCount(), DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT);
     BOOST_CHECK(config.SetDoubleSpendEndpointMaxCount(2 * DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT, &err));

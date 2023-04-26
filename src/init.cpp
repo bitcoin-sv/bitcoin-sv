@@ -188,7 +188,7 @@ void Shutdown() {
     }
 #endif
     MapPort(false);
-    UnregisterValidationInterface(peerLogic.get());
+    peerLogic->UnregisterValidationInterface();
     peerLogic.reset();
 
     rpc::client::g_pWebhookClient.reset();
@@ -239,7 +239,7 @@ void Shutdown() {
     {
         LOCK(cs_zmqNotificationInterface);
         if (pzmqNotificationInterface) {
-            UnregisterValidationInterface(pzmqNotificationInterface);
+            pzmqNotificationInterface->UnregisterValidationInterface();
             delete pzmqNotificationInterface;
             pzmqNotificationInterface = nullptr;
         }
@@ -677,9 +677,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "(default: %u)"),
             DEFAULT_BLOCK_TXN_MAX_PERCENT));
     strUsage += HelpMessageOpt(
-        "-maxconnections=<n>",
-        strprintf(_("Maintain at most <n> connections to peers (default: %u)"),
-                  DEFAULT_MAX_PEER_CONNECTIONS));
+        "-maxoutboundconnections=<n>",
+        strprintf(_("Maintain at most <n> outbound connections to peers (default: %u)"),
+                  DEFAULT_MAX_OUTBOUND_CONNECTIONS));
     strUsage +=
         HelpMessageOpt("-maxreceivebuffer=<n>",
                        strprintf(_("Maximum per-connection receive buffer "
@@ -1918,7 +1918,7 @@ namespace { // Variables internal to initialization process only
 
 ServiceFlags nRelevantServices = NODE_NETWORK;
 int nMaxConnections;
-int nUserMaxConnections;
+int nMaxOutboundConnections;
 int nFD;
 ServiceFlags nLocalServices = NODE_NETWORK;
 } // namespace
@@ -2010,36 +2010,39 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // Make sure enough file descriptors are available
-    int nBind = std::max(
+    const int nBind = std::max(
         (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
             (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
                                           : 0),
         size_t(1));
-    nUserMaxConnections =
-        gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS);
-    nMaxConnections = std::max(nUserMaxConnections, 0);
+    
+    if(gArgs.IsArgSet("-maxconnections"))
+        LogPrintf("Warning: configuration parameter -maxconnections was removed\n");
+    
+    const int nUserMaxOutboundConnections = gArgs.GetArg(
+        "-maxoutboundconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
 
     // Trim requested connection counts, to fit into system limitations
     if(std::string err; !config.SetMaxAddNodeConnections(gArgs.GetArg("-maxaddnodeconnections", DEFAULT_MAX_ADDNODE_CONNECTIONS), &err)) {
         return InitError(err);
     }
-    uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
-    nMaxConnections =
-        std::max(std::min(nMaxConnections,
-                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
-                 0);
-    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
+    const uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
+
+    const auto fds_required{MIN_CORE_FILEDESCRIPTORS + nBind + 
+                            maxAddNodeConnections + nUserMaxOutboundConnections}; 
+    nFD = RaiseFileDescriptorLimit(fds_required);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-    nMaxConnections =
-        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
 
-    if (nMaxConnections < nUserMaxConnections) {
-        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
-                                "because of system limitations."),
-                              nUserMaxConnections, nMaxConnections));
-    }
+    nMaxConnections = std::max(0, 
+                               nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections); 
 
+    nMaxOutboundConnections = std::clamp(nUserMaxOutboundConnections, 0, nMaxConnections);
+    if(nMaxOutboundConnections < nUserMaxOutboundConnections) 
+        InitWarning(strprintf("Reducing -maxoutboundconnections from %d to %d, "
+                              "because of system limitations",
+                              nUserMaxOutboundConnections, nMaxOutboundConnections));
+         
     // Step 3: parameter-to-internal-flags
     if (gArgs.IsArgSet("-debug")) {
         // Special-case: if -debug=0/-nodebug is set, turn off debugging
@@ -3272,7 +3275,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelayMillisecs));
         }
     }
-    RegisterValidationInterface(peerLogic.get());
+    peerLogic->RegisterValidationInterface();
     RegisterNodeSignals(GetNodeSignals());
 
     if (gArgs.IsArgSet("-onlynet")) {
@@ -3393,7 +3396,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         LOCK(cs_zmqNotificationInterface);
         pzmqNotificationInterface = CZMQNotificationInterface::Create();
         if (pzmqNotificationInterface) {
-            RegisterValidationInterface(pzmqNotificationInterface);
+            pzmqNotificationInterface->RegisterValidationInterface();
         }
     }
 #endif
@@ -3744,8 +3747,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     connOptions.nLocalServices = nLocalServices;
     connOptions.nRelevantServices = nRelevantServices;
     connOptions.nMaxConnections = nMaxConnections;
-    connOptions.nMaxOutbound =
-        std::min(MAX_OUTBOUND_CONNECTIONS, connOptions.nMaxConnections);
+    connOptions.nMaxOutbound = nMaxOutboundConnections;
     connOptions.nMaxAddnode = config.GetMaxAddNodeConnections();
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();

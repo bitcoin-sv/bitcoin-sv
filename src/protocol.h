@@ -22,7 +22,7 @@
 #include <string>
 
 class Config;
-class CDataStream;
+class msg_buffer;
 class CSerializedNetMsg;
 
 /**
@@ -136,7 +136,7 @@ public:
     CMessageHeader(const MessageMagic& pchMessageStartIn);
     CMessageHeader(const Config& config, const CSerializedNetMsg& msg);
 
-    uint64_t Read(const char* pch, uint64_t numBytes, CDataStream& buff);
+    uint64_t Read(const char* pch, uint64_t numBytes, msg_buffer&);
 
     std::string GetCommand() const;
     const MessageMagic& GetMsgStart() const { return pchMessageStart; }
@@ -189,6 +189,8 @@ private:
 
     bool complete {false};
 };
+
+bool operator==(const CMessageHeader&, const CMessageHeader&);
 
 /**
  * Bitcoin protocol message types. When adding new message types, don't forget
