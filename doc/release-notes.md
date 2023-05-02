@@ -1,1 +1,2 @@
-Placeholder for 1.0.15
+# Bitcoin SV Node software – v1.0.16 Release
+
