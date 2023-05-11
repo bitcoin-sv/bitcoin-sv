@@ -5,7 +5,7 @@
 #include <list>
 #include <locale>
 #include <stdexcept>
-#include "compiler_warnings.h"
+#include <tuple>
 
 namespace {
 // trigger: use ctype<char>::widen to trigger ctype<char>::_M_widen_init().
@@ -44,10 +44,7 @@ bool sanity_test_list(unsigned int size) {
 bool sanity_test_range_fmt() {
     std::string test;
     try {
-        MSVC_WARNINGS_PUSH;
-        MSVC_WARNINGS_IGNORE(4834);
-        test.at(1);
-        MSVC_WARNINGS_POP;
+        std::ignore = test.at(1);
     } catch (const std::out_of_range &) {
         return true;
     } catch (...) {
