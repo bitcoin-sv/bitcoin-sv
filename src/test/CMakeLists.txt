@@ -228,6 +228,7 @@ target_link_libraries(
 	Boost::unit_test_framework
 	rpcclient
 	server
+	$<$<PLATFORM_ID:Windows>:Mswsock> # use Mswsock.dll for aio on Windows
 	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 
 # We need to detect if the BOOST_TEST_DYN_LINK flag is required.

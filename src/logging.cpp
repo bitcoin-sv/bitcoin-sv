@@ -134,6 +134,26 @@ BCLog::Logger::~Logger() {
     }
 }
 
+#ifdef __MINGW32__
+// MinGW with POSIX threads has a bug where destructors for thread_local
+// objects are called after the memory has been already released.
+// As a workaround, Boost thread specific storage is used instead.
+#include <boost/thread/tss.hpp>
+namespace {
+const DateTimeFormatter& thread_local_log_DateTimeFormatter()
+{
+    static boost::thread_specific_ptr<DateTimeFormatter> dtf_tsp;
+    auto* dtf = dtf_tsp.get();
+    if(dtf==nullptr)
+    {
+        dtf_tsp.reset(new DateTimeFormatter{"%Y-%m-%d %H:%M:%S"});
+        dtf = dtf_tsp.get();
+    }
+    return *dtf;
+}
+}
+#endif
+
 std::string BCLog::Logger::LogTimestampStr(const std::string& str)
 {
     if(!fLogTimestamps)
@@ -143,7 +163,11 @@ std::string BCLog::Logger::LogTimestampStr(const std::string& str)
 
     if(fStartedNewLine)
     {
+#ifdef __MINGW32__
+        const DateTimeFormatter& dtf = thread_local_log_DateTimeFormatter();
+#else
         thread_local const DateTimeFormatter dtf{"%Y-%m-%d %H:%M:%S"};
+#endif
 
         const int64_t nTimeMicros{GetLogTimeMicros()};
         ss = dtf(nTimeMicros / 1000000);
