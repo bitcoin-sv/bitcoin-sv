@@ -8,7 +8,7 @@ project(bitcoin-test)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
 # Python is required to build C++ tests (and to execute functional tests)
-find_package(Python3 REQUIRED)
+find_package(PythonInterp 3 REQUIRED)
 
 
 function(gen_json_header NAME)
