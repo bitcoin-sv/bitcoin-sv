@@ -133,6 +133,7 @@ namespace tfm = tinyformat;
 // Implementation details.
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>

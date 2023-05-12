@@ -3494,7 +3494,7 @@ private:
         size_t maxThreads { parallelTxnValidation? static_cast<size_t>(config.GetPerBlockTxnValidatorThreadsCount()) : 1UL };
         uint64_t batchSize { config.GetBlockValidationTxBatchSize() };
         size_t numThreads { block.vtx.size() / batchSize };
-        numThreads = std::clamp(numThreads, 1UL, maxThreads);
+        numThreads = std::clamp(numThreads, size_t(1), maxThreads);
 
         int64_t startGroupTime { GetTimeMicros() };
         TxnGrouper grouper {};

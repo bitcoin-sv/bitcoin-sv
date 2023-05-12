@@ -8,7 +8,7 @@ project(bitcoin-test)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
 # Python is required to build C++ tests (and to execute functional tests)
-find_package(Python3 REQUIRED)
+find_package(PythonInterp 3 REQUIRED)
 
 
 function(gen_json_header NAME)
@@ -228,6 +228,7 @@ target_link_libraries(
 	Boost::unit_test_framework
 	rpcclient
 	server
+	$<$<PLATFORM_ID:Windows>:Mswsock> # use Mswsock.dll for aio on Windows
 	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 
 # We need to detect if the BOOST_TEST_DYN_LINK flag is required.

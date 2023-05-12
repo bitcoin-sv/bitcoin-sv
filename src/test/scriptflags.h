@@ -5,6 +5,7 @@
 #ifndef BITCOIN_TEST_SCRIPTFLAGS_H
 #define BITCOIN_TEST_SCRIPTFLAGS_H
 
+#include <cstdint>
 #include <string>
 
 uint32_t ParseScriptFlags(std::string strFlags);
