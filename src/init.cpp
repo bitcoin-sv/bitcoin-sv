@@ -189,7 +189,6 @@ void Shutdown() {
 #endif
     MapPort(false);
     peerLogic->UnregisterValidationInterface();
-    peerLogic.reset();
 
     rpc::client::g_pWebhookClient.reset();
     mining::g_miningFactory.reset();
@@ -201,6 +200,7 @@ void Shutdown() {
         g_connman->Stop();
         g_connman.reset();
     }
+    peerLogic.reset();
 
     // must be called after g_connman shutdown as conman threads could still be
     // using it before that
