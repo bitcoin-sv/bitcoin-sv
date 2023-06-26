@@ -88,16 +88,20 @@ void msg_buffer::read(span<uint8_t> s)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
 
         copy(&header_[read_pos_], &header_[read_pos_ + s.size()], s.begin());
+        read_pos_ = end_pos;
     }
     else
     {
-        if(end_pos > header_.size() + payload_->size())
+        const auto payload_len{payload_ ? payload_->size() : 0};
+        if(end_pos > header_.size() + payload_len)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
     
-        payload_->read(read_pos_ - header_.size(), s);
+        if(payload_)
+        {
+            payload_->read(read_pos_ - header_.size(), s);
+            read_pos_ = end_pos;
+        }
     }
-
-    read_pos_ = end_pos;
 }
 
 void msg_buffer::read(char* p, size_t n)
