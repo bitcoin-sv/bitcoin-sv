@@ -32,7 +32,7 @@ static auto make_msg_header{[](const string& cmd)
     array<uint8_t, 12> a{};
     copy(cmd.cbegin(), cmd.cend(), a.begin());
     v.insert(v.end(), a.begin(), a.end());
-    array<uint8_t, 4> len{0xcc, 0x0, 0x0, 0x0};
+    array<uint8_t, 4> len{0x0, 0x0, 0x0, 0x0};
     v.insert(v.end(), len.cbegin(), len.cend());
     array<uint8_t, 4> checksum{0x1, 0x2, 0x3, 0x4};
     v.insert(v.end(), checksum.cbegin(), checksum.cend());
@@ -223,6 +223,20 @@ BOOST_AUTO_TEST_CASE(write_read_block_msg)
                block_msg_payload.size()));
     BOOST_CHECK_EQUAL(block_msg_payload.size(), buff.size());
 }
+
+BOOST_AUTO_TEST_CASE(read_null_payload)
+{
+    msg_buffer buff{type, version};
+    const auto msg_header{make_msg_header("version")};
+
+    buff.write(std::span{msg_header.data(), msg_header.size()});
+    buff.payload_len(0);
+
+    vector<uint8_t> v(msg_header_len + 1);
+    buff.read(span{v.data(), msg_header_len});
+    BOOST_CHECK_EQUAL(msg_header_len, buff.size());
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
 
