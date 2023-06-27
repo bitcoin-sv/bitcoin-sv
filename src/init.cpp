@@ -188,7 +188,9 @@ void Shutdown() {
     }
 #endif
     MapPort(false);
-    peerLogic->UnregisterValidationInterface();
+    if(peerLogic) {
+        peerLogic->UnregisterValidationInterface();
+    }
 
     rpc::client::g_pWebhookClient.reset();
     mining::g_miningFactory.reset();
