@@ -47,7 +47,9 @@ void msg_buffer::payload_len(uint64_t len)
 
 static std::unique_ptr<msg_parser> make_parser(const string& cmd)
 {
-    assert(!cmd.empty());
+    // Note: It's not a protocol error to call make_parser with an
+    // empty cmd string, that's just another example of an unknown
+    // command which is detected in later processing.
 
     if(cmd == "block")
         return make_unique<msg_parser>(block_parser{});
