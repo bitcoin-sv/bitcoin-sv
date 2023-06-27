@@ -19,17 +19,66 @@
 #include "script/sign.h"
 
 #include <limits>
+#include <tuple>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
 
-// Helpers:
-static std::vector<uint8_t> Serialize(const CScript &s) {
-    std::vector<uint8_t> sSerialized(s.begin(), s.end());
-    return sSerialized;
+namespace
+{
+    // Helpers:
+    std::vector<uint8_t> Serialize(const CScript &s)
+    {
+        std::vector<uint8_t> sSerialized(s.begin(), s.end());
+        return sSerialized;
+    }
 }
 
 BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
+{
+    // Tests for GitHub #296 & SVN-2388
+    CScriptNum BigNum { std::vector<uint8_t>{1,2,3,4,5}, false, 6, true };
+    using TestParams = std::tuple<CScript, bool, uint64_t>; // <Script, triggers error, sig op count>
+    std::vector<TestParams> tests {
+        {
+            // Check we can reproduce the sigops error in a non OP_RETURN script
+            CScript{} << BigNum << OP_CHECKMULTISIG,
+                true, 0
+        },
+        {
+            // OP_RETURN allows us to skip unexecutable opcodes that follow it at the top level scope
+            CScript{} << OP_RETURN << BigNum << OP_CHECKMULTISIG,
+                false, 0
+        },
+        {
+            // Script with nested OP_IFs skips unexecutable opcodes that follow OP_RETURN at top level scope
+            CScript{} << OP_TRUE << OP_IF << OP_TRUE << OP_IF << OP_RETURN << OP_ELSE << OP_3 << OP_CHECKMULTISIG << OP_ENDIF << OP_ENDIF
+                      << OP_RETURN << BigNum << OP_CHECKMULTISIG,
+                false, 3
+        },
+        {
+            // Script with nested OP_IFs detects error if not short-circuited by OP_RETURN at top level scope
+            CScript{} << OP_TRUE << OP_IF << OP_TRUE << OP_IF << OP_RETURN << OP_ELSE << OP_3 << OP_CHECKMULTISIG << OP_ENDIF << OP_ENDIF
+                      << BigNum << OP_CHECKMULTISIG,
+                true, 0
+        },
+        {
+            // Invalid script with unbalanced IF/ENDIF
+            CScript{} << OP_TRUE << OP_IF << OP_ENDIF << OP_ENDIF,
+                true, 0
+        }
+    };
+
+    for(const auto& [script, errorExpected, sigOpsExpected] : tests)
+    {
+        bool sigOpCountError {false};
+        uint64_t sigOps { script.GetSigOpCount(true, true, sigOpCountError) };
+        BOOST_CHECK_EQUAL(sigOpCountError, errorExpected);
+        BOOST_CHECK_EQUAL(sigOps, sigOpsExpected);
+    }
+}
 
 BOOST_AUTO_TEST_CASE(GetSigOpCount) {
     // Test CScript::GetSigOpCount()
