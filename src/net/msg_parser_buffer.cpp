@@ -23,8 +23,7 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
 
     if(!buffer_.empty())
     {
-        size_t bytes_read{};
-        while(!bytes_read)
+        while(true)
         {
             const size_t reqd_bytes = min(s.size(), buffer_size_reqd_ - buffer_.size());
             buffer_.append(s.first(reqd_bytes));
