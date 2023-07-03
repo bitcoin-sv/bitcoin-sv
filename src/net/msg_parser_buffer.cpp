@@ -48,7 +48,6 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
                 buffer_.insert(buffer_.cend(),
                                s.begin(),
                                s.end());
-                bytes_read_ += s.size();
                 return;
             }
 
@@ -65,11 +64,9 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
         buffer_.insert(buffer_.cend(),
                        s.begin(),
                        s.end());
-        bytes_read_ += s.size();
         return;
     }
 
-    bytes_read_ = bytes_read;
     const size_t remaining_input_len{s.size() - bytes_read};
     buffer_size_reqd_ = bytes_reqd ? bytes_reqd : remaining_input_len;
     if(remaining_input_len) 

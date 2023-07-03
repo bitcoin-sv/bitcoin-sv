@@ -18,7 +18,6 @@ class msg_parser_buffer
 {
     std::unique_ptr<msg_parser> parser_;
     unique_array buffer_;
-    size_t bytes_read_{};
     size_t buffer_size_reqd_{};
     bool overflow_{};
 
