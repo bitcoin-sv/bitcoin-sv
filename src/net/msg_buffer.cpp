@@ -13,6 +13,7 @@
 #include "p2p_msg_lengths.h"
 #include "protocol.h"
 #include <cstdint>
+#include <ios>
 #include <memory>
 
 using namespace std;
@@ -92,7 +93,7 @@ void msg_buffer::read(span<uint8_t> s)
     }
     else
     {
-        const auto payload_len{payload_ ? payload_->size() : 0};
+        const auto payload_len{payload_ ? payload_->parsed_size() : 0};
         if(end_pos > header_.size() + payload_len)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
     
