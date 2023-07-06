@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <numeric>
 #include <optional>
 #include <span>
@@ -30,7 +31,14 @@ public:
     size_t size() const;
     bool empty() const { return size() == 0; }
 
-    const unique_array& operator[](size_t i) const { return segments_[i]; }
+    const unique_array& operator[](size_t i) const
+    {
+        if(i >= segments_.size())
+        {
+            throw std::ios_base::failure("parsing error: index out of bounds");
+        }
+        return segments_[i];
+    }
 
     auto begin() const { return segments_.begin(); }
     auto end() const { return segments_.end(); }
