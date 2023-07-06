@@ -5,6 +5,7 @@
 #include "blocktxn_parser.h"
 
 #include "parser_utils.h"
+#include <ios>
 
 using namespace std;
 using namespace bsv;
@@ -29,7 +30,8 @@ size_t blocktxn_parser::read(size_t read_pos, span<uint8_t> s)
     const size_t total_parser_size{header_parser_.size() +
                                    txs_parser_.size()};
 
-    assert(read_pos < total_parser_size);
+    if(read_pos >= total_parser_size)
+        throw std::ios_base::failure("blocktxn_parser::read(): end of data");
 
     const size_t max_readable{min(s.size(), total_parser_size)};
     
