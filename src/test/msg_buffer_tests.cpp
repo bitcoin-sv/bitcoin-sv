@@ -9,9 +9,11 @@
 
 #include <array>
 #include <boost/test/unit_test_suite.hpp>
+#include <cstdint>
 #include <mutex>
 #include <numeric>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "protocol.h"
@@ -237,6 +239,39 @@ BOOST_AUTO_TEST_CASE(read_null_payload)
     BOOST_CHECK_EQUAL(msg_header_len, buff.size());
 }
 
+BOOST_AUTO_TEST_CASE(read_too_much)
+{
+    msg_buffer buff{type, version};
+    
+    vector<uint8_t> header{0xda, 0xb5, 0xbf, 0xfa};
+    array<uint8_t, 12> a{};
+    const string cmd{"ping"};
+    copy(cmd.cbegin(), cmd.cend(), a.begin());
+    header.insert(header.end(), a.begin(), a.end());
+    constexpr auto payload_len{1};
+    array<uint8_t, 4> len{payload_len, 0x0, 0x0, 0x0};
+    header.insert(header.end(), len.cbegin(), len.cend());
+    array<uint8_t, 4> checksum{0x1, 0x2, 0x3, 0x4};
+    header.insert(header.end(), checksum.cbegin(), checksum.cend());
+    buff.write(std::span{header.data(), header.size()});
+    buff.payload_len(payload_len); // <-too short ping payload should be 8 bytes
+
+    vector<uint8_t> payload(payload_len);
+    buff.write(std::span{payload.data(), payload.size()});
+
+    vector<uint8_t> out(header.size() + payload.size() + 1);
+    try 
+    {
+        buff.read(span{out.data(), out.size()});
+        BOOST_FAIL("Expected runtime_error");
+    }
+    catch(const std::ios_base::failure& e)
+    {   
+        const string actual{e.what()};
+        const string expected{"msg_buffer::read(): end of data: iostream error"};
+        BOOST_CHECK_EQUAL(expected, actual);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
 
