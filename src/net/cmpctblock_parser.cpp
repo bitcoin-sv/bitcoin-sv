@@ -43,7 +43,8 @@ size_t cmpctblock_parser::read(size_t read_pos, span<uint8_t> s)
                                    shortid_parser_.size() + 
                                    pftxs_parser_.size()};
     
-    assert(read_pos < total_parser_size);
+    if(read_pos >= total_parser_size)
+        throw std::ios_base::failure("cmpctblock_parser::read(): end of data");
 
     const size_t max_readable{min(s.size(), total_parser_size)};
 

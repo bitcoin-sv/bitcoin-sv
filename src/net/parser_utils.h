@@ -24,6 +24,10 @@ template<typename T>
     while(total_bytes_read < max_readable)
     {
         const auto& seg{parser[seg_offset]};
+        if (byte_offset > seg.size())
+        {
+            throw std::ios_base::failure("read(): end of data");
+        }
         const auto seg_bytes_remaining{seg.size() - byte_offset};
         const auto n_bytes{std::min(seg_bytes_remaining, s.size())};
         const auto bytes_read = read(seg, byte_offset, s.first(n_bytes));

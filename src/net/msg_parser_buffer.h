@@ -29,6 +29,7 @@ public:
     void operator()(std::span<const uint8_t> s);
     size_t read(size_t read_pos, std::span<uint8_t>);
     size_t size() const;
+    size_t parsed_size() const;
     void clear();
 
     size_t buffer_size() const { return buffer_.size(); }
