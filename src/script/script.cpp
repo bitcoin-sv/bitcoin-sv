@@ -10,6 +10,7 @@
 #include "int_serialization.h"
 #include "script_num.h"
 #include "utilstrencodings.h"
+
 #include <algorithm>
 #include <sstream>
 
@@ -19,6 +20,9 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
     uint64_t n = 0;
     bsv::instruction last_instruction;
     const auto it_end{end_instructions()};
+
+    int32_t scopeLevel {0};
+
     for(auto it{begin_instructions()}; it != it_end; ++it)
     {
         opcodetype lastOpcode{last_instruction.opcode()};
@@ -26,6 +30,30 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
         opcodetype opcode{it->opcode()};
         if(it->opcode() == OP_INVALIDOPCODE)
             break;
+
+        if(fAccurate || isGenesisEnabled)
+        {
+            if(opcode == OP_RETURN && scopeLevel == 0)
+            {
+                // Everything after OP_RETURN at top level scope is unexecutable
+                break;
+            }
+            else if(opcode == OP_IF || opcode == OP_NOTIF)
+            {
+                // Entering a new scope at a new level
+                ++scopeLevel;
+            }
+            else if(opcode == OP_ENDIF)
+            {
+                // Leaving scope at this level
+                if(--scopeLevel < 0)
+                {
+                    // Invalid script with unbalanced IF/ENDIF
+                    sigOpCountError = true;
+                    return 0;
+                }
+            }
+        }
 
         if(opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
         {

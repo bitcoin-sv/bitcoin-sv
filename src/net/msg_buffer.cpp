@@ -13,6 +13,7 @@
 #include "p2p_msg_lengths.h"
 #include "protocol.h"
 #include <cstdint>
+#include <ios>
 #include <memory>
 
 using namespace std;
@@ -47,7 +48,9 @@ void msg_buffer::payload_len(uint64_t len)
 
 static std::unique_ptr<msg_parser> make_parser(const string& cmd)
 {
-    assert(!cmd.empty());
+    // Note: It's not a protocol error to call make_parser with an
+    // empty cmd string, that's just another example of an unknown
+    // command which is detected in later processing.
 
     if(cmd == "block")
         return make_unique<msg_parser>(block_parser{});
@@ -86,16 +89,20 @@ void msg_buffer::read(span<uint8_t> s)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
 
         copy(&header_[read_pos_], &header_[read_pos_ + s.size()], s.begin());
+        read_pos_ = end_pos;
     }
     else
     {
-        if(end_pos > header_.size() + payload_->size())
+        const auto payload_len{payload_ ? payload_->parsed_size() : 0};
+        if(end_pos > header_.size() + payload_len)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
     
-        payload_->read(read_pos_ - header_.size(), s);
+        if(payload_)
+        {
+            payload_->read(read_pos_ - header_.size(), s);
+            read_pos_ = end_pos;
+        }
     }
-
-    read_pos_ = end_pos;
 }
 
 void msg_buffer::read(char* p, size_t n)

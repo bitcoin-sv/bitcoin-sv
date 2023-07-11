@@ -28,7 +28,8 @@ size_t block_parser::read(size_t read_pos, std::span<uint8_t> s)
     const size_t total_parser_size{header_parser_.size() +
                                    txs_parser_.size()};
 
-    assert(read_pos < total_parser_size);
+    if(read_pos >= total_parser_size)
+        throw std::ios_base::failure("block_parser::read(): end of data");
 
     const size_t max_readable{min(s.size(), total_parser_size)};
     
