@@ -11,7 +11,6 @@
 #include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h"
-#include "checkpoints.h"
 #include "coins.h"
 #include "config.h"
 #include "consensus/validation.h"
@@ -21,6 +20,7 @@
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/http_protocol.h"
+#include "rpc/protocol.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
 #include "streams.h"
@@ -3471,6 +3471,10 @@ UniValue getblockstats_impl(const Config &config,
             maxfee = std::max(maxfee, txfee);
             minfee = std::min(minfee, txfee);
             totalfee += txfee;
+
+            if(tx_size == 0)
+                throw JSONRPCError(RPC_INTERNAL_ERROR,
+                                   "Division by zero: tx_size");
 
             Amount feerate = txfee / tx_size;
             if (do_medianfeerate) {
