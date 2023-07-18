@@ -25,7 +25,7 @@ endforeach()
 
 option(enable_debug "Enable debug (lockorder)" OFF)
 if(enable_debug)
-    add_definitions(-DDEBUG -DDEBUG_LOCKORDER)
+    add_definitions(-DDEBUG -DDEBUG_LOCKORDER -D_GLIBCXX_ASSERTIONS)
 endif()
 
 option(enable_metrics "Enable metrics" OFF)
