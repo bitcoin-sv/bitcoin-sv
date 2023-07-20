@@ -39,10 +39,8 @@ std::pair<size_t, size_t> cmpctblock_parser::operator()(span<const uint8_t> s)
 
 size_t cmpctblock_parser::read(size_t read_pos, span<uint8_t> s)
 {
-    const size_t total_parser_size{header_parser_.size() +
-                                   shortid_parser_.size() + 
-                                   pftxs_parser_.size()};
-    
+    const size_t total_parser_size{readable_size()};
+
     if(read_pos >= total_parser_size)
         throw std::ios_base::failure("cmpctblock_parser::read(): end of data");
 
@@ -89,7 +87,16 @@ size_t cmpctblock_parser::read(size_t read_pos, span<uint8_t> s)
 
 size_t cmpctblock_parser::size() const 
 {
-    return header_parser_.size() + shortid_parser_.size() + pftxs_parser_.size();
+    return header_parser_.size() + 
+           shortid_parser_.size() + 
+           pftxs_parser_.size();
+}
+
+size_t cmpctblock_parser::readable_size() const 
+{
+    return header_parser_.size() +
+           shortid_parser_.readable_size() +
+           pftxs_parser_.readable_size();
 }
 
 void cmpctblock_parser::clear()

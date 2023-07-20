@@ -228,6 +228,12 @@ struct always_0_parser
         assert(false);
         return 0;
     }
+    
+    [[nodiscard]] size_t readable_size() const
+    {
+        assert(false);
+        return 0;
+    }
 
     void clear()
     {

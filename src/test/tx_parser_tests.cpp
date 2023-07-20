@@ -2,9 +2,11 @@
 // Distributed under the Open BSV software license, see the accompanying file
 
 #include <algorithm>
+#include <boost/test/tools/old/interface.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <tuple>
 #include <vector>
 
 #include <boost/test/unit_test_suite.hpp>
@@ -399,7 +401,10 @@ BOOST_AUTO_TEST_CASE(tx_parser_2_pass)
 
     constexpr size_t split_pos{20};
     const auto [bytes_read, bytes_reqd] = parser(std::span{tx.data(), split_pos});
-    parser(std::span{tx.data() + bytes_read, tx.size() - bytes_read});
+    const auto [bytes_read_2, bytes_reqd_2] = parser(std::span{tx.data() + bytes_read, 
+                                                     tx.size() - bytes_read});
+    BOOST_CHECK_EQUAL(253U, bytes_read_2);
+    BOOST_CHECK_EQUAL(0U, bytes_reqd_2); 
     BOOST_CHECK_EQUAL(0U, parser.buffer_size());
     BOOST_CHECK_EQUAL(tx.size(), parser.size());
 }

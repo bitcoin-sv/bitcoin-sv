@@ -35,6 +35,12 @@ public:
                          remainder ? N : 0);
     }
 
+    [[nodiscard]] std::size_t readable_size() const
+    {
+        assert(false);
+        return 0;
+    }
+
     size_t read(size_t read_pos, std::span<uint8_t>)
     {
         assert(false);

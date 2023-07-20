@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE
 #include <boost/test/unit_test.hpp>
+#include <tuple>
 
 #include "net/blocktxn_parser.h"
 
@@ -119,8 +120,7 @@ BOOST_AUTO_TEST_CASE(read_all)
 {
     blocktxn_parser parser;
     std::span s{blocktxn_msg.data(), blocktxn_msg.size()};
-    parser(s);
-
+    std::ignore = parser(s);
     BOOST_CHECK_EQUAL(blocktxn_msg.size(), parser.size());
 
     vector<uint8_t> out(blocktxn_msg.size());
@@ -128,14 +128,13 @@ BOOST_AUTO_TEST_CASE(read_all)
     BOOST_CHECK_EQUAL(out.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(blocktxn_msg.cbegin(), blocktxn_msg.cend(),
                                   out.cbegin(), out.cend());
-    BOOST_CHECK_EQUAL(blocktxn_msg.size(), parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(read_byte_by_byte)
 {
     blocktxn_parser parser;
     std::span s{blocktxn_msg.data(), blocktxn_msg.size()};
-    parser(s);
+    std::ignore = parser(s);
 
     size_t total_bytes_read{};
     vector<uint8_t> out(blocktxn_msg.size());
@@ -152,7 +151,7 @@ BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
 {
     blocktxn_parser parser;
     std::span s{blocktxn_msg.data(), blocktxn_msg.size()};
-    parser(s);
+    std::ignore = parser(s);
     BOOST_CHECK_EQUAL(blocktxn_msg.size(), parser.size());
 
     vector<uint8_t> out(blocktxn_msg.size() + 1);
@@ -160,6 +159,22 @@ BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
     BOOST_CHECK_EQUAL(out.size() - 1, bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(blocktxn_msg.cbegin(), blocktxn_msg.cend(),
                                   out.cbegin(), out.cend() - 1);
+}
+
+BOOST_AUTO_TEST_CASE(read_partial_msg)
+{
+    vector<uint8_t> msg(32, 1);               // hash
+    msg.push_back(2);                         // tx count
+    msg.insert(msg.end(), version_len, 3);    // tx version
+
+    blocktxn_parser parser;
+    std::span s{msg.data(), msg.size()};
+    std::ignore = parser(s);
+    BOOST_CHECK_EQUAL(msg.size(), parser.size());
+
+    vector<uint8_t> out(msg.size());
+    const auto bytes_read = parser.read(0, std::span{out.data(), out.size()});
+    BOOST_CHECK_EQUAL(33, bytes_read);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -11,6 +11,11 @@
 using namespace std;
 using namespace bsv;
 
+constexpr size_t header_len{80};
+constexpr size_t tx_count_len{0x3};
+constexpr size_t tx_count{0xfd};
+constexpr size_t tx_len{62};
+
 const std::vector<uint8_t> block_msg{[]
 {
     vector<uint8_t> v;
@@ -21,23 +26,28 @@ const std::vector<uint8_t> block_msg{[]
     v.insert(v.end(), 4, 5);           // target
     v.insert(v.end(), 4, 6);           // nonce
 
-    v.insert(v.end(), 1, 1);              // tx count
+    v.push_back(0xfd);
+    v.push_back(tx_count);
+    v.push_back(0);
 
-    v.insert(v.end(), version_len, 7);    // tx version
-    v.push_back(1);                       // 1 input 
-    
-    v.insert(v.end(), outpoint_len, 8);   // tx outpoint 
-    v.push_back(1);                       // script length
-    v.push_back(0x6a);                    // script (op_return)
-    v.insert(v.end(), seq_len, 9);        // sequence
+    for(size_t i{}; i < tx_count; ++i)
+    {
+        v.insert(v.end(), version_len, 7);    // tx version
+        v.push_back(1);                       // 1 input 
+        
+        v.insert(v.end(), outpoint_len, 8);   // tx outpoint 
+        v.push_back(1);                       // script length
+        v.push_back(0x6a);                    // script (op_return)
+        v.insert(v.end(), seq_len, 9);        // sequence
 
-    v.push_back(1);                       // number of outputs
-    v.insert(v.end(), value_len, 10);      // value
-    v.push_back(1);                       // script length
-    v.push_back(0x6a);                    // script (op_return)
+        v.push_back(1);                       // number of outputs
+        v.insert(v.end(), value_len, 10);      // value
+        v.push_back(1);                       // script length
+        v.push_back(0x6a);                    // script (op_return)
 
-    // locktime
-    v.insert(v.end(), locktime_len, 11);  // lock time
+        // locktime
+        v.insert(v.end(), locktime_len, 11);  // lock time
+    }
 
     return v;
 }()};
@@ -103,7 +113,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
         }
     }
     BOOST_CHECK_EQUAL(block_msg.size(), total_bytes_read);
-    BOOST_CHECK_EQUAL(11U, passes);
+    BOOST_CHECK_EQUAL(2'028U, passes);
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
 }
 
@@ -172,6 +182,58 @@ BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
     BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), block_msg.cend(),
                                   out.cbegin(), out.cend() - 1);
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
+}
+
+BOOST_AUTO_TEST_CASE(read_partial_tx_count)
+{
+    block_parser parser;
+    constexpr auto n_bytes{header_len + 1}; // <- partial tx count
+    std::ignore = parser(span{block_msg.data(), n_bytes});
+
+    vector<uint8_t> out(block_msg.size());
+    const auto exp_bytes{n_bytes - 1};
+    const size_t bytes_read = parser.read(0, span{out.data(), out.size()});
+    BOOST_CHECK_EQUAL(exp_bytes, bytes_read);
+    BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), 
+                                  block_msg.cbegin() + exp_bytes, 
+                                  out.cbegin(), 
+                                  out.cbegin() + exp_bytes);
+}
+
+BOOST_AUTO_TEST_CASE(read_partial_tx_1)
+{
+    block_parser parser;
+    constexpr auto n_bytes{header_len + 
+                           tx_count_len +
+                           version_len }; // <- partial tx 
+    std::ignore = parser(span{block_msg.data(), n_bytes});
+
+    vector<uint8_t> out(block_msg.size());
+    const auto exp_bytes{n_bytes - version_len};
+    const size_t bytes_read = parser.read(0, span{out.data(), out.size()});
+    BOOST_CHECK_EQUAL(exp_bytes, bytes_read);
+    BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), 
+                                  block_msg.cbegin() + exp_bytes, 
+                                  out.cbegin(), 
+                                  out.cbegin() + exp_bytes);
+}
+
+BOOST_AUTO_TEST_CASE(read_partial_tx_2)
+{
+    block_parser parser;
+    constexpr auto n_bytes{header_len + 
+                           tx_count_len + tx_len +
+                           version_len }; // <- partial tx
+    std::ignore = parser(span{block_msg.data(), n_bytes});
+
+    vector<uint8_t> out(block_msg.size());
+    const auto exp_bytes{n_bytes - version_len};
+    const size_t bytes_read = parser.read(0, span{out.data(), out.size()});
+    BOOST_CHECK_EQUAL(exp_bytes, bytes_read);
+    BOOST_CHECK_EQUAL_COLLECTIONS(block_msg.cbegin(), 
+                                  block_msg.cbegin() + exp_bytes, 
+                                  out.cbegin(), 
+                                  out.cbegin() + exp_bytes);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

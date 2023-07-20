@@ -91,9 +91,9 @@ size_t msg_parser_buffer::size() const
     return parser_->size() + buffer_.size();
 }
 
-size_t msg_parser_buffer::parsed_size() const
+size_t msg_parser_buffer::readable_size() const
 {
-    return parser_->size();
+    return parser_->readable_size();
 }
 
 void msg_parser_buffer::clear()

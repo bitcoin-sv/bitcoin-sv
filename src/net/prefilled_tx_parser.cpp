@@ -42,6 +42,11 @@ std::size_t prefilled_tx_parser::size() const
     return buffer_.size() + tx_parser_.size();
 }
 
+std::size_t prefilled_tx_parser::readable_size() const
+{
+    return tx_parser_.readable_size();
+}
+
 unique_array prefilled_tx_parser::buffer() &&
 {
     unique_array a{std::move(tx_parser_).buffer()};

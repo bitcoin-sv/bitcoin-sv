@@ -20,6 +20,7 @@ class prefilled_tx_parser
 public:
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     std::size_t size() const;
+    [[nodiscard]] std::size_t readable_size() const;
     
     unique_array buffer() &&;
 };

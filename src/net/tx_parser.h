@@ -38,7 +38,7 @@ public:
     
     size_t buffer_size() const;
     size_t size() const;
-    bool empty() const { return size() == 0; }
+    [[nodiscard]] size_t readable_size() const;
     void clear() { size_ = 0;}
 
     unique_array buffer() &&;

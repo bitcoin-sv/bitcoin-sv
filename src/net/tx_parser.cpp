@@ -350,6 +350,11 @@ size_t tx_parser::size() const
     return size_ + buffer_size(); 
 }
 
+size_t tx_parser::readable_size() const
+{
+    return size_; 
+}
+
 std::ostream& operator<<(std::ostream& os, const tx_parser::state& state)
 {
     switch(state)

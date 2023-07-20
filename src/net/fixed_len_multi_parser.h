@@ -31,8 +31,11 @@ public:
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
     size_t size() const;
+    [[nodiscard]] size_t readable_size() const;
+
     bool empty() const { return size() == 0; }
 
+    const unique_array& at(size_t i) const { return segments_.at(i); }
     const unique_array& operator[](size_t i) const { return segments_[i]; }
 
     auto begin() const { return segments_.begin(); }
@@ -65,6 +68,7 @@ private:
     size_t fixed_lengths_per_seg_;
     size_t seg_size_{fixed_len_ * fixed_lengths_per_seg_};
     size_t size_{};
+    size_t readable_size_{};
 
     mutable std::vector<size_t> cum_lengths_;
 };

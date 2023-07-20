@@ -31,16 +31,11 @@ public:
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
     size_t size() const;
+    [[nodiscard]] size_t readable_size() const;
     bool empty() const { return size() == 0; }
 
-    const unique_array& operator[](size_t i) const
-    {
-        if(i >= segments_.size())
-        {
-            throw std::ios_base::failure("parsing error: index out of bounds");
-        }
-        return segments_[i];
-    }
+    const unique_array& at(size_t i) const { return segments_.at(i); }
+    const unique_array& operator[](size_t i) const { return segments_[i]; }
 
     auto begin() const { return segments_.begin(); }
     auto end() const { return segments_.end(); }
@@ -132,6 +127,12 @@ template<typename T>
 inline size_t array_parser<T>::size() const
 {
     return size_ + parser_.size(); 
+}
+
+template<typename T>
+inline size_t array_parser<T>::readable_size() const
+{
+    return size_ + parser_.readable_size(); 
 }
 
 template<typename T>
