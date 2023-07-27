@@ -4820,6 +4820,10 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             // Allow exceptions from non-canonical encoding
             LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
+        } else if (strstr(e.what(), "parsing error")) {
+            // Allow generic parsing errors
+            LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
+                     SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
