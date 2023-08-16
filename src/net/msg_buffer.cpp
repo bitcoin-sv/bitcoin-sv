@@ -88,7 +88,7 @@ void msg_buffer::read(span<uint8_t> s)
         if(end_pos > header_.size())
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
 
-        copy(&header_[read_pos_], &header_[read_pos_ + s.size()], s.begin());
+        copy(&header_[read_pos_], &header_[read_pos_] + s.size(), s.begin());
         read_pos_ = end_pos;
     }
     else
