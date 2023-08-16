@@ -522,13 +522,15 @@ bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB *pwalletdbIn,
         nWalletMaxVersion = nVersion;
     }
 
-    CWalletDB *pwalletdb = pwalletdbIn ? pwalletdbIn : new CWalletDB(*dbw);
-    if (nWalletVersion > 40000) {
-        pwalletdb->WriteMinVersion(nWalletVersion);
-    }
-
-    if (!pwalletdbIn) {
-        delete pwalletdb;
+    if(nWalletVersion > 40'000)
+    {
+        if(pwalletdbIn)
+            pwalletdbIn->WriteMinVersion(nWalletVersion);
+        else
+        { 
+            CWalletDB wdb{*dbw};
+            wdb.WriteMinVersion(nWalletVersion);
+        }
     }
 
     return true;
@@ -807,6 +809,7 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
         if (!EncryptKeys(vMasterKey)) {
             pwalletdbEncryption->TxnAbort();
             delete pwalletdbEncryption;
+            pwalletdbEncryption = nullptr;
             // We now probably have half of our keys encrypted in memory, and
             // half not... die and let the user reload the unencrypted wallet.
             assert(false);
@@ -817,6 +820,7 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
 
         if (!pwalletdbEncryption->TxnCommit()) {
             delete pwalletdbEncryption;
+            pwalletdbEncryption = nullptr;
             // We now have keys encrypted in memory, but not on disk... die to
             // avoid confusion and let the user reload the unencrypted wallet.
             assert(false);
