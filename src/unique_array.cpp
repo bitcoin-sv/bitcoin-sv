@@ -28,22 +28,22 @@ unique_array::unique_array(std::span<const uint8_t> s)
 }
     
 unique_array::unique_array(unique_array&& a) noexcept:
-    p_{move(a.p_)},
+    p_{std::move(a.p_)},
     cap_{a.cap_},
     size_{a.size_}
 {
-    a.p_ = nullptr;
+    a.p_ = make_unique<value_type[]>(0);
     a.cap_ = 0;
     a.size_ = 0;
 }
 
 unique_array& unique_array::operator=(unique_array&& a) noexcept
 {
-    p_ = move(a.p_);
+    p_ = std::move(a.p_);
     cap_ = a.cap_;
     size_ = a.size_;
 
-    a.p_ = nullptr;
+    a.p_ = make_unique<value_type[]>(0);
     a.cap_ = 0;
     a.size_ = 0;
     return *this;
@@ -54,15 +54,9 @@ void unique_array::reserve(size_t n)
     if(n <= cap_ || n <= size_)
         return;
 
-    if(p_)
-    {
-        auto tmp{make_unique<value_type[]>(n)}; 
-        copy(&p_[0], &p_[size_], &tmp[0]);
-        p_ = move(tmp);
-    }
-    else
-        p_ = make_unique<value_type[]>(n);
-    
+    auto tmp{make_unique<value_type[]>(n)}; 
+    copy(&p_[0], &p_[size_], &tmp[0]);
+    p_ = std::move(tmp);
     cap_ = n;
 }
     
@@ -103,7 +97,7 @@ void unique_array::append(const value_type* p, size_t n)
 
 void unique_array::reset()
 {
-    p_.reset();
+    p_ = make_unique<value_type[]>(0);
     size_ = 0;
     cap_ = 0;
 }

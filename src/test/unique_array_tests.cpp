@@ -38,11 +38,15 @@ BOOST_AUTO_TEST_CASE(move_construction)
 {
     unique_array a;
     a.push_back(42);
-    unique_array b{move(a)};
-    BOOST_CHECK(a.empty());
+    unique_array b{std::move(a)};
     BOOST_CHECK_EQUAL(1, b.size());
     BOOST_CHECK_EQUAL(1, b.capacity());
     BOOST_CHECK_EQUAL(42, b[0]);
+    
+    // moved from object should still be useable
+    BOOST_CHECK(a.empty());
+    a.push_back(101);
+    BOOST_CHECK_EQUAL(101, a[0]);
 }
 
 BOOST_AUTO_TEST_CASE(move_assignment)
@@ -52,11 +56,15 @@ BOOST_AUTO_TEST_CASE(move_assignment)
     unique_array b;
     b.push_back(2);
     b.push_back(3);
-    b = move(a);
-    BOOST_CHECK(a.empty());
+    b = std::move(a);
     BOOST_CHECK_EQUAL(1, b.size());
     BOOST_CHECK_EQUAL(1, b.capacity());
     BOOST_CHECK_EQUAL(1, b[0]);
+    
+    // moved from object should still be useable
+    BOOST_CHECK(a.empty());
+    a.push_back(101);
+    BOOST_CHECK_EQUAL(101, a[0]);
 }
 
 BOOST_AUTO_TEST_CASE(reserve_capacity)
@@ -148,11 +156,22 @@ BOOST_AUTO_TEST_CASE(insert_into_non_empty)
 BOOST_AUTO_TEST_CASE(data)
 {
     unique_array a;
-    BOOST_CHECK_EQUAL(nullptr, a.data());
+    BOOST_CHECK_NE(nullptr, a.data());
 
     a.push_back(42);
-    BOOST_CHECK_NE(nullptr, a.data());
     BOOST_CHECK_EQUAL(42, *a.data());
+}
+
+BOOST_AUTO_TEST_CASE(reset)
+{
+    unique_array a;
+    a.push_back(42);
+    a.reset();
+    BOOST_CHECK(a.empty());
+    
+    // check still useable
+    a.push_back(101);
+    BOOST_CHECK_EQUAL(101, a[0]);
 }
 
 BOOST_AUTO_TEST_CASE(shrink_to_fit_size_equal_cap)
