@@ -110,6 +110,8 @@ set(CMAKE_MODULE_PATH
 	${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules
 )
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # If ccache is available, then use it.
 find_program(CCACHE ccache)
 if(CCACHE)
