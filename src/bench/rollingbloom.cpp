@@ -36,6 +36,7 @@ static void RollingBloom(benchmark::State &state) {
         data[3] = count;
         match += filter.contains(data);
     }
+    (void) match;
 }
 
 BENCHMARK(RollingBloom)
