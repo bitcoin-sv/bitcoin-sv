@@ -175,7 +175,8 @@ template unsigned int base_uint<256>::bits() const;
 // This implementation directly uses shifts instead of going through an
 // intermediate MPI representation.
 arith_uint256 &arith_uint256::SetCompact(uint32_t nCompact, bool *pfNegative,
-                                         bool *pfOverflow) {
+                                         bool *pfOverflow)
+{
     int nSize = nCompact >> 24;
     uint32_t nWord = nCompact & 0x007fffff;
     if (nSize <= 3) {
@@ -228,3 +229,10 @@ arith_uint256 UintToArith256(const uint256 &a) {
         b.pn[x] = ReadLE32(a.begin() + x * 4);
     return b;
 }
+
+std::ostream& operator<<(std::ostream& os, const arith_uint256& a)
+{
+    os << a.ToString();
+    return os;
+}
+

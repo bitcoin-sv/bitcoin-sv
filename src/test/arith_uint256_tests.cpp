@@ -472,6 +472,45 @@ BOOST_AUTO_TEST_CASE(methods) // GetHex SetHex size() GetLow64 GetSerializeSize,
     }
 }
 
+BOOST_AUTO_TEST_CASE(setcompact_test)
+{
+    using input = std::tuple<uint32_t, bool, bool, std::string>;
+    const std::vector<input> inputs
+    { 
+        std::make_tuple(0x00123456, false, false, "0"),
+        std::make_tuple(0x01123456, false, false, "12"),
+        std::make_tuple(0x02123456, false, false, "1234"),
+        std::make_tuple(0x03123456, false, false, "123456"),
+        std::make_tuple(0x04123456, false, false, "12345600"),
+        std::make_tuple(0x20123456, false, false, "12345600000000000000000000000000"
+                                                  "00000000000000000000000000000000"),
+        std::make_tuple(0x21123456, false, true,  "34560000000000000000000000000000"
+                                                  "00000000000000000000000000000000"),
+
+        std::make_tuple(0x00923456, false, false, "0"),
+        std::make_tuple(0x01923456, true, false, "12"),
+        std::make_tuple(0x02923456, true, false, "1234"),
+        std::make_tuple(0x03923456, true, false, "123456"),
+        std::make_tuple(0x04923456, true, false, "12345600"),
+        std::make_tuple(0x20923456, true, false, "12345600000000000000000000000000"
+                                                 "00000000000000000000000000000000"),
+        std::make_tuple(0x21923456, true, true,  "34560000000000000000000000000000"
+                                                 "00000000000000000000000000000000"),
+    }; 
+
+    for(const auto& [input, exp_negative, exp_overflow, exp] : inputs)
+    {
+        bool is_negative{};
+        bool is_overflow{};
+        arith_uint256 a;
+        const auto b = a.SetCompact(input, &is_negative, &is_overflow);
+        BOOST_CHECK_EQUAL(exp_negative, is_negative);
+        BOOST_CHECK_EQUAL(exp_overflow, is_overflow);
+        BOOST_CHECK_EQUAL(arith_uint256{exp}, a);
+        BOOST_CHECK_EQUAL(a, b);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(bignum_SetCompact) {
     arith_uint256 num;
     bool fNegative;
