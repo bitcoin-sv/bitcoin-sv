@@ -16,6 +16,7 @@
 #include <chrono>
 #include <map>
 #include <optional>
+#include <thread>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -1577,8 +1578,39 @@ BOOST_FIXTURE_TEST_CASE(cache_all_inputs, TestingSetup)
         BOOST_CHECK(! provider.HaveCoinInCache(txn->vin[0].prevout));
     }
 
-    // Cache them all (Except the first in the list, which the function expects to be coinbase)
-    provider.DBCacheAllInputs(txns);
+    {
+        TestCoinsSpanCache span { provider };
+        span.SetBestBlock(blockHash);
+
+        auto shardedTarget = [](uint16_t shardIndex,
+                                CCoinsViewCache::Shard& shard,
+                                const std::vector<CTransactionRef>& txns)
+        {
+            CoinWithScript coin;
+            auto& tx = txns[shardIndex];
+            for (auto& vin : tx->vin) {
+                shard.SpendCoin(vin.prevout, &coin);
+            }
+            return true;
+        };
+
+        std::thread spawner([&]() {
+            std::vector<std::thread> threads;
+            for(int i = 0; i < NumTxns; ++i) {
+                threads.emplace_back([&]() {
+                    // Cache them all (Except the first in the list, which the function expects to be coinbase)
+                    provider.DBCacheAllInputs(txns);
+                });
+            }
+            for (auto& thread : threads) {
+                thread.join();
+            }
+        });
+
+        auto results = span.RunSharded(NumTxns, shardedTarget, std::cref(txns));
+        spawner.join();
+    }
+
     for(size_t i = 1; i < txns.size(); ++i)
     {
         BOOST_CHECK(provider.HaveCoinInCache(txns[i]->vin[0].prevout));
