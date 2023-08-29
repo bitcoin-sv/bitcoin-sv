@@ -359,9 +359,9 @@ public:
     /** Call the specified function for each node in parallel */
     template <typename Callable>
     auto ParallelForEachNode(Callable&& func)
-        -> std::vector<std::future<typename std::result_of<Callable(const CNodePtr&)>::type>>
+        -> std::vector<std::future<std::invoke_result_t<Callable, const CNodePtr&>>>
     {
-        using resultType = typename std::result_of<Callable(const CNodePtr&)>::type;
+        using resultType = std::invoke_result_t<Callable, const CNodePtr&>;
         std::vector<std::future<resultType>> results {};
 
         LOCK(cs_vNodes);
@@ -396,13 +396,13 @@ public:
             bool fUseTimedCancellationSource,
             std::chrono::milliseconds maxasynctasksrunduration,
             PTVTaskScheduleStrategy scheduleStrategy)
-        -> std::vector<std::future<typename std::result_of<
-            Callable(const TxInputDataSPtrRefVec&,
+        -> std::vector<std::future<std::invoke_result_t<
+            Callable, const TxInputDataSPtrRefVec&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
                 bool,
-                std::chrono::steady_clock::time_point)>::type>> {
+                std::chrono::steady_clock::time_point>>> {
         // Set end_time_point based on the current time and max duration for async tasks.
         std::chrono::steady_clock::time_point zero_time_point(std::chrono::milliseconds(0));
         std::chrono::steady_clock::time_point end_time_point =
@@ -418,13 +418,14 @@ public:
             auto scheduler = std::make_shared<ValidationScheduler>(mValidatorThreadPool, vNewTxns, validate);
             return scheduler->Schedule();
         } else {
-            using resultType = typename std::result_of<
-                    Callable(const TxInputDataSPtrRefVec&,
+            using resultType = std::invoke_result_t<
+                             Callable, 
+                             const TxInputDataSPtrRefVec&,
                              const Config*,
                              CTxMemPool*,
                              CTxnHandlers&,
                              bool,
-                             std::chrono::steady_clock::time_point)>::type;
+                             std::chrono::steady_clock::time_point>;
             auto chains = ScheduleChains(vNewTxns);
             // Reserve a space for the result set (a pessimistic estimation).
             std::vector<std::future<resultType>> results {};
