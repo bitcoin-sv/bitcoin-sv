@@ -35,7 +35,7 @@ void RawTxValidator::ThreadFunc()
 
             LogPrint(BCLog::RPC, "Processing a batch of 1 transaction from sendrawtransaction/sendrawtransactions\n");
 
-            std::shared_ptr<CTxInputData> sp{move(validationData.txInputData)};
+            std::shared_ptr<CTxInputData> sp{std::move(validationData.txInputData)};
             auto state = txValidator->processValidation(
                 sp, 
                 changeSet,    // an instance of the journal
@@ -57,7 +57,7 @@ void RawTxValidator::ThreadFunc()
             vTxInputData.reserve(batch.value().size());
             for(auto& txData : batch.value()) 
             {
-                vTxInputData.emplace_back(move(txData.txInputData));
+                vTxInputData.emplace_back(std::move(txData.txInputData));
             }
             LogPrint(BCLog::RPC, "Processing a batch of %s transactions from sendrawtransaction/sendrawtransactions\n", batch->size());
             CTxnValidator::RejectedTxns rejectedTxns{};
@@ -130,7 +130,7 @@ RawTxValidator::SubmitMany(std::vector<std::unique_ptr<CTxInputData>>& txInputDa
     std::vector<ValidationTaskData> taskDataVec;
     for(auto& txInputData : txInputDataVec)
     {
-        ValidationTaskData taskData{move(txInputData), std::promise<RawTxValidatorResult>()};
+        ValidationTaskData taskData{std::move(txInputData), std::promise<RawTxValidatorResult>()};
         futures.push_back(taskData.promise.get_future());
         taskDataVec.emplace_back(std::move(taskData));
     }

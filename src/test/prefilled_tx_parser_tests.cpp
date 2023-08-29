@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(parse_in_one_pass)
     BOOST_CHECK_EQUAL(0, bytes_reqd); 
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
 
-    unique_array a{move(parser).buffer()};
+    unique_array a{std::move(parser).buffer()};
     BOOST_CHECK_EQUAL(ip.size(), a.size());
     BOOST_CHECK_EQUAL_COLLECTIONS(ip.cbegin(), ip.cend(),
                                   a.cbegin(), a.cend());

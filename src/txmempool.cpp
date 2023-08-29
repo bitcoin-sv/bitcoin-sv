@@ -1445,7 +1445,6 @@ void CTxMemPool::CheckMempoolImplNL(
         {
             ++secondaryMempoolSize;
         }
-        unsigned int i = 0;
         checkTotal += it->GetTxSize();
         innerUsage += it->DynamicMemoryUsage();
         const auto tx = it->GetSharedTx();
@@ -1483,7 +1482,6 @@ void CTxMemPool::CheckMempoolImplNL(
             assert(it3 != mapNextTx.end());
             assert(it3->outpoint == txin.prevout);
             assert(it3->spentBy->GetTxId() == tx->GetId());
-            i++;
         }
         assert(setParentCheck == GetMemPoolParentsNL(it));
         assert(ancestorsCount == it->ancestorsCount);

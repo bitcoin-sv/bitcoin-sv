@@ -37,7 +37,7 @@ std::pair<size_t, size_t> tx_parser::parse_input(span<const uint8_t> s)
         vector<uint8_t> v;
         v.reserve(total_bytes_read);
         v.insert(v.cend(), s.begin(), s.begin() + total_bytes_read);
-        ip_buffers_.push_back(move(v));
+        ip_buffers_.push_back(std::move(v));
         s = s.subspan(total_bytes_read);
     }
 
@@ -77,7 +77,7 @@ std::pair<size_t, size_t> tx_parser::parse_output(span<const uint8_t> s)
         vector<uint8_t> v;
         v.reserve(total_bytes_read);
         v.insert(v.cend(), s.begin(), s.begin() + total_bytes_read);
-        op_buffers_.push_back(move(v));
+        op_buffers_.push_back(std::move(v));
         s = s.subspan(total_bytes_read);
     }
 
@@ -317,7 +317,7 @@ unique_array tx_parser::buffer() &&
     assert(state_ == state::complete); 
     size_ = 0;
     state_ = state::version;
-    return move(buffer_);
+    return std::move(buffer_);
 }
 
 size_t tx_parser::buffer_size() const

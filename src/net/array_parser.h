@@ -118,7 +118,7 @@ inline std::pair<size_t, size_t> array_parser<T>::operator()(std::span<const uin
 
         s = s.subspan(bytes_read);
         size_ += parser_.size();
-        segments_.push_back(move(parser_).buffer());
+        segments_.push_back(std::move(parser_).buffer());
         ++current_;
     }
     
