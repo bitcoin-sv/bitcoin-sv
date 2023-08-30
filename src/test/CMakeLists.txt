@@ -221,6 +221,8 @@ target_include_directories(test_bitcoin
 		${OPENSSL_INCLUDE_DIR}
 )
 
+target_compile_options(test_bitcoin PRIVATE -Wno-return-std-move)
+
 find_package(Boost 1.74 REQUIRED unit_test_framework)
 
 target_link_libraries(
