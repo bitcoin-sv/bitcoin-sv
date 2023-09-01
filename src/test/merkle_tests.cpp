@@ -473,7 +473,7 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
     {
         CMutableTransaction mtx{};
         mtx.nLockTime = j;
-        block.vtx[j] = make_shared<const CTransaction>(move(mtx));
+        block.vtx[j] = make_shared<const CTransaction>(std::move(mtx));
     }
 
     // lambda to create CMerkleTree version of proof and return a nodes list

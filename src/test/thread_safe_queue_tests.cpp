@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
                     collectingQueue.PushWait(popped.value());
                 }
             }, &ready[i]);
-        outs.push_back(move(f));
+        outs.push_back(std::move(f));
     }
 
     // wait until all threads are ready then set them running

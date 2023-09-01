@@ -1562,7 +1562,7 @@ static UniValue sendrawtransaction(const Config &config,
         // - no-op in terms of prioritise/clear operations
         CTxPrioritizer txPrioritizer{mempool, dontCheckFee ? txid : TxId()};
 
-        auto futureResult = g_connman->getRawTxValidator()->SubmitSingle(move(pTxInputData));
+        auto futureResult = g_connman->getRawTxValidator()->SubmitSingle(std::move(pTxInputData));
         auto result = futureResult.get();
         
         if (result.state.has_value())

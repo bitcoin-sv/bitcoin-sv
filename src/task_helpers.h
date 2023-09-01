@@ -6,13 +6,14 @@
 #include "task.h"
 #include "threadpool.h"
 
+#include <cwchar>
 #include <future>
 #include <type_traits>
 
 // Helper method to create task with a specified priority.
 template<typename ThreadPool, typename Priority, typename Callable, typename... Args>
 auto make_task(ThreadPool& pool, Priority priority, Callable&& call, Args&&... args)
-    -> std::future<typename std::result_of<Callable(Args...)>::type>
+    -> std::future<std::invoke_result_t<Callable, Args...>>
 {
     CTask task { priority };
     auto future { task.injectTask(std::forward<Callable>(call), std::forward<Args>(args)...) };
@@ -23,7 +24,7 @@ auto make_task(ThreadPool& pool, Priority priority, Callable&& call, Args&&... a
 // Helper method to create a default priority task.
 template<typename ThreadPool, typename Callable, typename... Args>
 auto make_task(ThreadPool& pool, Callable&& call, Args&&... args)
-    -> std::future<typename std::result_of<Callable(Args...)>::type>
+    -> std::future<std::invoke_result_t<Callable, Args...>>
 {
     // Default to medium priority
     CTask::Priority priority { CTask::Priority::Medium };

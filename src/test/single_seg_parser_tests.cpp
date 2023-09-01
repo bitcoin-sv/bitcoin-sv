@@ -27,7 +27,7 @@ BOOST_AUTO_TEST_CASE(default_move)
     single_seg_parser a;
     BOOST_CHECK_EQUAL(0, a.size());
 
-    single_seg_parser b{move(a)};
+    single_seg_parser b{std::move(a)};
     BOOST_CHECK_EQUAL(0, a.size());
     BOOST_CHECK_EQUAL(0, b.size());
 }
@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
 BOOST_AUTO_TEST_CASE(single_seg_parser_xvalue)
 {
     single_seg_parser dp;
-    msg_parser parser{move(dp)};
+    msg_parser parser{std::move(dp)};
     BOOST_CHECK_EQUAL(0, parser.size());
 
     vector<uint8_t> v(42);

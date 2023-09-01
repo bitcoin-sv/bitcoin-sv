@@ -44,8 +44,8 @@ std::size_t prefilled_tx_parser::size() const
 
 unique_array prefilled_tx_parser::buffer() &&
 {
-    unique_array a{move(tx_parser_).buffer()};
+    unique_array a{std::move(tx_parser_).buffer()};
     buffer_.insert(buffer_.cend(), a.cbegin(), a.cend());
-    return move(buffer_);
+    return std::move(buffer_);
 }
 

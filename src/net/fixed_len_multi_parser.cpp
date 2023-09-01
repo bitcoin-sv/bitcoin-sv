@@ -80,7 +80,7 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
         if(buffer_.size() == seg_size_ || 
            (current_ >= n_ && !buffer_.empty()))
         {
-            segments_.insert(segments_.end(), move(buffer_));
+            segments_.insert(segments_.end(), std::move(buffer_));
             buffer_.reserve(seg_size_);
 
             if(current_ >= n_)

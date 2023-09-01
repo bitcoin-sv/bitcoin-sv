@@ -851,7 +851,7 @@ BOOST_AUTO_TEST_CASE(db_thread_safety_tests)
 
     // Helper that continuously checks all TXOs in array and returns when should_quit is true.
     auto frozen_txo_checker = [&](std::int32_t height){
-        for(std::size_t i = 0; ; ++i) // NOTE: This loop typically finishes after only two iterations because writing thread takes most of the time.
+        for(;;) // NOTE: This loop typically finishes after only two iterations because writing thread takes most of the time.
         {
             // Check quit signal so that we can do one more loop before quitting
             bool should_quit_after_loop = should_quit;

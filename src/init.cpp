@@ -3711,7 +3711,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         while (!fHaveGenesis) {
             condvar_GenesisWait.wait(lock);
         }
-        uiInterface.NotifyBlockTip.disconnect(BlockNotifyGenesisWait);
+        uiInterface.NotifyBlockTip.disconnect(&BlockNotifyGenesisWait);
     }
 
     preloadChainState(threadGroup);

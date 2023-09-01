@@ -127,10 +127,10 @@ class Association
 
     // Helper functions for running something over all streams that returns a result
     template <typename Callable,
-              std::enable_if_t<!std::is_void<typename std::result_of<Callable(const StreamPtr&)>::type>::value, int> = 0>
-    std::vector<typename std::result_of<Callable(const StreamPtr&)>::type> ForEachStream(Callable&& func) const
+              std::enable_if_t<!std::is_void_v<std::invoke_result_t<Callable, const StreamPtr&>>, int> = 0>
+    std::vector<std::invoke_result_t<Callable, StreamPtr&>> ForEachStream(Callable&& func) const
     {
-        std::vector<typename std::result_of<Callable(const StreamPtr&)>::type> res {};
+        std::vector<std::invoke_result_t<Callable, const StreamPtr&>> res {};
 
         LOCK(cs_mStreams);
         for(const auto& stream : mStreams)
@@ -143,7 +143,7 @@ class Association
 
     // Helper functions for running something over all streams that returns void
     template <typename Callable,
-              std::enable_if_t<std::is_void<typename std::result_of<Callable(const StreamPtr&)>::type>::value, int> = 0>
+              std::enable_if_t<std::is_void_v<std::invoke_result_t<Callable, const StreamPtr&>>, int> = 0>
     void ForEachStream(Callable&& func) const
     {
         LOCK(cs_mStreams);
@@ -154,7 +154,7 @@ class Association
     }
     // Non-const version
     template <typename Callable,
-              std::enable_if_t<std::is_void<typename std::result_of<Callable(StreamPtr&)>::type>::value, int> = 0>
+              std::enable_if_t<std::is_void_v<std::invoke_result_t<Callable, StreamPtr&>>, int> = 0>
     void ForEachStream(Callable&& func)
     {
         LOCK(cs_mStreams);
