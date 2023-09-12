@@ -57,6 +57,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	addrman_tests.cpp
 	amount_tests.cpp
 	allocator_tests.cpp
+    array_parser_tests.cpp
 	base32_tests.cpp
 	base58_tests.cpp
 	base64_tests.cpp
@@ -142,6 +143,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	miner_info_doc_tests.cpp
 	miner_info_error_tests.cpp
 	miner_info_ref_tests.cpp
+    mod_n_byte_parser.h
     msg_buffer_tests.cpp
     msg_parser_buffer_tests.cpp
 	multisig_tests.cpp
