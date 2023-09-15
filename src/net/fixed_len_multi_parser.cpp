@@ -115,7 +115,7 @@ void fixed_len_multi_parser::init_cum_lengths() const
     assert(cum_lengths_.empty());
 
     vector<size_t> seg_lengths;
-    seg_lengths.reserve(count().value());
+    seg_lengths.reserve(segment_count());
 
     std::transform(segments_.cbegin(), segments_.cend(),
                    back_inserter(seg_lengths),
