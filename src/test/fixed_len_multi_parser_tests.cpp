@@ -4,6 +4,7 @@
 #include <boost/test/unit_test.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 
 #include "net/fixed_len_multi_parser.h"
@@ -65,8 +66,52 @@ BOOST_AUTO_TEST_CASE(parse_max_shortids_count_only)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(9, bytes_read);
-    //BOOST_CHECK_EQUAL(0xffff'ffff, bytes_reqd); Todo overflow error
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_and_partial_fixed_len)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    ip.push_back(42);            // partial fixed_len
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(9, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(9, parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_and_short_id)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    ip.insert(ip.cend(), 6, 42); // 1 fixed_len
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(15, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(15, parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_short_id_and_partial_short_id)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    ip.insert(ip.cend(), 6, 42); // 1 fixed_len
+    ip.push_back(101);           // partial fixed_len
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(15, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(15, parser.size());
     BOOST_CHECK_EQUAL(1, parser.segment_count());
 }
 

@@ -7,7 +7,9 @@
 #include <algorithm>
 #include <boost/token_functions.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
+#include <limits>
 #include <numeric>
 #include <thread>
 #include <unistd.h>
@@ -59,10 +61,6 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
        
     // Add any bytes that are given to the buffer, but only create
     // a new segment when the buffer has read the min seg size
-    const size_t bytes_reqd{(fixed_len_ * (n_.value() - current_)) - buffer_.size()};
-    if(s.empty())
-        return make_pair(total_bytes_read, bytes_reqd);
-
     while(s.size() >= fixed_len_)
     {
         const size_t seg_bytes_reqd{seg_size_ - buffer_.size()};
@@ -90,8 +88,11 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
         s = s.subspan(quotient);
     }
 
-    const size_t bytes_reqdx = (n_.value() - current_) * 6;
-    return make_pair(total_bytes_read, bytes_reqdx);
+    const auto fixed_lens_reqd{n_.value() - current_};
+    const auto max_fixed_lens{ numeric_limits<uint64_t>::max() / fixed_len_ };
+    const auto n_fixed_lens{min(fixed_lens_reqd, max_fixed_lens)}; 
+    const auto bytes_reqd{ n_fixed_lens * fixed_len_ };
+    return make_pair(total_bytes_read, bytes_reqd);
 }
 
 size_t fixed_len_multi_parser::size() const
