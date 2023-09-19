@@ -4,6 +4,7 @@
 #include <boost/test/unit_test.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 
 #include "net/fixed_len_multi_parser.h"
@@ -55,6 +56,62 @@ BOOST_AUTO_TEST_CASE(parse_count_only)
     BOOST_CHECK_EQUAL(1, bytes_read);
     BOOST_CHECK_EQUAL(2 * sid_len, bytes_reqd);
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_only)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(9, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(ip.size(), parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_and_partial_fixed_len)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    ip.push_back(42);            // partial fixed_len
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(9, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(9, parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_and_short_id)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    ip.insert(ip.cend(), 6, 42); // 1 fixed_len
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(15, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(15, parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
+BOOST_AUTO_TEST_CASE(parse_max_shortids_count_short_id_and_partial_short_id)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    vector<uint8_t> ip(9, 0xff); // cmpctsize::max
+    ip.insert(ip.cend(), 6, 42); // 1 fixed_len
+    ip.push_back(101);           // partial fixed_len
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(15, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(15, parser.size());
     BOOST_CHECK_EQUAL(1, parser.segment_count());
 }
 
@@ -331,6 +388,39 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     BOOST_CHECK_EQUAL(mcci_msg.size(), total_bytes_read);
     BOOST_CHECK_EQUAL(2, passes);
     BOOST_CHECK_EQUAL(mcci_msg.size(), parser.size());
+}
+
+BOOST_AUTO_TEST_CASE(seg_offset)
+{
+    const vector<uint8_t> ip{make_msg(2)};
+    const size_t sids_per_seg{1};
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+    const std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(ip.size(), bytes_read);
+    BOOST_CHECK_EQUAL(0, bytes_reqd);
+    BOOST_CHECK_EQUAL(ip.size(), parser.size());
+    BOOST_CHECK_EQUAL(3, parser.segment_count());
+    
+    const auto [seg0, byte0] = parser.seg_offset(0);
+    BOOST_CHECK_EQUAL(0, seg0);
+    BOOST_CHECK_EQUAL(0, byte0);
+    
+    const auto [seg1, byte1] = parser.seg_offset(1);
+    BOOST_CHECK_EQUAL(1, seg1);
+    BOOST_CHECK_EQUAL(0, byte1);
+    
+    const auto [seg2, byte2] = parser.seg_offset(6);
+    BOOST_CHECK_EQUAL(1, seg2);
+    BOOST_CHECK_EQUAL(5, byte2);
+    
+    const auto [seg3, byte3] = parser.seg_offset(7);
+    BOOST_CHECK_EQUAL(2, seg3);
+    BOOST_CHECK_EQUAL(0, byte3);
+    
+    const auto [seg4, byte4] = parser.seg_offset(12);
+    BOOST_CHECK_EQUAL(2, seg4);
+    BOOST_CHECK_EQUAL(5, byte4);
 }
 
 BOOST_AUTO_TEST_CASE(read_all)
