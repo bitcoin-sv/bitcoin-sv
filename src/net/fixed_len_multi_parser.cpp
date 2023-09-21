@@ -58,14 +58,19 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
 
     if(current_ >= n_.value())
         return make_pair(total_bytes_read, 0);
+    
+    const auto max_fixed_lens{ numeric_limits<uint64_t>::max() / fixed_len_ };
        
     // Add any bytes that are given to the buffer, but only create
     // a new segment when the buffer has read the min seg size
     while(s.size() >= fixed_len_)
     {
+        const auto fixed_lens_reqd{n_.value() - current_};
+        const auto n_fixed_lens{min(fixed_lens_reqd, max_fixed_lens)}; 
+        const auto bytes_reqd{ n_fixed_lens * fixed_len_ };
+
         const size_t seg_bytes_reqd{seg_size_ - buffer_.size()};
-        const size_t msg_bytes_reqd{fixed_len_ * (n_.value() - current_)};
-        const size_t min_bytes_reqd{min(seg_bytes_reqd, msg_bytes_reqd)};
+        const size_t min_bytes_reqd{min(seg_bytes_reqd, bytes_reqd)};
         const size_t n_bytes{min(s.size(), min_bytes_reqd)};
         const size_t quotient{(n_bytes / fixed_len_) * fixed_len_};
         buffer_.insert(buffer_.cend(), 
@@ -89,7 +94,6 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
     }
 
     const auto fixed_lens_reqd{n_.value() - current_};
-    const auto max_fixed_lens{ numeric_limits<uint64_t>::max() / fixed_len_ };
     const auto n_fixed_lens{min(fixed_lens_reqd, max_fixed_lens)}; 
     const auto bytes_reqd{ n_fixed_lens * fixed_len_ };
     return make_pair(total_bytes_read, bytes_reqd);
