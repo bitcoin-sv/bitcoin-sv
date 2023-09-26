@@ -115,6 +115,21 @@ BOOST_AUTO_TEST_CASE(parse_max_shortids_count_short_id_and_partial_short_id)
     BOOST_CHECK_EQUAL(1, parser.segment_count());
 }
 
+BOOST_AUTO_TEST_CASE(overflow_with_shortids_and_partial_short_id)
+{
+    fixed_len_multi_parser parser{sid_len, sids_per_seg};
+
+    vector<uint8_t> ip{0xff, 1, 0, 0, 0, 0, 0, 0, 0x80};
+    ip.insert(ip.cend(), sid_len * sid_len + 1, 42);
+    std::span s{ip.data(), ip.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(45, bytes_read);
+    const auto expected_bytes_reqd{(numeric_limits<uint64_t>::max() / sid_len) * sid_len};
+    BOOST_CHECK_EQUAL(expected_bytes_reqd, bytes_reqd);
+    BOOST_CHECK_EQUAL(45, parser.size());
+    BOOST_CHECK_EQUAL(1, parser.segment_count());
+}
+
 static std::vector<uint8_t> make_msg(const size_t n_sids)
 {
     constexpr size_t sid_len{6};
