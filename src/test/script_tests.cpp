@@ -9,6 +9,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "rpc/server.h"
+#include "script/opcodes.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "script/sigcache.h"
@@ -33,6 +34,7 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -1379,6 +1381,112 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
 
     BOOST_CHECK(pushdata4Stack == directStack);
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+}
+
+BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    constexpr uint8_t len{0xff};
+    vector<uint8_t> args{OP_PUSHDATA1, len};
+    args.insert(args.cend(), len, 42);
+    args.push_back(OP_SIZE);
+    args.push_back(2);
+    args.push_back(len);
+    args.push_back(0); // extra byte req'd for sign bit
+    args.push_back(OP_EQUALVERIFY);
+
+    CScript script(args.begin(), args.end());
+    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    ScriptError error;
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const auto status =
+        EvalScript(config, 
+                    false, 
+                    source->GetToken(), 
+                    stack, 
+                    script, 
+                    flags,
+                    BaseSignatureChecker{},
+                    &error);
+    BOOST_CHECK_EQUAL(true, status.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+    BOOST_CHECK_EQUAL(1U, stack.size());
+}
+
+BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    vector<uint8_t> args{OP_PUSHDATA2, 0xff, 0xff};
+    args.insert(args.cend(), 0xffff, 42);
+    args.push_back(OP_SIZE);
+    args.push_back(3);
+    args.push_back(0xff);
+    args.push_back(0xff);
+    args.push_back(0); // extra byte req'd for sign bit
+    args.push_back(OP_EQUALVERIFY);
+
+    CScript script(args.begin(), args.end());
+    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    ScriptError error;
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const auto status =
+        EvalScript(config, 
+                    false, 
+                    source->GetToken(), 
+                    stack, 
+                    script, 
+                    flags,
+                    BaseSignatureChecker{},
+                    &error);
+    BOOST_CHECK_EQUAL(true, status.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+    BOOST_CHECK_EQUAL(1U, stack.size());
+}
+        
+BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
+{
+    using namespace std;
+
+    ConfigInit& config = GlobalConfig::GetModifiableGlobalConfig();
+
+    config.SetMaxScriptSizePolicy(0xffff'ffff);
+    
+    vector<uint8_t> args{OP_PUSHDATA4, 0x0, 0x0, 0x0, 0x80};
+    args.insert(args.cend(), 0x8000'0000, 42);
+    args.push_back(OP_SIZE);
+    args.push_back(5);
+    args.push_back(0x0);
+    args.push_back(0x0);
+    args.push_back(0x0);
+    args.push_back(0x80);
+    args.push_back(0); // extra byte req'd for sign bit
+    args.push_back(OP_EQUALVERIFY);
+
+    CScript script(args.begin(), args.end());
+    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    ScriptError error;
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const auto status =
+        EvalScript(config, 
+                    false, 
+                    source->GetToken(), 
+                    stack, 
+                    script, 
+                    flags,
+                    BaseSignatureChecker{},
+                    &error);
+    BOOST_CHECK_EQUAL(true, status.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+    BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
 CScript sign_multisig(CScript scriptPubKey, std::vector<CKey> keys,
