@@ -30,8 +30,6 @@ public:
 
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
-    std::optional<uint64_t> count() const { return n_; }
-
     size_t size() const;
     bool empty() const { return size() == 0; }
 

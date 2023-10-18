@@ -68,6 +68,7 @@ static void FastRandom_32bit(benchmark::State &state) {
             x += rng.rand32();
         }
     }
+    (void) x;
 }
 
 static void FastRandom_1bit(benchmark::State &state) {
@@ -78,6 +79,7 @@ static void FastRandom_1bit(benchmark::State &state) {
             x += rng.randbool();
         }
     }
+    (void) x;
 }
 
 BENCHMARK(RIPEMD160)

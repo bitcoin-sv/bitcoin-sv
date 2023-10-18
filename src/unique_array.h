@@ -72,7 +72,7 @@ public:
     void reset();
 
 private:
-    std::unique_ptr<value_type[]> p_{};
+    std::unique_ptr<value_type[]> p_{std::make_unique<value_type[]>(0)};
 
     size_t cap_{0};
     size_t size_{0};

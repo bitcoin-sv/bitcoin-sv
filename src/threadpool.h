@@ -148,7 +148,7 @@ class CPriorityQueueAdaptor
     // Pop and return the next task from the queue
     CTask pop(ThreadPriority)
     {
-        CTask task { std::move(mTasks.top()) };
+        CTask task { mTasks.top() }; // NOTE: CTask object must be copied because std::priority_queue::top() returns a const_reference.
         mTasks.pop();
         return task;
     }

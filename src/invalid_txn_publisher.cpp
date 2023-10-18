@@ -162,13 +162,11 @@ void InvalidTxnInfo::ToJson(CJSONWriter& writer, bool writeHex) const
     PutState(writer);
 
     writer.writeBeginArray("collidedWith");
-    int idx=1;
     for(auto& item : mCollidedWithTransaction)
     {
         writer.writeBeginObject();
         PutTx(writer, item.mTransaction, writeHex);
         writer.writeEndObject();
-        ++idx;
     }
     writer.writeEndArray();
 

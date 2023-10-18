@@ -6,6 +6,8 @@
 
 #include "net/msg_parser_buffer.h"
 
+#include "mod_n_byte_parser.h"
+
 #include <numeric>
 #include <utility>
 
@@ -13,48 +15,9 @@ using namespace std;
 
 BOOST_AUTO_TEST_SUITE(msg_parser_buffer_tests)
 
-// reads n bytes at a time up to a max value;
-template<size_t N>
-class mod_n_byte_parser
-{
-    vector<uint8_t> v_;
-    size_t max_size_{};
-
-public:
-    explicit mod_n_byte_parser(size_t max_size):
-        max_size_{max_size}
-    {}
-
-    std::pair<size_t, size_t> operator()(std::span<const uint8_t> s)
-    {
-        if(v_.size() >= max_size_)
-            return make_pair(0, 0);
-
-        const auto old_size{v_.size()};
-        while(s.size() >= N && (max_size_ - v_.size() >= N))
-        {
-            v_.insert(v_.end(), s.begin(), s.begin() + N);
-            s = s.subspan(N);
-        }
-        
-        const size_t remainder{s.size() % N};
-        return make_pair(v_.size() - old_size,
-                         remainder ? N : 0);
-    }
-
-    size_t read(size_t read_pos, std::span<uint8_t>)
-    {
-        assert(false);
-        return 0;
-    }
-
-    size_t size() const { return v_.size(); }
-    void clear() { v_.clear(); }
-};
-
 BOOST_AUTO_TEST_CASE(mod_n_byte_parser_tests)
 {
-    mod_n_byte_parser<10> parser{20};
+    mod_n_byte_parser<10, 20> parser;
     vector<uint8_t> v(11);
 
     size_t offset{};
@@ -91,7 +54,7 @@ BOOST_AUTO_TEST_CASE(mod_n_byte_parser_tests)
 
 BOOST_AUTO_TEST_CASE(buffer_unread_input)
 {
-    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<10>{10})};
+    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<10, 10>{})};
 
     const vector<uint8_t> in{[]{
         vector<uint8_t> v(20);
@@ -112,7 +75,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input)
 BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
 {
     constexpr size_t N{10};
-    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<N>{20})};
+    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<N, 20>{})};
 
     const vector<uint8_t> in{[]{
         vector<uint8_t> v(24);
@@ -177,7 +140,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
 
 BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 {
-    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<10>{110})};
+    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<10, 110>{})};
 
     const vector<uint8_t> in{[]{
         vector<uint8_t> v(110);
@@ -196,7 +159,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 
 BOOST_AUTO_TEST_CASE(parse_byte_by_n_bytes)
 {
-    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<10>{110})};
+    msg_parser_buffer buffer{make_unique<msg_parser>(mod_n_byte_parser<10, 110>{})};
 
     const vector<uint8_t> in{[]{
         vector<uint8_t> v(110);
@@ -216,7 +179,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_n_bytes)
 
 BOOST_AUTO_TEST_CASE(parse_buffer_size)
 {
-    msg_parser_buffer parser{make_unique<msg_parser>(mod_n_byte_parser<10>{50})};
+    msg_parser_buffer parser{make_unique<msg_parser>(mod_n_byte_parser<10, 50>{})};
 
     const vector<uint8_t> in{[]{
         vector<uint8_t> v(42);

@@ -30,6 +30,7 @@ BITCOIN_TESTS =\
   test/addrman_tests.cpp \
   test/amount_tests.cpp \
   test/allocator_tests.cpp \
+  test/array_parser_tests.cpp \
   test/base32_tests.cpp \
   test/base58_tests.cpp \
   test/base64_tests.cpp \
@@ -118,6 +119,7 @@ BITCOIN_TESTS =\
   test/miner_info_ref_tests.cpp \
   test/miner_tests.cpp \
   test/minerid_tests.cpp \
+  test/mod_n_byte_parser.h \
   test/msg_buffer_tests.cpp \
   test/msg_parser_buffer_tests.cpp \
   test/multisig_tests.cpp \

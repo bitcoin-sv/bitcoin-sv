@@ -5,6 +5,7 @@
 #ifndef BITCOIN_RPCMISC_H
 #define BITCOIN_RPCMISC_H
 
+#include <cstdint>
 #include <string>
 #include <optional>
 

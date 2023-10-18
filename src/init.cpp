@@ -188,8 +188,9 @@ void Shutdown() {
     }
 #endif
     MapPort(false);
-    peerLogic->UnregisterValidationInterface();
-    peerLogic.reset();
+    if(peerLogic) {
+        peerLogic->UnregisterValidationInterface();
+    }
 
     rpc::client::g_pWebhookClient.reset();
     mining::g_miningFactory.reset();
@@ -201,6 +202,7 @@ void Shutdown() {
         g_connman->Stop();
         g_connman.reset();
     }
+    peerLogic.reset();
 
     // must be called after g_connman shutdown as conman threads could still be
     // using it before that
@@ -3709,7 +3711,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         while (!fHaveGenesis) {
             condvar_GenesisWait.wait(lock);
         }
-        uiInterface.NotifyBlockTip.disconnect(BlockNotifyGenesisWait);
+        uiInterface.NotifyBlockTip.disconnect(&BlockNotifyGenesisWait);
     }
 
     preloadChainState(threadGroup);

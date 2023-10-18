@@ -7,6 +7,7 @@
 #include <iterator>
 #include <vector>
 
+#include <boost/test/unit_test_suite.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include "net/tx_parser.h"
@@ -431,6 +432,42 @@ BOOST_AUTO_TEST_CASE(tx_parser_as_reqd)
     BOOST_CHECK_EQUAL(0, parser.buffer_size());
     BOOST_CHECK_EQUAL(27, passes);
     BOOST_CHECK_EQUAL(tx.size(), parser.size());
+}
+
+BOOST_AUTO_TEST_CASE(parse_large_input_count_and_script_len)
+{
+    tx_parser parser;
+    
+    std::vector<uint8_t> tx;
+    tx.insert(tx.cend(), version_len, 1);       // tx version
+    tx.insert(tx.cend(), 9, 0xff);              // <- large n inputs 
+    tx.insert(tx.cend(), bsv::outpoint_len, 2); // outpoint
+    tx.insert(tx.cend(), 9, 0xff);              // <- large script len
+    std::span s{tx.data(), tx.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(58, bytes_read);
+    BOOST_CHECK_EQUAL(0xffff'ffff'ffff'ffff, bytes_reqd);
+}
+
+BOOST_AUTO_TEST_CASE(parse_large_output_count_and_script_len)
+{
+    tx_parser parser;
+    
+    std::vector<uint8_t> tx;
+    tx.insert(tx.cend(), version_len, 1);       // tx version
+    tx.push_back(1);                            // n inputs
+    tx.insert(tx.cend(), bsv::outpoint_len, 2); // outpoint
+    tx.push_back(1);                            // script len
+    tx.push_back(0x6a);                         // script
+    tx.insert(tx.cend(), bsv::seq_len, 3);      // sequence
+    tx.insert(tx.cend(), 9, 0xff);              // <- large n outputs
+    tx.insert(tx.cend(), bsv::value_len, 4);    // value 
+    tx.insert(tx.cend(), 9, 0xff);              // <- large script len
+
+    std::span s{tx.data(), tx.size()};
+    const auto [bytes_read, bytes_reqd] = parser(s);
+    BOOST_CHECK_EQUAL(73, bytes_read);
+    BOOST_CHECK_EQUAL(0xffff'ffff'ffff'ffff, bytes_reqd);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
