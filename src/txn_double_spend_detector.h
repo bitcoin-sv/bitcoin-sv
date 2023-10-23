@@ -73,20 +73,18 @@ public:
     /** Check if any of txn's inputs is already known */
     bool isAnyOfInputsKnownNL(const CTransaction &tx, CValidationState& state) const;
 
-    struct OutPointWithTx;
+    struct OutPointWithTx
+    {
+        COutPoint mOut;
+        std::shared_ptr<const CTransaction> mspTx;
 
+        OutPointWithTx(const COutPoint& out, const std::shared_ptr<const CTransaction>& spTx)
+            : mOut{ out }
+            , mspTx{ spTx }
+        {}
+    };
     std::vector<OutPointWithTx> mKnownSpends = {};
     std::set<const CTransaction*> mKnownSpendsTx;
     mutable std::mutex mMainMtx {};
 };
 
-struct CTxnDoubleSpendDetector::OutPointWithTx
-{
-    COutPoint mOut;
-    std::shared_ptr<const CTransaction> mspTx;
-
-    OutPointWithTx(const COutPoint& out, const std::shared_ptr<const CTransaction>& spTx)
-        : mOut{ out }
-        , mspTx{ spTx }
-    {}
-};

@@ -70,13 +70,13 @@ class CTask
     */
     template<typename Callable, typename... Args>
     auto injectTask(Callable&& call, Args&&... args)
-        -> std::future<typename std::result_of<Callable(Args...)>::type>
+        -> std::future<std::invoke_result_t<Callable, Args...>>
     {
         // Use packaged_task with bind to get us a task we can easily call
         // without needing to remember all its args.
         // FIXME: Once we get generalised lambda capture & C++14 we could use
         // make_unique here instead of make_shared.
-        using returnType = typename std::result_of<Callable(Args...)>::type;
+        using returnType = std::invoke_result_t<Callable, Args...>;
         auto task { std::make_shared<std::packaged_task<returnType()>>(
             std::bind(std::forward<Callable>(call), std::forward<Args>(args)...))
         };

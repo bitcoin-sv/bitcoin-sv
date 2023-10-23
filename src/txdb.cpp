@@ -507,51 +507,12 @@ void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
         }
     }
     // FIXME: Consider using parallel sort when it beconmes available
+    // NOTE: parallel sorting requires -ltbb in few GCC versions
     std::sort(allInputs.begin(), allInputs.end(), Sort);
-
-    std::unique_lock lock { mCoinsViewCacheMtx };
 
     for(const auto& outpoint : allInputs)
     {
-        std::optional<CoinImpl> coinFromCache { mCache.FetchCoin(outpoint) };
-
-        // If we don't have it in the cache, or we do have it but it's unspent without the script loaded
-        if(!coinFromCache.has_value() || (!coinFromCache->IsSpent() && !coinFromCache->HasScript()))
-        {
-            std::optional<CoinImpl> coinFromView { DBGetCoin(outpoint, std::numeric_limits<uint64_t>::max()) };
-            if(coinFromView.has_value())
-            {
-                assert(coinFromView->HasScript());
-
-                if(coinFromCache.has_value())
-                {
-                    if(hasSpaceForScript(coinFromView->GetScriptSize()))
-                    {
-                        mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value()));
-                    }
-                }
-                else
-                {
-                    if(hasSpaceForScript(coinFromView->GetScriptSize()))
-                    {
-                        mCache.AddCoin(outpoint, std::move(coinFromView.value()));
-                    }
-                    else
-                    {
-                        mCache.AddCoin(
-                            outpoint,
-                            CoinImpl {
-                                coinFromView->GetTxOut().nValue,
-                                coinFromView->GetScriptSize(),
-                                coinFromView->GetHeight(),
-                                coinFromView->IsCoinBase(),
-                                coinFromView->IsConfiscation()
-                            }
-                        );
-                    }
-                }
-            }
-        }
+        GetCoin(outpoint, std::numeric_limits<uint64_t>::max());
     }
 }
 
@@ -617,15 +578,13 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
             //     cache above or obtain fetch coins guard and re-try DB fetch
             //     of coin that is guaranteed not to be in the cache
             fetchCoinsGuard = mFetchingCoins.TryInsert(outpoint);
-        }
-
-        if (fetchCoinsGuard.has_value())
-        {
-            // it can happen that we'll get multiple requests and unnecessarily
-            // load more scripts than needed but that should be rare enough
-            maxScriptLoadingSize = getMaxScriptLoadingSize(maxScriptSize);
-
-            break;
+            if (fetchCoinsGuard.has_value())
+            {
+                // it can happen that we'll get multiple requests and unnecessarily
+                // load more scripts than needed but that should be rare enough
+                maxScriptLoadingSize = getMaxScriptLoadingSize(maxScriptSize);
+                break;
+            }
         }
 
         // All but the first reader will end up here. Give the initial thread a

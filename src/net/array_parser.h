@@ -24,10 +24,12 @@ template<typename T>
 class array_parser
 {
 public:
+    using value_type = unique_array;
+    using segments_type = std::vector<value_type>;
+    using size_type = std::vector<value_type>::size_type;
+
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
-    std::optional<uint64_t> seg_count() const { return n_; }
-
     size_t size() const;
     bool empty() const { return size() == 0; }
 
@@ -48,7 +50,8 @@ public:
     auto end() { return segments_.end(); }
 
     std::pair<ptrdiff_t, size_t>  seg_offset(size_t read_pos) const;
-    auto segment_count() const { return segments_.size(); }
+
+    size_type segment_count() const { return segments_.size(); }
 
     void reset(size_t segment);
 
@@ -63,12 +66,11 @@ private:
     std::optional<uint64_t> n_{};
     uint64_t current_{};
 
-    using segments_type = std::vector<unique_array>;
     segments_type segments_;
 
-    size_t size_{};
+    size_type size_{};
 
-    mutable std::vector<size_t> cum_lengths_;
+    mutable std::vector<size_type> cum_lengths_;
 };
 
 template<typename T>
@@ -106,19 +108,20 @@ inline std::pair<size_t, size_t> array_parser<T>::operator()(std::span<const uin
         s = s.subspan(bytes_read);
     }
 
-    if(segments_.size() >= n_.value() + 1)
-        return make_pair(total_bytes_read, 0);
-
     while(current_ < n_)
     {
         const auto [bytes_read, bytes_reqd] = parser_(s);
         total_bytes_read += bytes_read;
+
+        if(!bytes_read)
+            return make_pair(total_bytes_read, bytes_reqd);
+
         if(bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
 
         s = s.subspan(bytes_read);
         size_ += parser_.size();
-        segments_.push_back(move(parser_).buffer());
+        segments_.push_back(std::move(parser_).buffer());
         ++current_;
     }
     
@@ -146,7 +149,7 @@ inline void array_parser<T>::init_cum_lengths() const
     assert(cum_lengths_.empty());
 
     vector<size_t> seg_lengths;
-    seg_lengths.reserve(seg_count().value());
+    seg_lengths.reserve(segment_count());
 
     std::transform(segments_.cbegin(), segments_.cend(),
                    back_inserter(seg_lengths),
