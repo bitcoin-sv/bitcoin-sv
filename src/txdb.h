@@ -18,6 +18,8 @@
 #include <vector>
 #include <optional>
 
+#include "boost/thread/shared_mutex.hpp"
+
 class CBlockFileInfo;
 class CBlockIndex;
 struct CDiskTxPos;
@@ -219,8 +221,11 @@ private:
 
     uint64_t mCacheSizeThreshold;
 
-    /* A mutex to support a thread safe access to cache. */
-    mutable std::shared_mutex mCoinsViewCacheMtx {};
+    // A mutex to support a thread safe access to cache.
+    // boost::shared_mutex used rather than std::shared_mutex as it implements a
+    // completely fair locking algorithm to guarantee against reader or writer 
+    // starvation.
+    mutable boost::shared_mutex mCoinsViewCacheMtx {};
 
     /**
      * Contains outpoints that are currently being loaded from base view by
