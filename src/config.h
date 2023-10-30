@@ -965,7 +965,7 @@ public:
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        maxTxSizePolicy = value;
+        maxTxSizePolicy = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
@@ -973,7 +973,7 @@ public:
     bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        minConsolidationFactor = value;
+        minConsolidationFactor = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMinConsolidationFactor() const override { return minConsolidationFactor; }
@@ -981,7 +981,7 @@ public:
     bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        maxConsolidationInputScriptSize = value;
+        maxConsolidationInputScriptSize = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMaxConsolidationInputScriptSize() const override { return maxConsolidationInputScriptSize; }
@@ -989,7 +989,7 @@ public:
     bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        minConfConsolidationInput = value;
+        minConfConsolidationInput = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMinConfConsolidationInput() const override { return minConfConsolidationInput; }
