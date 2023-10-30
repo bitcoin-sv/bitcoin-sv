@@ -60,7 +60,7 @@ public:
 
     //! Initialize a public key using begin/end iterators to byte data.
     template <typename T> void Set(const T pbegin, const T pend) {
-        int len = pend == pbegin ? 0 : GetLen(pbegin[0]);
+        auto len = pend == pbegin ? 0u : GetLen(pbegin[0]);
         if (len && len == (pend - pbegin))
             memcpy(vch, (uint8_t *)&pbegin[0], len);
         else
