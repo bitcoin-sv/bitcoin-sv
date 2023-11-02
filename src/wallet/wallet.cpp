@@ -1376,7 +1376,7 @@ void CWallet::BlockConnected(
         SyncTransaction(ptx);
     }
     for (size_t i = 0; i < pblock->vtx.size(); i++) {
-        SyncTransaction(pblock->vtx[i], pindex, i);
+        SyncTransaction(pblock->vtx[i], pindex, static_cast<int>(i));
     }
 }
 
@@ -2342,7 +2342,7 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
                 vCoins.push_back(COutput(
-                    pcoin, i, nDepth,
+                    pcoin, static_cast<int>(i), nDepth,
                     ((mine & ISMINE_SPENDABLE) != ISMINE_NO) ||
                         (coinControl && coinControl->fAllowWatchOnly &&
                          (mine & ISMINE_WATCH_SOLVABLE) != ISMINE_NO),
@@ -2634,8 +2634,9 @@ bool CWallet::FundTransaction(CMutableTransaction &tx, Amount &nFeeRet,
     // Turn the txout set into a CRecipient vector.
     for (size_t idx = 0; idx < tx.vout.size(); idx++) {
         const CTxOut &txOut = tx.vout[idx];
+        int i = static_cast<int>(idx);
         CRecipient recipient = {txOut.scriptPubKey, txOut.nValue,
-                                setSubtractFeeFromOutputs.count(idx) == 1};
+                                setSubtractFeeFromOutputs.count(i) == 1};
         vecSend.push_back(recipient);
     }
 
@@ -2745,7 +2746,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     // e.g. high-latency mix networks and some CoinJoin implementations, have
     // better privacy.
     if (GetRandInt(10) == 0) {
-        txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
+        txNew.nLockTime = static_cast<uint32_t>(std::max(0, (int)txNew.nLockTime - GetRandInt(100)));
     }
 
     assert(txNew.nLockTime <= static_cast<uint32_t>(chainActive.Height()));
