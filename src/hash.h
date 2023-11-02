@@ -73,7 +73,7 @@ template <typename T1> inline uint256 Hash(const T1 pbegin, const T1 pend) {
     uint256 result;
     CHash256()
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
-               (pend - pbegin) * sizeof(pbegin[0]))
+               static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -86,9 +86,9 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
     uint256 result;
     CHash256()
         .Write(p1begin == p1end ? pblank : (const uint8_t *)&p1begin[0],
-               (p1end - p1begin) * sizeof(p1begin[0]))
+               static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
         .Write(p2begin == p2end ? pblank : (const uint8_t *)&p2begin[0],
-               (p2end - p2begin) * sizeof(p2begin[0]))
+               static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -101,11 +101,11 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
     uint256 result;
     CHash256()
         .Write(p1begin == p1end ? pblank : (const uint8_t *)&p1begin[0],
-               (p1end - p1begin) * sizeof(p1begin[0]))
+               static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
         .Write(p2begin == p2end ? pblank : (const uint8_t *)&p2begin[0],
-               (p2end - p2begin) * sizeof(p2begin[0]))
+               static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
         .Write(p3begin == p3end ? pblank : (const uint8_t *)&p3begin[0],
-               (p3end - p3begin) * sizeof(p3begin[0]))
+               static_cast<size_t>(p3end - p3begin) * sizeof(p3begin[0]))
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -116,7 +116,7 @@ template <typename T1> inline uint160 Hash160(const T1 pbegin, const T1 pend) {
     uint160 result;
     CHash160()
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
-               (pend - pbegin) * sizeof(pbegin[0]))
+               static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
         .Finalize((uint8_t *)&result);
     return result;
 }
