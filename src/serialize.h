@@ -230,25 +230,25 @@ template <typename Stream> inline void Unserialize(Stream &s, char &a) {
     a = ser_readdata8(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int8_t &a) {
-    a = ser_readdata8(s);
+    a = static_cast<int8_t>(ser_readdata8(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint8_t &a) {
     a = ser_readdata8(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int16_t &a) {
-    a = ser_readdata16(s);
+    a = static_cast<int16_t>(ser_readdata16(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint16_t &a) {
     a = ser_readdata16(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int32_t &a) {
-    a = ser_readdata32(s);
+    a = static_cast<int32_t>(ser_readdata32(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint32_t &a) {
     a = ser_readdata32(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int64_t &a) {
-    a = ser_readdata64(s);
+    a = static_cast<int64_t>(ser_readdata64(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint64_t &a) {
     a = ser_readdata64(s);
