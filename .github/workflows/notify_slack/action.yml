@@ -1,0 +1,22 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Notify Slack'
+description: 'Notify Slack'
+inputs:
+  msg:
+    description: Messsage
+    required: true
+    default: 'Test_message'
+  url:
+    description: url to send the message to
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        msg=${{ inputs.msg }}
+        curl -X POST -H 'Content-type: application/json' --data '{"text":"'$msg'"}' ${{ inputs.url }}
+      shell: bash
+

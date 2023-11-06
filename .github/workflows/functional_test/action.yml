@@ -1,0 +1,12 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Functional test'
+description:  'Functional test'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+          ./test/functional/test_runner.py --failfast --extended --jobs=5 --output-type=0
+      shell: bash
+
