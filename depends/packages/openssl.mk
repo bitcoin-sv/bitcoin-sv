@@ -1,12 +1,12 @@
 package=openssl
-$(package)_version=1.1.1t
+$(package)_version=3.0.12
 $(package)_download_path=https://www.openssl.org/source
 $(package)_file_name=$(package)-$($(package)_version).tar.gz
-$(package)_sha256_hash=8dee9b24bdb1dcbf0c3d1e9b02fb8f6bf22165e807f45adeb7c9677536859d3b
+$(package)_sha256_hash=f93c9e8edde5e9166119de31755fc87b4aa34863662f67ddfcba14d0b6b69b61
 
 define $(package)_set_vars
 $(package)_config_env=AR="$($(package)_ar)" RANLIB="$($(package)_ranlib)" CC="$($(package)_cc)"
-$(package)_config_opts=--prefix=$(host_prefix) --openssldir=$(host_prefix)
+$(package)_config_opts=--prefix=$(host_prefix) --openssldir=$(host_prefix) --libdir=$(host_prefix)/lib
 $(package)_config_opts+=no-camellia
 $(package)_config_opts+=no-capieng
 $(package)_config_opts+=no-cast
@@ -14,7 +14,6 @@ $(package)_config_opts+=no-dso
 $(package)_config_opts+=no-dtls1
 $(package)_config_opts+=no-ec_nistp_64_gcc_128
 $(package)_config_opts+=no-gost
-$(package)_config_opts+=no-heartbeats
 $(package)_config_opts+=no-idea
 $(package)_config_opts+=no-md2
 $(package)_config_opts+=no-mdc2
