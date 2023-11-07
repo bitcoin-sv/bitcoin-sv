@@ -1,0 +1,11 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Install cmake prerequisites'
+description:  'Install cmake prerequisites'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+          apt-get update && apt-get -y install cmake clang-tidy ninja-build
+      shell: bash

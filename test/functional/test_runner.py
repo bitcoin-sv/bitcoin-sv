@@ -181,6 +181,8 @@ def main():
                         help='the default behavior is to flush the cache directory on startup. --keepcache retains the cache from the previous testrun.')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='only print results summary and failure logs')
+    parser.add_argument('--failfast', '-f', action='store_true',
+                        help='Exit on first failing test')
     parser.add_argument('--tmpdirprefix', '-t',
                         default=tempfile.gettempdir(), help="Root directory for datadirs")
     parser.add_argument('--junitouput', '-ju',
@@ -333,11 +335,11 @@ def main():
         shutil.rmtree(os.path.join(build_dir, "test",
                                    "cache"), ignore_errors=True)
 
-    run_tests(test_list, build_dir, tests_dir, args.junitouput,
+    run_tests(test_list, build_dir, tests_dir, args.junitouput, args.failfast,
               config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console, solo_position_start)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
+def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -410,6 +412,9 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
                   (BOLD[1], test_result.name, BOLD[0], test_result.time))
             print(BOLD[1] + 'stdout:\n' + BOLD[0] + test_result.stdout + '\n')
             print(BOLD[1] + 'stderr:\n' + BOLD[0] + test_result.stderr + '\n')
+
+            if(fail_fast):
+                break
 
     runtime = int(time.time() - time0)
     print_results(test_results, max_len_name, runtime)

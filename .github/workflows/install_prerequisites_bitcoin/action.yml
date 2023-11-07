@@ -1,0 +1,11 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Install Bitcoin prerequisites'
+description:  'Install Bitcoin prerequisites'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+          apt-get update && apt-get -y install libtool pkg-config libssl-dev libevent-dev bsdmainutils libboost-all-dev libdb-dev libdb++-dev libzmq3-dev
+      shell: bash
