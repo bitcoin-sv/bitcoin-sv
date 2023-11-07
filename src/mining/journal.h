@@ -91,7 +91,7 @@ class CJournal final
     TransactionList mTransactions {};
 
     // Convenience accessor to fetch the given multi-index index
-    template<unsigned I>
+    template<int I>
     const typename TransactionList::nth_index<I>::type& index() const
     {
         return mTransactions.get<I>();
