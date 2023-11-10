@@ -139,12 +139,11 @@ BOOST_AUTO_TEST_CASE(siphash) {
                       0x79751e980c2a0a35ULL);
 
     // Check consistency between CSipHasher and SipHashUint256[Extra].
-    FastRandomContext ctx;
     for (int i = 0; i < 16; ++i) {
-        uint64_t k1 = ctx.rand64();
-        uint64_t k2 = ctx.rand64();
+        uint64_t k1 = InsecureRand64();
+        uint64_t k2 = InsecureRand64();
         uint256 x = InsecureRand256();
-        uint32_t n = ctx.rand32();
+        uint32_t n = insecure_rand();
         uint8_t nb[4];
         WriteLE32(nb, n);
         CSipHasher sip256(k1, k2);

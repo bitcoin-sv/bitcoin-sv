@@ -124,7 +124,6 @@ static void RandomTransaction(CMutableTransaction &tx, bool fSingle) {
 BOOST_FIXTURE_TEST_SUITE(sighash_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(sighash_test) {
-    SeedInsecureRand(false);
 
 #if defined(PRINT_SIGHASH_JSON)
     std::cout << "[\n";

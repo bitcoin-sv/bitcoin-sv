@@ -36,6 +36,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <list>
 #include <memory>
@@ -43,18 +44,34 @@
 
 using mining::CBlockTemplate;
 
-uint256 insecure_rand_seed = GetRandHash();
+constexpr auto env_var_name = "TEST_BITCOIN_RANDOM_SEED";
+
+const uint256 insecure_rand_seed = []() {
+    auto env = std::getenv(env_var_name);
+    auto hash = env ? uint256S(env) : GetRandHash();
+    if (env) {
+        printf("Global random seed is set by environment: %s\n", hash.GetHex().c_str());
+    } else {
+        printf("To re-run tests using the same seed, set the following environment variable:\n export %s=%s\n", env_var_name, hash.GetHex().c_str());
+    }
+    return hash;
+}();
 FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern void noui_connect();
 
+void ResetGlobalRandomContext() {
+    RandomInit();
+    insecure_rand_ctx = FastRandomContext{insecure_rand_seed};
+}
+
 BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetModifiableGlobalConfig()) {
     SHA256AutoDetect();
-    RandomInit();
     SetupEnvironment();
     SetupNetworking();
     InitSignatureCache();
     InitScriptExecutionCache();
+    ResetGlobalRandomContext();
 
     // Don't want to write to bitcoind.log file.
     GetLogger().fPrintToDebugLog = false;
@@ -72,9 +89,10 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
 
     // Use a temporary datadir that we don't inadvertently create the default one.
     ClearDatadirCache();
+    static FastRandomContext local_rand_ctx{GetRandHash()};
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
                                          (unsigned long)GetTime(),
-                                         (int)(InsecureRandRange(100000)));
+                                         (int)(local_rand_ctx.randrange(100000)));
     fs::create_directories(pathTemp);
     gArgs.ForceSetArg("-datadir", pathTemp.string());
 
