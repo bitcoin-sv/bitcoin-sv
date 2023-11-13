@@ -6,7 +6,28 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <span>
+#include <vector>
+
+inline size_t read(const std::vector<uint8_t>& a,
+                   size_t read_pos,
+                   std::span<uint8_t> s)
+{
+    if(a.empty())
+        return 0;
+    
+    //assert(read_pos < a.size());
+    if(read_pos >= a.size())
+        throw std::ios_base::failure("read(): invalid read position");
+
+
+    const auto n{std::min(a.size() - read_pos, s.size())};
+    copy(a.cbegin() + read_pos,
+         a.cbegin() + read_pos + n,
+         s.begin()); 
+    return n; 
+}
 
 // reads from a parser and if it reaches the end of a parser's 
 // segment resets the segment.

@@ -8,16 +8,13 @@
 #include <utility>
 #include <vector>
 
-#include "unique_array.h"
-
 // reads n bytes at a time up to a max value;
 template<size_t N, size_t max_size>
 class mod_n_byte_parser
 {
-    unique_array buffer_;
-    size_t max_size_{max_size};
-
 public:
+    using value_type = std::vector<uint8_t>;
+
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s)
     {
         if(buffer_.size() >= max_size)
@@ -50,5 +47,10 @@ public:
     size_t size() const { return buffer_.size(); }
     void clear() { buffer_.clear(); }
 
-    unique_array buffer() && { return std::move(buffer_); }
+    value_type buffer() && { return std::move(buffer_); }
+
+private:
+    value_type buffer_;
+    size_t max_size_{max_size};
+
 };

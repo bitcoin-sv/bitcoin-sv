@@ -11,18 +11,12 @@
 #include <iterator>
 #include <limits>
 #include <numeric>
-#include <thread>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 #include "cmpct_size.h"
-#include "msg_parser.h"
 #include "parser_utils.h"
-#include "p2p_msg_lengths.h"
-#include "rpc/blockchain.h"
-#include "streams.h"
-#include "unique_array.h"
-#include "util.h"
 
 using namespace std;
 
@@ -34,7 +28,9 @@ std::pair<size_t, size_t> fixed_len_multi_parser::parse_count(span<const uint8_t
     if(!bytes_read)
         return make_pair(bytes_read, val);
 
-    segments_.push_back(unique_array{s.first(bytes_read)});
+    value_type v;
+    v.insert(v.cend(), s.begin(), s.begin() + bytes_read);
+    segments_.push_back(std::move(v));
     size_ += bytes_read;
     readable_size_ += bytes_read;
     n_ = val;
@@ -118,7 +114,8 @@ size_t fixed_len_multi_parser::read(size_t read_pos, std::span<uint8_t> s)
 
 void fixed_len_multi_parser::reset(const size_t segment)
 {
-    segments_[segment].reset();
+    value_type v;
+    segments_[segment].swap(v);
 }
 
 // converts the read position into an index into the segments and an offset

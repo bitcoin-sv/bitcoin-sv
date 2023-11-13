@@ -5,10 +5,9 @@
 #include "cmpctblock_parser.h"
 
 #include <cassert>
-#include <numeric>
+#include <ios>
 #include <utility>
 
-#include "cmpct_size.h"
 #include "parser_utils.h"
 
 using namespace std;

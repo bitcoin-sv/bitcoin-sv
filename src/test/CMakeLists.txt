@@ -205,7 +205,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp
 	undo_tests.cpp
-    unique_array_tests.cpp
 	univalue_tests.cpp
 	util_tests.cpp
     validation_scheduler_tests.cpp

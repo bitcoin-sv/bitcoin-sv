@@ -7,20 +7,21 @@
 #include <cstdint>
 #include <span>
 #include <utility>
-
-#include "unique_array.h"
+#include <vector>
 
 class fixed_len_parser
 {
-    unique_array buffer_;
-
 public:
-    explicit fixed_len_parser(size_t n):buffer_{n}
-    {}
+    using value_type = std::vector<uint8_t>;
+
+    explicit fixed_len_parser(size_t n)
+    {
+        buffer_.reserve(n);
+    }
 
     std::pair<size_t, size_t> operator()(const std::span<const uint8_t>);
 
-    unique_array buffer() && { return std::move(buffer_); }
+    value_type buffer() && { return std::move(buffer_); }
 
     bool empty() const { return buffer_.empty(); }
     size_t size() const { return buffer_.size(); }
@@ -34,7 +35,10 @@ public:
     auto begin() const { return buffer_.begin(); };
     auto end() const { return buffer_.end(); };
 
-    auto reset() { buffer_.reset(); }
+    void reset();
     void clear() { buffer_.clear(); }
+    
+private:
+    value_type buffer_;
 };
 

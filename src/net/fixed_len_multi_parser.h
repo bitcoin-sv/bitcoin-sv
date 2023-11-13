@@ -11,9 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "p2p_msg_lengths.h"
-#include "unique_array.h"
-
 // Parses a sequence of bytes into multiple segments, each of which contains a fixed number
 // of fixed length bytes. 
 //
@@ -22,6 +19,8 @@
 class fixed_len_multi_parser
 {
 public:
+    using value_type = std::vector<uint8_t>;
+
     fixed_len_multi_parser(size_t fixed_len, size_t fixed_lengths_per_seg):
         fixed_len_{fixed_len},
         fixed_lengths_per_seg_{fixed_lengths_per_seg},
@@ -35,8 +34,8 @@ public:
 
     bool empty() const { return size() == 0; }
 
-    const unique_array& at(size_t i) const { return segments_.at(i); }
-    const unique_array& operator[](size_t i) const { return segments_[i]; }
+    const value_type& at(size_t i) const { return segments_.at(i); }
+    const value_type& operator[](size_t i) const { return segments_[i]; }
 
     auto begin() const { return segments_.begin(); }
     auto end() const { return segments_.end(); }
@@ -60,8 +59,8 @@ private:
     std::optional<uint64_t> n_{};
     uint64_t current_{};
 
-    unique_array buffer_;
-    using segments_type = std::vector<unique_array>;
+    value_type buffer_;
+    using segments_type = std::vector<value_type>;
     segments_type segments_;
 
     size_t fixed_len_;

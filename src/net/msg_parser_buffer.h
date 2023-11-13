@@ -8,16 +8,16 @@
 #include <memory>
 #include <span>
 #include <utility>
+#include <vector>
 
 #include "msg_parser.h"
-#include "unique_array.h"
 
 // Buffers any bytes that can't be read by the parser until the required bytes
 // have been received
 class msg_parser_buffer
 {
     std::unique_ptr<msg_parser> parser_;
-    unique_array buffer_;
+    std::vector<uint8_t> buffer_;
     size_t buffer_size_reqd_{};
     bool parser_full_{};
 

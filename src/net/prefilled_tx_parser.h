@@ -14,14 +14,16 @@
 // p2p cmpctblock message.
 class prefilled_tx_parser
 {
-    tx_parser tx_parser_;
-    unique_array buffer_;
-
 public:
+    using value_type = std::vector<uint8_t>;
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     std::size_t size() const;
     [[nodiscard]] std::size_t readable_size() const;
     
-    unique_array buffer() &&;
+    value_type buffer() &&;
+   
+private:
+    tx_parser tx_parser_;
+    value_type buffer_;
 };
 

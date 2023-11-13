@@ -4,6 +4,8 @@
 
 #include "block_parser.h"
 
+#include <ios>
+
 #include "parser_utils.h"
 
 using namespace std;

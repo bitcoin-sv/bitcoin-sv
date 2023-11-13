@@ -314,7 +314,7 @@ std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
     return make_pair(total_bytes_read, 0);
 }
 
-unique_array tx_parser::buffer() &&
+tx_parser::value_type tx_parser::buffer() &&
 {
     assert(state_ == state::complete); 
     size_ = 0;

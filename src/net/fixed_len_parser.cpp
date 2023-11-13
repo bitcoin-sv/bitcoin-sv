@@ -4,6 +4,8 @@
 
 #include "fixed_len_parser.h"
 
+#include <cstdint>
+
 using namespace std;
 
 std::pair<size_t, size_t> fixed_len_parser::operator()(
@@ -13,13 +15,19 @@ std::pair<size_t, size_t> fixed_len_parser::operator()(
     const auto delta{capacity - buffer_.size()};
     if(s.size() <= delta)
     {
-        buffer_.append(s);
+        buffer_.insert(buffer_.cend(), s.begin(), s.end());
         return make_pair(s.size(), capacity - buffer_.size());
     }
     else
     {
-        buffer_.append(s.first(delta));
+        buffer_.insert(buffer_.cend(), s.begin(), s.begin() + delta);
         return make_pair(delta, 0);
     }
+}
+
+void fixed_len_parser::reset()
+{
+    value_type v;
+    buffer_.swap(v);
 }
 

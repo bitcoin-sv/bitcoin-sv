@@ -14,7 +14,7 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
 {
     if(parser_full_)
     {
-        buffer_.append(s);
+        buffer_.insert(buffer_.end(), s.begin(), s.end());
         return;
     }
 
@@ -24,7 +24,8 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
         {
             // Fill up the buffer to the required level
             const size_t reqd_bytes = min(s.size(), buffer_size_reqd_ - buffer_.size());
-            buffer_.append(s.first(reqd_bytes));
+            buffer_.insert(buffer_.cend(), s.begin(), s.begin() + reqd_bytes);
+
             s = s.subspan(reqd_bytes);
             if(buffer_.size() < buffer_size_reqd_)
                 return;
@@ -67,7 +68,7 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
     if(!bytes_reqd)
         parser_full_ = true;
     
-    buffer_.append(s.subspan(bytes_read));
+    buffer_.insert(buffer_.end(), s.begin() + bytes_read, s.end());
 }
 
 size_t msg_parser_buffer::read(size_t read_pos, span<uint8_t> s)
