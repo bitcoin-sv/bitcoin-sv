@@ -16,8 +16,8 @@ jobs:
   autotools:
     strategy:
       matrix:
-        os: [ubuntu]
-        version: [22.04]
+        os: [nchain/svn_dev]
+        version: [ubuntu_22.04, debian_11, centos_9]
         toolset: [gcc]
         toolset_version: [10]
     runs-on: [ self-hosted ]
@@ -26,39 +26,21 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        if: github.event_name != 'repository_dispatch'
         uses: actions/checkout@v3
         with:
           clean: ''
-      - name: Checkout branch
-        if: github.event_name == 'repository_dispatch'
-        uses: actions/checkout@v3
-        with:
-          clean: ''
-          ref: ${{ github.event.client_payload.branch }}
-      - name: Install build tools
-        uses: ./.github/workflows/install_build_tools
-        with: 
-          toolset: "${{ matrix.toolset }}"
-          toolset_version: "${{ matrix.toolset_version }}"
-      - name: Install pre-req for bitcoin
-        uses: ./.github/workflows/install_prerequisites_bitcoin
-      - name: Install pre-req for autotools
-        uses: ./.github/workflows/install_prerequisites_autotools
       - name: Build
         uses: ./.github/workflows/build_bitcoin_autotools
       - name: Unit test
         uses: ./.github/workflows/unit_test_bitcoin_autotools
-      - name: Install pre-req for functional tests
-        uses: ./.github/workflows/install_prerequisites_func_tests
       - name: Functional test
         uses: ./.github/workflows/functional_test
-        
+
   cmake:
     strategy:
       matrix:
-        os: [ubuntu]
-        version : [22.04]
+        os: [nchain/svn_dev]
+        version : [ubuntu_22.04]
         toolset: [clang]
         toolset_version: [ 14, 15 ]
         build_type: [ Release, Debug ]
@@ -75,15 +57,11 @@ jobs:
         uses: actions/checkout@v3
         with:
           clean: ''
-      - name: Install build tools
-        uses: ./.github/workflows/install_build_tools
+      - name: Select toolset version
+        uses: ./.github/workflows/select_toolset_version
         with: 
-          toolset: "${{ matrix.toolset }}"
-          toolset_version: "${{ matrix.toolset_version }}"
-      - name: Install pre-req for bitcoin
-        uses: ./.github/workflows/install_prerequisites_bitcoin
-      - name: Install pre-req for cmake build
-        uses: ./.github/workflows/install_prerequisites_cmake
+          toolset: ${{ matrix.toolset }}
+          toolset_version: ${{ matrix.toolset_version }}
       - name: Build Bitcoin
         uses: ./.github/workflows/build_bitcoin_cmake
         with: 
@@ -95,8 +73,6 @@ jobs:
         uses: ./.github/workflows/unit_test_bitcoin_cmake
       - name: Bench test Bitcoin
         uses: ./.github/workflows/bench_test_bitcoin_cmake
-      - name: Install pre-req for functional tests
-        uses: ./.github/workflows/install_prerequisites_func_tests
       - name: Functional test
         if: ${{ matrix.build_type != 'Debug' }}
         uses: ./.github/workflows/functional_test
