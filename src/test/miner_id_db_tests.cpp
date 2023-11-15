@@ -212,6 +212,7 @@ namespace
         ~SetupMinerIDChain()
         {
             g_dataRefIndex.reset();
+            pMerkleTreeFactory.reset();
         }
 
         // Add a couple of datarefs to the mempool so they get mined in the next block
