@@ -423,6 +423,12 @@ namespace
             forkBlockId = forkBlock.GetHash();
         }
 
+        ~SetupMinerIDChain()
+        {
+            g_dataRefIndex.reset();
+            pMerkleTreeFactory.reset();
+        }
+
         // Get a funding txn
         CTransactionRef GetFundingTxn()
         {
