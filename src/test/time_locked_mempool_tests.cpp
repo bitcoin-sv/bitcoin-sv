@@ -86,7 +86,7 @@ namespace
         for(unsigned j = 0; j < numInputs; ++j)
         {
             txn.vin[j].nSequence = j;
-            txn.vin[j].prevout = { GetRandHash(), 0 };
+            txn.vin[j].prevout = { InsecureRand256(), 0 };
         }
 
         return txn;

@@ -815,7 +815,7 @@ BOOST_AUTO_TEST_CASE(http_requests)
         RPCClientConfig clientConfig { RPCClientConfig::CreateForMinerIdGenerator(GlobalConfig::GetConfig(), 5) };
 
         const std::string alias { "MyAlias" };
-        const uint256 hash { GetRandHash() };
+        const uint256 hash { InsecureRand256() };
         std::stringstream endpoint {};
         endpoint << "/minerid/" << alias << "/pksign/" << hash.ToString();
 
@@ -832,7 +832,7 @@ BOOST_AUTO_TEST_CASE(http_responses)
     // BinaryHTTPResponse
     {
         // Any serialisable object will do here
-        uint256 randuint { GetRandHash() };
+        uint256 randuint { InsecureRand256() };
         CDataStream ss { SER_NETWORK, PROTOCOL_VERSION };
         ss << randuint;
 

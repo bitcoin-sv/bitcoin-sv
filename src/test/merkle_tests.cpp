@@ -530,7 +530,7 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
         }
 
         // Check invalid proof
-        MerkleProof badProof{TxId{GetRandHash()}, txnIndex, checkRoot, nodes};
+        MerkleProof badProof{TxId{InsecureRand256()}, txnIndex, checkRoot, nodes};
         BOOST_CHECK(!badProof.Verify());
     }
 

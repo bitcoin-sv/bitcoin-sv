@@ -11,7 +11,7 @@
 BOOST_FIXTURE_TEST_SUITE(test_txid_tracker, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(test_api) {
-    const TxId& txid = TxId(GetRandHash());
+    const TxId& txid = TxId(InsecureRand256());
     CTxIdTracker tracker {};
     // Check size
     BOOST_CHECK_EQUAL(tracker.Size(), 0U);
@@ -22,7 +22,7 @@ BOOST_AUTO_TEST_CASE(test_api) {
     tracker.Insert(txid);
     BOOST_CHECK_EQUAL(tracker.Size(), 1U);
     // ... insert a new TxId as a rvalue
-    tracker.Insert(TxId(GetRandHash()));
+    tracker.Insert(TxId(InsecureRand256()));
     BOOST_CHECK_EQUAL(tracker.Size(), 2U);
     // Check contains
     BOOST_REQUIRE(tracker.Contains(txid));

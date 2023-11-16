@@ -31,7 +31,7 @@ struct CBlockIndex::UnitTestAccess<class Unique>
 
     static uint256 CorruptDiskBlockMetaData( CBlockIndex& blockIndex, DirtyBlockIndexStore& notifyDirty )
     {
-        uint256 randomHash = GetRandHash();
+        uint256 randomHash = InsecureRand256();
         blockIndex.SetDiskBlockMetaData( randomHash, 1, notifyDirty );
 
         return randomHash;

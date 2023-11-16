@@ -12,6 +12,7 @@
 #include "miner_id/miner_info.h"
 #include "miner_id/miner_info_ref.h"
 #include "primitives/block.h"
+#include "test/test_bitcoin.h"
 
 #include "script/script.h"
 
@@ -219,13 +220,13 @@ BOOST_AUTO_TEST_CASE(is_der_signature_test)
     BOOST_CHECK(!is_der_signature(preamble + string(132, 'h')));
     BOOST_CHECK(!is_der_signature(preamble + string(132, 'H')));
 
-    RandomInit();
+    ResetGlobalRandomContext();
     CKey key {};
     std::vector<uint8_t> sig {};
     for(int i = 0; i < 1'000; ++i)
     {
         key.MakeNewKey(true);
-        uint256 hash { GetRandHash() };
+        uint256 hash { InsecureRand256() };
         assert(key.Sign(hash, sig));
         BOOST_CHECK(is_der_signature(HexStr(sig)));
     }

@@ -143,7 +143,7 @@ namespace
         return
             {
                 MakeTransactionRef(inTxn),
-                GetRandHash(), // dummy hash
+                InsecureRand256(), // dummy hash
                 10, // dummy height
                 std::time(nullptr),
                 doublespendState};
