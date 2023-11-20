@@ -15,9 +15,9 @@ fi
 for sanitizer in ${@:2}
 do
     case ${sanitizer,,} in
-        asan) args+=' -D enable-asan=ON -D CRYPTO_USE_ASM=OFF' ;;
-        tsan) args+=' -D enable-tsan=ON' ;;
-        usan) args+=' -D enable-usan=ON' ;;
+        asan) args+=' -D enable_asan=ON -D CRYPTO_USE_ASM=OFF' ;;
+        tsan) args+=' -D enable_tsan=ON' ;;
+        usan) args+=' -D enable_ubsan=ON' ;;
     esac
 done
 
