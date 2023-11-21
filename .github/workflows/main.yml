@@ -42,10 +42,10 @@ jobs:
         os: [nchain/svn_dev]
         version : [ubuntu_22.04]
         toolset: [clang]
-        toolset_version: [ 14, 15 ]
+        toolset_version: [ 17 ]
         build_type: [ Release, Debug ]
         include:
-          - toolset_version: 15
+          - toolset_version: 17
             build_type: Release
             sanitizers: asan usan
     runs-on: [ self-hosted ]
