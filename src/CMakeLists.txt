@@ -709,6 +709,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()
 
+include(ClangTidy)
+AddClangTidy(bitcoind)
+
 if (MSVC)
 	# prevents default build from running unit tests automaticaly
 	set_target_properties(check-bitcoin PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
