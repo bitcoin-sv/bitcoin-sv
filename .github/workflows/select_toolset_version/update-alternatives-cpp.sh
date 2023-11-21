@@ -33,5 +33,8 @@ fi
 
 update-alternatives --install /usr/bin/c++ c++ /usr/bin/${toolset/gcc/g++}-$version $priority \
                     --slave   /usr/bin/cc  cc  /usr/bin/$toolset-$version
+                
 
 update-alternatives --set c++ /usr/bin/${toolset/gcc/g++}-$version
+
+update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-$version $priority
