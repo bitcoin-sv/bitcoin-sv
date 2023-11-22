@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 1 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           clean: ''
       - run: |
@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           clean: ''
       - name: Build
@@ -74,7 +74,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           clean: ''
       - name: Select toolset version
@@ -96,4 +96,11 @@ jobs:
       - name: Functional test
         if: ${{ matrix.build_type != 'Debug' }}
         uses: ./.github/workflows/functional_test
-
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          path: |
+            output/bitcoin_test_runner*/**/test_framework.log
+            output/bitcoin_test_runner*/**/bitcoind.log 
+  
