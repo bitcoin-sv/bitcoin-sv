@@ -108,9 +108,13 @@ private:
         AtomicTxRef( CTransactionRef ref ) noexcept
             : mValue{ ref }
         {}
+        
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
         AtomicTxRef(AtomicTxRef&& other)
             : mValue{ std::atomic_load( &other.mValue ) }
         {}
+        
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
         AtomicTxRef& operator=(AtomicTxRef&& other)
         {
             mValue = std::atomic_load( &other.mValue );

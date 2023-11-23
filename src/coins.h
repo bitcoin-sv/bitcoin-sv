@@ -80,7 +80,8 @@ public:
         , mScriptSize{scriptSize}
     {}
 
-    CoinImpl(CoinImpl&& other) noexcept
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
+    CoinImpl(CoinImpl&& other)
         : storage{std::move(other.storage)}
         , out{storage.has_value() ? &storage.value() : other.out}
         , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
@@ -92,7 +93,8 @@ public:
 
     static CoinImpl FromCoinWithScript(CoinWithScript&& other) noexcept;
 
-    CoinImpl& operator=(CoinImpl&& other) noexcept
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
+    CoinImpl& operator=(CoinImpl&& other)
     {
         storage = std::move(other.storage);
         out = (storage.has_value() ? &storage.value() : other.out);
@@ -283,6 +285,7 @@ public:
         return {std::move(outIn), nHeightIn, IsCoinbase, IsConfiscation};
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
     CoinWithScript& operator=(CoinWithScript&& other)
     {
         static_cast<CoinImpl&>(*this) = std::move(other);
