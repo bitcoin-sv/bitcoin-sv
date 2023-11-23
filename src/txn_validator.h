@@ -239,12 +239,14 @@ class CTxnValidator final
 
     /** Add some txns (standard or non-standard) to the queue */
     template<typename Iterator, typename Callable>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void enqueueTxnsNL(Iterator begin, const Iterator& end, Callable&& func) {
         std::for_each(begin, end, func);
     }
 
     /** Eliminate elements, from src, that fulfill a certain criterion defined by func predicate. */
     template<typename T, typename Callable>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void eraseTxnIfNL(T& src, Callable&& func) {
         src.erase(
             std::remove_if(

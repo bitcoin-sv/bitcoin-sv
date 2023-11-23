@@ -106,6 +106,7 @@ public:
 
     // calculate the size for the sequence
     template <typename C>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     size_t SizeNeededForSequence(C&& value_sequence)
     {
         size_t totalSize = 0;
@@ -119,6 +120,7 @@ public:
     // appends the sequence to the end of the queue, 
     // copying because sequence is an reference l-value const reference
     template <typename C>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void AppendSequence(const C& value_sequence)
     {
         for(const auto& value: value_sequence)
@@ -130,6 +132,7 @@ public:
     // appends the sequence to the end of the queue, 
     // moving out because the sequence is an r-value reference to a container
     template <typename C>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void AppendSequence(C&& value_sequence)
     {
         for(auto&& value: value_sequence)

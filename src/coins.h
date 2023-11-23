@@ -766,6 +766,7 @@ public:
     * with the number of requested threads == 1).
     */
     template<typename Callable, typename... Args>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     auto RunSharded(uint16_t num, Callable&& call, Args&&... args)
         -> std::vector<typename std::invoke_result<Callable, uint16_t, Shard&, Args...>::type> 
     {

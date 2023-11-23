@@ -348,7 +348,8 @@ public:
     DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
-    template <typename Callable> void ForEachNode(Callable&& func) const {
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    template <typename Callable> void ForEachNode(Callable&& func) const { 
         LOCK(cs_vNodes);
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
@@ -358,6 +359,7 @@ public:
 
     /** Call the specified function for each node in parallel */
     template <typename Callable>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     auto ParallelForEachNode(Callable&& func)
         -> std::vector<std::future<std::invoke_result_t<Callable, const CNodePtr&>>>
     {
@@ -388,7 +390,7 @@ public:
     /** Call the specified function for parallel validation */
     template <typename Callable>
     auto ParallelTxnValidation(
-            Callable&& func,
+            Callable&& func, // NOLINT(cppcoreguidelines-missing-std-forward)
             const Config* config,
             CTxMemPool *pool,
             TxInputDataSPtrVec& vNewTxns,
