@@ -256,6 +256,7 @@ public:
             Acquire();
     }
 
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     ~CSemaphoreGrant() { Release(); }
 
     operator bool() { return fHaveGrant; }

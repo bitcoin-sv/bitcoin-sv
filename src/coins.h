@@ -82,7 +82,7 @@ public:
     {}
 
     // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    CoinImpl(CoinImpl&& other)
+    CoinImpl(CoinImpl&& other) // NOLINT(bugprone-exception-escape)
         : storage{std::move(other.storage)}
         , out{storage.has_value() ? &storage.value() : other.out}
         , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
@@ -95,7 +95,7 @@ public:
     static CoinImpl FromCoinWithScript(CoinWithScript&& other) noexcept;
 
     // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    CoinImpl& operator=(CoinImpl&& other)
+    CoinImpl& operator=(CoinImpl&& other) // NOLINT(bugprone-exception-escape)
     {
         storage = std::move(other.storage);
         out = (storage.has_value() ? &storage.value() : other.out);
@@ -268,10 +268,12 @@ public:
     CoinWithScript(const CoinWithScript&) = delete;
     CoinWithScript& operator=(const CoinWithScript&) = delete;
 
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     CoinWithScript(CoinWithScript&& coin) noexcept
         : CoinImpl{std::move(coin)}
     {}
 
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     CoinWithScript(CoinImpl&& coin) noexcept
         : CoinImpl{std::move(coin)}
     {}
@@ -287,7 +289,7 @@ public:
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    CoinWithScript& operator=(CoinWithScript&& other)
+    CoinWithScript& operator=(CoinWithScript&& other) // NOLINT(bugprone-exception-escape)
     {
         static_cast<CoinImpl&>(*this) = std::move(other);
 
@@ -318,6 +320,7 @@ private:
     friend CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept;
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 inline CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept
 {
     return std::move( other ).ToCoinImpl();
