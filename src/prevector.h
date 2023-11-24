@@ -380,7 +380,7 @@ public:
         }
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
 
     prevector &operator=(const prevector<N, T, Size, Diff> &other) {
@@ -398,7 +398,7 @@ public:
         return *this;
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector &operator=(prevector<N, T, Size, Diff> &&other) {
         swap(other);
         return *this;

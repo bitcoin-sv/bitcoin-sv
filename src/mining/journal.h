@@ -148,9 +148,9 @@ class CJournal final
         ReadLock(const ReadLock&) = delete;
         ReadLock& operator=(const ReadLock&) = delete;
 
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
         ReadLock(ReadLock&& that);
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations)
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
         ReadLock& operator=(ReadLock&& that);
 
         // Get start/end indexes for our underlying sequence

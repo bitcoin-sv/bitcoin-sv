@@ -532,6 +532,7 @@ public:
 
         if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
         {
+            // NOLINTNEXTLINE(performance-move-const-arg)
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
         }
