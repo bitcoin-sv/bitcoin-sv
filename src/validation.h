@@ -1010,6 +1010,7 @@ private:
     bool consensus = false;
 
 public:
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
                  const CTransaction &txToIn, unsigned int nInIn,
                  uint32_t nFlagsIn, bool cacheIn,

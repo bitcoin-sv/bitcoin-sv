@@ -20,6 +20,7 @@
 
 constexpr int DEFAULT_JSON_DEPTH (2048);
 
+// NOLINTBEGIN(performance-*)
 class UniValue {
 public:
     enum VType { VNULL, VOBJ, VARR, VSTR, VNUM, VBOOL, };
@@ -311,5 +312,7 @@ static inline bool json_isspace(int ch)
 extern const UniValue NullUniValue;
 
 const UniValue& find_value( const UniValue& obj, const std::string& name);
+
+// NOLINTEND(performance-*)
 
 #endif // __UNIVALUE_H__
