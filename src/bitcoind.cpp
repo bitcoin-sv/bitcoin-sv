@@ -48,7 +48,7 @@ void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellation
 
     // Tell the main threads to shutdown.
     while (!shutdownToken.IsCanceled()) {
-        MilliSleep(200);
+        MilliSleep(200); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
     }
     if (threadGroup) {
         Interrupt(*threadGroup);
