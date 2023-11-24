@@ -106,6 +106,7 @@ private:
     public:
         AtomicTxRef() = default;
         AtomicTxRef( CTransactionRef ref ) noexcept
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
             : mValue{ ref }
         {}
         

@@ -13,6 +13,7 @@
 #include <string>
 #include <type_traits>
 
+// NOLINTBEGIN(performance-unnecessary-value-param)
 struct Amount {
 private:
     int64_t amount;
@@ -214,5 +215,6 @@ public:
         READWRITE(nSatoshisPerK);
     }
 };
+// NOLINTEND(performance-unnecessary-value-param)
 
 #endif //  BITCOIN_AMOUNT_H

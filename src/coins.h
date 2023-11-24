@@ -72,6 +72,7 @@ class CoinImpl
 public:
     CoinImpl() : storage{CTxOut{}}, out{&storage.value()} {}
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : storage{CTxOut{amount, {}}}
         , out{&storage.value()}

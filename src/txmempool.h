@@ -221,6 +221,7 @@ public:
 };
 
 struct update_fee_delta {
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     update_fee_delta(Amount _feeDelta) : feeDelta(_feeDelta) {}
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateFeeDelta(feeDelta); }
@@ -645,8 +646,10 @@ public:
     void SuspendSanityCheck() { suspendSanityCheck.store(true); }
     void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
     CFeeRate GetBlockMinTxFee() const { return blockMinTxfee; };
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     void SetMinDebugRejectionFee(CFeeRate feerate) { minDebugRejectionFee = feerate; };
     CFeeRate GetMinDebugRejectionFee() const { return minDebugRejectionFee; };
 
@@ -1335,6 +1338,7 @@ class CPFPGroup
 public:
 
     explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : evaluationParams{evalParams}
         , transactions{txs}
         , groupId{counter++}

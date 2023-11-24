@@ -70,9 +70,11 @@ protected:
 
 public:
     TransactionSignatureChecker(const CTransaction *txToIn, unsigned int nInIn,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
                                 const Amount amountIn)
         : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
     TransactionSignatureChecker(const CTransaction *txToIn, unsigned int nInIn,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
                                 const Amount amountIn,
                                 const PrecomputedTransactionData &txdataIn)
         : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
@@ -89,6 +91,7 @@ private:
 
 public:
     MutableTransactionSignatureChecker(const CMutableTransaction *txToIn,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
                                        unsigned int nInIn, const Amount amount)
         : TransactionSignatureChecker(&txTo, nInIn, amount), txTo(*txToIn) {}
 };
