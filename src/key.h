@@ -67,6 +67,7 @@ public:
     //! Initialize using begin and end iterators to byte data.
     template <typename T>
     void Set(const T pbegin, const T pend, bool fCompressedIn) {
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (size_t(pend - pbegin) != keydata.size()) {
             fValid = false;
         } else if (Check(&pbegin[0])) {
