@@ -60,6 +60,8 @@ void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellation
 //
 // Start
 //
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
 bool AppInit(int argc, char *argv[]) {
     RenameThread("main");
     boost::thread_group threadGroup;
@@ -219,7 +221,8 @@ bool AppInit(int argc, char *argv[]) {
 
     return fRet;
 }
-
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 int main(int argc, char *argv[]) { // NOLINT(bugprone-exception-escape)
     SetupEnvironment();
