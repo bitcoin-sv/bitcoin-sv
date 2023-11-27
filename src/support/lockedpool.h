@@ -130,6 +130,7 @@ public:
      * and deallocation overhead. Setting it too high allocates more locked
      * memory from the OS than strictly necessary.
      */
+    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     static const size_t ARENA_SIZE = 256 * 1024;
     /**
      * Chunk alignment. Another compromise. Setting this too high will waste

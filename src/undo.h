@@ -34,6 +34,7 @@ public:
 
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(
+            // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
             s, VARINT( (pcoin->IsConfiscation() ? 0x100000000ll : 0ll) + pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0) ));
         if (pcoin->GetHeight() > 0) {
             // Required to maintain compatibility with older undo format.

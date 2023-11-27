@@ -28,6 +28,7 @@ class CBlockStreamReader;
  * Maximum amount of time that a block timestamp is allowed to exceed the
  * current network-adjusted time before the block will be accepted.
  */
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
 
 /**

@@ -25,8 +25,10 @@ using CompactExtraTxnsVec = std::vector<std::pair<uint256, CTransactionRef>>;
  */
 class COrphanTxns {
     /** Expiration time for orphan transactions in seconds */
+    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     static constexpr int64_t ORPHAN_TX_EXPIRE_TIME = 20 * 60;
     /** Minimum time between orphan transactions expire time checks in seconds */
+    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     static constexpr int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
 
   public:
