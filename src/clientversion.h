@@ -61,6 +61,7 @@
  * is shifted in the way the lowest version of Bitcoin SV is still higher 
  * than the highest calculated version in the traditional Bitcoin.
  */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 const int _SV_VERSION_SHIFT = 100000000;
 static const int CLIENT_VERSION = _SV_VERSION_SHIFT +
     1000000 * CLIENT_VERSION_MAJOR + 10000 * CLIENT_VERSION_MINOR +

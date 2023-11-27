@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef _BITCOIN_PREVECTOR_H_
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 #define _BITCOIN_PREVECTOR_H_
 
 #include <cassert>

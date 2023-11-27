@@ -55,6 +55,7 @@ extern const char *const BITCOIN_PID_FILENAME;
  * boost::optional result. If no translation slot is registered, nothing is
  * returned, and simply return the input.
  */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 inline std::string _(const char *psz) {
     boost::optional<std::string> rv = translationInterface.Translate(psz);
     return rv ? (*rv) : psz;
