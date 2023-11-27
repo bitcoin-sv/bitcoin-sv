@@ -88,7 +88,9 @@ public:
         }
 
     private:
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members) 
         CBlockValidationStatus& mInstance;
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members) 
         const CBlockIndex& mIndex;
     };
 

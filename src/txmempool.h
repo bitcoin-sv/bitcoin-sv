@@ -236,6 +236,7 @@ struct update_lock_points {
     void operator()(CTxMemPoolEntry &e) { e.UpdateLockPoints(lp); }
 
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const LockPoints &lp;
 };
 
@@ -330,8 +331,11 @@ std::ostream& operator<<(std::ostream&, const MemPoolRemovalReason&);
 struct DisconnectedBlockTransactions;
 
 struct CTransactionConflictData {
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CTransaction* const conflictedWith;
     const uint256* const blockhash;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
+
     CTransactionConflictData(const CTransaction* conflictedWith_, const uint256* blockhash_)
     : conflictedWith{conflictedWith_}
     , blockhash{blockhash_}

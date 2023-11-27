@@ -60,7 +60,9 @@ class TransactionSignatureChecker : public BaseSignatureChecker {
 private:
     const CTransaction *txTo;
     unsigned int nIn;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Amount amount;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const PrecomputedTransactionData *txdata;
 
 protected:
@@ -87,6 +89,7 @@ public:
 
 class MutableTransactionSignatureChecker : public TransactionSignatureChecker {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CTransaction txTo;
 
 public:

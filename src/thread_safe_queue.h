@@ -24,9 +24,12 @@ public:
     std::condition_variable onPush;
     std::condition_variable onPop;
     std::atomic_bool isClosed = false;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const SizeCalculator sizeCalculator;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const bool variableSizeObjects;
     size_t currentSize = 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const size_t maximalSize;
     OnBlockedCallback blockedPushNotifier{nullptr};
     OnBlockedCallback blockedPopNotifier{nullptr};

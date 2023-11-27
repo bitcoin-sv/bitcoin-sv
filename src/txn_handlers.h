@@ -14,6 +14,7 @@
  */
 struct CTxnHandlers {
     /** Mempool Journal ChangeSet */
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const mining::CJournalChangeSetPtr& mJournalChangeSet;
     /** Double Spend Detector */
     TxnDoubleSpendDetectorSPtr mpTxnDoubleSpendDetector {nullptr};

@@ -36,7 +36,7 @@ private:
      */
     static const unsigned int nSpecialScripts = 6;
 
-    CScript &script;
+    CScript &script; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 protected:
     /**
@@ -110,7 +110,7 @@ private:
 /** wrapper for CTxOut that provides a more compact serialization */
 class CTxOutCompressor {
 private:
-    CTxOut &txout;
+    CTxOut &txout;// NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 public:
     static uint64_t CompressAmount(Amount nAmount);

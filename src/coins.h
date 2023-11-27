@@ -805,6 +805,7 @@ public:
                     LogPrint(BCLog::BENCH, "        - Fold Shards: %.2fms\n", 0.001 * foldTime);
                 }
               private:
+                // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members) 
                 std::vector<Shard>& mShards;
             } foldShards {mShards};
 

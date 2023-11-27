@@ -171,6 +171,7 @@ private:
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     bool mfOrphan {false};
     bool mfTxIdStored {false};
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::shared_ptr<const TransactionSpecificConfig> mConfig;
 };
 

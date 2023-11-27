@@ -73,6 +73,7 @@ typedef std::map<CSubNet, CBanEntry> banmap_t;
 class CAddrDB {
 private:
     fs::path pathAddr;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CChainParams &chainParams;
 
 public:
@@ -86,6 +87,7 @@ public:
 class CBanDB {
 private:
     fs::path pathBanlist;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CChainParams &chainParams;
 
 public:

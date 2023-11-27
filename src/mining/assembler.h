@@ -61,6 +61,7 @@ protected:
     void FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn, const Amount& blockFees) const;
 
     // Keep reference to the global config
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Config& mConfig;
 };
 

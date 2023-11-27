@@ -37,6 +37,7 @@ class CMiningFactory
   private:
 
     // Keep reference to the global config
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Config& mConfig;
 
     // A single journaling block assember; only created if configured appropriately.

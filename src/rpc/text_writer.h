@@ -86,6 +86,7 @@ public:
 
 private:
     static constexpr size_t BUFFER_SIZE = ONE_MEGABYTE;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     HTTPRequest& _request;
     std::string strBuffer;
 

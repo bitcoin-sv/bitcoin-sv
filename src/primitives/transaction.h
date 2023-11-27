@@ -276,13 +276,16 @@ public:
     // actually immutable; deserialization and assignment are implemented,
     // and bypass the constness. This is safe, as they update the entire
     // structure, including the hash.
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int32_t nVersion;
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const uint32_t nLockTime;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 private:
     /** Memory only. */
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const uint256 hash;
 
     uint256 ComputeHash() const;

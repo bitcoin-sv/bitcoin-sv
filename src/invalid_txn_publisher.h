@@ -180,6 +180,7 @@ public:
             : mCollidedWithTransaction{ collidedWithTransaction }
         {}
 
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
         std::vector<CollidedWith>& mCollidedWithTransaction;
 
         friend class InvalidTxnInfo;

@@ -29,7 +29,9 @@
 template <typename Stream> class OverrideStream {
     Stream *stream;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 
 public:
@@ -114,9 +116,11 @@ public:
     }
 
 private:
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
     const int nVersion;
     std::vector<uint8_t> &vchData;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
     size_t nPos;
 };
 

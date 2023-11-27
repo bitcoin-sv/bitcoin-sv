@@ -441,6 +441,7 @@ public:
 
 template <typename I> class CVarInt {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     I &n;
 
 public:
@@ -457,6 +458,7 @@ public:
 
 class CCompactSize {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     uint64_t &n;
 
 public:
@@ -473,6 +475,7 @@ public:
 
 template <size_t Limit, typename ArrayType> class LimitedBytes {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     ArrayType& array;
 
 public:
@@ -1061,7 +1064,9 @@ class CSizeComputer {
 protected:
     size_t nSize;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 
 public:

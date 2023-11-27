@@ -136,8 +136,10 @@ inline uint160 Hash160(const prevector<N, uint8_t> &vch) {
 class CHashWriter {
 private:
     CHash256 ctx;
-
+ 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 
 public:

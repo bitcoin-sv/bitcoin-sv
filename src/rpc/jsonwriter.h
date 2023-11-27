@@ -127,7 +127,8 @@ private:
 
     void indentStr();
     void createTag(const std::string& tag, bool incrementLevel, const std::string& objectName = "");
-
+    
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     CTextWriter& jWriter;
     bool _prettyIndent;
     int _indentSize;
