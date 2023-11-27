@@ -389,6 +389,7 @@ public:
             CAddrInfo &info = mapInfo[n];
             s >> info;
             mapAddr[info] = n;
+            // NOLINTNEXTLINE(bugprone-narrowing-conversions)
             info.nRandomPos = vRandom.size();
             vRandom.push_back(n);
             if (nVersion != 1 || nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
@@ -413,6 +414,7 @@ public:
             int nKBucket = info.GetTriedBucket(nKey);
             int nKBucketPos = info.GetBucketPosition(nKey, false, nKBucket);
             if (vvTried[nKBucket][nKBucketPos] == -1) {
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions)
                 info.nRandomPos = vRandom.size();
                 info.fInTried = true;
                 vRandom.push_back(nIdCount);

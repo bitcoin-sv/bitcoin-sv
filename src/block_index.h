@@ -711,7 +711,8 @@ public:
     int64_t GetBlockTime() const { return int64_t(nTime); }
 
     int64_t GetBlockTimeMax() const { return int64_t(nTimeMax); }
-
+    
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
     int64_t GetHeaderReceivedTime() const { return nTimeReceived; }
 
     int64_t GetReceivedTimeDiff() const {
@@ -731,6 +732,7 @@ public:
         }
 
         const auto n{block_times.size() / 2};
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions)
         std::nth_element(begin(block_times), begin(block_times) + n,
                          end(block_times));
         return block_times[n];

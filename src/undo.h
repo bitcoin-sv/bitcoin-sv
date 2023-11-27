@@ -53,6 +53,7 @@ public:
     template <typename Stream> void Unserialize(Stream &s) {
         uint64_t nCode = 0;
         ::Unserialize(s, VARINT(nCode));
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions)
         int32_t nHeight = static_cast<uint32_t>(nCode & 0xffffffff) / 2;
         bool fCoinBase = nCode & 1;
         bool fConfiscation = nCode & 0x100000000ull;

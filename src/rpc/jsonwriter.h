@@ -118,7 +118,7 @@ private:
             }
             else
             {
-                outS += ch;
+                outS += ch; // NOLINT(bugprone-narrowing-conversions)
             }
         }
 

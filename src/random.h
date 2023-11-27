@@ -103,7 +103,7 @@ public:
     /** Generate a random integer in the range [0..range). */
     uint64_t randrange(uint64_t range) {
         --range;
-        int bits = CountBits(range);
+        int bits = CountBits(range); // NOLINT(bugprone-narrowing-conversions)
         while (true) {
             uint64_t ret = randbits(bits);
             if (ret <= range) {
