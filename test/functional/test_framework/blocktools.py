@@ -670,6 +670,8 @@ class ChainManager():
         self.blocks = {}
         # Store list of UTXO
         self._spendable_outputs = []
+        # Used for next distinct script
+        self._script_number = 0
 
     def set_genesis_hash(self, hash):
         self._genesis_hash = hash
@@ -695,6 +697,10 @@ class ChainManager():
     # move the tip back to a previous block
     def set_tip(self, number):
         self.tip = self.blocks[number]
+
+    def create_distinct_script(self):
+        self._script_number += 1
+        return CScript([self._script_number, OP_RETURN])
 
     def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
         if self.tip == None:
@@ -736,7 +742,7 @@ class ChainManager():
                     tx = create_transaction(spend.tx, spend.n, b"", 1, script)  # spend 1 satoshi
 
                     if script == CScript([OP_TRUE]):
-                        tx.vout.append(CTxOut(1, CScript([random.randint(0, 256), OP_RETURN])))
+                        tx.vout.append(CTxOut(1, self.create_distinct_script()))
                         coinbase.vout[0].nValue -= 1
                         coinbase.rehash()
 
@@ -782,8 +788,7 @@ class ChainManager():
                         extraCash, txout = CreateCTxOut(1, extraCash, script)
                         tx.vout.append(txout)
 
-                    # Put some random data into the first transaction of the chain to randomize ids.
-                    extraCash, txout = CreateCTxOut(1, extraCash, CScript([random.randint(0, 256), OP_RETURN]))
+                    extraCash, txout = CreateCTxOut(1, extraCash, self.create_distinct_script())
                     tx.vout.append(txout)
 
                     # Add the transaction to the block
