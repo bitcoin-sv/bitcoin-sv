@@ -115,6 +115,8 @@
 #ifndef TINYFORMAT_H_INCLUDED
 #define TINYFORMAT_H_INCLUDED
 
+// NOLINTBEGIN(*)
+
 namespace tinyformat {}
 //------------------------------------------------------------------------------
 // Config section.  Customize to your liking!
@@ -662,7 +664,6 @@ namespace detail {
                     continue;
                 case '0':
                     // overridden by left alignment ('-' flag)
-                    // NOLINTNEXTLINE(bugprone-non-zero-enum-to-bool-conversion)
                     if (!(out.flags() & std::ios::left)) {
                         // Use internal padding so that numeric values are
                         // formatted correctly, eg -00010 rather than 000-10
@@ -676,7 +677,6 @@ namespace detail {
                     continue;
                 case ' ':
                     // overridden by show positive sign, '+' flag.
-                    // NOLINTNEXTLINE(bugprone-non-zero-enum-to-bool-conversion)
                     if (!(out.flags() & std::ios::showpos))
                         spacePadPositive = true;
                     continue;
@@ -1075,5 +1075,7 @@ std::string format(const std::string &fmt, const Args &... args) {
 } // namespace tinyformat
 
 #define strprintf tfm::format
+
+// NOLINTEND(*)
 
 #endif // TINYFORMAT_H_INCLUDED
