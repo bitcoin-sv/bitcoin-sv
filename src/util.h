@@ -133,6 +133,7 @@ protected:
 public:
     static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void ParseParameters(int argc, const char *const argv[]);
     void ReadConfigFile(const std::string &confPath);
     std::vector<std::string> GetArgs(const std::string &strArg);

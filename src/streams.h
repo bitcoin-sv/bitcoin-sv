@@ -483,6 +483,7 @@ public:
         if (!file)
             throw std::ios_base::failure(
                 "CAutoFile::ignore: file handle is nullptr");
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t data[4096];
         while (nSize > 0) {
             size_t nNow = std::min<size_t>(nSize, sizeof(data));

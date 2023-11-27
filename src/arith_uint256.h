@@ -24,6 +24,7 @@ public:
 template <unsigned int BITS> class base_uint {
 protected:
     enum { WIDTH = BITS / 32 };
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint32_t pn[WIDTH];
 
 public:

@@ -46,6 +46,7 @@ private:
     bool requires_seed;
     ChaCha20 rng;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t bytebuf[64];
     int bytebuf_size;
 

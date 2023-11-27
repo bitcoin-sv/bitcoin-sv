@@ -104,11 +104,13 @@ public:
             insert(end(), uint8_t(b.size()));
         } else if (b.size() <= 0xffff) {
             insert(end(), OP_PUSHDATA2);
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[2];
             WriteLE16(data, b.size());
             insert(end(), data, data + sizeof(data));
         } else {
             insert(end(), OP_PUSHDATA4);
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[4];
             WriteLE32(data, b.size());
             insert(end(), data, data + sizeof(data));

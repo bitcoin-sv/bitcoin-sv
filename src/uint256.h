@@ -24,6 +24,7 @@
 template <unsigned int BITS> class base_blob {
 protected:
     enum { WIDTH = BITS / 8 };
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t data[WIDTH];
 
 public:

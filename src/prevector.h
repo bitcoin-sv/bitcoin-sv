@@ -259,6 +259,7 @@ public:
 private:
     size_type _size;
     union direct_or_indirect {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         char direct[sizeof(T) * N];
         struct {
             size_type capacity;

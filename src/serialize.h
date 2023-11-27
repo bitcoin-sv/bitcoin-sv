@@ -354,6 +354,7 @@ template <typename I> inline void WriteVarInt(CSizeComputer &os, I n);
 
 template <typename Stream, typename I, class = typename std::enable_if<std::is_integral<I>::value>::type>
 void WriteVarInt(Stream &os, I n) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t tmp[(sizeof(n) * 8 + 6) / 7];
     int len = 0;
     while (true) {

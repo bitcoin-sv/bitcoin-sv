@@ -24,7 +24,7 @@ struct CDNSSeedData {
 };
 
 struct SeedSpec6 {
-    uint8_t addr[16];
+    uint8_t addr[16]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     uint16_t port;
 };
 
@@ -113,6 +113,7 @@ protected:
     int nDefaultPort;
     int32_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
     CBlock genesis;

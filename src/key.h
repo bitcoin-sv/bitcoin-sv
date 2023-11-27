@@ -143,6 +143,7 @@ public:
 
 struct CExtKey {
     uint8_t nDepth;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t vchFingerprint[4];
     unsigned int nChild;
     ChainCode chaincode;
@@ -156,7 +157,9 @@ struct CExtKey {
                a.key == b.key;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Decode(const uint8_t code[BIP32_EXTKEY_SIZE]);
     bool Derive(CExtKey &out, unsigned int nChild) const;
     CExtPubKey Neuter() const;
@@ -164,12 +167,14 @@ struct CExtKey {
     template <typename Stream> void Serialize(Stream &s) const {
         unsigned int len = BIP32_EXTKEY_SIZE;
         ::WriteCompactSize(s, len);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
         Encode(code);
         s.write((const char *)&code[0], len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
         unsigned int len = ::ReadCompactSize(s);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
         if (len != BIP32_EXTKEY_SIZE)
             throw std::runtime_error("Invalid extended key size\n");

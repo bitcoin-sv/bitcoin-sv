@@ -72,6 +72,7 @@ public:
     void reset();
 
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     std::unique_ptr<value_type[]> p_{std::make_unique<value_type[]>(0)};
 
     size_t cap_{0};

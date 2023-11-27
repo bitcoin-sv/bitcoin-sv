@@ -199,12 +199,14 @@ private:
     int nTried;
 
     //! list of "tried" buckets
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     int vvTried[ADDRMAN_TRIED_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
     //! number of (unique) "new" entries
     int nNew;
 
     //! list of "new" buckets
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     int vvNew[ADDRMAN_NEW_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
     //! last time Good was called (memory only)
