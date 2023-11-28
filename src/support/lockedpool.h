@@ -15,6 +15,7 @@
  * OS-dependent allocation and deallocation of locked/pinned memory pages.
  * Abstract base class.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class LockedPageAllocator {
 public:
     virtual ~LockedPageAllocator() {}
@@ -46,6 +47,7 @@ public:
 /**
  * An arena manages a contiguous region of memory by dividing it into chunks.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Arena {
 public:
     Arena(void *base, size_t size, size_t alignment);
@@ -122,6 +124,7 @@ private:
  * in themselves sensitive information, as to conserve precious locked memory.
  * In some operating systems the amount of memory that can be locked is small.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class LockedPool {
 public:
     /**
@@ -192,6 +195,7 @@ private:
     std::unique_ptr<LockedPageAllocator> allocator;
 
     /** Create an arena from locked pages */
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class LockedPageArena : public Arena {
     public:
         LockedPageArena(LockedPageAllocator *alloc_in, void *base_in,

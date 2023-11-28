@@ -8,6 +8,7 @@
 #include <string>
 #include <fstream>
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTextWriter
 {
 public:
@@ -55,6 +56,7 @@ private:
     std::string strBuffer;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CHttpTextWriter : public CTextWriter
 {
 public:
@@ -124,6 +126,7 @@ private:
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CFileTextWriter : public CTextWriter
 {
 public:

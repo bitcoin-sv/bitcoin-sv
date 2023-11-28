@@ -47,6 +47,7 @@ class CNode;
  * This class is used to provide an input data to the TxnValidator.
  * It includes a pointer to a transaction and it's associated data.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxInputData final {
 public:
     // Constructor

@@ -12,6 +12,7 @@
 #include <vector>
 
 template <typename T>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct zero_after_free_allocator : public std::allocator<T> {
     typedef std::allocator<T> base;
     zero_after_free_allocator() throw() {}

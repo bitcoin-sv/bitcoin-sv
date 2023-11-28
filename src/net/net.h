@@ -223,6 +223,7 @@ class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CSerializedNetMsg
 {
 public:
@@ -573,6 +574,7 @@ public:
     // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
     // times maximum async requests that a node may have active at any given
     // time.
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class CAsyncTaskPool
     {
     public:

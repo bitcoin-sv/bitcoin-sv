@@ -101,6 +101,7 @@ private:
     // Wrapper that enables us to use TxMempoolInfo implicit copy/move
     // construction and assignment.
     // Class guarantees that once the value is set it won't be overwritten.
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class AtomicTxRef
     {
     public:

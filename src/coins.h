@@ -38,7 +38,7 @@ class CoinWithScript;
  * NOTE: Only CoinImpl instances that contain the script and are not spent
  *       can be serialized.
  */
-class CoinImpl
+class CoinImpl // NOLINT(cppcoreguidelines-special-member-functions)
 {
     /**
      * Unspent transaction output that is only set if coin instance is storage
@@ -259,6 +259,7 @@ public:
  * - VARINT((coinbase ? 1 : 0) | (height << 1))
  * - the non-spent CTxOut (via CTxOutCompressor)
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CoinWithScript : private CoinImpl
 {
 public:
@@ -387,6 +388,7 @@ using CCoinsMap = std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpoint
  * Implementations of this interface provide basic functionality that is needed
  * by CCoinsViewCache.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class ICoinsView {
 protected:
     //! As we use CCoinsViews polymorphically, have protected destructor as we
@@ -481,6 +483,7 @@ private:
 };
 
 // Interface for CoinsViewCache and CoinsViewCache::Shard
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class ICoinsViewCache
 {
 public:
@@ -508,6 +511,7 @@ public:
  * - owning coins without script that were spent with through SpendCoin()
  * - owning coins with script added to this cache through AddCoin()
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCoinsViewCache : public ICoinsViewCache
 {
 public:
@@ -786,6 +790,7 @@ public:
         {
             // RAII class to ensure we always recombine the shards when we leave this method.
             // Must be declared above the thread pool so it's destroyed after.
+            // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
             class ShardsRAII
             {
               public:

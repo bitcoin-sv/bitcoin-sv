@@ -88,6 +88,7 @@ static inline void DeleteLock(void *cs) {}
  * Wrapped boost mutex: supports recursive locking, but no waiting
  * TODO: We should move away from using the recursive lock by default.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCriticalSection : public AnnotatedMixin<boost::recursive_mutex> {
 public:
     ~CCriticalSection() { DeleteLock((void *)this); }
@@ -106,7 +107,9 @@ void PrintLockContention(const char *pszName, const char *pszFile, int nLine);
 #endif
 
 /** Wrapper around boost::unique_lock<Mutex> */
-template <typename Mutex> class SCOPED_LOCKABLE CMutexLock {
+template <typename Mutex>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+class SCOPED_LOCKABLE CMutexLock {
 private:
     boost::unique_lock<Mutex> lock;
 
@@ -219,6 +222,7 @@ public:
 };
 
 /** RAII-style semaphore lock */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CSemaphoreGrant {
 private:
     std::shared_ptr<CSemaphore> sem {nullptr};

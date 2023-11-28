@@ -124,6 +124,7 @@ public:
 
 /** Event handler closure.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class HTTPClosure {
 public:
     virtual void operator()() = 0;

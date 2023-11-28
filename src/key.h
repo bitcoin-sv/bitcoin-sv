@@ -32,6 +32,7 @@
 typedef std::vector<uint8_t, secure_allocator<uint8_t>> CPrivKey;
 
 /** An encapsulated private key. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CKey {
 private:
     //! Whether this private key is valid. We check for correctness when

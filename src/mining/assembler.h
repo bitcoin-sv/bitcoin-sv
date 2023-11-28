@@ -31,6 +31,7 @@ public:
  * The Block Assembler assembles a new block. It collects transactions from the mempool, prioritizes them, and ensures
  * that all required ancestors are present.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BlockAssembler {
 public:
     BlockAssembler(const Config& config);

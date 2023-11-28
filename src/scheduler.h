@@ -34,6 +34,7 @@
 // delete s; // Must be done after thread is interrupted/joined.
 //
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CScheduler {
 public:
     CScheduler();

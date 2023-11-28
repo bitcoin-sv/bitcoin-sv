@@ -11,6 +11,7 @@
 #include <span>
 
 // vector-like wrapper around a unique_ptr to an array of uint8_t's
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class unique_array
 {
 public:

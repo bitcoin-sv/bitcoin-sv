@@ -15,6 +15,7 @@
  *
  * It is a wrapper over an unordered set which provides mt support.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxIdTracker final
 {
   public:

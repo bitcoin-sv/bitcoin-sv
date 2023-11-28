@@ -14,6 +14,7 @@
 #include <type_traits>
 
 // NOLINTBEGIN(performance-unnecessary-value-param)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Amount {
 private:
     int64_t amount;

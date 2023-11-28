@@ -50,7 +50,7 @@ private:
     mutable std::mutex mMutexWaitAfterValidation;
 
 public:
-    class CScopeGuard
+    class CScopeGuard // NOLINT(cppcoreguidelines-special-member-functions)
     {
     public:
         CScopeGuard(CBlockValidationStatus& instance, const CBlockIndex& index)

@@ -21,6 +21,7 @@ public:
 };
 
 /** Template base class for unsigned big integers. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 template <unsigned int BITS> class base_uint {
 protected:
     enum { WIDTH = BITS / 32 };

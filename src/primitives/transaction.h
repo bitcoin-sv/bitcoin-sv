@@ -26,6 +26,7 @@ namespace std
  * A TxId is the identifier of a transaction. Currently identical to TxHash but
  * differentiated for type safety.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct TxId : public uint256 {
     TxId() = default;
     explicit TxId(const uint256 &b) : uint256{b} {}
@@ -397,6 +398,7 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn) {
 }
 
 /** Precompute sighash midstate to avoid quadratic hashing */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct PrecomputedTransactionData {
     uint256 hashPrevouts, hashSequence, hashOutputs;
 

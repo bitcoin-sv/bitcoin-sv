@@ -178,7 +178,7 @@ public:
 /**
  * Stochastical (IP) address manager
  */
-class CAddrMan {
+class CAddrMan { // NOLINT(cppcoreguidelines-special-member-functions)
 private:
     //! critical section to protect the inner data structures
     mutable CCriticalSection cs;

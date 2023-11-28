@@ -321,6 +321,7 @@ constexpr bool IsMinerInfo(const std::span<const uint8_t> script)
 
 size_t CountOp(std::span<const uint8_t>, opcodetype);
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CReserveScript {
 public:
     CScript reserveScript;

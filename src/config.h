@@ -35,6 +35,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 class CChainParams;
 struct DefaultBlockSizeParams;
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Config : public boost::noncopyable, public CScriptConfig {
 public:
     virtual uint64_t GetMaxBlockSize() const = 0;
@@ -198,6 +199,7 @@ protected:
     virtual ~Config() = default;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class ConfigInit : public Config {
 public:
     // used to specify default block size related parameters

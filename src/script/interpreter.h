@@ -37,6 +37,7 @@ uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       const PrecomputedTransactionData *cache = nullptr,
                       bool enabledSighashForkid = true);
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BaseSignatureChecker {
 public:
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,

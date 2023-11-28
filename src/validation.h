@@ -1094,6 +1094,7 @@ bool RewindBlockIndex(const Config &config);
  * RAII wrapper for VerifyDB: Verify consistency of the block and coin
  * databases.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CVerifyDB {
 public:
     CVerifyDB();

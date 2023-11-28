@@ -286,6 +286,7 @@ namespace InvalidTxnPublisher
         std::time_t mRejectionTime;
     };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class CInvalidTxnSink
     {
     protected:
@@ -311,6 +312,7 @@ namespace InvalidTxnPublisher
 
 // Class used for asynchronous publishing invalid transactions to different sinks, 
 // thread safe
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CInvalidTxnPublisher
 {
 public:

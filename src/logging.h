@@ -56,6 +56,7 @@ enum LogFlags : uint32_t {
     ALL = ~uint32_t(0),
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Logger {
 private:
     /**

@@ -18,6 +18,7 @@
  * The format of an AssociationID is as follows:
  * [Type of ID (1 byte)][ID (1 to 128 bytes)]
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class AssociationID
 {
   public:

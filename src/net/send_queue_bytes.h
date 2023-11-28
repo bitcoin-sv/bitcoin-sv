@@ -5,6 +5,7 @@
 
 #include <atomic>
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CSendQueueBytes
 {
 private:

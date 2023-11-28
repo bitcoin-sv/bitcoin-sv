@@ -419,6 +419,7 @@ public:
  * you're returning the file pointer, return file.release(). If you need to
  * close the file early, use file.reset() instead of fclose(file).
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CAutoFile {
 private:
     int nType;
@@ -530,6 +531,7 @@ public:
  * Will automatically close the file when it goes out of scope if not null. If
  * you need to close the file early, use file.fclose() instead of fclose(file).
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CBufferedFile {
 private:
     // Disallow copies
@@ -683,6 +685,7 @@ private:
  * exception is thrown and stream should not be used after that point as it will
  * be in an invalid state.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CForwardReadonlyStream
 {
 public:
@@ -708,6 +711,7 @@ public:
  * exception is thrown and stream should not be used after that point as it will
  * be in an invalid state.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CForwardAsyncReadonlyStream
 {
 public:
@@ -735,6 +739,7 @@ public:
  * underlying FILE pointer. File pointer is closed once the CFileReader instance
  * gets out of scope.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CFileReader
 {
 public:
@@ -776,6 +781,7 @@ private:
  * underlying FILE pointer - it's up to the file pointer provider to close it
  * afterwards.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CNonOwningFileReader
 {
 public:

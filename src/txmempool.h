@@ -139,6 +139,7 @@ public:
  * limit the amount of work we're willing to do to avoid consuming too much
  * CPU.)
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxMemPoolEntry {
 private:
     CTransactionWrapperRef tx;
@@ -424,6 +425,7 @@ using CTransactionConflict = std::optional<CTransactionConflictData>;
  * entry as "dirty", and set the feerate for sorting purposes to be equal the
  * feerate of the transaction without any descendants.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxMemPool {
 private:
     static constexpr int MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO = 1000;
@@ -1041,6 +1043,7 @@ public:
      *
      * @note This class is non-moveable and non-copyable.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class Snapshot final
     {
         // Only CTxMemPool is allowed to call the constructor.
@@ -1439,6 +1442,7 @@ private:
 // multi_index tag names
 struct txid_index {};
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct DisconnectedBlockTransactions {
     typedef boost::multi_index_container<
         CTransactionRef, boost::multi_index::indexed_by<

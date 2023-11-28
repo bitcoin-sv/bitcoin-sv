@@ -15,6 +15,7 @@
 // Allocator that locks its contents from being paged
 // out of memory and clears its contents before deletion.
 //
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 template <typename T> struct secure_allocator : public std::allocator<T> {
     typedef std::allocator<T> base;
     secure_allocator() throw() {}

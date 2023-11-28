@@ -25,6 +25,7 @@
 // jWriter.writeEndArray();
 // jWriter.writeEndObject();
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CJSONWriter
 {
 public:

@@ -287,7 +287,7 @@ public:
  *       This is not reflected in CBlockIndex state and can only be queried by
  *       calling IsInExplicitSoftConsensusFreeze() or IsInSoftConsensusFreeze()
  */
-class CBlockIndex {
+class CBlockIndex { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     template<typename T> struct UnitTestAccess;
     class TemporaryBlockIndex;
@@ -1156,6 +1156,7 @@ private:
  * checks if block is a valid candidate for potential later inclusion.
  * Class is also used in unit tests.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CBlockIndex::TemporaryBlockIndex
 {
 public:

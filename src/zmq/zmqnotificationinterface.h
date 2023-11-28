@@ -20,6 +20,7 @@ struct ActiveZMQNotifier
     std::string notifierAddress;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CZMQNotificationInterface final : public CValidationInterface {
 public:
     virtual ~CZMQNotificationInterface();
