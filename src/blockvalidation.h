@@ -180,7 +180,7 @@ public:
 
         // if blockHash is not in mWaitAfterValidation
         // then we break while loop
-        do
+        do // NOLINT(cppcoreguidelines-avoid-do-while) 
         {
             {
                 std::scoped_lock lockGuard(mMutexWaitAfterValidation);

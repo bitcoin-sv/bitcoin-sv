@@ -204,7 +204,7 @@ public:
         CScript result;
         iterator pc = begin(), pc2 = begin();
         opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
-        do {
+        do { // NOLINT(cppcoreguidelines-avoid-do-while)
             result.insert(result.end(), pc2, pc);
             while (static_cast<size_t>(end() - pc) >= b.size() &&
                    std::equal(b.begin(), b.end(), pc)) {
