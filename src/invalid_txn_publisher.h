@@ -295,7 +295,7 @@ namespace InvalidTxnPublisher
             constexpr int64_t APPROXIMATE_SIZE_NO_HEX = 500; // roughly size of the json file without transaction hex
             if (writeTxHex)
             {
-                // NOLINTNEXTLINE(bugprone-narrowing-conversions)
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 return invalidTxnInfo.GetTotalTransactionSize() * 2 + APPROXIMATE_SIZE_NO_HEX;
             }
             return APPROXIMATE_SIZE_NO_HEX;

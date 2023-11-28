@@ -208,7 +208,7 @@ public:
             result.insert(result.end(), pc2, pc);
             while (static_cast<size_t>(end() - pc) >= b.size() &&
                    std::equal(b.begin(), b.end(), pc)) {
-                pc = pc + b.size(); // NOLINT(bugprone-narrowing-conversions)
+                pc = pc + b.size(); // NOLINT(*-narrowing-conversions)
                 ++nFound;
             }
             pc2 = pc;

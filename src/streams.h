@@ -210,10 +210,10 @@ public:
     //
     // Vector subset
     //
-    // NOLINTBEGIN(bugprone-narrowing-conversions)
+    // NOLINTBEGIN(*-narrowing-conversions)
     const_iterator begin() const { return vch.begin() + nReadPos; }
     iterator begin() { return vch.begin() + nReadPos; }
-    // NOLINTEND(bugprone-narrowing-conversions)
+    // NOLINTEND(*-narrowing-conversions)
     const_iterator end() const { return vch.end(); }
     iterator end() { return vch.end(); }
     size_type size() const { return vch.size() - nReadPos; }
@@ -245,7 +245,7 @@ public:
         }
 
         assert(last - first > 0);
-        if (it == vch.begin() + nReadPos && // NOLINT(bugprone-narrowing-conversions)
+        if (it == vch.begin() + nReadPos && // NOLINT(*-narrowing-conversions)
             span <= nReadPos) {
             // special case for inserting at the front when there's room
             nReadPos -= span;
@@ -262,7 +262,7 @@ public:
         }
 
         assert(last - first > 0);
-        if (it == vch.begin() + nReadPos && // NOLINT(bugprone-narrowing-conversions)
+        if (it == vch.begin() + nReadPos && // NOLINT(*-narrowing-conversions)
             span <= nReadPos) {
             // special case for inserting at the front when there's room
             nReadPos -= span;
@@ -273,7 +273,7 @@ public:
     }
 
     iterator erase(iterator it) {
-        if (it == vch.begin() + nReadPos) { // NOLINT(bugprone-narrowing-conversions)
+        if (it == vch.begin() + nReadPos) { // NOLINT(*-narrowing-conversions)
             // special case for erasing from the front
             if (++nReadPos >= vch.size()) {
                 // whenever we reach the end, we take the opportunity to clear
@@ -281,14 +281,14 @@ public:
                 nReadPos = 0;
                 return vch.erase(vch.begin(), vch.end());
             }
-            return vch.begin() + nReadPos; // NOLINT(bugprone-narrowing-conversions)
+            return vch.begin() + nReadPos; // NOLINT(*-narrowing-conversions)
         } else {
             return vch.erase(it);
         }
     }
 
     iterator erase(iterator first, iterator last) {
-        if (first == vch.begin() + nReadPos) { // NOLINT(bugprone-narrowing-conversions)
+        if (first == vch.begin() + nReadPos) { // NOLINT(*-narrowing-conversions)
             // special case for erasing from the front
             if (last == vch.end()) {
                 nReadPos = 0;
@@ -302,7 +302,7 @@ public:
     }
 
     inline void Compact() {
-        vch.erase(vch.begin(), vch.begin() + nReadPos); // NOLINT(bugprone-narrowing-conversions)
+        vch.erase(vch.begin(), vch.begin() + nReadPos); // NOLINT(*-narrowing-conversions)
         nReadPos = 0;
     }
 
@@ -317,7 +317,7 @@ public:
     // Stream subset
     //
     bool eof() const { return size() == 0; }
-    int in_avail() { return size(); } // NOLINT(bugprone-narrowing-conversions)
+    int in_avail() { return size(); } // NOLINT(*-narrowing-conversions)
 
     void SetType(int n) { nType = n; }
     int GetType() const { return nType; }
@@ -401,7 +401,7 @@ public:
         }
 
         for (size_type i = 0, j = 0; i != size(); i++) {
-            vch[i] ^= key[j++]; // NOLINT(bugprone-narrowing-conversions)
+            vch[i] ^= key[j++]; // NOLINT(*-narrowing-conversions)
 
             // This potentially acts on very many bytes of data, so it's
             // important that we calculate `j`, i.e. the `key` index in this way

@@ -239,7 +239,7 @@ template <typename Stream> inline void Unserialize(Stream &s, double &a) {
 }
 
 template <typename Stream> inline void Serialize(Stream &s, bool a) {
-    char f = a; // NOLINT(bugprone-narrowing-conversions)
+    char f = a; // NOLINT(*-narrowing-conversions)
     ser_writedata8(s, f);
 }
 template <typename Stream> inline void Unserialize(Stream &s, bool &a) {
