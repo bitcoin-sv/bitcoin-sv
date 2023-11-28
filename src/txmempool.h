@@ -1342,7 +1342,7 @@ class CPFPGroup
     mining::GroupID groupId {};
 
 public:
-
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
     // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : evaluationParams{evalParams}

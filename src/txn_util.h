@@ -30,6 +30,7 @@ class CTxIdTracker final
         std::unique_lock lock {mMtx};
         return mTxIds.insert(txid).second;
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     bool Insert(TxId&& txid) {
         std::unique_lock lock {mMtx};
         return mTxIds.insert(txid).second;
