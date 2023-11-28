@@ -28,7 +28,9 @@ public:
     CDiskBlockPos() = default;
 
     CDiskBlockPos(int nFileIn, unsigned int nPosIn) {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         nFile = nFileIn;
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         nPos = nPosIn;
     }
 

@@ -138,6 +138,7 @@ public:
      */
     static inline constexpr int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     CTxIn() { nSequence = SEQUENCE_FINAL; }
 
     explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(),

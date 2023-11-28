@@ -35,6 +35,7 @@ public:
 
     CBanEntry(int64_t nCreateTimeIn) {
         SetNull();
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         nCreateTime = nCreateTimeIn;
     }
 

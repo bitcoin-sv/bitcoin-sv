@@ -418,12 +418,16 @@ public:
     CFlatData(void *pbeginIn, void *pendIn)
         : pbegin((char *)pbeginIn), pend((char *)pendIn) {}
     template <class T, class TAl> explicit CFlatData(std::vector<T, TAl> &v) {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pbegin = (char *)v.data();
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pend = (char *)(v.data() + v.size());
     }
     template <unsigned int N, typename T, typename S, typename D>
     explicit CFlatData(prevector<N, T, S, D> &v) {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pbegin = (char *)v.data();
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pend = (char *)(v.data() + v.size());
     }
     char *begin() { return pbegin; }

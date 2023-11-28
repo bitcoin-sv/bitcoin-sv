@@ -29,6 +29,7 @@ public:
     CMedianFilter(unsigned int size, T initial_value) : nSize(size) {
         vValues.reserve(size);
         vValues.push_back(initial_value);
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         vSorted = vValues;
     }
 

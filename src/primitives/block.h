@@ -160,6 +160,7 @@ struct CBlockLocator {
 
     CBlockLocator() {}
 
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     CBlockLocator(const std::vector<uint256> &vHaveIn) { vHave = vHaveIn; }
 
     ADD_SERIALIZE_METHODS

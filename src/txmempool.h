@@ -1352,6 +1352,7 @@ public:
         , transactions{txs}
         , groupId{counter++}
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         payingTxId = transactions.back()->GetTxId();
     }
 
