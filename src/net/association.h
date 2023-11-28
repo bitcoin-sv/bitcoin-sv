@@ -17,7 +17,7 @@
 class AssociationStats;
 class CConnman;
 class CNode;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CSerializedNetMsg;
 
 /**

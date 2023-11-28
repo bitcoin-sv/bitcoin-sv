@@ -7,7 +7,7 @@
 
 #include <string>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
 namespace rpc::client
 {

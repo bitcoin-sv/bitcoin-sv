@@ -15,8 +15,8 @@
 #include "zmq/zmqnotificationinterface.h"
 #endif
 
-class Config;
-class ConfigInit;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
+class ConfigInit; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CScheduler;
 class CWallet;
 

@@ -16,7 +16,7 @@ static const int DEFAULT_HTTP_SERVER_TIMEOUT = 30;
 struct evhttp_request;
 struct event_base;
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CService;
 class HTTPRequest;
 

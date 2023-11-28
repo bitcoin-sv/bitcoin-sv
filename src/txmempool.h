@@ -44,7 +44,7 @@
 class CAutoFile;
 class CBlockIndex;
 class CEvictionCandidateTracker;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CoinsDB;
 class CoinsDBView;
 class CAsyncMempoolTxDB;
@@ -1381,6 +1381,7 @@ public:
  *   + CTxnDoubleSpendDetector::insertTxnInputs  - this is final check, executed
  *     while holding double spend detector lock
  */
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CCoinsViewMemPool : public ICoinsView {
 private:
     const CTxMemPool &mempool;

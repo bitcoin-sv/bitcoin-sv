@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <string>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class msg_buffer;
 class CSerializedNetMsg;
 

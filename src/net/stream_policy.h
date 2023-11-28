@@ -13,7 +13,7 @@
 #include <string>
 
 class CConnman;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
 /**
  * A stream policy defines how a collection of streams to a peer are utilised.

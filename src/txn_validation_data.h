@@ -7,7 +7,7 @@
 #include "txn_util.h"
 #include <enum_cast.h>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class TransactionSpecificConfig;
 
 // Enumerate possible txn's source type

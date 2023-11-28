@@ -5,7 +5,7 @@
 
 #include "primitives/block.h"
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CBlockIndex;
 
 namespace mining

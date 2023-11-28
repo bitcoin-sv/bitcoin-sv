@@ -47,7 +47,7 @@ class CChainParams;
 class CConnman;
 class CFrozenTXOCheck;
 class CInv;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CScriptCheck;
 class CTxMemPool;
 struct CTxnHandlers;

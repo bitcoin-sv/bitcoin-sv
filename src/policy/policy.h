@@ -14,7 +14,7 @@
 #include <optional>
 #include <string>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CCoinsViewCache;
 
 namespace task{class CCancellationToken;}

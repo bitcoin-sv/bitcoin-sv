@@ -170,6 +170,7 @@ public:
 
 size_t ser_size(const CTxIn&);
 
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class Config; // declared in config.h, but including the header file here brings in additional problem
 /**
  * An output of a transaction.  It contains the public key that the next input

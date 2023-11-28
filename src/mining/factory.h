@@ -9,7 +9,7 @@
 
 #include <memory>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
 namespace mining
 {

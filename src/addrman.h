@@ -178,6 +178,7 @@ public:
 /**
  * Stochastical (IP) address manager
  */
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CAddrMan { // NOLINT(cppcoreguidelines-special-member-functions)
 private:
     //! critical section to protect the inner data structures

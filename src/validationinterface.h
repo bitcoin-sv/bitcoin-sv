@@ -29,6 +29,7 @@ class uint256;
 /** Unregister all wallets from core */
 void UnregisterAllValidationInterfaces();
 
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CValidationInterface {
 public:
     // Register / unregister this wallet

@@ -413,6 +413,7 @@ protected:
 /**
  * Coins view that never contains coins - dummy.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:

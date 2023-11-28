@@ -58,7 +58,7 @@
 #include <boost/signals2/signal.hpp>
 
 class CAddrMan;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CNode;
 class CScheduler;
 class CTxIdTracker;
