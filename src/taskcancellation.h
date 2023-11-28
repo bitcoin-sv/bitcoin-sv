@@ -161,6 +161,8 @@ namespace task
 
             return false;
         }
+
+        // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
         ~CTimedCancellationSourceT() {
             if (mBudget) {
                 mBudget->FillBudget(std::chrono::duration_cast<std::chrono::microseconds>(mStart_ + mCancelAfter - Clock::now()));

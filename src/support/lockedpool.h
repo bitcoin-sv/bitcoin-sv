@@ -196,6 +196,7 @@ private:
     public:
         LockedPageArena(LockedPageAllocator *alloc_in, void *base_in,
                         size_t size, size_t align);
+        // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
         ~LockedPageArena();
 
     private:

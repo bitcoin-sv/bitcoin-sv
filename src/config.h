@@ -373,6 +373,7 @@ public:
     virtual bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) = 0;
 
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
     ~ConfigInit() = default;
 };
 
