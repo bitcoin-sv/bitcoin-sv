@@ -38,11 +38,11 @@ private:
     //! Whether this private key is valid. We check for correctness when
     //! modifying the key data, so fValid should always correspond to the actual
     //! state.
-    bool fValid;
+    bool fValid; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     //! Whether the public key corresponding to this private key is (to be)
     //! compressed.
-    bool fCompressed;
+    bool fCompressed; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     //! The actual byte data
     std::vector<uint8_t, secure_allocator<uint8_t>> keydata;

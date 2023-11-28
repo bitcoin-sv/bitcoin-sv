@@ -361,13 +361,13 @@ bool CheckBlockTTOROrder(const CBlock& block);
 
 class BlockValidationOptions {
 private:
-    bool checkPoW : 1;
-    bool checkMerkleRoot : 1;
+    bool checkPoW : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool checkMerkleRoot : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     // If true; force block to be flagged as checked
-    bool markChecked : 1;
+    bool markChecked : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
     // If false, check for max block size is skipped in CheckBlock().
-    bool checkMaxBlockSize : 1;
+    bool checkMaxBlockSize : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
 
 public:
     BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}, checkMaxBlockSize{true}
@@ -1022,6 +1022,7 @@ public:
                  const PrecomputedTransactionData& txdataIn)
         : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
           nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
+          // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
           error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn), config(configIn), consensus(consensusIn) {}
 
     std::optional<bool> operator()(const task::CCancellationToken& token);

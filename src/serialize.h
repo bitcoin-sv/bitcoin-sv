@@ -1067,7 +1067,7 @@ inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
  */
 class CSizeComputer {
 protected:
-    size_t nSize;
+    size_t nSize; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
