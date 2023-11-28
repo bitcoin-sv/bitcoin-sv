@@ -381,7 +381,9 @@ class CScopedBlockOriginRegistry
     BlockOriginRegistry::const_iterator mThisItem;
 
     // registering origin of the block (from which peer, rpc)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     inline static BlockOriginRegistry mRegistry;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     inline static std::mutex mRegistryGuard;
 
 public:

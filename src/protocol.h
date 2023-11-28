@@ -203,6 +203,7 @@ namespace NetMsgType {
  * receiving node at the beginning of a connection.
  * @see https://bitcoin.org/en/developer-reference#version
  */
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern const char *VERSION;
 /**
  * The verack message acknowledges a previously-received version message,
@@ -429,6 +430,7 @@ extern const char *AUTHRESP;
  * Contains a dataref transaction.
  */
 extern const char *DATAREFTX;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * Indicate if the message is used to transmit the content of a block.

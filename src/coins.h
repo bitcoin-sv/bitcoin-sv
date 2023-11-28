@@ -839,7 +839,7 @@ public:
     }
 
 private:
-
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     inline static CCoinsViewEmpty mViewEmpty;
 
 protected:

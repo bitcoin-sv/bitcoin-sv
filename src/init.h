@@ -25,7 +25,9 @@ class CWallet;
 * cs_zmqNotificationInterface is used to protect pzmqNotificationInterface. One of the race conditions can occur
 * at shutdown when pzmqNotificationInterface gets deleted while RPC thread might still be using it.
 */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CCriticalSection cs_zmqNotificationInterface;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CZMQNotificationInterface *pzmqNotificationInterface;
 #endif
 

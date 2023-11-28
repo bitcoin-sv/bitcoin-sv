@@ -229,6 +229,7 @@ constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
 /** Default for -detectselfishmining. */
 static const bool DEFAULT_DETECT_SELFISH_MINING = false;
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
@@ -276,6 +277,7 @@ extern bool fHavePruned;
 extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 /** Default value for minimum number of blocks to keep */
 static const int32_t DEFAULT_MIN_BLOCKS_TO_KEEP = 288;
 /** Lowest value of MIN_BLOCKS_TO_KEEP */
@@ -409,6 +411,7 @@ public:
 /**
  * Keeping status of currently validating blocks and blocks that we wait after validation
  */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CBlockValidationStatus blockValidationStatus;
 
 /**
@@ -1145,6 +1148,7 @@ void InvalidateBlocksFromConfig(const Config &config);
 bool ResetBlockFailureFlags(CBlockIndex *pindex);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CChain chainActive;
 
 /** Global variable that points to the active CCoinsProvider (protected by cs_main)
@@ -1154,6 +1158,7 @@ extern std::unique_ptr<CoinsDB> pcoinsTip;
 /** Global variable that points to the active block tree (protected by cs_main)
  */
 extern CBlockTreeDB *pblocktree;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * Return the MTP and spend height, which is one more than the inputs.GetBestBlock().

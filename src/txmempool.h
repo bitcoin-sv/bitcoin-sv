@@ -825,6 +825,7 @@ private:
     std::once_flag db_initialized {};
     std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic_int mempoolTxDB_uniqueInit;
     int mempoolTxDB_uniqueSuffix {mempoolTxDB_uniqueInit.fetch_add(1)};
 
@@ -1336,6 +1337,7 @@ class CPFPGroup
     // txid of the groups paying transaction
     TxId payingTxId {};
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic<uint64_t> counter;
     mining::GroupID groupId {};
 

@@ -242,8 +242,10 @@ private:
     static void CreateInstance();
     /** Called when locking fails, warn the user here */
     static bool LockingFailed();
-
+ 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static LockedPoolManager *_instance;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::once_flag init_flag;
 };
 

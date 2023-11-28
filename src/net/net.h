@@ -781,6 +781,7 @@ private:
     /** Invalid transaction publisher*/
     CInvalidTxnPublisher mInvalidTxnPublisher;
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
 void MapPort(bool fUseUPnP);
@@ -847,20 +848,24 @@ bool IsReachable(const CNetAddr &addr);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer,
                          ServiceFlags nLocalServices);
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern bool fDiscover;
 extern bool fListen;
 extern bool fRelayTxes;
 
 extern CCriticalSection cs_invQueries;
 extern std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 struct LocalServiceInfo {
     int nScore;
     int nPort;
 };
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /** Information about a peer */
 class CNode : public std::enable_shared_from_this<CNode>

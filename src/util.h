@@ -45,6 +45,7 @@ public:
     boost::signals2::signal<std::string(const char *psz)> Translate;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CTranslationInterface translationInterface;
 
 extern const char *const BITCOIN_CONF_FILENAME;
@@ -229,6 +230,7 @@ public:
     void ClearArg(const std::string &strArg);
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern ArgsManager gArgs;
 
 /**

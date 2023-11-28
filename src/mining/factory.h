@@ -52,6 +52,7 @@ const enumTableT<CMiningFactory::BlockAssemblerType>& enumTable(CMiningFactory::
 constexpr CMiningFactory::BlockAssemblerType DEFAULT_BLOCK_ASSEMBLER_TYPE { CMiningFactory::BlockAssemblerType::JOURNALING };
 
 // A global unique mining factory
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 inline std::unique_ptr<CMiningFactory> g_miningFactory {nullptr};
 
 }
