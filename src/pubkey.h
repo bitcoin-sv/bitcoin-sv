@@ -106,7 +106,7 @@ public:
             s.read((char *)vch, len);
         } else {
             // invalid pubkey, skip available data
-            char dummy;
+            char dummy; // NOLINT(cppcoreguidelines-init-variables)
             while (len--)
                 s.read(&dummy, 1);
             Invalidate();

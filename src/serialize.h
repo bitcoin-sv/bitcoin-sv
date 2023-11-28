@@ -85,22 +85,22 @@ inline void ser_writedata64(Stream &s, uint64_t obj) {
     s.write((char *)&obj, 8);
 }
 template <typename Stream> inline uint8_t ser_readdata8(Stream &s) {
-    uint8_t obj;
+    uint8_t obj; // NOLINT(cppcoreguidelines-init-variables)
     s.read((char *)&obj, 1);
     return obj;
 }
 template <typename Stream> inline uint16_t ser_readdata16(Stream &s) {
-    uint16_t obj;
+    uint16_t obj; // NOLINT(cppcoreguidelines-init-variables)
     s.read((char *)&obj, 2);
     return le16toh(obj);
 }
 template <typename Stream> inline uint32_t ser_readdata32(Stream &s) {
-    uint32_t obj;
+    uint32_t obj; // NOLINT(cppcoreguidelines-init-variables)
     s.read((char *)&obj, 4);
     return le32toh(obj);
 }
 template <typename Stream> inline uint64_t ser_readdata64(Stream &s) {
-    uint64_t obj;
+    uint64_t obj; // NOLINT(cppcoreguidelines-init-variables)
     s.read((char *)&obj, 8);
     return le64toh(obj);
 }

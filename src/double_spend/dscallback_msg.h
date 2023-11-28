@@ -135,7 +135,7 @@ class DSCallbackMsg
             {
                 // There's no uniform way to check whether a stream has been drained, so
                 // try reading a byte and see if the underlying stream complains.
-                uint8_t dummy;
+                uint8_t dummy; // NOLINT(cppcoreguidelines-init-variables)
                 READWRITE(dummy);
                 ok = false;
             }

@@ -360,9 +360,9 @@ public:
 
         Clear();
 
-        uint8_t nVersion;
+        uint8_t nVersion; // NOLINT(cppcoreguidelines-init-variables)
         s >> nVersion;
-        uint8_t nKeySize;
+        uint8_t nKeySize; // NOLINT(cppcoreguidelines-init-variables)
         s >> nKeySize;
         if (nKeySize != 32)
             throw std::ios_base::failure(

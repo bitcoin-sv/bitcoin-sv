@@ -203,7 +203,7 @@ public:
         if (b.empty()) return nFound;
         CScript result;
         iterator pc = begin(), pc2 = begin();
-        opcodetype opcode;
+        opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
         do {
             result.insert(result.end(), pc2, pc);
             while (static_cast<size_t>(end() - pc) >= b.size() &&
