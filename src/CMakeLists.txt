@@ -61,6 +61,25 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
 	endif()
 endif()
 
+# Enable hardening
+option(USE_HARDENING "Enable extra hardening" ON)
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
+    if(USE_HARDENING)
+        add_compile_options(
+            -Wstack-protector
+            -fstack-protector-all
+            -fwrapv
+        )
+        add_link_options(
+            "LINKER:-z,relro"
+            "LINKER:-z,now"
+            "LINKER:-z,noexecstack"
+            "LINKER:-z,nodlopen"
+            "LINKER:-pie"
+        )
+    endif()
+endif()
+
 if(MSVC)
 	# Do not define min/max macros - we use std::min/max
 	add_compile_definitions(NOMINMAX)
@@ -708,6 +727,9 @@ target_link_libraries(
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()
+
+include(ClangTidy)
+AddClangTidy(bitcoind)
 
 if (MSVC)
 	# prevents default build from running unit tests automaticaly

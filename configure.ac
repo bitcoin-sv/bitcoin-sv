@@ -652,11 +652,15 @@ if test x$use_hardening != xno; then
     HARDENED_CPPFLAGS="$HARDENED_CPPFLAGS -D_FORTIFY_SOURCE=2"
   ])
 
+  AX_CHECK_COMPILE_FLAG([-fwrapv],[HARDENED_CXXFLAGS="$HARDENED_CXXFLAGS -fwrapv"])
+
   AX_CHECK_LINK_FLAG([[-Wl,--dynamicbase]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,--dynamicbase"])
   AX_CHECK_LINK_FLAG([[-Wl,--nxcompat]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,--nxcompat"])
   AX_CHECK_LINK_FLAG([[-Wl,--high-entropy-va]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,--high-entropy-va"])
   AX_CHECK_LINK_FLAG([[-Wl,-z,relro]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,relro"])
   AX_CHECK_LINK_FLAG([[-Wl,-z,now]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,now"])
+  AX_CHECK_LINK_FLAG([[-Wl,-z,noexecstack]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,noexecstack"])
+  AX_CHECK_LINK_FLAG([[-Wl,-z,nodlopen]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,nodlopen"])
 
   if test x$TARGET_OS != xwindows; then
     AX_CHECK_COMPILE_FLAG([-fPIE],[PIE_FLAGS="-fPIE"])
@@ -1372,33 +1376,35 @@ esac
 
 echo
 echo "Options used to compile and link:"
-echo "  prod build    = $enable_prod_build"
-echo "  with wallet   = $enable_wallet"
-echo "  with zmq      = $use_zmq"
-echo "  with test     = $use_tests"
-echo "  with bench    = $use_bench"
-echo "  with upnp     = $use_upnp"
-echo "  use asm       = $use_asm"
-echo "  debug enabled = $enable_debug"
-echo "  werror        = $enable_werror"
+echo "  prod build        = $enable_prod_build"
+echo "  with wallet       = $enable_wallet"
+echo "  with zmq          = $use_zmq"
+echo "  with test         = $use_tests"
+echo "  with bench        = $use_bench"
+echo "  with upnp         = $use_upnp"
+echo "  use asm           = $use_asm"
+echo "  debug enabled     = $enable_debug"
+echo "  werror            = $enable_werror"
 echo
-echo "  sanitizers    "
-echo "          asan  = $enable_asan"
-echo "          tsan  = $enable_tsan"
-echo "          ubsan = $enable_ubsan"
+echo "  sanitizers"
+echo "          asan      = $enable_asan"
+echo "          tsan      = $enable_tsan"
+echo "          ubsan     = $enable_ubsan"
 echo
 echo "  memory allocators"
-echo "       tcmalloc = $use_tcmalloc"
-echo "       jemalloc = $use_jemalloc"
+echo "       tcmalloc     = $use_tcmalloc"
+echo "       jemalloc     = $use_jemalloc"
 echo
-echo "  target os     = $TARGET_OS"
-echo "  build os      = $BUILD_OS"
+echo "  target os         = $TARGET_OS"
+echo "  build os          = $BUILD_OS"
 echo
-echo "  CC            = $CC"
-echo "  CFLAGS        = $CFLAGS"
-echo "  CPPFLAGS      = $CPPFLAGS"
-echo "  CXX           = $CXX"
-echo "  CXXFLAGS      = $CXXFLAGS"
-echo "  LDFLAGS       = $LDFLAGS"
+echo "  CC                = $CC"
+echo "  CFLAGS            = $CFLAGS"
+echo "  CPPFLAGS          = $CPPFLAGS"
+echo "  CXX               = $CXX"
+echo "  HARDENED_CXXFLAGS = $HARDENED_CXXFLAGS"
+echo "  HARDENED_LDFLAGS  = $HARDENED_LDFLAGS"
+echo "  CXXFLAGS          = $CXXFLAGS"
+echo "  LDFLAGS           = $LDFLAGS"
 
 echo

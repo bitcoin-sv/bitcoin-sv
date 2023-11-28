@@ -1,0 +1,22 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+FROM quay.io/centos/centos:stream9
+
+ENV TZ=Europe/London
+
+RUN set -xeu \
+    && dnf install -y 'dnf-command(config-manager)' \
+	&& dnf config-manager -y --set-enabled crb \
+    && dnf install -y \
+    epel-release epel-next-release \
+    gcc-c++ make which autoconf automake libtool \
+    openssl-devel libevent-devel libdb-devel libdb-cxx-devel \
+    boost-devel \
+    && dnf install -y miniupnpc-devel \
+    cppzmq-devel \
+    python3 python3-ecdsa python3-zmq pip \
+    git \
+    && dnf clean all -y
+
+RUN set -xeu && pip install bip32utils
