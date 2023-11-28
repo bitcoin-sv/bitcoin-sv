@@ -288,6 +288,7 @@ private:
                 T *src = indirect;
                 T *dst = direct_ptr(0);
                 memcpy(dst, src, size() * sizeof(T));
+                // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
                 free(indirect);
                 _size -= N + 1;
             }
@@ -298,12 +299,14 @@ private:
                 // allocator or new/delete so that handlers are called as
                 // necessary, but performance would be slightly degraded by
                 // doing so.
+                // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
                 _union.other.indirect = static_cast<char *>(realloc(
                     _union.other.indirect, ((size_t)sizeof(T)) * new_capacity));
                 assert(_union.other.indirect);
                 _union.other.capacity = new_capacity;
             } else {
                 char *new_indirect = static_cast<char *>(
+                    // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
                     malloc(((size_t)sizeof(T)) * new_capacity));
                 assert(new_indirect);
                 T *src = direct_ptr(0);
@@ -543,6 +546,7 @@ public:
     ~prevector() {
         clear();
         if (!is_direct()) {
+            // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
             free(_union.other.indirect);
             _union.other.indirect = nullptr;
         }
