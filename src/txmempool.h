@@ -603,6 +603,7 @@ private:
         uint64_t cachedSecondaryInnerUsage;
 
         public:
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         SecondaryMempoolStats()
         {
             Clear();

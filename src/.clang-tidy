@@ -11,11 +11,11 @@ Checks: '-*,
 
          -cppcoreguidelines-pro-type-cstyle-cast,
          -cppcoreguidelines-pro-type-const-cast,
-         -cppcoreguidelines-pro-type-member-init,
          -cppcoreguidelines-pro-type-reinterpret-cast,
          -cppcoreguidelines-pro-type-union-access,
          -cppcoreguidelines-pro-type-vararg,
       '
+#-cppcoreguidelines-pro-type-member-init,
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'

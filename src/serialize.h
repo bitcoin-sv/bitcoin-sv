@@ -105,6 +105,7 @@ template <typename Stream> inline uint64_t ser_readdata64(Stream &s) {
     return le64toh(obj);
 }
 inline uint64_t ser_double_to_uint64(double x) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         double x;
         uint64_t y;
@@ -113,6 +114,7 @@ inline uint64_t ser_double_to_uint64(double x) {
     return tmp.y;
 }
 inline uint32_t ser_float_to_uint32(float x) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         float x;
         uint32_t y;
@@ -121,6 +123,7 @@ inline uint32_t ser_float_to_uint32(float x) {
     return tmp.y;
 }
 inline double ser_uint64_to_double(uint64_t y) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         double x;
         uint64_t y;
@@ -129,6 +132,7 @@ inline double ser_uint64_to_double(uint64_t y) {
     return tmp.x;
 }
 inline float ser_uint32_to_float(uint32_t y) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         float x;
         uint32_t y;
@@ -400,7 +404,7 @@ I ReadVarInt(Stream &is) {
 }
 
 #define FLATDATA(obj)                                                          \
-    REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj)))
+    REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj))) // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 #define VARINT(obj) REF(WrapVarInt(REF(obj)))
 #define COMPACTSIZE(obj) REF(CCompactSize(REF(obj)))
 #define LIMITED_STRING(obj, n) REF(LimitedBytes<n, std::string>(REF(obj)))

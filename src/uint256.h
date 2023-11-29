@@ -32,12 +32,14 @@ public:
     base_blob() { memset(data, 0, sizeof(data)); }
     
     template<typename T>
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_blob(T first, T last)
     {
         assert(std::distance(first, last) == sizeof(data));
         std::copy(first, last, &data[0]);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     explicit base_blob(const std::vector<uint8_t> &vch) {
         assert(vch.size() == sizeof(data));
         // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,

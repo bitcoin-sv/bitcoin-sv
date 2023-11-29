@@ -106,6 +106,7 @@ public:
 
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CChainParams() {}
 
     Consensus::Params consensus;

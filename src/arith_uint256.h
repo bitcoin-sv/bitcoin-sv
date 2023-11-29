@@ -29,12 +29,14 @@ protected:
     uint32_t pn[WIDTH];
 
 public:
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint() {
         for (int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint(const base_uint &b) {
         for (int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
@@ -49,6 +51,7 @@ public:
         return *this;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint(uint64_t b) {
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);

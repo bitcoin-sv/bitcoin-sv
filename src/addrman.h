@@ -505,6 +505,7 @@ public:
         nLastGood = 1;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CAddrMan() { Clear(); }
 
     ~CAddrMan() { nKey.SetNull(); }

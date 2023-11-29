@@ -57,6 +57,7 @@ private:
 
 public:
     //! Construct an invalid public key.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CPubKey() { Invalidate(); }
 
     //! Initialize a public key using begin/end iterators to byte data.
@@ -71,11 +72,14 @@ public:
     }
 
     //! Construct a public key using begin/end iterators to byte data.
-    template <typename T> CPubKey(const T pbegin, const T pend) {
+    template <typename T> 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    CPubKey(const T pbegin, const T pend) {
         Set(pbegin, pend);
     }
 
     //! Construct a public key from a byte vector.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CPubKey(const std::vector<uint8_t> &_vch) { Set(_vch.begin(), _vch.end()); }
 
     //! Simple read-only vector-like interface to the pubkey data.
@@ -168,6 +172,7 @@ public:
                 const ChainCode &cc) const;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct CExtPubKey {
     uint8_t nDepth;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)

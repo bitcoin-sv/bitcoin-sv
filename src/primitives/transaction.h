@@ -371,6 +371,7 @@ public:
     }
 
     template <typename Stream>
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CMutableTransaction(deserialize_type, Stream &s) {
         Unserialize(s);
     }

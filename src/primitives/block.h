@@ -30,6 +30,7 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBlockHeader() { SetNull(); }
 
     ADD_SERIALIZE_METHODS
@@ -89,8 +90,10 @@ public:
     // memory only
     mutable bool fChecked;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBlock() { SetNull(); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBlock(const CBlockHeader &header) {
         SetNull();
         *((CBlockHeader *)this) = header;
