@@ -111,6 +111,7 @@ private:
         for (size_t i = 0; i < inS.size(); i++)
         {
             unsigned char ch = inS[i];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             const char* escStr = escapes[ch];
 
             if (escStr)

@@ -9,8 +9,6 @@ Checks: '-*,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-non-private-member-variables-in-classes,
 
-         -cppcoreguidelines-pro-bounds-constant-array-index,
-         -cppcoreguidelines-pro-bounds-pointer-arithmetic,
          -cppcoreguidelines-pro-type-cstyle-cast,
          -cppcoreguidelines-pro-type-const-cast,
          -cppcoreguidelines-pro-type-member-init,
@@ -18,7 +16,6 @@ Checks: '-*,
          -cppcoreguidelines-pro-type-union-access,
          -cppcoreguidelines-pro-type-vararg,
       '
-#-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'

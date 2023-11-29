@@ -46,6 +46,7 @@ public:
 
     bool IsNull() const {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             if (data[i] != 0) return false;
         return true;
     }
@@ -71,10 +72,12 @@ public:
     std::string GetHex() const {
         std::string hex(WIDTH * 2, 0);
         for(unsigned int i = 0; i < WIDTH; ++i) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             uint8_t c = data[WIDTH - i - 1];
             // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
             hex[i * 2] = hexmap[c >> 4];
             hex[i * 2 + 1] = hexmap[c & 15];
+            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
         return hex;
     }

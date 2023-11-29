@@ -31,17 +31,20 @@ protected:
 public:
     base_uint() {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
     }
 
     base_uint(const base_uint &b) {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
     }
 
     // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
     base_uint &operator=(const base_uint &b) {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
         return *this;
     }
@@ -50,6 +53,7 @@ public:
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);
         for (int i = 2; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
     }
 
@@ -122,7 +126,9 @@ public:
     base_uint &operator+=(const base_uint &b) {
         uint64_t carry = 0;
         for (int i = 0; i < WIDTH; i++) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             uint64_t n = carry + pn[i] + b.pn[i];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = n & 0xffffffff;
             carry = n >> 32;
         }

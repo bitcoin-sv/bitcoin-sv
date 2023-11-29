@@ -86,6 +86,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     const uint8_t *end() const { return vch + size(); }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     const uint8_t &operator[](unsigned int pos) const { return vch[pos]; }
 
     //! Comparator implementation.

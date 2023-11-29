@@ -89,6 +89,7 @@ public:
     std::string NetworkIDString() const { return strNetworkID; }
     const std::vector<CDNSSeedData> &DNSSeeds() const { return vSeeds; }
     const std::vector<uint8_t> &Base58Prefix(Base58Type type) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         return base58Prefixes[type];
     }
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }

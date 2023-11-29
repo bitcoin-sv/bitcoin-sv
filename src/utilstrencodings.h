@@ -130,7 +130,9 @@ void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = 
             writer.Write(' ');
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         writer.Write(hexmap[val >> 4]);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         writer.Write(hexmap[val & 15]);
     }
 }
