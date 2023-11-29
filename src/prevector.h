@@ -46,6 +46,7 @@
  * The data type T must be movable by memmove/realloc(). Once we switch to C++,
  * move constructors can be used instead.
  */
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 template <unsigned int N, typename T, typename Size = uint64_t,
           typename Diff = int64_t>
 class prevector {
@@ -609,5 +610,6 @@ public:
 
     const value_type *data() const { return item_ptr(0); }
 };
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 #endif

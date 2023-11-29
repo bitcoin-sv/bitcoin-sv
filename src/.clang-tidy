@@ -15,7 +15,6 @@ Checks: '-*,
          -cppcoreguidelines-pro-type-union-access,
          -cppcoreguidelines-pro-type-vararg,
       '
-#-cppcoreguidelines-pro-type-member-init,
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'

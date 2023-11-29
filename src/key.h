@@ -83,6 +83,7 @@ public:
     //! Simple read-only vector-like interface.
     unsigned int size() const { return (fValid ? keydata.size() : 0); }
     const uint8_t *begin() const { return keydata.data(); }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t *end() const { return keydata.data() + size(); }
 
     //! Check whether this private key is valid.

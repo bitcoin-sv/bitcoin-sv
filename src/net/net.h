@@ -248,6 +248,7 @@ public:
         // Only calculate message hash for non-extended messages
         if(! CMessageHeader::IsExtended(mSize))
         {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             mHash = ::Hash(data.data(), data.data() + data.size());
         }
         mData = std::make_unique<CVectorStream>(std::move(data));

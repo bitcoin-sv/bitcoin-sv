@@ -93,12 +93,15 @@ public:
         assert(nPos <= vchData.size());
         size_t nOverwrite = std::min(nSize, vchData.size() - nPos);
         if (nOverwrite) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(vchData.data() + nPos,
                    reinterpret_cast<const uint8_t *>(pch), nOverwrite);
         }
         if (nOverwrite < nSize) {
             vchData.insert(vchData.end(),
+                           // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                            reinterpret_cast<const uint8_t *>(pch) + nOverwrite,
+                           // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                            reinterpret_cast<const uint8_t *>(pch) + nSize);
         }
         nPos += nSize;
@@ -241,7 +244,9 @@ public:
     void insert(iterator it, size_type n, char x) {
         vch.insert(it, n, x);
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     value_type *data() { return vch.data() + nReadPos; }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const value_type *data() const { return vch.data() + nReadPos; }
 
     void insert(iterator it, std::vector<char>::const_iterator first,
@@ -273,6 +278,7 @@ public:
             span <= nReadPos) {
             // special case for inserting at the front when there's room
             nReadPos -= span;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(&vch[nReadPos], &first[0], span);
         } else {
             vch.insert(it, first, last);
@@ -372,6 +378,7 @@ public:
 
     void write(const char *pch, size_t nSize) {
         // Write to the end of the buffer
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         vch.insert(vch.end(), pch, pch + nSize);
     }
 
@@ -618,6 +625,7 @@ public:
             if (nNow + nReadPos > nSrcPos) nNow = nSrcPos - nReadPos;
             memcpy(pch, &vchBuf[pos], nNow);
             nReadPos += nNow;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             pch += nNow;
             nSize -= nNow;
         }
@@ -958,6 +966,7 @@ public:
         if(mData.size() > mConsumed)
         {
             size_t consume = std::min(mData.size() - mConsumed, maxSize);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             const uint8_t* start = mData.data() + mConsumed;
             mConsumed += consume;
 
@@ -995,6 +1004,7 @@ public:
         if(mData->size() > mConsumed)
         {
             size_t consume = std::min(mData->size() - mConsumed, maxSize);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             const uint8_t* start = mData->data() + mConsumed;
             mConsumed += consume;
 

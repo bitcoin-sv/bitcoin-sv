@@ -88,9 +88,10 @@ public:
         // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         memset(data, 0, sizeof(data));
         // skip leading spaces
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         while (isspace(*psz))
             ++psz;
-
+        
         // skip 0x
         if (psz[0] == '0' && tolower(psz[1]) == 'x')
             psz += 2;
@@ -113,6 +114,7 @@ public:
                 ++p1;
             }
         }
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     void SetHex(const std::string &str) { SetHex(str.c_str()); };
 
@@ -127,11 +129,13 @@ public:
     unsigned int size() const { return sizeof(data); }
 
     uint64_t GetUint64(int pos) const {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const uint8_t *ptr = data + pos * 8;
         return ((uint64_t)ptr[0]) | ((uint64_t)ptr[1]) << 8 |
                ((uint64_t)ptr[2]) << 16 | ((uint64_t)ptr[3]) << 24 |
                ((uint64_t)ptr[4]) << 32 | ((uint64_t)ptr[5]) << 40 |
                ((uint64_t)ptr[6]) << 48 | ((uint64_t)ptr[7]) << 56;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template <typename Stream> void Serialize(Stream &s) const {
