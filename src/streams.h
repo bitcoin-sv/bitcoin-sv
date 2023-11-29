@@ -488,6 +488,7 @@ public:
         uint8_t data[4096];
         while (nSize > 0) {
             size_t nNow = std::min<size_t>(nSize, sizeof(data));
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             if (fread(data, 1, nNow, file.get()) != nNow)
                 throw std::ios_base::failure(
                     feof(file.get()) ? "CAutoFile::ignore: end of file"

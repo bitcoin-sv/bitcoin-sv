@@ -106,13 +106,17 @@ public:
             insert(end(), OP_PUSHDATA2);
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[2];
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             WriteLE16(data, b.size());
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             insert(end(), data, data + sizeof(data));
         } else {
             insert(end(), OP_PUSHDATA4);
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[4];
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             WriteLE32(data, b.size());
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             insert(end(), data, data + sizeof(data));
         }
         insert(end(), b.begin(), b.end());

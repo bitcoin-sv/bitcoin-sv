@@ -59,6 +59,7 @@ private:
         if (requires_seed) {
             RandomSeed();
         }
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         rng.Output(bytebuf, sizeof(bytebuf));
         bytebuf_size = sizeof(bytebuf);
     }
@@ -79,6 +80,7 @@ public:
         if (bytebuf_size < 8) {
             FillByteBuffer();
         }
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         uint64_t ret = ReadLE64(bytebuf + 64 - bytebuf_size);
         bytebuf_size -= 8;
         return ret;

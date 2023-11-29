@@ -170,6 +170,8 @@ struct CExtKey {
         ::WriteCompactSize(s, len);
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Encode(code);
         s.write((const char *)&code[0], len);
     }
@@ -180,6 +182,8 @@ struct CExtKey {
         if (len != BIP32_EXTKEY_SIZE)
             throw std::runtime_error("Invalid extended key size\n");
         s.read((char *)&code[0], len);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Decode(code);
     }
 };
