@@ -59,8 +59,7 @@ class MinerIdKeys:
         return self.sign_strmessage(message)
 
     def sign_strmessage(self, message):
-        hashToSign = sha256(message)
-        signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
+        signedMessage = self.sign_strmessage_bytes(message)
         return bytes_to_hex_str(signedMessage)
 
     def sign_hexmessage_bytes(self, message):
@@ -69,7 +68,11 @@ class MinerIdKeys:
 
     def sign_strmessage_bytes(self, message):
         hashToSign = sha256(message)
-        signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
+        while True:
+            signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
+            # in miner_info.cpp there is similar check, we satisfy it here
+            if len(signedMessage) >= 69 and len(signedMessage) <= 72:
+                break
         return signedMessage
 
     def sign_tx_BIP143_with_forkid (self, tx_to_sign, txns_to_spend):
