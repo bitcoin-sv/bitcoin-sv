@@ -968,6 +968,7 @@ void Serialize(Stream &os, const boost::uuids::uuid &v) {
     static constexpr auto uuid_size = boost::uuids::uuid::static_size();
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     os.write(reinterpret_cast<const char*>(v.data), uuid_size);
 }
 
@@ -977,6 +978,7 @@ void Unserialize(Stream &is, boost::uuids::uuid &v) {
     static constexpr auto uuid_size = boost::uuids::uuid::static_size();
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     is.read(reinterpret_cast<char*>(v.data), uuid_size);
 }
 

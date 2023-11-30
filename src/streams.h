@@ -95,14 +95,17 @@ public:
         if (nOverwrite) {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(vchData.data() + nPos,
+                   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                    reinterpret_cast<const uint8_t *>(pch), nOverwrite);
         }
         if (nOverwrite < nSize) {
             vchData.insert(vchData.end(),
-                           // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                           // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+                           // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                            reinterpret_cast<const uint8_t *>(pch) + nOverwrite,
-                           // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                            reinterpret_cast<const uint8_t *>(pch) + nSize);
+                           // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                           // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
         }
         nPos += nSize;
     }
@@ -864,6 +867,7 @@ public:
 
         size_t read =
             Reader::Read(
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 reinterpret_cast<char*>(mBuffer.data()),
                 maxConsumable);
 
@@ -917,6 +921,7 @@ public:
 
             size_t read =
                 Reader::Read(
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                     reinterpret_cast<char*>(mBuffer.data()),
                     mPendingReadSize);
 

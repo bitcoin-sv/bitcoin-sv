@@ -269,15 +269,19 @@ private:
     } _union;
 
     T *direct_ptr(difference_type pos) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<T *>(_union.direct) + pos;
     }
     const T *direct_ptr(difference_type pos) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<const T *>(_union.direct) + pos;
     }
     T *indirect_ptr(difference_type pos) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<T *>(_union.other.indirect) + pos;
     }
     const T *indirect_ptr(difference_type pos) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<const T *>(_union.other.indirect) + pos;
     }
     bool is_direct() const { return _size <= N; }
@@ -312,6 +316,7 @@ private:
                     malloc(((size_t)sizeof(T)) * new_capacity));
                 assert(new_indirect);
                 T *src = direct_ptr(0);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 T *dst = reinterpret_cast<T *>(new_indirect);
                 memcpy(dst, src, size() * sizeof(T));
                 _union.other.indirect = new_indirect;
