@@ -87,6 +87,7 @@ template <typename T1> inline uint256 Hash(const T1 pbegin, const T1 pend) {
         // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -103,6 +104,7 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
                static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
         .Write(p2begin == p2end ? pblank : (const uint8_t *)&p2begin[0],
                static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -121,6 +123,7 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
                static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
         .Write(p3begin == p3end ? pblank : (const uint8_t *)&p3begin[0],
                static_cast<size_t>(p3end - p3begin) * sizeof(p3begin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -135,6 +138,7 @@ template <typename T1> inline uint160 Hash160(const T1 pbegin, const T1 pend) {
         // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -168,12 +172,14 @@ public:
     int GetVersion() const { return nVersion; }
 
     void write(const char *pch, size_t size) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ctx.Write((const uint8_t *)pch, size);
     }
 
     // invalidates the object
     uint256 GetHash() {
         uint256 result;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ctx.Finalize((uint8_t *)&result);
         return result;
     }

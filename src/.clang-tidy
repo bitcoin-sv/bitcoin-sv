@@ -8,9 +8,6 @@ Checks: '-*,
          -cppcoreguidelines-avoid-magic-numbers,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-non-private-member-variables-in-classes,
-
-         -cppcoreguidelines-pro-type-cstyle-cast,
-         -cppcoreguidelines-pro-type-vararg,
       '
 
 WarningsAsErrors: '*'

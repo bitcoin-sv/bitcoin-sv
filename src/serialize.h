@@ -69,40 +69,48 @@ template <typename T> inline T *NCONST_PTR(const T *val) {
  * @note Sizes of these types are verified in the tests
  */
 template <typename Stream> inline void ser_writedata8(Stream &s, uint8_t obj) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 1);
 }
 template <typename Stream>
 inline void ser_writedata16(Stream &s, uint16_t obj) {
     obj = htole16(obj);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 2);
 }
 template <typename Stream>
 inline void ser_writedata32(Stream &s, uint32_t obj) {
     obj = htole32(obj);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 4);
 }
 template <typename Stream>
 inline void ser_writedata64(Stream &s, uint64_t obj) {
     obj = htole64(obj);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 8);
 }
 template <typename Stream> inline uint8_t ser_readdata8(Stream &s) {
     uint8_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 1);
     return obj;
 }
 template <typename Stream> inline uint16_t ser_readdata16(Stream &s) {
     uint16_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 2);
     return le16toh(obj);
 }
 template <typename Stream> inline uint32_t ser_readdata32(Stream &s) {
     uint32_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 4);
     return le32toh(obj);
 }
 template <typename Stream> inline uint64_t ser_readdata64(Stream &s) {
     uint64_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 8);
     return le64toh(obj);
 }
@@ -414,7 +422,7 @@ I ReadVarInt(Stream &is) {
 }
 
 #define FLATDATA(obj)                                                          \
-    REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj))) // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj))) // NOLINT(cppcoreguidelines-pro-*)
 #define VARINT(obj) REF(WrapVarInt(REF(obj)))
 #define COMPACTSIZE(obj) REF(CCompactSize(REF(obj)))
 #define LIMITED_STRING(obj, n) REF(LimitedBytes<n, std::string>(REF(obj)))
@@ -430,6 +438,7 @@ protected:
 
 public:
     CFlatData(void *pbeginIn, void *pendIn)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         : pbegin((char *)pbeginIn), pend((char *)pendIn) {}
     template <class T, class TAl> explicit CFlatData(std::vector<T, TAl> &v) {
         // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)

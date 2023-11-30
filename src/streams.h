@@ -387,6 +387,7 @@ public:
 
     template <typename Stream> void Serialize(Stream &s) const {
         // Special case: stream << stream concatenates like stream += stream
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         if (!vch.empty()) s.write((char *)&vch[0], vch.size() * sizeof(vch[0]));
     }
 

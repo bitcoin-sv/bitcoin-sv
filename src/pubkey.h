@@ -111,11 +111,13 @@ public:
     template <typename Stream> void Serialize(Stream &s) const {
         unsigned int len = size();
         ::WriteCompactSize(s, len);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((char *)vch, len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
         unsigned int len = ::ReadCompactSize(s);
         if (len <= 65) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
             s.read((char *)vch, len);
         } else {
             // invalid pubkey, skip available data
@@ -207,6 +209,7 @@ struct CExtPubKey {
         uint8_t code[BIP32_EXTKEY_SIZE];
         // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Encode(code);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((const char *)&code[0], len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
@@ -215,6 +218,7 @@ struct CExtPubKey {
         uint8_t code[BIP32_EXTKEY_SIZE];
         if (len != BIP32_EXTKEY_SIZE)
             throw std::runtime_error("Invalid extended key size\n");
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.read((char *)&code[0], len);
         // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Decode(code);
