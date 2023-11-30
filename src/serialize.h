@@ -107,6 +107,7 @@ template <typename Stream> inline uint64_t ser_readdata64(Stream &s) {
     return le64toh(obj);
 }
 inline uint64_t ser_double_to_uint64(double x) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         double x;
@@ -114,8 +115,10 @@ inline uint64_t ser_double_to_uint64(double x) {
     } tmp;
     tmp.x = x;
     return tmp.y;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 inline uint32_t ser_float_to_uint32(float x) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         float x;
@@ -123,8 +126,10 @@ inline uint32_t ser_float_to_uint32(float x) {
     } tmp;
     tmp.x = x;
     return tmp.y;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 inline double ser_uint64_to_double(uint64_t y) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         double x;
@@ -132,8 +137,10 @@ inline double ser_uint64_to_double(uint64_t y) {
     } tmp;
     tmp.y = y;
     return tmp.x;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 inline float ser_uint32_to_float(uint32_t y) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         float x;
@@ -141,6 +148,7 @@ inline float ser_uint32_to_float(uint32_t y) {
     } tmp;
     tmp.y = y;
     return tmp.x;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 
 /////////////////////////////////////////////////////////////////
