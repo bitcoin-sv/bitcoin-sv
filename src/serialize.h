@@ -51,6 +51,7 @@ constexpr deserialize_type deserialize{};
  * makes sense with wrappers such as CFlatData or CTxDB
  */
 template <typename T> inline T &REF(const T &val) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return const_cast<T &>(val);
 }
 
@@ -59,6 +60,7 @@ template <typename T> inline T &REF(const T &val) {
  * serialization operations from a template
  */
 template <typename T> inline T *NCONST_PTR(const T *val) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return const_cast<T *>(val);
 }
 
@@ -662,6 +664,7 @@ inline void Unserialize(Stream &is, T &a) {
  */
 template<typename Stream, typename T, size_t N>
 void Serialize(Stream& os, const std::array<T, N>& arr) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     ::Serialize(os, CFlatData(const_cast<T*>(arr.data()), const_cast<T*>(arr.data() + arr.size())));
 }
 template<typename Stream, typename T, size_t N>

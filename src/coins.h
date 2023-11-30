@@ -731,6 +731,7 @@ public:
         {
             GetBestBlock();
             mView = &mViewEmpty;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
             const_cast<ICoinsView*>( mSourceView )->ReleaseLock();
         }
     }
@@ -754,6 +755,7 @@ public:
             return true;
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         const_cast<ICoinsView*>( mSourceView )->ReLock();
 
         if(mSourceView->GetBestBlock() != GetBestBlock())
