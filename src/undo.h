@@ -72,6 +72,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const size_t MAX_INPUTS_PER_TX =
     MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
 

@@ -10,7 +10,7 @@
 struct CloseFileDeleter
 {
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-    void operator()(FILE* file) { ::fclose(file); }
+    void operator()(FILE* file) { ::fclose(file); } // NOLINT(cert-err33-c)
 };
 using UniqueCFile = std::unique_ptr<FILE, CloseFileDeleter>;
 

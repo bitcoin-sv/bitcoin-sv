@@ -81,11 +81,14 @@ static const bool DEFAULT_REJECTMEMPOOLREQUEST = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr Amount DEFAULT_MIN_RELAY_TX_FEE(250);
 //! -maxtxfee default
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const Amount DEFAULT_TRANSACTION_MAXFEE(COIN / 10);
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
 /** -maxtxfee will warn if called with a higher fee than this amount (in
  * satoshis */
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const uint64_t DEFAULT_ANCESTOR_LIMIT = 10000;

@@ -8,6 +8,13 @@ Checks: '-*,
          -cppcoreguidelines-avoid-magic-numbers,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-non-private-member-variables-in-classes,
+
+         cert-*,
+         -cert-dcl16-c,
+         -cert-dcl37-c,
+         -cert-dcl21-cpp,
+         -cert-dcl51-cpp,
+         -cert-oop54-cpp
       '
 
 WarningsAsErrors: '*'
