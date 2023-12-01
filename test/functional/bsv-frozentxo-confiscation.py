@@ -19,6 +19,8 @@ See comments and log entries in above functions for detailed description of step
 from test_framework.blocktools import make_block, create_transaction, PreviousSpendableOutput
 from test_framework.key import CECKey
 from test_framework.mininode import (
+    COIN,
+    COutPoint,
     NetworkThread,
     NodeConn,
     NodeConnCB,
@@ -27,11 +29,29 @@ from test_framework.mininode import (
     ToHex,
     CTxOut
 )
-from test_framework.script import CScript, hash160, OP_CHECKSIG, OP_DUP, OP_EQUALVERIFY, OP_FALSE, OP_HASH160, OP_NOP, OP_PUSHDATA1, OP_RETURN, OP_TRUE, CScriptOp
+from test_framework.script import (
+    CScript,
+    hash160,
+    OP_1,
+    OP_CHECKSIG,
+    OP_CHECKMULTISIG,
+    OP_DUP,
+    OP_IF,
+    OP_EQUAL,
+    OP_EQUALVERIFY,
+    OP_FALSE,
+    OP_HASH160,
+    OP_NOP,
+    OP_PUSHDATA1,
+    OP_RETURN,
+    OP_TRUE,
+    CScriptOp
+)
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
+    check_for_log_msg,
     p2p_port,
     wait_until
 )
@@ -39,6 +59,46 @@ import glob
 import re
 import time
 
+'''
+> Tested rejection reasons
+bad-ctx-invalid
+bad-ctx-not-whitelisted
+bad-txns-premature-spend-of-confiscation
+bad-txns-inputs-missingorspent
+flexible-bad-txns-vout-p2sh
+bad-txns-vout-p2sh
+bad-txns-in-belowout
+bad-txns-inputs-duplicate
+bad-txns-vout-negative
+bad-txns-txouttotal-toolarge
+bad-txns-vout-toolarge
+bad-txns-nonfinal
+bad-txns-premature-spend-of-coinbase
+bad-txns-vin-empty
+absurdly-high-fee
+tx-size
+txn-mempool-conflict
+scriptsig-not-pushonly
+bare-multisig
+dust
+scriptpubkey
+datacarrier-size-exceeded
+
+! Not tested rejection reasons
+bad-txns-inputvalues-outofrange (such coin(s) doesn't exist)
+bad-txns-prevout-null (bad-txns-inputs-missingorspent happens first)
+bad-txns-fee-negative (bad-txns-in-belowout happens first)
+bad-txns-fee-outofrange (fees cannot be more than all coins)
+bad-txns-vout-empty (ctfx protocol is encoded in first output thus it's not a confiscation tx)
+bad-txns-oversize (too big transaction at consensus)
+bad-txn-sigops (before genesis)
+txn-already-known (it's valid tx with already known outputs)
+non-final-pool-full (confiscation tx cannot be non-final)
+too-long-non-final-chain (confiscation tx cannot be non-final)
+non-BIP68-final (confiscation tx cannot be non-final)
+too-long-validation-time (script checks are skipped for confiscation tx)
+too-long-mempool-chain (confiscation tx shouldn't have unconfirmed parents)
+'''
 
 # OP_RETURN protocol with confiscation transaction protocol id
 CTX_OP_RETURN = [OP_FALSE, OP_RETURN, b'cftx']
@@ -50,7 +110,13 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 2
         self.chain = ChainManager()
-        self.extra_args = [["-whitelist=127.0.0.1", "-minrelaytxfee=0", "-minminingtxfee=0", "-limitfreerelay=999999"]]*2
+        self.extra_args = [["-whitelist=127.0.0.1",
+                            "-minrelaytxfee=0",
+                            "-minminingtxfee=0",
+                            "-limitfreerelay=999999",
+                            "-genesisactivationheight=100",
+                            "-maxtxsigopscountspolicy=1MB",
+                            "-permitbaremultisig=0"]]*2
         self.block_count = 0
 
     def _init(self):
@@ -178,6 +244,222 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
                 self.log.debug("Found line in bitcoind.log: %s", line.strip())
                 return True
         return False
+
+    def _check_invalid_confiscation_transaction_common(self, node):
+        frozen_tx = self._create_and_send_tx(node)
+        self._freeze_txo(node, frozen_tx, 0)
+
+        def send_over_p2p_and_rpc(tx, err_str, err_code=-26):
+            best_hash = node.rpc.getbestblockhash()
+            if len(tx.vin) > 0:
+                self._whitelistTx(node, tx, node.rpc.getblockcount()+1)
+            node.send_message(msg_tx(tx))
+            err_str_tx = 'flexible-' + err_str if err_str == 'bad-txns-vout-p2sh' else err_str
+            wait_until(lambda: check_for_log_msg(node.rpc, f"txn= {tx.hash} rejected {err_str_tx}")
+                       or (err_str == 'Missing inputs'
+                           and check_for_log_msg(node.rpc, f"txn= {tx.hash} detected orphan")))
+            assert_raises_rpc_error(err_code, err_str_tx, node.rpc.sendrawtransaction, ToHex(confiscate_tx))
+            assert tx.hash not in node.rpc.getrawmempool()
+            block = self.make_block_with_tx(node, tx)
+            if err_str == 'Missing inputs':
+                err_str = "bad-txns-inputs-missingorspent"
+            assert_equal(node.rpc.submitblock(ToHex(block)), err_str)
+            node.send_message(msg_block(block))
+            wait_until(lambda: check_for_log_msg(node.rpc, f"received block {block.hash}"
+                                                 or f"ConnectBlock {block.hash} failed"))
+            assert_equal(best_hash, node.rpc.getbestblockhash())
+
+        # invalid tx vin is null
+        result = node.rpc.addToConsensusBlacklist({
+            "funds": [{"txOut": {"txId": '0' * 256, "vout": 0},
+                       "enforceAtHeight": [{"start": 0}],
+                       "policyExpiresWithConsensus": False}]
+        })
+        assert_equal(result["notProcessed"], [])
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vin[0].prevout = COutPoint()
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "Missing inputs", -25)
+
+        # invalid tx p2sh
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout.append(CTxOut(COIN, CScript([OP_HASH160, hash160(self.pubkey), OP_EQUAL])))
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-vout-p2sh")
+
+        # invalid tx value in < value out
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout[0].nValue = 100 * COIN
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-in-belowout")
+
+        # invalid tx duplicate vin
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vin.append(confiscate_tx.vin[-1])
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-inputs-duplicate")
+
+        # invalid tx vout < 0
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout[0].nValue = -1
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-vout-negative")
+
+        # invalid sum tx vout > MAX_MONEY
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout[0].nValue = 11000000 * COIN
+        confiscate_tx.vout.append(CTxOut(11000000 * COIN, CScript([OP_TRUE])))
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-txouttotal-toolarge")
+
+        # invalid tx vout > MAX_MONEY
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout[0].nValue = 21000000 * COIN + 1
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-vout-toolarge")
+
+        # invalid tx double-spent
+        prev_spent = frozen_tx.vin[0].prevout
+        result = node.rpc.addToConsensusBlacklist({
+            "funds": [{"txOut": {"txId": '%064x' % prev_spent.hash, "vout": prev_spent.n},
+                       "enforceAtHeight": [{"start": 0}],
+                       "policyExpiresWithConsensus": False}]
+        })
+        assert_equal(result["notProcessed"], [])
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vin[0].prevout = frozen_tx.vin[0].prevout
+        confiscate_tx.rehash()
+        send_over_p2p_and_rpc(confiscate_tx, "Missing inputs", -25)
+
+        # non-final tx in block only
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.nLockTime = node.rpc.getblockcount()+1
+        confiscate_tx.vin[0].nSequence = 0
+        confiscate_tx.rehash()
+        best_hash = node.rpc.getbestblockhash()
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        block = self.make_block_with_tx(node, confiscate_tx)
+        assert_equal(node.rpc.submitblock(ToHex(block)), "bad-txns-nonfinal")
+        node.send_message(msg_block(block))
+        wait_until(lambda: check_for_log_msg(node.rpc, f"received block {block.hash}"))
+        assert_equal(best_hash, node.rpc.getbestblockhash())
+
+        # coinbase confiscation tx
+        block, _ = make_block(node.rpc)
+        node.rpc.submitblock(ToHex(block))
+        wait_until(lambda: node.rpc.getbestblockhash() == block.hash)
+        coinbase_tx = block.vtx[0]
+        result = node.rpc.addToConsensusBlacklist({
+            "funds": [{"txOut": {"txId": coinbase_tx.hash, "vout": 0},
+                       "enforceAtHeight": [{"start": 0}],
+                       "policyExpiresWithConsensus": False}]
+        })
+        assert_equal(result["notProcessed"], [])
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(coinbase_tx, 0), b'', CScript([OP_TRUE]))
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-premature-spend-of-coinbase")
+
+        # bad-txns-vin-empty
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vin = []
+        confiscate_tx.rehash()
+        node.send_message(msg_tx(confiscate_tx))
+        send_over_p2p_and_rpc(confiscate_tx, "bad-txns-vin-empty")
+
+        node.rpc.clearBlacklists({"removeAllEntries" : True})
+
+    def _check_invalid_confiscation_transaction_policy(self, node):
+        frozen_tx = self._create_and_send_tx(node)
+        self._freeze_txo(node, frozen_tx, 0)
+
+        def assert_result(result, txid, err_str):
+            assert 'invalid' in result
+            invalid = result['invalid'][0]
+            assert_equal(invalid['txid'], txid)
+            assert_equal(invalid['reject_reason'], err_str)
+
+        def send_block_over_p2p_accept_invalidate(tx):
+            block = self.make_block_with_tx(node, tx)
+            node.send_message(msg_block(block))
+            wait_until(lambda: node.rpc.getbestblockhash() == block.hash)
+            node.rpc.invalidateblock(block.hash)
+
+        # invalid tx vout > max fee
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout[1].nValue = COIN
+        confiscate_tx.rehash()
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        assert_raises_rpc_error(-26, "absurdly-high-fee", node.rpc.sendrawtransaction, ToHex(confiscate_tx))
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx size
+        script = CScript([OP_RETURN] * 1048576)
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', script)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'maxtxsizepolicy': 1048576, 'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'tx-size')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx mempool conflict
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        # previous tx locks the utxo
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': True}}])
+        assert_result(result, confiscate_tx.hash, 'txn-mempool-conflict')
+        # it's needed block to be accepted
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid script not push only
+        script = CScript([OP_NOP])
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), script, CScript([OP_TRUE]))
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'scriptsig-not-pushonly')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx multisig
+        script = CScript([b'\x01', self.pubkey, b'\x01', OP_CHECKMULTISIG])
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', script)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'bare-multisig')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx vout dust
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout.append(CTxOut(0, CScript([OP_RETURN])))
+        confiscate_tx.rehash()
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'dust')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx scriptpubkey
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_RETURN]))
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'scriptpubkey')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx scriptpubkey (2)
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_RETURN]))
+        confiscate_tx.vout[1].nValue = 1
+        # no rehash call
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        confiscate_tx.rehash()
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'scriptpubkey')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        # invalid tx data carrier size
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        confiscate_tx.vout[0].scriptPubKey = CScript(CTX_OP_RETURN + [b'\x01' * 70])
+        confiscate_tx.rehash()
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'datacarriersize': 50, 'acceptnonstdoutputs': False}}])
+        assert_result(result, confiscate_tx.hash, 'datacarrier-size-exceeded')
+        send_block_over_p2p_accept_invalidate(confiscate_tx)
+
+        node.rpc.clearBlacklists({"removeAllEntries" : True})
 
     def _check_invalid_confiscation_transactios(self, node):
         frozen_tx = self._create_and_send_tx(node)
@@ -501,6 +783,8 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         node, node1 = self._init()
 
         self._check_invalid_confiscation_transactios(node)
+        self._check_invalid_confiscation_transaction_common(node)
+        self._check_invalid_confiscation_transaction_policy(node)
         self._check_confiscation(node, node1)
         self._check_mempool_removal(node)
 
