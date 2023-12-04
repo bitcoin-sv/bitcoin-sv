@@ -105,8 +105,10 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead), 
                 "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500',
                 '-maxsendbuffer=1000']
-        with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers", 0,
-            args+["-factormaxsendqueuesbytes={}".format(self.num_peers)], self.num_peers) as connections:
+        with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers",
+                                            0,
+                                            args+["-factormaxsendqueuesbytes={}".format(self.num_peers)],
+                                            self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksParallel, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
@@ -116,8 +118,10 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Scenario 2: Blocks from bitcoind should not be sent in parallel because factormaxsendqueuesbytes=1
         # only allows one 5MB to be downloaded at once.
-        with self.run_node_with_connections("should not be sent in parallel because factormaxsendqueuesbytes=1", 0,
-            args+["-factormaxsendqueuesbytes=1"], self.num_peers) as connections:
+        with self.run_node_with_connections("should not be sent in parallel because factormaxsendqueuesbytes=1",
+                                            0,
+                                            args+["-factormaxsendqueuesbytes=1"],
+                                            self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksSeries, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
@@ -143,8 +147,10 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Scenario 4: Blocks from bitcoind should be sent in parallel, because there is no limit on whitelisted peers
         # requesting most recent block even if queue is full.
-        with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block", 0,
-            args+["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"], self.num_peers) as connections:
+        with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block",
+                                            0,
+                                            args+["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"],
+                                            self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(connections, newBlock)

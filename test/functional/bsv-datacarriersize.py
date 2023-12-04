@@ -89,8 +89,10 @@ class DataCarrierSizeTest(BitcoinTestFramework):
     def check_datacarriersize(self, script_op_codes, n_outputs, dataCarrierSize, description):
 
         # dataCarrierSize parameter is used for checking the size of the whole script (CScript).
-        with self.run_node_with_connections(description, 0,
-            ['-datacarriersize=%d' % dataCarrierSize, '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'], self.num_peers) as connections:
+        with self.run_node_with_connections(description,
+                                            0,
+                                            ['-datacarriersize=%d' % dataCarrierSize, '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'],
+                                            self.num_peers) as connections:
 
             connection = connections[0]
             rejected_txs = []
@@ -118,8 +120,10 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
     def check_max_tx_size_policy(self, script_op_codes, n_outputs, description):
 
-        with self.run_node_with_connections(description, 0,
-            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2),  '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'], self.num_peers) as connections:
+        with self.run_node_with_connections(description,
+                                            0,
+                                            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2),  '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'],
+                                            self.num_peers) as connections:
 
             connection = connections[0]
             rejected_txs = []
