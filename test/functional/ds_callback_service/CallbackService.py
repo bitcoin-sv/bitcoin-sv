@@ -7,7 +7,8 @@ from http.server import BaseHTTPRequestHandler
 from enum import Enum
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
-import json, time
+import json
+import time
 
 class RECEIVE(Enum):
     YES = 1

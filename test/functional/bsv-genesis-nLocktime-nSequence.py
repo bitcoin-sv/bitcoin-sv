@@ -92,7 +92,8 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
 from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_getdata, msg_tx, CInv, mininode_lock
-import time, copy
+import time
+import copy
 
 class MyNode(TestNode):
     def __init__(self, block_store, tx_store, blocks_recvd):

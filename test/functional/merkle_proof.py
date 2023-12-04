@@ -8,7 +8,8 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import connect_nodes, assert_equal, Decimal, assert_raises_rpc_error, sync_blocks, random, assert_greater_than
-import os, shutil
+import os
+import shutil
 
 class MerkleProofTest(BitcoinTestFramework):
     def set_test_params(self):

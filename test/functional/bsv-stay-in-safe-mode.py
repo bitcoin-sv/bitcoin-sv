@@ -17,7 +17,9 @@ from test_framework.blocktools import make_block, send_by_headers, wait_for_tip,
 from test_framework.mininode import msg_block
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
-import glob, shutil, os
+import glob
+import shutil
+import os
 
 class StayInSafeMode(BitcoinTestFramework):
 

@@ -3,7 +3,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import threading, json
+import threading
+import json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
