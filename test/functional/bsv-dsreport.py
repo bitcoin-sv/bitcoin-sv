@@ -64,7 +64,7 @@ def ping6(host):
     return success
 
 class HTTPServerV6(HTTPServer):
-        address_family = socket.AF_INET6
+    address_family = socket.AF_INET6
 
 class DoubleSpendReport(BitcoinTestFramework):
 

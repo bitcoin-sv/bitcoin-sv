@@ -23,11 +23,11 @@ class TxnMallTest(BitcoinTestFramework):
         super(TxnMallTest, self).setup_network()
         # Create a 200-block-long chain. Each of the 4 nodes gets 25 mature blocks with 1250 BTC
         for i in range(2):
-                for peer in range(4):
-                    for j in range(25):
-                        self.nodes[peer].generate(1)
-                    # Must sync before next peer starts generating blocks
-                    sync_blocks(self.nodes)
+            for peer in range(4):
+                for j in range(25):
+                    self.nodes[peer].generate(1)
+                # Must sync before next peer starts generating blocks
+                sync_blocks(self.nodes)
         
         # Start with split network:
         self.split_network()
