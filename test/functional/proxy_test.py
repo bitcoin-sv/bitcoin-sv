@@ -83,9 +83,9 @@ class ProxyTest(BitcoinTestFramework):
         args = [
             ['-listen', '-proxy=%s:%i' %
                 (self.conf1.addr), '-proxyrandomize=1'],
-           ['-listen', '-proxy=%s:%i' %
+            ['-listen', '-proxy=%s:%i' %
                (self.conf2.addr), '-proxyrandomize=1'],
-           []
+            []
         ]
         if self.have_ipv6:
             args[2] = ['-listen', '-proxy=[%s]:%i' %
