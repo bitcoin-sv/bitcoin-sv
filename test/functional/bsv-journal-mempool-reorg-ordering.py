@@ -337,8 +337,7 @@ class ReorgTests(BitcoinTestFramework):
                                              ["-checkmempool=1",
                                              '-whitelist=127.0.0.1',
                                              '-genesisactivationheight=1',
-                                             '-jbafillafternewblock=1'
-                                             ],
+                                             '-jbafillafternewblock=1'],
                                             number_of_connections=1) as (conn,):
             self.log.info("making coinbase")
             fee_delta = 10

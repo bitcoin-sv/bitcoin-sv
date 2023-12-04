@@ -29,7 +29,7 @@ class msg_badblocktxn():
                     0x00, 0x00, 0x00, 0x00, # Txn 1 locktime
                     0x00, 0x00, 0x00, 0x00  # Txn 2 Version
                                             # Rest of txn2 is missing
-                ])
+                    ])
         return r
 
 class TestIncompleteTxnList(BitcoinTestFramework):

@@ -191,8 +191,7 @@ class SafeMode(BitcoinTestFramework):
         args_off_by_one = [f"-safemodemaxforkdistance={max_fork_distance-1}",
                            f"-safemodeminforklength={min_fork_len+1}",
                            f"-safemodeminblockdifference={max_height_difference+1}",
-                           f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode",
-                          ]
+                           f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode"]
 
         # Restaring the node with limits off by 1 so no fork satisfies safe mode activation criteria
         with self.run_node_with_connections("Preparation", 0, args_off_by_one,
