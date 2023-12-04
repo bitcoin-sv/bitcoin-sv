@@ -13,7 +13,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pycodestyle:
+    strategy:
+      matrix:
+        os: [nchain/svn_dev]
+        version : [ubuntu_22.04]
+    runs-on: [ self-hosted ]
+    container:
+      image: "${{ matrix.os }}:${{ matrix.version }}"
+    timeout-minutes: 1 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          clean: ''
+      - run: |
+          ./pycodestyle.sh 
+        shell: bash
+  
   autotools:
+    needs: pycodestyle
     strategy:
       matrix:
         os: [nchain/svn_dev]
@@ -37,6 +56,7 @@ jobs:
         uses: ./.github/workflows/functional_test
 
   cmake:
+    needs: pycodestyle
     strategy:
       matrix:
         os: [nchain/svn_dev]
