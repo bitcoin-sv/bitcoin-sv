@@ -25,13 +25,13 @@ class TestOP_PUSHDATA(BitcoinTestFramework):
                             '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-maxmempool=3GB',
                             '-minminingtxfee=0.00000001',
-                            '-maxnonstdtxvalidationduration=14000',
+                            '-maxnonstdtxvalidationduration=50000',
                             '-maxscriptnumlengthpolicy=0',
                             '-maxscriptsizepolicy=0',
                             '-maxstackmemoryusagepolicy=0',
                             '-maxstackmemoryusageconsensus=0',
                             '-maxstdtxvalidationduration=1000',
-                            '-maxtxnvalidatorasynctasksrunduration=15000',
+                            '-maxtxnvalidatorasynctasksrunduration=100000',
                             '-maxtxsizepolicy=0',
                             '-txnvalidationqueuesmaxmemory=3000MB']]
 
