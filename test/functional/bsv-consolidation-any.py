@@ -23,24 +23,25 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.blockmintxfee_sats = 500
         self.minrelaytxfee_sats = 250
         self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-txindex=1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=2",
-            "-maxconsolidationinputscriptsize=151",
-            "-minconfconsolidationinput=5",
-            "-acceptnonstdtxn=1",
-            "-acceptnonstdconsolidationinput=1"
-            ],[
-            "-whitelist=127.0.0.1",
-            "-txindex=1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-acceptnonstdconsolidationinput=1"
-        ]]
+                            "-whitelist=127.0.0.1",
+                            "-txindex=1",
+                            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                            "-minconsolidationfactor=2",
+                            "-maxconsolidationinputscriptsize=151",
+                            "-minconfconsolidationinput=5",
+                            "-acceptnonstdtxn=1",
+                            "-acceptnonstdconsolidationinput=1"
+                           ],
+                           [
+                            "-whitelist=127.0.0.1",
+                            "-txindex=1",
+                            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                            "-minconsolidationfactor=10",
+                            "-acceptnonstdtxn=1",
+                            "-acceptnonstdconsolidationinput=1"
+                           ]]
 
     def test_extra_args_values (self):
         # Check that all exra args are read correction

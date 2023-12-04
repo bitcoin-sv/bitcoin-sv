@@ -50,14 +50,15 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         self.mining_relay_factor = 4
         self.minrelaytxfee_sats = 250
         self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
-            ],[
-            "-whitelist=127.0.0.1",
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
-            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
-        ]]
+                            "-whitelist=127.0.0.1",
+                            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+                           ],
+                           [
+                            "-whitelist=127.0.0.1",
+                            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+                           ]]
 
     def run_test(self):
         node1 = self.nodes[1]

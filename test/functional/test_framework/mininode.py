@@ -809,13 +809,11 @@ class CBlockHeaderEnriched(CBlockHeader):
         self.minerInfoProof = deser_optional(self.TxnAndProof, f)
 
     def serialize(self):
-        r = b"".join((
-            super(CBlockHeaderEnriched, self).serialize(),
-            ser_compact_size(self.nTx),
-            struct.pack("<b", self.noMoreHeaders),
-            ser_optional(self.coinbaseTxProof),
-            ser_optional(self.minerInfoProof)
-            ))
+        r = b"".join((super(CBlockHeaderEnriched, self).serialize(),
+                      ser_compact_size(self.nTx),
+                      struct.pack("<b", self.noMoreHeaders),
+                      ser_optional(self.coinbaseTxProof),
+                      ser_optional(self.minerInfoProof)))
         return r
 
     def __repr__(self):

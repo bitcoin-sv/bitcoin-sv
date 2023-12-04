@@ -57,24 +57,25 @@ class FeeFilterTest(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-whitelistforcerelay=1"
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
-            "-txindex=1"
-            ],[
-            "-whitelist=127.0.0.1",
-            "-whitelistforcerelay=1"
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
-            "-txindex=1"
-        ]]
+                            "-whitelist=127.0.0.1",
+                            "-whitelistforcerelay=1"
+                            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                            "-minconsolidationfactor=10",
+                            "-acceptnonstdtxn=1",
+                            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+                            "-txindex=1"
+                           ],
+                           [
+                            "-whitelist=127.0.0.1",
+                            "-whitelistforcerelay=1"
+                            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                            "-minconsolidationfactor=10",
+                            "-acceptnonstdtxn=1",
+                            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+                            "-txindex=1"
+                           ]]
 
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
