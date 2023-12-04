@@ -415,7 +415,7 @@ def number_of_additional_streams(from_node, to_node):
                 additional_streams = []
                 if policy_from_node == "BlockPriority":
                     additional_streams = BlockPriorityStreamPolicy().additional_streams
-                elif  policy_from_node == "Default":
+                elif policy_from_node == "Default":
                     additional_streams = DefaultStreamPolicy().additional_streams
                 else:
                     raise AssertionError("Connecting test nodes are using an unexpected stream policy %s" % (policy_from_node))

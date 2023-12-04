@@ -8,7 +8,7 @@ Test GetArgAsBytes human readable unit parser with -maxmempool parameter.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
-import  os
+import os
 
 class GetArgAsBytesTest(BitcoinTestFramework):
 

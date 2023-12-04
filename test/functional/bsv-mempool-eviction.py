@@ -193,7 +193,7 @@ class Evictions(BitcoinTestFramework):
                 # when there are still some secondary mempool transaction in the mempool
                 if len(txs_in_mempool & set(secondaryMempoolTxs)) != 0:
                     # the mempoolminfee should not exceed minminingtxfee
-                    assert  conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['minminingtxfee']
+                    assert conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['minminingtxfee']
 
 
 
