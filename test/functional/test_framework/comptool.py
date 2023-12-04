@@ -308,7 +308,7 @@ class TestManager():
                 if c.cb.bestblockhash == blockhash:
                     return ('Block was not rejected: %064x' % (blockhash), False)
 
-                if not blockhash in c.cb.block_reject_map:
+                if blockhash not in c.cb.block_reject_map:
                     return ('Block not in reject map: %064x' % (blockhash), True)
 
                 if not outcome.match(c.cb.block_reject_map[blockhash]):
@@ -376,7 +376,7 @@ class TestManager():
                     if txhash in c.cb.tx_reject_map:
                         logger.error('Tx in reject map: %064x' % (txhash))
                         return False
-                    return not txhash in c.cb.lastInv
+                    return txhash not in c.cb.lastInv
                 elif ((txhash in c.cb.lastInv) != outcome):
                     return False
             return True

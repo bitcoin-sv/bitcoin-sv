@@ -129,7 +129,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         if(get_coinbase):
             assert 'coinbase' in candidate
         else:
-            assert not 'coinbase' in candidate
+            assert 'coinbase' not in candidate
         assert 'coinbaseValue' in candidate
         assert 'version' in candidate
         assert 'nBits' in candidate

@@ -217,7 +217,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_equal(res[1]["flags"], expected_flags)
         assert_equal(res[2]["flags"], expected_flags)
         assert_equal(res[3]["flags"], expected_flags)
-        assert(not "flags" in res[4])
+        assert("flags" not in res[4])
 
         # Changing the output value must make the script invalid
         tx2 = create_tx(tx_test, 1, 1*COIN)
