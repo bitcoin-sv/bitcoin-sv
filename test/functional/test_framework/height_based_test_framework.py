@@ -432,7 +432,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
             # maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration
             # If we modiy maxnonstdtxvalidationduration due to slower circumstances, check if maxtxnvalidatorasynctasksrunduration should be implicitly increased.
-            if self.options.timeoutfactor > 1  and \
+            if self.options.timeoutfactor > 1 and \
                (not any("-maxtxnvalidatorasynctasksrunduration" in arg for arg in test.ARGS) and any("-maxnonstdtxvalidationduration" in arg for arg in test.ARGS)):
                 new_maxnonstdtxvalidationduration = [int(arg.split("=")[1]) for arg in test.ARGS if arg.startswith("-maxnonstdtxvalidationduration=")]
                 if len(new_maxnonstdtxvalidationduration) > 0:
