@@ -77,10 +77,10 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
 
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS99 + [THE_KEY.get_pubkey(), 100, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script),
-							 
+                             
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS100 + [THE_KEY.get_pubkey(), 101, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script, 
-                             b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)")		
+                             b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)")        
 
     ]    
 
@@ -112,4 +112,4 @@ class MaxMultiSigTestPolicyNotSet(GenesisHeightBasedSimpleTestsCase):
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script_for_default)
 
-    ]							 
+    ]                             
