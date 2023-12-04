@@ -8,7 +8,7 @@ from test_framework.util import sync_blocks, p2p_port, wait_until, hashToHex
 import time
 
 '''
-FeeFilterTest -- test relaying zero fee paying transactions when the 
+FeeFilterTest -- test relaying zero fee paying transactions when the
 minimum mining fee is also set to zero and the relaying fee is left at default (also zero)
 '''
 

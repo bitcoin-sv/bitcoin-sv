@@ -41,7 +41,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         args = [
             '-mindebugrejectionfee=0',
             '-paytxfee=0.00003'
-        ] 
+        ]
 
         self.extra_args = [args,args]
 

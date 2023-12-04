@@ -43,7 +43,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         numberOfRejectedMsgs = 0
         numberOfReceivedBlocks = 0
         def on_block(conn, message):
-            nonlocal numberOfReceivedBlocks 
+            nonlocal numberOfReceivedBlocks
             numberOfReceivedBlocks += 1
         def on_reject(conn, message):
             assert_equal(message.code, REJECT_TOOBUSY)
@@ -95,14 +95,14 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
          # Mine a big block.
         oldBlock = self.mineBigBlock(node)
-        
+
         # Mine another big block so that the previous block is not the tip of chain.
         newBlock = self.mineBigBlock(node)
-        
+
         self.stop_node(0)
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factormaxsendqueuesbytes=num_peers.
-        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead), 
+        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead),
                 "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500',
                 '-maxsendbuffer=1000']
         with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers",

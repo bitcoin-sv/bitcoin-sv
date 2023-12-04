@@ -198,7 +198,7 @@ class BitcoinTestFramework():
                     except OSError:
                         print("Opening file %s failed." % fn)
                         traceback.print_exc()
-            
+
 
         if success == TestStatus.PASSED:
             self.log.info("Tests successful")

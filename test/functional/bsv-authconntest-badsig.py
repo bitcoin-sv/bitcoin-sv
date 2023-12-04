@@ -18,7 +18,7 @@ import http.client as httplib
 import os
 
 '''
-this test is identical to bsv-authconntest.py but the signature is corrupted purpusefully 
+this test is identical to bsv-authconntest.py but the signature is corrupted purpusefully
 to assert that authentication fails because of this.
 '''
 

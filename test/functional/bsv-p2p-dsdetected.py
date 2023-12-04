@@ -19,7 +19,7 @@ import threading
 # A dummy webhook service that accepts POST request and stores the JSON string sent
 # This JSON string can then be retrieved through GET request for evaluation.
 class WebHookService(BaseHTTPRequestHandler):
-    
+
     # On every POST/GET new WebHookService instance is created. To be able to share the last JSON received between instances, static variable is used.
     lastReceivedJSON = None
 
@@ -119,7 +119,7 @@ class DSDetectedTests(BitcoinTestFramework):
     # commonBlock should be a CBlock() instance.
     # txsWithUtxos should be an array of transactions [CTransaction()]. Each transaction should have spendable outputs.
     def createRandomBlockTree(self, maxNumberOfBranches, maxNumberOfBlocksPerBranch, commonBlock, txsWithUtxos):
-        
+
         # Select a random transaction which output we will double-spend
         spendTransaction = txsWithUtxos[random.randrange(len(txsWithUtxos))]
         spendOutput = random.randrange(len(spendTransaction.vout))

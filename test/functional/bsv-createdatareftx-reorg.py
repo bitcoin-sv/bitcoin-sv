@@ -222,9 +222,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.one_test(allKeys1, nodenum=1)
         self.one_test(allKeys1, nodenum=1)
         self.one_test(allKeys1, nodenum=1)
-        sync_blocks(self.nodes) 
+        sync_blocks(self.nodes)
         self.one_test(allKeys0, nodenum=0, do_mining=True)
-        # disconnect and mine independently. 
+        # disconnect and mine independently.
         # make the second nodes chain the longest
         forkHeight = self.nodes[0].getblockcount()
         disconnect_nodes_bi(self.nodes,0,1)
@@ -255,7 +255,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # mined by the second node
         connect_nodes_bi(self.nodes,0,1)
         sync_blocks(self.nodes)
-        
+
         # no change for the second node which has the longer chain
         assert(last_block1 == self.nodes[1].getbestblockhash())
         assert(last_height1 == self.nodes[1].getblockcount())

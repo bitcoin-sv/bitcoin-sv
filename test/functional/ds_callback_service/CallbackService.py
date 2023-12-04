@@ -88,7 +88,7 @@ class CallbackService(BaseHTTPRequestHandler):
                     self.send_header('x-bsv-dsnt', 0)
                     self.end_headers()
                     return
-                
+
         elif (len(request) == 4):
             dsnt = request[1]
             ver = request[2]

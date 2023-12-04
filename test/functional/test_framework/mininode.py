@@ -90,7 +90,7 @@ network_thread_loop_lock = RLock()
 # Network thread acquires network_thread_loop_lock at start of each iteration and releases
 # it at the end. Since the next iteration is run immediately after that, lock is acquired
 # almost all of the time making it difficult for other threads to also acquire this lock.
-# To work around this problem, NetworkThread first acquires network_thread_loop_intent_lock 
+# To work around this problem, NetworkThread first acquires network_thread_loop_intent_lock
 # and immediately releases it before acquiring network_thread_loop_lock.
 # Other threads (e.g. the ones calling NodeConn constructor) acquire both locks before
 # proceeding. The end result is that other threads wait at most one iteration of loop in
@@ -447,7 +447,7 @@ class CProtoconf():
         self.number_of_fields = number_of_fields
         self.max_recv_payload_length = max_recv_payload_length
         self.stream_policies = stream_policies
-        
+
     def deserialize(self, f):
         self.number_of_fields = deser_compact_size(f)
         self.max_recv_payload_length = struct.unpack("<i", f.read(4))[0]
@@ -457,7 +457,7 @@ class CProtoconf():
     def serialize(self):
         r = b""
         r += ser_compact_size(self.number_of_fields)
-        r += struct.pack("<i", self.max_recv_payload_length) 
+        r += struct.pack("<i", self.max_recv_payload_length)
         if self.number_of_fields > 1:
             r += ser_string(self.stream_policies)
         return r
@@ -720,7 +720,7 @@ class TSCMerkleProof():
                 ser_uint256(self.value)
             ))
             return r
-        
+
         def __repr__(self):
             return "(%i, %064x)" % (self.type, self.value)
 

@@ -198,7 +198,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         #
         assert_raises_rpc_error(
             -8, "Invalid parameter: An empty json object", conn.rpc.sendrawtransactions, [{}])
-        
+
         #
         # Missing the hex string of the raw transaction.
         #

@@ -92,7 +92,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         # Now send tx1 and tx2 again, but this time in block. Block should be rejected.
         block = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
         add_tx_to_block(block, [tx1,tx2])
-        
+
         rejected_blocks = []
         rejected_txs = []
         def on_reject(conn, msg):
@@ -150,13 +150,13 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         # Send tx4 again, this time in block. Block should be rejected.
         block = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
         add_tx_to_block(block, [tx4])
-       
+
         self.test.connections[0].send_message(msg_block(block))
 
         # Wait for hash in rejected blocks
         wait_until(lambda: block.sha256 in [msg.data for msg in rejected_blocks], timeout=5, lock=mininode_lock)
         assert_equal(False, block.hash == node.getbestblockhash())
-        
+
         ########## SCENARIO 3
 
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight - 1)

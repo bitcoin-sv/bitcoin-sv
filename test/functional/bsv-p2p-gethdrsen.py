@@ -36,7 +36,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-        
+
     # This function takes unspent transaction and returns transaction (pay to random address), second (optional)
     # parameter is fee that we want to pay for this transaction.
     def make_signed_tx(self, node, unspent_transaction, fee=10000):
@@ -105,7 +105,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
         assert_equal(hdrsen.coinbaseTxProof.proof.txOrId, coinbase_tx.sha256)
         assert_equal(hdrsen.coinbaseTxProof.proof.target, block.sha256)
         assert_equal(len(hdrsen.coinbaseTxProof.proof.nodes), math.ceil(math.log2(num_of_txs)))
-    
+
         merkleProof = [format(x.value, '064x') for x in hdrsen.coinbaseTxProof.proof.nodes]
         calculatedRootHash = merkle_root_from_merkle_proof(hdrsen.coinbaseTxProof.tx.sha256, merkleProof)
         assert_equal(calculatedRootHash, hdrsen.hashMerkleRoot)

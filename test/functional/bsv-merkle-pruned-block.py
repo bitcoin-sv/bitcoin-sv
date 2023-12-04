@@ -35,7 +35,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         self.chain.tip = blockTip
         self.chain.block_heights[blockTip.sha256] = blockHeight
 
-    # Take care...if too many blocks will be required then the function will run out of coins 
+    # Take care...if too many blocks will be required then the function will run out of coins
     # the reason is that it currently takes coins only from 1 CB transaction
     def create_big_blocks(self, spendableCB_Tx, num_of_blocks, tx_count_per_block, node, conn):
         fee = satoshi_round(Decimal(((ONE_MEGABYTE + 100) * tx_count_per_block * 0.00000001)))
@@ -66,17 +66,17 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
                 n += 1
             node.generate(1)
             self.sync_chain_tip_with_node(node)
-    
+
     def set_test_params(self):
         self.num_nodes = 1
-        self.setup_clean_chain = True        
+        self.setup_clean_chain = True
         self.FORMAT_SEPARATOR = "."
-        self.extra_args = [['-whitelist=127.0.0.1', 
-                            '-rpcservertimeout=5000', 
-                            '-acceptnonstdtxn', 
-                            '-genesisactivationheight=1', 
-                            '-maxtxnvalidatorasynctasksrunduration=3600001', 
-                            '-maxnonstdtxvalidationduration=3600000', 
+        self.extra_args = [['-whitelist=127.0.0.1',
+                            '-rpcservertimeout=5000',
+                            '-acceptnonstdtxn',
+                            '-genesisactivationheight=1',
+                            '-maxtxnvalidatorasynctasksrunduration=3600001',
+                            '-maxnonstdtxvalidationduration=3600000',
                             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
                             '-preferredblockfilesize=%d' % ONE_MEGABYTE,
                             '-prune=1']]
@@ -89,7 +89,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         block = self.chain.next_block
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-        
+
         # Create a new block
         block(0)
         self.chain.save_spendable_output()
@@ -103,7 +103,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
             self.chain.save_spendable_output()
 
         yield test
-        
+
         # collect spendable outputs now to avoid cluttering the code later on
         out = []
         for i in range(50):

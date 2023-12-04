@@ -14,19 +14,19 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        
+
     def _create_confiscation_tx(self, txo):
         ctx = CTransaction()
 
         ctx.vin.append(CTxIn( COutPoint(int(txo["txId"], 16), txo["vout"]), b'', 0xffffffff ))
-        
+
         # OP_RETURN output that makes this a confiscation transaction
         ctx.vout.append( CTxOut(0, CScript( [OP_FALSE, OP_RETURN, b'cftx'] + [
             b'\x01' +                       # protocol version number
             hash160(b'confiscation order2') # hash of confiscation order document
         ])) )
         ctx.vout.append(CTxOut(42, CScript([OP_TRUE])))
-        
+
         ctx.calc_sha256()
         return ctx
 
@@ -34,17 +34,17 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Querying whitelisted transactions to check that initially there are none")
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(result["confiscationTxs"], [])
-        
+
         txo1 = {"txId" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "vout" : 0}
         txo2 = {"txId" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "vout" : 0}
         txo3 = {"txId" : "fefefefefefefefefefefeefefefefefefefefeffefefefefefefefefefefefe", "vout" : 2}
-        
+
         # Valid confiscation transactions used by this test
         # NOTE: Checking whitelisting of invalid confiscation transactions is done in test 'bsv-frozentxo-confiscation.py'.
         ctx1 = self._create_confiscation_tx(txo1)
         ctx2 = self._create_confiscation_tx(txo2)
         ctx3 = self._create_confiscation_tx(txo3)
-        
+
         self.log.info("Checking that transactions cannot be whitelisted if inputs are not frozen")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
@@ -83,7 +83,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
             }]
         });
         assert_equal(result["notProcessed"], [])
-        
+
         self.log.info("Checking that transactions cannot be whitelisted if inputs are not consensus frozen at specific height")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
@@ -134,11 +134,11 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(len(result["confiscationTxs"]), 2) # there should be 2
         wltxs = sorted(result["confiscationTxs"], key=lambda f: f["confiscationTx"]["txId"]) # must be sorted since order in result is unspecified
-        assert_equal(wltxs[0], {"confiscationTx" : {"txId" : ctx1.hash, "enforceAtHeight" : 123}}) 
+        assert_equal(wltxs[0], {"confiscationTx" : {"txId" : ctx1.hash, "enforceAtHeight" : 123}})
         assert_equal(wltxs[1], {"confiscationTx" : {"txId" : ctx2.hash, "enforceAtHeight" : 456}})
 
         wltxs0 = wltxs
-        
+
         self.log.info("Querying whitelisted transactions in verbose mode")
         result = self.nodes[0].queryConfiscationTxidWhitelist(True)
         wltxs = sorted(result["confiscationTxs"], key=lambda f: f["confiscationTx"]["txId"]) # must be sorted since order in result is unspecified
@@ -186,7 +186,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         wltxs = sorted(result["confiscationTxs"], key=lambda f: f["confiscationTx"]["txId"])
         assert_equal(wltxs, wltxs0)
-        
+
         self.log.info("Decreasing enforceAtHeight on whitelisted tx should be allowed")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
@@ -211,14 +211,14 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         wltxs = sorted(result["confiscationTxs"], key=lambda f: f["confiscationTx"]["txId"])
         assert_equal(wltxs, wltxs0)
-        
+
         self.log.info("Clearing confiscation whitelist should remove all whitelisted txs")
         result = self.nodes[0].clearConfiscationWhitelist()
         assert_equal(result["numFrozenBackToConsensus"], 2)
         assert_equal(result["numUnwhitelistedTxs"], 2)
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(result["confiscationTxs"], [])
-        
+
         self.log.info("Whitelisting same transactions again")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
@@ -255,7 +255,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         assert_equal(result["numRemovedEntries"], 4) # 2 CTXs + 2 consensus frozen TXOs
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(result["confiscationTxs"], [])
-        
+
         self.log.info("Freezing TXOs and whitelisting same transactions again")
         result = self.nodes[0].addToConsensusBlacklist({
             "funds": [

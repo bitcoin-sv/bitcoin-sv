@@ -9,5 +9,5 @@
 # s/\([,;:]\)\(\S\)/\1 \2/g  # E231 missing whitespace after ,;: tricky!
 
 s/\t/    /g          # W191 tabs to 4 spaces
-#s/\s\+$//            # W291 remove trailing whitespace
+s/\s\+$//            # W291 remove trailing whitespace
 

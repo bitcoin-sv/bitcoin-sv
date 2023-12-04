@@ -74,7 +74,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              p2p_reject_reason=b'mandatory-script-verify-flag-failed (Stack size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
-    
+
     ]
 
 class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):

@@ -24,7 +24,7 @@ class BSVBigBlockRestCall(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        self.setup_clean_chain = True        
+        self.setup_clean_chain = True
         self.FORMAT_SEPARATOR = "."
         self.extra_args = [['-whitelist=127.0.0.1', '-rpcservertimeout=1000', '-blocksizeactivationtime=10']]
 

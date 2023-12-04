@@ -30,7 +30,7 @@ TIMESTAMP_WINDOW = 2 * 60 * 60
 def calc_usage(blockdir):
     return sum(os.path.getsize(blockdir + f) for f in os.listdir(blockdir) if os.path.isfile(blockdir + f)) / (1024. * 1024.)
 
-            
+
 class PruneTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True

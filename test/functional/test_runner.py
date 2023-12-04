@@ -55,7 +55,7 @@ NON_SCRIPTS = [
 ]
 
 LARGE_BLOCK_TESTS = [
-    # Tests for block files larger than 4GB. 
+    # Tests for block files larger than 4GB.
     # This tests take really long time to execute or require a great deal of memory so they
     # are excluded by default.
     # Use --large-block-tests command line parameter to run them.
@@ -108,7 +108,7 @@ TIMEOUT_FACTOR_FOR_TESTS = {
     "bsv-block-stalling-test.py" : [1,2,2,3]
 }
 
-# This tests can be only run by explicitly specifying them on command line. 
+# This tests can be only run by explicitly specifying them on command line.
 # This is usefull for tests that take really long time to execute.
 EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
@@ -268,8 +268,8 @@ def main():
         cutoff = EXTENDED_CUTOFF
         if args.extended:
             cutoff = sys.maxsize
-        # Exclude tests specified in EXCLUDED_TESTS. 
-        # These tests should be specified in command line to execute 
+        # Exclude tests specified in EXCLUDED_TESTS.
+        # These tests should be specified in command line to execute
         test_list = [test for test in test_list if test not in EXCLUDED_TESTS]
         # Exclude large block tests unless explicitly told to run them
         if not args.large_block_tests:

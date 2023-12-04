@@ -283,7 +283,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         assert_equal(len(template_txns), 2)
         bt = [template_txns[0]['txid'], template_txns[1]['txid']]
         assert(spend_frozen_tx1a.hash in mp and spend_frozen_tx2a.hash in bt)
-        
+
         self.log.info("Checking that transactions are not present in mempool on node0")
         assert_equal(self.nodes[0].getrawmempool(), [])
 

@@ -2,9 +2,9 @@
 # Copyright (C) 2018-2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 '''
-Test checks if transactions included in inv message are in the same order 
-in which they were sent to node (send_message()) and then validated. -broadcastdelay=10000 is used to prevent 
-the node from broadcasting of each transaction separately it processed. Only one inv is sent for all transactions 
+Test checks if transactions included in inv message are in the same order
+in which they were sent to node (send_message()) and then validated. -broadcastdelay=10000 is used to prevent
+the node from broadcasting of each transaction separately it processed. Only one inv is sent for all transactions
 in mempool after 10s instead.
 '''
 

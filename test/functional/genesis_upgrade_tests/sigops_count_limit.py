@@ -40,7 +40,7 @@ class SigOpLimitCountDefaultTestCase(GenesisHeightBasedSimpleTestsCase):
     TESTS_POST_GENESIS_DEFAULT = [
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
                              "GENESIS", b"", test_tx_locking_script=CScript(
-                [OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS + 1)))        
+                [OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS + 1)))
     ]
 
 
@@ -83,7 +83,7 @@ class SigOpLimitCountPolicyTestCase(GenesisHeightBasedSimpleTestsCase):
     ]
 
     TESTS_POST_GENESIS_POLICY = [
-        
+
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
                              "GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * 9000)),
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),

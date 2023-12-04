@@ -47,7 +47,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
     # - node accepts tx output which meets dust threshold
     def test_node_with_fees(self, nodeid):
         node = self.nodes[nodeid]
-        
+
         # Check that nodes agree before shutting one off
         sync_blocks(self.nodes[nodeid:], timeout=20)
 

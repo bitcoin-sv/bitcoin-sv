@@ -16,7 +16,7 @@ from test_framework.util import wait_until
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
-    
+
     def __init__(self, test, *a, **kw):
         self.test = test
         super(WebhookHandler, self).__init__(*a, **kw)

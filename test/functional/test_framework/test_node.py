@@ -97,7 +97,7 @@ class TestNode():
             while configFileArg:
                 allSetArgs += ["-" + configFileArg.rstrip()]
                 configFileArg = configFile.readline()
-        
+
         allSetArgs += inputArgs
 
         for currentArg in allSetArgs:

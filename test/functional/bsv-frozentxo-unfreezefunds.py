@@ -67,7 +67,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
             }]
         });
         assert_equal(result["notProcessed"], [])
-        
+
         self.log.info("Querying frozen funds and checking that data was updated...")
         result = self.nodes[0].queryBlacklist()
         assert_equal(len(result["funds"]), 3)
@@ -75,22 +75,22 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         assert_equal(funds[0], {"txOut" : {"txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout" : 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}                ], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
         assert_equal(funds[1], {"txOut" : {"txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "vout" : 0}, "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
         assert_equal(funds[2], {"txOut" : {"txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "vout" : 0}, "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}], "policyExpiresWithConsensus": 1, "blacklist": ["policy", "consensus"]})
-        
+
         self.log.info("Cleanup expired consensus record #2 and update #1 from consensus to policy...")
-        
+
         # should do nothing until height 3 since records only expire then
         for h in range(0, 3):
             result = self.nodes[0].clearBlacklists( { "removeAllEntries": False, "expirationHeightDelta": 0 } )
             assert_equal(result["numRemovedEntries"], 0)
-            
-            self.nodes[0].generate(1); 
-        
+
+            self.nodes[0].generate(1);
+
         # should still do nothing at height 3 if records must be at least one block old
         result = self.nodes[0].clearBlacklists( { "removeAllEntries": False, "expirationHeightDelta": 1 } )
         assert_equal(result["numRemovedEntries"], 0)
-        
+
         self.nodes[0].generate(1); # generate one more block to increase height to 2
-        
+
         # now entries should be removed/updated
         result = self.nodes[0].clearBlacklists( { "removeAllEntries": False, "expirationHeightDelta": 1 } )
         assert_equal(result["numRemovedEntries"], 1)

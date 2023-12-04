@@ -15,7 +15,7 @@ SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spe
 class TxSizeConsensusCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Max consensus tx size"
-    _UTXO_KEY = make_key()    
+    _UTXO_KEY = make_key()
     ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
 
     def get_transactions_for_test(self, tx_collection, coinbases):

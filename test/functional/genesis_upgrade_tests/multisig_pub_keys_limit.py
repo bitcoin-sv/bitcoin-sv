@@ -41,10 +41,10 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
                              "MEMPOOL AT GENESIS", make_unlock_script),
 
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
-                             "MEMPOOL AT GENESIS", make_unlock_script, 
-                             b"genesis-script-verify-flag-failed (Pubkey count negative or limit exceeded)", 
+                             "MEMPOOL AT GENESIS", make_unlock_script,
+                             b"genesis-script-verify-flag-failed (Pubkey count negative or limit exceeded)",
                              b"blk-bad-inputs"),
-        
+
         SimpleTestDefinition(None, CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "MEMPOOL AT GENESIS", make_unlock_script),
 
@@ -55,7 +55,7 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
                              "MEMPOOL AT GENESIS", make_unlock_script),
 
         SimpleTestDefinition(None, CScript([OP_1] + PUBKEYS100 + [THE_KEY.get_pubkey(), 101, OP_CHECKMULTISIG]),
-                             "MEMPOOL AT GENESIS", make_unlock_script, 
+                             "MEMPOOL AT GENESIS", make_unlock_script,
                              b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)"),
 
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS, OP_CHECKMULTISIG]),
@@ -65,8 +65,8 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
                              "GENESIS", make_unlock_script),
 
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
-                             "GENESIS", make_unlock_script, 
-                             b"genesis-script-verify-flag-failed (Pubkey count negative or limit exceeded)", 
+                             "GENESIS", make_unlock_script,
+                             b"genesis-script-verify-flag-failed (Pubkey count negative or limit exceeded)",
                              b"blk-bad-inputs"),
 
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS10 + [THE_KEY.get_pubkey(), 11, OP_CHECKMULTISIG]),
@@ -77,12 +77,12 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
 
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS99 + [THE_KEY.get_pubkey(), 100, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script),
-                             
-        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS100 + [THE_KEY.get_pubkey(), 101, OP_CHECKMULTISIG]),
-                             "GENESIS", make_unlock_script, 
-                             b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)")        
 
-    ]    
+        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS100 + [THE_KEY.get_pubkey(), 101, OP_CHECKMULTISIG]),
+                             "GENESIS", make_unlock_script,
+                             b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)")
+
+    ]
 
 def make_unlock_script_for_default(tx, tx_to_spend):
     sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
@@ -112,4 +112,4 @@ class MaxMultiSigTestPolicyNotSet(GenesisHeightBasedSimpleTestsCase):
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script_for_default)
 
-    ]                             
+    ]

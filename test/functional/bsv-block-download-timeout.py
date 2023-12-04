@@ -13,24 +13,24 @@ from test_framework.util import wait_until, check_mempool_equals, connect_nodes_
 """
 Testing block downloading timeouts:
 Three cases with two subcases each:
-Preparation: 
+Preparation:
     - preparing a funding transaction (with enough outputs) on three node instances, one for each case
     - creating a block with significant size used for testing
-    
+
 CASE 1: Testing on a node with single connection, "timeout base" set to 60s (10 meaning 10% of the 10min)
     - sending prepared block with sending rate set so that expected transfer time would be 70s -> timeout occures
-    - sending prepared block with sending rate set so that expected transfer time would be 50s -> timeout does not occur 
+    - sending prepared block with sending rate set so that expected transfer time would be 50s -> timeout does not occur
 
 CASE 2: Testing on a node with single connection, mocktime set to future so the node enters the IBD, "timeout base IBD" set to 60s
     - sending prepared block with sending rate set so that expected transfer time would be 70s -> timeout occures
-    - sending prepared block with sending rate set so that expected transfer time would be 50s -> timeout does not occur 
+    - sending prepared block with sending rate set so that expected transfer time would be 50s -> timeout does not occur
 
-CASE 3: Testing on a node with two connections, after download starts on the test connection other blocks are downloading 
-       through the additional connection. This simulates situation when the node is downloading blocks from two 
+CASE 3: Testing on a node with two connections, after download starts on the test connection other blocks are downloading
+       through the additional connection. This simulates situation when the node is downloading blocks from two
        different peers at the same time. "timeout base" and "timeout per peer" are set to 30s each.
-       The total timeout is: <timeout base> + <number of additional peers> * <timeout per peer> = 30s + 1 * 30s = 60s    
+       The total timeout is: <timeout base> + <number of additional peers> * <timeout per peer> = 30s + 1 * 30s = 60s
     - sending prepared block with sending rate set so that expected transfer time would be 70s -> timeout occures
-    - sending prepared block with sending rate set so that expected transfer time would be 50s -> timeout does not occur 
+    - sending prepared block with sending rate set so that expected transfer time would be 50s -> timeout does not occur
 
 """
 
@@ -193,7 +193,7 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             cmd_timeout_per_peer=1000000, # we are sending on only one connection so this param is not relevant
             expect_timeout=True,
         )
-        
+
         self.test_send_block_to_node(
             label="Single connection, sending fast enough, setting only base timeout, timeout does not occure",
             node_index=0,

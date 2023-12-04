@@ -19,7 +19,7 @@ def make_key():
     return key
 
 def new_transaction(utxokey, utxo, target_tx_size):
-    ndx, tx_to_spend = utxo                
+    ndx, tx_to_spend = utxo
     padding_size = target_tx_size
     while True:
         tx = CTransaction()
@@ -29,7 +29,7 @@ def new_transaction(utxokey, utxo, target_tx_size):
         tx.vout.append(CTxOut(1, CScript([OP_FALSE,OP_RETURN] + [bytes(1) * padding_size])))
         sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
         sig = utxokey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
-        tx.vin[0].scriptSig = CScript([sig])        
+        tx.vin[0].scriptSig = CScript([sig])
         tx.rehash()
 
         diff = target_tx_size - len(tx.serialize())
@@ -40,7 +40,7 @@ def new_transaction(utxokey, utxo, target_tx_size):
 class DefaultTxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Default max policy tx size"
-    _UTXO_KEY = make_key()    
+    _UTXO_KEY = make_key()
     ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0']
 
     def get_transactions_for_test(self, tx_collection, coinbases):
@@ -63,7 +63,7 @@ class DefaultTxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
 class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Increased max policy tx size"
-    _UTXO_KEY = make_key()    
+    _UTXO_KEY = make_key()
     ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-maxtxsizepolicy=%d' % NEW_MAX_TX_SIZE_POLICY, '-datacarriersize=%d' % NEW_MAX_TX_SIZE_POLICY] +\
                                              ['-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
 
@@ -77,10 +77,10 @@ class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
                p2p_reject_reason = b'tx-size')
 
         if tx_collection.label == "MEMPOOL AT GENESIS":
-            utxos, data = self.utxos["PRE-GENESIS"]            
+            utxos, data = self.utxos["PRE-GENESIS"]
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), NEW_MAX_TX_SIZE_POLICY)
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), NEW_MAX_TX_SIZE_POLICY + 1)
             tx_collection.add_tx(tx,
-               p2p_reject_reason = b'tx-size')               
+               p2p_reject_reason = b'tx-size')
 

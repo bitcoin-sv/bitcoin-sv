@@ -94,7 +94,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
             # Disconnect nodes before each generate RPC. On a busy environment generate
             # RPC might not create the provided number of blocks. While nodes are communicating
-            # P2P messages can cause generateBlocks function to skip a block. Check the comment 
+            # P2P messages can cause generateBlocks function to skip a block. Check the comment
             # in generateBlocks function for details.
             disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(300)
@@ -130,7 +130,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             confirmations = tx.get('confirmations', 0)
             assert_equal (confirmations, 1)
             self.log.info ("test 3: PASS")
-            # Blocks must be synced because we do not want to start generating new blocks on node1 in the next loop iteration 
+            # Blocks must be synced because we do not want to start generating new blocks on node1 in the next loop iteration
             # before node1 has received all blocks generated on node0 and all pending P2P block requests have completed.
             sync_blocks(self.nodes)
 

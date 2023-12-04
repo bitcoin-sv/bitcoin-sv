@@ -95,7 +95,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # This block must be in list of blocks considered soft rejected and explicitly marked as such.
         assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
-        
+
         # Check other data (besides block hash) returned by getsoftrejectedblocks
         assert_equal(self.nodes[0].getsoftrejectedblocks(True), [{
             'blockhash': b2_hash,
@@ -148,7 +148,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), b4_hash)
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash, b4_hash})
         assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
-        
+
         # Check other data (besides block hash) returned by getsoftrejectedblocks
         for b in self.nodes[0].getsoftrejectedblocks(False):
             # NOTE: Must check each one separately, because the order in array is unspecified
@@ -282,12 +282,12 @@ class SoftRejectedBlocks(BitcoinTestFramework):
 
         self.nodes[0].acceptblock(b1_hash)
         self.nodes[0].acceptblock(b2_hash)
-        
+
         # b3 cannot be marked as soft rejected for 1 or more blocks because that would
         # affect b4, which is already soft rejected
         assert_raises_rpc_error(-1, "Error marking block as soft rejected", self.nodes[
             0].softrejectblock, b3_hash, 1)
-        
+
         # ... and the same for b2 but 2 or more blocks
         assert_raises_rpc_error(-1, "Error marking block as soft rejected", self.nodes[
             0].softrejectblock, b2_hash, 2)
@@ -295,12 +295,12 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # b3 can be marked as soft rejected for 0 subsequent blocks
         self.nodes[0].softrejectblock(b3_hash, 0)
         self.nodes[0].acceptblock(b3_hash)
-        
+
         # ... so can b2, but for 0 or 1 subsequent blocks
         self.nodes[0].softrejectblock(b2_hash, 0)
         self.nodes[0].softrejectblock(b2_hash, 1)
         self.nodes[0].acceptblock(b2_hash)
-        
+
         # finish cleaning up so that there are no soft rejected blocks
         self.nodes[0].acceptblock(b4_hash)
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), set())

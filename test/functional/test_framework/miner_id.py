@@ -2,7 +2,7 @@
 # Copyright (c) 2022 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-''' 
+'''
 Bip32 Keys for MinerId and MinerIdInfo creation
 Usage:
     minerIdKeys = MinerIdKeys("0001")
@@ -133,7 +133,7 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
 
     # Convert dictionary to json string
     if json_override_string != None:
-        infoDocJson = json_override_string 
+        infoDocJson = json_override_string
     else:
         infoDocJson = json.dumps(infoDoc, indent=0)
     infoDocJson = infoDocJson.replace('\n', '')

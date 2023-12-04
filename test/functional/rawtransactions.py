@@ -306,7 +306,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[3].gettransaction(txid2)["txid"], txid2)
 
-        
+
         #
         # Submit transaction without checking fee 2/2 #
         #
@@ -327,7 +327,7 @@ class RawTransactionsTest(BitcoinTestFramework):
             rawTxn = self.nodes[3].createrawtransaction(inputs, outputs)
             signedTxn = self.nodes[3].signrawtransaction(rawTxn)["hex"]
             self.nodes[3].sendrawtransaction(signedTxn, False, False)
-        
+
         # create new transaction
         mempoolsize = self.nodes[3].getmempoolinfo()['size']
         signedTxn = self.make_data_transaction(self.nodes[3], utxos.pop())

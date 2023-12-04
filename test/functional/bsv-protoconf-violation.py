@@ -25,7 +25,7 @@ class BsvProtoconfViolationTest(BitcoinTestFramework):
 
     def run_test(self):
         test_node = mininode.NodeConnCB()
-       
+
         connections = []
         connections.append(
             mininode.NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node))
@@ -49,7 +49,7 @@ class BsvProtoconfViolationTest(BitcoinTestFramework):
         # 2. Test that protoconf can only be sent once (if is sent twice --> disconnection)
         assert_equal(len(self.nodes[0].listbanned()), 0)# Before, there are zero banned node
 
-        # First protoconf was already sent from mininode. 
+        # First protoconf was already sent from mininode.
         # Another protoconf message will cause disconnection (but not banning).
         test_node.send_message(mininode.msg_protoconf())
         test_node.wait_for_disconnect()

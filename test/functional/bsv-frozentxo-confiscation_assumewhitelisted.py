@@ -230,8 +230,8 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self._wait_for_block_status(node1, best_block_hash, "")
         time.sleep(1)
         assert_equal(root_block_hash, node1.rpc.getbestblockhash())
-        
-        
+
+
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -240,7 +240,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         initialize_datadir(self.options.tmpdir, 1)
 
         self.log.info("Starting node1 with option -assumewhitelistedblockdepth=6")
-        node1.rpc.start(True, self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=6"]) 
+        node1.rpc.start(True, self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=6"])
         node1.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -249,8 +249,8 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self._wait_for_block_status(node1, best_block_hash, "")
         time.sleep(1)
         assert_equal(root_block_hash, node1.rpc.getbestblockhash())
-        
-        
+
+
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -261,10 +261,10 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Starting node1 with option -assumewhitelistedblockdepth=5")
         node1.rpc.start(True) # option -assumewhitelistedblockdepth=5 is already included in extra_args for this node
         node1.rpc.wait_for_rpc_connection()
-        
+
         self.log.info("Mining 1 block on node1 before connecting it to network to check that option assumewhitelistedblockdepth works in case of a large reorg")
         node1.rpc.generate(1)
-        
+
         self.log.info("Connecting node 1 to network")
         connect_nodes_bi(self.nodes, 0, 1)
 

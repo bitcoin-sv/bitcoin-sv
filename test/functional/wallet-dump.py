@@ -68,7 +68,7 @@ class WalletDumpTest(BitcoinTestFramework):
         self.add_nodes(self.num_nodes, self.extra_args, timewait=60)
         self.start_nodes()
 
-    def run_test(self):        
+    def run_test(self):
         unencrypted_dump = os.path.join(self.nodes[0].datadir, "wallet.unencrypted.dump")
         encrypted_dump = os.path.join(self.nodes[0].datadir, "wallet.encrypted.dump")
 

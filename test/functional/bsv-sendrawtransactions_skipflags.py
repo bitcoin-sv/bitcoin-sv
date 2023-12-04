@@ -351,12 +351,12 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         config_overrides_decrease = {"maxtxsizepolicy": 100000, "datacarriersize": 99000, "maxscriptsizepolicy": 7000,
                                      "maxscriptnumlengthpolicy": 200, "maxstackmemoryusagepolicy": 6000, "limitancestorcount": 3,
-                                     "limitcpfpgroupmemberscount": 5, 
+                                     "limitcpfpgroupmemberscount": 5,
                                      "minconsolidationfactor": 2, "minconfconsolidationinput": 3,
                                       "acceptnonstdconsolidationinput": False}
         config_overrides_increase = {"maxtxsizepolicy": ONE_MEGABYTE*100, "datacarriersize": 99995000, "maxscriptsizepolicy": 20000000,
                                      "maxscriptnumlengthpolicy": 250000, "maxstackmemoryusagepolicy": ONE_MEGABYTE*100,
-                                     "limitancestorcount": 7, "limitcpfpgroupmemberscount": 10, 
+                                     "limitancestorcount": 7, "limitcpfpgroupmemberscount": 10,
                                      "minconsolidationfactor": 15, "minconfconsolidationinput": 8, "acceptnonstdconsolidationinput": True}
 
         self.log.info("Test sendrawtransactions with overriden policy values")

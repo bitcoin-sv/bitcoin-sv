@@ -104,7 +104,7 @@ class JournalReorg(BitcoinTestFramework):
         for node in self.nodes:
             # Disconnect nodes before each generate RPC. On a busy environment generate
             # RPC might not create the provided number of blocks. While nodes are communicating
-            # P2P messages can cause generateBlocks function to skip a block. Check the comment 
+            # P2P messages can cause generateBlocks function to skip a block. Check the comment
             # in generateBlocks function for details.
             disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(150)

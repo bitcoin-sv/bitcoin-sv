@@ -24,7 +24,7 @@ class RpcFloddingTest (BitcoinTestFramework):
     def run_test(self):
 
         #
-        # low-level check for http persistent connection 
+        # low-level check for http persistent connection
         #
         url = urllib.parse.urlparse(self.nodes[0].url)
         authpair = url.username + ':' + url.password

@@ -343,7 +343,7 @@ class MiningJournal(BitcoinTestFramework):
         # Sleep to ensure the node has fully restarted before we stop it again,
         # otherwise the test framework treats it as a test failure
         time.sleep(5)
- 
+
     # Test the RPC rebuildJounral command
     def test_rebuild(self, rebuildNode):
         self.log.info("Testing journal rebuild...")

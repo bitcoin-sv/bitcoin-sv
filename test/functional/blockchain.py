@@ -324,7 +324,7 @@ class BlockchainTest(BitcoinTestFramework):
         tx = blockjson['tx'][0]
         assert isinstance(tx, dict)
         assert_is_hash_string(tx['vin'][0]['coinbase'], length=None)
-        
+
 
         self.log.info("Test getblock with invalid verbosity fails")
         assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblockbyheight, 200, 4)

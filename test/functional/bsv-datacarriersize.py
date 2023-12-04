@@ -52,7 +52,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-    # creates transaction with n_outputs, and size of the whole transaction of total_bytes. 
+    # creates transaction with n_outputs, and size of the whole transaction of total_bytes.
     # we try to create transactions multiple time, until we get exact size match
     def make_tx_total_size(self, n_outputs, script_op_codes, fund, total_bytes):
 

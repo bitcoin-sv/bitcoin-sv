@@ -307,7 +307,7 @@ class MiningTest(BitcoinTestFramework):
         self.test_mine_from_old_mining_candidate(blockNode, True)
 
         self.sync_all()
-        
+
         self.test_mine_from_old_mining_candidate(blockNode, False)
 
         self.test_additional_fields(txnNode)

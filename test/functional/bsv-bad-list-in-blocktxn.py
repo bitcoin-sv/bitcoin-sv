@@ -25,17 +25,17 @@ class msg_badblocktxn():
         return r
 
 class TestBadTxnList(BitcoinTestFramework):
-    
+
     def set_test_params(self):
         self.num_nodes = 1
-    
+
     def run_test(self):
         self.nodes[0].generate(1)
-        
+
         self.stop_node(0)
         with self.run_node_with_connections("Bad blocktxn list test", 0, [], 1) as (conn,):
             conn.send_message(msg_badblocktxn())
-            
+
             wait_until(lambda: check_for_log_msg(self, "read(): end of data: iostream error", "/node0"), timeout=60)
 
 if __name__ == '__main__':

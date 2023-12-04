@@ -16,7 +16,7 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.genesisactivationheight = 600 
+        self.genesisactivationheight = 600
         self.extra_args = [['-debug', '-peerbloomfilters=1', '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-maxmempoolnonfinal=0', '-rejectmempoolrequest=0']] * self.num_nodes
 

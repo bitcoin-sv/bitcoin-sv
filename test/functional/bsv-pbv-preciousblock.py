@@ -93,7 +93,7 @@ class PBVPreciousBlock(BitcoinTestFramework):
 
         node0.send_message(msg_block(block2_hard))
         node1.send_message(msg_block(block4_hard))
- 
+
         # make sure we started validating blocks
         wait_for_validating_blocks({block2_hard.hash, block4_hard.hash}, self.nodes[0], self.log)
 

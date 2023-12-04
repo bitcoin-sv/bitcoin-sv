@@ -17,7 +17,7 @@ class CProtoconfWithZeroFields():
 
     def __init__(self):
         self.number_of_fields = 0
-        
+
     def deserialize(self, f):
         self.number_of_fields = struct.unpack("<i", f.read(4))[0]
 
@@ -37,11 +37,11 @@ class CProtoconfWithNewField(mininode.CProtoconf):
     def __init__(self, number_of_fields=2, max_recv_payload_length=0, new_property=0):
         super().__init__(number_of_fields, max_recv_payload_length)
         self.new_property = new_property
-        
+
     def deserialize(self, f):
         super().deserialize(f)
         self.new_property = struct.unpack("<i", f.read(4))[0]
-        
+
     def serialize(self):
         r = super().serialize()
         r += struct.pack("<i", self.new_property)
@@ -92,7 +92,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             logger.debug("before %s", title)
             yield
             logger.debug("after %s", title)
-  
+
             connections[0].close()
             del connections
             thr.join()
@@ -170,7 +170,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             # 3.4. We should receive 2 GetData messages with (1 * 1024 * 1024 + 4 + 32)B size (29127 elements).
             assert_equal(wanted_inv_lengths[0], expected_inv_len)
             assert_equal(wanted_inv_lengths[1], expected_inv_len)
-            assert_equal(len(wanted_inv_lengths), 2)    
+            assert_equal(len(wanted_inv_lengths), 2)
 
         ########
         # 4.test
@@ -180,7 +180,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
             conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH))
         test_node.send_protoconf = send_largest_protoconf
-   
+
         with run_connection(test_node, "largest protoconf"):
             test_node.wait_for_verack()
             test_node.sync_with_ping()

@@ -20,7 +20,7 @@ _policy_h_contents = _policy_h_fh.read()
 _policy_h_fh.close()
 
 # Slurp in chainparams.cpp contents
-_chainparams_cpp_fh = open(os.path.join(get_srcdir(), 'src', 
+_chainparams_cpp_fh = open(os.path.join(get_srcdir(), 'src',
                                     'chainparams.cpp'), 'rt')
 _chainparams_cpp_contents = _chainparams_cpp_fh.read()
 _chainparams_cpp_fh.close()
@@ -157,7 +157,7 @@ MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSEN
 #Gracefull period for genesis activation where nodes will not be banned for certain ops
 GENESIS_GRACEFULL_ACTIVATION_PERIOD = _extractPolicyValue('GENESIS_GRACEFULL_ACTIVATION_PERIOD')
 
-# Maximum number of non-push operations per script before GENESIS 
+# Maximum number of non-push operations per script before GENESIS
 MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = _extractConsensusValue('MAX_OPS_PER_SCRIPT_BEFORE_GENESIS')
 
 MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = _extractScriptValue('MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS')
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     print("COINBASE_MATURITY = %d (blocks)" % COINBASE_MATURITY)
     print("MAX_TX_SIZE_POLICY_BEFORE_GENESIS = %d" % MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
     print("DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = %d" % DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
-    print("MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)    
+    print("MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
     print("MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS)
     print("GENESIS_ACTIVATION_HEIGHT_REGTEST = %d" % GENESIS_ACTIVATION_HEIGHT_REGTEST)
     print("MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = %d" % MAX_OPS_PER_SCRIPT_BEFORE_GENESIS)

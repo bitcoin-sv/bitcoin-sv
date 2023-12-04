@@ -70,7 +70,7 @@ class RevokeMid(BitcoinTestFramework):
             block = make_miner_id_block(p2p_0, minerIdParams, utxo=utxos.pop())
             p2p_0.send_message(msg_block(block))
             wait_until(lambda: self.nodes[0].getbestblockhash() == block.hash)
-            
+
             minerIdParams = {
                 'height': self.nodes[0].getblockcount() + 1,
                 'minerKeys': self.minerIdKeys[2],

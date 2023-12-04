@@ -39,7 +39,7 @@ class User:
                 output['value'] = float(output['value'])
             text = json.dumps(tx_json, indent=4)
             print("ds transaction:", text)
-        
+
         return tx
 
     def __sign_tx(self, sign_tx, spend_tx, n):
@@ -76,7 +76,7 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         scriptPubKey = CScript([OP_DUP, OP_HASH160, hash160(attacker.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])
         for i in range(self.nbDoubleSpends):
-            funding_tx.vout.append(CTxOut(funding_amount, scriptPubKey)) 
+            funding_tx.vout.append(CTxOut(funding_amount, scriptPubKey))
 
         funding_tx.rehash()
         funding_txid = node.sendrawtransaction(ToHex(funding_tx), False, True)
@@ -105,7 +105,7 @@ class CompetingChainsTest(BitcoinTestFramework):
                         else:
                             spent_inputs.add(new_element)
         return ds_counter
-            
+
     def run_test(self):
 
         # Test 1:
@@ -189,7 +189,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         lastblock0 = node0.getbestblockhash()
         lastblock1 = node1.getbestblockhash()
         assert(lastblock0 == lastblock1)
-        
+
         self.log.info("check that double-spends have been removed")
         assert (self.contains_double_spends () == 0)
 

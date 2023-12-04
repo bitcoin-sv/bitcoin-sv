@@ -137,7 +137,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.genesisactivationheight = 600 
+        self.genesisactivationheight = 600
         self.extra_args = [['-debug', '-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1', '-checknonfinalfreq=100',
                             '-mempoolexpirynonfinal=1', '-maxgenesisgracefulperiod=0',

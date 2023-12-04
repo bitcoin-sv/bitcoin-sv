@@ -30,13 +30,13 @@ class NotificationsTest(BitcoinTestFramework):
         self.log.info("test -blocknotify")
         block_count = 10
         blocks = self.nodes[1].generate(block_count)
-        
+
         # wait at most 10 seconds for expected number of block notification files
         wait_until(lambda: len(os.listdir(self.dir_notify_block)) == block_count, timeout=10)
 
         # file names in notify_block directory should equal the generated blocks hashes
         assert_equal(sorted(blocks), sorted(os.listdir(self.dir_notify_block)))
-        
+
         self.log.info("test -walletnotify")
         # wait at most 10 seconds for expected number of transaction notification files
         wait_until(lambda: len(os.listdir(self.dir_notify_tx)) == block_count, timeout=10)
@@ -47,7 +47,7 @@ class NotificationsTest(BitcoinTestFramework):
 
         shutil.rmtree(self.dir_notify_tx)
         os.mkdir(self.dir_notify_tx)
-        
+
         self.log.info("test -walletnotify after rescan")
         # restart node to rescan to force wallet notifications
         self.restart_node(1)

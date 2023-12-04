@@ -65,7 +65,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "already in policy")
-        assert_equal(np[0]["txOut"], {"txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout" : 0})        
+        assert_equal(np[0]["txOut"], {"txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout" : 0})
 
         self.log.info("Freezing fund on consensus level...")
         result = self.nodes[0].addToConsensusBlacklist({
@@ -149,7 +149,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "already in consensus")
-        assert_equal(np[0]["txOut"], {"txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout" : 0})        
+        assert_equal(np[0]["txOut"], {"txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout" : 0})
 
         self.log.info("Querying frozen funds and checking there are 4 in consensus blacklist")
         result = self.nodes[0].queryBlacklist()
@@ -170,7 +170,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                 }
             }]
         });
-        
+
         self.log.info("Cleanup expired records should do nothing since nothing is expired")
         result = self.nodes[0].clearBlacklists({ "removeAllEntries" : False, "expirationHeightDelta": 0 })
         assert_equal(result["numRemovedEntries"], 0)

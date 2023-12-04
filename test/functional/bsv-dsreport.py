@@ -401,7 +401,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxOut(25, CScript([OP_TRUE]))
         ]
         tx3 = self.create_and_send_transaction(vin, vout)
-        
+
         wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend was cancelled", "/node0"))
 
         # Wait for the callback service to process requests
@@ -522,7 +522,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                                        '-dsattemptqueuemaxmemory=1KB',
                                        '-dsnotifylevel=2'])
         self.createConnection()
- 
+
         assert(not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
 
         # tx1 is dsnt-enabled
@@ -578,7 +578,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.check_invalid_transactions(utxo[13])
 
         self.check_multiple_callback_services(utxo[14:16])
-        
+
         self.check_long_lasting_transactions()
 
         self.kill_server()

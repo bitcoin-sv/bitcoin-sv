@@ -4,7 +4,7 @@
 
 """
 Start up nodes, feed in some transactions, use the mining API to
-mine some blocks, verify all nodes accept the mined blocks and 
+mine some blocks, verify all nodes accept the mined blocks and
 check if merkleproof returned by getblockheader RPC function and
 /rest/headers/extended REST call is valid.
 """
@@ -143,24 +143,24 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         # submitResult is bool True for success, if failure error is returned
         assert_equal(submitResult, True)
 
-    # Return JSON header obtained via REST call /rest/headers/extended 
+    # Return JSON header obtained via REST call /rest/headers/extended
     def call_rest_headers_extended_json(self, node, hash):
         FORMAT_SEPARATOR = "."
         url = urllib.parse.urlparse(node.url)
         conn = http.client.HTTPConnection(url.hostname, url.port)
         conn.request('GET', '/rest/headers/extended/1/' + hash + FORMAT_SEPARATOR + "json")
-        
+
         response = conn.getresponse()
         assert_equal(response.status, 200)
-        
+
         return json.loads(response.read().decode('utf-8'), parse_float=Decimal)
 
-    # Helper to check if JSON extended header returned via rest call matches hdr 
+    # Helper to check if JSON extended header returned via rest call matches hdr
     def check_rest_header_extendeded_json(self, node, hash, hdr_expected):
         hdrs_rest = self.call_rest_headers_extended_json(node, hash)
         assert_equal(len(hdrs_rest), 1)
         assert_equal(hdrs_rest[0], hdr_expected)
-        
+
     def check_node(self, node, block_hash):
         obj = node.getblock(block_hash, 2)
         hdr = node.getblockheader(block_hash, 2)
@@ -180,7 +180,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         self.check_node(blockNode, bestHash)
         # also check in 2nd node that received the newly mined block if merkleeproof is present and if it's correct
         self.check_node(txnNode, bestHash)
-        
+
         self.test_mine_block(txnNode, blockNode, False)
         bestHash = blockNode.getbestblockhash()
         self.check_node(blockNode, bestHash)

@@ -94,7 +94,7 @@ class FullBlockTest(ComparisonTestFramework):
         test, out, _ = prepare_init_chain(self.chain, 99, 100)
 
         yield test
-        
+
         # Check that compact block also work for big blocks
         node = self.nodes[0]
         peer = TestNode()

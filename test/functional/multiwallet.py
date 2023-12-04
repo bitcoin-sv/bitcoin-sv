@@ -33,7 +33,7 @@ class MultiWalletTest(BitcoinTestFramework):
             0, ['-wallet=w11'], 'Error loading wallet w11. -wallet filename must be a regular file.')
 
         # should not initialize if wallet file is a symlink (do not test on windows where symlinks are not supported by python)
-        # On Windows SeCreateSymbolicLinkPrivilege  is usually not held unless user is admin and has used 
+        # On Windows SeCreateSymbolicLinkPrivilege  is usually not held unless user is admin and has used
         # escalation. Skip the symlink link test there
 
         if (os.name != 'nt'):

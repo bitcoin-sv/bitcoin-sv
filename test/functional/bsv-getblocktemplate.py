@@ -91,7 +91,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
         assert_equal(self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'] + 1, template['height'])
 
     def run_test(self):
-        
+
         self.stop_node(0)
         with self.run_node_with_connections("test getblocktemplate RPC call", 0, ["-minminingtxfee=0.0000001"], 1) as connections:
 
@@ -124,7 +124,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter/2), transactions)
             connection.cb.send_message(msg_tx(largeTx))
             self.check_mempool(self.nodes[0], [largeTx])
-           
+
             # Check getblocktemplate response.
             template = self.nodes[0].getblocktemplate()
             self.checkBlockTemplate(template, transactions, largeTx)

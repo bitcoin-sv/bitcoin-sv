@@ -97,9 +97,9 @@ class P2PAssociation(BitcoinTestFramework):
                 expstream = expected['streams'][j]
                 if stream['streamtype'] != expstream:
                     return False
-                
+
         return True
-            
+
 
     def run_test(self):
         # Create all the connections we will need to node0 at the start because they all need to be

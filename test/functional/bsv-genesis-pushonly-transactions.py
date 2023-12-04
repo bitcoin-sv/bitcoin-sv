@@ -35,7 +35,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         self.test.connections[0].cb.wait_for_reject()
 
     def get_tests(self):
-        
+
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]

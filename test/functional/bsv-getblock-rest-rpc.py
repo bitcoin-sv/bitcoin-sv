@@ -33,7 +33,7 @@ class BSVGetBlock(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        self.setup_clean_chain = True        
+        self.setup_clean_chain = True
         self.FORMAT_SEPARATOR = "."
 
     def getBlock(self, block, block_size, form):
@@ -60,7 +60,7 @@ class BSVGetBlock(ComparisonTestFramework):
         elif form == "hex":
             assert_equal(response.getheader('content-length'), str(block_size*2))
             assert_equal(ToHex(block), response.read().decode('utf-8'))
-            
+
     def run_test(self):
         self.test.run()
 

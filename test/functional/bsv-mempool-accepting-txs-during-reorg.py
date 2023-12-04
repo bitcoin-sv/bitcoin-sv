@@ -16,41 +16,41 @@ from test_framework.util import wait_until, check_mempool_equals
 """
     We are testing acceptance of the transactions to the mempool during the reorg.
      - First, we are creating block structure like this:
-    
+
        +-----root-----+
-       |    |    |    |   
+       |    |    |    |
       a1    b1   c1   d1
             |    |    |
             b2   c2   d2
-    
-       a1 - a block with 2000 p2pk transactions       
+
+       a1 - a block with 2000 p2pk transactions
        b1,b2,c1,c2,d1,d2 each a block with several transactions with long evaluating scripts
-    
+
        and we send a1 which becomes a tip.
-       
-    1. Then we send the same 2000 transactions from the a1 block through p2p, and blocks b1 and b2. This causes 
-       a reorg, and we are disconnecting a1 block and validating b1 and b2 while validating transactions from a1. 
-       So while the block a1 is disconnected we are accepting transactions to the mempool resulting in having several 
-       transactions both in disconnectpool and mempool. 
-       
+
+    1. Then we send the same 2000 transactions from the a1 block through p2p, and blocks b1 and b2. This causes
+       a reorg, and we are disconnecting a1 block and validating b1 and b2 while validating transactions from a1.
+       So while the block a1 is disconnected we are accepting transactions to the mempool resulting in having several
+       transactions both in disconnectpool and mempool.
+
 
     2. We set b1 as invalid forcing that a1 becomes a tip again.
-       Then we send the other 2000 transactions which are in conflict to transactions from the a1 block through p2p, 
-       and blocks c1 and c2. This also causes a reorg, and we are disconnecting a1 block and validating c1 and c2 while 
-       validating submitted transactions. So while the block a1 is disconnected we are accepting transactions to 
-       the mempool resulting in having several transactions in the mempool which are in conflict with transactions 
+       Then we send the other 2000 transactions which are in conflict to transactions from the a1 block through p2p,
+       and blocks c1 and c2. This also causes a reorg, and we are disconnecting a1 block and validating c1 and c2 while
+       validating submitted transactions. So while the block a1 is disconnected we are accepting transactions to
+       the mempool resulting in having several transactions in the mempool which are in conflict with transactions
        in the disconnectpool. Transactions in conflict should be removed from mempool.
 
-    3. We set c1 as invalid forcing that a1 becomes a tip again and sending another 2000 transactions which are 
-       spending outputs of the a1 block transactions. When all transactions are in the mempool we are sending 
-       blocks d1 and d2 triggering the reorg. During the reorg we are calling rpc generate(1) to generate a block. 
-       This call would fail if the mempool is in inconsistent state during the reorg. 
+    3. We set c1 as invalid forcing that a1 becomes a tip again and sending another 2000 transactions which are
+       spending outputs of the a1 block transactions. When all transactions are in the mempool we are sending
+       blocks d1 and d2 triggering the reorg. During the reorg we are calling rpc generate(1) to generate a block.
+       This call would fail if the mempool is in inconsistent state during the reorg.
 
 """
 
 class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
-    
+
     def __init__(self, *a, **kw):
         super(MemepoolAcceptingTransactionsDuringReorg, self).__init__(*a, **kw)
         self.private_key = CECKey()
