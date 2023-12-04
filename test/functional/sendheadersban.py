@@ -26,7 +26,7 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         
     def _test_sendheadersban(self):
 
-    # Setup the p2p connections and start up the network thread.
+        # Setup the p2p connections and start up the network thread.
         inv_node = TestNode()
         test_node = TestNode()
 
