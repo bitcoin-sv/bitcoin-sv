@@ -64,19 +64,20 @@ class StallingTest(ComparisonTestFramework):
 
         # Launch another node with config that should avoid a stall during IBD
         self.log.info("Launching extra nodes")
-        self.add_node(2, extra_args = [
-                                    '-whitelist=127.0.0.1',
-                                    '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
-                                    '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-                                    '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
-                                    '-maxscriptsizepolicy=0',
-                                    '-rpcservertimeout=1000',
-                                    '-genesisactivationheight=%d' % self.genesisactivationheight,
-                                    "-txindex",
-                                    "-maxtipage=0",
-                                    "-blockdownloadwindow=64",
-                                    "-blockstallingtimeout=6"
-                                      ],
+        self.add_node(2,
+                      extra_args = [
+                          '-whitelist=127.0.0.1',
+                          '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
+                          '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
+                          '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
+                          '-maxscriptsizepolicy=0',
+                          '-rpcservertimeout=1000',
+                          '-genesisactivationheight=%d' % self.genesisactivationheight,
+                          "-txindex",
+                          "-maxtipage=0",
+                          "-blockdownloadwindow=64",
+                          "-blockstallingtimeout=6"
+                      ],
                       init_data_dir=True)
         self.start_node(2)
 

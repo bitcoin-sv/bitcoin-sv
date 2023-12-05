@@ -531,8 +531,8 @@ def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0
 # The function checks if transaction/block was rejected
 # The actual reject reason is checked if specified
 def wait_for_reject_message(conn, reject_reason=None, timeout=5):
-    wait_until(lambda: ('reject' in list(conn.cb.last_message.keys()) and (
-                reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)), timeout=timeout)
+    wait_until(lambda: ('reject' in list(conn.cb.last_message.keys())
+        and (reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)), timeout=timeout)
     if conn.cb.last_message['reject'].message == b'tx':
         conn.rpc.log.info('Transaction rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
     else:

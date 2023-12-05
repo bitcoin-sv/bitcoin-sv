@@ -94,15 +94,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # create a dummy transaction to compare behaviour
         height = self.nodes[0].getblockcount() + 1
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[0],
-                'publicIP': '127.0.0.1',
-                'publicPort': '8333',
-                'minerKeys': allKeys.minerIdKeys,
-                'revocationKeys': allKeys.revocationKeys,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None}
+            'height': height,
+            'name': self.miner_names[0],
+            'publicIP': '127.0.0.1',
+            'publicPort': '8333',
+            'minerKeys': allKeys.minerIdKeys,
+            'revocationKeys': allKeys.revocationKeys,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         # create json with bad syntax. 'height' is wrongly a string here
         if test_case == self.TEST_call_create_with_bad_json_synatx:

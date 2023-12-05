@@ -199,9 +199,9 @@ def splice(*iters):
     nothing = object()
     return (x
             for x in itertools.chain(
-                    *itertools.zip_longest(
-                        *iters,
-                        fillvalue=nothing))
+                *itertools.zip_longest(
+                    *iters,
+                    fillvalue=nothing))
             if x is not nothing)
 
 def make_blocks_from(conn, root_block, nblocks, *txs_lists, wait_for_tip=True):

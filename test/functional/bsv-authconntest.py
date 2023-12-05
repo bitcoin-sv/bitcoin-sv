@@ -147,15 +147,16 @@ class AuthConnTestReputation(BitcoinTestFramework):
             return signature["signature"]
 
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[nodenum],
-                'publicIP': '127.0.0.1',
-                'publicPort': str(rpc_port(nodenum)),
-                'minerKeys': signWithService,
-                'revocationKeys':  None,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None}
+            'height': height,
+            'name': self.miner_names[nodenum],
+            'publicIP': '127.0.0.1',
+            'publicPort': str(rpc_port(nodenum)),
+            'minerKeys': signWithService,
+            'revocationKeys':  None,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum],  height))
         response = http_conns[nodenum].getresponse()

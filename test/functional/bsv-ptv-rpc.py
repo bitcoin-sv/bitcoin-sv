@@ -135,7 +135,7 @@ class PTVRPCTests(ComparisonTestFramework):
         # The parent tx from the chain is skipped.
         for tx in txchain[1:]:
             assert_raises_rpc_error(
-                    -25, "Missing inputs", conn.rpc.sendrawtransaction, ToHex(tx), allowhighfees, dontcheckfee)
+                -25, "Missing inputs", conn.rpc.sendrawtransaction, ToHex(tx), allowhighfees, dontcheckfee)
         # At this stage the mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # The p2p orphan pool must contain 'chain_length-1' transactions.

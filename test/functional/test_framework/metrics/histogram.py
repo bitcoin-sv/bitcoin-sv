@@ -221,9 +221,8 @@ def load_histograms(fs: List[str], histogram_filter: HistogramFilter) -> List[Hi
 def grouped(hists: List[HistogramLog], key):
     return dict((k, list(g))
                 for k, g in itertools.groupby(
-                        sorted(hists,
-                               key=key),
-                        key=key)
+                    sorted(hists, key=key),
+                    key=key)
                 )
 
 def histogram_filter_all(h: HistogramLog) -> bool:

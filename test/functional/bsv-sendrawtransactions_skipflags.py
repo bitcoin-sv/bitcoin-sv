@@ -502,9 +502,9 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         invalid_txs = [{'reject_reason': "non-mandatory-script-verify-flag (Stack size limit exceeded)"} for _ in
                        range(4)] + falses(5) + [
-                          {'reject_reason': "non-mandatory-script-verify-flag (Stack size limit exceeded)"} for _ in
-                          range(3)] + [
-                          {'reject_reason': "non-mandatory-script-verify-flag (Stack size limit exceeded)"}] + falses(3)
+            {'reject_reason': "non-mandatory-script-verify-flag (Stack size limit exceeded)"} for _ in
+            range(3)] + [
+            {'reject_reason': "non-mandatory-script-verify-flag (Stack size limit exceeded)"}] + falses(3)
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
                                                       {"maxstackmemoryusagepolicy": 1}, None, None, None]
         tx_params = {"fee": 600, 'op_codes': [], "tx_size": self.maxtxsize, "script_size": 0}
@@ -524,9 +524,9 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         invalid_txs = [{'reject_reason': "tx-size"} for _ in
                        range(4)] + falses(5) + [
-                          {'reject_reason': "tx-size"} for _ in
-                          range(3)] + [
-                          {'reject_reason': "tx-size"}] + falses(3)
+            {'reject_reason': "tx-size"} for _ in
+            range(3)] + [
+            {'reject_reason': "tx-size"}] + falses(3)
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
                                                       {"maxtxsizepolicy": 100000}, None, None, None]
         self.create_transactions_and_send_with_overridden_config(utxos[i_utxo:i_utxo + 16], tx_params,

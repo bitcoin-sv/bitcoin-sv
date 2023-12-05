@@ -32,20 +32,22 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
         self.minrelaytxfee_sats = 250
-        self.extra_args = [[
-                            "-whitelist=127.0.0.1",
-                            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-                            "-minconsolidationfactor=2",
-                            "-acceptnonstdtxn=1",
-                           ],
-                           [
-                            "-whitelist=127.0.0.1",
-                            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-                            #"-minconsolidationfactor=10", # test default consolidation factor
-                            "-acceptnonstdtxn=1",
-                           ]]
+        self.extra_args = [
+            [
+                "-whitelist=127.0.0.1",
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minconsolidationfactor=2",
+                "-acceptnonstdtxn=1",
+            ],
+            [
+                "-whitelist=127.0.0.1",
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                #"-minconsolidationfactor=10", # test default consolidation factor
+                "-acceptnonstdtxn=1",
+            ]
+        ]
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations):
 

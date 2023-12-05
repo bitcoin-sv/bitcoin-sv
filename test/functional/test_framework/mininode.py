@@ -292,8 +292,8 @@ def deser_byte_array(s):
 
 def ser_byte_array(s):
     return b"".join((
-            struct.pack("<B", 0),
-            s.bytes,
+        struct.pack("<B", 0),
+        s.bytes,
     ))
 
 def deser_optional(typename, f):

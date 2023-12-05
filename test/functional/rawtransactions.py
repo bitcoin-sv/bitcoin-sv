@@ -254,9 +254,9 @@ class RawTransactionsTest(BitcoinTestFramework):
             "vout": 0,
         }]
         outputs = {
-                self.nodes[0].getnewaddress(): 0.5,
-                "data": 'ffffffff'
-            }
+            self.nodes[0].getnewaddress(): 0.5,
+            "data": 'ffffffff'
+        }
         rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
         tx = CTransaction()
         f = BytesIO(hex_str_to_bytes(rawtx))

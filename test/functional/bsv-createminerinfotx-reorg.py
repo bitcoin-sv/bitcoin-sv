@@ -87,16 +87,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         height = node.getblockcount() + 1
 
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[nodenum],
-                'publicIP': '127.0.0.1',
-                'publicPort': '8333',
-                'minerKeys': allKeys.minerIdKeys,
-                'revocationKeys': allKeys.revocationKeys,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None}
-
+            'height': height,
+            'name': self.miner_names[nodenum],
+            'publicIP': '127.0.0.1',
+            'publicPort': '8333',
+            'minerKeys': allKeys.minerIdKeys,
+            'revocationKeys': allKeys.revocationKeys,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))

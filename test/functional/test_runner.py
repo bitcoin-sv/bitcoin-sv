@@ -90,10 +90,10 @@ SOLO_TESTS = {
 }
 
 ENVIRONMENT_TYPE = {
-   1 : "Release build",
-   2 : "Release build with sanitizers enabled",
-   3 : "Debug build",
-   4 : "Debug build with sanitizers enabled"
+    1 : "Release build",
+    2 : "Release build with sanitizers enabled",
+    3 : "Debug build",
+    4 : "Debug build with sanitizers enabled"
 }
 
 # collection of timeout factors for time-sensitive tests:
