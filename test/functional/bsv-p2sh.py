@@ -24,7 +24,7 @@ class P2SH(ComparisonTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.genesisactivationheight = 203
-         # Build the redeem script, hash it, use hash to create the p2sh script
+        # Build the redeem script, hash it, use hash to create the p2sh script
         self.redeem_script = CScript([self.coinbase_pubkey, OP_2DUP, OP_CHECKSIGVERIFY, OP_CHECKSIG])
         self.p2sh_script = CScript([OP_HASH160, hash160(self.redeem_script), OP_EQUAL])
         self.extra_args = [['-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',

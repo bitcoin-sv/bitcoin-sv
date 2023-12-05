@@ -121,7 +121,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
 
         node.invalidateblock(hashToHex(b108.sha256))
 
-         # tx0 and tx1 are not in mempool (mempool is deleted when 108 is invalidated)
+        # tx0 and tx1 are not in mempool (mempool is deleted when 108 is invalidated)
         assert_equal(False, tx0.hash in node.getrawmempool())
         assert_equal(False, tx1.hash in node.getrawmempool())
 

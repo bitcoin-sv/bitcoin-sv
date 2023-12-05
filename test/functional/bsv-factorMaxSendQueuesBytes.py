@@ -93,7 +93,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
     def run_test(self):
         node = self.prepareChain()
 
-         # Mine a big block.
+        # Mine a big block.
         oldBlock = self.mineBigBlock(node)
 
         # Mine another big block so that the previous block is not the tip of chain.

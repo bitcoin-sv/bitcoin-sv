@@ -149,15 +149,15 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                     # we expect to have increasing number of unconfirmed ancestors by each transaction in this chain
                     assert_equal(len(tx['ancestors']), len(expected_ancestors))
                     for ancestor in tx['ancestors']:
-                      assert(ancestor['txid'] in expected_ancestors)
-                      # each ancestor has 1 input
-                      assert_equal(len(ancestor['vin']), 1)
-                      # check input
-                      if ancestor['txid'] in parentsMap:
-                        assert_equal(ancestor['vin'][0]['txid'], parentsMap[ancestor['txid']])
+                        assert(ancestor['txid'] in expected_ancestors)
+                        # each ancestor has 1 input
+                        assert_equal(len(ancestor['vin']), 1)
+                        # check input
+                        if ancestor['txid'] in parentsMap:
+                            assert_equal(ancestor['vin'][0]['txid'], parentsMap[ancestor['txid']])
                 expected_ancestors.append(tx['txid'])
                 if parentTxId:
-                  parentsMap[tx['txid']] = parentTxId
+                    parentsMap[tx['txid']] = parentTxId
             # Each chain should have one transaction (first in chain) without any unconfirmed ancestors
             assert_equal(first_in_chain, num_of_chains)
         else:

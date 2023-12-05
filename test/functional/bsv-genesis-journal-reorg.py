@@ -113,7 +113,7 @@ class JournalReorg(BitcoinTestFramework):
 
         # Wait for coinbase to mature
         for node in self.nodes:
-           # Disconnect nodes for the same reason as above.
+            # Disconnect nodes for the same reason as above.
             disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(50)
             connect_nodes_bi(self.nodes, 0, 1)
