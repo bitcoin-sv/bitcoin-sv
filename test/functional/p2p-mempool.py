@@ -10,8 +10,8 @@ import time
 
 # This test checks different cases of handling mempool requests.
 # If a peer is not whitelisted:
-    # If rejectmempoolrequest=true (default value), mempool request is always rejected.
-    # If rejectmempoolrequest=false mempool request is rejected only if peerbloomfilters=0.
+#     If rejectmempoolrequest=true (default value), mempool request is always rejected.
+#     If rejectmempoolrequest=false mempool request is rejected only if peerbloomfilters=0.
 # Is a peer is whitelisted, mempool request is never rejected.
 
 class P2PMempoolTests(BitcoinTestFramework):

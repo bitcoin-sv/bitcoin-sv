@@ -604,10 +604,11 @@ class SoftRejectedBlocks(BitcoinTestFramework):
 
             def new_blk(idx, prev_idx):
                 chain.set_tip(prev_idx)
-                b = chain.next_block(idx, spend=out[idx])   # spend output with the same index as block
-                                                            # NOTE: We don't really care about spending outputs in this test.
-                                                            #       Spending different outputs is only used as a convenient way
-                                                            #       to make two blocks different if they have the same parent.
+                # spend output with the same index as block
+                # NOTE: We don't really care about spending outputs in this test.
+                #       Spending different outputs is only used as a convenient way
+                #       to make two blocks different if they have the same parent.
+                b = chain.next_block(idx, spend=out[idx])
                 conn0.cb.send_message(msg_block(b)) # send block to node
                 conn0.cb.sync_with_ping() # wait until node has processed the block
                 self.log.debug("Created block: idx=%i prev=%i hash=%s" % (idx, prev_idx, b.hash))
