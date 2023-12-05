@@ -45,27 +45,27 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_equal(coinbase_tx.vout[0].nValue, 50*COIN) # we expect 50 coins
 
         tx = CTransaction()
-        tx.vin.append( CTxIn(COutPoint(coinbase_tx.sha256, 0), b"", 0xffffffff) )
+        tx.vin.append(CTxIn(COutPoint(coinbase_tx.sha256, 0), b"", 0xffffffff))
 
         # Simple anyone-can-spend output
-        tx.vout.append( CTxOut(int(1*COIN), CScript([OP_TRUE])) )
+        tx.vout.append(CTxOut(int(1*COIN), CScript([OP_TRUE])))
 
         # Output using standard P2PKH script
-        tx.vout.append( CTxOut(int(1*COIN), CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) )
+        tx.vout.append(CTxOut(int(1*COIN), CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])))
 
         # Another simple anyone-can-spend output
-        tx.vout.append( CTxOut(int(1*COIN), CScript([OP_TRUE])) )
+        tx.vout.append(CTxOut(int(1*COIN), CScript([OP_TRUE])))
 
         # Final output provides remaining coins and is not needed by test
-        tx.vout.append( CTxOut(int(47*COIN), CScript([OP_FALSE])) )
+        tx.vout.append(CTxOut(int(47*COIN), CScript([OP_FALSE])))
 
         tx.rehash()
         return tx
 
     # Sign input 0 in tx spending n-th output from spend_tx using self.prvkey
     def sign_tx(self, tx, spend_tx, n):
-        sighash = SignatureHashForkId( spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue )
-        tx.vin[0].scriptSig = CScript([ self.prvkey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey ])
+        sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+        tx.vin[0].scriptSig = CScript([self.prvkey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
 
     def verifyscript_check(self, node, expected_result, scripts, *args):
         N = len(scripts)
@@ -104,57 +104,57 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         # Check parameter parsing
         #
         tx0 = create_tx(tx_test, 0, 1*COIN)
-        assert_raises_rpc_error( -8, "Missing required argument", node.verifyscript ) # 1st parameter scripts is required and must be JSON array of objects
-        assert_raises_rpc_error( -1, None, node.verifyscript, "abc" )
-        assert_raises_rpc_error( -1, None, node.verifyscript, 123 )
-        assert_raises_rpc_error( -1, None, node.verifyscript, True )
-        assert_raises_rpc_error( -1, None, node.verifyscript, {} )
-        assert_raises_rpc_error( -1, None, node.verifyscript, ["abc"] )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [123] )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [True] )
+        assert_raises_rpc_error(-8, "Missing required argument", node.verifyscript) # 1st parameter scripts is required and must be JSON array of objects
+        assert_raises_rpc_error(-1, None, node.verifyscript, "abc")
+        assert_raises_rpc_error(-1, None, node.verifyscript, 123)
+        assert_raises_rpc_error(-1, None, node.verifyscript, True)
+        assert_raises_rpc_error(-1, None, node.verifyscript, {})
+        assert_raises_rpc_error(-1, None, node.verifyscript, ["abc"])
+        assert_raises_rpc_error(-1, None, node.verifyscript, [123])
+        assert_raises_rpc_error(-1, None, node.verifyscript, [True])
 
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], "abc" ) # 2nd parameter stopOnFirstInvalid is boolean
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], 0 )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], [] )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], {} )
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], "abc") # 2nd parameter stopOnFirstInvalid is boolean
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], 0)
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], [])
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], {})
 
-        assert_raises_rpc_error( -8, "Invalid value for totalTimeout", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, -1 ) # 3rd parameter totalTimeout is non-negative integer
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, "abc" )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, True )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, [] )
-        assert_raises_rpc_error( -1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, {} )
+        assert_raises_rpc_error(-8, "Invalid value for totalTimeout", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, -1) # 3rd parameter totalTimeout is non-negative integer
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, "abc")
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, True)
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, [])
+        assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, {})
 
-        assert_raises_rpc_error( -8, "Too many arguments", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, 100, "abc" ) # max 3 arguments
+        assert_raises_rpc_error(-8, "Too many arguments", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, 100, "abc") # max 3 arguments
 
 
         #
         # Check scripts parameter parsing
         #
-        assert_raises_rpc_error( -8, "Missing", node.verifyscript, [{}] ) # tx and n fields are required
-        assert_raises_rpc_error( -8, "Missing scripts[0].n", node.verifyscript, [{"tx": ToHex(tx0)}] )
-        assert_raises_rpc_error( -8, "Missing scripts[0].tx", node.verifyscript, [{"n": 0}] )
-        assert_raises_rpc_error( -8, "Missing scripts[1].n", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}, {"tx": ToHex(tx0)}])
-        assert_raises_rpc_error( -8, "Missing scripts[1].tx", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}, {"n": 0}])
+        assert_raises_rpc_error(-8, "Missing", node.verifyscript, [{}]) # tx and n fields are required
+        assert_raises_rpc_error(-8, "Missing scripts[0].n", node.verifyscript, [{"tx": ToHex(tx0)}])
+        assert_raises_rpc_error(-8, "Missing scripts[0].tx", node.verifyscript, [{"n": 0}])
+        assert_raises_rpc_error(-8, "Missing scripts[1].n", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}, {"tx": ToHex(tx0)}])
+        assert_raises_rpc_error(-8, "Missing scripts[1].tx", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}, {"n": 0}])
 
-        assert_raises_rpc_error(-22, "TX decode failed for scripts[0].tx", node.verifyscript, [{"tx": "", "n": 0}] ) # tx must be a hex string of a transaction
-        assert_raises_rpc_error(-22, "TX decode failed for scripts[0].tx", node.verifyscript, [{"tx": "01abc", "n": 0}] )
-        assert_raises_rpc_error(-22, "TX decode failed for scripts[0].tx", node.verifyscript, [{"tx": "00", "n": 0}] )
-        assert_raises_rpc_error( -8, "Invalid value for n in scripts[0]", node.verifyscript, [{"tx": ToHex(tx0), "n": -1}]) # n must be non-negative integer
-        assert_raises_rpc_error( -8, "Both flags and prevblockhash specified in scripts[0]", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "flags": 0, "prevblockhash": tip_hash}]) # both flags and prevblockhash are not allowed
-        assert_raises_rpc_error( -8, "Unknown block", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "prevblockhash": "0000000000000000000000000000000000000000000000000000000000000000"}]) # invalid block hash
+        assert_raises_rpc_error(-22, "TX decode failed for scripts[0].tx", node.verifyscript, [{"tx": "", "n": 0}]) # tx must be a hex string of a transaction
+        assert_raises_rpc_error(-22, "TX decode failed for scripts[0].tx", node.verifyscript, [{"tx": "01abc", "n": 0}])
+        assert_raises_rpc_error(-22, "TX decode failed for scripts[0].tx", node.verifyscript, [{"tx": "00", "n": 0}])
+        assert_raises_rpc_error(-8, "Invalid value for n in scripts[0]", node.verifyscript, [{"tx": ToHex(tx0), "n": -1}]) # n must be non-negative integer
+        assert_raises_rpc_error(-8, "Both flags and prevblockhash specified in scripts[0]", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "flags": 0, "prevblockhash": tip_hash}]) # both flags and prevblockhash are not allowed
+        assert_raises_rpc_error(-8, "Unknown block", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "prevblockhash": "0000000000000000000000000000000000000000000000000000000000000000"}]) # invalid block hash
 
-        assert_raises_rpc_error( -3, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": 0}]) # txo must be JSON object with three fields
-        assert_raises_rpc_error( -3, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": "abc"}])
-        assert_raises_rpc_error( -3, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": True}])
-        assert_raises_rpc_error( -8, "Missing scripts[0].txo.lock", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"value": 1, "height": 0}}])
-        assert_raises_rpc_error( -8, "Missing scripts[0].txo.value", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "height": 0}}])
-        assert_raises_rpc_error( -8, "Missing scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1}}])
-        assert_raises_rpc_error( -8, "must be hexadecimal string", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "01abc", "value": 1, "height": 0}}]) # lock must be hexstring
+        assert_raises_rpc_error(-3, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": 0}]) # txo must be JSON object with three fields
+        assert_raises_rpc_error(-3, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": "abc"}])
+        assert_raises_rpc_error(-3, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": True}])
+        assert_raises_rpc_error(-8, "Missing scripts[0].txo.lock", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"value": 1, "height": 0}}])
+        assert_raises_rpc_error(-8, "Missing scripts[0].txo.value", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "height": 0}}])
+        assert_raises_rpc_error(-8, "Missing scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1}}])
+        assert_raises_rpc_error(-8, "must be hexadecimal string", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "01abc", "value": 1, "height": 0}}]) # lock must be hexstring
         self.verifyscript_check_ok(node, [{"tx": ToHex(create_transaction(tx_test, 0, CScript([OP_TRUE]), 1*COIN)), "n": 0, "txo": {"lock": "", "value": 1*COIN, "height": 0}}]) # empty lock script is valid
-        assert_raises_rpc_error( -8, "Invalid value for scripts[0].txo.value", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": -1, "height": 0}}]) # value must be non-negative integer
-        assert_raises_rpc_error( -8, "Invalid value for scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1, "height": -2}}]) # height must be non-negative integer or -1
+        assert_raises_rpc_error(-8, "Invalid value for scripts[0].txo.value", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": -1, "height": 0}}]) # value must be non-negative integer
+        assert_raises_rpc_error(-8, "Invalid value for scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1, "height": -2}}]) # height must be non-negative integer or -1
 
-        assert_raises_rpc_error( -8, "Unable to find TXO spent by transaction scripts[0].tx", node.verifyscript, [{"tx": ToHex(create_tx(tx0, 0, 1*COIN)), "n": 0}]) # Check that non-existent coin is detected
+        assert_raises_rpc_error(-8, "Unable to find TXO spent by transaction scripts[0].tx", node.verifyscript, [{"tx": ToHex(create_tx(tx0, 0, 1*COIN)), "n": 0}]) # Check that non-existent coin is detected
 
 
         #

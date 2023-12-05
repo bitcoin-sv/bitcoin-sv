@@ -335,7 +335,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         tx3_update1.rehash()
         tx3_update2.rehash()
         tx3_update3.rehash()
-        updateHashes = { tx3_update1.hash, tx3_update2.hash, tx3_update3.hash };
+        updateHashes = {tx3_update1.hash, tx3_update2.hash, tx3_update3.hash};
         yield TestInstance([[tx3_update1, None], [tx3_update2, None], [tx3_update3, None]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)

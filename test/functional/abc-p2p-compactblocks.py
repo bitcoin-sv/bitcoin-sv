@@ -83,7 +83,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.test.run()
 
     def get_tests(self):
-        self.chain.set_genesis_hash( int(self.nodes[0].getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block

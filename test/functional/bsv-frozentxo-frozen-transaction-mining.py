@@ -217,7 +217,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
 
         self.log.info("Invalidating chain tip on both nodes to force reorg back one block")
         for no in range(0, 2):
-            self.nodes[no].invalidateblock( self.nodes[no].getbestblockhash() )
+            self.nodes[no].invalidateblock(self.nodes[no].getbestblockhash())
             assert(self.nodes[no].getblockcount() == enforce_height)
 
         mempool_scan_check_log_string = "Removing any transactions that spend TXOs, which were previously not considered policy frozen"
@@ -233,11 +233,11 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
             assert(spend_unfrozen_tx3.hash in mp and spend_unfrozen_tx4.hash in bt)
 
             # bitcoind sould not unnecessarily scan whole mempool to find transactions that spend TXOs, which could become frozen again.
-            assert( not self.check_log(self.nodes[no], mempool_scan_check_log_string) )
+            assert(not self.check_log(self.nodes[no], mempool_scan_check_log_string))
 
         self.log.info("Invalidating chain tip on both nodes to force reorg back to height where TXO is still frozen")
         for no in range(0, 2):
-            self.nodes[no].invalidateblock( self.nodes[no].getbestblockhash() )
+            self.nodes[no].invalidateblock(self.nodes[no].getbestblockhash())
             assert(self.nodes[no].getblockcount() == enforce_height - 1)
 
         self.log.info("Checking that both transactions were removed from mempool and block template on both nodes")
@@ -246,12 +246,12 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
             assert_equal(self.nodes[no].getblocktemplate()["transactions"], [])
 
             # bitcoind now should scan whole mempool.
-            assert( self.check_log(self.nodes[no], mempool_scan_check_log_string) )
+            assert(self.check_log(self.nodes[no], mempool_scan_check_log_string))
 
         self.log.info("Unfreezing all frozen outputs on both nodes")
         for no in range(0, 2):
-            self.nodes[no].invalidateblock( self.nodes[no].getbestblockhash() )
-            result = self.nodes[no].clearBlacklists({ "removeAllEntries" : True })
+            self.nodes[no].invalidateblock(self.nodes[no].getbestblockhash())
+            result = self.nodes[no].clearBlacklists({"removeAllEntries" : True})
             assert_equal(result["numRemovedEntries"], 1)
 
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on policy blacklist on node0 (but not on node1)")
@@ -298,7 +298,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
 
         self.log.info("Invalidating chain tip on both nodes to force reorg back one block")
         for no in range(0, 2):
-            self.nodes[no].invalidateblock( hash_block_spending_policy_frozen_txo )
+            self.nodes[no].invalidateblock(hash_block_spending_policy_frozen_txo)
             assert(self.nodes[no].getblockcount() == height_before_block_spending_policy_frozen_txo)
 
         self.log.info("Checking that transactions are not present in mempool on node0")

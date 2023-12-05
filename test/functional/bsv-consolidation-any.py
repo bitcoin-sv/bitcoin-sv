@@ -198,11 +198,11 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     self.minConfirmations = int(network_info['minconfconsolidationinput'])
                     self.acceptNonStandardInputs = network_info['acceptnonstdconsolidationinput']
                     self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
-                    self.log.info ("scriptSig limit: {}".format( self.scriptSigSpam))
-                    self.log.info("minimum input confirmations: {}".format( self.minConfirmations))
-                    self.log.info("accept non-std consolidation inputs: {}".format( self.acceptNonStandardInputs))
-                    self.log.info ("output_count: {}".format( output_count))
-                    self.log.info ("single_output_script_size: {}".format( single_output_script_size))
+                    self.log.info ("scriptSig limit: {}".format(self.scriptSigSpam))
+                    self.log.info("minimum input confirmations: {}".format(self.minConfirmations))
+                    self.log.info("accept non-std consolidation inputs: {}".format(self.acceptNonStandardInputs))
+                    self.log.info ("output_count: {}".format(output_count))
+                    self.log.info ("single_output_script_size: {}".format(single_output_script_size))
 
                     enough_inputs = output_count * self.consolidation_factor
                     not_spam = self.scriptSigSpam

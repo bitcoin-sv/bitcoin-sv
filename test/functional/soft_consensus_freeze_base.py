@@ -204,7 +204,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         node.rpc.submitblock(block.serialize().hex())
         if expect_tip == None:
             expect_tip = block.hash
-        assert_equal( expect_tip, node.rpc.getbestblockhash() )
+        assert_equal(expect_tip, node.rpc.getbestblockhash())
 
     def get_chain_tip(self):
         block_number = self.block_count - 1

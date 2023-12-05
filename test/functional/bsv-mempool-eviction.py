@@ -220,7 +220,7 @@ class Evictions(BitcoinTestFramework):
 
             #now we have room for some more txs
             for _ in range(3):
-                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoint_to_spend,], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)

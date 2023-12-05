@@ -263,20 +263,20 @@ class DSDetectedTests(BitcoinTestFramework):
         # Webhook should not receive the notification if we send dsdetected message with two block details and one is containing no headers.
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
-            BlockDetails([                    ], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
+            BlockDetails([], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message where last headers in block details do not have a common previous block hash.
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)   ], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(utxoBlock)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message where block details does not have headers in proper order.
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)                         ], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(utxoBlock), CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
@@ -284,7 +284,7 @@ class DSDetectedTests(BitcoinTestFramework):
         # Webhook should not receive the notification if we send dsdetected message with the empty merkle proof.
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
-            BlockDetails([CBlockHeader(blockB)], DSMerkleProof(                                                                      ))])
+            BlockDetails([CBlockHeader(blockB)], DSMerkleProof())])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
@@ -311,14 +311,14 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Webhook should not receive the notification if we send dsdetected message with the wrong merkle proof (merkle root validation should fail)
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256 )])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockA.hashMerkleRoot)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message with the merkle proof having an additional unexpected node (merkle root validation should fail)
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256                                        )])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256), MerkleProofNode(blockA.hashMerkleRoot)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)

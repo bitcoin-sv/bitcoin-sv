@@ -34,7 +34,7 @@ class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):
         block = self.chain.next_block
 
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         test, out, _ = prepare_init_chain(self.chain, 105, 105, block_0=False)
 

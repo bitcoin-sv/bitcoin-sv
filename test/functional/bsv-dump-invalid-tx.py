@@ -185,7 +185,7 @@ class InvalidTx(BitcoinTestFramework):
 
         invalid_coinbases = []
         valid_coinbases = []
-        with self.run_node_with_connections("Preparaton", 0, ["-genesisactivationheight=1"], 1) as (conn, ):
+        with self.run_node_with_connections("Preparaton", 0, ["-genesisactivationheight=1"], 1) as (conn,):
             for _ in range(5):
                 coinbase, _ = new_block(conn, valid_coinbase=False, wait_for_confirmation=True)
                 invalid_coinbases.append(coinbase)
@@ -204,7 +204,7 @@ class InvalidTx(BitcoinTestFramework):
                                              "-invalidtxsink=ZMQ",
                                              "-invalidtxsink=FILE",
                                              f"-zmqpubinvalidtx={self.address}"],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             self.zmqSubSocket.connect(self.address)
             invalid_tx1 = make_invalid_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx1], wait_for_confirmation=False)
@@ -233,7 +233,7 @@ class InvalidTx(BitcoinTestFramework):
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
                                              "-invalidtxsink=FILE",],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             invalid_tx2 = make_invalid_p2sh_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx2], wait_for_confirmation=False)
             conn.send_message(msg_tx(invalid_tx2))
@@ -255,7 +255,7 @@ class InvalidTx(BitcoinTestFramework):
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
                                              "-invalidtxsink=FILE",],
-                                            1) as (conn, ):
+                                            1) as (conn,):
 
             valid_tx_1 = create_transaction(valid_coinbases[0], 0, CScript(), valid_coinbases[0].vout[0].nValue - 200)
             valid_tx_2 = create_transaction(valid_coinbases[1], 0, CScript(), valid_coinbases[0].vout[0].nValue - 200)
@@ -298,7 +298,7 @@ class InvalidTx(BitcoinTestFramework):
                                              f"-zmqpubinvalidtx={self.address}",
                                              "-invalidtxzmqmaxmessagesize=1",
                                              ],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             self.zmqSubSocket.connect(self.address)
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size == 0, "Freed size must zero, dumped transactions are deleted in last test."
@@ -339,7 +339,7 @@ class InvalidTx(BitcoinTestFramework):
                                              f"-zmqpubinvalidtx={self.address}",
                                              "-invalidtxzmqmaxmessagesize=0",
                                              ],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             self.zmqSubSocket.connect(self.address)
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size > 0, "Freed size must be larger than zero."
@@ -410,7 +410,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000"],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[1], 0)
             new_block(conn, [invalid_tx1], wait_for_confirmation=False)
             sleep(1)

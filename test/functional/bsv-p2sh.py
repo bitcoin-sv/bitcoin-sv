@@ -54,7 +54,7 @@ class P2SH(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # Create and mature coinbase txs
         test = TestInstance(sync_every_block=False)

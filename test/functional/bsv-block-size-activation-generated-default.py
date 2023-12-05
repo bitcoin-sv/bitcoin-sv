@@ -56,7 +56,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         node = self.nodes[0]
         hashPrev = int(node.getbestblockhash(),16)
 
-        coinbase = create_coinbase(node.getblockcount() + 1 )
+        coinbase = create_coinbase(node.getblockcount() + 1)
         block = create_block(hashPrev, coinbase, nTime)
         block.solve()
         ret = node.submitblock(ToHex(block))
@@ -80,7 +80,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE]))) # anyone can spend
 
         # Fund the transaction
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = node.signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -134,7 +134,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
 
         # Create and submit 6 empty block with [activation_time-1 .. activation_time+4] to bring MPT to activation_time-1
         for i in range(6):
-            self.mine_empty_block(activation_time-1 + i )
+            self.mine_empty_block(activation_time-1 + i)
 
         mpt = node.getblockheader(node.getbestblockhash())['mediantime']
         assert_equal(mpt, activation_time-1)

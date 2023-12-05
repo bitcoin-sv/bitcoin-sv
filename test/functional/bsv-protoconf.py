@@ -143,7 +143,7 @@ class BsvProtoconfTest(BitcoinTestFramework):
         assert_equal(len(self.nodes[0].listbanned()), 0)  # not banned
 
         # 3. Send bitcoind Inv message that is larger than max_recv_payload_length.
-        logger.info( "Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements + 1, maxInvElements))
+        logger.info("Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements + 1, maxInvElements))
         logger.info("Expecting to be banned...")
         test_node.send_message(msg_inv([CInv(CInv.TX, 2*maxInvElements+i) for i in range(0, maxInvElements + 1)]))
         test_node.wait_for_disconnect()

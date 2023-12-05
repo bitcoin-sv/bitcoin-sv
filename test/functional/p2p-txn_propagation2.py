@@ -31,7 +31,7 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
 
     def get_tests(self):
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         block = self.chain.next_block
         block(0)
         yield self.accepted()

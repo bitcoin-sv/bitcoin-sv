@@ -109,18 +109,18 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         ctx = self._create_tx(tx_out, unlock, lock)
 
         # Insert OP_RETURN output that makes this a confiscation transaction.
-        ctx.vout.insert( 0, CTxOut(0, CScript( CTX_OP_RETURN + [
+        ctx.vout.insert(0, CTxOut(0, CScript(CTX_OP_RETURN + [
             b'\x01' +                       # protocol version number
             hash160(b'confiscation order')  # hash of confiscation order document
-        ])) )
+        ])))
         ctx.rehash()
 
         return ctx
 
     def _create_and_send_tx(self, node):
-        tx = self._create_tx( self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG]) ) # TXO with standard P2PKH script that can normally only be spent if private key is known
+        tx = self._create_tx(self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) # TXO with standard P2PKH script that can normally only be spent if private key is known
         self.log.info(f"Sending transaction {tx.hash} and generating a new block")
-        node.rpc.sendrawtransaction( ToHex(tx) )
+        node.rpc.sendrawtransaction(ToHex(tx))
         assert_equal(node.rpc.getrawmempool(), [tx.hash])
         node.rpc.generate(1)
         assert_equal(node.rpc.getrawmempool(), [])
@@ -209,7 +209,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         node.rpc.generate(1)
         best_block_hash = node.rpc.getbestblockhash()
         self._wait_for_block_status(node1, best_block_hash, "active")
-        assert_equal( len(node1.rpc.getchaintips()), 1 ) # there should now be only one chain
+        assert_equal(len(node1.rpc.getchaintips()), 1) # there should now be only one chain
         node1.rpc.acceptblock(block.hash) # remove (now redundant) soft rejection
 
 

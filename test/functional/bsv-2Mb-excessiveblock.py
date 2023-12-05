@@ -34,7 +34,7 @@ class BSV2MBlocks(ComparisonTestFramework):
 
     def get_tests(self):
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block

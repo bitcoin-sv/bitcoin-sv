@@ -23,13 +23,13 @@ class JournalReorg(BitcoinTestFramework):
                             '-debug=journal',
                             '-blockassembler=journaling',
                             '-genesisactivationheight=400',
-                            '-maxgenesisgracefulperiod=0' ],
+                            '-maxgenesisgracefulperiod=0'],
                            ['-whitelist=127.0.0.1',
                             '-checkmempool=1',
                             '-debug=journal',
                             '-blockassembler=journaling',
                             '-genesisactivationheight=403',
-                            '-maxgenesisgracefulperiod=0' ]]
+                            '-maxgenesisgracefulperiod=0']]
 
     def mine_big_txns(self, node):
         # Mine 25 blocks with big txns

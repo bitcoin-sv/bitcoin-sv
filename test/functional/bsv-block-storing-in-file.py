@@ -40,7 +40,7 @@ class RunnerNode(NodeConnCB):
     def finish_setup_after_network_is_started(self, tmp_dir):
         self.wait_for_verack()
 
-        self.chain.set_genesis_hash( int(self.remote_node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.remote_node.getbestblockhash(), 16))
 
         # Build the blockchain
         self.tip = int(self.remote_node.getbestblockhash(), 16)

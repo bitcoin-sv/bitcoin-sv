@@ -592,7 +592,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             #      5 7
             chain = ChainManager()
             genesis_hash = self.nodes[0].getbestblockhash()
-            chain.set_genesis_hash( int(genesis_hash, 16) )
+            chain.set_genesis_hash(int(genesis_hash, 16))
             _, out, _ = prepare_init_chain(chain, 200, 12, block_0=False, start_block=1001, node=conn0.cb)
             conn0.cb.sync_with_ping()
 
@@ -608,7 +608,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
                                                           # NOTE: We don't really care about spending outputs in this test.
                                                           #       Spending different outputs is only used as a convenient way
                                                           #       to make two blocks different if they have the same parent.
-                conn0.cb.send_message( msg_block(b) ) # send block to node
+                conn0.cb.send_message(msg_block(b)) # send block to node
                 conn0.cb.sync_with_ping() # wait until node has processed the block
                 self.log.debug("Created block: idx=%i prev=%i hash=%s" % (idx, prev_idx, b.hash))
 
@@ -750,7 +750,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
 
             # create and send block (child of b3) containing an invalid txn
             b4a_invalid = create_block(int(b3_hash, 16), create_coinbase(103))
-            b4a_invalid.vtx.append( create_transaction(tx_spendable, 0, CScript([OP_RETURN]), 100000) ) # invalid unlock script
+            b4a_invalid.vtx.append(create_transaction(tx_spendable, 0, CScript([OP_RETURN]), 100000)) # invalid unlock script
             b4a_invalid.hashMerkleRoot = b4a_invalid.calc_merkle_root()
             b4a_invalid.solve()
             b4a_invalid.rehash()

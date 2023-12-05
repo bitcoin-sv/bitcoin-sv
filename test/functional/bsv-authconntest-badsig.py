@@ -157,7 +157,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
                 'revocationKeys':  None,
                 'prev_minerKeys': None,
                 'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
+                'pubCompromisedMinerKeyHex': None}
 
         http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum],  height))
         response = http_conns[nodenum].getresponse()

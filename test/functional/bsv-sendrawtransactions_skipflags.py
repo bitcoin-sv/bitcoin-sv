@@ -1026,7 +1026,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                    "max-script-num-length-policy-limit-violated (Script number overflow)",
                    "too-long-mempool-chain, too many unconfirmed parents,",
                    "too-long-mempool-chain, too many unconfirmed parents which we are not willing to mine",
-                   "non-mandatory-script-verify-flag (Stack size limit exceeded)", "tx-size" ]
+                   "non-mandatory-script-verify-flag (Stack size limit exceeded)", "tx-size"]
 
         for msg in rejects:
             # we get 7 reject msgs per the looser tx override -- for all the transactions that were accepted then,

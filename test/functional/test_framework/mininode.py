@@ -226,7 +226,7 @@ def deser_vector(f, c):
 @generator_based_serializator
 def ser_vector(l, ser_function_name=""):
     # using generator because of need for lazy evaluation
-    return (getattr(i, ser_function_name, i.serialize )() for i in l)
+    return (getattr(i, ser_function_name, i.serialize)() for i in l)
 
 
 def deser_uint256_vector(f):
@@ -1003,7 +1003,7 @@ class P2PHeaderAndShortIDs():
             self.header.serialize(),
             struct.pack("<Q", self.nonce),
             ser_compact_size(self.shortids_length),
-            b"".join( struct.pack("<Q", x)[0:6] for x in self.shortids), # We only want the first 6 bytes
+            b"".join(struct.pack("<Q", x)[0:6] for x in self.shortids), # We only want the first 6 bytes
             ser_vector(self.prefilled_txn),))
         return r
 
@@ -1479,7 +1479,7 @@ class msg_alert():
         return self.alert.serialize()
 
     def __repr__(self):
-        return "msg_alert(alert=%s)" % (repr(self.alert), )
+        return "msg_alert(alert=%s)" % (repr(self.alert),)
 
 
 class msg_inv():

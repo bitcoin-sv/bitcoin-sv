@@ -283,7 +283,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                  '-genesisactivationheight=1',
                  '-maxstackmemoryusageconsensus=2GB',
                  "-maxscriptsizepolicy=2GB",
-                 "-acceptnonstdoutputs=1", ],
+                 "-acceptnonstdoutputs=1",],
                 number_of_connections=1) as (conn,):
 
             # see if everything is still as expected

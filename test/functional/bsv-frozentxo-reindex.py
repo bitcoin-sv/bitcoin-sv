@@ -212,7 +212,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
         assert_equal(send_node.rpc.getbestblockhash(), old_tip_hash)
 
         # Unfreeze and reconsider block to show that the block was still stored on disk
-        result = self.nodes[0].clearBlacklists( { "removeAllEntries": True } )
+        result = self.nodes[0].clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
 
         self.stop_node(0)

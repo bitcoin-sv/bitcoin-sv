@@ -14,7 +14,7 @@ class MsgCmpctBlockBadShortIDsCount():
 
     def serialize(self):
         r = b""
-        r += bytes([0xff] * 88 ) # blockheader and nonce
+        r += bytes([0xff] * 88) # blockheader and nonce
         r += bytes([0xff, 0xff, 0xff, 0xff,
                     0xff, 0xff, 0xff, 0xff,
                     0x01]) # large shortids count (<= std::vector::max_size())

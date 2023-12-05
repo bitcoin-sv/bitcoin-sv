@@ -14,7 +14,7 @@ class MsgCmpctBlockBadPrefilledTxCount():
 
     def serialize(self):
         r = b""
-        r += bytes([0xff] * 88 ) # blockheader and nonce
+        r += bytes([0xff] * 88) # blockheader and nonce
         r += bytes([0])          # shortid count
         r += bytes([0xff, 0xff, 0xff, 0xff,
                     0xff, 0xff, 0xff, 0xff,

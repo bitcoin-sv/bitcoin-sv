@@ -51,7 +51,7 @@ class MaxBlockTxn(ComparisonTestFramework):
 
     def get_tests(self):
         # Out of IBD
-        self.chain.set_genesis_hash( int(self.nodes[0].getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
         block = self.chain.next_block
         block(0)
         yield self.accepted()

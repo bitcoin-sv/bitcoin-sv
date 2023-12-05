@@ -26,19 +26,19 @@ b. node mines a block [expect: tip header]
 c. for N in 1, ..., 10:
    * for announce-type in {inv, header}
      - peer mines N blocks, announces with announce-type
-       [ expect: getheaders/getdata or getdata, deliver block(s) ]
-     - node mines a block [ expect: 1 header ]
+       [expect: getheaders/getdata or getdata, deliver block(s)]
+     - node mines a block [expect: 1 header]
 
 Part 3: Headers announcements stop after large reorg and resume after getheaders or inv from peer.
 - For response-type in {inv, getheaders}
-  * node mines a 7 block reorg [ expect: headers announcement of 8 blocks ]
-  * node mines an 8-block reorg [ expect: inv at tip ]
-  * peer responds with getblocks/getdata [expect: inv, blocks ]
-  * node mines another block [ expect: inv at tip, peer sends getdata, expect: block ]
-  * node mines another block at tip [ expect: inv ]
+  * node mines a 7 block reorg [expect: headers announcement of 8 blocks]
+  * node mines an 8-block reorg [expect: inv at tip]
+  * peer responds with getblocks/getdata [expect: inv, blocks]
+  * node mines another block [expect: inv at tip, peer sends getdata, expect: block]
+  * node mines another block at tip [expect: inv]
   * peer responds with getheaders with an old hashstop more than 8 blocks back [expect: headers]
-  * peer requests block [ expect: block ]
-  * node mines another block at tip [ expect: inv, peer sends getdata, expect: block ]
+  * peer requests block [expect: block]
+  * node mines another block at tip [expect: inv, peer sends getdata, expect: block]
   * peer sends response-type [expect headers if getheaders, getheaders/getdata if mining new block]
   * node mines 1 block [expect: 1 header, peer responds with getdata]
 

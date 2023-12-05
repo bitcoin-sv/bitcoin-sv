@@ -58,7 +58,7 @@ class MempoolPersistTest(BitcoinTestFramework):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[2].signrawtransaction(ftxHex)['hex']
         self.nodes[2].sendrawtransaction(ftxHex)
         ftx = FromHex(CTransaction(), ftxHex)

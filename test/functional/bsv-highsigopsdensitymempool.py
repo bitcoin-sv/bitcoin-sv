@@ -24,7 +24,7 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         block = self.chain.next_block
 
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()

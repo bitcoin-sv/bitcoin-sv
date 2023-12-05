@@ -478,7 +478,7 @@ class PruneTest(BitcoinTestFramework):
         self.mainchainhash2 = self.nodes[2].getblockhash(self.mainchainheight)
 
         self.log.info("Check that we can survive a 288 block reorg still")
-        (self.forkheight, self.forkhash) = self.reorg_test()  # (1033, )
+        (self.forkheight, self.forkhash) = self.reorg_test()  # (1033,)
         # Now create a 288 block reorg by mining a longer chain on N1
         # First disconnect N1
         # Then invalidate 1033 on main chain and 1032 on fork so height is 1032 on main chain

@@ -26,7 +26,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg, sync_blocks
-from test_framework.mininode import ( NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
+from test_framework.mininode import (NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
         CTxIn, CTxOut, FromHex, ToHex)
 import time
 import copy
@@ -70,7 +70,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
     def create_funding_txn(self, out_value):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()

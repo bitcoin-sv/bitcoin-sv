@@ -115,7 +115,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
         #fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
@@ -145,7 +145,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 'prev_minerKeys': None,
                 'prev_revocationKeys': None,
                 'pubCompromisedMinerKeyHex': None,
-                'datarefs': datarefs }
+                'datarefs': datarefs}
 
         scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))

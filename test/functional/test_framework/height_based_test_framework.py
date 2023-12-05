@@ -61,8 +61,8 @@ class HeightBasedTestsCase:
 
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
-    TESTING_HEIGHTS = [ (150,   None, "PREPARE"),
-                        (150, "TEST", None), ]
+    TESTING_HEIGHTS = [(150,   None, "PREPARE"),
+                        (150, "TEST", None),]
 
     def __init__(self):
         self.utxos = defaultdict(list)
@@ -350,7 +350,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         wait_until(tt,
                    timeout=(p2p_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
-                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept) }")
+                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept)}")
         self.check_mp()
 
     def _assert_height(self, connection, desired_height):
@@ -369,7 +369,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tx_col = TxCollection(height=height, label=label)
         test.get_transactions_for_test(tx_col, self._get_new_coinbase)
 
-        if not( tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs ):
+        if not(tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs):
             self.log.info(f"No transactions to test at height {label} height={height}")
 
         if tx_col.mempool_txs:

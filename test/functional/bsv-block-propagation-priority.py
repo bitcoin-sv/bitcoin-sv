@@ -134,7 +134,7 @@ class BlockPriorityTest(BitcoinTestFramework):
             wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns, timeout=(240 * self.options.timeoutfactor))
 
         # Restart node with associations
-        associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
+        associations_stream_policies = [BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy()]
         extra_args = [
             '-whitelist=127.0.0.1',
             '-mindebugrejectionfee=0.00000250'

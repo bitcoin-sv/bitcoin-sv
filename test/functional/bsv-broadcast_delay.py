@@ -48,7 +48,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
 
         # fund the transcation:
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = node.signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()

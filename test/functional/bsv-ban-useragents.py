@@ -33,7 +33,7 @@ class BanClientUA(BitcoinTestFramework):
 
     def run_test(self):
 
-        connArgs = [ { "strSubVer":b"ClientA" } ]
+        connArgs = [{"strSubVer":b"ClientA"}]
         with self.run_node_with_connections("Testing that we will get banned if we are ClientA",
                                             0, ['-banclientua=ClientA', '-banclientua=ClientB'],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs, wait_for_verack=False) as (conn,):
@@ -41,7 +41,7 @@ class BanClientUA(BitcoinTestFramework):
             assert get_lan_ip() in conn.rpc.listbanned()[0]["address"]
             conn.rpc.clearbanned()
 
-        connArgs = [ { "strSubVer":b"ThisIsClientB_" } ]
+        connArgs = [{"strSubVer":b"ThisIsClientB_"}]
         with self.run_node_with_connections("Testing that we will get banned if we are ClientB",
                                             0, ['-banclientua=ClientA', '-banclientua=ClientB'],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs, wait_for_verack=False) as (conn,):
@@ -49,19 +49,19 @@ class BanClientUA(BitcoinTestFramework):
             assert get_lan_ip() in conn.rpc.listbanned()[0]["address"]
             conn.rpc.clearbanned()
 
-        connArgs = [ { "strSubVer":b"ClientC" } ]
+        connArgs = [{"strSubVer":b"ClientC"}]
         with self.run_node_with_connections("Testing that we will NOT get banned if we are ClientC",
                                             0, ['-banclientua=ClientA', '-banclientua=ClientB'],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs) as (conn,):
             assert conn.connected
 
-        connArgs = [ { "strSubVer":b"ClientA" } ]
+        connArgs = [{"strSubVer":b"ClientA"}]
         with self.run_node_with_connections("Testing that we will NOT get banned if banclientua is not specified and we are not bch",
                                             0, [],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs) as (conn,):
             assert conn.connected
 
-        connArgs = [ { "strSubVer":b"ThisIsAnABCClient" } ]
+        connArgs = [{"strSubVer":b"ThisIsAnABCClient"}]
         with self.run_node_with_connections("Testing that we will get banned if we are BCH even with default settings",
                                             0, [],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs, wait_for_verack=False) as (conn,):
@@ -69,7 +69,7 @@ class BanClientUA(BitcoinTestFramework):
             assert get_lan_ip() in conn.rpc.listbanned()[0]["address"]
             conn.rpc.clearbanned()
 
-        connArgs = [ { "strSubVer":b"ThisIsAnAbcClient" } ]
+        connArgs = [{"strSubVer":b"ThisIsAnAbcClient"}]
         with self.run_node_with_connections("Testing that case does not matter",
                                             0, [],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs, wait_for_verack=False) as (conn,):
@@ -77,13 +77,13 @@ class BanClientUA(BitcoinTestFramework):
             assert get_lan_ip() in conn.rpc.listbanned()[0]["address"]
             conn.rpc.clearbanned()
 
-        connArgs = [ { "strSubVer":b"ClientA" } ]
+        connArgs = [{"strSubVer":b"ClientA"}]
         with self.run_node_with_connections("Test that we can override ban settings using 'allowclientua' parameter",
                                             0, ['-banclientua=ClientA', '-banclientua=ClientB', '-allowclientua=Client'],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs) as (conn,):
             assert conn.connected
 
-        connArgs = [ { "strSubVer":b"ThisIsAnABCClient" } ]
+        connArgs = [{"strSubVer":b"ThisIsAnABCClient"}]
         with self.run_node_with_connections("Test that we can override the default ban settings with our own",
                                             0, ['-banclientua=ClientA'],
                                             number_of_connections=1, ip=get_lan_ip(), connArgs=connArgs) as (conn,):

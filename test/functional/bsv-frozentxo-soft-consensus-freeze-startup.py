@@ -38,14 +38,14 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
 
         spendable_out = self.chain.get_spendable_output()
 
-        frozen_tx = self._create_tx_mine_block_and_freeze_tx( node, spendable_out )
+        frozen_tx = self._create_tx_mine_block_and_freeze_tx(node, spendable_out)
 
         last_valid_tip_hash = node.rpc.getbestblockhash()
         last_valid_tip_height = node.rpc.getblockcount()
 
         # this block must not become tip because it contains a transaction trying to spend consensus frozen output
-        spend_frozen_tx = self._create_tx( PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]) )
-        self._mine_and_check_rejected( node, spend_frozen_tx )
+        spend_frozen_tx = self._create_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        self._mine_and_check_rejected(node, spend_frozen_tx)
 
         # child blocks are still considered frozen
         self._mine_and_send_block(None, node, False, last_valid_tip_hash)

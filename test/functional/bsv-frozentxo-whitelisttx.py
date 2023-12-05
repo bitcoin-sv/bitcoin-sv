@@ -18,13 +18,13 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
     def _create_confiscation_tx(self, txo):
         ctx = CTransaction()
 
-        ctx.vin.append(CTxIn( COutPoint(int(txo["txId"], 16), txo["vout"]), b'', 0xffffffff ))
+        ctx.vin.append(CTxIn(COutPoint(int(txo["txId"], 16), txo["vout"]), b'', 0xffffffff))
 
         # OP_RETURN output that makes this a confiscation transaction
-        ctx.vout.append( CTxOut(0, CScript( [OP_FALSE, OP_RETURN, b'cftx'] + [
+        ctx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, b'cftx'] + [
             b'\x01' +                       # protocol version number
             hash160(b'confiscation order2') # hash of confiscation order document
-        ])) )
+        ])))
         ctx.vout.append(CTxOut(42, CScript([OP_TRUE])))
 
         ctx.calc_sha256()
@@ -67,7 +67,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         ])
 
         self.log.info("Freezing some funds...")
-        result = self.nodes[0].addToPolicyBlacklist({ "funds": [{"txOut" : txo3}] });
+        result = self.nodes[0].addToPolicyBlacklist({"funds": [{"txOut" : txo3}]});
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConsensusBlacklist({
             "funds": [
@@ -142,8 +142,8 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Querying whitelisted transactions in verbose mode")
         result = self.nodes[0].queryConfiscationTxidWhitelist(True)
         wltxs = sorted(result["confiscationTxs"], key=lambda f: f["confiscationTx"]["txId"]) # must be sorted since order in result is unspecified
-        assert_equal(wltxs[0], {"confiscationTx" : {"txId" : ctx1.hash, "enforceAtHeight" : 123, "inputs" : [{"txOut" : txo1}] }})
-        assert_equal(wltxs[1], {"confiscationTx" : {"txId" : ctx2.hash, "enforceAtHeight" : 456, "inputs" : [{"txOut" : txo2}] }})
+        assert_equal(wltxs[0], {"confiscationTx" : {"txId" : ctx1.hash, "enforceAtHeight" : 123, "inputs" : [{"txOut" : txo1}]}})
+        assert_equal(wltxs[1], {"confiscationTx" : {"txId" : ctx2.hash, "enforceAtHeight" : 456, "inputs" : [{"txOut" : txo2}]}})
 
         self.log.info("Restarting node...")
         self.restart_node(0)
@@ -206,7 +206,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         assert_equal(wltxs, wltxs0)
 
         self.log.info("Clearing blacklists with removeAllEntries=false should not affect whitelisted txs")
-        result = self.nodes[0].clearBlacklists({ "removeAllEntries" : False, "expirationHeightDelta": 0 })
+        result = self.nodes[0].clearBlacklists({"removeAllEntries" : False, "expirationHeightDelta": 0})
         assert_equal(result["numRemovedEntries"], 0)
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         wltxs = sorted(result["confiscationTxs"], key=lambda f: f["confiscationTx"]["txId"])
@@ -251,7 +251,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         assert_equal(wltxs, wltxs0)
 
         self.log.info("Clearing blacklists with removeAllEntries=true,keepExistingPolicyEntries=true should remove all whitelisted txs")
-        result = self.nodes[0].clearBlacklists({ "removeAllEntries" : True, "keepExistingPolicyEntries": True })
+        result = self.nodes[0].clearBlacklists({"removeAllEntries" : True, "keepExistingPolicyEntries": True})
         assert_equal(result["numRemovedEntries"], 4) # 2 CTXs + 2 consensus frozen TXOs
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(result["confiscationTxs"], [])
@@ -302,7 +302,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         assert_equal(wltxs, wltxs0)
 
         self.log.info("Clearing blacklists with removeAllEntries=true should remove all whitelisted txs")
-        result = self.nodes[0].clearBlacklists({ "removeAllEntries" : True })
+        result = self.nodes[0].clearBlacklists({"removeAllEntries" : True})
         assert_equal(result["numRemovedEntries"], 5) # 2 CTXs + 3 TXOs
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(result["confiscationTxs"], [])

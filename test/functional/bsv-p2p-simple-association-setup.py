@@ -32,7 +32,7 @@ class P2PSimpleAssociation(BitcoinTestFramework):
 
     def run_test(self):
         # Setup 2 associations; one with BlockPriority policy and one with Default policy
-        associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
+        associations_stream_policies = [BlockPriorityStreamPolicy(), DefaultStreamPolicy()]
         with self.run_node_with_associations("Simple Association Setup", 0, [], associations_stream_policies, cb_class=MyAssociationCB) as associations:
 
             # Check we got an association ID and some known stream policies back

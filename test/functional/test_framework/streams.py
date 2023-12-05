@@ -26,7 +26,7 @@ class DefaultStreamPolicy():
 class BlockPriorityStreamPolicy():
     def __init__(self):
         self.policy_name = b"BlockPriority"
-        self.additional_streams = [ StreamType.DATA1 ]
+        self.additional_streams = [StreamType.DATA1]
 
     def stream_type_for_message_type(self, msg):
         # Block related and pings over DATA1, everything else over GENERAL

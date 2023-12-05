@@ -15,7 +15,7 @@ from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, bytes_to_hex_str
 
-OP_TRUE_OP_RETURN_SCRIPT = CScript([OP_TRUE, OP_RETURN, b"xxx" ])
+OP_TRUE_OP_RETURN_SCRIPT = CScript([OP_TRUE, OP_RETURN, b"xxx"])
 
 def make_coinbase(connection):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"

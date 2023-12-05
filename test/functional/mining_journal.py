@@ -167,7 +167,7 @@ class MiningJournal(BitcoinTestFramework):
                             '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool',
-                            "-checkmempool=1", ]] * self.num_nodes
+                            "-checkmempool=1",]] * self.num_nodes
         self.conncbs = []
         self.num_utxos = 5000
         self.ancestor_depth = 25

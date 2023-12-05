@@ -7,9 +7,9 @@ The test checks 4 scenarios that can occur around genesis activation height that
 node gets banned, but it mustn't be banned if block is inside Genesis gracefull period
 1. Test (!gracefullPeriod && !isGenesis): Node is banned when it tries to send a transaction to mempool that is valid only after Genesis is activated
     (OP_ADD with big numbers) (multiple OP_ELSE is accepted into block)
-2. Test ( gracefullPeriod && !isGenesis): Transaction is rejected from a mempool (not banned) if it contains a script that is valid only after Genesis is activated
+2. Test (gracefullPeriod && !isGenesis): Transaction is rejected from a mempool (not banned) if it contains a script that is valid only after Genesis is activated
     (OP_ADD with big numbers) (multiple OP_ELSE is accepted into block)
-3. Test ( gracefullPeriod &&  isGenesis): Transaction is rejected from a mempool (not banned) if it contains a script that is valid only before Genesis is activated
+3. Test (gracefullPeriod &&  isGenesis): Transaction is rejected from a mempool (not banned) if it contains a script that is valid only before Genesis is activated
     (multiple OP_ELSE) (OP_ADD is accepted into block)
 4. Test (!gracefullPeriod &&  isGenesis): Node is banned when it tries to send a transaction to mempool that is valid only before Genesis is activated
     (multiple OP_ELSE) (OP_ADD is accepted into block)
@@ -77,7 +77,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()

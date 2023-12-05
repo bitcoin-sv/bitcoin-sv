@@ -326,9 +326,9 @@ class TxCreator:
         Example:
           spend_tx = ...
           tx = CTransaction()
-          tx.vin.append( CTxIn(COutPoint(spend_tx.sha256, 0), nSequence=0xffffffff) )
-          tx.vout.append( CTxOut(spend_tx.vout[0].nValue, CScript([OP_DUP, OP_HASH160, hash160(tx_creator.public_key), OP_EQUALVERIFY, OP_CHECKSIG])) )
-          tx_creator.sign_tx_p2pkh_input( tx, 0, spend_tx.vout[0], tx_creator.private_key )
+          tx.vin.append(CTxIn(COutPoint(spend_tx.sha256, 0), nSequence=0xffffffff))
+          tx.vout.append(CTxOut(spend_tx.vout[0].nValue, CScript([OP_DUP, OP_HASH160, hash160(tx_creator.public_key), OP_EQUALVERIFY, OP_CHECKSIG])))
+          tx_creator.sign_tx_p2pkh_input(tx, 0, spend_tx.vout[0], tx_creator.private_key)
 
         Parameters:
           tx -- Transaction whose input will be signed
@@ -384,33 +384,33 @@ class TxCreator:
           cbtx? = ... # coinbase transactions whose first output is P2PKH locked with key self.public_key (or trivially spendable)
 
           # Spends the first output of a coinbase transaction and provides one P2PKH output of 50BSV
-          tx0 = tx_creator.create_signed_transaction( cbtx1, value=50*COIN )
+          tx0 = tx_creator.create_signed_transaction(cbtx1, value=50*COIN)
 
           # Spends the first output of tx0 and provides two P2PKH outputs of 25BSV
-          tx1 = tx_creator.create_signed_transaction( tx0, value=25*COIN, num_outputs=2 )
+          tx1 = tx_creator.create_signed_transaction(tx0, value=25*COIN, num_outputs=2)
 
           # Spends the first output of tx1 and provides 25 P2PKH outputs of 1BSV locked with user1's key
-          tx2 = tx_creator.create_signed_transaction( tx1, num_outputs=25, value=1*COIN, pubkey=public_key_user1 )
+          tx2 = tx_creator.create_signed_transaction(tx1, num_outputs=25, value=1*COIN, pubkey=public_key_user1)
 
           # Spends the second output of tx2, provides 2 P2PKH outputs that pay each 1000 satoshi to user2, pays 50 satoshi
           # to the miner (transaction fee) and pays the rest in the third P2PKH output back to user1
-          tx3 = tx_creator.create_signed_transaction( (tx2, 1, private_key_user1), num_outputs=2, value=1000, fee=50, pubkey=public_key_user2, pubkey_change=public_key_user1 )
+          tx3 = tx_creator.create_signed_transaction((tx2, 1, private_key_user1), num_outputs=2, value=1000, fee=50, pubkey=public_key_user2, pubkey_change=public_key_user1)
 
           # Spends the first output of a coinbase transaction, provides one non-locked output of 1BSV and sends the rest back in the 2nd output
-          tx4 = tx_creator.create_signed_transaction( cbtx2, value=1*COIN, fee=0, scriptPubKey=CScript([OP_TRUE]) )
+          tx4 = tx_creator.create_signed_transaction(cbtx2, value=1*COIN, fee=0, scriptPubKey=CScript([OP_TRUE]))
 
           # Similar as above except that here we spend whatever was left of a coinbase output and is now in last output in tx4
-          tx5 = tx_creator.create_signed_transaction( (tx4, -1), value=1*COIN, fee=0, scriptPubKey=CScript([OP_TRUE]) )
+          tx5 = tx_creator.create_signed_transaction((tx4, -1), value=1*COIN, fee=0, scriptPubKey=CScript([OP_TRUE]))
 
           # Similar as above except that here we also pass tx_customize_func argument to add an OP_RETURN output to the front
-          tx6 = tx_creator.create_signed_transaction( (tx5, -1), value=1*COIN, fee=0, scriptPubKey=CScript([OP_TRUE]), tx_customize_func=lambda tx: tx.vout.insert(0, CTxOut(0, CScript([OP_FALSE, OP_RETURN]))) )
+          tx6 = tx_creator.create_signed_transaction((tx5, -1), value=1*COIN, fee=0, scriptPubKey=CScript([OP_TRUE]), tx_customize_func=lambda tx: tx.vout.insert(0, CTxOut(0, CScript([OP_FALSE, OP_RETURN]))))
 
           # Same as tx4 except that fee_rate is used to calculate the transaction fee based on its size and reduce the
           # value of the 2nd output accordingly.
-          tx7 = tx_creator.create_signed_transaction( cbtx3, value=1*COIN, fee_rate=10000, scriptPubKey=CScript([OP_TRUE]) )
+          tx7 = tx_creator.create_signed_transaction(cbtx3, value=1*COIN, fee_rate=10000, scriptPubKey=CScript([OP_TRUE]))
 
           # Spends several transaction outputs and provides one P2PKH output that pays everything back to the owner of key within the TxCreator
-          tx8 = tx_creator.create_signed_transaction( [tx4, tx5, (tx3, 0, private_key_user2), (tx3, -1, private_key_user1, SIGHASH_NONE)], num_outputs=0, fee=0 )
+          tx8 = tx_creator.create_signed_transaction([tx4, tx5, (tx3, 0, private_key_user2), (tx3, -1, private_key_user1, SIGHASH_NONE)], num_outputs=0, fee=0)
           assert tx8.vout[0].nValue == 1*COIN + 1*COIN + 1000 + (1*COIN - 2*1000 - 50)
 
         Parameters:
@@ -472,7 +472,7 @@ class TxCreator:
 
         # Convert inputs argument into a list of SpentOutput objects using defaults for missing values
         spent_outputs = []
-        for input in ( inputs if type(inputs) is list else [inputs] ):
+        for input in (inputs if type(inputs) is list else [inputs]):
             # defaults
             n = 0
             private_key = self.private_key
@@ -502,7 +502,7 @@ class TxCreator:
                     n+=1
                 assert n < len(spend_tx.vout)
 
-            spent_outputs.append( SpentOutput(spend_tx, n, private_key, sighash_flags) )
+            spent_outputs.append(SpentOutput(spend_tx, n, private_key, sighash_flags))
 
         if pubkey is None:
             pubkey = self.public_key
@@ -516,10 +516,10 @@ class TxCreator:
 
         tx = CTransaction()
         for so in spent_outputs:
-            tx.vin.append( CTxIn(COutPoint(so.tx.sha256, so.n), b"", 0xffffffff) )
+            tx.vin.append(CTxIn(COutPoint(so.tx.sha256, so.n), b"", 0xffffffff))
         for i in range(num_outputs):
             assert value is not None
-            tx.vout.append( CTxOut(value, scriptPubKey) )
+            tx.vout.append(CTxOut(value, scriptPubKey))
 
         if tx_customize_func is not None:
             tx_customize_func(tx)
@@ -551,7 +551,7 @@ class TxCreator:
                 value_change -= fee
 
             # add a 'change' output
-            tx.vout.append( CTxOut(value_change, scriptPubKey_change) )
+            tx.vout.append(CTxOut(value_change, scriptPubKey_change))
 
             if fee_rate is not None:
                 # Create dummy signatures to be able to get the correct size of transaction
@@ -596,7 +596,7 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
         block = create_block(int(tip_hash, 16), txcb, tip_time+1)
         block.nNonce = 0
         block.solve()
-        conn.cb.send_message( msg_block(block) )
+        conn.cb.send_message(msg_block(block))
         tip_hash = block.hash
         tip_height += 1
         tip_time = block.nTime

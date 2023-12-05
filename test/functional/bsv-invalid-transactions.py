@@ -313,7 +313,7 @@ class InvalidTx(BitcoinTestFramework):
         # the banscore is set to 101 because rejection of the tx with invalid signature brings 100 points,
         # we don't want to be banned as result of only one tx
         with self.run_node_with_connections("Scenario 4: bad signature parent", 0, ['-banscore=101','-mindebugrejectionfee=0.0000025'],
-                                            number_of_connections=1, ip=get_lan_ip()) as (conn, ):
+                                            number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             valid_parent_tx, invalid_parent_tx, orphans, rejected_txs = self.prepare_parents_and_children(conn,
                                                                                 parent_invalidity="bad_signature",

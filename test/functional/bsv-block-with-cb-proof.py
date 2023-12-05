@@ -166,7 +166,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         hdr = node.getblockheader(block_hash, 2)
         self.check_rest_header_extendeded_json(node, block_hash, hdr) # header returned via rest call must be the same
         assert_equal(hdr["tx"][0], obj["tx"][0]) # coinbase transaction must also be returned in a header
-        assert(len( hdr["merkleproof"]) > 0)
+        assert(len(hdr["merkleproof"]) > 0)
         # check if merkle root is correct by calculating root from merkleproof tree and coinbase tx hash
         root_hash = merkle_root_from_merkle_proof(int(obj["tx"][0]["hash"],16), hdr["merkleproof"])
         assert_equal(root_hash, int(obj["merkleroot"],16))

@@ -355,7 +355,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         # Create funding transactions that will provide funds for other transcations
         ftx = CTransaction()
         ftx.vout.append(CTxOut(1000000, CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
