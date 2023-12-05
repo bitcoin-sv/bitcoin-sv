@@ -109,8 +109,8 @@ class TestNode():
                 if checkRequiredAt == -1:
                     checkRequiredAt = len(requiredArg)
                 if requiredArg[:checkRequiredAt] == currentArg[:checkCurentAt]:
-                   requiredArgs.remove(requiredArg)
-                   break
+                    requiredArgs.remove(requiredArg)
+                    break
 
         return inputArgs + requiredArgs
 

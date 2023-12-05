@@ -388,11 +388,11 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert_equal(len(unconfirmed["unconfirmed"][0]["ancestors"]), 2)
         ancestors_txids = []
         for ancestor in unconfirmed["unconfirmed"][0]["ancestors"]:
-          ancestors_txids.append(ancestor["txid"])
-          assert_equal(len(ancestor["vin"]), 1)
-          vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
-          assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
-          assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
+            ancestors_txids.append(ancestor["txid"])
+            assert_equal(len(ancestor["vin"]), 1)
+            vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
+            assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
+            assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
         assert(parent_tx_1 in ancestors_txids)
         assert(parent_tx_2 in ancestors_txids)
 
