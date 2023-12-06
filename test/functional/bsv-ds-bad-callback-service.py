@@ -57,7 +57,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
         tx = CTransaction()
         tx.vin = inputs
         tx.vout = outputs
-        tx_hex =  self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
+        tx_hex = self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
         tx = FromHex(CTransaction(), tx_hex)
 
         self.node0.send_message(msg_tx(tx))

@@ -214,7 +214,7 @@ def make_blocks_from(conn, root_block, nblocks, *txs_lists, wait_for_tip=True):
 
 def submit_to_mempool(conn, *txs_lists):
     txs = list(splice(*txs_lists))
-    expected_mempool_size = conn.rpc.getmempoolinfo()["size"]  + len(txs)
+    expected_mempool_size = conn.rpc.getmempoolinfo()["size"] + len(txs)
     for tx in txs:
         conn.send_message(msg_tx(tx))
     # All planned transactions should be accepted into the mempool

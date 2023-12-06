@@ -83,11 +83,11 @@ class Cpfp(BitcoinTestFramework):
             conn.send_message(msg_block(block))
             wait_until(lambda: conn.rpc.getbestblockhash() == block.hash, check_interval=0.3)
 
-            tx_pays_relay1 =            self.create_tx([(low_fee_tx,     0)], 2, relayfee)
-            tx_pays_relay2 =            self.create_tx([(tx_pays_relay1, 0)], 1, relayfee)
+            tx_pays_relay1 = self.create_tx([(low_fee_tx,     0)], 2, relayfee)
+            tx_pays_relay2 = self.create_tx([(tx_pays_relay1, 0)], 1, relayfee)
             tx_pays_enough_for_itself = self.create_tx([(tx_pays_relay1, 1)], 1, mining_fee)
-            tx_pays_for_ancestors =     self.create_tx([(tx_pays_relay2, 0)], 1, 3.5 * mining_fee)
-            tx_pays_relay3 =            self.create_tx([(tx_pays_for_ancestors, 0)], 1, relayfee)
+            tx_pays_for_ancestors = self.create_tx([(tx_pays_relay2, 0)], 1, 3.5 * mining_fee)
+            tx_pays_relay3 = self.create_tx([(tx_pays_for_ancestors, 0)], 1, relayfee)
 
             conn.send_message(msg_tx(tx_pays_relay1))
             check_mempool_equals(conn.rpc, [tx_pays_relay1])

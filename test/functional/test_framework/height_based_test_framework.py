@@ -123,16 +123,16 @@ class SimpleTestDefinition:
     def __init__(self, utxo_label, locking_script, label, unlocking_script,
                  p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None,
                  post_utxo_tx_creation=lambda tx: tx, post_test_tx_creation=lambda tx: tx):
-        self.scenario            = None
-        self.label               = label
-        self.locking_script      = locking_script
-        self.unlocking_script    = unlocking_script
-        self.utxo_label          = utxo_label
-        self.p2p_reject_reason   = p2p_reject_reason
+        self.scenario = None
+        self.label = label
+        self.locking_script = locking_script
+        self.unlocking_script = unlocking_script
+        self.utxo_label = utxo_label
+        self.p2p_reject_reason = p2p_reject_reason
         self.block_reject_reason = block_reject_reason
         self.test_tx_locking_script = test_tx_locking_script or CScript([OP_FALSE, OP_RETURN])
         self.funding_tx = None
-        self.test_tx    = None
+        self.test_tx = None
         self.post_utxo_tx_creation = post_utxo_tx_creation
         self.post_test_tx_creation = post_test_tx_creation
 
@@ -313,7 +313,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
     def _process_rpc_rejects(self, connection, to_reject, reasons, error_codes, test_label, height_label):
         for tx, reason, error_code in zip(to_reject, reasons, error_codes):
-            exception_rised =  try_rpc(error_code, reason, connection.rpc.sendrawtransaction, ToHex(tx))
+            exception_rised = try_rpc(error_code, reason, connection.rpc.sendrawtransaction, ToHex(tx))
             assert exception_rised, f"Exception should be raised for {test_label}, {height_label}"
 
     def _process_rpc_accepts(self, connection, to_accept):

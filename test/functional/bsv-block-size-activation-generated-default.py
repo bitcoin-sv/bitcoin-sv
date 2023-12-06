@@ -67,7 +67,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
     def make_transactions(self, num_transactions, add_op_return_size = 0): # TODO: Consolidate with bsv-broadcast_delay.py
 
         # Sanity check - estimate size  of funding transaction and check that it is not too big
-        assert(200 + num_transactions *  20 < MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
+        assert(200 + num_transactions * 20 < MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
 
         node = self.nodes[0]
         # Generate and age some blocks to have enough spendable coins

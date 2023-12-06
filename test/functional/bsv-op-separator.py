@@ -111,7 +111,7 @@ class InvalidTx(BitcoinTestFramework):
 
     def run_test(self):
         with self.run_node_with_connections("Scenario 1", 0, ['-acceptnonstdtxn=1'], number_of_connections=1) as (conn,):
-            coinbase_tx, coinbase_key =  make_coinbase(conn)
+            coinbase_tx, coinbase_key = make_coinbase(conn)
             conn.rpc.generate(100)
 
             sep_tx, sep_keys = make_separator_tx(coinbase_tx, coinbase_key, 5)

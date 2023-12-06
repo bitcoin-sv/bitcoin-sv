@@ -81,7 +81,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 # amounting to roughly 10000 satoshis
                 for i in range(len(u.vout)):
                     uu = u.vout[i]
-                    if uu.nValue <=  self.utxo_test_sats and uu.nValue > self.utxo_test_sats // 2:
+                    if uu.nValue <= self.utxo_test_sats and uu.nValue > self.utxo_test_sats // 2:
                         tx.vin.append(CTxIn(COutPoint(uint256_from_str(hex_str_to_bytes(u.hash)[::-1]), i), b''))
                         break
 

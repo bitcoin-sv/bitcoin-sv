@@ -854,7 +854,7 @@ class ChainManager():
             assert_equal(len(block.serialize()), block_size)
 
         # check that extra_sigops are included
-        if extra_sigops >  0:
+        if extra_sigops > 0:
             raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
         if version != None:

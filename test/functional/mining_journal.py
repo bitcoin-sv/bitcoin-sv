@@ -139,7 +139,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             # Setup for next txn in chain
             input_txid = decoded_raw["txid"]
             for i in range(len(decoded_raw["vout"])):
-                value =  decoded_raw["vout"][i]["value"]
+                value = decoded_raw["vout"][i]["value"]
                 if(value > 0):
                     input_vout = i
                     break

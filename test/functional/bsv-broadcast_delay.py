@@ -109,7 +109,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
                 syncThr.join()
 
         # Make some transactions to work with.
-        txs =  self.make_transactions(50)
+        txs = self.make_transactions(50)
         self.stop_node(0)
 
         # Use small poll timeout to minimize errors in elapsed time measurement

@@ -157,7 +157,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             test_node.wait_for_protoconf()
             max_recv_payload_length = test_node.last_message["protoconf"].protoconf.max_recv_payload_length
             assert_equal(max_recv_payload_length, mininode.MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)
-            maxInvElements =  mininode.CInv.estimateMaxInvElements(max_recv_payload_length)
+            maxInvElements = mininode.CInv.estimateMaxInvElements(max_recv_payload_length)
             logger.info("Received bitcoind max message size: {} B, which represents {} elements. ".format(max_recv_payload_length, maxInvElements))
 
             # 3.2. Send bitcoind Inv message (should be 2MiB)
