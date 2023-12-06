@@ -179,4 +179,3 @@ class BigBlockTests(BitcoinTestFramework):
 
 if __name__ == '__main__':
     BigBlockTests().main()
-

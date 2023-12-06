@@ -144,4 +144,3 @@ class BroadcastDelayTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     BroadcastDelayTest().main()
-

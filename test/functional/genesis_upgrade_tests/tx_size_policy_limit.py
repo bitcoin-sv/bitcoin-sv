@@ -83,4 +83,3 @@ class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), NEW_MAX_TX_SIZE_POLICY + 1)
             tx_collection.add_tx(tx,
                p2p_reject_reason = b'tx-size')
-

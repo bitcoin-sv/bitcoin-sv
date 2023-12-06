@@ -150,4 +150,3 @@ class RevokeMid(BitcoinTestFramework):
 
 if __name__ == '__main__':
     RevokeMid().main()
-

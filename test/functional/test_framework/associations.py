@@ -246,4 +246,3 @@ class Association():
 
         # Send message
         stream.send_message(msg)
-

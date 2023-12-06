@@ -145,4 +145,3 @@ class GetdataDataref(BitcoinTestFramework):
 
 if __name__ == '__main__':
     GetdataDataref().main()
-

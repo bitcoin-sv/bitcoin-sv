@@ -65,4 +65,3 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
 
 if __name__ == '__main__':
     MempoolHighSigopsDensity().main()
-

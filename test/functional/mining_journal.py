@@ -384,4 +384,3 @@ class MiningJournal(BitcoinTestFramework):
 
 if __name__ == '__main__':
     MiningJournal().main()
-

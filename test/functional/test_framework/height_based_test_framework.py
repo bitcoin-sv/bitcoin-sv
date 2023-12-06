@@ -482,4 +482,3 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 del self._coinbases[:]
                 self.log.info(f"Finishing test \"{test.NAME}\"")
                 self.log.info(f"="*100)
-

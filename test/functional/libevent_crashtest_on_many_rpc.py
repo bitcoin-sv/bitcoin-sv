@@ -46,4 +46,3 @@ class RpcFloddingTest (BitcoinTestFramework):
 
 if __name__ == '__main__':
     RpcFloddingTest().main()
-

@@ -219,4 +219,3 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
 
 if __name__ == '__main__':
     RovokeMinerIdRpc().main()
-

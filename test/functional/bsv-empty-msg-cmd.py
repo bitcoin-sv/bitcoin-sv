@@ -35,4 +35,3 @@ class TestEmptyCmd(BitcoinTestFramework):
 
 if __name__ == '__main__':
     TestEmptyCmd().main()
-

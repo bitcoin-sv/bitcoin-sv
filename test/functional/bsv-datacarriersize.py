@@ -169,4 +169,3 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     DataCarrierSizeTest().main()
-

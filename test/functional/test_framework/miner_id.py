@@ -309,4 +309,3 @@ def make_miner_id_block(connection, params, utxo=None, datarefTxns=None, minerIn
     block.height = parentHeight + 1
     block.solve()
     return block
-
