@@ -40,6 +40,10 @@ class AddNodeTest(BitcoinTestFramework):
 
         return True
 
+    # Returns number of peers added by addnode from the getpeerinfo RPC output
+    def count_addnode_peers(self, node_index):
+        return sum(peer['addnode'] for peer in self.nodes[node_index].getpeerinfo())
+
     def run_test(self):
         # Get out of IBD
         self.nodes[0].generate(1)
@@ -53,13 +57,13 @@ class AddNodeTest(BitcoinTestFramework):
         self.log.info("Taking node0 up to the addnode limit")
         for i in range(2, 4):
             assert(self.add_node_conn(0, i))
-        assert_equal(len(self.nodes[0].getpeerinfo()), 2)
+        assert_equal(self.count_addnode_peers(0), 2)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 2)
 
         # Can't add another without going over the addnode limit
         self.log.info("Taking node0 over the addnode limit")
         assert(not self.add_node_conn(0, 4))
-        assert_equal(len(self.nodes[0].getpeerinfo()), 2)
+        assert_equal(self.count_addnode_peers(0), 2)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 3)
 
         # Restart node0 with an increased addnode connection limit
@@ -71,7 +75,7 @@ class AddNodeTest(BitcoinTestFramework):
         self.log.info("Taking node0 up to the new higher addnode limit")
         for i in range(2, 5):
             assert(self.add_node_conn(0, i))
-        assert_equal(len(self.nodes[0].getpeerinfo()), 3)
+        assert_equal(self.count_addnode_peers(0), 3)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 3)
 
 if __name__ == '__main__':
