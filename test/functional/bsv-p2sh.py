@@ -33,7 +33,6 @@ class P2SH(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-
     # Creates a new transaction using a p2sh transaction as input
     def spend_p2sh_tx(self, p2sh_tx_to_spend, output_script=SPEND_OUTPUT, privateKey=None):
         privateKey = privateKey or self.coinbase_key
@@ -80,8 +79,6 @@ class P2SH(ComparisonTestFramework):
         p2sh_txs = [new_P2SH_tx() for _ in range(4)]
         self.chain.update_block(200, p2sh_txs)
         yield self.accepted()
-
-
 
         coinbase_to_p2sh_tx = new_P2SH_tx()
 

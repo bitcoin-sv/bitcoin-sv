@@ -284,7 +284,6 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             connection.rpc.invalidateblock(block.hash)
         return coinbase_tx
 
-
     def _advance_in_main_chain(self, n_blocks, connection):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
 
@@ -319,7 +318,6 @@ class SimplifiedTestFramework(BitcoinTestFramework):
     def _process_rpc_accepts(self, connection, to_accept):
         for tx in to_accept:
             connection.rpc.sendrawtransaction(ToHex(tx)) # will raise if not successful
-
 
     def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label):
         rejects = []
@@ -403,8 +401,6 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         txs_to_be_in_the_next_block = transactions_for_next_block + tx_col.mempool_txs + tx_col.block_valid_txs
         if txs_to_be_in_the_next_block:
             self._new_block_check_accept(conn, txs=txs_to_be_in_the_next_block, label=f"At \"{test.NAME}\" {label}")
-
-
 
     def _do_prepare_for_height(self, conn, test, label, height, additional_conns):
         self.log.info(f"Preparing for {label} at height={height}")

@@ -99,7 +99,6 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
 
         tip_hash = node.getbestblockhash()
 
-
         #
         # Check parameter parsing
         #
@@ -125,7 +124,6 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_raises_rpc_error(-1, None, node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, {})
 
         assert_raises_rpc_error(-8, "Too many arguments", node.verifyscript, [{"tx": ToHex(tx0), "n": 0}], True, 100, "abc") # max 3 arguments
-
 
         #
         # Check scripts parameter parsing
@@ -155,7 +153,6 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_raises_rpc_error(-8, "Invalid value for scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1, "height": -2}}]) # height must be non-negative integer or -1
 
         assert_raises_rpc_error(-8, "Unable to find TXO spent by transaction scripts[0].tx", node.verifyscript, [{"tx": ToHex(create_tx(tx0, 0, 1*COIN)), "n": 0}]) # Check that non-existent coin is detected
-
 
         #
         # Check verification of a valid P2PKH script
@@ -230,14 +227,12 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
             }
         ])
 
-
         #
         # Check working of stopOnFirstInvalid
         #
         self.verifyscript_check(node, ["error", "ok"], [{"tx": ToHex(tx2), "n": 0}, {"tx": ToHex(tx1), "n": 0}])
         self.verifyscript_check(node, ["error", "ok"], [{"tx": ToHex(tx2), "n": 0}, {"tx": ToHex(tx1), "n": 0}], False)  # default for stopOnFirstInvalid is False
         self.verifyscript_check(node, ["error", "skipped"], [{"tx": ToHex(tx2), "n": 0}, {"tx": ToHex(tx1), "n": 0}], True)
-
 
         #
         # Check that TXO is also found in mempool
@@ -247,7 +242,6 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [tx3.hash])
         tx4 = create_tx(tx3, 0, 1*COIN)
         self.verifyscript_check_ok(node, [{"tx": ToHex(tx4), "n": 0}])
-
 
         #
         # Check that genesis related script flags are selected after some height
@@ -277,7 +271,6 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         # include SCRIPT_UTXO_AFTER_GENESIS, because TXO is also after genesis.
         res = self.verifyscript_check_ok(node, [{"tx": ToHex(tx5), "n": 0, "reportflags": True}])
         assert_equal(res[0]["flags"], expected_flags + 524288 + 262144 + 32)
-
 
         #
         # Check timeout detection

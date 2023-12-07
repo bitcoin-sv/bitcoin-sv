@@ -89,7 +89,6 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
 
         node0.on_getdata = on_getdata
 
-
         # ***** 1. *****
         # starting_blocks are needed to provide spendable outputs
         starting_blocks = MIN_TTOR_VALIDATION_DISTANCE + 1
@@ -107,7 +106,6 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
 
         self.log.info("Block tip height: %d " % block_count)
 
-
         # ***** 2. *****
         # branch with blocks that do not violate TTOR
         valid_ttor_branch_height = MIN_TTOR_VALIDATION_DISTANCE + 1
@@ -119,7 +117,6 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
         self.nodes[0].waitforblockheight(starting_blocks + valid_ttor_branch_height)
 
         self.log.info("Node's active chain height: %d " % (starting_blocks + valid_ttor_branch_height))
-
 
         # ***** 3. *****
         # branch with invalid transaction order that will try to cause a reorg

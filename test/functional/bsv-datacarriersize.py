@@ -41,7 +41,6 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             assert len(script) == n_bytes
             tx.vout.append(CTxOut(amount, script))
 
-
     # creates transaction with n_outputs which cumulative size is total_bytes
     def make_tx_script_size(self, n_outputs, script_op_codes, fund, total_bytes):
         tx = CTransaction()
@@ -150,7 +149,6 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             assert_equal(len(rejected_txs), 1)
             assert_equal(rejected_txs[0].data, tx_invalid.sha256)
             assert_equal(rejected_txs[0].reason, b'tx-size')
-
 
     def run_test(self):
 

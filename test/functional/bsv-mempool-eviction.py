@@ -95,7 +95,6 @@ class Evictions(BitcoinTestFramework):
             conn.send_message(msg_block(second_block))
             wait_until(lambda: conn.rpc.getbestblockhash() == second_block.hash, check_interval=1)
 
-
             #mature the coinbase
             conn.rpc.generate(100)
 
@@ -194,8 +193,6 @@ class Evictions(BitcoinTestFramework):
                 if len(txs_in_mempool & set(secondaryMempoolTxs)) != 0:
                     # the mempoolminfee should not exceed minminingtxfee
                     assert conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['minminingtxfee']
-
-
 
         with self.run_node_with_connections("Restart the node with using the disk for storing transactions.",
                                             0, ["-minminingtxfee=0.00001", # 1 satoshi/byte

@@ -623,8 +623,6 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             new_blk(8, 1)
             new_blk(9, 8)
 
-
-
             # Block 5 should be tip of the active chain (it its highest and was received before 7, which is at the same height)
             assert_equal(self.nodes[0].getbestblockhash(), chain.blocks[5].hash)
 

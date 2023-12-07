@@ -280,7 +280,6 @@ def plot_last_experiment():
     show_percentiles(fs)
 
 
-
 def main():
     from docopt import docopt                          # type: ignore
     args = docopt(__doc__, version="0.1")

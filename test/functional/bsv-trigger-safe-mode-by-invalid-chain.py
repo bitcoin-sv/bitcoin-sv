@@ -72,8 +72,6 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 self.log.info(e.error["message"])
                 assert e.error["message"] == "Safe mode: Warning: The network does not appear to agree with the local blockchain! Still waiting for block data for more details."
 
-
-
             # send headers only for the rest of the second branch
             send_by_headers(conn2, branch_2_blocks[20:], do_send_blocks=False)
 

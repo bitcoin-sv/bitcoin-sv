@@ -65,6 +65,5 @@ class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):
         yield TestInstance([[tx1, RejectResult(16, b'bad-txns-inputs-too-large')]])
 
 
-
 if __name__ == '__main__':
     BSVTxMaxCoinsCacheSizePolicyLimit().main()

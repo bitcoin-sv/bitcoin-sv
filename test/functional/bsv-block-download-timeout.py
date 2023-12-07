@@ -46,7 +46,6 @@ class BlockDownloadTimeout(BitcoinTestFramework):
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
-
     def create_tx(self, outpoints, noutput, fee, additional_output_size=ONE_MEGABYTE):
         tx = CTransaction()
         total_input = 0
@@ -165,7 +164,6 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             self.stop_node(1)
             self.stop_node(2)
 
-
         block = self.create_block(funding_tx=funding_tx_1, block_target_size=10*ONE_MEGABYTE,
                                   prev_hash=int(last_block_info["hash"], 16), prev_height=last_block_info["height"], prev_time=last_block_info["time"])
 
@@ -179,7 +177,6 @@ class BlockDownloadTimeout(BitcoinTestFramework):
         target_send_rate_fast = block_size / TARGET_SENDING_TIME_FAST
         cmd_total_timeout = 100 * TOTAL_BLOCK_DOWNLOAD_TIMEOUT // (10 * 60) # 100% * (timeout) / 10min ,
         target_send_rate_slow = block_size / TARGET_SENDING_TIME_SLOW
-
 
         """ CASE 1 """
         self.test_send_block_to_node(

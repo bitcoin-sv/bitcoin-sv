@@ -191,7 +191,6 @@ class DSDetectedTests(BitcoinTestFramework):
         send_by_headers(connection, [initialBlock], do_send_blocks=True)
         wait_for_tip(connection, initialBlock.hash)
 
-
         node.generate(101)
         block101hex = node.getblock(node.getbestblockhash(), False)
         block101dict = node.getblock(node.getbestblockhash(), 2)

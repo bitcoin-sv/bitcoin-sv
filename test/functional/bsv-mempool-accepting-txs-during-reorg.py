@@ -50,7 +50,6 @@ from test_framework.util import wait_until, check_mempool_equals
 
 class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
-
     def __init__(self, *a, **kw):
         super(MemepoolAcceptingTransactionsDuringReorg, self).__init__(*a, **kw)
         self.private_key = CECKey()
@@ -66,7 +65,6 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-
 
     long_eval_script = [bytearray(b"x" * 300000), bytearray(b"y" * 290000), OP_MUL, OP_DROP]
 
@@ -131,7 +129,6 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             # mature the coinbase
             conn.rpc.generate(150)
 
-
             funding_tx = self.create_tx([(coinbase, 0)], 2006, mining_fee)
             conn.send_message(msg_tx(funding_tx))
             check_mempool_equals(conn.rpc, [funding_tx])
@@ -161,7 +158,6 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                 for _ in range(TX_COUNT - 1):
                     long_eval_txs.append(self.create_tx([(long_eval_txs[-1], 0)], 1, 0.0001, make_long_eval_script=True))
 
-
             root_block_info = conn.rpc.getblock(conn.rpc.getbestblockhash())
             root_hash = root_block_info["hash"]
             root_height = root_block_info["height"]
@@ -178,7 +174,6 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
             conn.send_message(msg_block(block_a1))
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=0.3)
-
 
         with self.run_node_with_connections("1. Try sending the same transaction that are in the disconnected block during the reorg",
                                             0,
@@ -222,7 +217,6 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             # transactions from the disconnected blocks b1 and b2 will not be added to mempool because of
             # the insufficient priority (zero fee)
             check_mempool_equals(conn.rpc, [], timeout=60, check_interval=1)
-
 
         with self.run_node_with_connections("2. Try sending transaction that are spending same inputs as transactions in the disconnected block during the reorg",
                                             0,

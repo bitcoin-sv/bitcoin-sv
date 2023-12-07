@@ -848,7 +848,6 @@ class ChainManager():
                     coinbase.rehash()
                     block.hashMerkleRoot = block.calc_merkle_root()
 
-
         # Check that the block size is what's expected
         if block_size > 0:
             assert_equal(len(block.serialize()), block_size)

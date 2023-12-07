@@ -139,7 +139,6 @@ class ZMQNewTopicsTest (BitcoinTestFramework):
         connect_nodes_bi(self.nodes, nodeNumber, connectingNodeNumber)
         self.test_activenotifications()
 
-
     def _zmq_test(self):
         genhashes = self.nodes[1].generate(1)
         currentTxSeq = 0

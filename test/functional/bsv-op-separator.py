@@ -69,7 +69,6 @@ def spend_separator_tx(tx_sep_tx, keys_for_sep_tx):
 
     tx.vin.append(CTxIn(COutPoint(tx_sep_tx.sha256, 0), b"", 0xffffffff))
 
-
     k = CECKey()
     k.set_secretbytes(b"horsebattery")
 

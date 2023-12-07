@@ -143,7 +143,6 @@ class PTVRPCTests(ComparisonTestFramework):
 
         return txchain
 
-
     # An extension to the scenario1.
     # - submit txns through p2p interface
     # - resubmit duplicates via rpc interface

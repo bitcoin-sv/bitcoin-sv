@@ -19,7 +19,6 @@ class msg_garbage():
     def __init__(self):
         pass
 
-
     def serialize(self):
         r = b""
         r += ser_uint256_vector([0xff, 0xff, 0xff, 0xff])

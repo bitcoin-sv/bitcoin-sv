@@ -212,7 +212,6 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         assert_equal(len(node1.rpc.getchaintips()), 1) # there should now be only one chain
         node1.rpc.acceptblock(block.hash) # remove (now redundant) soft rejection
 
-
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -231,7 +230,6 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         time.sleep(1)
         assert_equal(root_block_hash, node1.rpc.getbestblockhash())
 
-
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -249,7 +247,6 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self._wait_for_block_status(node1, best_block_hash, "")
         time.sleep(1)
         assert_equal(root_block_hash, node1.rpc.getbestblockhash())
-
 
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
@@ -272,7 +269,6 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self._wait_for_block_status(node1, best_block_hash, "active")
         assert_equal(best_block_hash, node1.rpc.getbestblockhash())
 
-
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -288,7 +284,6 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Checking that IBD finishes successfully at the tip of the chain")
         self._wait_for_block_status(node1, best_block_hash, "active")
         assert_equal(best_block_hash, node1.rpc.getbestblockhash())
-
 
         self.log.info("Checking that verifychain find no issues")
         assert node1.rpc.verifychain(4, 0)

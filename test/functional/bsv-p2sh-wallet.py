@@ -39,7 +39,6 @@ class P2SH(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-
     def get_tests(self):
         # shorthand for functions
         block = self.chain.next_block
@@ -118,8 +117,6 @@ class P2SH(ComparisonTestFramework):
 
         balance1_new = node1.getbalance("*", 1, False)
         assert balance1 > balance1_new, "Pre genesis P2SH is spent."
-
-
 
 
 if __name__ == '__main__':

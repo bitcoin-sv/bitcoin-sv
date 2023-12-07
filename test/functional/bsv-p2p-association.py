@@ -100,7 +100,6 @@ class P2PAssociation(BitcoinTestFramework):
 
         return True
 
-
     def run_test(self):
         # Create all the connections we will need to node0 at the start because they all need to be
         # setup before we call NetworkThread().start()

@@ -56,7 +56,6 @@ class SafeMode(BitcoinTestFramework):
     def make_handler(self, *a, **kw):
         return WebhookHandler(self,  *a, **kw)
 
-
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
@@ -156,13 +155,11 @@ class SafeMode(BitcoinTestFramework):
             low_height_difference_fork = self.make_chain(conn1, main_chain[0], low_height_difference_fork_len)
             expected_low_height_difference_fork_data = {"forkfirstblock": low_height_difference_fork[0].hash, "tips": {low_height_difference_fork[-1].hash}, "lastcommonblock": main_chain[0].hash}
 
-
             # send main branch that should be active chain
             send_by_headers(conn1, main_chain, do_send_blocks=True)
             wait_for_tip(conn1, main_chain[-1].hash)
             # no forks yes, not in the safe mode
             self.wait_for_safe_mode_data(conn1.rpc, []) # not in safe mode
-
 
             send_by_headers(conn1, distant_fork, do_send_blocks=False)
             wait_for_tip_status(conn1, distant_fork[-1].hash, "headers-only")
@@ -184,7 +181,6 @@ class SafeMode(BitcoinTestFramework):
                                                      expected_low_height_difference_fork_data,
                                                      expected_short_fork_data,
                                                      ])
-
 
         # stopping the node
         self.webhook_messages = []
@@ -282,7 +278,6 @@ class SafeMode(BitcoinTestFramework):
                                                      expected_short_fork_data,
                                                      ])
             pass
-
 
     def run_test(self):
 

@@ -92,7 +92,6 @@ class FullBlockTest(ComparisonTestFramework):
 
         test, out, _ = prepare_init_chain(self.chain, 99, 33)
 
-
         yield test
 
         # Start by building a couple of blocks on top (which output is spent is

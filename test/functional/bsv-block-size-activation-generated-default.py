@@ -50,7 +50,6 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         self.nodes[0].rpc_timeout = 300
         self.start_nodes()
 
-
     # Create an empty block with given block time. Used to move median past time around
     def mine_empty_block(self, nTime):
         node = self.nodes[0]
@@ -61,7 +60,6 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         block.solve()
         ret = node.submitblock(ToHex(block))
         assert(ret is None)
-
 
     # Ensure funding and returns given number of spend anyone transactions without submitting them
     def make_transactions(self, num_transactions, add_op_return_size = 0): # TODO: Consolidate with bsv-broadcast_delay.py
@@ -139,7 +137,6 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         mpt = node.getblockheader(node.getbestblockhash())['mediantime']
         assert_equal(mpt, activation_time-1)
 
-
         # Send all of the transactions:
         for tx in txs:
             node.sendrawtransaction(ToHex(tx))
@@ -148,7 +145,6 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
 
         # Mempool should now contain enough transactions for two blocks
         assert(mempool_size_before > DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE + DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
-
 
         # Mine the next block with unique block time. MPT before mining the block
         # will be activation_time - 1, so the old rules should apply

@@ -24,7 +24,6 @@ class Conflict(BitcoinTestFramework):
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
-
     def create_tx(self, outpoints, noutput):
         tx = CTransaction()
         total_input = 0
@@ -38,14 +37,10 @@ class Conflict(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-
-
-
     def run_test(self):
         with self.run_node_with_connections("Scenario 1: Create complex graph of txs, doublespend some fo them and check mempool after"
                                             , 0, ["-minrelaytxfee=0"],
                                             number_of_connections=1) as (conn,):
-
 
             # create block with coinbase
             coinbase = create_coinbase(height=1)
@@ -134,7 +129,6 @@ class Conflict(BitcoinTestFramework):
             wait_until(lambda: conn.rpc.getbestblockhash() == block2.hash, check_interval=0.3)
 
             check_mempool_equals(conn.rpc, [tx_stay_in_mempool_1, tx_stay_in_mempool_2])
-
 
 
 if __name__ == '__main__':

@@ -129,7 +129,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(len(rejected_txs), 0) #not rejected
         assert len(self.nodes[0].listbanned()) == 0  # and not banned
 
-
         # Create transaction with OP_ELSE in the locking script and send it to mempool which should be accepted
         txOpElse1 = create_transaction(out[2].tx, out[2].n, b'', 100000, CScript([OP_FALSE, OP_IF, OP_FALSE, OP_ELSE, OP_TRUE, OP_ELSE, OP_FALSE, OP_ENDIF]))
         self.test.connections[0].send_message(msg_tx(txOpElse1))
@@ -143,14 +142,12 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(len(rejected_txs), 0) # not rejected
         assert len(self.nodes[0].listbanned()) == 0  # and not banned
 
-
         # generate a block to move into genesis gracefull height
         block(3)
         # Create transaction with multiple OP_ELSE in the locking script which should be accepted to block and will be spent later when we move into Genesis
         txOpElseIsSpentInGenesis1 = create_transaction(out[3].tx, out[3].n, b'', 100000, CScript([OP_FALSE, OP_IF, OP_FALSE, OP_ELSE, OP_TRUE, OP_ELSE, OP_FALSE, OP_ENDIF]))
         self.chain.update_block(3, [txOpElseIsSpentInGenesis1])
         yield self.accepted()
-
 
         # Create transaction with OP_ELSE in the locking script and send it to mempool which should be accepted
         txOpElse1 = create_transaction(out[4].tx, out[4].n, b'', 100000, CScript([OP_FALSE, OP_IF, OP_FALSE, OP_ELSE, OP_TRUE, OP_ELSE, OP_FALSE, OP_ENDIF]))
@@ -164,7 +161,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 
         assert_equal(len(rejected_txs), 0) #not rejected
         assert len(self.nodes[0].listbanned()) == 0  # and not banned
-
 
         # Create transaction with OP_ADD in the locking script and send it to mempool
         # which should not be banned (but should be rejected instead), because we are in Genesis gracefull period now
@@ -212,7 +208,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert len(self.nodes[0].listbanned()) == 0  # not banned
         rejected_txs = []
 
-
         #now we need to raise block count so we are in genesis
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
         for x in range(height, self.genesisactivationheight):
@@ -221,7 +216,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         yield test
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
         assert_equal(height, self.genesisactivationheight) # check if we are in right height
-
 
         # Create transaction with OP_ELSE in the locking script and send it to mempool
         # which should not be banned but should be rejected now
@@ -238,7 +232,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(rejected_txs[0].reason, b'genesis-script-verify-flag-failed (Invalid OP_IF construction)')
         assert len(self.nodes[0].listbanned()) == 0  # not banned
         rejected_txs = []
-
 
         # generate an empty block, height is Genesis + 1
         block(6)
@@ -257,7 +250,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(len(rejected_txs), 0) #not rejected
         assert len(self.nodes[0].listbanned()) == 0  # not banned
 
-
         # Create transaction with OP_ADD in the locking script and send it to mempool
         # which should not be banned (but should be rejected instead), because we are in genesis gracefull period now
         txOpAdd1 = create_transaction(out[10].tx, out[10].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
@@ -273,7 +265,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(len(rejected_txs), 0) # not rejected
         assert len(self.nodes[0].listbanned()) == 0  # not banned
 
-
         # Create transaction that spends the OP_ELSE transaction that was put into block before Genesis
         txOpElseIsSpentInGenesis2 = create_transaction(txOpElseIsSpentInGenesis1, 0, b'', 4, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpElseIsSpentInGenesis2))
@@ -282,7 +273,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 
         assert_equal(len(rejected_txs), 0) #not rejected
         assert len(self.nodes[0].listbanned()) == 0  # not banned
-
 
         # generate a block
         block(8)
@@ -301,7 +291,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert len(self.nodes[0].listbanned()) == 0  # not banned
         rejected_txs = []
 
-
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
         genesisHeightNoGracefullPeriod = self.genesisactivationheight + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)
 
@@ -312,7 +301,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         yield test
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
         assert_equal(height, self.genesisactivationheight + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)) # check if we are in right height
-
 
         # generate an empty block, height is Genesis + gracefull period + 1, we moved beyond gracefull period now
         block(9, spend=out[12])
@@ -335,7 +323,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(len(rejected_txs), 0) # accepted
         assert len(self.nodes[0].listbanned()) == 0  # not banned
 
-
         # Create transaction with OP_ADD in the locking script and send it to mempool
         # which should not be banned (but should be rejected instead), because we are in genesis gracefull period now
         txOpAdd1 = create_transaction(out[14].tx, out[14].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
@@ -350,7 +337,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 
         assert_equal(len(rejected_txs), 0) # accepted
         assert len(self.nodes[0].listbanned()) == 0  # not banned
-
 
         # Create transaction with OP_ELSE in the locking script which should now be banned
         txOpElse1 = create_transaction(out[15].tx, out[15].n, b'', 100004, CScript([OP_FALSE, OP_IF, OP_FALSE, OP_ELSE, OP_TRUE, OP_ELSE, OP_FALSE, OP_ENDIF]))
@@ -367,7 +353,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         wait_until(lambda: len(self.nodes[0].listbanned()) == 1, timeout=5) # banned
         rejected_txs = []
 
-
         self.nodes[0].clearbanned()
         wait_until(lambda: len(self.nodes[0].listbanned()) == 0, timeout=5) # and not banned
         rejected_txs = []
@@ -376,7 +361,6 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         # TODO: This sleep needs to be replaced with a proper wait_until function
         sleep(3)
         self.test.connections[0].cb.on_reject = on_reject
-
 
         # Create transaction with OP_NOP that exceeds policy limits to check that node does not get banned for exceeding our policy limit
         txPubKeys = create_transaction(out[16].tx, out[16].n, b'', 100004, CScript([OP_TRUE] + [OP_NOP] * 1001))

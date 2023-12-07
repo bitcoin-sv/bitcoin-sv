@@ -115,7 +115,6 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             assert(self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 0)
 
-
         # 2. test
         # Send protoconf with 1B of max_recv_payload_length. Node should be disconnected, since minimum message size is 1MiB
         test_node = mininode.NodeConnCB()

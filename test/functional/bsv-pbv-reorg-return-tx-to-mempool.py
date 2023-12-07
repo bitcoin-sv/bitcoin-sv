@@ -101,7 +101,6 @@ class PBVReorg(BitcoinTestFramework):
         block3 = self.chain.next_block(block_count, spend=out[10:19], extra_txns=10)
         block_count += 1
 
-
         block4 = self.chain.next_block(block_count, spend=out[20:29], extra_txns=8)
         block_count += 1
 

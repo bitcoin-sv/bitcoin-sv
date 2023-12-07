@@ -34,7 +34,6 @@ class AuthConnTestReputation(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
 
-
         args = ['-mineridreputation_m=1', '-mineridreputation_n=10', '-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003']
         self.extra_args = [args + ['-mineridgeneratorurl=http://127.0.0.1:9002', '-mineridgeneratoralias=testMiner0'],
                            args + ['-mineridgeneratorurl=http://127.0.0.1:9003', '-mineridgeneratoralias=testMiner1']]
@@ -85,7 +84,6 @@ class AuthConnTestReputation(BitcoinTestFramework):
             f.write("debug=1\n")
             f.write("port=" + str(p2p_port(1)) + "\n")
             f.write("shrinkdebugfile=0\n")
-
 
     def make_block_with_coinbase(self, conn_rpc):
         tip = conn_rpc.getblock(conn_rpc.getbestblockhash())

@@ -118,8 +118,6 @@ class FeeFilterTest(BitcoinTestFramework):
         rawtx = node.createrawtransaction(inputs, outputs)
         return node.signrawtransaction(rawtx)['hex']
 
-
-
     def run_test(self):
         node1 = self.nodes[1]
         node0 = self.nodes[0]

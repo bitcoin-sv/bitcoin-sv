@@ -150,7 +150,6 @@ class MiningTest(BitcoinTestFramework):
                                                        'coinbase': '{}'.format(ToHex(coinbase_tx))})
         assert submitResult == 'high-hash'
 
-
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
         self.relayfee = Decimal("250") / 100000000
@@ -160,7 +159,6 @@ class MiningTest(BitcoinTestFramework):
         # Create a lot of transactions from the UTXOs
         newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, self.nodes)
         fill_mempool(self.relayfee, node, newutxos)
-
 
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
@@ -203,7 +201,6 @@ class MiningTest(BitcoinTestFramework):
         # submitResult is bool True for success, false if failure
         assert submitResult
 
-
     def test_mine_from_old_mining_candidate(self, blockNode, get_coinbase):
 
         sync_blocks(self.nodes)
@@ -226,7 +223,6 @@ class MiningTest(BitcoinTestFramework):
 
             candidate = candidate_new
             sync_blocks(self.nodes)
-
 
     def test_optional_validation(self):
         # Start 2 nodes, 1 with validation enabled the other disabled

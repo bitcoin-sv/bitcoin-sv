@@ -61,7 +61,6 @@ class JournalReorg(BitcoinTestFramework):
         send_value1 = int((spendTxn['amount'] - fee) * 100000000)
         send_value2 = int((spendTxn['amount'] - fee*2) * 100000000)
 
-
         txOpAdd1 = CTransaction()
         txOpAdd1.vin.append(CTxIn(COutPoint(int(spendTxn["txid"], 16), spendTxn["vout"]), b'', 0xffffffff))
         txOpAdd1.vout.append(CTxOut(send_value1, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE])))

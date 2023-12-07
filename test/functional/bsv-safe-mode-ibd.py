@@ -38,7 +38,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
         pass
 
 
-
 class SafeModeIBDTest(BitcoinTestFramework):
 
     def start_server(self):

@@ -52,7 +52,6 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
                 rejectSent = True
                 conn.send_message(msg_reject(message=b"getdata", code=self.REJECT_TOOBUSY, reason=b"node too busy"))
 
-
         with self.run_node_with_connections("Scenario 1: sending TOOBUSY reject message with 2 nodes", 0, [], self.num_peers) as connections:
             block = self.prepareBlock()
 

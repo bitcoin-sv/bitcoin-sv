@@ -110,7 +110,6 @@ class P2P_send_node(Send_node):
         if expect_reject:
             self._reject_check(tx)
 
-
     def _reject_check(self, tx):
         self.p2p.wait_for_reject()
 
@@ -185,7 +184,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         del self.chain.blocks[self.block_count-1]
         self.block_count -= 1
         self.chain.set_tip(self.block_count-1)
-
 
     def _test_policy_freeze(self, spendable_out, node):
         self.log.info("*** Performing policy freeze checks")
@@ -269,7 +267,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         });
         assert_equal(result["notProcessed"], [])
         assert_equal(node.rpc.getrawmempool(), [])
-
 
     def _test_consensus_freeze(self, spendable_out, node):
         self.log.info("*** Performing consensus freeze checks")
@@ -424,7 +421,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         spend_frozen_tx3_4 = self._create_tx(PreviousSpendableOutput(spend_frozen_tx2, 0), b'', CScript([OP_TRUE, OP_NOP, OP_NOP, OP_NOP, OP_NOP]))
         MineAndCheckAccepted(spend_frozen_tx3_4)
 
-
         self.log.info("*** Performing consensus freeze checks with several block height enforcement intervals")
 
         # Helper to freeze output 0 of given tx on heights [h+1,h+3), [h+5,h+7), where h is current block height
@@ -485,7 +481,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         MineEmptyBlock()
         SendTxAndCheckRejected(tx) # tx is rejected because policy freeze also applies after enforcement intervals if policyExpiresWithConsensus=false
         MineAndCheckAccepted(tx) # block is accepted after the last interval
-
 
     def run_test(self):
 

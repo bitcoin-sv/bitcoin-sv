@@ -2389,7 +2389,6 @@ class RateLimiter:
         if prune_to_ndx is not None:
             del self.history[:prune_to_ndx + 1]
 
-
         if self.processed_in_last_measuring_period == 0:
             assert len(self.history) == 0, "History not empty when processed data is 0"
         else:

@@ -151,7 +151,6 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             # Test second headersEnriched message.
             self.check_hdrsen_message(headersEnriched[1], txsInSecondBlock, second_coinbase_tx, second_block)
 
-
             #######################
             hash_at_122 = int(self.nodes[0].getbestblockhash(), 16)
             unspent_txns = self.nodes[0].listunspent()

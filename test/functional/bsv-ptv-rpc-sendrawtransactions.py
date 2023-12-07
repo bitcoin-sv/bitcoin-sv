@@ -380,7 +380,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
         return block
 
-
     # Test an attempt to submit transactions (via rpc interface) which are already mined
     def run_scenario6(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
         # Create and send tx chains.
@@ -497,7 +496,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             out.append(self.chain.get_spendable_output())
 
         self.stop_node(0)
-
 
         #====================================================================
         # Valid test cases.

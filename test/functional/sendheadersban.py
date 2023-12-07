@@ -50,7 +50,6 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         inv_node.sync_with_ping()
         test_node.sync_with_ping()
 
-
         peerInfoPreSendHeaderMsg=self.nodes[0].getpeerinfo()
         #print ([peer['banscore'] for peer in peerInfoPreSendHeaderMsg])
         #print (peerInfoPreSendHeaderMsg[1]['banscore'])

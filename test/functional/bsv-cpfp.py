@@ -23,7 +23,6 @@ class Cpfp(BitcoinTestFramework):
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
-
     def create_tx(self, outpoints, noutput, feerate):
         tx = CTransaction()
         total_input = 0
@@ -45,9 +44,6 @@ class Cpfp(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-
-
-
     def run_test(self):
         with self.run_node_with_connections("Scenario 1: Low fee, non-whitelisted peer", 0, ["-minminingtxfee=0.00001", "-mindebugrejectionfee=0.00000250"],
                                             number_of_connections=1) as (conn,):
@@ -64,7 +60,6 @@ class Cpfp(BitcoinTestFramework):
 
             #mature the coinbase
             conn.rpc.generate(150)
-
 
             funding_tx = self.create_tx([(coinbase, 0)], 10, 1.5)
 

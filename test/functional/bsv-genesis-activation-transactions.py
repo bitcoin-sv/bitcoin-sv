@@ -44,7 +44,6 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-
         test, out, _ = prepare_init_chain(self.chain, 100, 100)
 
         yield test

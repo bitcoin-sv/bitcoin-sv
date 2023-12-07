@@ -126,7 +126,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         else:
             jsonOverrideWithBadSyntax = None
 
-
         scriptPubKey = create_miner_info_scriptPubKey (
             params=minerinfotx_parameters,
             json_override_string=jsonOverrideWithBadSyntax)
@@ -213,7 +212,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert(tx0 == None)
         assert(tx1 == None)
 
-
     def run_test(self):
         # create bip32 keys
         allKeys = AllKeys()
@@ -243,7 +241,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         disconnect_nodes_bi(self.nodes, 0, 1)
         connect_nodes_bi(self.nodes, 0, 1)
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
-
 
 
 if __name__ == '__main__':

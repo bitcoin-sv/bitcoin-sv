@@ -101,7 +101,6 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, sync_nodes=self.nodes)
         fill_mempool(self.relayfee, node, newutxos)
 
-
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
         block, coinbase_tx = create_block_from_candidate(candidate, get_coinbase)

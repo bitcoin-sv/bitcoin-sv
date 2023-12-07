@@ -309,7 +309,6 @@ class tx_set(set):
         return " ".join(show_slices(find_slices()))
 
 
-
 c = property_dict(A="abc", B="def", C="ghi", Z="xyz")
 e = tx_set(c.A + c.B + c.C, _name="'e'")
 a = tx_set("abcdegixyq", _name="'a'")
@@ -328,8 +327,6 @@ class ReorgTests(BitcoinTestFramework):
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
-
-
     def run_test(self):
 
         with self.run_node_with_connections("Xxxxxxxxxxxxx",
@@ -343,7 +340,6 @@ class ReorgTests(BitcoinTestFramework):
             fee_delta = 10
             utxo, _ = make_and_send_block_ex(conn, [])
             conn.rpc.generate(110)
-
 
             # we will mine two competing chains, old and new
             # the old one will be one block longer than the new
@@ -368,7 +364,6 @@ class ReorgTests(BitcoinTestFramework):
 
             for strategy, case_utxo in zip(reorg_strategies, case_utxos):
                 self.check_reorg_cases(conn, root_block_data, strategy, case_utxo=case_utxo, fee_delta=fee_delta)
-
 
     def check_reorg_cases(self, conn, root_block_data, instigate_reorg, case_utxo, fee_delta):
         self.log.info("Check reorg cases with %s", instigate_reorg.__name__)
@@ -426,7 +421,6 @@ class ReorgTests(BitcoinTestFramework):
                                              chains.Hy,
                                              chains.Iy,
                                              wait_for_tip=False)
-
 
         self.log.info("check tip before reorg")
         expected_tip = chain_to_be_invalidated[-1]

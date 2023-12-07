@@ -43,7 +43,6 @@ class SigOpLimitCountDefaultTestCase(GenesisHeightBasedSimpleTestsCase):
             [OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS + 1)))
     ]
 
-
     TESTS = TESTS_PRE_GENESIS_DEFAULT + TESTS_POST_GENESIS_DEFAULT
 
 

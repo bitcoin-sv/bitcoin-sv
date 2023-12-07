@@ -264,8 +264,6 @@ class TestNodeCLI():
         return json.loads(cli_stdout, parse_float=decimal.Decimal)
 
 
-
-
 def TestNode_kill_running_processes():
     """ Kill all started external processes that are still running in reverse order they were added to array """
     for p in reversed(TestNode_process_list):

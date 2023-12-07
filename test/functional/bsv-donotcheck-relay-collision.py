@@ -44,7 +44,6 @@ class NoCheckCollisionTest(BitcoinTestFramework):
     def created_signed_transaction(self, sats, node):
         utxo = create_confirmed_utxos(sats, node, 1, age=101)[0]
 
-
     def set_test_params(self):
         self.num_nodes = 2
         self.mining_relay_factor = 4

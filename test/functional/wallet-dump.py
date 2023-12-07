@@ -72,7 +72,6 @@ class WalletDumpTest(BitcoinTestFramework):
         unencrypted_dump = os.path.join(self.nodes[0].datadir, "wallet.unencrypted.dump")
         encrypted_dump = os.path.join(self.nodes[0].datadir, "wallet.encrypted.dump")
 
-
         # generate 20 addresses to compare against the dump
         test_addr_count = 20
         addrs = []

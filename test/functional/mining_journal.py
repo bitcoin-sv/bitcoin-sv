@@ -221,7 +221,6 @@ class MiningJournal(BitcoinTestFramework):
         # Fee for txns
         self.relayfee = Decimal("250") / COIN
 
-
     # Fill the mempool with some different kinds of txns and check the journal accurately tracks it
     def test_initial_mempool(self, txnNode, numTxns=100, mainTest=False):
         if mainTest:
@@ -231,7 +230,6 @@ class MiningJournal(BitcoinTestFramework):
         fill_mempool(self.relayfee, self.nodes[txnNode], numTxns, self.ancestor_depth)
         info = self.nodes[txnNode].getmempoolinfo()
         assert_equal(info["size"], info["journalsize"])
-
 
     # Check the next mining candidate looks correct given the current contents of the journal
     def check_mining_candidate(self, txnNode):
@@ -268,7 +266,6 @@ class MiningJournal(BitcoinTestFramework):
             self.sync_all([[self.nodes[txnNode]]])
             info = self.nodes[txnNode].getmempoolinfo()
             assert_equal(info["size"], info["journalsize"])
-
 
     # Invalidate some blocks to force a reorg and check the mempool, journal and mining candidate
     # all still look correct
@@ -356,7 +353,6 @@ class MiningJournal(BitcoinTestFramework):
         self.nodes[rebuildNode].rebuildjournal()
         status = self.nodes[rebuildNode].checkjournal()
         assert(status["ok"])
-
 
     def run_test(self):
 

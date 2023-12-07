@@ -306,7 +306,6 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[3].gettransaction(txid2)["txid"], txid2)
 
-
         #
         # Submit transaction without checking fee 2/2 #
         #

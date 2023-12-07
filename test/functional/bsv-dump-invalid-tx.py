@@ -180,7 +180,6 @@ class InvalidTx(BitcoinTestFramework):
 
         return data
 
-
     def run_test(self):
 
         invalid_coinbases = []
@@ -283,8 +282,6 @@ class InvalidTx(BitcoinTestFramework):
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size == 0, "Nothing to free."
 
-
-
         with self.run_node_with_connections("Scenario 4: Limiting file size and putting three large (1MB each) transactions, "
                                             "only first two txs are saved through file sink, last is ignored, "
                                             "maximal zmq message size is limited, messages should be smaller",
@@ -371,7 +368,6 @@ class InvalidTx(BitcoinTestFramework):
                 # maximal zmq tx size is set to msximal value so messages will contain tx hex (tx hex > 2MB)
                 assert len(msg[1]) > 2 * ONE_MEGABYTE
 
-
         with self.run_node_with_connections("Scenario 6: ",
                                             0,
                                             ["-genesisactivationheight=1",
@@ -402,7 +398,6 @@ class InvalidTx(BitcoinTestFramework):
 
             # transactions are sent from different connections so they must have different addresses
             assert data1["address"] != data2["address"]
-
 
         shutil.rmtree(invalidtxsfolder)
 

@@ -146,7 +146,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.nodes[1].generate(1)
         self.sync_all()
 
-
         # mine minerid blocks and sync
         self.one_test(allKeys0, nodenum=0)
         sync_blocks(self.nodes)

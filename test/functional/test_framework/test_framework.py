@@ -199,7 +199,6 @@ class BitcoinTestFramework():
                         print("Opening file %s failed." % fn)
                         traceback.print_exc()
 
-
         if success == TestStatus.PASSED:
             self.log.info("Tests successful")
             exit_code = TEST_EXIT_PASSED
@@ -352,7 +351,6 @@ class BitcoinTestFramework():
         thr.join()
         self.stop_node(node_index)
         logger.debug("finished %s", title)
-
 
     # this method creates following network graph
     #
@@ -711,7 +709,6 @@ class ComparisonTestFramework(BitcoinTestFramework):
 
     def check_mempool(self, rpc, should_be_in_mempool, timeout=20):
         wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=timeout)
-
 
 
 class SkipTest(Exception):

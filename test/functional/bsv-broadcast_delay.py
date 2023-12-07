@@ -68,7 +68,6 @@ class BroadcastDelayTest(BitcoinTestFramework):
 
         return txs
 
-
     def set_test_params(self):
         self.num_nodes = 1
         self.num_peers = 3

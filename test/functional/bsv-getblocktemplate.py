@@ -134,7 +134,6 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             rsp = self.nodes[0].getblocktemplate({'data': b2x(block.serialize()), 'mode': 'proposal'})
             assert_equal(rsp, "inconclusive-not-best-prevblk")
 
-
             assert_raises_rpc_error(-22, "Block decode failed", self.nodes[0].getblocktemplate,
                                 {'data': b2x(block.serialize()[:-1]), 'mode': 'proposal'})
 

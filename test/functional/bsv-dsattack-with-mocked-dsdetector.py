@@ -245,7 +245,6 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [funding_txid])
         return funding_tx
 
-
     def run_test(self):
 
         # Test 1:

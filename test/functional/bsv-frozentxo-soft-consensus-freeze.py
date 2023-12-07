@@ -321,7 +321,6 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         # invalid block has now been validated
         assert(node.check_log(frozen_block_block_checked_log_string))
 
-
         # same thing again but with frozen block that is also invalid because it contains invalid transaction
         self.set_chain_tip(root_chain_tip)
         frozen_block = self._mine_block(spend_frozen_tx)

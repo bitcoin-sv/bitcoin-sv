@@ -179,7 +179,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             tx.vout.append(CTxOut(amount, scriptPubKey))
             sum_values_sats = sum_values_sats - amount
 
-
         assert (is_donation or check_size == out_size)
         tx.rehash()
         return ToHex(tx)

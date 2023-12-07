@@ -106,7 +106,6 @@ class BSVGenesisActivation(ComparisonTestFramework):
             b109_accepted.hash, self.genesisactivationheight, self.genesisactivationheight)
         yield self.accepted()
 
-
         #############
 
         # At this point, we have tx0 and tx1 in cache script marked as valid.

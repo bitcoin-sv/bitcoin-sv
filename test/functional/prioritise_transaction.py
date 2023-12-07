@@ -39,7 +39,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
 
         low_paying_txs = []
 
-
         # let's create a chain of three low paying transactions and sent them to the node, they end up in the mempool
         for _ in range(3):
             inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
@@ -52,7 +51,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
             assert txid in node.getrawmempool()
             tx_info = node.getrawtransaction(txid, True)
             utxo = {"txid":txid, "vout":0, "amount":tx_info["vout"][0]["value"]}
-
 
         node.generate(1)
 
@@ -74,7 +72,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         assert low_paying_txs[2] in rawmempool
 
         self.stop_node(0)
-
 
 
 if __name__ == '__main__':

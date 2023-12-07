@@ -132,7 +132,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             assert(len(self.nodes[looser].getrawmempool()) == 0)
             assert(bhash == self.nodes[looser].getbestblockhash())
 
-
     def run_test(self):
         # create bip32 keys
         allKeys = AllKeys()

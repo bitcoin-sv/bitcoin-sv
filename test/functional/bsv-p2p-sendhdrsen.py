@@ -47,7 +47,6 @@ class SPVNode(NodeConnCB):
         return our_peer_info[0]
 
 
-
 class SendHdrsEnTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
@@ -325,7 +324,6 @@ class SendHdrsEnTest(BitcoinTestFramework):
             time.sleep(1)
         peerInfoPostSendHeaderMsg = spv_node.get_peer_info(node)
         assert_greater_than(peerInfoPostSendHeaderMsg['banscore'], peerInfoPreSendHeaderMsg['banscore'])
-
 
 
 if __name__ == '__main__':

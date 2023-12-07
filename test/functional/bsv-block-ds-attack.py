@@ -159,7 +159,6 @@ class CompetingChainsTest(BitcoinTestFramework):
         self.log.info("check that funds have been double spent to different addresses")
         assert(self.contains_double_spends () == self.nbDoubleSpends)
 
-
         # Test 2.
         # 1. Progress the two competing chains in node0 and node1 to different lengths (configurable).
         #    node1 shall hold the longer chain and is the one controlled by the attacker.

@@ -180,7 +180,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "Already notified about txn {}".format(tx1.hash), "/node0"))
 
-
         # tx4 is not dsnt enabled, and gets accepted to the mempool
         vin = [
             CTxIn(COutPoint(int(utxo[2]["txid"], 16), utxo[2]["vout"]), CScript([OP_FALSE]), 0xffffffff),
@@ -458,7 +457,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1 for double-spend enabled txn {}".format(tx3.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Skipping notification to duplicate endpoint 127.0.0.1", "/node0"))
 
-
     # Test that proof is not sent if callback server does not want it.
     def check_ds_enabled_no_proof(self, utxo):
 
@@ -471,7 +469,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
-
 
         # spend the same output as tx1 (double spend)
         vin = [
@@ -496,7 +493,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx1 = self.create_and_send_transaction(vin, vout)
         tx1.rehash()
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
-
 
         # spend the same output as tx1 (double spend)
         vin = [

@@ -90,8 +90,5 @@ class BanClientUA(BitcoinTestFramework):
             assert conn.connected
 
 
-
-
-
 if __name__ == '__main__':
     BanClientUA().main()
