@@ -58,6 +58,7 @@ class WebHookService(BaseHTTPRequestHandler):
 
 class fake_msg_dsdetected():
     command = b"dsdetected"
+
     def serialize(self):
         r = os.urandom(random.randint(100, 1000))
         return r

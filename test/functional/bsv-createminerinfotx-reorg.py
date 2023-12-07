@@ -22,6 +22,7 @@ After a reorg they still should be able to continue mining further minerinfo tra
 
 class AllKeys:
     last_seed_number = 1
+
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 1))
         self.revocationKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 2))
