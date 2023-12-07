@@ -98,6 +98,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             relayfee = 0.501  # in satoshi per byte
 
             rejected_txs = []
+
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
             conn.cb.on_reject = on_reject
@@ -176,6 +177,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, [])
 
             rejected_txs = []
+
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
             conn.cb.on_reject = on_reject

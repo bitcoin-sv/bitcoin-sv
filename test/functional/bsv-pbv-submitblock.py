@@ -129,6 +129,7 @@ class PBVSubmitBlock(BitcoinTestFramework):
         node2.send_and_ping(msg_getheaders(locator_have=[int(self.nodes[0].getbestblockhash(), 16)]))
         receivedAnnouncement = False
         waiting_for_announcement_block_hash = block2_hard.sha256
+
         def on_cmpctblock(conn, message):
             nonlocal receivedAnnouncement
             message.header_and_shortids.header.calc_sha256()

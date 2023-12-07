@@ -42,9 +42,11 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         numberOfRejectedMsgs = 0
         numberOfReceivedBlocks = 0
+
         def on_block(conn, message):
             nonlocal numberOfReceivedBlocks
             numberOfReceivedBlocks += 1
+
         def on_reject(conn, message):
             assert_equal(message.code, REJECT_TOOBUSY)
             nonlocal numberOfRejectedMsgs

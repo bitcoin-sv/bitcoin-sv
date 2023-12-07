@@ -138,11 +138,13 @@ class InvalidTx(BitcoinTestFramework):
         conn_sending.rpc.generate(100)
 
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         conn_sending.cb.on_reject = on_reject
 
         relayed_txs = []
+
         def on_inv(conn, msg):
             for i in msg.inv:
                 if i.type == 1:

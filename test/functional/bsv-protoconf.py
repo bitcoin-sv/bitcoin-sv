@@ -42,10 +42,12 @@ class BsvProtoconfTest(BitcoinTestFramework):
         # Create a connection and connect to the node
         test_node = NodeConnCB()
         test_node.wanted_inv_lengths = []
+
         def on_getdata(conn, message):
             test_node.wanted_inv_lengths.append(len(message.inv))
         test_node.on_getdata = on_getdata
         # Send protoconf message from python node to bitcoind node
+
         def send_protoconf_default_msg_length(conn):
             conn.send_message(msg_protoconf(CProtoconf(1, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)))
         test_node.send_protoconf = send_protoconf_default_msg_length

@@ -133,6 +133,7 @@ class PtvCpfp(BitcoinTestFramework):
         last_descendant_from_each_txchain = []
         ths = []
         req_start_time = time.time()
+
         def make_chained_txs(chain_id, spend, chain_length, tx_fee, locking_script):
             self.log.info("Creating txchain[%d], length=%d", chain_id, chain_length)
             nonlocal txchains

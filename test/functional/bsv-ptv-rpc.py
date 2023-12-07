@@ -180,6 +180,7 @@ class PTVRPCTests(ComparisonTestFramework):
 
     def get_tests(self):
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         # Shorthand for functions

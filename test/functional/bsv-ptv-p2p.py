@@ -148,6 +148,7 @@ class PTVP2PTest(ComparisonTestFramework):
     def run_scenario2(self, conn, spend, num_txs_to_create, locking_script, num_ds_to_create=0, additional_txs=[], shuffle_txs=False, send_txs=True, money_to_spend=2000000, timeout=60):
         # A handler to catch reject messages.
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
             # A double spend reject message is the expected one to occur.

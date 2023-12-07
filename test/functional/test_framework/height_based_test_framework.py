@@ -323,6 +323,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
     def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label):
         rejects = []
+
         def on_reject(_, msg):
             rejects.append(msg)
 

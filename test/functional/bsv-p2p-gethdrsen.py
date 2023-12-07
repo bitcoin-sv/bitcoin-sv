@@ -118,6 +118,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             self.test_node = connections[0]
 
             headersEnriched = []
+
             def on_hdrsen(conn, message):
                 for h in message.headers:
                     headersEnriched.append(h)

@@ -72,6 +72,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
     def get_tests(self):
 
         rejected_txs = []
+
         def on_reject(conn, msg):
             if msg.message == b'tx':
                 rejected_txs.append(msg)

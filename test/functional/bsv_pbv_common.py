@@ -10,6 +10,7 @@ from test_framework.util import wait_until
 
 def wait_for_waiting_blocks(hashes, node, log):
     oldArray = []
+
     def should_wait():
         nonlocal oldArray
         blocks = node.getwaitingblocks()
@@ -22,6 +23,7 @@ def wait_for_waiting_blocks(hashes, node, log):
 
 def wait_for_validating_blocks(hashes, node, log):
     oldArray = []
+
     def should_wait():
         nonlocal oldArray
         blocks = node.getcurrentlyvalidatingblocks()
@@ -34,6 +36,7 @@ def wait_for_validating_blocks(hashes, node, log):
 
 def wait_for_not_validating_blocks(hashes, node, log):
     oldArray = []
+
     def should_wait():
         nonlocal oldArray
         blocks = node.getcurrentlyvalidatingblocks()

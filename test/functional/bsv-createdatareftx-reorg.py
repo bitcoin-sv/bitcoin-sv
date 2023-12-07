@@ -75,6 +75,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             '8884052ad433': {'mydata':'byby world2'}}
 
         brfcDatas = [brfcDataA, brfcDataB]
+
         def datarefToScript (data):
             brfcDataJson = json.dumps(data, indent=0)
             brfcDataJson = brfcDataJson.replace('\n', '')

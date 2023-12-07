@@ -194,6 +194,7 @@ def chop(x, n=2):
     x = list(x)
     if n < 2:
         return [x]
+
     def gen():
         m = len(x) / n
         i = 0
@@ -317,6 +318,7 @@ class tx_set(set):
                     last = None
             if last is not None:
                 yield last
+
         def show_slices(slices):
             for s in slices:
                 start = str(s.start) if s.start > 0 else ""

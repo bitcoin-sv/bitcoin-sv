@@ -154,6 +154,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # A handler to catch any reject messages.
         # - it is expected to get only 'too-long-validation-time' reject msgs.
         rejected_txs = []
+
         def on_reject(conn, msg):
             assert_equal(msg.reason, b'too-long-validation-time')
             rejected_txs.append(msg)

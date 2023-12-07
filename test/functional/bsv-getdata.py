@@ -25,16 +25,19 @@ class GetDataTest(BitcoinTestFramework):
         with self.run_node_with_connections("send GETDATA messages and check responses", 0, [], 1) as p2p_connections:
 
             receivedBlocks = set()
+
             def on_block(conn, message):
                 nonlocal receivedBlocks
                 receivedBlocks.add(message.block.hash)
 
             receivedTxs = set()
+
             def on_tx(conn, message):
                 nonlocal receivedTxs
                 receivedTxs.add(message.tx.hash)
 
             receivedTxsNotFound = set()
+
             def on_notfound(conn, message):
                 nonlocal receivedTxsNotFound
                 for inv in message.inv:

@@ -353,6 +353,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             self.log.info("====== rejected_txns[%s] = %s", k, v)
         assert_equal(len(rejected_txns), 1)
         assert_equal(len(rejected_txns['invalid']), len(bad) + len(orphan))
+
         def reject_reason(x):
             return x['reject_reason']
         invalid = {k: list(v)
@@ -470,6 +471,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
     def get_tests(self):
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         # Shorthand for functions

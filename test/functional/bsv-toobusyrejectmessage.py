@@ -42,6 +42,7 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
 
         askedFor = {}
         rejectSent = False
+
         def on_getdata(conn, message):
             if (conn in askedFor):
                 askedFor[conn] += 1

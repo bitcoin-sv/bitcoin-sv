@@ -85,6 +85,7 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 
         getDataMessages = []
+
         def on_getdata(conn, message):
             getDataMessages.append(message)
 

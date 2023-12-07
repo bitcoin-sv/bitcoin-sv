@@ -97,6 +97,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         rejected_blocks = []
         rejected_txs = []
+
         def on_reject(conn, msg):
             if (msg.message == b'block'):
                 rejected_blocks.append(msg)

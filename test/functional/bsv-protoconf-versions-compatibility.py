@@ -108,6 +108,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 1. test
         # Send protoconf with 0 fields. Bitcoind should disconnect the node, since minimum number of fields is 1
         test_node = mininode.NodeConnCB()
+
         def send_protoconf(conn):
             conn.send_message(mininode.msg_protoconf(CProtoconfWithZeroFields()))
         test_node.send_protoconf = send_protoconf
@@ -121,6 +122,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 2. test
         # Send protoconf with 1B of max_recv_payload_length. Node should be disconnected, since minimum message size is 1MiB
         test_node = mininode.NodeConnCB()
+
         def send_protoconf_1B(conn):
             conn.send_message(mininode.msg_protoconf(mininode.CProtoconf(1, 1)))
         test_node.send_protoconf = send_protoconf_1B
@@ -134,11 +136,13 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 3. test
         # Send protoconf with numberOfFields=2. max_recv_payload_length should be parsed correctly.
         test_node = mininode.NodeConnCB()
+
         def send_protoconf_2Fields(conn):
             conn.send_message(mininode.msg_protoconf(CProtoconfWithNewField(2, MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT, 5)))
         test_node.send_protoconf = send_protoconf_2Fields
 
         wanted_inv_lengths = []
+
         def on_getdata(conn, message):
             wanted_inv_lengths.append(len(message.inv))
         test_node.on_getdata = on_getdata
@@ -178,6 +182,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 4.test
         # Send protoconf that is LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH of size
         test_node = mininode.NodeConnCB()
+
         def send_largest_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
             conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH))
@@ -191,6 +196,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 5.test
         # Send protoconf that is larger that LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
         test_node = mininode.NodeConnCB()
+
         def send_oversized_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1
             conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH+1))

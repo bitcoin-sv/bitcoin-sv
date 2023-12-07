@@ -359,6 +359,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         self.log.info("Test sendrawtransactions with overriden policy values")
         i_utxo = 0
+
         def falses(no):
             return [{'reject_reason': False} for _ in range(no)]
 
