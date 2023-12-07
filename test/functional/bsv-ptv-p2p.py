@@ -404,5 +404,6 @@ class PTVP2PTest(ComparisonTestFramework):
             # Only tc6_num_of_subsets txns are allowed to be in the mempool from the given ds set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), tc6_num_of_subsets)
 
+
 if __name__ == '__main__':
     PTVP2PTest().main()

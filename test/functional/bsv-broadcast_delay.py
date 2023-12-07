@@ -142,5 +142,6 @@ class BroadcastDelayTest(BitcoinTestFramework):
                 assert(propagation_delay < datetime.timedelta(milliseconds=1500)) # allow variation of +-500ms
                 assert(propagation_delay > datetime.timedelta(milliseconds=500))
 
+
 if __name__ == '__main__':
     BroadcastDelayTest().main()

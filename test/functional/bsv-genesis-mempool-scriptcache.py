@@ -186,5 +186,6 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         assert_equal(False, tx5.hash in node.getrawmempool())
         assert_equal(False, tx6.hash in node.getrawmempool())
 
+
 if __name__ == '__main__':
     BSVGenesisMempoolScriptCache().main()

@@ -44,5 +44,6 @@ class MagicBytes(BitcoinTestFramework):
         assert(self.nodes[0].getconnectioncount() == 0)
         assert(self.nodes[1].getconnectioncount() == 0)
 
+
 if __name__ == '__main__':
     MagicBytes().main()

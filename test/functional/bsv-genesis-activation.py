@@ -136,5 +136,6 @@ class BSVGenesisActivation(ComparisonTestFramework):
         # Now we are at height 108.
         assert_equal(node.getblock(node.getbestblockhash())['height'], 108)
 
+
 if __name__ == '__main__':
     BSVGenesisActivation().main()

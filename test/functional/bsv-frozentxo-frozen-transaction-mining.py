@@ -315,5 +315,6 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         bt = [template_txns[0]['txid'], template_txns[1]['txid']]
         assert(spend_frozen_tx1a.hash in mp and spend_frozen_tx2a.hash in bt)
 
+
 if __name__ == '__main__':
     FrozenTXOTransactionMining().main()

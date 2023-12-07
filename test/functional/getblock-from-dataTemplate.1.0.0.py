@@ -43,5 +43,6 @@ class GetBlockRPCTest(BitcoinTestFramework):
         assert_equal(block['hash'], "56fe3682f1d08b3fc9c21349b5a56b6faca0930fbbe2073b183942fe6e9a912c")
         assert_equal(block['size'], 834)
 
+
 if __name__ == '__main__':
     GetBlockRPCTest().main()

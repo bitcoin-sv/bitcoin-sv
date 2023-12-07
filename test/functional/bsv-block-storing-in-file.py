@@ -150,5 +150,6 @@ class BlockStoringInFile(BitcoinTestFramework):
         self.__test_one_block_in_file_second_block_exceeds_preferred_file_size(self.runner_nodes[1])
         self.__test_block_larger_than_preferred_file_size(self.runner_nodes[2])
 
+
 if __name__ == '__main__':
     BlockStoringInFile().main()

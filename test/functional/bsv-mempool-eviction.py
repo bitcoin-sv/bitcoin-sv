@@ -248,5 +248,6 @@ class Evictions(BitcoinTestFramework):
             # make sure that we are using the tx database
             assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
 
+
 if __name__ == '__main__':
     Evictions().main()

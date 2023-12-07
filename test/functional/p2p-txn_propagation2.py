@@ -70,5 +70,6 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
         assert_equal(self.nodes[0].getpeerinfo()[0]['txninvsize'], 10)
         assert_equal(self.nodes[0].getmempoolinfo()['size'], 20)
 
+
 if __name__ == '__main__':
     TxnPropagationAfterBlock().main()

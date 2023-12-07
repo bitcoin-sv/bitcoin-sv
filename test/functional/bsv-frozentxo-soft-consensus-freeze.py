@@ -361,5 +361,6 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         self._test_soft_consensus_freeze_competing_chains(spendable_out_6, send_node)
         self._test_soft_consensus_freeze_invalid_frozen_block(spendable_out_7, send_node)
 
+
 if __name__ == '__main__':
     FrozenTXOSoftConsensusFreeze().main()

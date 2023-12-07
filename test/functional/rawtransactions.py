@@ -395,5 +395,6 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(parent_tx_1 in ancestors_txids)
         assert(parent_tx_2 in ancestors_txids)
 
+
 if __name__ == '__main__':
     RawTransactionsTest().main()

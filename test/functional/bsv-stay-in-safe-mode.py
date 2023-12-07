@@ -108,5 +108,6 @@ class StayInSafeMode(BitcoinTestFramework):
         self.run_test_case("Send active chain first and then headers from second branch. Wait between sending.", order=1, wait=True, numberOfSafeModeLevelChanges=2)
         self.run_test_case("Send headers from second branch first and then active chain. Wait between sending.", order=-1, wait=True)
 
+
 if __name__ == '__main__':
     StayInSafeMode().main()

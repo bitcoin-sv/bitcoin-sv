@@ -59,5 +59,6 @@ class SpamLog(BitcoinTestFramework):
         self.log.info("Logile size = {}".format(size))
         assert(size < 1000000)
 
+
 if __name__ == '__main__':
     SpamLog().main()

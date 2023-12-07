@@ -70,5 +70,6 @@ class DecodeRawTransactionsTest(BitcoinTestFramework):
         getrawtx2 = self.nodes[0].getrawtransaction(rawtx2_sent)
         assert_equal(getrawtx2, rawtx2_signed["hex"])
 
+
 if __name__ == '__main__':
     DecodeRawTransactionsTest().main()

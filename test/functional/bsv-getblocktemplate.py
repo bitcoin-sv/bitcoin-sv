@@ -153,5 +153,6 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             assert_equal(batch[3]["error"]["message"], "Method not found")
             assert_equal(batch[3]["result"], None)
 
+
 if __name__ == '__main__':
     GetBlockTemplateRPCTest().main()

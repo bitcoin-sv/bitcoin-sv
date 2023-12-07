@@ -330,5 +330,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         dataref_txids = [x['txid'] for x in dataref_dump]
         assert(dataref_txid not in dataref_txids)
 
+
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

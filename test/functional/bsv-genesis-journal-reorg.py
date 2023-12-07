@@ -140,5 +140,6 @@ class JournalReorg(BitcoinTestFramework):
         # check we didn't hit a reorg error
         assert(not check_for_log_msg(self, "ERROR: Failed to find and remove txn", "/node1"))
 
+
 if __name__ == '__main__':
     JournalReorg().main()

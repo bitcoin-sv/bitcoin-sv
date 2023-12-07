@@ -63,5 +63,6 @@ class UpdateInvalidChainAtStartup(BitcoinTestFramework):
         wait_for_tip_status(self.nodes[0], "129cae8395e28cdf8acda1e78853d45b037b4945edc7f13e799db2ab5354488f", "invalid")
         wait_for_tip_status(self.nodes[0], "4fdd65af7b30f80d97b89d7584ac66a6e5d5f81ce971b218b7380202a076146c", "invalid")
 
+
 if __name__ == '__main__':
     UpdateInvalidChainAtStartup().main()

@@ -330,5 +330,6 @@ class AuthConnTestReputation(BitcoinTestFramework):
         assert (self.isAuthenticated(0))
         assert (self.isAuthenticated(1))
 
+
 if __name__ == '__main__':
     AuthConnTestReputation().main()

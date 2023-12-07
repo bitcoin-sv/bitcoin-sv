@@ -85,5 +85,6 @@ class P2PVersion(BitcoinTestFramework):
         # Check clear log message was generated
         assert check_for_log_msg(self, "Failed to process version: (Badly formatted association ID", "/node0")
 
+
 if __name__ == '__main__':
     P2PVersion().main()

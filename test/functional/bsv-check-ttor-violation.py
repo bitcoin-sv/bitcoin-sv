@@ -210,5 +210,6 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
         # we should find information about TTOR being violated
         assert_equal(ttor_violation_log, True)
 
+
 if __name__ == '__main__':
     BSVCheckTTORViolation().main()

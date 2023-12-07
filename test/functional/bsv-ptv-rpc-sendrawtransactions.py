@@ -828,5 +828,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             # Run test case.
             self.run_scenario7(conn, out, conn.rpc.sendrawtransaction, dontcheckfee=True, timeout=20)
 
+
 if __name__ == '__main__':
     RPCSendRawTransactions().main()

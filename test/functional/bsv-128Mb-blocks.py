@@ -71,5 +71,6 @@ class BSV128MBlocks(ComparisonTestFramework):
         block(3, spend=out[1], block_size=self.options.excessive_block_size)
         yield self.accepted()
 
+
 if __name__ == '__main__':
     BSV128MBlocks().main()

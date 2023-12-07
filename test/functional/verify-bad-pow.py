@@ -34,5 +34,6 @@ class VerifyWithoutPowTest(BitcoinTestFramework):
         submitResult = node.verifyblockcandidate(ToHex(block))
         assert submitResult == None
 
+
 if __name__ == '__main__':
     VerifyWithoutPowTest().main()

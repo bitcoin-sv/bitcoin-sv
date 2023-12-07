@@ -180,5 +180,6 @@ class NonFinalP2PTest(BitcoinTestFramework):
         # Use sendrawtransactions rpc interface.
         self.test_case(rpc.sendrawtransactions)
 
+
 if __name__ == '__main__':
     NonFinalP2PTest().main()

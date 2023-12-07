@@ -84,5 +84,6 @@ class AcceptHeaderWithAncestor(BitcoinTestFramework):
             connection.cb.send_message(msg_block(genesis_block))
             wait_until(lambda: check_for_log_msg(self, "ERROR: FindPreviousBlockIndex: prev block not found", "/node0"))
 
+
 if __name__ == '__main__':
     AcceptHeaderWithAncestor().main()

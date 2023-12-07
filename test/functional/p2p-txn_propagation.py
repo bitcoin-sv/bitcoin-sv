@@ -105,5 +105,6 @@ class P2PTxnPropagation(BitcoinTestFramework):
         self.test_full_transactions()
         self.test_basic_transactions()
 
+
 if __name__ == '__main__':
     P2PTxnPropagation().main()

@@ -380,5 +380,6 @@ class MiningJournal(BitcoinTestFramework):
         # Shutdown/restart with mempool persist
         self.test_shutdown_restart(0)
 
+
 if __name__ == '__main__':
     MiningJournal().main()

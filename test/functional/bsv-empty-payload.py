@@ -36,5 +36,6 @@ class TestEmptyPayload(BitcoinTestFramework):
             wait_until(lambda: check_for_log_msg(self, "Unparseable reject message received", "/node0"), timeout=10)
             time.sleep(2)
 
+
 if __name__ == '__main__':
     TestEmptyPayload().main()

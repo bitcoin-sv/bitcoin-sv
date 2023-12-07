@@ -182,5 +182,6 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         # Mining should consume almost whole block size
         assert(block2size > DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER - 2 * self.data_carrier_size)
 
+
 if __name__ == '__main__':
     BSVGeneratedBlockSizeActivation().main()

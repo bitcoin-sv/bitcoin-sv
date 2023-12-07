@@ -207,5 +207,6 @@ class CompetingChainsTest(BitcoinTestFramework):
         balance = node0.rpc.getbalance()
         assert (balance != None)
 
+
 if __name__ == '__main__':
     CompetingChainsTest().main()

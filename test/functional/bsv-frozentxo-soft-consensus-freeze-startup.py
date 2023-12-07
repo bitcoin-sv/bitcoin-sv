@@ -104,5 +104,6 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         assert_equal(new_valid_tip.hash, self.nodes[0].getbestblockhash())
         assert_equal(new_valid_tip.hash, self.nodes[1].getbestblockhash())
 
+
 if __name__ == '__main__':
     FrozenTXOSoftConsensusFreezeStartup().main()

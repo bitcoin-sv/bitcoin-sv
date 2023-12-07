@@ -820,6 +820,8 @@ class Timings():
             json.dump(merged_timings, f, indent=True)
 
 # Prints a user friendly report of currently running jobs
+
+
 printed_lines = 0
 
 
@@ -862,6 +864,7 @@ def check_jobs(jobs=None):
 
     if printed_header:
         print("  *********************************")
+
 
 if __name__ == '__main__':
     main()

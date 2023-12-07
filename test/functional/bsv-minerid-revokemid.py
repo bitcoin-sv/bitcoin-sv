@@ -150,5 +150,6 @@ class RevokeMid(BitcoinTestFramework):
             assert(minerids1['miners'][0]['minerids'][0]['state'] == 'CURRENT')
             assert(minerids2['miners'][0]['minerids'][0]['state'] == 'CURRENT')
 
+
 if __name__ == '__main__':
     RevokeMid().main()

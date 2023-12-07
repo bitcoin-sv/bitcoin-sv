@@ -110,5 +110,6 @@ class LargeBlockFileReindex(ComparisonTestFramework):
             sleep(0.1)
         assert_equal(node.getblockcount(), blockcount)
 
+
 if __name__ == '__main__':
     LargeBlockFileReindex().main()

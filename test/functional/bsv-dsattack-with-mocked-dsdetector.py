@@ -361,5 +361,6 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         exchange.stop_webhook_server()
 
+
 if __name__ == '__main__':
     CompetingChainsTest().main()

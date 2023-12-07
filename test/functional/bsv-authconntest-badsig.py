@@ -294,5 +294,6 @@ class AuthConnTestReputation(BitcoinTestFramework):
         # this must fail because we provided bad signature
         assert (not self.isAuthenticated(1))  # node0 good and authenticated after reconnection
 
+
 if __name__ == '__main__':
     AuthConnTestReputation().main()

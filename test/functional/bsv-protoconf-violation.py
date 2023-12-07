@@ -58,5 +58,6 @@ class BsvProtoconfViolationTest(BitcoinTestFramework):
         assert(self.nodes[0].closed) # disconnected
         assert_equal(len(self.nodes[0].listbanned()), 0) # After, there are also zero banned node
 
+
 if __name__ == '__main__':
     BsvProtoconfViolationTest().main()

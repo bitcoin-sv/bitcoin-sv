@@ -84,5 +84,6 @@ class ExitSafeModeForDistantFork(BitcoinTestFramework):
                     return False
             wait_until(is_not_safemode, timeout=10, check_interval=0.2) # Only a small timeout is needed since safe mode level is changed shortly after the block has become tip.
 
+
 if __name__ == '__main__':
     ExitSafeModeForDistantFork().main()

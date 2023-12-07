@@ -66,5 +66,6 @@ class ParallelBlockDownloadTest(BitcoinTestFramework):
         # Check that a parallel fetch to node0 was triggered from node2
         assert(check_for_log_msg(self, "Triggering parallel block download for {}".format(large_block_hash), "/node2"))
 
+
 if __name__ == '__main__':
     ParallelBlockDownloadTest().main()

@@ -344,5 +344,6 @@ class PVQTimeoutTest(ComparisonTestFramework):
             self.check_mempool(conn.rpc, std_and_nonstd_txs, timeout=30)
             assert_equal(conn.rpc.getmempoolinfo()['size'], tc5_1_txs_num+tc5_2_txs_num)
 
+
 if __name__ == '__main__':
     PVQTimeoutTest().main()

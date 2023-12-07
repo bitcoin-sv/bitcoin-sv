@@ -130,5 +130,6 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
             # active chain
             conn1.rpc.getbalance()
 
+
 if __name__ == '__main__':
     TriggerSafeModeByIvalidChain().main()

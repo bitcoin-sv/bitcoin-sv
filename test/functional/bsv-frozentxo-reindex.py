@@ -225,5 +225,6 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self.log.info(send_node.rpc.getblockchaininfo())
         assert_equal(send_node.rpc.getbestblockhash(), rejected_block_hash)
 
+
 if __name__ == '__main__':
     FrozenTXOReindex().main()

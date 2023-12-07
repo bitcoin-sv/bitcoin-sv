@@ -189,5 +189,6 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             self.test_node.cb.wait_for_hdrsen()
             assert_equal(len(headersEnriched), 1)
 
+
 if __name__ == '__main__':
     BsvHeadersEnrichedTest().main()

@@ -201,5 +201,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         minerinfotx, _ = self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)
 
+
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

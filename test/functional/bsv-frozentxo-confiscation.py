@@ -504,5 +504,6 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self._check_confiscation(node, node1)
         self._check_mempool_removal(node)
 
+
 if __name__ == '__main__':
     FrozenTXOConfiscation().main()

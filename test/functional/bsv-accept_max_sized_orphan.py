@@ -73,5 +73,6 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
             conn.send_message(msg_tx(tx_parent))
             check_mempool_equals(conn.rpc, [tx_parent, tx_orphan])
 
+
 if __name__ == '__main__':
     TestMaxSizedOrphan().main()

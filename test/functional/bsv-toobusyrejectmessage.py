@@ -96,5 +96,6 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             assert_equal(next(iter(askedFor.values())), 2)
             assert_equal(len(askedFor), 1)
 
+
 if __name__ == '__main__':
     TooBusyRejectMsgTest().main()

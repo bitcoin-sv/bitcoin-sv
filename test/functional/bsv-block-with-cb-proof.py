@@ -189,5 +189,6 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         # also check in 2nd node that received the newly mined block if merkleeproof is present and if it's correct
         self.check_node(txnNode, bestHash)
 
+
 if __name__ == '__main__':
     BSVBlockWithCBProof().main()

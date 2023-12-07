@@ -62,5 +62,6 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
 
         return
 
+
 if __name__ == '__main__':
     TestSendHeadersBanScore().main()

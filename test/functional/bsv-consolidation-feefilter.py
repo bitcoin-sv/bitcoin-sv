@@ -194,5 +194,6 @@ class FeeFilterTest(BitcoinTestFramework):
         assert(expectedInvsReceived([txid4], test_node, 60))
         assert(not expectedInvsReceived([txid3], test_node, 5))
 
+
 if __name__ == '__main__':
     FeeFilterTest().main()

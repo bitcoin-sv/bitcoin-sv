@@ -67,5 +67,6 @@ class BSVBigBlockRestCall(ComparisonTestFramework):
         # getting big block with REST should not fail
         self.getLargeBlockWithoutFailing(maxBlock.hash, blockSize)
 
+
 if __name__ == '__main__':
     BSVBigBlockRestCall().main()

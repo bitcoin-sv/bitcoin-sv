@@ -148,6 +148,7 @@ def strip_common_prefix(names):
 def assert_eq(a,b):
     assert (a==b), f"{a} != {b}"
 
+
 assert_eq(strip_common_prefix(["a/b"]), ["a"])
 assert_eq(strip_common_prefix(["", ""]), ["", ""])
 assert_eq(strip_common_prefix(["a", "a"]), ["", ""])
@@ -158,6 +159,7 @@ assert_eq(strip_common_prefix(["ab"]), ["ab"])
 def flip(names):
     return [name[::-1] for name in names]
 
+
 assert_eq(flip(["ab", "ac"]), ["ba", "ca"])
 
 
@@ -166,6 +168,7 @@ def unique_parts(names):
     front = strip_common_prefix(names)
     ret = flip(strip_common_prefix(flip(front)))
     return ret
+
 
 assert_eq(unique_parts(["ab1c", "ad2c"]), ["b1", "d2"])
 assert_eq(unique_parts(["a/b/c"]), ["a"])
@@ -310,6 +313,7 @@ def main():
         show_percentiles(paths, histogram_filter=histogram_filter)
 
     plt.show()
+
 
 if __name__ == "__main__":
     main()

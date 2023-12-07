@@ -71,5 +71,6 @@ class GetDataTest(BitcoinTestFramework):
             wait_until(lambda: known_hash in receivedTxs)
             assert_equal(len(receivedTxs), 1)
 
+
 if __name__ == '__main__':
     GetDataTest().main()

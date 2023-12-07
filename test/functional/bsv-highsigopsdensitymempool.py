@@ -64,5 +64,6 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         for tx in txsBasics:
             assert_equal(True, tx.hash in blockTxs)
 
+
 if __name__ == '__main__':
     MempoolHighSigopsDensity().main()

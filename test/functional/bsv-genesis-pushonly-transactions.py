@@ -66,5 +66,6 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
 
         self.assert_rejected_transaction(out[2])
 
+
 if __name__ == '__main__':
     BSVGenesisActivationTransactions().main()

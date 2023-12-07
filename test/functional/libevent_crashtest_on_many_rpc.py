@@ -43,5 +43,6 @@ class RpcFloddingTest (BitcoinTestFramework):
         for _ in range(2000):
             r = requests.get("http://" + url.hostname + ":" + str(url.port), auth=(url.username, url.password), data=json.dumps({}))
 
+
 if __name__ == '__main__':
     RpcFloddingTest().main()

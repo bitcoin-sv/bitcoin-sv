@@ -219,5 +219,6 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
 
             self.test_invalid_input(p2p_0)
 
+
 if __name__ == '__main__':
     RovokeMinerIdRpc().main()

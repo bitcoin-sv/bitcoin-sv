@@ -160,5 +160,6 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         assert_equal(confirmations, 1)
         self.log.info("test 3 - low fee donotcheck tx was minded:PASS")
 
+
 if __name__ == '__main__':
     NoCheckCollisionTest().main()

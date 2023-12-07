@@ -112,5 +112,6 @@ class PBVReorgShutdown(BitcoinTestFramework):
 
         self.stop_node(0)
 
+
 if __name__ == '__main__':
     PBVReorgShutdown().main()

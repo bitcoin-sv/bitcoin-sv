@@ -39,5 +39,6 @@ class TestShortBlocktxn(BitcoinTestFramework):
             conn.send_message(msg_shortblocktxn())
             wait_until(lambda: check_for_log_msg(self, "shorter than its ", "/node0"), timeout=10)
 
+
 if __name__ == '__main__':
     TestShortBlocktxn().main()

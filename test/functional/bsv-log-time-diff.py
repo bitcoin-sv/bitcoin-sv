@@ -91,5 +91,6 @@ class LogTimeDiffTest(BitcoinTestFramework):
 
             assert_equal(time_difference_log_found, True)
 
+
 if __name__ == '__main__':
     LogTimeDiffTest().main()

@@ -150,5 +150,6 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         assert_equal(len(funds), 1)
         assert_equal(funds[0], {"txOut" : {"txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout" : 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
 
+
 if __name__ == '__main__':
     FrozenTXORPCUnfreezeFunds().main()

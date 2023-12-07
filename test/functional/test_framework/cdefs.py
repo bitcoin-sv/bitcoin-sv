@@ -71,6 +71,7 @@ _txnvalidator_h_fh.close()
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
+
 INT64_MAX = 2**63-1
 UINT32_MAX = 2**32-1
 # This constant is currently needed to evaluate some that are formulas

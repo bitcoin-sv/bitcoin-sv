@@ -96,5 +96,6 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         self._test_minimal_freeze(spendable_out_1, send_node)
         self._test_unlimited_freeze(spendable_out_2, send_node)
 
+
 if __name__ == '__main__':
     FrozenTXOSoftConsensusFreeze().main()

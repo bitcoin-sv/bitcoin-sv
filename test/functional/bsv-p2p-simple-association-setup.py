@@ -62,5 +62,6 @@ class P2PSimpleAssociation(BitcoinTestFramework):
                 elif type(association.stream_policy) is DefaultStreamPolicy:
                     assert_equal(association.callbacks.pong_stream, StreamType.GENERAL)
 
+
 if __name__ == '__main__':
     P2PSimpleAssociation().main()

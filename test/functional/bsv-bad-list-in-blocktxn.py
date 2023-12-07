@@ -40,5 +40,6 @@ class TestBadTxnList(BitcoinTestFramework):
 
             wait_until(lambda: check_for_log_msg(self, "read(): end of data: iostream error", "/node0"), timeout=60)
 
+
 if __name__ == '__main__':
     TestBadTxnList().main()

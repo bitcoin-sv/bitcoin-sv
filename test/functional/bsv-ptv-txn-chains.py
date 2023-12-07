@@ -136,5 +136,6 @@ class PTVTxnChains(ComparisonTestFramework):
             # Run test case.
             self.run_scenario1(conn, 100, 50, out, timeout=60)
 
+
 if __name__ == '__main__':
     PTVTxnChains().main()

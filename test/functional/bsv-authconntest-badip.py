@@ -293,5 +293,6 @@ class AuthConnTestReputation(BitcoinTestFramework):
         # this must fail because nodes advertise mismatching ip-addresses
         assert (not self.isAuthenticated(1))
 
+
 if __name__ == '__main__':
     AuthConnTestReputation().main()

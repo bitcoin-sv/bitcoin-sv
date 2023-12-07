@@ -212,5 +212,6 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
+
 if __name__ == '__main__':
     DoubleSpendHandlerErrors().main()

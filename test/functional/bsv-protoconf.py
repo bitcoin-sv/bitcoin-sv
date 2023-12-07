@@ -198,5 +198,6 @@ class BsvProtoconfTest(BitcoinTestFramework):
         # Send many INV messages and check when they fill up queue in bitcoind and some of them get missing
         self.run_recvinvqueuefactor_test(ONE_MiB, 2)
 
+
 if __name__ == '__main__':
     BsvProtoconfTest().main()

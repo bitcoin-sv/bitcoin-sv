@@ -506,5 +506,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self._test_policy_freeze(out_policy_freeze_txo_rpc, rpc_send_node)
         self._test_consensus_freeze(out_consensus_freeze_txo_rpc, rpc_send_node)
 
+
 if __name__ == '__main__':
     FrozenTXOTransactionFreeze().main()

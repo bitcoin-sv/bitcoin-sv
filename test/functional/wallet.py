@@ -437,5 +437,6 @@ class WalletTest(BitcoinTestFramework):
         assert(extra_txid in [tx["txid"]
                               for tx in self.nodes[0].listtransactions()])
 
+
 if __name__ == '__main__':
     WalletTest().main()

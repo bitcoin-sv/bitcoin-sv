@@ -77,5 +77,6 @@ class TriggerSafeModeByValidChain(BitcoinTestFramework):
             # we should exit safe mode because fork base is too far from active tip
             assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 
+
 if __name__ == '__main__':
     TriggerSafeModeByValidChain().main()

@@ -147,5 +147,6 @@ class GetRawMempoolTest(BitcoinTestFramework):
             assert_equal(batch[3]["error"], None)
             assert_equal(batch[4]["error"], None)
 
+
 if __name__ == '__main__':
     GetRawMempoolTest().main()

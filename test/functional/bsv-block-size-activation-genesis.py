@@ -61,5 +61,6 @@ class BSVBlockSizeTest(ComparisonTestFramework):
         # Current block height is 105 - genesis
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight)
 
+
 if __name__ == '__main__':
     BSVBlockSizeTest().main()

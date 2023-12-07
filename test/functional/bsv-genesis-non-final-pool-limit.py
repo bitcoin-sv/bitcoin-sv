@@ -69,5 +69,6 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
         yield TestInstance([[tx1, DiscardResult()]])
         assert(tx1.hash not in self.nodes[0].getrawnonfinalmempool())
 
+
 if __name__ == '__main__':
     BSVGenesis_NonFinalPoolLimit().main()

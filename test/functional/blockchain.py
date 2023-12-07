@@ -418,5 +418,6 @@ class BlockchainTest(BitcoinTestFramework):
         blockjson = self.nodes[0].getblockheader(blockhash)
         assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
 
+
 if __name__ == '__main__':
     BlockchainTest().main()

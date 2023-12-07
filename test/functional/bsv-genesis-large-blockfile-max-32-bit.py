@@ -124,5 +124,6 @@ class LargeBlockFileMax32Bit(ComparisonTestFramework):
             txCopy = node.getrawtransaction(txId, 1)
             assert_equal(txId, txCopy['txid'])
 
+
 if __name__ == '__main__':
     LargeBlockFileMax32Bit().main()

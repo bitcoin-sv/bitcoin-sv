@@ -106,5 +106,6 @@ class SafeModeIBDTest(BitcoinTestFramework):
 
         self.kill_server()
 
+
 if __name__ == '__main__':
     SafeModeIBDTest().main()

@@ -145,5 +145,6 @@ class GetdataDataref(BitcoinTestFramework):
             conn.send_message(msg_getdata([CInv(CInv.DATAREF_TX, dataref3.sha256)]))
             wait_until(lambda: dataref3.sha256 in conn.cb.notFound, timeout=10, lock=mininode_lock)
 
+
 if __name__ == '__main__':
     GetdataDataref().main()

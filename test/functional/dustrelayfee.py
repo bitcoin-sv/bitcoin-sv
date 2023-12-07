@@ -104,5 +104,6 @@ class DustRelayFeeTest(BitcoinTestFramework):
         # 1. Default settings of BSV node before Genesis release
         self.test_node_with_fees(0)
 
+
 if __name__ == '__main__':
     DustRelayFeeTest().main()

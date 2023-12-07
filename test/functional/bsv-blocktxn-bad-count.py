@@ -40,5 +40,6 @@ class BlockTxnBadCount(BitcoinTestFramework):
             wait_until(lambda: check_for_log_msg(self, "reason: Over-long", "/node0"),
                        timeout=3)
 
+
 if __name__ == '__main__':
     BlockTxnBadCount().main()

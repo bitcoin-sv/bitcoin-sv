@@ -95,5 +95,6 @@ class MaxBlockTxn(ComparisonTestFramework):
         assert(peer.last_block.block.sha256 == b1.sha256)
         peer.clear_block_data()
 
+
 if __name__ == '__main__':
     MaxBlockTxn().main()

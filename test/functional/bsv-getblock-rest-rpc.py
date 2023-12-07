@@ -127,5 +127,6 @@ class BSVGetBlock(ComparisonTestFramework):
         assert_equal(batch[3]["result"], None)
         assert_equal(batch[3]["error"]["message"], "Method not found")
 
+
 if __name__ == '__main__':
     BSVGetBlock().main()

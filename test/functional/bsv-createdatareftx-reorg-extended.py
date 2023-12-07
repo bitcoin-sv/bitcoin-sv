@@ -283,5 +283,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0)
 
+
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

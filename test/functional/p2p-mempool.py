@@ -53,5 +53,6 @@ class P2PMempoolTests(BitcoinTestFramework):
         for test_case in test_cases:
             runTestWithParams(test_case[0], test_case[1], test_case[2])
 
+
 if __name__ == '__main__':
     P2PMempoolTests().main()

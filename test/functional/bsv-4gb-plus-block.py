@@ -179,5 +179,6 @@ class BigBlockTests(BitcoinTestFramework):
             # Verify node1 also got the big block
             assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
+
 if __name__ == '__main__':
     BigBlockTests().main()

@@ -214,5 +214,6 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
         result = self.nodes[0].clearBlacklists({"removeAllEntries" : True})
         assert_equal(result["numRemovedEntries"], 0) # nothing should be removed when nothing is frozen
 
+
 if __name__ == '__main__':
     FrozenTXORPCFreezeFunds().main()

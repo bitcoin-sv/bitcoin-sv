@@ -79,5 +79,6 @@ class AddNodeTest(BitcoinTestFramework):
         assert_equal(self.count_addnode_peers(0), 3)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 3)
 
+
 if __name__ == '__main__':
     AddNodeTest().main()

@@ -109,5 +109,6 @@ class SelfishMiningTest(BitcoinTestFramework):
         node1.generate(1)
         wait_until(lambda: check_for_log_msg(self, "7/7 transactions have a fee above the config blockmintxfee value. Block was either empty or none of its transactions are in our mempool.", "/node0"))
 
+
 if __name__ == '__main__':
     SelfishMiningTest().main()

@@ -166,5 +166,6 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         self.check_max_tx_size_policy([OP_RETURN]          , 1, "script with one OP_RETURN op code")
         self.check_max_tx_size_policy([OP_FALSE, OP_RETURN], 3, "script with three OP_FALSE, OP_RETURN op codes")
 
+
 if __name__ == '__main__':
     DataCarrierSizeTest().main()

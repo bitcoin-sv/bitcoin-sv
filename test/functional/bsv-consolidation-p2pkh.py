@@ -163,5 +163,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             0, self.extra_args[0],
             'Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time')
 
+
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

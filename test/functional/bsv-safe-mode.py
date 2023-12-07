@@ -291,5 +291,6 @@ class SafeMode(BitcoinTestFramework):
 
         self.kill_server()
 
+
 if __name__ == '__main__':
     SafeMode().main()

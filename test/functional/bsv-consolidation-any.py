@@ -243,5 +243,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     assert_equal (confirmations, 1)
                     self.log.info("test 2 - donation with one input and one output:PASS")
 
+
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

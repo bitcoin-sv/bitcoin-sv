@@ -325,5 +325,6 @@ class PtvCpfp(BitcoinTestFramework):
         # Test long chains of cpfp txs.
         self.test_case1(timeout=7200)
 
+
 if __name__ == '__main__':
     PtvCpfp().main()

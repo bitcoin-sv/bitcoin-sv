@@ -130,5 +130,6 @@ class BSVNodeSettings(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "-dustlimitfactor", "/node0"))
         wait_until(lambda: check_for_log_msg(self, "-blockmintxfee", "/node0"))
 
+
 if __name__ == '__main__':
     BSVNodeSettings().main()

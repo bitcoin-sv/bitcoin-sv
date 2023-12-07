@@ -96,5 +96,6 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         self.log.info("Created transactions %s and %s on height %d that tries to spend transaction on height %d",
             tx3.hash, tx4.hash, self.genesisactivationheight, self.genesisactivationheight)
 
+
 if __name__ == '__main__':
     BSVGenesisActivationTransactions().main()

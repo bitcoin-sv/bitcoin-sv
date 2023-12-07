@@ -508,5 +508,6 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert(tx8.hash in nonfinalmempool)
 
+
 if __name__ == '__main__':
     BSVGenesis_Restore_nLockTime_nSequence().main()

@@ -59,6 +59,7 @@ class UTXO:
         self.ndx = ndx
         self.key = key
 
+
 _cntr2 = 1
 
 
@@ -477,6 +478,7 @@ class ReorgTests(BitcoinTestFramework):
                                   _name='expected_mempool')
 
         assert expected_mempool == actual_mempool, expected_mempool.explain(actual_mempool, context=chains)
+
 
 if __name__ == '__main__':
     ReorgTests().main()

@@ -298,5 +298,6 @@ class PTVRPCTests(ComparisonTestFramework):
             # Run test case.
             self.run_scenario2(conn, num_of_chains, chain_length, out)
 
+
 if __name__ == '__main__':
     PTVRPCTests().main()

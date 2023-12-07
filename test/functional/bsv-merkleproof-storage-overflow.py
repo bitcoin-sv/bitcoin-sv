@@ -84,5 +84,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.create_merkleproof (True)
         assert self.find_overflow_message_in_logs()
 
+
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

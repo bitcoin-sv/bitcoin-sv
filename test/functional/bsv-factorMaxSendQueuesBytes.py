@@ -158,5 +158,6 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             assert_equal(self.num_peers, numberOfReceivedBlocksNewBlock)
             assert_equal(0, numberOfRejectedMsgs)
 
+
 if __name__ == '__main__':
     MaxSendQueuesBytesTest().main()

@@ -66,5 +66,6 @@ class GetArgAsBytesTest(BitcoinTestFramework):
         self.start_node(0, extra_args=["-maxmempool=0.3GiB"])
         assert_equal(self.nodes[0].getmempoolinfo()["maxmempool"], 322122547)
 
+
 if __name__ == '__main__':
     GetArgAsBytesTest().main()

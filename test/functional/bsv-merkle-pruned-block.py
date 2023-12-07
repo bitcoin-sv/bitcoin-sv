@@ -148,5 +148,6 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         assert_equal(headerEnriched.hash, bigBlockHash)
         assert(headerEnriched.coinbaseTxProof is None)
 
+
 if __name__ == '__main__':
     BSVMerkleProofInPrunedBlock().main()

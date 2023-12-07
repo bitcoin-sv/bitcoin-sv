@@ -307,5 +307,6 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         result = self.nodes[0].queryConfiscationTxidWhitelist()
         assert_equal(result["confiscationTxs"], [])
 
+
 if __name__ == '__main__':
     FrozenTXORPCWhitelistTx().main()

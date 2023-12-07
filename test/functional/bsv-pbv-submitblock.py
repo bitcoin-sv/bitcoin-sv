@@ -192,5 +192,6 @@ class PBVSubmitBlock(BitcoinTestFramework):
         # easier block should still be on tip
         assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
 
+
 if __name__ == '__main__':
     PBVSubmitBlock().main()

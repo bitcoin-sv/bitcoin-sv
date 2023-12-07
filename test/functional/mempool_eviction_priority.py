@@ -103,5 +103,6 @@ class MempoolEvictionPriorityTest(BitcoinTestFramework):
             assert(txid not in mempool)
         self.log.info("All transactions with insufficient fee were evicted.")
 
+
 if __name__ == '__main__':
     MempoolEvictionPriorityTest().main()

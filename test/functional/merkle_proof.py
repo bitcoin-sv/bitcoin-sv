@@ -258,5 +258,6 @@ class MerkleProofTest(BitcoinTestFramework):
                 new_disk_size += os.path.getsize(data_file_name)
         assert_equal(disk_size, new_disk_size)
 
+
 if __name__ == '__main__':
     MerkleProofTest().main()

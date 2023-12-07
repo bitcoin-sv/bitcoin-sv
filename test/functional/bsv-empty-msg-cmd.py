@@ -35,5 +35,6 @@ class TestEmptyCmd(BitcoinTestFramework):
             conn.send_message(msg_emptycmdmsg())
             wait_until(lambda: check_for_log_msg(self, "Unknown command \"\" from peer=0", "/node0"), timeout=10)
 
+
 if __name__ == '__main__':
     TestEmptyCmd().main()

@@ -93,5 +93,6 @@ class P2PConnections(BitcoinTestFramework):
     def run_test(self):
         self.test_connections()
 
+
 if __name__ == '__main__':
     P2PConnections().main()

@@ -163,5 +163,6 @@ class PBVCallGetDataBeforeBlockIsValidated(BitcoinTestFramework):
         self.__send_blocking_validation_waiting_block(block, node0)
         wait_for_validating_blocks({block.hash}, self.nodes[0], self.log)
 
+
 if __name__ == '__main__':
     PBVCallGetDataBeforeBlockIsValidated().main()

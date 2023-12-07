@@ -109,6 +109,7 @@ def check_seeds(network, dnsseeds, print_out=False):
     else:
         return False
 
+
 if __name__ == "__main__":
     network = "mainnet"
     if len(sys.argv) == 2:

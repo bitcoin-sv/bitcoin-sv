@@ -68,5 +68,6 @@ class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
         assert_equal(tx1.hash, tx[1])
         assert_equal(tx2.hash, tx[2])
 
+
 if __name__ == '__main__':
     BSVGenesisActivationTransactionsBeforeAfter().main()

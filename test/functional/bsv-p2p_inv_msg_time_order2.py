@@ -88,5 +88,6 @@ class TxnInvOrder(BitcoinTestFramework):
         sync_blocks(self.nodes)
         self.test_inventory_order()
 
+
 if __name__ == '__main__':
     TxnInvOrder().main()
