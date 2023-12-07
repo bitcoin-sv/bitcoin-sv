@@ -31,6 +31,7 @@ from test_framework.mininode import (NodeConn, NodeConnCB, NetworkThread, msg_tx
 import time
 import copy
 
+
 class NonFinalP2PTest(BitcoinTestFramework):
 
     def set_test_params(self):

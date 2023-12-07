@@ -9,6 +9,7 @@ Test: block P2P message with large tx count.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 
+
 class MsgBlockBadCount():
     command = b"block"
 
@@ -19,6 +20,7 @@ class MsgBlockBadCount():
                     0xff, 0xff, 0xff, 0xff,
                     0x01]) # large tx count (<= std::vector::max_size())
         return r
+
 
 class BlockBadCountTest(BitcoinTestFramework):
 

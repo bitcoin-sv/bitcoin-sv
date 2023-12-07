@@ -12,6 +12,7 @@ from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
+
 def make_coinbase(connection):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"
     tip = connection.rpc.getblock(connection.rpc.getbestblockhash())

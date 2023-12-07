@@ -45,6 +45,7 @@ class MaxOpsPerScriptTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
                              ),
     ]
 
+
 class MaxOpsPerScriptTest(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
     NAME = "Max operations per script limit, maxopsperscriptpolicy not defined"

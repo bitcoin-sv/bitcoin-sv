@@ -11,6 +11,7 @@ from test_framework.script import CScript, OP_TRUE, OP_RETURN
 import http.client
 import urllib.parse
 
+
 def http_get_call(host, port, path, response_object=0):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path)
@@ -19,6 +20,7 @@ def http_get_call(host, port, path, response_object=0):
         return conn.getresponse()
 
     return conn.getresponse().read().decode('utf-8')
+
 
 class GetRawMempoolTest(BitcoinTestFramework):
     FORMAT_SEPARATOR = "."

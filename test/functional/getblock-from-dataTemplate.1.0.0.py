@@ -10,6 +10,7 @@ import shutil
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
+
 class GetBlockRPCTest(BitcoinTestFramework):
 
     def set_test_params(self):

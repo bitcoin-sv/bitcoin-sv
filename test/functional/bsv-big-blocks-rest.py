@@ -14,11 +14,13 @@ from test_framework.cdefs import ONE_MEGABYTE
 import http.client
 import urllib.parse
 
+
 def http_get_call(host, port, path):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path)
 
     return conn.getresponse()
+
 
 class BSVBigBlockRestCall(ComparisonTestFramework):
 

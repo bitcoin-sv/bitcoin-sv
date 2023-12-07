@@ -14,6 +14,7 @@ from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_ADD,
 from test_framework.blocktools import create_transaction
 import codecs
 
+
 class JournalReorg(BitcoinTestFramework):
 
     def set_test_params(self):

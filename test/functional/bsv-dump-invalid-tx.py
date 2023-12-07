@@ -47,12 +47,14 @@ def new_block(connection, txs=[], valid_coinbase=False, wait_for_confirmation=Tr
 
     return coinbase_tx, block
 
+
 def make_invalid_tx(tx_to_spend, output_ndx):
     tx = CTransaction()
     tx.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, output_ndx), b"", 0xffffffff))
     tx.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 2000, CScript([OP_FALSE])))
     tx.rehash()
     return tx
+
 
 def make_invalid_p2sh_tx(tx_to_spend, output_ndx):
     tx = CTransaction()
@@ -61,12 +63,14 @@ def make_invalid_p2sh_tx(tx_to_spend, output_ndx):
     tx.rehash()
     return tx
 
+
 def make_large_invalid_tx(tx_to_spend, output_ndx):
     tx = CTransaction()
     tx.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, output_ndx), b"", 0xffffffff))
     tx.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 2000000, CScript([bytes(1000000), OP_DROP, OP_FALSE])))
     tx.rehash()
     return tx
+
 
 class InvalidTx(BitcoinTestFramework):
 

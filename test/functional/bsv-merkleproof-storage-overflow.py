@@ -13,6 +13,7 @@ create a merkle tree that has memory requirements below available and check that
 create a merkle tree that has memory requirements above available and check that error log is emitted
 '''
 
+
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1

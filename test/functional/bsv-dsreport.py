@@ -48,6 +48,7 @@ SKIP_IP = 0x7F000003
 # 127.0.0.4 as network-order bytes
 WRONG_IP2 = 0x7F000004
 
+
 # Returns True if host (str) responds to a ping6 request.
 def ping6(host):
     # option for the number of packets
@@ -64,8 +65,10 @@ def ping6(host):
 
     return success
 
+
 class HTTPServerV6(HTTPServer):
     address_family = socket.AF_INET6
+
 
 class DoubleSpendReport(BitcoinTestFramework):
 

@@ -23,6 +23,7 @@ from .util import hashToHex, satoshi_round, assert_equal
 from .blocktools import create_coinbase, create_block
 import copy
 
+
 class MinerIdKeys:
     ''' Bip32 Keys for MinerId '''
     def __init__(self, hexseed):
@@ -169,6 +170,7 @@ def create_miner_info_txn(connection, params, utxo):
     minerInfoTx.rehash()
     return minerInfoTx
 
+
 # Create dataref transaction
 def create_dataref_txn(connection, dataref_json, utxo):
     # Create basic raw transaction from UTXO
@@ -230,6 +232,7 @@ def calc_blockbind_merkle_root(block):
 
     return block.get_merkle_root(hashes)
 
+
 # Make a V0.3 compliant miner ID coinbase transaction and miner-info transaction
 def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, minerInfoTx, makeValid):
     # Create miner-info txn if one not provided
@@ -280,6 +283,7 @@ def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, min
     # Update block
     block.hashMerkleRoot = block.calc_merkle_root()
     block.rehash()
+
 
 # Make a V0.3 compliant miner ID block
 def make_miner_id_block(connection, params, utxo=None, datarefTxns=None, minerInfoTx=None, parentBlock=None, makeValid=True, lastBlockTime=0, txns=None):

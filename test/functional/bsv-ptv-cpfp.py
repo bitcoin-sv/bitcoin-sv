@@ -26,6 +26,8 @@ c) when the mempool is full verify tx eviction (by a newly received tx which pay
 a) p2p
 b) rpc sendrawtransactions (bulk txs submit)
 """
+
+
 class PtvCpfp(BitcoinTestFramework):
 
     def set_test_params(self):

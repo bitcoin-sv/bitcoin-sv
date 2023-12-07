@@ -14,6 +14,7 @@ from test_framework.mininode import COIN
 from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, ONE_KILOBYTE
 import decimal
 
+
 class PrioritiseTransactionTest(BitcoinTestFramework):
 
     def setup_network(self):

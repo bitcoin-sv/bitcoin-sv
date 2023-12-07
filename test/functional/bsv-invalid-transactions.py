@@ -13,6 +13,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
 
 _lan_ip = None
+
+
 def get_lan_ip():
     global _lan_ip
     if _lan_ip: return _lan_ip
@@ -44,6 +46,7 @@ def make_coinbase(connection):
     wait_until(lambda: connection.rpc.getbestblockhash() == block.hash, timeout=10)
 
     return coinbase_tx, coinbase_key
+
 
 def create_parent_tx(tx_to_spend, key_for_tx_to_spend, n_outputs, invalidity=None):
     tx = CTransaction()

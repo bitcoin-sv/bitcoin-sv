@@ -18,6 +18,7 @@ import datetime
 #   Node A sends HEADERS message to bitcoind. Bitcoind sends GetData to node A.
 #   Node A sends REJECT_TOOBUSY message. Bitcoind waits and asks again after 5 seconds.
 
+
 class TooBusyRejectMsgTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1

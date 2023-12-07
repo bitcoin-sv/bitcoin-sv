@@ -28,11 +28,13 @@ from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, msg_block, mininode_lock
 from time import sleep
 
+
 def add_tx_to_block(block, txs):
     block.vtx.extend(txs)
     block.hashMerkleRoot = block.calc_merkle_root()
     block.calc_sha256()
     block.solve()
+
 
 class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 

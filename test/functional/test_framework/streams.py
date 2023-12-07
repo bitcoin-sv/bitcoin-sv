@@ -4,6 +4,7 @@
 
 from enum import Enum
 
+
 # Stream types enumeration
 class StreamType(Enum):
     UNKNOWN = 0
@@ -14,6 +15,8 @@ class StreamType(Enum):
     DATA4 = 5
 
 # Stream policies
+
+
 class DefaultStreamPolicy():
     def __init__(self):
         self.policy_name = b"Default"
@@ -22,6 +25,7 @@ class DefaultStreamPolicy():
     def stream_type_for_message_type(self, msg):
         # Everything over the GENERAL stream
         return StreamType.GENERAL
+
 
 class BlockPriorityStreamPolicy():
     def __init__(self):

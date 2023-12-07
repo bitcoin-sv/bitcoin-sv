@@ -10,19 +10,23 @@ from urllib.parse import parse_qs
 import json
 import time
 
+
 class RECEIVE(Enum):
     YES = 1
     NO = 0
+
 
 class STATUS(Enum):
     SUCCESS = 0
     CLIENT_ERROR = 1
     SERVER_ERROR = 2
 
+
 class RESPONSE_TIME(Enum):
     FAST = 0
     SLOW = 10
     SLOWEST = 70
+
 
 class FLAG(Enum):
     YES = 1
@@ -32,9 +36,12 @@ expectedProofs = []
 receivedProofs = []
 
 # Function to reset the expected/received proofs
+
+
 def reset_proofs():
     expectedProofs = []
     receivedProofs = []
+
 
 class CallbackService(BaseHTTPRequestHandler):
 

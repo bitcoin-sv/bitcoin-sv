@@ -14,6 +14,7 @@ from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE, DEFAULT_MIN_BLOCKS_
 from test_framework.script import CScript, CTransaction, CTxOut, OP_TRUE
 from test_framework.mininode import FromHex, CBlock, msg_gethdrsen
 
+
 class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
 
     def create_transaction(self, prevtx, number_of_outputs, sig, value, scriptPubKey=CScript()):

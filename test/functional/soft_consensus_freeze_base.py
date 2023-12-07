@@ -24,6 +24,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import create_transaction
 from test_framework.script import CScript, OP_TRUE
 
+
 class Send_node():
     rejected_blocks = []
 
@@ -87,6 +88,7 @@ class Send_node():
                 self.log.debug("Found line in bitcoind.log: %s", line.strip())
                 return True
         return False
+
 
 class SoftConsensusFreezeBase(BitcoinTestFramework):
 

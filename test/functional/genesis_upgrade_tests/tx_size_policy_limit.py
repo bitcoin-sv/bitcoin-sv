@@ -13,10 +13,12 @@ from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashFor
 SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 NEW_MAX_TX_SIZE_POLICY = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS * 2
 
+
 def make_key():
     key = CECKey()
     key.set_secretbytes(b"randombytes")
     return key
+
 
 def new_transaction(utxokey, utxo, target_tx_size):
     ndx, tx_to_spend = utxo
@@ -36,6 +38,7 @@ def new_transaction(utxokey, utxo, target_tx_size):
         if diff == 0:
             return tx
         padding_size += diff
+
 
 class DefaultTxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
 
@@ -59,6 +62,7 @@ class DefaultTxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS + 1)
             tx_collection.add_tx(tx,
             p2p_reject_reason = b'tx-size')
+
 
 class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
 

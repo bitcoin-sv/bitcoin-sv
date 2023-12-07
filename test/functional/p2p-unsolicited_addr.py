@@ -11,6 +11,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
 
+
 # A connection handler that records recieved ADDR messages
 class TestNode(NodeConnCB):
     def __init__(self, id):
@@ -21,6 +22,7 @@ class TestNode(NodeConnCB):
     def on_addr(self, conn, message):
         self.gotAddr = True;
         #print("Got ADDR message from peer {}".format(self.id))
+
 
 # 1) Connect a number of real nodes together in a mesh.
 # 2) Feed in an unsolicited ADDR msg to one of those nodes.

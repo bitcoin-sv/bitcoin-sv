@@ -10,6 +10,7 @@ from test_framework.mininode import CBlock, NodeConn, NodeConnCB, NetworkThread,
 
 example_script_hash = "748284390f9e263a4b766a75d0633c50426eb875"
 
+
 class MiningCoinbaseWithP2SHTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1

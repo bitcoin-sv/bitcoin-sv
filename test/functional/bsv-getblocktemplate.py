@@ -10,8 +10,10 @@ from test_framework.script import CScript, OP_TRUE, OP_RETURN
 from test_framework.cdefs import BUFFER_SIZE_HttpTextWriter
 from binascii import b2a_hex
 
+
 def b2x(b):
     return b2a_hex(b).decode('ascii')
+
 
 class GetBlockTemplateRPCTest(BitcoinTestFramework):
     def set_test_params(self):

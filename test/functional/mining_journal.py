@@ -20,6 +20,7 @@ from test_framework.blocktools import merkle_root_from_merkle_proof, create_bloc
 import math
 import random
 
+
 class MyNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -147,6 +148,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             chain_len += 1
             num_reqd -= 1
             reqd_chain_len -= 1
+
 
 def mempool_sizes(nodes):
     res = ""

@@ -14,6 +14,7 @@ import time
 #     If rejectmempoolrequest=false mempool request is rejected only if peerbloomfilters=0.
 # Is a peer is whitelisted, mempool request is never rejected.
 
+
 class P2PMempoolTests(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True

@@ -20,6 +20,7 @@ from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 import random
 import time
 
+
 class PTVP2PTest(ComparisonTestFramework):
 
     def set_test_params(self):

@@ -15,6 +15,7 @@ import time
 Test P2P handling of the MinerID revokemid message.
 '''
 
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -23,6 +24,7 @@ class TestNode(NodeConnCB):
     def on_revokemid(self, conn, message):
         super().on_revokemid(conn, message)
         self.revokemid_count += 1
+
 
 class RevokeMid(BitcoinTestFramework):
 

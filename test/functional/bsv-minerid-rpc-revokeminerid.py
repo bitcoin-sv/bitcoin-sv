@@ -16,6 +16,8 @@ import os
 '''
 Test handling of the MinerID revokeminerid RPC interface.
 '''
+
+
 class RovokeMinerIdRpc(BitcoinTestFramework):
 
     def set_test_params(self):

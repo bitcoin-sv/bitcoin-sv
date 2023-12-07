@@ -30,6 +30,7 @@ Test badly behaving double-spend endpoints:
 LOCAL_HOST_IP = 0x7F000001
 WRONG_IP = 0x7F000002
 
+
 class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
     def __del__(self):

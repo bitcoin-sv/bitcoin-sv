@@ -16,12 +16,14 @@ from test_framework.util import assert_raises_rpc_error, connect_nodes_bi, disco
 from test_framework.mininode import FromHex, CTransaction, COIN
 from decimal import Decimal
 
+
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
     raw = node.getrawtransaction(txid)
     tx = FromHex(CTransaction(), raw)
     tx.rehash()
     return tx.vout[index].scriptPubKey
+
 
 class ConsolidationP2PKHTest(BitcoinTestFramework):
 

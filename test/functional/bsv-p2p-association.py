@@ -13,6 +13,7 @@ from test_framework.util import assert_equal, connect_nodes, p2p_port
 from test_framework.streams import StreamType
 import time
 
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()

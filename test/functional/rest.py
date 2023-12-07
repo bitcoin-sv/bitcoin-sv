@@ -37,6 +37,7 @@ def http_get_call(host, port, path, response_object=0):
 
     return conn.getresponse().read().decode('utf-8')
 
+
 def http_get_call_with_headers(host, port, path, headers, response_object=0):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path, None, headers)

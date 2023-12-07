@@ -12,6 +12,7 @@ from test_framework.util import *
 #   Submitblock RPC call should return 'high-hash' failure, which means POW was invalid.
 #   VerifyBlock should return no failure.
 
+
 class VerifyWithoutPowTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1

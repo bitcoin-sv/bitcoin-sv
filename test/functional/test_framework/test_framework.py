@@ -43,6 +43,7 @@ from .util import (
 
 from test_framework.blocktools import *
 
+
 class TestStatus(Enum):
     PASSED = 1
     FAILED = 2

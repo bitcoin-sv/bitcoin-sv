@@ -18,6 +18,8 @@ Create and send a dataref transaction with two scripts to the node.
 Send a minerinfo transaction referencing said dataref transaction in the miner info doc.
 Check reorg conditions.
 '''
+
+
 class AllKeys:
     last_seed_number = 1
     def __init__(self):
@@ -28,6 +30,7 @@ class AllKeys:
         self.compromisedKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 5))
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):

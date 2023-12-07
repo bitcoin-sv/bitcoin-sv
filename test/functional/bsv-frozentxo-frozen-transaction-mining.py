@@ -44,6 +44,7 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.script import CScript, OP_TRUE, OP_NOP
 
+
 class FrozenTXOTransactionMining(BitcoinTestFramework):
 
     def set_test_params(self):

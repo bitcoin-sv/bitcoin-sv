@@ -11,6 +11,7 @@ from test_framework.util import wait_until, check_for_log_msg
 
 import time
 
+
 class msg_emptypayload():
     command = b"reject"
 
@@ -19,6 +20,7 @@ class msg_emptypayload():
 
     def serialize(self):
         return b""
+
 
 class TestEmptyPayload(BitcoinTestFramework):
 

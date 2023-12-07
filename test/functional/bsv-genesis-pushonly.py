@@ -14,6 +14,7 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, hashToHex
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 
+
 class BSVGenesisActivation(ComparisonTestFramework):
 
     def set_test_params(self):

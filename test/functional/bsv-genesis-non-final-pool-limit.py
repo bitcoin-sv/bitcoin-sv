@@ -11,6 +11,7 @@ from test_framework.util import assert_equal, wait_until
 from test_framework.comptool import TestInstance, RejectResult, DiscardResult
 import time
 
+
 class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
 
     def set_test_params(self):

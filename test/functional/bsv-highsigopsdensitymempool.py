@@ -8,6 +8,7 @@ from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import create_transaction, CScript, msg_tx, prepare_init_chain
 from test_framework.script import OP_CHECKMULTISIG, OP_TRUE
 
+
 # We create 100 high and 10 low sigops density transactions and make sure that low density transactions are mined too.
 class MempoolHighSigopsDensity(ComparisonTestFramework):
     def set_test_params(self):

@@ -18,6 +18,8 @@ Test two nodes mining with different minerid's and forking.
 Both nodes need to be able to continue creating minerinfo transactions.
 After a reorg they still should be able to continue mining further minerinfo transactions.
 '''
+
+
 class AllKeys:
     last_seed_number = 1
     def __init__(self):
@@ -28,6 +30,7 @@ class AllKeys:
         self.compromisedKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 5))
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):

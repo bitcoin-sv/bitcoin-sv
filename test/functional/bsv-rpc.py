@@ -2,6 +2,7 @@ from test_framework.cdefs import REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER,
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (assert_equal, assert_raises_rpc_error)
 
+
 class BSV_RPC_MaxBlockSize_Test (BitcoinTestFramework):
 
     def set_test_params(self):

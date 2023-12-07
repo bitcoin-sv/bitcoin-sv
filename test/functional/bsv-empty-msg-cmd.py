@@ -11,6 +11,7 @@ from test_framework.util import wait_until, check_for_log_msg
 
 import struct
 
+
 class msg_emptycmdmsg():
     command = b'\x00'
 
@@ -19,6 +20,7 @@ class msg_emptycmdmsg():
 
     def serialize(self):
         return struct.pack("<I", self.payload)
+
 
 class TestEmptyCmd(BitcoinTestFramework):
 

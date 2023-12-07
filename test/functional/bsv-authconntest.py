@@ -22,11 +22,13 @@ test that blocks are sent via authenticated connection
 only after n/m reputation earned
 '''
 
+
 class AllKeys:
     last_seed_number = 1
     def __init__(self):
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class AuthConnTestReputation(BitcoinTestFramework):
 

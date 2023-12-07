@@ -11,6 +11,7 @@ from test_framework.comptool import TestInstance
 from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE, ONE_KILOBYTE
 from test_framework.util import get_rpc_proxy, wait_until, check_for_log_msg
 
+
 class StallingTest(ComparisonTestFramework):
 
     def set_test_params(self):

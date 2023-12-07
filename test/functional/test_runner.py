@@ -141,6 +141,7 @@ EXTENDED_CUTOFF = 40
 
 running_jobs = []
 
+
 def on_ci():
     return os.getenv('TRAVIS') == 'true' or os.getenv('TEAMCITY_VERSION') != None
 
@@ -820,6 +821,8 @@ class Timings():
 
 # Prints a user friendly report of currently running jobs
 printed_lines = 0
+
+
 def print_log(data="", jobs=None, console=False):
     global printed_lines
     if not console:
@@ -844,6 +847,7 @@ def print_log(data="", jobs=None, console=False):
             sys.stdout.write("\033[K")  # clear line
             print("%s %ss" % (job[0], f"{time.time() - job[1]:.0f}"))
             printed_lines += 1
+
 
 # Prints running jobs if they take a long time
 def check_jobs(jobs=None):

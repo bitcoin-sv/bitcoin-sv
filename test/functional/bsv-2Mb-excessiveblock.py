@@ -16,6 +16,7 @@ import time
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 
+
 class BSV2MBlocks(ComparisonTestFramework):
 
     def set_test_params(self):

@@ -14,6 +14,7 @@ import time
 Test the behaviour of the txn propagation after a new block.
 '''
 
+
 class TxnPropagationAfterBlock(ComparisonTestFramework):
 
     def set_test_params(self):

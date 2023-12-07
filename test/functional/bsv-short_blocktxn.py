@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 from test_framework.mininode import ser_uint256
 
+
 class msg_shortblocktxn():
     command = b"blocktxn"
 
@@ -23,6 +24,7 @@ class msg_shortblocktxn():
         r += ser_uint256(self.blockhash)
         r += bytes([0xff])
         return r
+
 
 class TestShortBlocktxn(BitcoinTestFramework):
 

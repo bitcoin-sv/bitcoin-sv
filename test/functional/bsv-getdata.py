@@ -12,6 +12,7 @@ from test_framework.blocktools import assert_equal
 # 3. Check that sending GETDATA of unknown transaction returns NOTFOUND message.
 # 4. Check that sending GETDATA of known transaction returns TX message.
 
+
 class GetDataTest(BitcoinTestFramework):
 
     def set_test_params(self):

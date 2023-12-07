@@ -7,10 +7,12 @@ from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.script import CScript, OP_TRUE, OP_HASH160, OP_EQUAL, hash160, OP_FALSE, OP_RETURN, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 
+
 def make_key(bytes=b"randombytes"):
     key = CECKey()
     key.set_secretbytes(bytes)
     return key
+
 
 def make_unlock_default(tx, tx_to_spend):
     sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
@@ -18,17 +20,20 @@ def make_unlock_default(tx, tx_to_spend):
     sig = HandleTxsDefaultNode.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([sig])
 
+
 def make_unlock_modified11(tx, tx_to_spend):
     sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
                                   tx_to_spend.vout[0].nValue)
     sig = HandleTxsModified11Node.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([sig])
 
+
 def make_unlock_modified10(tx, tx_to_spend):
     sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
                                   tx_to_spend.vout[0].nValue)
     sig = HandleTxsModified10Node.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([sig])
+
 
 def make_unlock_modified00(tx, tx_to_spend):
     sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
@@ -162,6 +167,7 @@ class HandleTxsModified10Node(GenesisHeightBasedSimpleTestsCase):
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
+
 
 class HandleTxsModified00Node(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0']

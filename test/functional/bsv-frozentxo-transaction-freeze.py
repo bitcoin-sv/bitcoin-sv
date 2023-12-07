@@ -33,6 +33,7 @@ from test_framework.script import CScript, OP_NOP, OP_TRUE, OP_CHECKSIG, Signatu
 from test_framework.key import CECKey
 from test_framework.address import key_to_p2pkh
 
+
 class Send_node():
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         self.p2p = p2p_connection
@@ -61,6 +62,7 @@ class Send_node():
                 return True
         return False
 
+
 class RPC_send_node(Send_node):
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         super().__init__(tmpdir, log, node_no, p2p_connection, rpc_connection)
@@ -83,6 +85,7 @@ class RPC_send_node(Send_node):
                 ToHex(tx))
         else:
             self.rpc.sendrawtransaction(ToHex(tx))
+
 
 class P2P_send_node(Send_node):
     rejected_txs = []
@@ -119,6 +122,7 @@ class P2P_send_node(Send_node):
 
         self.rejected_txs = []
         self.p2p.message_count["reject"] = 0
+
 
 class FrozenTXOTransactionFreeze(BitcoinTestFramework):
 

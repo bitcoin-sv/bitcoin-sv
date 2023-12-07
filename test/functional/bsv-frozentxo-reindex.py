@@ -28,6 +28,7 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.script import CScript, OP_TRUE
 
+
 class Send_node():
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         self.p2p = p2p_connection
@@ -58,6 +59,7 @@ class Send_node():
                 self.log.debug("Found line in bitcoind.log: %s", line.strip())
                 return True
         return False
+
 
 class FrozenTXOReindex(BitcoinTestFramework):
 

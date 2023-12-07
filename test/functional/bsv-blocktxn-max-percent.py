@@ -18,6 +18,7 @@ from test_framework.util import wait_until, p2p_port
 
 import random
 
+
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 class TestNode(NodeConnCB):
 
@@ -38,6 +39,7 @@ class TestNode(NodeConnCB):
         with mininode_lock:
             self.last_block = None
             self.last_blocktxn = None
+
 
 class MaxBlockTxn(ComparisonTestFramework):
 

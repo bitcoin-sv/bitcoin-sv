@@ -45,6 +45,7 @@ from test_framework.blocktools import create_transaction, PreviousSpendableOutpu
 from test_framework.cdefs import MIN_TTOR_VALIDATION_DISTANCE
 import time
 
+
 class BSVCheckTTORViolation(BitcoinTestFramework):
 
     def set_test_params(self):

@@ -15,6 +15,7 @@ from test_framework.util import assert_equal, assert_raises_rpc_error, wait_unti
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, ToHex
 
+
 class PTVRPCTests(ComparisonTestFramework):
 
     def set_test_params(self):

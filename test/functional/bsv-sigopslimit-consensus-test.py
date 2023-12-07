@@ -31,6 +31,7 @@ from test_framework.script import *
 from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB
 from time import sleep
 
+
 class CheckSigTest(ComparisonTestFramework):
     # Can either run this test as 1 node with expected answers, or two and compare them.
     # Change the "outcome" variable from each TestInstance object to only do the comparison.

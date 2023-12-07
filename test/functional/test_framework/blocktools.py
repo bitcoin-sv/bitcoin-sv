@@ -15,6 +15,7 @@ from .util import assert_equal, assert_raises_rpc_error, hash256, satoshi_round,
 from collections import deque
 from decimal import Decimal
 
+
 # Create a block (with regtest difficulty)
 def create_block(hashprev, coinbase, nTime=None):
     block = CBlock()
@@ -29,6 +30,7 @@ def create_block(hashprev, coinbase, nTime=None):
     block.hashMerkleRoot = block.calc_merkle_root()
     block.calc_sha256()
     return block
+
 
 # Mine a block of the specified size
 def mine_block_of_size(node, size, utxos=None, fee=Decimal("0.00001"), genesisActivated=True):
@@ -60,6 +62,7 @@ def mine_block_of_size(node, size, utxos=None, fee=Decimal("0.00001"), genesisAc
         node.sendrawtransaction(signed["hex"], True)
     node.generate(1)
 
+
 # Do incorrect POW for block
 def solve_bad(block):
     block.rehash()
@@ -67,6 +70,7 @@ def solve_bad(block):
     while block.sha256 < target:
         block.nNonce += 1
         block.rehash()
+
 
 def serialize_script_num(value):
     r = bytearray(0)
@@ -94,6 +98,7 @@ def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
         merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
     return uint256_from_str(merkleRootBytes)
 
+
 # Calculate merkle root from a branch
 def merkle_root_from_branch(leaf_hash, index, branch):
     root = ser_uint256(leaf_hash)
@@ -109,6 +114,7 @@ def merkle_root_from_branch(leaf_hash, index, branch):
         root = root[::-1]
         index >>= 1
     return uint256_from_str(root)
+
 
 # Create a valid submittable block (and coinbase) from a mining candidate
 def create_block_from_candidate(candidate, get_coinbase):
@@ -137,8 +143,6 @@ def create_block_from_candidate(candidate, get_coinbase):
 # Create a coinbase transaction, assuming no miner fees.
 # If pubkey is passed in, the coinbase output will be a P2PK output;
 # otherwise an anyone-can-spend output.
-
-
 def create_coinbase(height, pubkey=None, outputValue=50):
     coinbase = CTransaction()
     coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
@@ -155,9 +159,8 @@ def create_coinbase(height, pubkey=None, outputValue=50):
     coinbase.calc_sha256()
     return coinbase
 
+
 # Create a coinbase transaction containing P2SH, assuming no miner fees.
-
-
 def create_coinbase_P2SH(height, scriptHash, outputValue=50):
     coinbase = CTransaction()
     coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
@@ -171,10 +174,9 @@ def create_coinbase_P2SH(height, scriptHash, outputValue=50):
     coinbase.calc_sha256()
     return coinbase
 
+
 # Create a transaction.
 # If the scriptPubKey is not specified, make it anyone-can-spend.
-
-
 def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx = CTransaction()
     assert(n < len(prevtx.vout))
@@ -183,10 +185,12 @@ def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx.calc_sha256()
     return tx
 
+
 # a little handier version of create_transaction
 def create_tx(spend_tx, n, value, script=CScript([OP_TRUE])):
     tx = create_transaction(spend_tx, n, b"", value, script)
     return tx
+
 
 def get_legacy_sigopcount_block(block, fAccurate=True):
     count = 0
@@ -204,6 +208,7 @@ def get_legacy_sigopcount_tx(tx, fAccurate=True):
         count += CScript(j.scriptSig).GetSigOpCount(fAccurate)
     return count
 
+
 def calc_needed_data_size(script_op_codes, target_size):
     def pushdata_size(sz):
         if sz < 0x4c:
@@ -218,6 +223,7 @@ def calc_needed_data_size(script_op_codes, target_size):
             raise ValueError("Data too long to encode in a PUSHDATA op")
 
     return target_size - (len(script_op_codes) + pushdata_size(target_size))
+
 
 def make_block(connection, parent_block=None, makeValid=True, last_block_time=0):
     if parent_block is not None:
@@ -242,6 +248,7 @@ def make_block(connection, parent_block=None, makeValid=True, last_block_time=0)
     block.solve()
     return block, block.nTime
 
+
 def send_by_headers(conn, blocks, do_send_blocks):
     hash_block_map = {b.sha256: b for b in blocks}
 
@@ -260,6 +267,7 @@ def send_by_headers(conn, blocks, do_send_blocks):
         if do_send_blocks:
             wait_until(lambda: len(hash_block_map)==0, label="wait until all blocks are sent")
 
+
 def chain_tip_status_equals(conn, hash, status):
     chain_tips = conn.rpc.getchaintips()
     for tip in chain_tips:
@@ -267,13 +275,16 @@ def chain_tip_status_equals(conn, hash, status):
             return True
     return False
 
+
 def wait_for_tip(conn, hash):
     wait_until(lambda: conn.rpc.getbestblockhash() == hash, timeout=10, check_interval=0.2,
                 label=f"waiting until {hash} become tip")
 
+
 def wait_for_tip_status(conn, hash, status):
     wait_until(lambda: chain_tip_status_equals(conn, hash, status), timeout=10, check_interval=0.2,
                 label=f"waiting until {hash} is tip with status {status}")
+
 
 # sign a transaction, using the key we know about
 # this signs input 0 in tx, which is assumed to be spending output n in
@@ -287,6 +298,7 @@ def sign_tx(tx, spend_tx, n, private_key):
         spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
     tx.vin[0].scriptSig = CScript(
         [private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
+
 
 def create_and_sign_transaction(spend_tx, n, value, script=CScript([OP_TRUE]), private_key=None):
     tx = create_tx(spend_tx, n, value, script)
@@ -650,11 +662,13 @@ def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, start_block=5
 
 ### Helper to build chain
 
+
 class PreviousSpendableOutput():
 
     def __init__(self, tx=CTransaction(), n=-1):
         self.tx = tx
         self.n = n  # the output we're spending
+
 
 class ChainManager():
     # Tool helping to manage creating blockchain

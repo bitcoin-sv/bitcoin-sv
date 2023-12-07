@@ -13,6 +13,7 @@ from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx
 import multiprocessing
 
+
 class PTVTxnChains(ComparisonTestFramework):
 
     def set_test_params(self):

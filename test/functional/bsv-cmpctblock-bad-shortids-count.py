@@ -9,6 +9,7 @@ Test: cmpctblock P2P message with large shortids count.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 
+
 class MsgCmpctBlockBadShortIDsCount():
     command = b"cmpctblock"
 
@@ -19,6 +20,7 @@ class MsgCmpctBlockBadShortIDsCount():
                     0xff, 0xff, 0xff, 0xff,
                     0x01]) # large shortids count (<= std::vector::max_size())
         return r
+
 
 class CmpctBlockBadShortIDsCountTest(BitcoinTestFramework):
 

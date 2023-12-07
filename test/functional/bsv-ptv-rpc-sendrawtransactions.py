@@ -42,6 +42,7 @@ from test_framework.mininode import msg_tx, msg_block, ToHex
 import random
 import itertools
 
+
 class RPCSendRawTransactions(ComparisonTestFramework):
 
     def set_test_params(self):

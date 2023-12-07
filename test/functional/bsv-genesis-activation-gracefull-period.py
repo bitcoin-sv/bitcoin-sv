@@ -34,6 +34,8 @@ from test_framework.script import CScript, SignatureHashForkId, OP_0, OP_TRUE, O
 OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, SIGHASH_ALL, SIGHASH_FORKID, OP_NOP
 
 _lan_ip = None
+
+
 def get_lan_ip():
     global _lan_ip
     if _lan_ip: return _lan_ip
@@ -46,10 +48,12 @@ def get_lan_ip():
         s.close()
     return _lan_ip
 
+
 def makePubKeys(numOfKeys):
     key = CECKey()
     key.set_secretbytes(b"randombytes2")
     return [key.get_pubkey()] * numOfKeys
+
 
 class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 

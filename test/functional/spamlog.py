@@ -9,9 +9,11 @@ from test_framework.util import *
 import time
 import os
 
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
+
 
 class msg_garbage():
     command = b"inv"
@@ -26,6 +28,7 @@ class msg_garbage():
 
     def __repr__(self):
         return "garbage"#(announce=%s, version=%lu)" % (self.announce, self.version)
+
 
 class SpamLog(BitcoinTestFramework):
     def set_test_params(self):

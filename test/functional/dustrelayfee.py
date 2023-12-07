@@ -34,6 +34,7 @@ def create_zero_fee_tx_funded_from(node, tx_id, small_value):
     signed = node.signrawtransaction(rawtx)
     return signed["hex"]
 
+
 class DustRelayFeeTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True

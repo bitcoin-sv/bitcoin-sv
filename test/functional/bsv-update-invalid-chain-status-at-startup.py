@@ -38,6 +38,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.blocktools import wait_for_tip, wait_for_tip_status
 
+
 class UpdateInvalidChainAtStartup(BitcoinTestFramework):
 
     def set_test_params(self):

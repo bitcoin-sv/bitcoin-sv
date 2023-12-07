@@ -10,6 +10,7 @@ from test_framework.util import assert_equal
 
 import os
 
+
 class GetArgAsBytesTest(BitcoinTestFramework):
 
     def set_test_params(self):

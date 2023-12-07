@@ -34,6 +34,7 @@ from test_framework.blocktools import create_block, create_coinbase, create_tx
 
 from operator import itemgetter
 
+
 class MyConnCB(NodeConnCB):
 
     def __init__(self):
@@ -57,6 +58,7 @@ class MyConnCB(NodeConnCB):
                 break
         if request:
             super().on_inv(conn, message)
+
 
 class BigBlockTests(BitcoinTestFramework):
 

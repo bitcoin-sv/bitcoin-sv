@@ -20,6 +20,7 @@ from decimal import Decimal
 import math
 import time
 
+
 def get_any_unspent(listunspent, threshold_amount=0.0):
     if len(listunspent) == 0:
         raise AssertionError(
@@ -29,6 +30,7 @@ def get_any_unspent(listunspent, threshold_amount=0.0):
             return utx
     raise AssertionError(
         'Could not find any unspent with threshold={}'.format(threshold_amount))
+
 
 # Split some UTXOs into some number of spendable outputs
 def split_utxos(fee, node, count, utxos, nodes):
@@ -72,6 +74,7 @@ def split_utxos(fee, node, count, utxos, nodes):
     utxos = node.listunspent()
     return utxos
 
+
 # Feed some UTXOs into a nodes mempool
 def fill_mempool(fee, node, utxos):
     addr = node.getnewaddress()
@@ -91,11 +94,13 @@ def fill_mempool(fee, node, utxos):
         if num_sent % 10000 == 0:
             print("Num sent: {}".format(num_sent))
 
+
 # Connect each node to each other node
 def connect_nodes_mesh(nodes):
     for i in range(len(nodes)):
         for j in range(i + 1, len(nodes)):
             connect_nodes_bi(nodes, i, j)
+
 
 # The main test class
 class MiningTest(BitcoinTestFramework):

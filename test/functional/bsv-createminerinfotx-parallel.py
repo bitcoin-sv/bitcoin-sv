@@ -22,6 +22,8 @@ Reconnect and continue mining on both nodes
 The two funding seeds are the two outputs of a coinbase signed with different keys
 to ensure the funding chains are different
 '''
+
+
 class AllKeys:
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("01")
@@ -31,6 +33,7 @@ class AllKeys:
         self.compromisedKeys = MinerIdKeys("06")
         self.fundingKey0 = MinerIdKeys("10")
         self.fundingKey1 = MinerIdKeys("11")
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):

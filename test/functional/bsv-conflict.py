@@ -12,6 +12,7 @@ from test_framework.util import wait_until, check_mempool_equals
 # Creating a complex graph of transacions in the mempool, mining some of them and double-spend (in block) some other
 # Checking if descedants of double-spend tx are removed while other stay in mempool
 
+
 class Conflict(BitcoinTestFramework):
 
     def set_test_params(self):

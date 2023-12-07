@@ -14,6 +14,7 @@ from test_framework.util import assert_equal
 from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import msg_tx
 
+
 class BSVGenesisActivationTransactions(ComparisonTestFramework):
 
     def set_test_params(self):

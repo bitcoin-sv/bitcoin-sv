@@ -89,12 +89,14 @@ def all_rlt_txs(txarray):
                     txs.append(txarray[b31][b25][b22][b18])
     return txs
 
+
 def get_csv_status(node):
     softforks = node.getblockchaininfo()['softforks']
     for sf in softforks:
         if sf['id'] == 'csv' and sf['version'] == 5:
             return sf['reject']['status']
     raise AssertionError('Cannot find CSV fork activation informations')
+
 
 class BIP68_112_113Test(ComparisonTestFramework):
     def set_test_params(self):

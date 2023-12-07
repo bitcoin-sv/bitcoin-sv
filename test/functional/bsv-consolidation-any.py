@@ -13,6 +13,7 @@ from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_e
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
 
+
 class ConsolidationP2PKHTest(BitcoinTestFramework):
 
     def set_test_params(self):

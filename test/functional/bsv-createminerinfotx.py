@@ -23,6 +23,8 @@ import json
 - Stop/Restart nodes and check if the further minerinfo transactions can be created which
   proves the funding chain was persisted
 '''
+
+
 class AllKeys:
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("01")
@@ -31,6 +33,7 @@ class AllKeys:
         self.prev_revocationKeys = MinerIdKeys("04")
         self.compromisedKeys = MinerIdKeys("06")
         self.fundingKeys = MinerIdKeys("10")
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):

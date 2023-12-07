@@ -95,6 +95,7 @@ from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_get
 import time
 import copy
 
+
 class MyNode(TestNode):
     def __init__(self, block_store, tx_store, blocks_recvd):
         super().__init__(block_store, tx_store)
@@ -118,6 +119,7 @@ class MyNode(TestNode):
                 # Request block
                 self.conn.send_message(msg_getdata([CInv(x.type, x.hash)]))
 
+
 class MyTestManager(TestManager):
     def __init__(self, testgen, datadir):
         super().__init__(testgen, datadir)
@@ -131,6 +133,7 @@ class MyTestManager(TestManager):
             self.connections.append(NodeConn('127.0.0.1', p2p_port(i), nodes[i], test_node))
             # Make sure the TestNode (callback class) has a reference to its associated NodeConn
             test_node.add_connection(self.connections[-1])
+
 
 class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
 

@@ -21,6 +21,7 @@ from test_framework.util import wait_until, assert_equal, assert_greater_than
 
 from itertools import islice
 
+
 # Create initial funding transaction
 def make_funding_transaction(node, n_outputs=30, value=100000000):
 
@@ -38,6 +39,7 @@ def make_funding_transaction(node, n_outputs=30, value=100000000):
     node.generate(1)
 
     return ftx
+
 
 # Generate a list of transactions
 def transaction_generator(funding_tx, count=-1, exp_rate=30):

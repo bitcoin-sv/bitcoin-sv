@@ -11,6 +11,7 @@ from test_framework.util import connect_nodes, assert_equal, Decimal, assert_rai
 import os
 import shutil
 
+
 class MerkleProofTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2

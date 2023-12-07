@@ -19,10 +19,12 @@ from test_framework.util import wait_until, check_for_log_msg
 # 8. Send HEADERS of B2 to bitcoind. It should be accepted now that B1 is known (GETDATA should be received).
 # 9. Try to send alternative Genesis block (no previous block). It should be rejected.
 
+
 def prepareBlock(height, tip_hash):
     block = create_block(int("0x" + tip_hash, 16), create_coinbase(height=height, outputValue=25))
     block.solve()
     return block
+
 
 class AcceptHeaderWithAncestor(BitcoinTestFramework):
     def set_test_params(self):

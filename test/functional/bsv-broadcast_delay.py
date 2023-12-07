@@ -33,6 +33,7 @@ class NetworkThreadPinging(Thread):
     def stop(self):
         self.conn = None
 
+
 class BroadcastDelayTest(BitcoinTestFramework):
 
     # ensure funding and returns  given number of transcations without submitting them

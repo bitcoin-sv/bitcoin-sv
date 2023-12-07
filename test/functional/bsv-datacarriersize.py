@@ -15,6 +15,7 @@ from test_framework.blocktools import calc_needed_data_size
 # 2. Send transaction with script that contains 500B. It should be accepted.
 # 3. Send transaction with script that contains 501B. It should be rejected.
 
+
 class DataCarrierSizeTest(BitcoinTestFramework):
 
     def set_test_params(self):

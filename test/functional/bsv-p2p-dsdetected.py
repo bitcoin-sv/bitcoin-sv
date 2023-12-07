@@ -16,6 +16,7 @@ import os
 import random
 import threading
 
+
 # A dummy webhook service that accepts POST request and stores the JSON string sent
 # This JSON string can then be retrieved through GET request for evaluation.
 class WebHookService(BaseHTTPRequestHandler):
@@ -54,11 +55,13 @@ class WebHookService(BaseHTTPRequestHandler):
     def log_request(self, code):
         return
 
+
 class fake_msg_dsdetected():
     command = b"dsdetected"
     def serialize(self):
         r = os.urandom(random.randint(100, 1000))
         return r
+
 
 class DSDetectedTests(BitcoinTestFramework):
 

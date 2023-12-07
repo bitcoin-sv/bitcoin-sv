@@ -20,6 +20,7 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
 from test_framework.mininode import msg_tx, wait_until
 
+
 class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
 
     def set_test_params(self):

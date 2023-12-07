@@ -27,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import http.client as httplib
 from functools import partial
 
+
 class MockDsdetector():
     def __init__(self, testRig, node):
         self.peer = NodeConnCB()
@@ -89,6 +90,7 @@ class MockDsdetector():
                             spent_inputs.append({'txid':txraw['txid'], 'tx':txA, 'utxo':utxoA, 'block':blockA})
 
         return ds_counter
+
 
 class Exchange():
     def __init__(self, testRig, node):
@@ -167,6 +169,7 @@ class WebHookService(BaseHTTPRequestHandler):
     # To avoid filling up the stderr on every successful request
     def log_request(self, code):
         return
+
 
 class User:
 

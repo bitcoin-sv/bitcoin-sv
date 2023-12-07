@@ -23,6 +23,7 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, check_for_log_msg
 from test_framework.mininode import msg_tx
 
+
 class BSVGenesisActivationTransactions(ComparisonTestFramework):
 
     def set_test_params(self):

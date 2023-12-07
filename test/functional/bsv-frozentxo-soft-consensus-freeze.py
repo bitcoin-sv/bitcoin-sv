@@ -27,6 +27,7 @@ from test_framework.mininode import msg_block, COIN
 from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_DROP
 from test_framework.util import assert_equal
 
+
 class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
     def set_test_params(self):

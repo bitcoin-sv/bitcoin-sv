@@ -17,6 +17,7 @@ from test_framework.util import wait_until, bytes_to_hex_str
 
 OP_TRUE_OP_RETURN_SCRIPT = CScript([OP_TRUE, OP_RETURN, b"xxx"])
 
+
 def make_coinbase(connection):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"
     tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
@@ -33,6 +34,7 @@ def make_coinbase(connection):
     wait_until(lambda: connection.rpc.getbestblockhash() == block.hash, timeout=10)
 
     return coinbase_tx, coinbase_key
+
 
 def spend_tx_to_data(tx_to_spend, key_for_tx_to_spend):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"

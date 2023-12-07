@@ -22,12 +22,14 @@ This test is identical to bsv-authconntest.py but wrong ip addresses are adverti
 resulting in an expected authentication failure
 '''
 
+
 class AllKeys:
     last_seed_number = 1
 
     def __init__(self):
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class AuthConnTestReputation(BitcoinTestFramework):
 

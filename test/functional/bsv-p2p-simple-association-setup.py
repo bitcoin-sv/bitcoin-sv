@@ -10,6 +10,7 @@ from test_framework.streams import StreamType, BlockPriorityStreamPolicy, Defaul
 
 # Test functionality within the test framework for simply creating P2P associations to nodes
 
+
 # Subclass association callback type to get notifications we are interested in
 class MyAssociationCB(AssociationCB):
     def __init__(self):
@@ -22,6 +23,7 @@ class MyAssociationCB(AssociationCB):
         super().on_pong(stream, message)
         self.pong_count += 1
         self.pong_stream = stream.stream_type
+
 
 class P2PSimpleAssociation(BitcoinTestFramework):
     def set_test_params(self):

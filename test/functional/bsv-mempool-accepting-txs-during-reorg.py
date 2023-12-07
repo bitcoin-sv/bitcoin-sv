@@ -48,6 +48,7 @@ from test_framework.util import wait_until, check_mempool_equals
 
 """
 
+
 class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
     def __init__(self, *a, **kw):

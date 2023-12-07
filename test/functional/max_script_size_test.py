@@ -15,6 +15,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import create_transaction
 
 CHUNK_SIZE=len(CScript([b"a" * 500]))
+
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()

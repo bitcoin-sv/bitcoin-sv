@@ -67,6 +67,7 @@ _txnvalidator_h_fh = open(os.path.join(get_srcdir(), 'src',
 _txnvalidator_h_contents = _txnvalidator_h_fh.read()
 _txnvalidator_h_fh.close()
 
+
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
@@ -77,26 +78,34 @@ ONE_KILOBYTE = 1000
 ONE_MEGABYTE = 1000000
 ONE_GIGABYTE = 1000000000
 
+
 def _extractPolicyValue(name):
     return int(eval(re.search(name + ' = (.+);', _policy_h_contents).group(1)))
+
 
 def _extractChainParamsValue(name):
     return eval(re.search('#define ' + name + ' (.+)', _chainparams_cpp_contents).group(1))
 
+
 def _extractScriptValue(name):
     return int(eval(re.search(name + ' = (.+);', _script_h_contents).group(1)))
+
 
 def _extractLimitedStackValue(name):
     return int(eval(re.search(name + ' = (.+);', _limitedstack_h_contents).group(1)))
 
+
 def _extractValidationValue(name):
     return int(eval(re.search(name + ' = (.+);', _validation_h_contents).group(1)))
+
 
 def _extractTextWriterValue(name):
     return int(eval(re.search(name + ' = (.+);', _textwriter_h_contents).group(1)))
 
+
 def _extractTxnValidationConfigValue(name):
     return int(eval(re.search(name + " =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
+
 
 def _extractTxnValidatorValue(name):
     return int(eval(re.search(name + " \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))

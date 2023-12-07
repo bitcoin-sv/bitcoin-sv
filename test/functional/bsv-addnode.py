@@ -10,6 +10,7 @@ is configurable.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, p2p_port, wait_until
 
+
 class AddNodeTest(BitcoinTestFramework):
 
     def set_test_params(self):

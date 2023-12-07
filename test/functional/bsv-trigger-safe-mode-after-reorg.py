@@ -20,6 +20,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_FORK_LENGTH, SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE
 
+
 class TriggerSafeModeAfterReorg(BitcoinTestFramework):
 
     def set_test_params(self):

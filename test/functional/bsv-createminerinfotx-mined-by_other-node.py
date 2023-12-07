@@ -18,6 +18,8 @@ This test checks a condition, where a valid minerinfo transactions becomes inval
 role of a minerinfo transaction. This transaction is still a valid transaction and must
 still be considered as a valid member of the funding chain created by the minerinfo transactions.
 '''
+
+
 class AllKeys:
     last_seed_number = 1
     def __init__(self):
@@ -28,6 +30,7 @@ class AllKeys:
         self.compromisedKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 5))
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):

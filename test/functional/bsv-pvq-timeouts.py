@@ -49,6 +49,7 @@ from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, CTransaction, CTxIn, CTxOut, COutPoint
 import random
 
+
 class PVQTimeoutTest(ComparisonTestFramework):
 
     def set_test_params(self):

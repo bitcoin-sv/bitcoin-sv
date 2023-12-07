@@ -27,6 +27,7 @@ Test P2P handling of getdata requests for dataref txns.
 8) Verify we get notfound response.
 '''
 
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -47,6 +48,7 @@ class TestNode(NodeConnCB):
             if(msg.tx.hash == txid):
                 return msg
         return None
+
 
 class GetdataDataref(BitcoinTestFramework):
 

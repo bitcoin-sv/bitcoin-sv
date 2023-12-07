@@ -9,6 +9,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import random
 
+
 class P2PConnections(BitcoinTestFramework):
 
     def clear_disconnections(self):

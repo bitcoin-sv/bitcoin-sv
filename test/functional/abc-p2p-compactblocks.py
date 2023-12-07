@@ -18,6 +18,7 @@ from test_framework.blocktools import *
 import time
 from test_framework.script import *
 
+
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 class TestNode(NodeConnCB):
 

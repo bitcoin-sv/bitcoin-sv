@@ -43,9 +43,11 @@ class RejectResult():
     def __repr__(self):
         return '%i:%s' % (self.code, self.reason or '*')
 
+
 class DiscardResult():
     """Outcome that expects the silent discarding of a transaction."""
     pass
+
 
 class TestNode(NodeConnCB):
 

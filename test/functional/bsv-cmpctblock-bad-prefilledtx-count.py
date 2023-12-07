@@ -9,6 +9,7 @@ Test: cmpctblock P2P message with large prefilled tx count.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 
+
 class MsgCmpctBlockBadPrefilledTxCount():
     command = b"cmpctblock"
 
@@ -20,6 +21,7 @@ class MsgCmpctBlockBadPrefilledTxCount():
                     0xff, 0xff, 0xff, 0xff,
                     0x01]) # large prefilled tx count (<= std::vector::max_size())
         return r
+
 
 class CmpctBlockBadPrefilledTxCountTest(BitcoinTestFramework):
 

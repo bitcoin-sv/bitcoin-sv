@@ -6,6 +6,7 @@ from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.script import CScript, OP_ADD
 from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS, MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS, DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 
+
 class MaxScriptNumLengthTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
     POLICY_VALUE = 100
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + [
@@ -45,6 +46,7 @@ class MaxScriptNumLengthTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
                              p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)'
                              ),
     ]
+
 
 class MaxScriptNumLengthTest(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + [

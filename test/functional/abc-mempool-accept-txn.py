@@ -23,6 +23,7 @@ TXNS_TOO_MANY_SIGOPS_ERROR = b'bad-txns-too-many-sigops'
 RPC_TXNS_TOO_MANY_SIGOPS_ERROR = "64: " + \
     TXNS_TOO_MANY_SIGOPS_ERROR.decode("utf-8")
 
+
 class FullBlockTest(ComparisonTestFramework):
 
     # Can either run this test as 1 node with expected answers, or two and compare them.

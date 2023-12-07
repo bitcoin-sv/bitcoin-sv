@@ -24,6 +24,8 @@ During initialization it:
 - fills remote node's blockfile with more than 1MB of contents so
   that the next block will always go into the beginning of the second blockfile
 """
+
+
 class RunnerNode(NodeConnCB):
     def __init__(self, remote_node, node_number):
         super(RunnerNode,self).__init__()

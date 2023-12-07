@@ -44,6 +44,7 @@ from test_framework.util import wait_until
 
 _cntr = 1
 
+
 def new_key():
     k = CECKey()
     global _cntr
@@ -60,14 +61,17 @@ class UTXO:
 
 _cntr2 = 1
 
+
 def get_tip(connection):
     return connection.rpc.getblock(connection.rpc.getbestblockhash())
+
 
 def get_block_hash(block):
     if isinstance(block, dict):
         return block["hash"]
     else:
         return block.hash
+
 
 def knows_of_block(connection, block):
     def predicate(*, _block_hash=get_block_hash(block)):
@@ -81,6 +85,7 @@ def knows_of_block(connection, block):
             return False
     return predicate
 
+
 def block_is_tip(connection, block):
     def predicate(*, _block_hash=get_block_hash(block)):
         ret = connection.rpc.getbestblockhash() == _block_hash
@@ -88,6 +93,7 @@ def block_is_tip(connection, block):
             print(f"node tip is block {_block_hash}")
         return ret
     return predicate
+
 
 def make_and_send_block_ex(connection, vtx, *, tip=None, wait_for_tip=True):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"
@@ -119,6 +125,7 @@ def make_and_send_block_ex(connection, vtx, *, tip=None, wait_for_tip=True):
 
     return UTXO(coinbase_tx, 0, coinbase_key), connection.rpc.getblock(get_block_hash(block))
 
+
 def make_and_send_block(connection, vtx, *, tip=None, wait_for_tip=True):
     return make_and_send_block_ex(connection, vtx, tip, wait_for_tip)[0]
 
@@ -147,12 +154,14 @@ def create_tx(utxos, n_outputs, fee_delta=0):
 
     return tx, new_utxos
 
+
 def split(utxos, n_inputs, n_outputs, fee_delta=0):
     new_utxos = []
     transactions = []
     for _ in split_iter(utxos, n_inputs, n_outputs, new_utxos, transactions, fee_delta):
         pass
     return transactions, new_utxos
+
 
 def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fee_delta=0):
 
@@ -164,6 +173,7 @@ def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fe
             transactions.append(tx)
         yield tx, xx
 
+
 def make_tx_chain(utxo, chain_length, fee_delta=0):
     def gen():
         utxos = [utxo]
@@ -171,6 +181,7 @@ def make_tx_chain(utxo, chain_length, fee_delta=0):
             tx, utxos = create_tx(utxos, 1, fee_delta=fee_delta)
             yield tx
     return list(gen())
+
 
 def chop(x, n=2):
     """Chop sequence into n approximately equal slices
@@ -191,6 +202,7 @@ def chop(x, n=2):
         yield x[round(i):]
     return list(gen())
 
+
 def splice(*iters):
     """
     >>> print(*splice('abc', 'de', 'f'))
@@ -203,6 +215,7 @@ def splice(*iters):
                     *iters,
                     fillvalue=nothing))
             if x is not nothing)
+
 
 def make_blocks_from(conn, root_block, nblocks, *txs_lists, wait_for_tip=True):
     def gen(root_block, nblocks):
@@ -229,11 +242,13 @@ class property_dict(dict):
 def tx_ids(txs):
     return [tx if isinstance(tx, str) else tx.hash for tx in txs]
 
+
 class tx_set_context(dict):
     def __init__(self, context={}, **subsets):
         context = dict(context)
         context.update(subsets)
         super().__init__((k, tx_ids(v)) for k,v in context.items())
+
 
 class tx_set(set):
     def __init__(self, _members=(), *, _name=None):
@@ -313,8 +328,8 @@ c = property_dict(A="abc", B="def", C="ghi", Z="xyz")
 e = tx_set(c.A + c.B + c.C, _name="'e'")
 a = tx_set("abcdegixyq", _name="'a'")
 
-# assert e == a, e.explain(a, context=c)
 
+# assert e == a, e.explain(a, context=c)
 class ReorgTests(BitcoinTestFramework):
 
     def set_test_params(self):

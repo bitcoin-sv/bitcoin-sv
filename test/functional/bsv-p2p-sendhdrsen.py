@@ -14,6 +14,7 @@ from test_framework.util import assert_equal, assert_greater_than, p2p_port, wai
 import time
 import os
 
+
 class SPVNode(NodeConnCB):
     def __init__(self):
         super().__init__()

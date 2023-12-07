@@ -8,6 +8,7 @@ Check the P2P connection with magicbytes parameter.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import connect_nodes_bi, wait_until
 
+
 class MagicBytes(BitcoinTestFramework):
 
     def set_test_params(self):

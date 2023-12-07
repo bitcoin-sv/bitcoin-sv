@@ -23,6 +23,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 from test_framework.util import wait_until, assert_equal
 
+
 class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
     def set_test_params(self):

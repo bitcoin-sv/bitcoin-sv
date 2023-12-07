@@ -3,6 +3,7 @@ from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut,ToHex
 from test_framework.script import CScript, OP_TRUE
 from test_framework.util import assert_equal, assert_raises_rpc_error
 
+
 class GettxoutsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1

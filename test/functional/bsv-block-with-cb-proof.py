@@ -20,6 +20,7 @@ import json
 import http.client
 import urllib.parse
 
+
 # Split some UTXOs into some number of spendable outputs
 def split_utxos(fee, node, count, utxos, sync_nodes):
     # Split each UTXO into this many outputs
@@ -59,6 +60,7 @@ def split_utxos(fee, node, count, utxos, sync_nodes):
     utxos = node.listunspent()
     return utxos
 
+
 # Feed some UTXOs into a nodes mempool
 def fill_mempool(fee, node, utxos):
     addr = node.getnewaddress()
@@ -77,6 +79,7 @@ def fill_mempool(fee, node, utxos):
         num_sent += 1
         if num_sent % 10000 == 0:
             print("Num sent: {}".format(num_sent))
+
 
 # The main test class
 class BSVBlockWithCBProof(BitcoinTestFramework):

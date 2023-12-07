@@ -9,6 +9,7 @@ from test_framework.util import *
 import time
 from test_framework.blocktools import create_block, create_coinbase
 
+
 class BsvProtoconfViolationTest(BitcoinTestFramework):
 
     def add_options(self, parser):

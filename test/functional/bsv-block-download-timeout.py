@@ -34,6 +34,7 @@ CASE 3: Testing on a node with two connections, after download starts on the tes
 
 """
 
+
 class BlockDownloadTimeout(BitcoinTestFramework):
 
     def set_test_params(self):

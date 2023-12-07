@@ -14,6 +14,7 @@ from test_framework.test_framework import ChainManager
 from test_framework.util import assert_equal, connect_nodes, disconnect_nodes
 import time
 
+
 class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
 
     def set_test_params(self):

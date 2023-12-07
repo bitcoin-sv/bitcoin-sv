@@ -36,12 +36,14 @@ from test_framework.blocktools import COIN, CScript, CTransaction, CTxOut, CTxIn
     calc_needed_data_size, create_tx
 from test_framework.blocktools import create_transaction
 
+
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
     raw = node.getrawtransaction(txid)
     tx = FromHex(CTransaction(), raw)
     tx.rehash()
     return tx.vout[index].scriptPubKey
+
 
 def count_in_log(rpc, msg, node_dir, from_line=0):
     count = 0

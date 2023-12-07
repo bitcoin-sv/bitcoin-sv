@@ -15,6 +15,7 @@ from test_framework.util import assert_equal
 Test the mock double-spend notification endpoint server.
 '''
 
+
 class CallBackServiceTest():
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)

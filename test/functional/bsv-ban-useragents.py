@@ -7,6 +7,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
 _lan_ip = None
+
+
 def get_lan_ip():
     global _lan_ip
     if _lan_ip: return _lan_ip

@@ -7,6 +7,7 @@ from .mininode import (NodeConn, NodeConnCB, msg_createstream, msg_block, msg_cm
 from .util import p2p_port
 from .streams import StreamType
 
+
 # Association callbacks
 class AssociationCB():
 

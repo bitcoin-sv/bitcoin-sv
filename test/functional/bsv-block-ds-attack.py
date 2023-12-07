@@ -12,6 +12,7 @@ from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUAL
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex
 from test_framework.authproxy import JSONRPCException
 
+
 class User:
 
     def __init__(self, secret_bytes):
@@ -45,6 +46,7 @@ class User:
     def __sign_tx(self, sign_tx, spend_tx, n):
         sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
+
 
 class CompetingChainsTest(BitcoinTestFramework):
     def set_test_params(self):

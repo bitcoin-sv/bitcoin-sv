@@ -20,6 +20,7 @@ from test_framework.key import CECKey
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 
+
 class FullBlockTest(ComparisonTestFramework):
 
     # Can either run this test as 1 node with expected answers, or two and compare them.

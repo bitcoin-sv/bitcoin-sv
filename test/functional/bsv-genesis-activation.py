@@ -32,6 +32,7 @@ from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import msg_tx
 from time import sleep
 
+
 class BSVGenesisActivation(ComparisonTestFramework):
 
     def set_test_params(self):

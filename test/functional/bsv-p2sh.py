@@ -15,6 +15,7 @@ from test_framework.script import *
 
 SPEND_OUTPUT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 
+
 class P2SH(ComparisonTestFramework):
 
     def set_test_params(self):

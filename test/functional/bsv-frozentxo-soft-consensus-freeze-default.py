@@ -13,6 +13,7 @@ from test_framework.test_framework import ChainManager
 from test_framework.blocktools import PreviousSpendableOutput
 from test_framework.script import CScript, OP_TRUE
 
+
 class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
     def set_test_params(self):

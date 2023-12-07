@@ -16,12 +16,14 @@ Test if consolidation transactions pass the feefilter
 # For Debug build, recommended timeoutfactor is 4.
 # For Debug build with sanitizers enabled, recommended timeoutfactor is 5.
 
+
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
     raw = node.getrawtransaction(txid)
     tx = FromHex(CTransaction(), raw)
     tx.rehash()
     return tx.vout[index].scriptPubKey
+
 
 def expectedInvsReceived(invsExpected, testnode, timeout = 60):
     expectedSet = set(invsExpected)
@@ -31,6 +33,7 @@ def expectedInvsReceived(invsExpected, testnode, timeout = 60):
                 return True
         time.sleep(1)
     return False
+
 
 class TestNode(NodeConnCB):
     def __init__(self):
@@ -45,6 +48,7 @@ class TestNode(NodeConnCB):
     def clear_invs(self):
         with mininode_lock:
             self.txinvs = []
+
 
 class FeeFilterTest(BitcoinTestFramework):
     def set_test_params(self):

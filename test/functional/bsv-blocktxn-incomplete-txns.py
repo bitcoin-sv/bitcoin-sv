@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 from test_framework.mininode import ser_uint256
 
+
 class msg_badblocktxn():
     command = b"blocktxn"
 
@@ -31,6 +32,7 @@ class msg_badblocktxn():
                                             # Rest of txn2 is missing
                     ])
         return r
+
 
 class TestIncompleteTxnList(BitcoinTestFramework):
 

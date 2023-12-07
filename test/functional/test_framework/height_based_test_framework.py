@@ -15,6 +15,7 @@ from test_framework.cdefs import DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION
 # For Debug build, recommended timeoutfactor is 2.
 # For Debug build with sanitizers enabled, recommended timeoutfactor is 3.
 
+
 class TxCollection:
 
     def __init__(self, height, label):
@@ -189,6 +190,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
                 tx.rehash()
                 self.log.info(f"Created Test Tx {loghash(tx.hash)} for scenario: \"{t.scenario or self.NAME}\" and for test_label: {t.label}")
                 tx_collection.add_tx(tx, t.p2p_reject_reason, t.block_reject_reason)
+
 
 class SimplifiedTestFramework(BitcoinTestFramework):
 

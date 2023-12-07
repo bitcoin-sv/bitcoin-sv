@@ -25,6 +25,7 @@ from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_p
 from test_framework.script import CScript, OP_RETURN, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 import math
 
+
 class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
     def set_test_params(self):

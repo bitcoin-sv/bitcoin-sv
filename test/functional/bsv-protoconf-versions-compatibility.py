@@ -30,6 +30,7 @@ class CProtoconfWithZeroFields():
         return "CProtoconf(number_of_fields=%064x)" \
             % (self.number_of_fields)
 
+
 # New class that represents Protoconf upgraded with a new field,
 # not implemented by current version of bitcoind
 class CProtoconfWithNewField(mininode.CProtoconf):
@@ -51,6 +52,7 @@ class CProtoconfWithNewField(mininode.CProtoconf):
         return "CProtoconfWithNewField(number_of_fields=%064x max_recv_payload_length=%064x new_property=%064x)" \
             % (self.number_of_fields, self.max_recv_payload_length, self.new_property)
 
+
 # msg that represents largest protoconf message, whereas size is configurable
 class msg_protoconf_largest():
     command = b"protoconf"
@@ -66,6 +68,7 @@ class msg_protoconf_largest():
 
     def __repr__(self):
         return "msg_protoconf(data=%s)" % (repr(self.data))
+
 
 class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 

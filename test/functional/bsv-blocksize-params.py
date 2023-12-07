@@ -14,6 +14,7 @@ from test_framework.cdefs import (ONE_MEGABYTE)
 
 import os
 
+
 class BSVBlockSizeParams(BitcoinTestFramework):
 
     def set_test_params(self):

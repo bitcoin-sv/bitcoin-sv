@@ -19,15 +19,18 @@ from test_framework.mininode import ToHex
 import http.client
 import urllib.parse
 
+
 def http_get_call(host, port, path):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path)
 
     return conn.getresponse()
 
+
 def checkJsonBlock(json_obj, showTxDetails, hash):
     assert_equal(json_obj['hash'], hash)
     assert_equal("hash" in json_obj["tx"][0], showTxDetails)
+
 
 class BSVGetBlock(ComparisonTestFramework):
 

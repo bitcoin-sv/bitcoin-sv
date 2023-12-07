@@ -42,6 +42,7 @@ from bsv_pbv_common import (
     wait_for_not_validating_blocks
 )
 
+
 class PBVTerminate(BitcoinTestFramework):
 
     def set_test_params(self):

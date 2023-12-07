@@ -21,6 +21,7 @@ import glob
 import shutil
 import os
 
+
 class StayInSafeMode(BitcoinTestFramework):
 
     def set_test_params(self):

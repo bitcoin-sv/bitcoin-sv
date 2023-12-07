@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 from test_framework.mininode import ser_uint256
 
+
 class msg_badblocktxn():
     command = b"blocktxn"
 
@@ -23,6 +24,7 @@ class msg_badblocktxn():
         # Txn list length 0x3a, then just 4 0x00 bytes
         r += bytes([0x3a, 0x00, 0x00, 0x00, 0x00])
         return r
+
 
 class TestBadTxnList(BitcoinTestFramework):
 

@@ -31,6 +31,7 @@ from bsv_pbv_common import (
     wait_for_validating_blocks
 )
 
+
 class WaitAfterValidation(BitcoinTestFramework):
 
     def set_test_params(self):
