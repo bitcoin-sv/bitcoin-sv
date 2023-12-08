@@ -62,7 +62,7 @@ private:
     /**
      * Name of the log file
      */
-    const char* const fileName;
+    const char* const fileName; // NOLINT (cppcoreguidelines-avoid-const-or-ref-data-members)
 
     FILE *fileout = nullptr;
     std::mutex mutexDebugLog;

@@ -730,6 +730,9 @@ endif()
 
 include(ClangTidy)
 AddClangTidy(bitcoind)
+if(BUILD_BITCOIN_CLI)
+    AddClangTidy(bitcoin-cli)
+endif()
 
 if (MSVC)
 	# prevents default build from running unit tests automaticaly

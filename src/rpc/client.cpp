@@ -41,6 +41,7 @@ namespace
         if(buf)
         {   
             size_t size { evbuffer_get_length(buf) };
+            // NOLINTNEXTLINE (cppcoreguidelines-narrowing-conversions)
             response->SetBody(evbuffer_pullup(buf, size), size);
             evbuffer_drain(buf, size);
         }

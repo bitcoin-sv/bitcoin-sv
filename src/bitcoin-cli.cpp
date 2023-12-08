@@ -76,12 +76,13 @@ std::string HelpMessageCli() {
 // Start
 //
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 int CommandLineRPC(int argc, char *argv[]) {
     std::string strPrint;
     int nRet = 0;
     try {
         // Skip switches
-        while (argc > 1 && IsSwitchChar(argv[1][0])) {
+        while (argc > 1 && IsSwitchChar(argv[1][0])) { // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             argc--;
             argv++;
         }
@@ -93,7 +94,7 @@ int CommandLineRPC(int argc, char *argv[]) {
             gArgs.ForceSetArg("-rpcpassword", rpcPass);
         }
         std::vector<std::string> args =
-            std::vector<std::string>(&argv[1], &argv[argc]);
+            std::vector<std::string>(&argv[1], &argv[argc]); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
         if (gArgs.GetBoolArg("-stdin", false)) {
             // Read one arg per line from stdin and append
             std::string line;
@@ -110,6 +111,7 @@ int CommandLineRPC(int argc, char *argv[]) {
         args.erase(args.begin());
 
         UniValue params;
+        // NOLINTNEXTLINE (bugprone-branch-clone)
         if (gArgs.GetBoolArg("-named", DEFAULT_NAMED)) {
             params = RPCConvertNamedValues(strMethod, args);
         } else {
@@ -118,6 +120,7 @@ int CommandLineRPC(int argc, char *argv[]) {
 
         // Execute and handle connection failures with -rpcwait
         const bool fWait = gArgs.GetBoolArg("-rpcwait", false);
+        // NOLINTNEXTLINE (cppcoreguidelines-avoid-do-while)
         do {
             try {
                 const UniValue reply = CallRPC(strMethod, params);
@@ -183,7 +186,8 @@ int CommandLineRPC(int argc, char *argv[]) {
     }
 
     if (strPrint != "") {
-        fprintf((nRet == 0 ? stdout : stderr), "%s\n", strPrint.c_str());
+        // NOLINTNEXTLINE (cert-err33-c)
+        fprintf((nRet == 0 ? stdout : stderr), "%s\n", strPrint.c_str()); // NOLINT (cppcoreguidelines-pro-type-vararg)
     }
     return nRet;
 }
@@ -191,7 +195,8 @@ int CommandLineRPC(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
     SetupEnvironment();
     if (!SetupNetworking()) {
-        fprintf(stderr, "Error: Initializing networking failed\n");
+        // NOLINTNEXTLINE (cert-err33-c)
+        fprintf(stderr, "Error: Initializing networking failed\n"); // NOLINT (cppcoreguidelines-pro-type-vararg)
         return EXIT_FAILURE;
     }
 

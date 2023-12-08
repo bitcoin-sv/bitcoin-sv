@@ -12,6 +12,7 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
 static const uint8_t pchIPv4[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
 
 void CNetAddr::SetIP(const CNetAddr &ipIn) {
@@ -22,7 +23,8 @@ void CNetAddr::SetRaw(Network network, const uint8_t *ip_in) {
     switch (network) {
         case NET_IPV4:
             memcpy(ip, pchIPv4, 12);
-            memcpy(ip + 12, ip_in, 4);
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            memcpy(ip + 12, ip_in, 4); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
             break;
         case NET_IPV6:
             memcpy(ip, ip_in, 16);
@@ -33,15 +35,19 @@ void CNetAddr::SetRaw(Network network, const uint8_t *ip_in) {
 }
 
 CNetAddr::CNetAddr(const struct in_addr &ipv4Addr) {
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast)
     SetRaw(NET_IPV4, (const uint8_t *)&ipv4Addr);
 }
 
 CNetAddr::CNetAddr(const struct in6_addr &ipv6Addr, const uint32_t scope) {
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast)
     SetRaw(NET_IPV6, (const uint8_t *)&ipv6Addr);
+    // NOLINTNEXTLINE (cppcoreguidelines-prefer-member-initializer)
     scopeId = scope;
 }
 
 unsigned int CNetAddr::GetByte(int n) const {
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
     return ip[15 - n];
 }
 
@@ -90,6 +96,7 @@ bool CNetAddr::IsRFC3964() const {
 }
 
 bool CNetAddr::IsRFC6052() const {
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
     static const uint8_t pchRFC6052[] = {0, 0x64, 0xFF, 0x9B, 0, 0,
                                          0, 0,    0,    0,    0, 0};
     return (memcmp(ip, pchRFC6052, sizeof(pchRFC6052)) == 0);
@@ -101,6 +108,7 @@ bool CNetAddr::IsRFC4380() const {
 }
 
 bool CNetAddr::IsRFC4862() const {
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
     static const uint8_t pchRFC4862[] = {0xFE, 0x80, 0, 0, 0, 0, 0, 0};
     return (memcmp(ip, pchRFC4862, sizeof(pchRFC4862)) == 0);
 }
@@ -110,6 +118,7 @@ bool CNetAddr::IsRFC4193() const {
 }
 
 bool CNetAddr::IsRFC6145() const {
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
     static const uint8_t pchRFC6145[] = {0, 0, 0,    0,    0, 0,
                                          0, 0, 0xFF, 0xFF, 0, 0};
     return (memcmp(ip, pchRFC6145, sizeof(pchRFC6145)) == 0);
@@ -125,7 +134,7 @@ bool CNetAddr::IsLocal() const {
     if (IsIPv4() && (GetByte(3) == 127 || GetByte(3) == 0)) return true;
 
     // IPv6 loopback (::1/128)
-    static const uint8_t pchLocal[16] = {0, 0, 0, 0, 0, 0, 0, 0,
+    static const uint8_t pchLocal[16] = {0, 0, 0, 0, 0, 0, 0, 0, // NOLINT (cppcoreguidelines-avoid-c-arrays)
                                          0, 0, 0, 0, 0, 0, 0, 1};
     if (memcmp(ip, pchLocal, 16) == 0) return true;
 
@@ -139,10 +148,11 @@ bool CNetAddr::IsValid() const {
     // header20 vectorlen3 addr26 addr26 addr26 header20 vectorlen3 addr26
     // addr26 addr26... so if the first length field is garbled, it reads the
     // second batch of addr misaligned by 3 bytes.
-    if (memcmp(ip, pchIPv4 + 3, sizeof(pchIPv4) - 3) == 0) return false;
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    if (memcmp(ip, pchIPv4 + 3, sizeof(pchIPv4) - 3) == 0) return false; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     // unspecified IPv6 address (::/128)
-    uint8_t ipNone6[16] = {};
+    uint8_t ipNone6[16] = {}; // NOLINT (ppcoreguidelines-avoid-c-arrays)
     if (memcmp(ip, ipNone6, 16) == 0) return false;
 
     // documentation IPv6 address
@@ -151,11 +161,13 @@ bool CNetAddr::IsValid() const {
     if (IsIPv4()) {
         // INADDR_NONE
         uint32_t ipNone = INADDR_NONE;
-        if (memcmp(ip + 12, &ipNone, 4) == 0) return false;
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        if (memcmp(ip + 12, &ipNone, 4) == 0) return false; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         // 0
         ipNone = 0;
-        if (memcmp(ip + 12, &ipNone, 4) == 0) return false;
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        if (memcmp(ip + 12, &ipNone, 4) == 0) return false; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     return true;
@@ -181,6 +193,7 @@ std::string CNetAddr::ToStringIP() const {
     struct sockaddr_storage sockaddr;
     socklen_t socklen = sizeof(sockaddr);
     if (serv.GetSockAddr((struct sockaddr *)&sockaddr, &socklen)) {
+        // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
         char name[1025] = "";
         if (!getnameinfo((const struct sockaddr *)&sockaddr, socklen, name,
                          sizeof(name), nullptr, 0, NI_NUMERICHOST))
@@ -216,7 +229,8 @@ bool operator<(const CNetAddr &a, const CNetAddr &b) {
 
 bool CNetAddr::GetInAddr(struct in_addr *pipv4Addr) const {
     if (!IsIPv4()) return false;
-    memcpy(pipv4Addr, ip + 12, 4);
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    memcpy(pipv4Addr, ip + 12, 4); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return true;
 }
 
@@ -282,6 +296,7 @@ std::vector<uint8_t> CNetAddr::GetGroup() const {
 
 uint64_t CNetAddr::GetHash() const {
     uint256 hash = Hash(&ip[0], &ip[16]);
+    // NOLINTNEXTLINE (cppcoreguidelines-init-variables)
     uint64_t nRet;
     memcpy(&nRet, &hash, sizeof(nRet));
     return nRet;
@@ -384,9 +399,11 @@ CService::CService(const struct sockaddr_in6 &addr)
 bool CService::SetSockAddr(const struct sockaddr *paddr) {
     switch (paddr->sa_family) {
         case AF_INET:
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
             *this = CService(*reinterpret_cast<const sockaddr_in *>(paddr));
             return true;
         case AF_INET6:
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
             *this = CService(*reinterpret_cast<const sockaddr_in6 *>(paddr));
             return true;
         default:
@@ -398,6 +415,7 @@ unsigned short CService::GetPort() const {
     return port;
 }
 
+// NOLINTBEGIN (cppcoreguidelines-slicing)
 bool operator==(const CService &a, const CService &b) {
     return (CNetAddr)a == (CNetAddr)b && a.port == b.port;
 }
@@ -410,11 +428,13 @@ bool operator<(const CService &a, const CService &b) {
     return (CNetAddr)a < (CNetAddr)b ||
            ((CNetAddr)a == (CNetAddr)b && a.port < b.port);
 }
+// NOLINTEND (cppcoreguidelines-slicing)
 
 bool CService::GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const {
     if (IsIPv4()) {
         if (*addrlen < (socklen_t)sizeof(struct sockaddr_in)) return false;
         *addrlen = sizeof(struct sockaddr_in);
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
         struct sockaddr_in *paddrin = reinterpret_cast<sockaddr_in *>(paddr);
         memset(paddrin, 0, *addrlen);
         if (!GetInAddr(&paddrin->sin_addr)) return false;
@@ -425,6 +445,7 @@ bool CService::GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const {
     if (IsIPv6()) {
         if (*addrlen < (socklen_t)sizeof(struct sockaddr_in6)) return false;
         *addrlen = sizeof(struct sockaddr_in6);
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
         sockaddr_in6 *paddrin6 = reinterpret_cast<sockaddr_in6 *>(paddr);
         memset(paddrin6, 0, *addrlen);
         if (!GetIn6Addr(&paddrin6->sin6_addr)) return false;
@@ -451,9 +472,11 @@ std::string CService::ToStringPort() const {
 
 std::string CService::ToStringIPPort() const {
     if (IsIPv4()) {
+        // NOLINTBEGIN (cppcoreguidelines-pro-bounds-pointer-arithmetic)
         return ToStringIP() + ":" + ToStringPort();
     } else {
         return "[" + ToStringIP() + "]:" + ToStringPort();
+        // NOLINTEND (cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 }
 
@@ -465,13 +488,15 @@ void CService::SetPort(unsigned short portIn) {
     port = portIn;
 }
 
+// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CSubNet::CSubNet() : valid(false) {
     memset(netmask, 0, sizeof(netmask));
 }
 
+// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CSubNet::CSubNet(const CNetAddr &addr, int32_t mask) {
-    valid = true;
-    network = addr;
+    valid = true; // NOLINT (cppcoreguidelines-prefer-member-initializer)
+    network = addr; // NOLINT (cppcoreguidelines-prefer-member-initializer)
     // Default to /32 (IPv4) or /128 (IPv6), i.e. match single address
     memset(netmask, 255, sizeof(netmask));
 
@@ -485,6 +510,7 @@ CSubNet::CSubNet(const CNetAddr &addr, int32_t mask) {
         n += astartofs * 8;
         // Clear bits [n..127]
         for (; n < 128; ++n)
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
             netmask[n >> 3] &= ~(1 << (7 - (n & 7)));
     } else {
         valid = false;
@@ -492,13 +518,15 @@ CSubNet::CSubNet(const CNetAddr &addr, int32_t mask) {
 
     // Normalize network according to netmask
     for (int x = 0; x < 16; ++x) {
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         network.ip[x] &= netmask[x];
     }
 }
 
+// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask) {
-    valid = true;
-    network = addr;
+    valid = true; // NOLINT (cppcoreguidelines-prefer-member-initializer)
+    network = addr; // NOLINT (cppcoreguidelines-prefer-member-initializer)
     // Default to /32 (IPv4) or /128 (IPv6), i.e. match single address
     memset(netmask, 255, sizeof(netmask));
 
@@ -507,21 +535,25 @@ CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask) {
     const int astartofs = network.IsIPv4() ? 12 : 0;
 
     for (int x = astartofs; x < 16; ++x)
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         netmask[x] = mask.ip[x];
 
     // Normalize network according to netmask
     for (int x = 0; x < 16; ++x)
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         network.ip[x] &= netmask[x];
 }
 
+// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CSubNet::CSubNet(const CNetAddr &addr) : valid(addr.IsValid()) {
     memset(netmask, 255, sizeof(netmask));
-    network = addr;
+    network = addr; // NOLINT (cppcoreguidelines-prefer-member-initializer)
 }
 
 bool CSubNet::Match(const CNetAddr &addr) const {
     if (!valid || !addr.IsValid()) return false;
     for (int x = 0; x < 16; ++x)
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         if ((addr.ip[x] & netmask[x]) != network.ip[x]) return false;
     return true;
 }
@@ -566,9 +598,11 @@ std::string CSubNet::ToString() const {
     int cidr = 0;
     bool valid_cidr = true;
     int n = network.IsIPv4() ? 12 : 0;
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
     for (; n < 16 && netmask[n] == 0xff; ++n)
         cidr += 8;
     if (n < 16) {
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         int bits = NetmaskBits(netmask[n]);
         if (bits < 0)
             valid_cidr = false;
@@ -577,10 +611,11 @@ std::string CSubNet::ToString() const {
         ++n;
     }
     for (; n < 16 && valid_cidr; ++n)
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         if (netmask[n] != 0x00) valid_cidr = false;
 
     /* Format output */
-    std::string strNetmask;
+    std::string strNetmask; // NOLINT (cppcoreguidelines-init-variables)
     if (valid_cidr) {
         strNetmask = strprintf("%u", cidr);
     } else {
@@ -596,6 +631,7 @@ std::string CSubNet::ToString() const {
                 netmask[14] << 8 | netmask[15]);
     }
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return network.ToString() + "/" + strNetmask;
 }
 

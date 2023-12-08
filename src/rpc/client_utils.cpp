@@ -17,6 +17,7 @@
 #include <univalue.h>
 #include <event2/buffer.h>
 
+// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 class CRPCConvertParam {
 public:
     std::string methodName; //!< method whose params want conversion
@@ -30,6 +31,7 @@ public:
  *
  * @note Parameter indexes start from 0.
  */
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
 static const CRPCConvertParam vRPCConvertParams[] = {
     {"setmocktime", 0, "timestamp"},
     {"generate", 0, "nblocks"},
@@ -170,6 +172,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CRPCConvertTable::CRPCConvertTable() {
     const unsigned int n_elem =
         (sizeof(vRPCConvertParams) / sizeof(vRPCConvertParams[0]));
@@ -182,7 +185,8 @@ CRPCConvertTable::CRPCConvertTable() {
     }
 }
 
-static CRPCConvertTable rpcCvtTable;
+// NOLINTNEXTLINE cppcoreguidelines-avoid-non-const-global-variables
+static CRPCConvertTable rpcCvtTable; // NOLINTNEXTLINE (cert-err58-cpp)
 
 /**
  * Non-RFC4627 JSON parser, accepts internal values (such as numbers, true,
@@ -272,6 +276,7 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 // This function returns either one of EXIT_ codes when it's expected to stop
 // the process or CONTINUE_EXECUTION when it's expected to continue further.
 //
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
 int AppInitRPC(int argc, char *argv[], const std::string& usage_format, const std::function<std::string(void)>& help_message)
 {
     try
