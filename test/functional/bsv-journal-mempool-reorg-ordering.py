@@ -349,7 +349,7 @@ class ReorgTests(BitcoinTestFramework):
 
         with self.run_node_with_connections("Xxxxxxxxxxxxx",
                                             0,
-                                             ["-checkmempool=1",
+                                            ["-checkmempool=1",
                                              '-whitelist=127.0.0.1',
                                              '-genesisactivationheight=1',
                                              '-jbafillafternewblock=1'],

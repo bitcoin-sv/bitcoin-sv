@@ -56,7 +56,7 @@ def make_unlock_modified00(tx, tx_to_spend):
         TEST_PRE_GENESIS_NONSTANDARD_TX = [
             SimpleTestDefinition("PRE-GENESIS", P2PK_LOCKING_SCRIPT,
                                  "PRE-GENESIS", make_unlock_default, test_tx_locking_script=CScript([OP_TRUE]),
-                                                p2p_reject_reason = b'scriptpubkey')
+                                 p2p_reject_reason=b'scriptpubkey')
         ]
 
         TEST_PRE_GENESIS_P2SH_TX = [
@@ -78,7 +78,7 @@ def make_unlock_modified00(tx, tx_to_spend):
         TEST_GENESIS_P2SH_TX = [
             SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                                  "GENESIS", make_unlock_default, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
-                                            p2p_reject_reason=b'bad-txns-vout-p2sh')
+                                 p2p_reject_reason=b'bad-txns-vout-p2sh')
         ]
 
         TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
@@ -119,8 +119,8 @@ class HandleTxsModified11Node(GenesisHeightBasedSimpleTestsCase):
     TEST_GENESIS_P2SH_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified11, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
-                                        p2p_reject_reason = b'flexible-bad-txns-vout-p2sh',
-                                        block_reject_reason=b'bad-txns-vout-p2sh')
+                             p2p_reject_reason=b'flexible-bad-txns-vout-p2sh',
+                             block_reject_reason=b'bad-txns-vout-p2sh')
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
@@ -156,14 +156,14 @@ class HandleTxsModified10Node(GenesisHeightBasedSimpleTestsCase):
     TEST_GENESIS_NONSTANDARD_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified10, test_tx_locking_script=CScript([OP_TRUE]),
-                                        p2p_reject_reason = b'scriptpubkey')
+                             p2p_reject_reason=b'scriptpubkey')
     ]
 
     TEST_GENESIS_P2SH_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified10, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
-                                        p2p_reject_reason=b'flexible-bad-txns-vout-p2sh',
-                                        block_reject_reason=b'bad-txns-vout-p2sh')
+                             p2p_reject_reason=b'flexible-bad-txns-vout-p2sh',
+                             block_reject_reason=b'bad-txns-vout-p2sh')
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
@@ -184,7 +184,7 @@ class HandleTxsModified00Node(GenesisHeightBasedSimpleTestsCase):
     TEST_PRE_GENESIS_NONSTANDARD_TX = [
         SimpleTestDefinition("PRE-GENESIS", P2PK_LOCKING_SCRIPT,
                              "PRE-GENESIS", make_unlock_modified00, test_tx_locking_script=CScript([OP_TRUE]),
-                                            p2p_reject_reason = b'scriptpubkey')
+                             p2p_reject_reason=b'scriptpubkey')
     ]
 
     TEST_PRE_GENESIS_P2SH_TX = [
@@ -200,14 +200,14 @@ class HandleTxsModified00Node(GenesisHeightBasedSimpleTestsCase):
     TEST_GENESIS_NONSTANDARD_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified00, test_tx_locking_script=CScript([OP_TRUE]),
-                                        p2p_reject_reason = b'scriptpubkey')
+                             p2p_reject_reason=b'scriptpubkey')
     ]
 
     TEST_GENESIS_P2SH_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified00, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
-                                        p2p_reject_reason = b'flexible-bad-txns-vout-p2sh',
-                                        block_reject_reason=b'bad-txns-vout-p2sh')
+                             p2p_reject_reason=b'flexible-bad-txns-vout-p2sh',
+                             block_reject_reason=b'bad-txns-vout-p2sh')
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX

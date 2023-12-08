@@ -19,10 +19,10 @@ class P2PInvMsgTimeOrder(BitcoinTestFramework):
         unspent_amount = int(unspent_transaction['amount']) * 100000000  # BTC to Satoshis
         ftx = CTransaction()
         ftx.vout.append(CTxOut(unspent_amount - fee, CScript([OP_DUP, OP_HASH160,
-                                                                 hex_str_to_bytes(
-                                                                     "ab812dc588ca9d5787dde7eb29569da63c3a238c"),
-                                                                 OP_EQUALVERIFY,
-                                                                 OP_CHECKSIG])))  # Pay to random address
+                                                              hex_str_to_bytes(
+                                                                  "ab812dc588ca9d5787dde7eb29569da63c3a238c"),
+                                                              OP_EQUALVERIFY,
+                                                              OP_CHECKSIG])))  # Pay to random address
         ftx.vin.append(CTxIn(COutPoint(uint256_from_str(hex_str_to_bytes(unspent_transaction["txid"])[::-1]),
                                        unspent_transaction["vout"])))
         ftx.rehash()

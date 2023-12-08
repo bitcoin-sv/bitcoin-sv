@@ -63,7 +63,7 @@ class HeightBasedTestsCase:
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
     TESTING_HEIGHTS = [(150,   None, "PREPARE"),
-                        (150, "TEST", None),]
+                       (150, "TEST", None),]
 
     def __init__(self):
         self.utxos = defaultdict(list)

@@ -229,8 +229,12 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                 for inv_tx in resultset['invalid']:
                     if inv_tx['txid'] == tx['txid']:
                         tx['marked_invalid_ok'] = True
-                        assert inv_tx['reject_reason'] == tx['reject_reason'], tx['txid'] + " marked invalid with reason " \
-                                             + inv_tx['reject_reason'] + ", should be with " + tx['reject_reason']
+                        assert inv_tx['reject_reason'] == tx['reject_reason'], \
+                            tx['txid'] \
+                            + " marked invalid with reason " \
+                            + inv_tx['reject_reason'] \
+                            + ", should be with " \
+                            + tx['reject_reason']
                         break
                 assert tx['marked_invalid_ok'], tx['txid'] + " not marked invalid. Should be marked invalid with reason " + tx['reject_reason']
 
@@ -351,7 +355,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                                      "maxscriptnumlengthpolicy": 200, "maxstackmemoryusagepolicy": 6000, "limitancestorcount": 3,
                                      "limitcpfpgroupmemberscount": 5,
                                      "minconsolidationfactor": 2, "minconfconsolidationinput": 3,
-                                      "acceptnonstdconsolidationinput": False}
+                                     "acceptnonstdconsolidationinput": False}
         config_overrides_increase = {"maxtxsizepolicy": ONE_MEGABYTE*100, "datacarriersize": 99995000, "maxscriptsizepolicy": 20000000,
                                      "maxscriptnumlengthpolicy": 250000, "maxstackmemoryusagepolicy": ONE_MEGABYTE*100,
                                      "limitancestorcount": 7, "limitcpfpgroupmemberscount": 10,
@@ -552,13 +556,13 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         for j in range(16):
             for i in range(self.limitancestorcount):
                 tx = self.create_transaction(int(ceil(len(ToHex(CTransaction())) * mining_fee * 2)), [OP_TRUE],
-                                              [(outpoints[j], 0)], 1, int((outpoints[j]['amount']) * COIN))
+                                             [(outpoints[j], 0)], 1, int((outpoints[j]['amount']) * COIN))
 
                 txid = self.nodes[0].sendrawtransaction(tx, False, False)
 
                 outpoints[j] = {'txid': txid, 'vout': 0, 'amount': FromHex(CTransaction(), tx).vout[0].nValue / COIN}
             tx = self.create_transaction(int(ceil(len(ToHex(CTransaction())) * mining_fee * 2)), [OP_TRUE],
-                                          [(outpoints[j], 0)], 1, int((outpoints[j]['amount']) * COIN))
+                                         [(outpoints[j], 0)], 1, int((outpoints[j]['amount']) * COIN))
             txes.append({"hex": tx, "config": overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
 
@@ -613,7 +617,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         txes_fee_too_low = falses(16)
         for j in range(16):
             tx = self.create_transaction(0, [OP_TRUE], [(utxos[i_utxo+j], 0)], no_outputs,
-                                          int((utxos[i_utxo+j]['amount']) * COIN), feerate=relayfee)
+                                         int((utxos[i_utxo+j]['amount']) * COIN), feerate=relayfee)
 
             txid = self.nodes[0].sendrawtransaction(tx, False, False)
 
@@ -622,14 +626,14 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
             for i in range(no_outputs):
                 outpoints[j]['vout'] = i
                 tx = self.create_transaction(0, [OP_TRUE], [(outpoints[j], i)], 1, int((outpoints[j]['amount']) * COIN),
-                                              feerate=relayfee)
+                                             feerate=relayfee)
 
                 txid = self.nodes[0].sendrawtransaction(tx, False, False)
 
                 children[j].append([{'txid': txid, 'vout': 0, 'amount': FromHex(CTransaction(), tx).vout[0].nValue / COIN}, 0])
 
             tx = self.create_transaction(0, [OP_TRUE], children[j], 1,
-                                          int((children[j][0][0]['amount']) * COIN * no_outputs), feerate=mining_fee*(no_outputs+1))
+                                         int((children[j][0][0]['amount']) * COIN * no_outputs), feerate=mining_fee*(no_outputs+1))
 
             txes.append({"hex": tx, "config": overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]

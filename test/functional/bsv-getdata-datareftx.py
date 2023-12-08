@@ -98,7 +98,7 @@ class GetdataDataref(BitcoinTestFramework):
 
             # Reference just 2 of the datarefs in the miner-info document
             datarefs = [create_dataref(['id1'], dataref1.hash, 0),
-                         create_dataref(['id2'], dataref2.hash, 0)]
+                        create_dataref(['id2'], dataref2.hash, 0)]
 
             # Send a miner ID block containing dataref txns
             minerIdParams = {

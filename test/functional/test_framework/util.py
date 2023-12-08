@@ -927,7 +927,7 @@ def wait_for_ptv_completion(conn, exp_mempool_size, check_interval=0.1, timeout=
     - not sending all txs to the node through the connection
     """
     wait_until(lambda: conn.rpc.getmempoolinfo()['size'] >= exp_mempool_size,
-                    check_interval=check_interval, timeout=timeout)
+               check_interval=check_interval, timeout=timeout)
     conn.rpc.waitforptvcompletion()
 
 

@@ -72,11 +72,11 @@ class BigBlockTests(BitcoinTestFramework):
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
 
         self.nodeArgs = ['-genesisactivationheight=1',
-                          '-blockmaxsize={}'.format(ONE_GIGABYTE * 5),
-                          '-maxmempool=10000',
-                          '-maxnonstdtxvalidationduration=100000',
-                          '-maxtxnvalidatorasynctasksrunduration=100001',
-                          '-blockdownloadtimeoutbasepercent=300']
+                         '-blockmaxsize={}'.format(ONE_GIGABYTE * 5),
+                         '-maxmempool=10000',
+                         '-maxnonstdtxvalidationduration=100000',
+                         '-maxtxnvalidatorasynctasksrunduration=100001',
+                         '-blockdownloadtimeoutbasepercent=300']
 
         self.extra_args = [self.nodeArgs] * self.num_nodes
 

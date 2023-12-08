@@ -278,12 +278,12 @@ def chain_tip_status_equals(conn, hash, status):
 
 def wait_for_tip(conn, hash):
     wait_until(lambda: conn.rpc.getbestblockhash() == hash, timeout=10, check_interval=0.2,
-                label=f"waiting until {hash} become tip")
+               label=f"waiting until {hash} become tip")
 
 
 def wait_for_tip_status(conn, hash, status):
     wait_until(lambda: chain_tip_status_equals(conn, hash, status), timeout=10, check_interval=0.2,
-                label=f"waiting until {hash} is tip with status {status}")
+               label=f"waiting until {hash} is tip with status {status}")
 
 
 # sign a transaction, using the key we know about
