@@ -232,10 +232,17 @@ class BlockDownloadTimeout(BitcoinTestFramework):
         )
 
         """ CASE 3 """
-        block_2 = self.create_block(funding_tx=funding_tx_2, block_target_size=10*ONE_MEGABYTE,
-                                  prev_hash=int(last_block_info["hash"], 16), prev_height=last_block_info["height"], prev_time=last_block_info["time"])
-        block_3 = self.create_block(funding_tx=funding_tx_3, block_target_size=10*ONE_MEGABYTE,
-                                  prev_hash=int(block_2.hash, 16), prev_height=last_block_info["height"]+1, prev_time=last_block_info["time"]+1)
+        block_2 = self.create_block(funding_tx=funding_tx_2,
+                                    block_target_size=10*ONE_MEGABYTE,
+                                    prev_hash=int(last_block_info["hash"], 16),
+                                    prev_height=last_block_info["height"],
+                                    prev_time=last_block_info["time"])
+
+        block_3 = self.create_block(funding_tx=funding_tx_3,
+                                    block_target_size=10*ONE_MEGABYTE,
+                                    prev_hash=int(block_2.hash, 16),
+                                    prev_height=last_block_info["height"]+1,
+                                    prev_time=last_block_info["time"]+1)
 
         self.test_send_block_to_node(
             label="Two connections, on both connections we are sending blocks, sending slowly, timeout occures",

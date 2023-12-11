@@ -227,12 +227,16 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, pausedp2p=True)
         # dontcheckfee=True
         with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc (dontcheckfee=True).'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, dontcheckfee=True, pausedp2p=True)
 
@@ -249,12 +253,16 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1_1: {} chain of length {}. Test duplicates resubmitted via rpc.'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_1(conn, chain_length, out)
         # dontcheckfee=True
         with self.run_node_with_connections('TS1_1: {} chain of length {}. Test duplicates resubmitted via rpc (dontcheckfee=True).'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_1(conn, chain_length, out, dontcheckfee=True)
 
@@ -271,12 +279,16 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1_2: {} chain of length {}. Test orphans resubmitted via rpc.'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_2(conn, chain_length, out)
         # dontcheckfee=True
         with self.run_node_with_connections('TS1_2: {} chain of length {}. Test orphans resubmitted via rpc.'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_2(conn, chain_length, out, dontcheckfee=True)
 
@@ -295,7 +307,9 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS2: {} chains of length {}. Test duplicates and generate a new block.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario2(conn, num_of_chains, chain_length, out)
 

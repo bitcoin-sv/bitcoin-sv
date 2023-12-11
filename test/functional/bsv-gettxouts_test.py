@@ -24,8 +24,9 @@ class GettxoutsTest(BitcoinTestFramework):
         # Compare gettxouts results to results from gettxout RPC function
         gettxout_results = []
         for i in range(len(utxos)):
-            gettxout_results.append(self.nodes[0].gettxout(txid=utxos[i]["txid"], n=utxos[i]["vout"],
-                                              include_mempool=True))
+            gettxout_results.append(self.nodes[0].gettxout(txid=utxos[i]["txid"],
+                                                           n=utxos[i]["vout"],
+                                                           include_mempool=True))
 
         utxos_list = []
         for utxo in utxos:

@@ -20,7 +20,7 @@ _policy_h_fh.close()
 
 # Slurp in chainparams.cpp contents
 _chainparams_cpp_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'chainparams.cpp'), 'rt')
+                                        'chainparams.cpp'), 'rt')
 _chainparams_cpp_contents = _chainparams_cpp_fh.read()
 _chainparams_cpp_fh.close()
 
@@ -37,31 +37,33 @@ _script_h_fh.close()
 
 # Slurp in limitedstack.h contents
 _limitedstack_h_fh = open(os.path.join(get_srcdir(), 'src', 'script',
-                                    'limitedstack.h'), 'rt')
+                                       'limitedstack.h'), 'rt')
 _limitedstack_h_contents = _limitedstack_h_fh.read()
 _limitedstack_h_fh.close()
 
 # Slurp in validation.h contents
 _validation_h_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'validation.h'), 'rt')
+                                     'validation.h'), 'rt')
 _validation_h_contents = _validation_h_fh.read()
 _validation_h_fh.close()
 
 # Slurp in text_writer.h contents
 _textwriter_h_fh = open(os.path.join(get_srcdir(), 'src', 'rpc',
-                                    'text_writer.h'), 'rt')
+                                     'text_writer.h'), 'rt')
 _textwriter_h_contents = _textwriter_h_fh.read()
 _textwriter_h_fh.close()
 
 # Slurp in txn_validation_config.h contents
-_txnvalidationconfig_h_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'txn_validation_config.h'), 'rt')
+_txnvalidationconfig_h_fh = open(os.path.join(get_srcdir(),
+                                              'src',
+                                              'txn_validation_config.h'), 'rt')
 _txnvalidationconfig_h_contents = _txnvalidationconfig_h_fh.read()
 _txnvalidationconfig_h_fh.close()
 
 # Slurp in txn_validator.h contents
-_txnvalidator_h_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'txn_validator.h'), 'rt')
+_txnvalidator_h_fh = open(os.path.join(get_srcdir(),
+                                       'src',
+                                       'txn_validator.h'), 'rt')
 _txnvalidator_h_contents = _txnvalidator_h_fh.read()
 _txnvalidator_h_fh.close()
 

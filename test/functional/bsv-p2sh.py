@@ -92,8 +92,10 @@ class P2SH(ComparisonTestFramework):
         wrongPrivateKey.set_secretbytes(b"wrongkeysecret")
         wrongkey_txn = self.spend_p2sh_tx(p2sh_txs[0], privateKey=wrongPrivateKey)
         # A transaction with this output script can't get into the mempool
-        assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed",
-            node.sendrawtransaction, ToHex(wrongkey_txn))
+        assert_raises_rpc_error(-26,
+                                "mandatory-script-verify-flag-failed",
+                                node.sendrawtransaction,
+                                ToHex(wrongkey_txn))
 
         # A transaction with this output script can get into the mempool
         correctkey_tx = self.spend_p2sh_tx(p2sh_txs[1])
@@ -128,8 +130,10 @@ class P2SH(ComparisonTestFramework):
         wrongPrivateKey.set_secretbytes(b"wrongkeysecret")
         wrongkey_txn = self.spend_p2sh_tx(p2sh_txs[2], privateKey=wrongPrivateKey)
         # A transaction with this output script can't get into the mempool
-        assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed",
-            node.sendrawtransaction, ToHex(wrongkey_txn))
+        assert_raises_rpc_error(-26,
+                                "mandatory-script-verify-flag-failed",
+                                node.sendrawtransaction,
+                                ToHex(wrongkey_txn))
 
         # We can spend old P2SH transactions
         correctkey_tx = self.spend_p2sh_tx(p2sh_txs[3])

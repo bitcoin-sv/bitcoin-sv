@@ -26,8 +26,8 @@ class TxSizeConsensusCaseTest(GenesisHeightTestsCaseBase):
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS + 1)
             tx_collection.add_tx(tx,
-               p2p_reject_reason = b'flexible-bad-txns-oversize',
-               block_reject_reason=b'bad-txns-oversize')
+                                 p2p_reject_reason = b'flexible-bad-txns-oversize',
+                                 block_reject_reason=b'bad-txns-oversize')
 
         if tx_collection.label == "MEMPOOL AT GENESIS":
             utxos, data = self.utxos["MEMPOOL AT GENESIS"]

@@ -227,7 +227,9 @@ class PVQTimeoutTest(ComparisonTestFramework):
                 '-maxstdtxvalidationduration=500', # increasing max validation time ensures that timeout doesn't occur for standard txns, even on slower machines and on debug build
                 '-maxnonstdtxnsperthreadratio=0'] # setting it to zero ensures that non-standard txs won't be processed (if there are any queued).
         with self.run_node_with_connections('TC1: {} txs detected as std and then accepted.'.format(tc1_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             std_txs = self.run_scenario1(conn, spend_txs, tc1_txs_num, self.locking_script_1)
             # Check if required transactions are accepted by the mempool.
@@ -250,7 +252,9 @@ class PVQTimeoutTest(ComparisonTestFramework):
         spend_txs = out[tc1_txs_num:tc1_txs_num+1]
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC2: {} txs with small bignums detected as non-std txs and then finally accepted.'.format(tc2_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc2_txs_num, self.locking_script_2)
             wait_for_ptv_completion(conn, len(nonstd_txs))
@@ -279,7 +283,9 @@ class PVQTimeoutTest(ComparisonTestFramework):
                 '-maxtxnvalidatorasynctasksrunduration=100001', # This needs to mehigher then maxnonstdtxvalidationduration
                 '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000']
         with self.run_node_with_connections('TC3: {} txs with large bignums detected as non-std txs and then finally accepted.'.format(tc3_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc3_txs_num, self.locking_script_3)
             wait_for_ptv_completion(conn, len(nonstd_txs))
@@ -308,7 +314,9 @@ class PVQTimeoutTest(ComparisonTestFramework):
         args = ['-checkmempool=0', '-persistmempool=0',
                 '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000']
         with self.run_node_with_connections('TC4: {} txs with large bignums detected as non-std txs and then finally rejected.'.format(tc4_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc4_txs_num, self.locking_script_3)
             wait_for_ptv_completion(conn, 0)
@@ -336,7 +344,9 @@ class PVQTimeoutTest(ComparisonTestFramework):
         spend_txs2 = out[tc1_txs_num+3+tc5_1_txs_num:tc1_txs_num+4+tc5_1_txs_num]
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC5: The total of {} std and nonstd txs processed and accepted.'.format(tc5_1_txs_num+tc5_2_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             std_txs = self.get_txchains_n(tc5_1_txs_num, 1, spend_txs, CScript(), self.locking_script_1, 2000000, 10)
             std_and_nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs2, tc5_2_txs_num, self.locking_script_2, std_txs, shuffle_txs=True)

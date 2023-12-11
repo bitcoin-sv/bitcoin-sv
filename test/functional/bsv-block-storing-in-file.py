@@ -85,9 +85,9 @@ class BlockStoringInFile(BitcoinTestFramework):
         self.preferred_blockfile_size += 1
 
         self.extra_args = ['-whitelist=127.0.0.1',
-                    "-excessiveblocksize=%d" % self.excessive_block_size,
-                    "-preferredblockfilesize=%d" % self.preferred_blockfile_size,
-                    "-blockmaxsize=%d" % self.mining_block_max_size]
+                           "-excessiveblocksize=%d" % self.excessive_block_size,
+                           "-preferredblockfilesize=%d" % self.preferred_blockfile_size,
+                           "-blockmaxsize=%d" % self.mining_block_max_size]
 
     def setup_network(self):
         self.add_nodes(self.num_nodes)
@@ -106,10 +106,14 @@ class BlockStoringInFile(BitcoinTestFramework):
     def __count_blk_files(self, block_number, expected_number_of_files, node_number):
         blockfile_count = len(glob.glob(self.options.tmpdir + "/node" + str(node_number) + "/regtest/blocks/blk0000*.dat"))
 
-        assert blockfile_count == expected_number_of_files, ("unexpected blockfile count for block: " + str(block_number) +
-            "; node: " + str(node_number) +
-            "; expected: " + str(expected_number_of_files) +
-            "; got: " + str(blockfile_count))
+        assert blockfile_count == expected_number_of_files, ("unexpected blockfile count for block: "
+                                                             + str(block_number)
+                                                             + "; node: "
+                                                             + str(node_number)
+                                                             + "; expected: "
+                                                             + str(expected_number_of_files)
+                                                             + "; got: "
+                                                             + str(blockfile_count))
 
     def __compare_local_and_remote_block_size(self, local_block, remote_node):
         remote_best_block_hash = remote_node.getbestblockhash()

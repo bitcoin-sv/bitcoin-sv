@@ -129,19 +129,22 @@ class MiningTest(BitcoinTestFramework):
         # Submit with wrong ID
         self.log.info("Submitting to wrong node with unknown ID")
         assert_raises_rpc_error(-22, "Block candidate ID not found",
-            otherNode.submitminingsolution, {'id': candidate['id'], 'nonce': block.nNonce})
+                                otherNode.submitminingsolution,
+                                {'id': candidate['id'], 'nonce': block.nNonce})
 
         # Omit nonce
         self.log.info("Submitting without nonce")
         assert_raises_rpc_error(-22, "nonce not found",
-            blockNode.submitminingsolution, {'id': candidate['id']})
+                                blockNode.submitminingsolution,
+                                {'id': candidate['id']})
 
         # Bad coinbase
         self.log.info("Submitting with bad coinbase")
         assert_raises_rpc_error(-22, "coinbase decode failed",
-            blockNode.submitminingsolution, {'id': candidate['id'],
-                                             'nonce': block.nNonce,
-                                             'coinbase': 'ALoadOfRubbish'})
+                                blockNode.submitminingsolution,
+                                {'id': candidate['id'],
+                                 'nonce': block.nNonce,
+                                 'coinbase': 'ALoadOfRubbish'})
 
         # Bad POW
         self.log.info("Submitting with bad POW")

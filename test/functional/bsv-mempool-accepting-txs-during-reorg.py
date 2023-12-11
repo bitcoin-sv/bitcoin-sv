@@ -269,17 +269,17 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, [], timeout=60, check_interval=1)
 
         with self.run_node_with_connections("3. Submit transactions that are spending ouputs from disconnecting block and try to mine a block during the reorg",
-                0,
-                ["-minminingtxfee=0.00001",
-                 "-mindebugrejectionfee=0.000005",
-                 "-maxtxsizepolicy=0",
-                 '-maxnonstdtxvalidationduration=200000',
-                 '-maxtxnvalidatorasynctasksrunduration=200010',
-                 '-genesisactivationheight=1',
-                 '-maxstackmemoryusageconsensus=2GB',
-                 "-maxscriptsizepolicy=2GB",
-                 "-acceptnonstdoutputs=1",],
-                number_of_connections=1) as (conn,):
+                                            0,
+                                            ["-minminingtxfee=0.00001",
+                                             "-mindebugrejectionfee=0.000005",
+                                             "-maxtxsizepolicy=0",
+                                             '-maxnonstdtxvalidationduration=200000',
+                                             '-maxtxnvalidatorasynctasksrunduration=200010',
+                                             '-genesisactivationheight=1',
+                                             '-maxstackmemoryusageconsensus=2GB',
+                                             "-maxscriptsizepolicy=2GB",
+                                             "-acceptnonstdoutputs=1",],
+                                            number_of_connections=1) as (conn,):
 
             # see if everything is still as expected
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=1)

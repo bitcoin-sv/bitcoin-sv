@@ -122,24 +122,30 @@ class MerkleProofTest(BitcoinTestFramework):
         # Check some negative tests on verifymerkleproof
         assert_raises_rpc_error(-8, "\"flags\" must be a numeric value", self.nodes[0].verifymerkleproof, {'flags': '2'})
         assert_raises_rpc_error(-8, "verifymerkleproof only supports \"flags\" with value 2", self.nodes[0].verifymerkleproof, {'flags': 1})
-        assert_raises_rpc_error(-8, "\"nodes\" must be a Json array", self.nodes[0].verifymerkleproof,
-            {'flags':2,
-             'index':4,
-             'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-             'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
-             'nodes':'*'})
-        assert_raises_rpc_error(-8, "\"node\" must be a \"hash\" or \"*\"", self.nodes[0].verifymerkleproof,
-            {'flags':2,
-             'index':4,
-             'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-             'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
-             'nodes':[2]})
-        assert_raises_rpc_error(-8, "node must be of length 64 (not 10)", self.nodes[0].verifymerkleproof,
-            {'flags':2,
-             'index':4,
-             'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-             'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
-             'nodes':['*','abcdef1234']})
+        assert_raises_rpc_error(-8,
+                                "\"nodes\" must be a Json array",
+                                self.nodes[0].verifymerkleproof,
+                                {'flags':2,
+                                 'index':4,
+                                 'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                                 'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
+                                 'nodes':'*'})
+        assert_raises_rpc_error(-8,
+                                "\"node\" must be a \"hash\" or \"*\"",
+                                self.nodes[0].verifymerkleproof,
+                                {'flags':2,
+                                 'index':4,
+                                 'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                                 'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
+                                 'nodes':[2]})
+        assert_raises_rpc_error(-8,
+                                "node must be of length 64 (not 10)",
+                                self.nodes[0].verifymerkleproof,
+                                {'flags':2,
+                                 'index':4,
+                                 'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                                 'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
+                                 'nodes':['*','abcdef1234']})
 
         # Get proof for 1st and 2nd transaction and verify that calculated roots are the same as block's merkle root
         hash_of_block_501 = self.nodes[0].getblockhash(height_of_block_501)

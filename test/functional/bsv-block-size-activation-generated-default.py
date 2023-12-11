@@ -17,7 +17,7 @@ from test_framework.script import CScript, OP_TRUE, OP_RETURN
 from test_framework.blocktools import *
 
 from test_framework.cdefs import (ONE_MEGABYTE, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME,
-REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE, REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
+                                  REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE, REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
 
 DEFAULT_ACTIVATION_TIME = REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME # can be orverriden on command line
 DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE
@@ -120,8 +120,9 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
 
         # Generate cca 10 more transactions that needed to avoid problems with rounding
         nrTransactions = math.ceil(
-            (DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE + DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
-            + 10 * (200 + self.data_carrier_size))
+            (DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE
+                + DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
+                + 10 * (200 + self.data_carrier_size))
             / (200 + self.data_carrier_size))
 
         self.log.info("Required number of transactions: %d " % nrTransactions)

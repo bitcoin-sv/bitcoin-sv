@@ -115,9 +115,9 @@ class BSVGetBlock(ComparisonTestFramework):
 
         #check errors still work
         batch = self.nodes[0].batch([self.nodes[0].getblock.get_request(block.hash),
-                          self.nodes[0].getblock.get_request("somehash"),
-                          self.nodes[0].getblockcount.get_request(),
-                          self.nodes[0].undefinedmethod.get_request()])
+                                     self.nodes[0].getblock.get_request("somehash"),
+                                     self.nodes[0].getblockcount.get_request(),
+                                     self.nodes[0].undefinedmethod.get_request()])
 
         checkJsonBlock(batch[0]["result"], False, block.hash)
         assert_equal(batch[0]["error"], None)

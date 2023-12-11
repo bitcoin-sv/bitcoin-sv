@@ -300,14 +300,14 @@ def main():
         for timeout_test in TIMEOUT_FACTOR_FOR_TESTS.keys():
             if timeout_test in test_list:
                 test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}"
-                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1]))
+                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1])) # noqa
 
     else:
         try:
             timeout_factors_json = json.loads(args.timeout_factors)
             if (set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys()) - set(timeout_factors_json.keys()) != set()):
                 print("Timeout factor tests should include timeout factor for tests: {}"
-                    .format([test for test in set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys())]))
+                    .format([test for test in set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys())])) # noqa
                 sys.exit(0)
             for timeout_test in timeout_factors_json.keys():
                 if timeout_test in test_list:
@@ -410,7 +410,7 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tm
                       (BOLD[1], test_result.name, BOLD[0]), console=console)
         else:
             print_log("\n%s%s%s failed, Duration: %s s\n" %
-                  (BOLD[1], test_result.name, BOLD[0], test_result.time))
+                      (BOLD[1], test_result.name, BOLD[0], test_result.time))
             print(BOLD[1] + 'stdout:\n' + BOLD[0] + test_result.stdout + '\n')
             print(BOLD[1] + 'stderr:\n' + BOLD[0] + test_result.stderr + '\n')
 
@@ -517,13 +517,18 @@ class TestHandler:
                 tmpdir = [os.path.join("--tmpdir=%s", "%s_%s") %
                           (self.tmpdir, re.sub(".py.*$", "", t), portseed)]
                 running_jobs.append((t,
-                             time.time(),
-                                  subprocess.Popen([sys.executable, os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,
-                                 universal_newlines=True,
-                                 stdout=log_stdout,
-                                 stderr=log_stderr),
-                             log_stdout,
-                             log_stderr))
+                                    time.time(),
+                                    subprocess.Popen([sys.executable,
+                                                      os.path.join(self.tests_dir, test_argv[0])]
+                                                     + test_argv[1:]
+                                                     + self.flags
+                                                     + portseed_arg
+                                                     + tmpdir,
+                                                     universal_newlines=True,
+                                                     stdout=log_stdout,
+                                                     stderr=log_stderr),
+                                    log_stdout,
+                                    log_stderr))
 
                 if self.file_for_monitoring is not None:
                     logfile = os.path.join(self.tmpdir, f"{t[:-3]}_{portseed}", self.file_for_monitoring)

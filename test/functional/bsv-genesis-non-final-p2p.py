@@ -27,7 +27,7 @@ from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg, sync_blocks
 from test_framework.mininode import (NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
-        CTxIn, CTxOut, FromHex, ToHex)
+                                     CTxIn, CTxOut, FromHex, ToHex)
 import time
 import copy
 

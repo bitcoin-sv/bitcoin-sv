@@ -253,7 +253,9 @@ class PTVP2PTest(ComparisonTestFramework):
                 '-numstdtxvalidationthreads=6',
                 '-numnonstdtxvalidationthreads=2']
         with self.run_node_with_connections('TC1: {} std txn chains used, each of length {}.'.format(tc1_txchains_num, tc1_tx_chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             std_txs = self.run_scenario1(conn, spend_txs, tc1_txchains_num, tc1_tx_chain_length, self.locking_script_1, 5000000000, 1)
             wait_for_ptv_completion(conn, tc1_txchains_num*tc1_tx_chain_length)
@@ -274,7 +276,9 @@ class PTVP2PTest(ComparisonTestFramework):
         spend_txs = self.get_front_slice(out, 1)
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC2: {} non-std txs used.'.format(tc2_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, rejected_txs = self.run_scenario2(conn, spend_txs, tc2_txs_num, self.locking_script_2)
             wait_for_ptv_completion(conn, tc2_txs_num)
@@ -299,7 +303,9 @@ class PTVP2PTest(ComparisonTestFramework):
         spend_txs = self.get_front_slice(out, 1)
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC3: {} non-std txs ({} double spends) used.'.format(tc3_txs_num, ds_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, _ = self.run_scenario2(conn, spend_txs, tc3_txs_num, self.locking_script_2, ds_txs_num)
             wait_for_ptv_completion(conn, len(nonstd_txs)+1)
@@ -329,7 +335,9 @@ class PTVP2PTest(ComparisonTestFramework):
         spend_txs2 = self.get_front_slice(out, 1)
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC4: {} std, {} nonstd txs ({} double spends) used (shuffled set).'.format(tc4_1_txs_num, tc4_2_txs_num, ds_txs_num),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             # Create some additional std txs to use.
             std_txs = self.get_txchains_n(tc4_1_txs_num, 1, spend_txs, CScript(), self.locking_script_1, 2000000, 10)
@@ -362,7 +370,9 @@ class PTVP2PTest(ComparisonTestFramework):
         spend_txs = self.get_front_slice(out, tc5_num_of_subsets)
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC5: {} non-std txs ({} double spends) used.'.format(tc5_txs_num*tc5_num_of_subsets, ds_txs_num*tc5_num_of_subsets),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc5_txs_num, self.locking_script_2, ds_txs_num)
             wait_for_ptv_completion(conn, len(nonstd_txs)+tc5_num_of_subsets, check_interval=0.5)
@@ -394,7 +404,9 @@ class PTVP2PTest(ComparisonTestFramework):
         spend_txs = self.get_front_slice(out, tc6_num_of_subsets)
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC6: {} non-std txs ({} double spends) used (shuffled set).'.format(tc6_txs_num*tc6_num_of_subsets, ds_txs_num*tc6_num_of_subsets),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc6_txs_num, self.locking_script_2, ds_txs_num, shuffle_txs=True)
             wait_for_ptv_completion(conn, len(nonstd_txs)+tc6_num_of_subsets, check_interval=0.5)

@@ -53,7 +53,7 @@ class DefaultTxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), MAX_TX_SIZE_POLICY_BEFORE_GENESIS + 1)
             tx_collection.add_tx(tx,
-               p2p_reject_reason = b'tx-size')
+                                 p2p_reject_reason = b'tx-size')
 
         if tx_collection.label == "MEMPOOL AT GENESIS":
             utxos, data = self.utxos["MEMPOOL AT GENESIS"]
@@ -61,7 +61,7 @@ class DefaultTxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS + 1)
             tx_collection.add_tx(tx,
-            p2p_reject_reason = b'tx-size')
+                                 p2p_reject_reason = b'tx-size')
 
 
 class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
@@ -78,7 +78,7 @@ class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), MAX_TX_SIZE_POLICY_BEFORE_GENESIS + 1)
             tx_collection.add_tx(tx,
-               p2p_reject_reason = b'tx-size')
+                                 p2p_reject_reason = b'tx-size')
 
         if tx_collection.label == "MEMPOOL AT GENESIS":
             utxos, data = self.utxos["PRE-GENESIS"]
@@ -86,4 +86,4 @@ class TxSizePolicyCaseTest(GenesisHeightTestsCaseBase):
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), NEW_MAX_TX_SIZE_POLICY + 1)
             tx_collection.add_tx(tx,
-               p2p_reject_reason = b'tx-size')
+                                 p2p_reject_reason = b'tx-size')

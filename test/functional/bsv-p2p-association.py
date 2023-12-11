@@ -8,7 +8,7 @@ Test association and stream handling within P2P.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import (create_association_id, msg_createstream, mininode_lock,
-    NetworkThread, NodeConn, NodeConnCB, wait_until)
+                                     NetworkThread, NodeConn, NodeConnCB, wait_until)
 from test_framework.util import assert_equal, connect_nodes, p2p_port
 from test_framework.streams import StreamType
 import time

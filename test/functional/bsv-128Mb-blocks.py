@@ -29,15 +29,14 @@ class BSV128MBlocks(ComparisonTestFramework):
 
     def run_test(self):
         self.extra_args = [['-whitelist=127.0.0.1',
-                    "-excessiveblocksize=%d" % self.options.excessive_block_size]]
+                            "-excessiveblocksize=%d" % self.options.excessive_block_size]]
         self.nodes[0].setexcessiveblock(self.options.excessive_block_size)
         self.test.run()
 
     def get_tests(self):
         self.log.info("Testing with -excessiveblocksize set to {} MB ({} bytes)"
-            .format(
-                (self.options.excessive_block_size/ONE_MEGABYTE),
-                self.options.excessive_block_size))
+                      .format((self.options.excessive_block_size/ONE_MEGABYTE),
+                              self.options.excessive_block_size))
 
         node = self.nodes[0]
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))

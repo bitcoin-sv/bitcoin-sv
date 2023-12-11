@@ -150,8 +150,9 @@ class PBVSubmitBlock(BitcoinTestFramework):
         submitblock_thread.start()
 
         # because self.nodes[0] rpc is blocked we use another rpc client
-        rpc_client = get_rpc_proxy(rpc_url(get_datadir_path(self.options.tmpdir, 0), 0), 0,
-                             coveragedir=self.options.coveragedir)
+        rpc_client = get_rpc_proxy(rpc_url(get_datadir_path(self.options.tmpdir, 0), 0),
+                                   0,
+                                   coveragedir=self.options.coveragedir)
 
         wait_for_validating_blocks({block2_hard.hash, block4_hard.hash}, rpc_client, self.log)
 

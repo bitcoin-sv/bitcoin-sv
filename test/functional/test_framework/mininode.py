@@ -1315,8 +1315,9 @@ class msg_createstream():
         ))
 
     def __repr__(self):
-        return "msg_createstream(assocID=%s stream_type=%i stream_policy=%s)" % (str(self.assocID), self.stream_type,
-            str(self.stream_policy))
+        return "msg_createstream(assocID=%s stream_type=%i stream_policy=%s)" % (str(self.assocID),
+                                                                                 self.stream_type,
+                                                                                 str(self.stream_policy))
 
 
 class msg_streamack():

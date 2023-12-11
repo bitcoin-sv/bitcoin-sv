@@ -258,8 +258,8 @@ class InvalidTx(BitcoinTestFramework):
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             parent_tx1, parent_tx2, orphans, rejected_txs = self.prepare_parents_and_children(conn,
-                                                                                parent_invalidity=None,
-                                                                                children_invalidity="low_fee")
+                                                                                              parent_invalidity=None,
+                                                                                              children_invalidity="low_fee")
 
             # sending orphans
             for tx in orphans:
@@ -286,8 +286,8 @@ class InvalidTx(BitcoinTestFramework):
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             parent_tx1, parent_tx2, orphans, rejected_txs = self.prepare_parents_and_children(conn,
-                                                                                parent_invalidity=None,
-                                                                                children_invalidity="bad_signature")
+                                                                                              parent_invalidity=None,
+                                                                                              children_invalidity="bad_signature")
 
             # sending orphans
             for tx in orphans:
@@ -315,8 +315,8 @@ class InvalidTx(BitcoinTestFramework):
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             valid_parent_tx, invalid_parent_tx, orphans, rejected_txs = self.prepare_parents_and_children(conn,
-                                                                                parent_invalidity="bad_signature",
-                                                                                children_invalidity=None)
+                                                                                                          parent_invalidity="bad_signature",
+                                                                                                          children_invalidity=None)
 
             for tx in orphans:
                 conn.send_message(msg_tx(tx))
