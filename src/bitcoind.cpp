@@ -199,6 +199,7 @@ bool AppInit(int argc, char *argv[]) {
                 return false;
             }
 #else
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(
                 stderr,
                 "Error: -daemon is not supported on this operating system\n");
