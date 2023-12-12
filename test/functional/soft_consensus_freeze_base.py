@@ -189,14 +189,14 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist {stop}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": enforce_at_height,
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": enforce_at_height,
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 

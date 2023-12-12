@@ -104,8 +104,9 @@ class GetRawMempoolTest(BitcoinTestFramework):
             assert_equal(mempool[largeTx.hash]["size"] > txSize, True)
 
             # /rest/mempool/contents REST call
-            json_string = http_get_call(
-            url.hostname, url.port, '/rest/mempool/contents' + self.FORMAT_SEPARATOR + 'json')
+            json_string = http_get_call(url.hostname,
+                                        url.port,
+                                        '/rest/mempool/contents' + self.FORMAT_SEPARATOR + 'json')
             json_obj = json.loads(json_string)
             self.check_getRawMempool(json_obj, transactions + [largeTx])
             assert_equal(mempool[transactions[0].hash]["depends"], [])

@@ -160,14 +160,14 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         for no in range(0, 2):
             self.nodes[no].addToConsensusBlacklist({
                 "funds": [
-                {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
-                    },
-                    "enforceAtHeight": [{"start": enforce_height}],
-                    "policyExpiresWithConsensus": False
-                }]
+                    {
+                        "txOut" : {
+                            "txId" : freeze_tx.hash,
+                            "vout" : 0
+                        },
+                        "enforceAtHeight": [{"start": enforce_height}],
+                        "policyExpiresWithConsensus": False
+                    }]
             });
 
         self.log.info("Checking that both transactions were removed from mempool and block template on both nodes")
@@ -180,14 +180,14 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         for no in range(0, 2):
             self.nodes[no].addToConsensusBlacklist({
                 "funds": [
-                {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
-                    },
-                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_stop_height}],
-                    "policyExpiresWithConsensus": True
-                }]
+                    {
+                        "txOut" : {
+                            "txId" : freeze_tx.hash,
+                            "vout" : 0
+                        },
+                        "enforceAtHeight": [{"start": enforce_height, "stop": enforce_stop_height}],
+                        "policyExpiresWithConsensus": True
+                    }]
             });
 
         self.log.info(f"Generating blocks so that mempool reaches height {enforce_stop_height+1}")
@@ -258,12 +258,12 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on policy blacklist on node0 (but not on node1)")
         result = self.nodes[0].addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
 

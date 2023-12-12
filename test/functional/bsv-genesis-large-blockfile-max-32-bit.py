@@ -30,19 +30,19 @@ class LargeBlockFileMax32Bit(ComparisonTestFramework):
         self.nocleanup = True
         self.extra_args = [
             [
-            '-whitelist=127.0.0.1',
-            '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
-            '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-            '-maxmempool=%d' % (ONE_GIGABYTE * 10),
-            '-maxmempoolsizedisk=0',
-            '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
-            '-maxscriptsizepolicy=0',
-            '-maxstdtxvalidationduration=15000',
-            '-maxnonstdtxvalidationduration=15001',
-            '-maxtxnvalidatorasynctasksrunduration=15002',
-            '-rpcservertimeout=6000',
-            '-rpcclienttimeout=0',
-            '-genesisactivationheight=%d' % self.genesisactivationheight
+                '-whitelist=127.0.0.1',
+                '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
+                '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
+                '-maxmempool=%d' % (ONE_GIGABYTE * 10),
+                '-maxmempoolsizedisk=0',
+                '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
+                '-maxscriptsizepolicy=0',
+                '-maxstdtxvalidationduration=15000',
+                '-maxnonstdtxvalidationduration=15001',
+                '-maxtxnvalidatorasynctasksrunduration=15002',
+                '-rpcservertimeout=6000',
+                '-rpcclienttimeout=0',
+                '-genesisactivationheight=%d' % self.genesisactivationheight
             ]
         ]
 

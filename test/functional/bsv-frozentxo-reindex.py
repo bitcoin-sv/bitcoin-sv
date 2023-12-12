@@ -143,12 +143,12 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on policy blacklist")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -166,14 +166,14 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 

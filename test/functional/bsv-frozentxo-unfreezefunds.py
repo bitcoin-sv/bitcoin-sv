@@ -20,51 +20,51 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         # preparing test cases...
         self.nodes[0].addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    "vout" : 0
+                {
+                    "txOut" : {
+                        "txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
                 },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            },
-            {
-                "txOut" : {
-                    "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                    "vout" : 0
+                {
+                    "txOut" : {
+                        "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
                 },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            },
-            {
-                "txOut" : {
-                    "txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
 
         self.log.info("Unfreezing funds on consensus level (#2 with keepOnPolicy=false)...")
         result = self.nodes[0].addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                    "vout" : 0
+                {
+                    "txOut" : {
+                        "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
+                    "policyExpiresWithConsensus": False
                 },
-                "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
-                "policyExpiresWithConsensus": False
-            },
-            {
-                "txOut" : {
-                    "txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
-                "policyExpiresWithConsensus": True
-            }]
+                {
+                    "txOut" : {
+                        "txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
+                    "policyExpiresWithConsensus": True
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -105,24 +105,24 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         self.log.info("Unfreezing fund on policy level...")
         result = self.nodes[0].removeFromPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Unfreezing non-existent fund should fail...")
         result = self.nodes[0].removeFromPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                        "vout" : 0
+                    }
+                }]
         });
         np = result["notProcessed"]
         assert_equal(len(np), 1)
@@ -132,12 +132,12 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         self.log.info("Unfreezing fund on policy level that is on consensus level is not allowed...")
         result = self.nodes[0].removeFromPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "vout" : 0
+                    }
+                }]
         });
         np = result["notProcessed"]
         assert_equal(len(np), 1)

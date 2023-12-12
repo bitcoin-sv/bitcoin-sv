@@ -30,8 +30,8 @@ from test_framework.cdefs import GENESIS_GRACEFULL_ACTIVATION_PERIOD
 from test_framework.key import CECKey
 from time import sleep
 from test_framework.key import CECKey
-from test_framework.script import CScript, SignatureHashForkId, OP_0, OP_TRUE, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE, \
-OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, SIGHASH_ALL, SIGHASH_FORKID, OP_NOP
+from test_framework.script import (CScript, SignatureHashForkId, OP_0, OP_TRUE, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE,
+                                   OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, SIGHASH_ALL, SIGHASH_FORKID, OP_NOP)
 
 _lan_ip = None
 

@@ -222,14 +222,14 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [enforceAtHeight],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [enforceAtHeight],
+                    "policyExpiresWithConsensus": False
+                }]
         })
         assert_equal(result["notProcessed"], [])
 

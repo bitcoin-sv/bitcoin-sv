@@ -48,18 +48,18 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Checking that transactions cannot be whitelisted if inputs are not frozen")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 123,
-                    "hex": ToHex(ctx1)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 456,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 123,
+                        "hex": ToHex(ctx1)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 456,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [
             {'confiscationTx': {'txId': ctx1.hash}, 'reason': 'confiscated TXO is not consensus frozen'},
@@ -71,40 +71,40 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : txo1,
-                "enforceAtHeight": [{"start": 100}],
-                "policyExpiresWithConsensus": False
-            },
-            {
-                "txOut" : txo2,
-                "enforceAtHeight": [{"start": 456, "stop": 457}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : txo1,
+                    "enforceAtHeight": [{"start": 100}],
+                    "policyExpiresWithConsensus": False
+                },
+                {
+                    "txOut" : txo2,
+                    "enforceAtHeight": [{"start": 456, "stop": 457}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Checking that transactions cannot be whitelisted if inputs are not consensus frozen at specific height")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 50, # height too low
-                    "hex": ToHex(ctx1)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 457, # height too high
-                    "hex": ToHex(ctx2)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 100,
-                    "hex": ToHex(ctx3) # not consensus frozen
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 50, # height too low
+                        "hex": ToHex(ctx1)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 457, # height too high
+                        "hex": ToHex(ctx2)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 100,
+                        "hex": ToHex(ctx3) # not consensus frozen
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [
             {'confiscationTx': {'txId': ctx1.hash}, 'reason': 'confiscated TXO is not consensus frozen'},
@@ -115,18 +115,18 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Whitelisting transactions...")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 123,
-                    "hex": ToHex(ctx1)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 456,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 123,
+                        "hex": ToHex(ctx1)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 456,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
 
@@ -155,30 +155,30 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Whitelisting same transactions again should have no effect")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 123,
-                    "hex": ToHex(ctx1)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 456,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 123,
+                        "hex": ToHex(ctx1)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 456,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Trying to increase enforceAtHeight on whitelisted tx should have no effect")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 789,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 789,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
 
@@ -190,12 +190,12 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Decreasing enforceAtHeight on whitelisted tx should be allowed")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 200,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 200,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
 
@@ -222,28 +222,28 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Whitelisting same transactions again")
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 123,
-                    "hex": ToHex(ctx1)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 456,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 123,
+                        "hex": ToHex(ctx1)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 456,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 200,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 200,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].queryConfiscationTxidWhitelist()
@@ -259,42 +259,42 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         self.log.info("Freezing TXOs and whitelisting same transactions again")
         result = self.nodes[0].addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : txo1,
-                "enforceAtHeight": [{"start": 100}],
-                "policyExpiresWithConsensus": False
-            },
-            {
-                "txOut" : txo2,
-                "enforceAtHeight": [{"start": 456, "stop": 457}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : txo1,
+                    "enforceAtHeight": [{"start": 100}],
+                    "policyExpiresWithConsensus": False
+                },
+                {
+                    "txOut" : txo2,
+                    "enforceAtHeight": [{"start": 456, "stop": 457}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 123,
-                    "hex": ToHex(ctx1)
-                }
-            },
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 456,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 123,
+                        "hex": ToHex(ctx1)
+                    }
+                },
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 456,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [
-            {
-                "confiscationTx" : {
-                    "enforceAtHeight" : 200,
-                    "hex": ToHex(ctx2)
-                }
-            }]
+                {
+                    "confiscationTx" : {
+                        "enforceAtHeight" : 200,
+                        "hex": ToHex(ctx2)
+                    }
+                }]
         })
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].queryConfiscationTxidWhitelist()

@@ -199,12 +199,12 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on policy blacklist")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -229,12 +229,12 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {spend_frozen_tx.hash},0 on policy blacklist")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx.hash,
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx.hash,
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -246,12 +246,12 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Unfreezing TXO {spend_frozen_tx.hash},0 from policy blacklist")
         result = node.rpc.removeFromPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx.hash,
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx.hash,
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -262,12 +262,12 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Checking that transaction {spend_frozen_tx2.hash} is removed from mempool if TXO is re-frozen")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx.hash,
-                    "vout" : 0
-                }
-            }]
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx.hash,
+                        "vout" : 0
+                    }
+                }]
         });
         assert_equal(result["notProcessed"], [])
         assert_equal(node.rpc.getrawmempool(), [])
@@ -317,14 +317,14 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -341,14 +341,14 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist at height {enforce_height}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -362,14 +362,14 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {spend_frozen_tx2.hash},0 on consensus blacklist at height {enforce_height}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx2.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx2.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -380,14 +380,14 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus blacklist at height {enforce_height+2}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx2.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx2.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
+                    "policyExpiresWithConsensus": False
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -406,14 +406,14 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus and policy blacklist at height {enforce_height+2}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx2.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
-                "policyExpiresWithConsensus": True
-            }]
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx2.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
+                    "policyExpiresWithConsensus": True
+                }]
         });
         assert_equal(result["notProcessed"], [])
 
@@ -436,14 +436,14 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             self.log.info(f"Freezing TXO {tx.hash},0 on consensus blacklist at heights [{h+1}, {h+3}), [{h+5}, {h+7})")
             result=node.rpc.addToConsensusBlacklist({
                 "funds": [
-                {
-                    "txOut" : {
-                        "txId" : tx.hash,
-                        "vout" : 0
-                    },
-                    "enforceAtHeight": [{"start": h+1, "stop": h+3}, {"start": h+5, "stop": h+7}],
-                    "policyExpiresWithConsensus": False
-                }]
+                    {
+                        "txOut" : {
+                            "txId" : tx.hash,
+                            "vout" : 0
+                        },
+                        "enforceAtHeight": [{"start": h+1, "stop": h+3}, {"start": h+5, "stop": h+7}],
+                        "policyExpiresWithConsensus": False
+                    }]
             });
             assert_equal(result["notProcessed"], [])
             tx2=self._create_tx(PreviousSpendableOutput(tx, 0), b'', CScript([OP_TRUE]))

@@ -86,14 +86,14 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         self.log.info(f"Freezing TXO {first_frozen_tx.hash} on consensus blacklist until height {freeze_for_two_blocks}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : first_frozen_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0, "stop": freeze_for_two_blocks}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : first_frozen_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0, "stop": freeze_for_two_blocks}],
+                    "policyExpiresWithConsensus": False
+                }]
         })
         assert_equal(result["notProcessed"], [])
 
