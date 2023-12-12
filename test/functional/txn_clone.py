@@ -132,6 +132,7 @@ class TxnMallTest(BitcoinTestFramework):
 
         # Before connecting node1 and node2, wait for node0 and node1 to relay all previous transactions
         sync_mempools(self.nodes[0:2])
+        wait_for_txn_propagator(self.nodes[1])
 
         # Reconnect the split network, and sync chain:
         connect_nodes(self.nodes, 1, 2)
