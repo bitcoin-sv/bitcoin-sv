@@ -24,7 +24,9 @@ class PTVTxnChains(ComparisonTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
-        self.extra_args = [['-debug', '-genesisactivationheight=%d' % self.genesisactivationheight]] * self.num_nodes
+        self.extra_args = [['-debug',
+                            '-maxorphantxsize=10MB',
+                            '-genesisactivationheight=%d' % self.genesisactivationheight]] * self.num_nodes
 
     def run_test(self):
         self.test.run()
