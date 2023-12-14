@@ -110,7 +110,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
 
         # Create finalising txn.
         finaltx = copy.deepcopy(tx)
-        finaltx.vin[0].nSequence = 0xFFFFFFFF;
+        finaltx.vin[0].nSequence = 0xFFFFFFFF
         finaltx.rehash()
 
         # Send finalising txn to node0. It should be forwarded over P2P to node1.

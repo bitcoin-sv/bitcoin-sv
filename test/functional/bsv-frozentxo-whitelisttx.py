@@ -67,7 +67,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
         ])
 
         self.log.info("Freezing some funds...")
-        result = self.nodes[0].addToPolicyBlacklist({"funds": [{"txOut" : txo3}]});
+        result = self.nodes[0].addToPolicyBlacklist({"funds": [{"txOut" : txo3}]})
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConsensusBlacklist({
             "funds": [
@@ -81,7 +81,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 456, "stop": 457}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Checking that transactions cannot be whitelisted if inputs are not consensus frozen at specific height")
@@ -269,7 +269,7 @@ class FrozenTXORPCWhitelistTx (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 456, "stop": 457}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
         result = self.nodes[0].addToConfiscationTxidWhitelist({
             "confiscationTxs": [

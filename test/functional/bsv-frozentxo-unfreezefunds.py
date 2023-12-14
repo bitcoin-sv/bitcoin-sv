@@ -44,7 +44,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
 
         self.log.info("Unfreezing funds on consensus level (#2 with keepOnPolicy=false)...")
         result = self.nodes[0].addToConsensusBlacklist({
@@ -65,7 +65,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
                     "policyExpiresWithConsensus": True
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Querying frozen funds and checking that data was updated...")
@@ -83,13 +83,13 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
             result = self.nodes[0].clearBlacklists({"removeAllEntries": False, "expirationHeightDelta": 0})
             assert_equal(result["numRemovedEntries"], 0)
 
-            self.nodes[0].generate(1);
+            self.nodes[0].generate(1)
 
         # should still do nothing at height 3 if records must be at least one block old
         result = self.nodes[0].clearBlacklists({"removeAllEntries": False, "expirationHeightDelta": 1})
         assert_equal(result["numRemovedEntries"], 0)
 
-        self.nodes[0].generate(1); # generate one more block to increase height to 2
+        self.nodes[0].generate(1) # generate one more block to increase height to 2
 
         # now entries should be removed/updated
         result = self.nodes[0].clearBlacklists({"removeAllEntries": False, "expirationHeightDelta": 1})
@@ -111,7 +111,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Unfreezing non-existent fund should fail...")
@@ -123,7 +123,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "not found")
@@ -138,7 +138,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "in consensus")

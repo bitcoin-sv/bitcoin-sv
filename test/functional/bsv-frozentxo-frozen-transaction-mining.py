@@ -168,7 +168,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
                         "enforceAtHeight": [{"start": enforce_height}],
                         "policyExpiresWithConsensus": False
                     }]
-            });
+            })
 
         self.log.info("Checking that both transactions were removed from mempool and block template on both nodes")
         for no in range(0, 2):
@@ -188,7 +188,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
                         "enforceAtHeight": [{"start": enforce_height, "stop": enforce_stop_height}],
                         "policyExpiresWithConsensus": True
                     }]
-            });
+            })
 
         self.log.info(f"Generating blocks so that mempool reaches height {enforce_stop_height+1}")
         while self.nodes[0].getblockcount() < enforce_stop_height:
@@ -264,7 +264,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         spend_frozen_tx1a = self.create_tx_(PreviousSpendableOutput(freeze_tx, 0), b'', CScript([OP_NOP, OP_NOP, OP_TRUE]))

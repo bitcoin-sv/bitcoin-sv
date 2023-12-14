@@ -313,7 +313,7 @@ def deser_optional(typename, f):
 
 
 def ser_optional(o):
-    r = b"";
+    r = b""
     if(o):
         r += struct.pack("<b", 1)
         r += o.serialize()

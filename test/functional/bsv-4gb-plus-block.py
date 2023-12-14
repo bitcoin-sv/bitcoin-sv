@@ -54,7 +54,7 @@ class MyConnCB(NodeConnCB):
         request = False
         for i in message.inv:
             if i.type != 1:
-                request = True;
+                request = True
                 break
         if request:
             super().on_inv(conn, message)

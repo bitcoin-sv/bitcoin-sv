@@ -51,7 +51,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
         for peer in peerinfo:
             txninvsize = peer['txninvsize']
             if(txninvsize > 0):
-                return False;
+                return False
         return True
 
     # For checking the txns make it into all peers mempools

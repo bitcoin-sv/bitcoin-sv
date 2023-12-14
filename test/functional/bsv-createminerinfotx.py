@@ -149,7 +149,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         except Exception as e:
             if test_case != self.TEST_call_create_with_bad_json_synatx:
                 raise e
-            code = -1;
+            code = -1
             message = "failed to extract miner info document from scriptPubKey: doc parse error - ill-formed json"
             if code != e.error["code"]:
                 raise AssertionError(

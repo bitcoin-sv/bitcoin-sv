@@ -104,7 +104,7 @@ class MyNode(TestNode):
     def on_block(self, conn, message):
         super().on_block(conn, message)
 
-        block = message.block;
+        block = message.block
         block.rehash()
         self.blocks_recvd[block.sha256] = block
 
@@ -338,7 +338,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         tx3_update1.rehash()
         tx3_update2.rehash()
         tx3_update3.rehash()
-        updateHashes = {tx3_update1.hash, tx3_update2.hash, tx3_update3.hash};
+        updateHashes = {tx3_update1.hash, tx3_update2.hash, tx3_update3.hash}
         yield TestInstance([[tx3_update1, None], [tx3_update2, None], [tx3_update3, None]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)
@@ -356,8 +356,8 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         # Send an invalid update in a single txn which wants to update both txn4 and txn5. It will be rejected.
         tx4_tx5_invalid = copy.deepcopy(tx4)
         tx4_tx5_invalid.vin.append(tx5.vin[0])
-        tx4_tx5_invalid.vin[0].nSequence += 1;
-        tx4_tx5_invalid.vin[1].nSequence += 1;
+        tx4_tx5_invalid.vin[0].nSequence += 1
+        tx4_tx5_invalid.vin[1].nSequence += 1
         tx4_tx5_invalid.rehash()
         yield TestInstance([[tx4_tx5_invalid, RejectResult(16, b'bad-txn-update')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
@@ -368,7 +368,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         # Send an invalid update for txn4 which changes the number of inputs. It will be rejected.
         tx4_invalid = copy.deepcopy(tx4)
         tx4_invalid.vin.append(spend_tx8.vin[0])
-        tx4_invalid.vin[0].nSequence += 1;
+        tx4_invalid.vin[0].nSequence += 1
         tx4_invalid.rehash()
         yield TestInstance([[tx4_invalid, RejectResult(16, b'bad-txn-update')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()

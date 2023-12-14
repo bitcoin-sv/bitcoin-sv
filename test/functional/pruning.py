@@ -538,7 +538,7 @@ class PruneTest(BitcoinTestFramework):
         self.manual_test(4, use_timestamp=True)
 
         self.log.info("Test pruning with min blocks to keep")
-        self.minblocks_test(3);
+        self.minblocks_test(3)
 
         self.log.info("Test wallet re-scan")
         self.wallet_test()

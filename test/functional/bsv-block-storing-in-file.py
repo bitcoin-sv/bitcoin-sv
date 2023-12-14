@@ -124,7 +124,7 @@ class BlockStoringInFile(BitcoinTestFramework):
         assert_equal(remote_block['size'], len(local_block.serialize()))
 
     def __send_and_test_block(self, runner_node, block_size, expected_number_of_files):
-        local_block, block_number = runner_node.create_and_send_block(block_size);
+        local_block, block_number = runner_node.create_and_send_block(block_size)
         self.__compare_local_and_remote_block_size(local_block, runner_node.remote_node)
         self.__count_blk_files(block_number, expected_number_of_files, runner_node.node_number)
 

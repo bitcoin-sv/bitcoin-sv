@@ -21,7 +21,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.num_peers = 1
-        self.dataCarrierSize = 500;
+        self.dataCarrierSize = 500
         self.genesisHeight = 1000
 
     def setup_network(self):

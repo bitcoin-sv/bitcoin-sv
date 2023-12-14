@@ -39,7 +39,7 @@ class MyNode(NodeConnCB):
         super().on_block(conn, message)
 
         if(self.setup_finished):
-            block = message.block;
+            block = message.block
             block.rehash()
 
             for txn in block.vtx:
@@ -106,7 +106,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
         input_amount = utxo['amount']
 
         chain_len = 1
-        reqd_chain_len = random.randint(1, ancestor_depth);
+        reqd_chain_len = random.randint(1, ancestor_depth)
         for addr in addrs:
             if num_reqd == 0 or reqd_chain_len == 0:
                 break
@@ -114,7 +114,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             inputs = []
             inputs.append({"txid": input_txid, "vout": input_vout})
             outputs = {}
-            pad_size = random.randint(0, max_pad_size);
+            pad_size = random.randint(0, max_pad_size)
             bytes_used = 70 + pad_size
 
             # Estimate fee we need

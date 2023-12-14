@@ -20,7 +20,7 @@ class TestNode(NodeConnCB):
         self.gotAddr = False
 
     def on_addr(self, conn, message):
-        self.gotAddr = True;
+        self.gotAddr = True
         #print("Got ADDR message from peer {}".format(self.id))
 
 

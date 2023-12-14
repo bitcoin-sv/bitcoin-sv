@@ -44,7 +44,7 @@ class Send_node():
             assert(self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False);
+            assert(self.check_frozen_tx_log(block.hash) == False)
 
     def check_frozen_tx_log(self, hash):
         for line in open(glob.glob(self.tmpdir + f"/node{self.node_no}" + "/regtest/blacklist.log")[0]):
@@ -127,8 +127,8 @@ class FrozenTXOReindex(BitcoinTestFramework):
         old_tip = self.chain.tip
         rejected_block_hash = self._mine_and_send_block(tx, node, True)
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash));
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash));
+        assert(node.check_frozen_tx_log(self.chain.tip.hash))
+        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
 
         # remove rejected block from test node - the only remaining copy after this point is on remote node disk
         self._remove_last_block()
@@ -149,7 +149,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         spend_frozen_tx = self._create_tx(PreviousSpendableOutput(freeze_tx, 0), b'', CScript([OP_TRUE]))
@@ -174,7 +174,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         spend_frozen_tx = self._create_tx(PreviousSpendableOutput(freeze_tx, 0), b'', CScript([OP_TRUE]))

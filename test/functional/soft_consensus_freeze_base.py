@@ -171,8 +171,8 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         old_tip = self.chain.tip
         block = self._mine_and_send_block(tx, node, True, node.rpc.getbestblockhash())
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash));
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash));
+        assert(node.check_frozen_tx_log(self.chain.tip.hash))
+        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
 
         return block
 
@@ -197,7 +197,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
                     "enforceAtHeight": enforce_at_height,
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         return freeze_tx

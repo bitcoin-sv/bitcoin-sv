@@ -36,7 +36,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Querying frozen funds and checking there are 2 in policy blacklist")
@@ -61,7 +61,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "already in policy")
@@ -86,7 +86,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Freezing fund on consensus level (prev not on policy)...")
@@ -108,7 +108,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Refreezing fund + new fund on consensus level...")
@@ -130,7 +130,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 1, "stop": 2}, {"start": 11, "stop": 12}],
                     "policyExpiresWithConsensus": True
                 }]
-        });
+        })
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "already in consensus")
@@ -145,7 +145,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
         np = result["notProcessed"]
         assert_equal(len(np), 1)
         assert_equal(np[0]["reason"], "already in consensus")
@@ -169,7 +169,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                         "vout" : 0
                     }
                 }]
-        });
+        })
 
         self.log.info("Cleanup expired records should do nothing since nothing is expired")
         result = self.nodes[0].clearBlacklists({"removeAllEntries" : False, "expirationHeightDelta": 0})
@@ -201,7 +201,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
                 }]
-        });
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info("Unfreezing all frozen funds")

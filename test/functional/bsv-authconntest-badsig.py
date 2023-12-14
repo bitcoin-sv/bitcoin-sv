@@ -184,7 +184,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         assert(txid in block['tx'])
 
     def isAuthenticated (self, nodenum):
-        peerinfo = self.nodes[nodenum].getpeerinfo();
+        peerinfo = self.nodes[nodenum].getpeerinfo()
         if len(peerinfo) > 1:
             if (peerinfo[1]["authconn"]):
                 return True
