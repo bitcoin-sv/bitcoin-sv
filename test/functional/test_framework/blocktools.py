@@ -250,9 +250,12 @@ def make_block(connection, parent_block=None, makeValid=True, last_block_time=0)
 
 
 def send_by_headers(conn, blocks, do_send_blocks):
-    hash_block_map = {b.sha256: b for b in blocks}
+    if do_send_blocks:
+        hash_block_map = {b.sha256: b for b in blocks}
 
     def on_getdata(c, msg):
+        if not do_send_blocks:
+            return
         for i in msg.inv:
             bl = hash_block_map.get(i.hash, None)
             if not bl:
