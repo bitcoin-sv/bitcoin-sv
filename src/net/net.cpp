@@ -2952,6 +2952,17 @@ void CConnman::PeerAvgBandwithCalc()
     }
 }
 
+
+CNode::MonitoredPendingResponses::PendingResponses::PendingResponses(unsigned int max_allowed)
+: max_allowed(max_allowed)
+{}
+
+CNode::MonitoredPendingResponses::MonitoredPendingResponses()
+: getheaders( static_cast<unsigned int>(gArgs.GetArg("-maxpendingresponses_getheaders", DEFAULT_MAXPENDINGRESPONSES_GETHEADERS)) )
+, gethdrsen( static_cast<unsigned int>(gArgs.GetArg("-maxpendingresponses_gethdrsen", DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN)) )
+{}
+
+
 CNode::CNode(
     NodeId idIn,
     ServiceFlags nLocalServicesIn,

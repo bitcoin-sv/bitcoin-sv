@@ -803,6 +803,20 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Tries to keep outbound traffic under the given target (in "
                     "MiB per 24h), 0 = no limit (default: %d). The value may be given in megabytes or with unit (KiB, MiB, GiB)."),
                   DEFAULT_MAX_UPLOAD_TARGET));
+    strUsage += HelpMessageOpt(
+        "-maxpendingresponses_getheaders=<n>",
+        strprintf(_("Maximum allowed number of pending responses in the sending queue for received GETHEADERS P2P requests before "
+                    "the connection is closed. Not applicable to whitelisted peers. 0 = no limit (default: %d). Main purpose of "
+                    "this setting is to limit memory usage. The specified value should be small (e.g. ~50) since in practice connected "
+                    "peers do need to send many GETHEADERS requests in parallel."),
+                  DEFAULT_MAXPENDINGRESPONSES_GETHEADERS));
+    strUsage += HelpMessageOpt(
+        "-maxpendingresponses_gethdrsen=<n>",
+        strprintf(_("Maximum allowed number of pending responses in the sending queue for received GETHDRSEN P2P requests before "
+                    "the connection is closed. Not applicable to whitelisted peers. 0 = no limit (default: %d). Main purpose of "
+                    "this setting is to limit memory usage. The specified value should be small (e.g. ~10) since in practice connected "
+                    "peers do need to send many GETHDRSEN requests in parallel."),
+                  DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN));
 
 #ifdef ENABLE_WALLET
     strUsage += CWallet::GetWalletHelpString(showDebug);
@@ -3421,6 +3435,19 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     if (gArgs.IsArgSet("-maxuploadtarget")) {
         nMaxOutboundLimit =
             gArgs.GetArgAsBytes("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET, ONE_MEBIBYTE);
+    }
+
+    if (gArgs.IsArgSet("-maxpendingresponses_getheaders")) {
+        auto v = gArgs.GetArg("-maxpendingresponses_getheaders", -1);
+        if (v<0 || v>std::numeric_limits<unsigned int>::max()) {
+            return InitError( strprintf(_("Invalid value for -maxpendingresponses_getheaders: '%s'"), gArgs.GetArg("-maxpendingresponses_getheaders", "")) );
+        }
+    }
+    if (gArgs.IsArgSet("-maxpendingresponses_gethdrsen")) {
+        auto v = gArgs.GetArg("-maxpendingresponses_gethdrsen", -1);
+        if (v<0 || v>std::numeric_limits<unsigned int>::max()) {
+            return InitError( strprintf(_("Invalid value for -maxpendingresponses_gethdrsen: '%s'"), gArgs.GetArg("-maxpendingresponses_gethdrsen", "")) );
+        }
     }
 
     // Step 7: load block chain

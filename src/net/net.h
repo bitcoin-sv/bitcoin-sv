@@ -108,6 +108,10 @@ static const bool DEFAULT_UPNP = false;
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** The default for -maxuploadtarget. 0 = Unlimited */
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
+/** The default for -maxpendingresponses_getheaders. 0 = Unlimited */
+static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHEADERS = 0;
+/** The default for -maxpendingresponses_gethdrsen. 0 = Unlimited */
+static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN = 0;
 /** The default timeframe for -maxuploadtarget. 1 day. */
 // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MAX_UPLOAD_TIMEFRAME = 60 * 60 * 24;
@@ -286,6 +290,14 @@ private:
     uint256 mHash {};
     size_t mSize {0};
     std::unique_ptr<CForwardAsyncReadonlyStream> mData {nullptr};
+
+public:
+    // If specified, this function will be called to create a CVectorStream object which will be
+    // added to the P2P sending queue to send P2P header of this P2P message.
+    // Otherwise (empty function), CVectorStream object will be created in a default way.
+    // The purpose of this is to be able to create an object of derived class with additional
+    // functionality (e.g. detect when the message was sent in the destructor).
+    std::function< std::unique_ptr<CVectorStream> (std::vector<uint8_t>&& serialisedHeader) > headerStreamCreator;
 };
 
 class CConnman {
@@ -1018,6 +1030,94 @@ public:
     bool protoconfReceived {false};
     /** Maximum size for data that is allowed to be sent to the client */
     uint32_t maxRecvPayloadLength {0};
+
+    /**
+     * Number of outgoing response messages created by processing specific types of P2P requests
+     * that are still stored in the P2P sending queue waiting to be sent to the requesting peer.
+     */
+    class MonitoredPendingResponses
+    {
+    public:
+        class PendingResponses
+        {
+        public:
+            // NOTE: Relaxed memory order can be used because this is not a synchronization primitive
+            //       and only counter atomicity and its modification order consistency are needed.
+            //       In other words, a thread that calls IsBelowLimit() only needs to see the value
+            //       of a counter that was modified by a thread that last called Increment() or
+            //       Decrement(). It does not depend on and consequently does not need to observe
+            //       changes in other memory locations.
+
+            /**
+             * Increments the pending responses count.
+             *
+             * This is intended to be called by the processor of the P2P request when the
+             * response is added to the sending queue.
+             */
+            void Increment()
+            {
+                counter.fetch_add(1, std::memory_order_relaxed);
+            }
+
+            /**
+             * Decrements the pending responses count.
+             *
+             * This is intended to be called when the response message is removed from the sending queue.
+             */
+            void Decrement()
+            {
+                counter.fetch_sub(1, std::memory_order_relaxed);
+            }
+
+            /**
+             * Returns true if current number of pending responses is below allowed limit and false otherwise.
+             *
+             * This is intended to be called by the processor of the P2P request before it starts processing
+             * a new request.
+             *
+             * @param[out] numPendingResponses Will be set to current number of pending responses.
+             *
+             * @note Because checking the value is done independently of its modification, actual number of
+             *       pending responses could become a bit higher than specified maximum if used concurrently.
+             *       E.g. Two threads simultaneously check this value, they both get max-1, and they both
+             *       proceed to call Increment() resulting in value=max+1. It is assumed that this is not a
+             *       problem.
+             */
+            bool IsBelowLimit(unsigned int& numPendingResponses) const
+            {
+                if(max_allowed==0)
+                {
+                    return true;
+                }
+
+                unsigned int n = counter.load(std::memory_order_relaxed);
+                numPendingResponses = n;
+                return n < max_allowed;
+            }
+
+            /**
+             * Returns maximum allowed pending responses. 0 means checking is disabled.
+             */
+            unsigned int GetMaxAllowed() const
+            {
+                return max_allowed;
+            }
+
+        private:
+            friend MonitoredPendingResponses;
+            PendingResponses(unsigned int max_allowed);
+
+            std::atomic<unsigned int> counter {0};
+            const unsigned int max_allowed;
+        };
+
+        PendingResponses getheaders;
+        PendingResponses gethdrsen;
+
+    private:
+        friend CNode;
+        MonitoredPendingResponses();
+    } pendingResponses;
 
     /** Constructor for producing CNode shared pointer instances */
     template<typename ... Args>

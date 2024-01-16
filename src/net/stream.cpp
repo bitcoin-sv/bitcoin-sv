@@ -226,14 +226,14 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
         }
 
         // Queue combined header & data
-        auto combinedStream { std::make_unique<CVectorStream>(std::move(serialisedHeader)) };
+        auto combinedStream { msg.headerStreamCreator ? msg.headerStreamCreator(std::move(serialisedHeader)) : std::make_unique<CVectorStream>(std::move(serialisedHeader)) };
         mSendMsgQueueSize.AddMemoryUsed(combinedStream->GetEstimatedMaxMemoryUsage());
         mSendMsgQueue.push_back(std::move(combinedStream));
     }
     else
     {
         // Queue header and payload separately
-        auto headerStream { std::make_unique<CVectorStream>(std::move(serialisedHeader)) };
+        auto headerStream { msg.headerStreamCreator ? msg.headerStreamCreator(std::move(serialisedHeader)) : std::make_unique<CVectorStream>(std::move(serialisedHeader)) };
         mSendMsgQueueSize.AddMemoryUsed(headerStream->GetEstimatedMaxMemoryUsage());
         mSendMsgQueue.push_back(std::move(headerStream));
         if(nPayloadLength)
