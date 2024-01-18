@@ -688,6 +688,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Maximum number of inbound connections from a single address "
                     "(not applicable to whitelisted peers) 0 = unrestricted (default: %d)"),
                   DEFAULT_MAX_CONNECTIONS_FROM_ADDR));
+    strUsage += HelpMessageOpt(
+        "-maxconnections=<n>",
+        strprintf(_("Maintain at most <n> connections to peers (default: %d)"),
+                  DEFAULT_MAX_PEER_CONNECTIONS));
     strUsage +=
         HelpMessageOpt("-maxreceivebuffer=<n>",
                        strprintf(_("Maximum per-connection receive buffer "
@@ -2038,10 +2042,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
                                           : 0),
         size_t(1));
-    
-    if(gArgs.IsArgSet("-maxconnections"))
-        LogPrintf("Warning: configuration parameter -maxconnections was removed\n");
-    
+
+    const int nUserMaxConnections =
+        static_cast<int>(gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS));
+    nMaxConnections = std::max(nUserMaxConnections, 0);
+
     const int nUserMaxOutboundConnections = gArgs.GetArg(
         "-maxoutboundconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
 
@@ -2050,15 +2055,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     const uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
-
-    const auto fds_required{MIN_CORE_FILEDESCRIPTORS + nBind + 
-                            maxAddNodeConnections + nUserMaxOutboundConnections}; 
-    nFD = RaiseFileDescriptorLimit(fds_required);
+    nMaxConnections =
+        std::max(std::min(nMaxConnections,
+                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
+                 0);
+    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-
-    nMaxConnections = std::max(0, 
-                               nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections); 
+    nMaxConnections =
+        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
+    if (nMaxConnections < nUserMaxConnections)
+        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
+                                "because of system limitations."),
+                              nUserMaxConnections, nMaxConnections));
 
     nMaxOutboundConnections = std::clamp(nUserMaxOutboundConnections, 0, nMaxConnections);
     if(nMaxOutboundConnections < nUserMaxOutboundConnections) 
