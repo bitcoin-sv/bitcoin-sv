@@ -94,6 +94,8 @@ static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 static const int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 8;
 /** Maximum number of addnode outgoing nodes */
 static const uint16_t DEFAULT_MAX_ADDNODE_CONNECTIONS = 8;
+/** Maximum number of incoming connections from same address */
+static const uint16_t DEFAULT_MAX_CONNECTIONS_FROM_ADDR = 0;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -299,6 +301,7 @@ public:
         ServiceFlags nLocalServices = NODE_NONE;
         ServiceFlags nRelevantServices = NODE_NONE;
         int nMaxConnections = 0;
+        int nMaxConnectionsFromAddr = 0;
         int nMaxOutbound = 0;
         int nMaxAddnode = 0;
         int nMaxFeeler = 0;
@@ -735,6 +738,7 @@ private:
     std::shared_ptr<CSemaphore> semOutbound {nullptr};
     std::shared_ptr<CSemaphore> semAddnode {nullptr};
     int nMaxConnections;
+    int nMaxConnectionsFromAddr;
     int nMaxOutbound;
     int nMaxAddnode;
     int nMaxFeeler;

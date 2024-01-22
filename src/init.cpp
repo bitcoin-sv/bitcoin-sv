@@ -63,6 +63,7 @@
 #endif
 #include "warnings.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -682,6 +683,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxoutboundconnections=<n>",
         strprintf(_("Maintain at most <n> outbound connections to peers (default: %u)"),
                   DEFAULT_MAX_OUTBOUND_CONNECTIONS));
+    strUsage += HelpMessageOpt(
+        "-maxconnectionsfromaddr=<n>",
+        strprintf(_("Maximum number of inbound connections from a single address, 0 = unrestricted (default: %d)"),
+                  DEFAULT_MAX_CONNECTIONS_FROM_ADDR));
     strUsage +=
         HelpMessageOpt("-maxreceivebuffer=<n>",
                        strprintf(_("Maximum per-connection receive buffer "
@@ -1920,6 +1925,7 @@ namespace { // Variables internal to initialization process only
 
 ServiceFlags nRelevantServices = NODE_NETWORK;
 int nMaxConnections;
+int nMaxConnectionsFromAddr;
 int nMaxOutboundConnections;
 int nFD;
 ServiceFlags nLocalServices = NODE_NETWORK;
@@ -2044,7 +2050,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         InitWarning(strprintf("Reducing -maxoutboundconnections from %d to %d, "
                               "because of system limitations",
                               nUserMaxOutboundConnections, nMaxOutboundConnections));
-         
+
+    nMaxConnectionsFromAddr = static_cast<int>(gArgs.GetArg("-maxconnectionsfromaddr", DEFAULT_MAX_CONNECTIONS_FROM_ADDR));
+    nMaxConnectionsFromAddr = std::clamp(nMaxConnectionsFromAddr, 0, INT32_MAX);
+    if (nMaxConnectionsFromAddr == 0) {
+        nMaxConnectionsFromAddr = INT32_MAX;
+    }
+
     // Step 3: parameter-to-internal-flags
     if (gArgs.IsArgSet("-debug")) {
         // Special-case: if -debug=0/-nodebug is set, turn off debugging
@@ -3749,6 +3761,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     connOptions.nLocalServices = nLocalServices;
     connOptions.nRelevantServices = nRelevantServices;
     connOptions.nMaxConnections = nMaxConnections;
+    connOptions.nMaxConnectionsFromAddr = nMaxConnectionsFromAddr;
     connOptions.nMaxOutbound = nMaxOutboundConnections;
     connOptions.nMaxAddnode = config.GetMaxAddNodeConnections();
     connOptions.nMaxFeeler = 1;
