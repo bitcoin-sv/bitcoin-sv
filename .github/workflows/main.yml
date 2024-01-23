@@ -16,11 +16,11 @@ jobs:
   pycodestyle:
     strategy:
       matrix:
-        os: [nchain/svn_dev]
-        version : [ubuntu_22.04]
+        org_repo: [nchain/svn_dev]
+        tag : [ubuntu_22.04]
     runs-on: [ self-hosted ]
     container:
-      image: "${{ matrix.os }}:${{ matrix.version }}"
+      image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 1 
     steps:
       - name: Checkout
@@ -35,13 +35,11 @@ jobs:
     needs: pycodestyle
     strategy:
       matrix:
-        os: [nchain/svn_dev]
-        version: [ubuntu_22.04, debian_11, centos_9]
-        toolset: [gcc]
-        toolset_version: [10]
+        org_repo: [nchain/svn_dev]
+        tag: [ubuntu_22.04, debian_11, centos_9]
     runs-on: [ self-hosted ]
     container:
-      image: "${{ matrix.os }}:${{ matrix.version }}"
+      image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -59,18 +57,18 @@ jobs:
     needs: pycodestyle
     strategy:
       matrix:
-        os: [nchain/svn_dev]
-        version : [ubuntu_22.04]
+        org_repo: [nchain/svn_dev]
+        tag : [ubuntu_22.04]
         toolset: [clang]
-        toolset_version: [ 17 ]
+        version: [ 17 ]
         build_type: [ Release, Debug ]
         include:
-          - toolset_version: 17
+          - version: 17
             build_type: Release
             sanitizers: asan usan
     runs-on: [ self-hosted ]
     container:
-      image: "${{ matrix.os }}:${{ matrix.version }}"
+      image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 90
     steps:
       - name: Checkout
@@ -81,7 +79,7 @@ jobs:
         uses: ./.github/workflows/select_toolset_version
         with: 
           toolset: ${{ matrix.toolset }}
-          toolset_version: ${{ matrix.toolset_version }}
+          version: ${{ matrix.version }}
       - name: Build Bitcoin
         uses: ./.github/workflows/build_bitcoin_cmake
         with: 

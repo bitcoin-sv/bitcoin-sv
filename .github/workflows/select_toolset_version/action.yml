@@ -9,7 +9,7 @@ inputs:
     description: toolset (clang/gcc)
     required: true
   
-  toolset_version:
+  version:
     description: toolset version 
     required: true
 
@@ -19,5 +19,5 @@ runs:
     - run: |
         .github/workflows/select_toolset_version/update-alternatives-cpp.sh -r \
             ${{ inputs.toolset }} \
-            ${{ inputs.toolset_version }}
+            ${{ inputs.version }}
       shell: bash
