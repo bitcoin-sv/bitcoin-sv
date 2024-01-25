@@ -37,6 +37,7 @@ jobs:
       matrix:
         org_repo: [nchain/svn_dev]
         tag: [ubuntu_22.04, debian_11, centos_9]
+        toolset: [gcc]
     runs-on: [ self-hosted ]
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
@@ -52,6 +53,9 @@ jobs:
         uses: ./.github/workflows/unit_test_bitcoin_autotools
       - name: Functional test
         uses: ./.github/workflows/functional_test
+        with: 
+          tag: ${{ matrix.tag }}
+          toolset: ${{ matrix.toolset }}
 
   cmake:
     needs: pycodestyle
@@ -94,11 +98,7 @@ jobs:
       - name: Functional test
         if: ${{ matrix.build_type != 'Debug' }}
         uses: ./.github/workflows/functional_test
-      - name: Upload logs
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          path: |
-            output/bitcoin_test_runner*/**/test_framework.log
-            output/bitcoin_test_runner*/**/bitcoind.log 
-  
+        with: 
+          tag: ${{ matrix.tag }}
+          toolset: ${{ matrix.toolset }}
+
