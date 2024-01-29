@@ -65,9 +65,9 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         result=self.nodes[1].addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : frozen_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": frozen_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False

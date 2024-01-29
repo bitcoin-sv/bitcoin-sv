@@ -167,7 +167,7 @@ def split(utxos, n_inputs, n_outputs, fee_delta=0):
 def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fee_delta=0):
 
     for ndx in range(0, len(utxos), n_inputs):
-        tx, xx = create_tx(utxos[ndx : ndx+n_inputs], n_outputs, fee_delta)
+        tx, xx = create_tx(utxos[ndx: ndx+n_inputs], n_outputs, fee_delta)
         if new_utxos is not None:
             new_utxos.extend(xx)
         if transactions is not None:

@@ -190,9 +190,9 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": enforce_at_height,
                     "policyExpiresWithConsensus": False

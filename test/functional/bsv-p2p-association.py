@@ -174,76 +174,76 @@ class P2PAssociation(BitcoinTestFramework):
         with mininode_lock: assert_equal(len(newStyleSecondConnCB_Data4.message_count), 0)
         expected = [
             {
-                'id'           : 0,                                 # oldStyleConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # oldStyleConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 1,                                 # newStyleConn
-                'associd'      : str(newStyleConn.assocID),
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 1,                                 # newStyleConn
+                'associd': str(newStyleConn.assocID),
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 2,                                 # newStyleFirstConn
-                'associd'      : str(newStyleFirstConn.assocID),
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 2,                                 # newStyleFirstConn
+                'associd': str(newStyleFirstConn.assocID),
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 3,                                 # newStyleSecondConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 3,                                 # newStyleSecondConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 4,                                 # newStyleSecondConn_Data2
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 4,                                 # newStyleSecondConn_Data2
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 5,                                 # newStyleSecondConn_Data3
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 5,                                 # newStyleSecondConn_Data3
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 6,                                 # newStyleSecondConn_Data4
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 6,                                 # newStyleSecondConn_Data4
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 7,                                 # badStreamConn1
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 7,                                 # badStreamConn1
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 8,                                 # badStreamConn2
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 8,                                 # badStreamConn2
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 9,                                 # badStreamConn3
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 9,                                 # badStreamConn3
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 10,                                # badStreamConn4
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 10,                                # badStreamConn4
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 11,                                # badStreamConn5
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 11,                                # badStreamConn5
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
@@ -263,70 +263,70 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleSecondConn.send_message(msg_createstream(stream_type=StreamType.DATA1.value, stream_policy=b"BlockPriority", assocID=newStyleFirstConn.assocID))
         expected = [
             {
-                'id'           : 0,                                 # oldStyleConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # oldStyleConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 1,
-                'associd'      : str(newStyleConn.assocID),         # newStyleConn
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 1,
+                'associd': str(newStyleConn.assocID),         # newStyleConn
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 2,
-                'associd'      : str(newStyleFirstConn.assocID),    # newStyleFirstConn & newStyleSecondConn
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1']
+                'id': 2,
+                'associd': str(newStyleFirstConn.assocID),    # newStyleFirstConn & newStyleSecondConn
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1']
             },
             {
-                'id'           : 4,                                 # newStyleSecondConn_Data2
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 4,                                 # newStyleSecondConn_Data2
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 5,                                 # newStyleSecondConn_Data3
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 5,                                 # newStyleSecondConn_Data3
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 6,                                 # newStyleSecondConn_Data4
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 6,                                 # newStyleSecondConn_Data4
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 7,                                 # badStreamConn1
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 7,                                 # badStreamConn1
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 8,                                 # badStreamConn2
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 8,                                 # badStreamConn2
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 9,                                 # badStreamConn3
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 9,                                 # badStreamConn3
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 10,                                # badStreamConn4
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 10,                                # badStreamConn4
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 11,                                # badStreamConn5
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 11,                                # badStreamConn5
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
@@ -380,40 +380,40 @@ class P2PAssociation(BitcoinTestFramework):
         # Check streams are in the expected state after all those errors
         expected = [
             {
-                'id'           : 0,                                 # oldStyleConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # oldStyleConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 1,                                 # newStyleConn
-                'associd'      : str(newStyleConn.assocID),
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 1,                                 # newStyleConn
+                'associd': str(newStyleConn.assocID),
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 2,                                 # newStyleFirstConn & newStyleSecondConn
-                'associd'      : str(newStyleFirstConn.assocID),
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1']
+                'id': 2,                                 # newStyleFirstConn & newStyleSecondConn
+                'associd': str(newStyleFirstConn.assocID),
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1']
             },
             {
-                'id'           : 4,                                 # newStyleSecondConn_Data2
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 4,                                 # newStyleSecondConn_Data2
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 5,                                 # newStyleSecondConn_Data3
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 5,                                 # newStyleSecondConn_Data3
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 6,                                 # newStyleSecondConn_Data4
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 6,                                 # newStyleSecondConn_Data4
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
@@ -424,22 +424,22 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleSecondConn_Data4.send_message(msg_createstream(stream_type=StreamType.DATA4.value, assocID=newStyleFirstConn.assocID))
         expected = [
             {
-                'id'           : 0,                                 # oldStyleConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # oldStyleConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 1,
-                'associd'      : str(newStyleConn.assocID),         # newStyleConn
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 1,
+                'associd': str(newStyleConn.assocID),         # newStyleConn
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
-                'associd'      : str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4']
+                'id': 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
+                'associd': str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
@@ -448,37 +448,37 @@ class P2PAssociation(BitcoinTestFramework):
         connect_nodes(self.nodes, 0, 1)
         expected0 = [
             {
-                'id'           : 0,                                 # oldStyleConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # oldStyleConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 1,                                 # newStyleConn
-                'associd'      : str(newStyleConn.assocID),
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 1,                                 # newStyleConn
+                'associd': str(newStyleConn.assocID),
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
-                'associd'      : str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4']
+                'id': 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
+                'associd': str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4']
             },
             {
-                'id'           : 12,                                # A new association established to node1
-                'associd'      : '<UNKNOWN>',
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1']
+                'id': 12,                                # A new association established to node1
+                'associd': '<UNKNOWN>',
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected0), timeout=5)
         expected1 = [
             {
-                'id'           : 0,                                 # An association to node0
-                'associd'      : '<UNKNOWN>',
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1']
+                'id': 0,                                 # An association to node0
+                'associd': '<UNKNOWN>',
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[1], expected1), timeout=5)
@@ -487,43 +487,43 @@ class P2PAssociation(BitcoinTestFramework):
         connect_nodes(self.nodes, 0, 2)
         expected0 = [
             {
-                'id'           : 0,                                 # oldStyleConn
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # oldStyleConn
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 1,                                 # newStyleConn
-                'associd'      : str(newStyleConn.assocID),
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 1,                                 # newStyleConn
+                'associd': str(newStyleConn.assocID),
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
             {
-                'id'           : 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
-                'associd'      : str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4']
+                'id': 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
+                'associd': str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4']
             },
             {
-                'id'           : 12,                                # Association to node 1
-                'associd'      : '<UNKNOWN>',
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1']
+                'id': 12,                                # Association to node 1
+                'associd': '<UNKNOWN>',
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1']
             },
             {
-                'id'           : 14,                                # Old style association to node 2
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 14,                                # Old style association to node 2
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected0), timeout=5)
         expected2 = [
             {
-                'id'           : 0,                                 # An association to node0
-                'associd'      : 'Not-Set',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # An association to node0
+                'associd': 'Not-Set',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[2], expected2), timeout=5)
@@ -560,25 +560,25 @@ class P2PAssociation(BitcoinTestFramework):
         connect_nodes(self.nodes, 1, 3)
         expected1 = [
             {
-                'id'           : 0,                                 # An association to node0
-                'associd'      : '<UNKNOWN>',
-                'streampolicy' : 'BlockPriority',
-                'streams'      : ['GENERAL', 'DATA1']
+                'id': 0,                                 # An association to node0
+                'associd': '<UNKNOWN>',
+                'streampolicy': 'BlockPriority',
+                'streams': ['GENERAL', 'DATA1']
             },
             {
-                'id'           : 2,                                 # An association to node3
-                'associd'      : '<UNKNOWN>',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 2,                                 # An association to node3
+                'associd': '<UNKNOWN>',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[1], expected1), timeout=5)
         expected3 = [
             {
-                'id'           : 0,                                 # An association to node1
-                'associd'      : '<UNKNOWN>',
-                'streampolicy' : 'Default',
-                'streams'      : ['GENERAL']
+                'id': 0,                                 # An association to node1
+                'associd': '<UNKNOWN>',
+                'streampolicy': 'Default',
+                'streams': ['GENERAL']
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[3], expected3), timeout=5)

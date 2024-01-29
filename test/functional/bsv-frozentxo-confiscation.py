@@ -223,9 +223,9 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [enforceAtHeight],
                     "policyExpiresWithConsensus": False
@@ -235,7 +235,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
     def _whitelistTx(self, node, tx, enforce_at_height):
         self.log.info(f"Whitelisting confiscation transaction {tx.hash} with enforceAtHeight={enforce_at_height}")
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : enforce_at_height, "hex": ToHex(tx)}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": enforce_at_height, "hex": ToHex(tx)}}]})
         assert_equal(result["notProcessed"], [])
 
     def check_log(self, node, line_text):
@@ -365,7 +365,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         node.send_message(msg_tx(confiscate_tx))
         send_over_p2p_and_rpc(confiscate_tx, "bad-txns-vin-empty")
 
-        node.rpc.clearBlacklists({"removeAllEntries" : True})
+        node.rpc.clearBlacklists({"removeAllEntries": True})
 
     def _check_invalid_confiscation_transaction_policy(self, node):
         frozen_tx = self._create_and_send_tx(node)
@@ -459,7 +459,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_result(result, confiscate_tx.hash, 'datacarrier-size-exceeded')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
 
-        node.rpc.clearBlacklists({"removeAllEntries" : True})
+        node.rpc.clearBlacklists({"removeAllEntries": True})
 
     def _check_invalid_confiscation_transactios(self, node):
         frozen_tx = self._create_and_send_tx(node)
@@ -471,7 +471,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
             confiscate_tx.rehash()
             assert_raises_rpc_error(-26, "bad-ctx-invalid", node.rpc.sendrawtransaction, ToHex(confiscate_tx))
             # Check that invalid confiscation transaction cannot be whitelisted
-            result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 100, "hex": ToHex(confiscate_tx)}}]})
+            result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 100, "hex": ToHex(confiscate_tx)}}]})
             assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': confiscate_tx.hash}, 'reason': 'confiscation transaction is not valid'}])
 
         self.log.info(f"Checking detection of invalid confiscation transactions trying to spend frozen TXO {frozen_tx.hash},0")
@@ -510,17 +510,17 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         ctx0 = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
         ctx0.vin=[]
         ctx0.rehash()
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 0, "hex": ToHex(ctx0)}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": ToHex(ctx0)}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': ctx0.hash}, 'reason': 'confiscation transaction is not valid'}])
 
         # invalid hex strings should be detected when whitelisting
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 0, "hex": ""}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": ""}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': '0000000000000000000000000000000000000000000000000000000000000000'}, 'reason': 'invalid transaction hex string'}])
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 0, "hex": "02"}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": "02"}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': '0000000000000000000000000000000000000000000000000000000000000000'}, 'reason': 'invalid transaction hex string'}])
 
         # Cleanup
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 1) # 1 frozen txo
 
     def _check_confiscation(self, node, node1):
@@ -553,7 +553,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self._wait_for_block_status(node, block_ctx2.hash, "invalid")
 
         self.log.info("Clearing blacklists with removeAllEntries=true to remove all whitelisted txs and frozen TXOs")
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
 
         # Make sure both nodes are synchronized
@@ -673,7 +673,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         node1.rpc.waitforblockheight(current_block_height+1)
 
         self.log.info("Clearing blacklists+whitelist on node1 to check it is not needed when spending confiscation TXO")
-        result = node1.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node1.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2) # 1 whitelisted txs + 1 frozen txo
 
         self.log.info(f"Sending transaction {spend_tx.hash} spending confiscated TXO {confiscate_tx.hash},1 and checking that it is accepted on both nodes")
@@ -710,7 +710,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(node1.rpc.getbestblockhash(), block_hash)
 
         # Cleanup
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 3) # 2 whitelisted txs + 1 frozen txo
 
     def _check_mempool_removal(self, node):
@@ -731,7 +731,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
         self.log.info("Checking that confiscation transaction is removed from mempool if blacklist is cleared")
-        result=node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result=node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
         assert_equal(node.rpc.getrawmempool(), [])
 
@@ -776,7 +776,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         # Cleanup
         node.rpc.reconsiderblock(root_block.hash) # this will also reconsider next block which was invalidated above
         assert_equal(block.hash, node.rpc.getbestblockhash())
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2) # 1 whitelisted tx + 1 frozen txo
 
     def run_test(self):

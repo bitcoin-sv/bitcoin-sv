@@ -144,9 +144,9 @@ class FrozenTXOReindex(BitcoinTestFramework):
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     }
                 }]
         })
@@ -167,9 +167,9 @@ class FrozenTXOReindex(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False

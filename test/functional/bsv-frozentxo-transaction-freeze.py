@@ -200,9 +200,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     }
                 }]
         })
@@ -230,9 +230,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : spend_frozen_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": spend_frozen_tx.hash,
+                        "vout": 0
                     }
                 }]
         })
@@ -247,9 +247,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result = node.rpc.removeFromPolicyBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : spend_frozen_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": spend_frozen_tx.hash,
+                        "vout": 0
                     }
                 }]
         })
@@ -263,9 +263,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : spend_frozen_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": spend_frozen_tx.hash,
+                        "vout": 0
                     }
                 }]
         })
@@ -318,9 +318,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
@@ -342,9 +342,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": enforce_height}],
                     "policyExpiresWithConsensus": False
@@ -363,9 +363,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : spend_frozen_tx2.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": spend_frozen_tx2.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": enforce_height}],
                     "policyExpiresWithConsensus": False
@@ -381,9 +381,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : spend_frozen_tx2.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": spend_frozen_tx2.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
                     "policyExpiresWithConsensus": False
@@ -407,9 +407,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : spend_frozen_tx2.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": spend_frozen_tx2.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
                     "policyExpiresWithConsensus": True
@@ -437,9 +437,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             result=node.rpc.addToConsensusBlacklist({
                 "funds": [
                     {
-                        "txOut" : {
-                            "txId" : tx.hash,
-                            "vout" : 0
+                        "txOut": {
+                            "txId": tx.hash,
+                            "vout": 0
                         },
                         "enforceAtHeight": [{"start": h+1, "stop": h+3}, {"start": h+5, "stop": h+7}],
                         "policyExpiresWithConsensus": False

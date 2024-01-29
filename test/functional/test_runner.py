@@ -90,22 +90,22 @@ SOLO_TESTS = {
 }
 
 ENVIRONMENT_TYPE = {
-    1 : "Release build",
-    2 : "Release build with sanitizers enabled",
-    3 : "Debug build",
-    4 : "Debug build with sanitizers enabled"
+    1: "Release build",
+    2: "Release build with sanitizers enabled",
+    3: "Debug build",
+    4: "Debug build with sanitizers enabled"
 }
 
 # collection of timeout factors for time-sensitive tests:
 # test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
 # factor for release build is always 1; it is still present in this map for consistency
 TIMEOUT_FACTOR_FOR_TESTS = {
-    "bsv-block-propagation-priority.py" : [1,2,2,3],
-    "bsv-consolidation-feefilter.py" : [1,4,4,5],
-    "bsv-genesis-general.py" : [1,2,2,3],
-    "bsv-mempool-eviction.py" : [1,1,3,5],
-    "bsv-4gb-plus-block.py" : [1,2,2,3],
-    "bsv-block-stalling-test.py" : [1,2,2,3]
+    "bsv-block-propagation-priority.py": [1,2,2,3],
+    "bsv-consolidation-feefilter.py": [1,4,4,5],
+    "bsv-genesis-general.py": [1,2,2,3],
+    "bsv-mempool-eviction.py": [1,1,3,5],
+    "bsv-4gb-plus-block.py": [1,2,2,3],
+    "bsv-block-stalling-test.py": [1,2,2,3]
 }
 
 # This tests can be only run by explicitly specifying them on command line.
@@ -117,7 +117,7 @@ TEST_PARAMS = {
     # When a test is listed here, then it will be run without parameters
     # as well as with additional parameters listed here.
     # This:
-    #    example "testName" : [["--param1", "--param2"] , ["--param3"]]
+    #    example "testName" : [["--param1", "--param2"], ["--param3"]]
     # will run the test 3 times:
     #    testName
     #    testName --param1 --param2
@@ -201,7 +201,7 @@ def main():
                                                                          " There are two possible inputs for this argument: You can choose environment type and default timeout factors will be set:"
                                                                          " 1: Release build. (default) 2: Debug build. 3: Release build with sanitizers. 4: Debug build with sanitizers.\n"
                                                                          "If these factors do not work for you, you can pass them directly (in JSON): "
-                                                                         " Example: --timeout-factors={{\"bsv-genesis-general.py\" : 2, \"bsv-mempool-eviction.py\" : 3 , ...}}."
+                                                                         " Example: --timeout-factors={{\"bsv-genesis-general.py\" : 2, \"bsv-mempool-eviction.py\" : 3, ...}}."
                                                                          " You must pass timeout factors for all the following tests (if you are running them): {}."
                                                                          .format([test for test in TIMEOUT_FACTOR_FOR_TESTS.keys()]))
     args, unknown_args = parser.parse_known_args()

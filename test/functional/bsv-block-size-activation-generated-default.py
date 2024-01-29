@@ -78,7 +78,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE]))) # anyone can spend
 
         # Fund the transaction
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition': len(ftx.vout)})['hex']
         ftxHex = node.signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()

@@ -12,7 +12,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, connect_nodes, sync_blocks, disconnect_nodes_bi, p2p_port
 from test_framework.key import CECKey
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL , SIGHASH_FORKID
+from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, NetworkThread, NodeConn, NodeConnCB, msg_dsdetected, BlockDetails, CBlockHeader, DSMerkleProof, MerkleProofNode, FromHex, CBlock
 from test_framework.authproxy import JSONRPCException
 

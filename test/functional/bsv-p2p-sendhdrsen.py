@@ -216,7 +216,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
             'minerKeys': self.minerIdKey,
             'revocationKeys': self.minerIdRevocationKey
         }
-        block5 = make_miner_id_block(node, minerIdParams, utxo={"txid" : funding_tx.hash, "vout" : 49, "amount" : 1.0}, txns=txs)
+        block5 = make_miner_id_block(node, minerIdParams, utxo={"txid": funding_tx.hash, "vout": 49, "amount": 1.0}, txns=txs)
         coinbase_tx = block5.vtx[0]
         miner_info_tx = block5.vtx[1 + len(txs)]
         node.submitblock(ToHex(block5))

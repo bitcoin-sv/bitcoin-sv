@@ -99,10 +99,10 @@ network_thread_loop_intent_lock = RLock()
 
 # ports used by chain type
 NETWORK_PORTS = {
-    "mainnet" : 8333,
-    "testnet3" : 18333,
-    "stn" : 9333,
-    "regtest" : 18444
+    "mainnet": 8333,
+    "testnet3": 18333,
+    "stn": 9333,
+    "regtest": 18444
 }
 
 # Serialization/deserialization tools

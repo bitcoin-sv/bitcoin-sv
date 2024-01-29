@@ -105,7 +105,7 @@ def read_histograms(name: str, *, dataset=None, offset:int = 0) -> Iterator[Hist
                 found = line.find(pattern)
             histogram = line[found+3:].strip()
             parts = line[:found].strip().split()
-            # , {"Histogram":Histogram}
+            #, {"Histogram":Histogram}
             yield HistogramLog(dataset if dataset is not None else name,
                                " ".join(parts[0:2]),
                                parts[-1],

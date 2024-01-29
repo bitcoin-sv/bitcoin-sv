@@ -39,8 +39,9 @@ class Conflict(BitcoinTestFramework):
         return tx
 
     def run_test(self):
-        with self.run_node_with_connections("Scenario 1: Create complex graph of txs, doublespend some fo them and check mempool after"
-                                            , 0, ["-minrelaytxfee=0"],
+        with self.run_node_with_connections("Scenario 1: Create complex graph of txs, doublespend some fo them and check mempool after",
+                                            0,
+                                            ["-minrelaytxfee=0"],
                                             number_of_connections=1) as (conn,):
 
             # create block with coinbase

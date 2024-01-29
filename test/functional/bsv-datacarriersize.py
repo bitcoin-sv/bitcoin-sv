@@ -157,13 +157,13 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         self.stop_node(0)
 
         dataCarrierSize = 500
-        self.check_datacarriersize([OP_RETURN]          , 1, dataCarrierSize, "script with one OP_RETURN op code")
+        self.check_datacarriersize([OP_RETURN], 1, dataCarrierSize, "script with one OP_RETURN op code")
         self.check_datacarriersize([OP_FALSE, OP_RETURN], 1, dataCarrierSize, "script with one OP_FALSE, OP_RETURN op code")
-        self.check_datacarriersize([OP_RETURN]          , 3, dataCarrierSize, "script with three OP_RETURN op codes")
+        self.check_datacarriersize([OP_RETURN], 3, dataCarrierSize, "script with three OP_RETURN op codes")
         self.check_datacarriersize([OP_FALSE, OP_RETURN], 3, dataCarrierSize, "script with three OP_FALSE, OP_RETURN op codes")
 
         self.stop_node(0)
-        self.check_max_tx_size_policy([OP_RETURN]          , 1, "script with one OP_RETURN op code")
+        self.check_max_tx_size_policy([OP_RETURN], 1, "script with one OP_RETURN op code")
         self.check_max_tx_size_policy([OP_FALSE, OP_RETURN], 3, "script with three OP_FALSE, OP_RETURN op codes")
 
 

@@ -71,7 +71,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
     def create_funding_txn(self, out_value):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition': len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()

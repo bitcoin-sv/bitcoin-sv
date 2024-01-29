@@ -700,7 +700,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # create spendable tx
         tx_spendable = CTransaction()
         tx_spendable.vout = [CTxOut(4500000000, CScript([OP_TRUE]))]
-        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition' : len(tx_spendable.vout)})['hex']
+        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition': len(tx_spendable.vout)})['hex']
         tx_hex = self.nodes[0].signrawtransaction(tx_hex_funded)['hex']
         self.nodes[0].sendrawtransaction(tx_hex, True)
         tx_spendable = FromHex(CTransaction(), tx_hex)
@@ -771,7 +771,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # create spendable tx
         tx_spendable = CTransaction()
         tx_spendable.vout = [CTxOut(4500000000, CScript([OP_TRUE]))]
-        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition' : len(tx_spendable.vout)})['hex']
+        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition': len(tx_spendable.vout)})['hex']
         tx_hex = self.nodes[0].signrawtransaction(tx_hex_funded)['hex']
         self.nodes[0].sendrawtransaction(tx_hex, True)
         tx_spendable = FromHex(CTransaction(), tx_hex)
