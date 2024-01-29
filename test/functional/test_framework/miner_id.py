@@ -76,7 +76,7 @@ class MinerIdKeys:
                 break
         return signedMessage
 
-    def sign_tx_BIP143_with_forkid (self, tx_to_sign, txns_to_spend):
+    def sign_tx_BIP143_with_forkid(self, tx_to_sign, txns_to_spend):
         # txns_to_send is a dictionary of txid, tx pairs
         for i, vin in enumerate(tx_to_sign.vin):
             n = vin.prevout.n
@@ -201,7 +201,7 @@ def create_dataref_txn(connection, dataref_json, utxo):
     return datarefTx
 
 
-def create_dataref (brfcIds, txid, vout, compress=None):
+def create_dataref(brfcIds, txid, vout, compress=None):
 
     dataref = {
         'brfcIds': brfcIds,

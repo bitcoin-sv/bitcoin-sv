@@ -90,7 +90,7 @@ class FeeFilterTest(BitcoinTestFramework):
 
         utxos = []
         addr = node.getnewaddress()
-        for i in range (utxo_count):
+        for i in range(utxo_count):
             txid = node.sendtoaddress(addr, self.utxo_test_bsvs)
             tx = FromHex(CTransaction(), node.getrawtransaction(txid))
             tx.rehash()
@@ -103,7 +103,7 @@ class FeeFilterTest(BitcoinTestFramework):
         return utxos
 
     def create_and_sign_tx(self, node, in_count, min_confirmations):
-        utxos = self.create_utxos_value10000 (node, in_count, min_confirmations)
+        utxos = self.create_utxos_value10000(node, in_count, min_confirmations)
         inputs = []
         sum_values_bsvs = 0
         for u in utxos:

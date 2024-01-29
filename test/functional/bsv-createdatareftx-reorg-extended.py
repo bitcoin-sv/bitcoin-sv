@@ -63,7 +63,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [txid])
         return tx
 
-    def create_dataref_txn (self, node):
+    def create_dataref_txn(self, node):
 
         brfcDataA = {
             '62b21572ca46': {'mydata':'hello world1'},
@@ -80,7 +80,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         brfcDatas = [brfcDataA, brfcDataB, brfcDataC, brfcDataD]
 
-        def datarefToScript (data):
+        def datarefToScript(data):
             brfcDataJson = json.dumps(data, indent=0)
             brfcDataJson = brfcDataJson.replace('\n', '')
             brfcDataJson = brfcDataJson.replace(' ', '')
@@ -90,7 +90,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         scriptPubKeys = []
         for b in brfcDatas:
             script = CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), bytearray([0x0]),datarefToScript(b)])
-            scriptPubKeys.append (bytes_to_hex_str(script))
+            scriptPubKeys.append(bytes_to_hex_str(script))
 
         txid = node.createdatareftx(scriptPubKeys)
         wait_until(lambda: txid in node.getrawmempool())
@@ -101,7 +101,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         return dataRefs
 
-    def second_spends_first (self, node, txid1, txid2):
+    def second_spends_first(self, node, txid1, txid2):
         tx1 = FromHex(CTransaction(), node.getrawtransaction(txid1))
         tx2 = FromHex(CTransaction(), node.getrawtransaction(txid2))
         tx1.rehash()
@@ -154,7 +154,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
-        wait_until (lambda: txid in node.getrawmempool())
+        wait_until(lambda: txid in node.getrawmempool())
 
         if datarefs:
             wait_until(lambda: datarefs[0]['txid'] in node.getrawmempool())
@@ -173,7 +173,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         block = make_miner_id_block(node, minerinfotx_parameters, datarefTxns=list(datarefTxns.values()), minerInfoTx=minerInfoTx)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == node.getblockcount())
+        wait_until(lambda: block_count + 1 == node.getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
@@ -223,7 +223,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # create a minerinfo txn with a dataref and prove that
         # the minerinfo txn spends the dataref transaction
-        datarefs = self.create_dataref_txn (self.nodes[0])
+        datarefs = self.create_dataref_txn(self.nodes[0])
         minerinfo_tx = self.one_test(allKeys0, 0, datarefs=datarefs)
         dataref_tx = datarefs[0]['txid']
         assert(self.second_spends_first(self.nodes[0], dataref_tx, minerinfo_tx))

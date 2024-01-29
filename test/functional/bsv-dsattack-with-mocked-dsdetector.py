@@ -41,7 +41,7 @@ class MockDsdetector():
         if self.message:
             self.peer.send_and_ping(self.message)
 
-    def CheckForDoubleSpends (self, nodes):
+    def CheckForDoubleSpends(self, nodes):
         spent_inputs = []
         seen_transactions = []
         ds_counter = 0
@@ -178,7 +178,7 @@ class User:
         self.key.set_secretbytes(secret_bytes)
         self.pubkey = self.key.get_pubkey()
 
-    def spend_to_pkh (self, node, spend_tx, n, amount, to_pubkey):
+    def spend_to_pkh(self, node, spend_tx, n, amount, to_pubkey):
         value = int(amount)
         scriptPubKey = CScript([OP_DUP, OP_HASH160, hash160(to_pubkey), OP_EQUALVERIFY, OP_CHECKSIG])
 
@@ -233,7 +233,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         conn_rpc.submitblock(ToHex(block))
         return coinbase_tx
 
-    def send_funds_to_attacker (self, node, attacker, coinbase_tx):
+    def send_funds_to_attacker(self, node, attacker, coinbase_tx):
         funding_amount = int(coinbase_tx.vout[0].nValue / self.nbDoubleSpends)
         funding_tx = CTransaction()
 
@@ -279,7 +279,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT - 1)
 
         self.log.info("fund attacker")
-        funding_tx = self.send_funds_to_attacker (node0, attacker, coinbase_tx)
+        funding_tx = self.send_funds_to_attacker(node0, attacker, coinbase_tx)
         node0.generate(1)
         assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + 0)
 

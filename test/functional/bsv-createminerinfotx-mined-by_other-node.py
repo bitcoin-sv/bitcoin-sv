@@ -107,7 +107,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             'pubCompromisedMinerKeyHex': None
         }
 
-        scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
+        scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
@@ -115,7 +115,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         block = make_miner_id_block(node, minerinfotx_parameters, minerInfoTx=minerInfoTx)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == node.getblockcount())
+        wait_until(lambda: block_count + 1 == node.getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block

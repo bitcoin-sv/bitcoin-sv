@@ -60,7 +60,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         rpcport0 = "rpcport=" + str(rpc_port(0))
         rpcport1 = "rpcport=" + str(rpc_port(1))
 
-        def make_datadir (n):
+        def make_datadir(n):
             datadir = os.path.join(self.options.tmpdir, "node" + str(n))
             if not os.path.isdir(datadir):
                 os.makedirs(datadir)
@@ -167,14 +167,14 @@ class AuthConnTestReputation(BitcoinTestFramework):
         scriptPubKey = scriptPubKey.decode('ascii')
 
         txid = node.createminerinfotx(scriptPubKey)
-        wait_until (lambda: txid in node.getrawmempool())
+        wait_until(lambda: txid in node.getrawmempool())
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
         block = make_miner_id_block(node, minerinfotx_parameters, minerInfoTx=minerInfoTx)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == node.getblockcount())
+        wait_until(lambda: block_count + 1 == node.getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
@@ -183,7 +183,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         block = node.getblock(bhash)
         assert(txid in block['tx'])
 
-    def isAuthenticated (self, nodenum):
+    def isAuthenticated(self, nodenum):
         peerinfo = self.nodes[nodenum].getpeerinfo()
         if len(peerinfo) > 1:
             if (peerinfo[1]["authconn"]):

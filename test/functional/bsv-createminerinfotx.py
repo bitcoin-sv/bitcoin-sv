@@ -129,7 +129,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         else:
             jsonOverrideWithBadSyntax = None
 
-        scriptPubKey = create_miner_info_scriptPubKey (
+        scriptPubKey = create_miner_info_scriptPubKey(
             params=minerinfotx_parameters,
             json_override_string=jsonOverrideWithBadSyntax)
 
@@ -165,7 +165,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         if test_case == self.TEST_call_replace:
             minerinfotx_parameters['publicPort'] = '8334' # vary the port to get a different txid
-            scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
+            scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
             txid_twice = self.nodes[0].replaceminerinfotx(bytes_to_hex_str(scriptPubKey))
             assert(txid != txid_twice)
             txid = txid_twice
@@ -190,11 +190,11 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             block_count0 = self.nodes[0].getblockcount()
             self.nodes[1].generate(1)
             wait_until(lambda: block_count0 + 1 == self.nodes[0].getblockcount(), timeout=10)
-            wait_until (lambda: tx0 not in self.nodes[0].getrawmempool(), timeout=10, check_interval=1)
+            wait_until(lambda: tx0 not in self.nodes[0].getrawmempool(), timeout=10, check_interval=1)
             return True
 
         self.nodes[0].submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == self.nodes[0].getblockcount())
+        wait_until(lambda: block_count + 1 == self.nodes[0].getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block

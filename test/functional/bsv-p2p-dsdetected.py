@@ -403,7 +403,7 @@ class DSDetectedTests(BitcoinTestFramework):
         # repeat previous test but generate many blocks in the node to age the notificatoin message.
         # very old notification messages shall be ignored. We use the same thresholds as safe mode.
         # We will hardcode this threshold for now until branch we depend on is merged
-        node.generate (289)
+        node.generate(289)
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockF)], DSMerkleProof(1, txF, blockF.hashMerkleRoot, [MerkleProofNode(blockF.vtx[0].sha256)]))])

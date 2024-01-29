@@ -313,7 +313,7 @@ def main():
                 if timeout_test in test_list:
                     test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}".format(timeout_factors_json[timeout_test]))
         except ValueError as e:
-            print ("Error parsing input json: ", e)
+            print("Error parsing input json: ", e)
 
     if not test_list:
         print("No valid test scripts specified. Check that your test is in one "

@@ -16,7 +16,7 @@ def tests():
     for mn in mod_names:
         mod = importlib.import_module(f"{__name__}.{mn}")
 
-        def tt (obj):
+        def tt(obj):
             if not inspect.isclass(obj):
                 return False
             if obj in [GenesisHeightTestsCaseBase, GenesisHeightBasedSimpleTestsCase]:

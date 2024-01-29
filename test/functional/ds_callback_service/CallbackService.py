@@ -153,7 +153,7 @@ class CallbackService(BaseHTTPRequestHandler):
                     time.sleep(RESPONSE_TIME.SLOWEST.value)
 
                 parsed = parse_qs(urlparse.urlparse(self.path).query)
-                if all (key in parsed for key in ('txid', 'n', 'ctxid', 'cn')):
+                if all(key in parsed for key in('txid', 'n', 'ctxid', 'cn')):
                     txid = parsed['txid'][0]
                     ctxid = parsed['ctxid'][0]
                     n = parsed['n'][0]
