@@ -6,6 +6,5 @@ description:  'Autotools Unit test'
 runs:
   using: "composite"
   steps:
-    - run: |
-        make check
+    - run: make -j$(nproc --all) VERBOSE=1 check
       shell: bash
