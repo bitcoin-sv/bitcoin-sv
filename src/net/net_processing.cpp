@@ -2918,7 +2918,7 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
         //       (e.g. no more than one pending response guarantee), this would need to be addressed properly and
         //       would probably introduce some performance overhead.
         LogPrint(BCLog::NETMSG, "Ignoring getheaders and disconnecting the peer because there are too many (%d, max=%d) pending responses to previously received getheaders from peer=%d.\n",
-            pfrom->id, n, pfrom->pendingResponses.getheaders.GetMaxAllowed());
+            n, pfrom->pendingResponses.getheaders.GetMaxAllowed(), pfrom->id);
         pfrom->fDisconnect = true;
         return;
     }
@@ -3156,7 +3156,7 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
     {
         // Same comment applies as in ProcessGetHeadersMessage().
         LogPrint(BCLog::NETMSG, "Ignoring gethdrsen and disconnecting the peer because there are too many (%d, max=%d) pending responses to previously received gethdrsen from peer=%d.\n",
-            pfrom->id, n, pfrom->pendingResponses.gethdrsen.GetMaxAllowed());
+            n, pfrom->pendingResponses.gethdrsen.GetMaxAllowed(), pfrom->id);
         pfrom->fDisconnect = true;
         return;
     }
