@@ -685,7 +685,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                   DEFAULT_MAX_OUTBOUND_CONNECTIONS));
     strUsage += HelpMessageOpt(
         "-maxconnectionsfromaddr=<n>",
-        strprintf(_("Maximum number of inbound connections from a single address, 0 = unrestricted (default: %d)"),
+        strprintf(_("Maximum number of inbound connections from a single address "
+                    "(not applicable to whitelisted peers) 0 = unrestricted (default: %d)"),
                   DEFAULT_MAX_CONNECTIONS_FROM_ADDR));
     strUsage +=
         HelpMessageOpt("-maxreceivebuffer=<n>",
@@ -808,14 +809,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Maximum allowed number of pending responses in the sending queue for received GETHEADERS P2P requests before "
                     "the connection is closed. Not applicable to whitelisted peers. 0 = no limit (default: %d). Main purpose of "
                     "this setting is to limit memory usage. The specified value should be small (e.g. ~50) since in practice connected "
-                    "peers do need to send many GETHEADERS requests in parallel."),
+                    "peers do not need to send many GETHEADERS requests in parallel."),
                   DEFAULT_MAXPENDINGRESPONSES_GETHEADERS));
     strUsage += HelpMessageOpt(
         "-maxpendingresponses_gethdrsen=<n>",
         strprintf(_("Maximum allowed number of pending responses in the sending queue for received GETHDRSEN P2P requests before "
                     "the connection is closed. Not applicable to whitelisted peers. 0 = no limit (default: %d). Main purpose of "
                     "this setting is to limit memory usage. The specified value should be small (e.g. ~10) since in practice connected "
-                    "peers do need to send many GETHDRSEN requests in parallel."),
+                    "peers do not need to send many GETHDRSEN requests in parallel."),
                   DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN));
 
 #ifdef ENABLE_WALLET
