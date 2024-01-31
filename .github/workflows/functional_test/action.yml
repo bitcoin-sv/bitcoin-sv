@@ -21,4 +21,6 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.tag }}-${{ inputs.toolset }}
-        path: /tmp/bitcoin_test_runner_*
+        path: |
+          /tmp/bitcoin_test_runner_*
+          !/tmp/bitcoin_test_runner_*/.lock
