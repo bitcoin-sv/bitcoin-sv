@@ -6,9 +6,12 @@ run-name:
 
 on:
   pull_request:
+    paths-ignore:
+      - 'doc/**'
   workflow_dispatch:
     paths-ignore:
       - 'doc/**'
+
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
