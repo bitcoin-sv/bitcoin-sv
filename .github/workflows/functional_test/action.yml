@@ -23,4 +23,6 @@ runs:
         name: ${{ inputs.tag }}-${{ inputs.toolset }}
         path: |
           /tmp/bitcoin_test_runner_*
+          !/tmp/bitcoin_test_runner_*/.cookie
           !/tmp/bitcoin_test_runner_*/.lock
+          !/tmp/bitcoin_test_runner_*/.pid
