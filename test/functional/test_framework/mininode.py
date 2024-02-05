@@ -1398,7 +1398,7 @@ class msg_protoconf():
 
     def __init__(self, protoconf=None):
         if protoconf is None:
-            self.protoconf = CProtoconf(2,0,b"")
+            self.protoconf = CProtoconf(2, 0, b"")
         else:
             self.protoconf = protoconf
 

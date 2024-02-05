@@ -108,7 +108,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
         # Create a block with CB transaction whose outputs we can spend later
         funding_tx = create_coinbase(node.getblockcount())
         funding_tx.vout[0].nValue = 1*COIN
-        for i in range(1,50):
+        for i in range(1, 50):
             funding_tx.vout.append(CTxOut(1*COIN, CScript([OP_TRUE])))
         funding_tx.rehash()
         self.submit_block(node, funding_tx)
@@ -276,12 +276,12 @@ class SendHdrsEnTest(BitcoinTestFramework):
             block_hashes.append(node1.generate(1)[0])
 
         # Should receive an inv instead of hdrsen, because hdrsen message would contain more than 8 headers
-        spv_node.wait_for_inv([CInv(CInv.BLOCK, int(block_hashes[8],16))], 5)
+        spv_node.wait_for_inv([CInv(CInv.BLOCK, int(block_hashes[8], 16))], 5)
         assert_equal(spv_node.hdrsen, [])
         assert_equal(node.getblockcount(), start_height+9)
 
         # Send gethdrsen to get the missing headers
-        spv_node.gethdrsen(locator=[int(block0_hash,16), int(h.headers[7].hash,16)], hashstop=0) # NOTE: h still contains the last blocks announcement before reorg
+        spv_node.gethdrsen(locator=[int(block0_hash, 16), int(h.headers[7].hash, 16)], hashstop=0) # NOTE: h still contains the last blocks announcement before reorg
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 9)
         for i in range(9):

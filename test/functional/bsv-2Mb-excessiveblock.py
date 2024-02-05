@@ -54,7 +54,7 @@ class BSV2MBlocks(ComparisonTestFramework):
         # Sending oversized blocks will cause disconnection and banning (not able to reconnect within 10 seconds of bantime)
         assert(not self.test.test_nodes[0].closed)
         block(2, spend=out[1], block_size=self.excessive_block_size + 1)
-        assert_equal(len(self.nodes[0].listbanned()),0)# Before, there are zero banned node
+        assert_equal(len(self.nodes[0].listbanned()), 0)# Before, there are zero banned node
         self.test.connections[0].send_message(msg_block((self.chain.tip)))
         self.test.wait_for_disconnections()
         assert(self.test.test_nodes[0].closed)# disconnected
@@ -72,7 +72,7 @@ class BSV2MBlocks(ComparisonTestFramework):
         logger.info("Test banning excessive block size : PASS")
 
         time.sleep(10)#make sure at least 10 seconds (bantime) has passed
-        assert_equal(len(self.nodes[0].listbanned()),0)# Make sure the banned register has been cleared
+        assert_equal(len(self.nodes[0].listbanned()), 0)# Make sure the banned register has been cleared
         # Rewind bad block and reconnect to node
         self.chain.set_tip(1)
         self.restart_network()

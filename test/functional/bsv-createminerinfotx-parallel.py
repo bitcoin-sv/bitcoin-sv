@@ -39,14 +39,14 @@ class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.miner_names = ["miner name 0","miner name 1"]
+        self.miner_names = ["miner name 0", "miner name 1"]
 
         args = [
             '-mindebugrejectionfee=0',
             '-paytxfee=0.00003'
         ]
 
-        self.extra_args = [args,args]
+        self.extra_args = [args, args]
 
         self.TEST_call_create = 1
         self.TEST_call_replace = 3
@@ -83,8 +83,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': key.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
-        fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
+        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['firstFundingOutpoint'] = {'txid': txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
         fundingSeedJson = json.dumps(fundingSeed, indent=3)

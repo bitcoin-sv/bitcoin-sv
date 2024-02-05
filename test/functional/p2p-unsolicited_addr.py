@@ -64,7 +64,7 @@ class UnsolictedAddr(BitcoinTestFramework):
 
         maddr = msg_addr()
         for addr in addrs:
-            ca = CAddress(addr.split(":")[0],int(addr.split(":")[1]))
+            ca = CAddress(addr.split(":")[0], int(addr.split(":")[1]))
             maddr.addrs.append(ca)
         connections[0].send_message(maddr)
 

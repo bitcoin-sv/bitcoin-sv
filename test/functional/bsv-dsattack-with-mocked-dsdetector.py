@@ -87,7 +87,7 @@ class MockDsdetector():
 
                             break
                         else:
-                            spent_inputs.append({'txid':txraw['txid'], 'tx':txA, 'utxo':utxoA, 'block':blockA})
+                            spent_inputs.append({'txid': txraw['txid'], 'tx': txA, 'utxo': utxoA, 'block': blockA})
 
         return ds_counter
 

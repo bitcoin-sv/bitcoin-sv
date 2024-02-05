@@ -349,7 +349,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             rpc_txs_bulk_input.append({'hex': ToHex(tx), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
         # Submit a batch of txns through rpc interface.
         rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
-        for k,v in rejected_txns.items():
+        for k, v in rejected_txns.items():
             self.log.info("====== rejected_txns[%s] = %s", k, v)
         assert_equal(len(rejected_txns), 1)
         assert_equal(len(rejected_txns['invalid']), len(bad) + len(orphan))
@@ -357,9 +357,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         def reject_reason(x):
             return x['reject_reason']
         invalid = {k: list(v)
-                   for k,v in itertools.groupby(sorted(rejected_txns['invalid'],
-                                                       key=reject_reason),
-                                                key=reject_reason)
+                   for k, v in itertools.groupby(sorted(rejected_txns['invalid'],
+                                                        key=reject_reason),
+                                                 key=reject_reason)
                    }
         self.log.info("invalid: %s", invalid)
         missing_inputs = invalid.pop('missing-inputs')

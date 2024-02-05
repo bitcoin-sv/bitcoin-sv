@@ -249,7 +249,7 @@ class tx_set_context(dict):
     def __init__(self, context={}, **subsets):
         context = dict(context)
         context.update(subsets)
-        super().__init__((k, tx_ids(v)) for k,v in context.items())
+        super().__init__((k, tx_ids(v)) for k, v in context.items())
 
 
 class tx_set(set):

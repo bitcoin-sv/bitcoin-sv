@@ -28,7 +28,7 @@ During initialization it:
 
 class RunnerNode(NodeConnCB):
     def __init__(self, remote_node, node_number):
-        super(RunnerNode,self).__init__()
+        super(RunnerNode, self).__init__()
         self.chain = ChainManager()
         self.next_block = 0
         self.remote_node = remote_node

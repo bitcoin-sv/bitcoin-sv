@@ -80,7 +80,7 @@ class BlockDownloadTimeout(BitcoinTestFramework):
         block.solve()
         return block
 
-    def test_send_block_to_node(self, label, node_index, block, send_rate, expected_time_to_send,cmd_timeout_base,
+    def test_send_block_to_node(self, label, node_index, block, send_rate, expected_time_to_send, cmd_timeout_base,
                                 cmd_timeout_base_ibd, cmd_timeout_per_peer, expect_timeout,
                                 mocktime=0,
                                 additional_conn_blocks=[],

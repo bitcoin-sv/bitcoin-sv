@@ -63,7 +63,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.tip = None
         self.blocks = {}
-        self.extra_args = [['-mindebugrejectionfee=0.0000025','-whitelist=127.0.0.1']]
+        self.extra_args = [['-mindebugrejectionfee=0.0000025', '-whitelist=127.0.0.1']]
 
     def add_options(self, parser):
         super().add_options(parser)
@@ -76,7 +76,7 @@ class FullBlockTest(ComparisonTestFramework):
     def get_tests(self):
         # shorthand for functions
         block=lambda *a, **kw: self.chain.next_block(*a,  coinbase_key=self.coinbase_key, simple_output=True, **kw)
-        create_and_sign_tx=lambda *a, **kw: create_and_sign_transaction(*a, private_key=self.coinbase_key, **({k:v for k,v in kw.items() if not k == 'private_key'}))
+        create_and_sign_tx=lambda *a, **kw: create_and_sign_transaction(*a, private_key=self.coinbase_key, **({k: v for k, v in kw.items() if not k == 'private_key'}))
         update_block = self.chain.update_block
         tip = self.chain.set_tip
         accepted = self.accepted

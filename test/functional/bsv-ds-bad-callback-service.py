@@ -161,7 +161,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
-        with self.run_node_with_connections("Server is consistently slow, but functional", 0, ['-dsendpointport=8080','-dsendpointslowrateperhour=2'], 1) as p2p_connections:
+        with self.run_node_with_connections("Server is consistently slow, but functional", 0, ['-dsendpointport=8080', '-dsendpointslowrateperhour=2'], 1) as p2p_connections:
             # Turn on CallbackService.
             handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOW, FLAG.YES)
             self.server = HTTPServer(('localhost', 8080), handler)

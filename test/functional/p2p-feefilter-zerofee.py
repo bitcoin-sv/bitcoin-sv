@@ -63,7 +63,7 @@ class FeeFilterTest(BitcoinTestFramework):
         self.num_nodes = 2
 
     def setup_nodes(self):
-        self.extra_args = [[],[]]
+        self.extra_args = [[], []]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
 

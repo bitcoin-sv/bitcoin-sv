@@ -148,10 +148,10 @@ class Evictions(BitcoinTestFramework):
             wait_until(lambda: conn.rpc.getminingcandidate()["num_tx"] == len(primaryMempoolTxs) + 1)
 
             txs_in_mempool = set(primaryMempoolTxs + secondaryMempoolTxs)
-            outpoints_to_spend = [(funding_tx, n) for n in range(4,15)]
+            outpoints_to_spend = [(funding_tx, n) for n in range(4, 15)]
 
             while len(txs_in_mempool) < 299:
-                tx = self.create_tx([outpoints_to_spend.pop(0),], noutput=2, feerate=5, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoints_to_spend.pop(0), ], noutput=2, feerate=5, totalSize=ONE_MEGABYTE)
                 outpoints_to_spend.append((tx, 0))
                 outpoints_to_spend.append((tx, 1))
                 conn.send_message(msg_tx(tx))
@@ -183,7 +183,7 @@ class Evictions(BitcoinTestFramework):
             outpoint_to_spend = (funding_tx, 15)
 
             for evicting in eviction_order:
-                tx = self.create_tx([outpoint_to_spend,], noutput=1, feerate=30, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=30, totalSize=ONE_MEGABYTE)
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)
@@ -218,7 +218,7 @@ class Evictions(BitcoinTestFramework):
 
             #now we have room for some more txs
             for _ in range(3):
-                tx = self.create_tx([outpoint_to_spend,], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)

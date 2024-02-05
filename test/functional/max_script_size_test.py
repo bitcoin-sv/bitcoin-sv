@@ -47,7 +47,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         test_node = TestNode()
         conn = NodeConn(dstaddr, p2p_port(dstportno), self.nodes[node_index], test_node)
         test_node.add_connection(conn)
-        return test_node,conn
+        return test_node, conn
 
     def run_test(self):
         def new_tx(utxo=None, target_script_size=20000, op_codes=[OP_TRUE], elem=[b"a" * 499, OP_DROP], target_tx_size=None, simple=False, lock_script=None, unlock_script=b""):
@@ -132,7 +132,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
             if len_mem0 > 0:
                 return block_id, mempool0[0]
             else:
-                return None,None
+                return None, None
 
         node = self.nodes[0]
         test_node, conn = self.run_test_node(0)
@@ -154,7 +154,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         base_tx = new_tx(utxos[0], target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS)
         add_to_block_and_send(txs=[base_tx])
         # Create a test tx that'll try to spend it      --> OK
-        utxo = {'txid':base_tx, 'vout': 0, 'amount': 200000000}
+        utxo = {'txid': base_tx, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS)
         add_to_block_and_send(txs=[test_tx])
         ensure_no_rejection(conn)
@@ -163,7 +163,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         # Check that it doesn't get into the mempool, because parent is unspendable
         base_tx = new_tx(utxos[1], target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1)
         add_to_block_and_send(txs=[base_tx])
-        utxo = {'txid':base_tx, 'vout': 0, 'amount': 200000000}
+        utxo = {'txid': base_tx, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1)
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
         ensure_no_rejection(conn)

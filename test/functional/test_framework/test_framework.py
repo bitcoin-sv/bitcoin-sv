@@ -472,7 +472,7 @@ class BitcoinTestFramework():
                 self.start_node(i, extra_args, stderr=log_stderr)
                 self.stop_node(i)
             except Exception as e:
-                self.wait_for_node_exit(i,1) # wait until process properly terminates and resources are cleaned up
+                self.wait_for_node_exit(i, 1) # wait until process properly terminates and resources are cleaned up
                 assert 'bitcoind exited' in str(e)  # node must have shutdown
                 if expected_msg is not None:
                     log_stderr.seek(0)
@@ -650,7 +650,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
     def __init__(self, destAddress = '127.0.0.1'):
-        super(ComparisonTestFramework,self).__init__()
+        super(ComparisonTestFramework, self).__init__()
         self.chain = ChainManager()
         self.destAddr = destAddress
         self._network_thread = None

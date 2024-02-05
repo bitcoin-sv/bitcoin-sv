@@ -105,7 +105,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                             '-txindex=1',
                             ], []]
         self.setup_nodes()
-        connect_nodes_bi(self.nodes, 0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
 
     def create_transaction(self, fee, op_codes, input_txs, no_outputs, amount, feerate=1.001, dustrelay=0, out0_value=0):
         ftx = CTransaction()
@@ -337,7 +337,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         test_node = TestNode()
         conn = NodeConn(dstaddr, p2p_port(dstportno), self.nodes[node_index], test_node)
         test_node.add_connection(conn)
-        return test_node,conn
+        return test_node, conn
 
     def run_test(self):
         #generate 500 utxos
@@ -464,7 +464,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         tx_params = {"fee": 600, "script_size": self.maxscriptsize, "tx_size": 0}
 
-        self.create_transactions_and_send_with_overridden_config(base_utxos,tx_params,
+        self.create_transactions_and_send_with_overridden_config(base_utxos, tx_params,
                                                                  config_overrides_decrease, overrides_pertx,
                                                                  invalid_txs=invalid_txs, custom_scripts=True)
         i_utxo += 16
@@ -574,7 +574,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         invalid_txs = ([{'reject_reason': "too-long-mempool-chain"} for _ in range(4)]
                        + falses(5)
-                       + [{'reject_reason':"too-long-mempool-chain"} for _ in range(3)]
+                       + [{'reject_reason': "too-long-mempool-chain"} for _ in range(3)]
                        + [{'reject_reason': "too-long-mempool-chain"}]
                        + falses(3))
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
@@ -604,7 +604,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                        + [{'reject_reason': "too-long-mempool-chain"} for _ in range(4)]
                        + [{'reject_reason': "too-long-mempool-chain"}]
                        + falses(4)
-                       + [{'reject_reason':"too-long-mempool-chain"} for _ in range(3)])
+                       + [{'reject_reason': "too-long-mempool-chain"} for _ in range(3)])
 
         overrides_pertx = [None for _ in range(8)] + [config_overrides_decrease, None, None, None,
                                                       {"limitancestorcount": 5}, None, None, None]
@@ -700,7 +700,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                        + [{'reject_reason': "too-long-mempool-chain"} for _ in range(4)]
                        + [{'reject_reason': "too-long-mempool-chain"}]
                        + falses(4)
-                       + [{'reject_reason':"too-long-mempool-chain"} for _ in range(3)])
+                       + [{'reject_reason': "too-long-mempool-chain"} for _ in range(3)])
 
         overrides_pertx = (
             [None for _ in range(8)]
@@ -754,7 +754,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         invalid_txs = (
             [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
             + [{'reject_reason': "scriptpubkey"} for _ in range(5)]
-            + [{'reject_reason':"non-mandatory-script-verify-flag" " (Script is too big)"} for _ in range(4)]
+            + [{'reject_reason': "non-mandatory-script-verify-flag" " (Script is too big)"} for _ in range(4)]
             + [{'reject_reason': "scriptpubkey"} for _ in range(3)])
 
         overrides_pertx = (
@@ -816,7 +816,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         enough_confirmations = self.minconfconsolidationinput
 
         invalid_txs = (falses(4)
-                       + [{'reject_reason':"mempool min fee not met"} for _ in range(5)]
+                       + [{'reject_reason': "mempool min fee not met"} for _ in range(5)]
                        + falses(4)
                        + [{'reject_reason': "mempool min fee not met"} for _ in range(3)])
 
@@ -1071,7 +1071,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.nodes[1].generate(height0 - height1 + 288) # to avoid safe mode
         self.extra_args[0][19] = "-minconfconsolidationinput=0"
         self.start_node(0)
-        connect_nodes_bi(self.nodes, 0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
         sync_blocks(self.nodes, timeout=120)
         self.stop_node(1)
 

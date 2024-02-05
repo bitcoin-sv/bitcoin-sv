@@ -152,7 +152,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         ]
         vout = [
             # inputs 0 and 2 are valid, input 9 is out of range
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0,2,9]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0, 2, 9]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -357,7 +357,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         # Create funding transactions that will provide funds for other transcations
         ftx = CTransaction()
         ftx.vout.append(CTxOut(1000000, CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition': len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx), {'changePosition': len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -377,7 +377,7 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 1, which means nonstandard transaction will not even validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000',"-maxnonstdtxvalidationduration=11", "-dsnotifylevel=1"])
+        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000', "-maxnonstdtxvalidationduration=11", "-dsnotifylevel=1"])
 
         self.createConnection()
         # Create double spend of tx1
@@ -393,7 +393,7 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 2, which means nonstandard transaction will validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000',"-maxnonstdtxvalidationduration=11", "-dsnotifylevel=2"])
+        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000', "-maxnonstdtxvalidationduration=11", "-dsnotifylevel=2"])
 
         self.createConnection()
         vin = [
@@ -416,7 +416,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo[0]["txid"], 16), utxo[0]["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP,WRONG_IP1,SKIP_IP,WRONG_IP2], [0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP, WRONG_IP1, SKIP_IP, WRONG_IP2], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -443,7 +443,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo[1]["txid"], 16), utxo[1]["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP,LOCAL_HOST_IP], [0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP, LOCAL_HOST_IP], [0]).serialize()]))
         ]
         tx3 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx3.hash in self.nodes[0].getrawmempool())
@@ -491,7 +491,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129, [LOCAL_HOST_IPV6],[0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129, [LOCAL_HOST_IPV6], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         tx1.rehash()

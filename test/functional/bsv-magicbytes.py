@@ -15,12 +15,12 @@ class MagicBytes(BitcoinTestFramework):
         self._magicbyte='0a0b0c0d'
         self.num_nodes = 2
         self._extra_args_same = [['-magicbytes={}'.format(self._magicbyte)]]*self.num_nodes
-        self._extra_args_diff = [[],['-magicbytes={}'.format(self._magicbyte)]]
+        self._extra_args_diff = [[], ['-magicbytes={}'.format(self._magicbyte)]]
         self.extra_args = self._extra_args_same
 
     def setup_network(self):
         self.setup_nodes()
-        connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes, self.extra_args, timewait=900)

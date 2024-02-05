@@ -51,7 +51,7 @@ class P2SH(ComparisonTestFramework):
 
         # Now we need that block to mature so we can spend the coinbase.
         test = TestInstance(sync_every_block=False)
-        for i in range(0,100):
+        for i in range(0, 100):
             block(i, coinbase_pubkey=self.coinbase_pubkey)
             test.blocks_and_transactions.append([self.chain.tip, True])
             self.chain.save_spendable_output()

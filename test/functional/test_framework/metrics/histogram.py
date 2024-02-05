@@ -69,7 +69,7 @@ class Histogram(dict):
 
     @classmethod
     def parse(cls, ser):
-        return eval(ser, {"Histogram":cls})
+        return eval(ser, {"Histogram": cls})
 
 
 HistogramLog = collections.namedtuple("HistogramLog", "dataset, ts, name, histogram")
@@ -91,7 +91,7 @@ def open_at_offset(offset: int = 0):
     return opener
 
 
-def read_histograms(name: str, *, dataset=None, offset:int = 0) -> Iterator[HistogramLog]:
+def read_histograms(name: str, *, dataset=None, offset: int = 0) -> Iterator[HistogramLog]:
     bug = "An invalid reference: Node doesn't exist"
     pattern = " = Histogram("
     with open(name, opener=open_at_offset(offset)) as fd:
@@ -101,7 +101,7 @@ def read_histograms(name: str, *, dataset=None, offset:int = 0) -> Iterator[Hist
                 continue
             b = line.find(bug)
             if b >= 0:
-                line = line.replace(bug,"")
+                line = line.replace(bug, "")
                 found = line.find(pattern)
             histogram = line[found+3:].strip()
             parts = line[:found].strip().split()
@@ -145,7 +145,7 @@ def strip_common_prefix(names):
     return [name[cp:] for name in names]
 
 
-def assert_eq(a,b):
+def assert_eq(a, b):
     assert (a==b), f"{a} != {b}"
 
 
@@ -204,7 +204,7 @@ def plot_percentiles(ax, ls, *, key):
 #                plt.annotate(f"{100*xy[1]:.3f}% < {xy[0]}", xy)
     plt.title(key(ls[0]))
     plt.yscale("logit")
-    plt.ylim((1e-1,1-1e-6))
+    plt.ylim((1e-1, 1-1e-6))
 
 
 def prefix(l):
@@ -219,7 +219,7 @@ HistogramFilter = Callable[[HistogramLog], bool]
 
 
 def load_histograms(fs: List[str], histogram_filter: HistogramFilter) -> List[HistogramLog]:
-    def keep_last(it, *, key=lambda x:x.name):
+    def keep_last(it, *, key=lambda x: x.name):
         return {key(elt): elt for elt in it}.values()
 
     def read_last(f, dataset):
@@ -256,9 +256,9 @@ def show_percentiles(logs, *,
                      key=prefix_t,
                      histogram_filter: HistogramFilter = histogram_filter_all):
 
-    for r, (k,v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
+    for r, (k, v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
         print("percentiles =======", k, [l.dataset for l in v])
-        fig = plt.figure(figsize=(8,6))
+        fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         plot_percentiles(ax, v, key=key)
         plt.grid(which='major', axis='both')
@@ -268,9 +268,9 @@ def show_percentiles(logs, *,
 def show_histograms(logs, *, key=prefix,
                     histogram_filter: HistogramFilter = histogram_filter_all):
 
-    for r, (k,v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
+    for r, (k, v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
         print("histogram =======", k, [l.dataset for l in v])
-        fig = plt.figure(figsize=(8,6))
+        fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         plot_histogram(ax, v)
         plt.grid(which='major', axis='both')

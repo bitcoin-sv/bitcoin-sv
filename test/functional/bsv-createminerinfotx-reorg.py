@@ -37,7 +37,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.miner_names = ["miner name 0","miner name 1"]
+        self.miner_names = ["miner name 0", "miner name 1"]
         args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003']
         self.extra_args = [args, args]
 
@@ -72,8 +72,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
-        fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
+        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['firstFundingOutpoint'] = {'txid': txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
         fundingSeedJson = json.dumps(fundingSeed, indent=3)
@@ -157,7 +157,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # disconnect and mine independently.
         # make the second nodes chain the longest
         forkHeight = self.nodes[0].getblockcount()
-        disconnect_nodes_bi(self.nodes,0,1)
+        disconnect_nodes_bi(self.nodes, 0, 1)
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0, do_mining=False)
         self.one_test(allKeys1, 1)
@@ -175,7 +175,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # connect nodes. All nodes should now mine on the longer chain
         # mined by the second node
-        connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
         sync_blocks(self.nodes)
 
         # no change for the second node which has the longer chain

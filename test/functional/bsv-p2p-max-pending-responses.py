@@ -116,8 +116,8 @@ class P2PPendingResponses(BitcoinTestFramework):
         self.send_requests_without_reading_responses([], "gethdrsen", 25, False)
 
         self.log.info("--- Part 4: Check that maximum pending responses for getheaders/gethdrsen is not enforced for whitelisted peers")
-        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1","-maxpendingresponses_getheaders=50"], "getheaders", 100, False)
-        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1","-maxpendingresponses_gethdrsen=10"], "gethdrsen", 25, False)
+        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1", "-maxpendingresponses_getheaders=50"], "getheaders", 100, False)
+        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1", "-maxpendingresponses_gethdrsen=10"], "gethdrsen", 25, False)
 
 
 if __name__ == '__main__':

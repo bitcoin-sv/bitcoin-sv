@@ -53,7 +53,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
     # Create an empty block with given block time. Used to move median past time around
     def mine_empty_block(self, nTime):
         node = self.nodes[0]
-        hashPrev = int(node.getbestblockhash(),16)
+        hashPrev = int(node.getbestblockhash(), 16)
 
         coinbase = create_coinbase(node.getblockcount() + 1)
         block = create_block(hashPrev, coinbase, nTime)
@@ -78,7 +78,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE]))) # anyone can spend
 
         # Fund the transaction
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition': len(ftx.vout)})['hex']
+        ftxHex = node.fundrawtransaction(ToHex(ftx), {'changePosition': len(ftx.vout)})['hex']
         ftxHex = node.signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()

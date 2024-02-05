@@ -131,9 +131,9 @@ class BigBlockTests(BitcoinTestFramework):
         # Disconnect node1 and node2 for now
         disconnect_nodes_bi(self.nodes, 1, 2)
 
-        connArgs = [{"versionNum":MY_VERSION}, {"versionNum":70015}]
+        connArgs = [{"versionNum": MY_VERSION}, {"versionNum": 70015}]
         with self.run_node_with_connections("Test old and new protocol versions", 0, self.nodeArgs, number_of_connections=2,
-                                            connArgs=connArgs, cb_class=MyConnCB) as (newVerConn,oldVerConn):
+                                            connArgs=connArgs, cb_class=MyConnCB) as (newVerConn, oldVerConn):
             assert newVerConn.connected
             assert oldVerConn.connected
 
@@ -152,7 +152,7 @@ class BigBlockTests(BitcoinTestFramework):
             # Reconnect node0 and node2 and sync their blocks. Node2 will end up receiving the
             # large block via compact blocks
             connect_nodes(self.nodes, 0, 2)
-            sync_blocks(itemgetter(0,2)(self.nodes))
+            sync_blocks(itemgetter(0, 2)(self.nodes))
 
             # Mine a >4GB block, verify we only get it over the new connection
             old_block_count = newVerConn.cb.block_count

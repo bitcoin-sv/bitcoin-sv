@@ -23,7 +23,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.extra_args = [[],[]]
+        self.extra_args = [[], []]
 
     # Return a set containing chain tip hashes
     def chain_tips_hashes(self, conn):

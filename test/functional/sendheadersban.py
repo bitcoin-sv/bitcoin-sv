@@ -58,7 +58,7 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
             time.sleep(1)
         peerInfoPostSendHeaderMsg=self.nodes[0].getpeerinfo()
         #print (peerInfoPostSendHeaderMsg[1]['banscore'])
-        assert_greater_than(peerInfoPostSendHeaderMsg[1]['banscore'],peerInfoPreSendHeaderMsg[1]['banscore'])
+        assert_greater_than(peerInfoPostSendHeaderMsg[1]['banscore'], peerInfoPreSendHeaderMsg[1]['banscore'])
 
         return
 

@@ -93,7 +93,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         # Now send tx1 and tx2 again, but this time in block. Block should be rejected.
         block = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
-        add_tx_to_block(block, [tx1,tx2])
+        add_tx_to_block(block, [tx1, tx2])
 
         rejected_blocks = []
         rejected_txs = []

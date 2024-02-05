@@ -140,7 +140,7 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
 
     def run_test(self):
 
-        with self.run_all_nodes_connected(title="revokeminerid_rpc", args=self.extra_args, p2pConnections=[0,1,2]) as (p2p_0,p2p_1,p2p_2):
+        with self.run_all_nodes_connected(title="revokeminerid_rpc", args=self.extra_args, p2pConnections=[0, 1, 2]) as (p2p_0, p2p_1, p2p_2):
 
             # Get out of IBD and make some spendable outputs
             utxos = create_confirmed_utxos(Decimal("250") / 100000000, self.nodes[0], 5, nodes=self.nodes)

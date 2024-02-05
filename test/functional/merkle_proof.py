@@ -44,20 +44,20 @@ class MerkleProofTest(BitcoinTestFramework):
         a1 = self.nodes[node].getmerkleproof(txid)
         a2 = self.nodes[node].getmerkleproof(txid, blockhash)
         b1 = self.nodes[node].getmerkleproof2("", txid)
-        b2 = self.nodes[node].getmerkleproof2(blockhash,txid)
+        b2 = self.nodes[node].getmerkleproof2(blockhash, txid)
         assert self.nodes[node].verifymerkleproof(a1)
         assert self.nodes[node].verifymerkleproof(a2)
         assert(self.check_equivalence(a1, b1))
         assert(self.check_equivalence(a2, b2))
 
-        c1 = self.nodes[node].getmerkleproof2("",txid, False, "merkleroot")
-        c2 = self.nodes[node].getmerkleproof2(blockhash,txid, False, "merkleroot")
+        c1 = self.nodes[node].getmerkleproof2("", txid, False, "merkleroot")
+        c2 = self.nodes[node].getmerkleproof2(blockhash, txid, False, "merkleroot")
 
         assert(c1["target"] == a1["target"]["merkleroot"])
         assert(c2["target"] == a2["target"]["merkleroot"])
 
-        d1 = self.nodes[node].getmerkleproof2("",txid, False, "hash")
-        d2 = self.nodes[node].getmerkleproof2(blockhash,txid, False, "hash")
+        d1 = self.nodes[node].getmerkleproof2("", txid, False, "hash")
+        d2 = self.nodes[node].getmerkleproof2(blockhash, txid, False, "hash")
 
         assert(d1["target"] == a1["target"]["hash"])
         assert(d2["target"] == a2["target"]["hash"])
@@ -125,27 +125,27 @@ class MerkleProofTest(BitcoinTestFramework):
         assert_raises_rpc_error(-8,
                                 "\"nodes\" must be a Json array",
                                 self.nodes[0].verifymerkleproof,
-                                {'flags':2,
-                                 'index':4,
-                                 'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-                                 'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
-                                 'nodes':'*'})
+                                {'flags': 2,
+                                 'index': 4,
+                                 'txOrId': 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                                 'target': {'merkleroot': 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
+                                 'nodes': '*'})
         assert_raises_rpc_error(-8,
                                 "\"node\" must be a \"hash\" or \"*\"",
                                 self.nodes[0].verifymerkleproof,
-                                {'flags':2,
-                                 'index':4,
-                                 'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-                                 'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
-                                 'nodes':[2]})
+                                {'flags': 2,
+                                 'index': 4,
+                                 'txOrId': 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                                 'target': {'merkleroot': 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
+                                 'nodes': [2]})
         assert_raises_rpc_error(-8,
                                 "node must be of length 64 (not 10)",
                                 self.nodes[0].verifymerkleproof,
-                                {'flags':2,
-                                 'index':4,
-                                 'txOrId':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-                                 'target':{'merkleroot':'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
-                                 'nodes':['*','abcdef1234']})
+                                {'flags': 2,
+                                 'index': 4,
+                                 'txOrId': 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                                 'target': {'merkleroot': 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'},
+                                 'nodes': ['*', 'abcdef1234']})
 
         # Get proof for 1st and 2nd transaction and verify that calculated roots are the same as block's merkle root
         hash_of_block_501 = self.nodes[0].getblockhash(height_of_block_501)
@@ -175,7 +175,7 @@ class MerkleProofTest(BitcoinTestFramework):
         a = self.nodes[0].getmerkleproof(txid_spent, hash_of_block_501)
         b = self.nodes[0].getmerkleproof2(hash_of_block_501, txid_spent)
         assert self.nodes[0].verifymerkleproof(a)
-        assert(self.check_equivalence(a,b))
+        assert(self.check_equivalence(a, b))
 
         # We can't get the proof if we specify a non-existent block
         assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof,  txid_spent, "1234567890abcdef1234567890abcdef")

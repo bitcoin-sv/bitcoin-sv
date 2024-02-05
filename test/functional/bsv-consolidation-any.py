@@ -166,7 +166,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
             if is_donation:
                 protocol_id = 'dust'
-                scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray(protocol_id,'utf-8')])
+                scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray(protocol_id, 'utf-8')])
             else:
                 scriptPubKey = CScript([OP_NOP] * (x - 1) + [OP_TRUE])
 
@@ -188,7 +188,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         self.test_extra_args_values()
         output_counts = [1, 5]
-        single_output_script_sizes = [25,50]
+        single_output_script_sizes = [25, 50]
         for node in self.nodes:
             node.generate(200)
             sync_blocks(self.nodes)

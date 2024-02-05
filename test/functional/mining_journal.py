@@ -169,7 +169,7 @@ class MiningJournal(BitcoinTestFramework):
                             '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool',
-                            "-checkmempool=1",]] * self.num_nodes
+                            "-checkmempool=1", ]] * self.num_nodes
         self.conncbs = []
         self.num_utxos = 5000
         self.ancestor_depth = 25
@@ -257,7 +257,7 @@ class MiningJournal(BitcoinTestFramework):
         if mainTest:
             self.log.info("Testing block creation...")
 
-        for i in range(1,3):
+        for i in range(1, 3):
             if mainTest or i > 1:
                 # Topup and check the mempool again
                 self.test_initial_mempool(txnNode, numTxns=numTxns)
@@ -284,13 +284,13 @@ class MiningJournal(BitcoinTestFramework):
         disconnect_nodes(self.nodes[node0], node1)
 
         # Mine 20 blocks on node0 and lots more on node1
-        for i in range(1,11):
+        for i in range(1, 11):
             self.test_mine_block(node0, numTxns=250)
         blockheight = self.nodes[node0].getblockchaininfo()['blocks']
         blockhash1 = self.nodes[node0].getblockhash(blockheight - 10)
 
         self.setup_for_submission(node1)
-        for i in range(1,11):
+        for i in range(1, 11):
             self.test_mine_block(node1, numTxns=100)
 
         info0 = self.nodes[node0].getmempoolinfo()

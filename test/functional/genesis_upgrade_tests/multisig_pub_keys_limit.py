@@ -27,7 +27,7 @@ def make_unlock_script(tx, tx_to_spend):
 
 
 class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1','-maxpubkeyspermultisigpolicy=100']
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxpubkeyspermultisigpolicy=100']
     NAME = "Max multi signature test"
     THE_KEY = make_key()
     PUBKEYS10 = makePubKeys(10)

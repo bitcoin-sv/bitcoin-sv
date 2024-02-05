@@ -91,7 +91,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
                                              "-relayfee=0.000005",
                                              f"-limitancestorcount={limitancestorcount}",
                                              f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",
-                                             "-checkmempool=1",],
+                                             "-checkmempool=1", ],
                                             number_of_connections=1) as (conn,):
 
             mining_fee = 1.001 # in satoshi per byte
@@ -171,7 +171,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
                                              "-relayfee=0.000005",
                                              f"-limitancestorcount={limitancestorcount}",
                                              f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",
-                                             "-checkmempool=1",],
+                                             "-checkmempool=1", ],
                                             number_of_connections=1) as (conn,):
             # ensure that the mempool is empty
             check_mempool_equals(conn.rpc, [])

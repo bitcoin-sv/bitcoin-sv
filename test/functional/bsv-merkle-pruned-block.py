@@ -119,8 +119,8 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         bigBlockHash = bigBlock["hash"]
         bigBlockHdr = node.getblockheader(node.getbestblockhash(), 2)
         assert(len(bigBlockHdr["merkleproof"]) == 4)
-        rootHash = merkle_root_from_merkle_proof(int(bigBlock["tx"][0],16), bigBlockHdr["merkleproof"])
-        assert_equal(rootHash, int(bigBlock["merkleroot"],16))
+        rootHash = merkle_root_from_merkle_proof(int(bigBlock["tx"][0], 16), bigBlockHdr["merkleproof"])
+        assert_equal(rootHash, int(bigBlock["merkleroot"], 16))
 
         # Need to mine at least DEFAULT_MIN_BLOCKS_TO_KEEP additional blocks (min number of unpruned blocks) so we can prune our big blocks
         for i in range(DEFAULT_MIN_BLOCKS_TO_KEEP + 100):
@@ -140,7 +140,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         assert("merkleproof" not in bigBlockHeader)
 
         # P2P message gethdrsen should also return hdrsen message without Merkle proof and coinbase transaction for pruned block
-        self.test.connections[0].send_message(msg_gethdrsen(locator_have=[], hashstop=int(bigBlockHash,16)))
+        self.test.connections[0].send_message(msg_gethdrsen(locator_have=[], hashstop=int(bigBlockHash, 16)))
         self.test.test_nodes[0].wait_for_hdrsen(5)
         assert_equal(len(self.test.test_nodes[0].last_message.get("hdrsen").headers), 1)
         headerEnriched = self.test.test_nodes[0].last_message.get("hdrsen").headers[0]

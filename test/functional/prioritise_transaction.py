@@ -51,7 +51,7 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
             low_paying_txs.append(txid)
             assert txid in node.getrawmempool()
             tx_info = node.getrawtransaction(txid, True)
-            utxo = {"txid":txid, "vout":0, "amount":tx_info["vout"][0]["value"]}
+            utxo = {"txid": txid, "vout": 0, "amount": tx_info["vout"][0]["value"]}
 
         node.generate(1)
 

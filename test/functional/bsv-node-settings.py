@@ -124,7 +124,7 @@ class BSVNodeSettings(BitcoinTestFramework):
         self.test_getsettings(parameters2)
 
         # verify the warning messages of -minrelayfee, -dustrelayfee and -dustlimitfactor are deprecated on log file
-        self.restart_node(0, extra_args=['-minrelaytxfee=0', '-dustrelayfee=0', '-dustlimitfactor=0','-blockmintxfee=0.000005'])
+        self.restart_node(0, extra_args=['-minrelaytxfee=0', '-dustrelayfee=0', '-dustlimitfactor=0', '-blockmintxfee=0.000005'])
         wait_until(lambda: check_for_log_msg(self, "-minrelaytxfee", "/node0"))
         wait_until(lambda: check_for_log_msg(self, "-dustrelayfee", "/node0"))
         wait_until(lambda: check_for_log_msg(self, "-dustlimitfactor", "/node0"))

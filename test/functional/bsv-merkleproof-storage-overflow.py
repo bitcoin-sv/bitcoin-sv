@@ -18,7 +18,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        args = ['-excessiveblocksize=15MB', '-maxmempool=1000', '-mindebugrejectionfee=0','-paytxfee=0.00003','-txindex=1']
+        args = ['-excessiveblocksize=15MB', '-maxmempool=1000', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-txindex=1']
         self.extra_args = [args]
 
     def make_block_with_coinbase(self):

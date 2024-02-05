@@ -138,11 +138,11 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
     else:
         infoDocJson = json.dumps(infoDoc, indent=0)
     infoDocJson = infoDocJson.replace('\n', '')
-    infoDocJson = infoDocJson.replace(' ','')
+    infoDocJson = infoDocJson.replace(' ', '')
     infoDocJson = infoDocJson.encode('utf8')
     infoDocJsonSig = minerKeys.sign_strmessage_bytes(infoDocJson)
 
-    return CScript([OP_0, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),bytearray([0x00]), infoDocJson, infoDocJsonSig])
+    return CScript([OP_0, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), bytearray([0x00]), infoDocJson, infoDocJsonSig])
 
 
 # Create a miner-info transaction containing the miner ID document
@@ -187,7 +187,7 @@ def create_dataref_txn(connection, dataref_json, utxo):
     # Add dataref json to output 0 of transaction
     docjson = json.dumps(dataref_json, indent=0)
     docjson = docjson.replace('\n', '')
-    docjson = docjson.replace(' ','')
+    docjson = docjson.replace(' ', '')
     docjson = docjson.encode('utf8')
     datarefTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), docjson])))
     datarefTx.vout[0], datarefTx.vout[1] = datarefTx.vout[1], datarefTx.vout[0]

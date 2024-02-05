@@ -92,7 +92,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         for output in tx.vout:
             output.nValue -= fee_per_output
 
-        for input,(parent_tx, n) in zip(tx.vin, outpoints):
+        for input, (parent_tx, n) in zip(tx.vin, outpoints):
             sighash = SignatureHashForkId(parent_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
                                           parent_tx.vout[n].nValue)
             input.scriptSig = CScript([self.private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
@@ -188,7 +188,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                                              '-genesisactivationheight=1',
                                              '-maxstackmemoryusageconsensus=2GB',
                                              "-maxscriptsizepolicy=2GB",
-                                             "-acceptnonstdoutputs=1",],
+                                             "-acceptnonstdoutputs=1", ],
                                             number_of_connections=1) as (conn,):
 
             # send all transactions form block a1 at once and flood the PTV
@@ -231,7 +231,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                                              '-genesisactivationheight=1',
                                              '-maxstackmemoryusageconsensus=2GB',
                                              "-maxscriptsizepolicy=2GB",
-                                             "-acceptnonstdoutputs=1",],
+                                             "-acceptnonstdoutputs=1", ],
                                             number_of_connections=1) as (conn,):
 
             # see if everything is still as expected
@@ -278,7 +278,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                                              '-genesisactivationheight=1',
                                              '-maxstackmemoryusageconsensus=2GB',
                                              "-maxscriptsizepolicy=2GB",
-                                             "-acceptnonstdoutputs=1",],
+                                             "-acceptnonstdoutputs=1", ],
                                             number_of_connections=1) as (conn,):
 
             # see if everything is still as expected

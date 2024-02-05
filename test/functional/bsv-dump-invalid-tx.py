@@ -235,7 +235,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE",],
+                                             "-invalidtxsink=FILE", ],
                                             1) as (conn,):
             invalid_tx2 = make_invalid_p2sh_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx2], wait_for_confirmation=False)
@@ -257,7 +257,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE",],
+                                             "-invalidtxsink=FILE", ],
                                             1) as (conn,):
 
             valid_tx_1 = create_transaction(valid_coinbases[0], 0, CScript(), valid_coinbases[0].vout[0].nValue - 200)
@@ -376,7 +376,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE",],
+                                             "-invalidtxsink=FILE", ],
                                             2) as (conn1, conn2):
 
             conn.rpc.clearinvalidtransactions()

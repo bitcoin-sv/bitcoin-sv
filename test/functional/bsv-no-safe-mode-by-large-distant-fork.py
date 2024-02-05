@@ -44,7 +44,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
         args= [f"-safemodemaxforkdistance={MAX_FORK_DISTANCE}",
                f"-safemodeminforklength={MIN_FORK_LENGTH}",
-               f"-safemodeminblockdifference={MIN_FORK_DIFFERENCE}",]
+               f"-safemodeminblockdifference={MIN_FORK_DIFFERENCE}", ]
 
         with self.run_node_with_connections("Preparation", 0, args, 2) as (conn1, conn2):
             last_block_time = 0

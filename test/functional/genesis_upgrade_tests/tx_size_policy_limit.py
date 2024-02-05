@@ -10,7 +10,7 @@ from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SignatureHash, SIGHASH_ALL, \
     SIGHASH_FORKID, OP_CHECKSIG
 
-SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
+SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE, OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 NEW_MAX_TX_SIZE_POLICY = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS * 2
 
 
@@ -28,7 +28,7 @@ def new_transaction(utxokey, utxo, target_tx_size):
         tx.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, ndx), b''))
         tx.vin[0].scriptSig = b''
         tx.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 2 * target_tx_size, SIMPLE_OUTPUT_SCRIPT))
-        tx.vout.append(CTxOut(1, CScript([OP_FALSE,OP_RETURN] + [bytes(1) * padding_size])))
+        tx.vout.append(CTxOut(1, CScript([OP_FALSE, OP_RETURN] + [bytes(1) * padding_size])))
         sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
         sig = utxokey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
         tx.vin[0].scriptSig = CScript([sig])

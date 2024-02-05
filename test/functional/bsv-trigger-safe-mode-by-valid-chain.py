@@ -72,7 +72,7 @@ class TriggerSafeModeByValidChain(BitcoinTestFramework):
             send_by_headers(conn1, branch_1_blocks[SAFE_MODE_DEFAULT_MIN_FORK_LENGTH + 2:], do_send_blocks=True)
 
             # active tip is last block from branch 1
-            wait_for_tip(conn1,branch_1_blocks[-1].hash)
+            wait_for_tip(conn1, branch_1_blocks[-1].hash)
 
             # we should exit safe mode because fork base is too far from active tip
             assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]

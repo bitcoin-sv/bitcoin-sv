@@ -30,7 +30,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 4
         self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
-        self.extra_args = [['-persistmempool=0'],['-persistmempool=0'],['-persistmempool=0'],
+        self.extra_args = [['-persistmempool=0'], ['-persistmempool=0'], ['-persistmempool=0'],
                            ['-persistmempool=0',
                             '-maxmempool=300',
                             '-maxmempoolsizedisk=0',

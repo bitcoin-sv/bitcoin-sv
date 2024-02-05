@@ -195,7 +195,7 @@ class InvalidTx(BitcoinTestFramework):
             sleep(1) #give time to relay
             assert len(relayed_txs) == 0, "No transaction should be relayed."
 
-        with self.run_node_with_connections("Scenario 2: Low fee, whitelisted peer", 0, [f'-whitelist={get_lan_ip()}','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 2: Low fee, whitelisted peer", 0, [f'-whitelist={get_lan_ip()}', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=2, ip=get_lan_ip()) as (sending_conn, receiving_conn):
 
             low_fee_tx, rejected_txs, relayed_txs = self.prepare_invalid_tx(sending_conn, receiving_conn, "low_fee")
@@ -205,7 +205,7 @@ class InvalidTx(BitcoinTestFramework):
             self.check_rejected(rejected_txs, [low_fee_tx]) # tx is rejected, but
             self.check_relayed(relayed_txs, [low_fee_tx])   # it is relayed as we are whitelisted
 
-        with self.run_node_with_connections("Scenario 3: Bad signature, big banscore", 0, ['-banscore=10000000','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 3: Bad signature, big banscore", 0, ['-banscore=10000000', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=2, ip=get_lan_ip()) as (sending_conn, receiving_conn):
             tx, rejected_txs, relayed_txs = self.prepare_invalid_tx(sending_conn, receiving_conn, "bad_signature")
 
@@ -216,7 +216,7 @@ class InvalidTx(BitcoinTestFramework):
             assert len(relayed_txs) == 0, "No tx should be relayed."
             assert sending_conn.connected, "Should not be banned."
 
-        with self.run_node_with_connections("Scenario 4: Bad signature, small banscore", 0, ['-banscore=1','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 4: Bad signature, small banscore", 0, ['-banscore=1', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=2, ip=get_lan_ip()) as (sending_conn, receiving_conn):
             tx, rejected_txs, relayed_txs = self.prepare_invalid_tx(sending_conn, receiving_conn, "bad_signature")
 
@@ -311,7 +311,7 @@ class InvalidTx(BitcoinTestFramework):
 
         # the banscore is set to 101 because rejection of the tx with invalid signature brings 100 points,
         # we don't want to be banned as result of only one tx
-        with self.run_node_with_connections("Scenario 4: bad signature parent", 0, ['-banscore=101','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 4: bad signature parent", 0, ['-banscore=101', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             valid_parent_tx, invalid_parent_tx, orphans, rejected_txs = self.prepare_parents_and_children(conn,
