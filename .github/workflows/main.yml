@@ -5,10 +5,8 @@ name: Main
 run-name:
 
 on:
-  pull_request:
-    paths-ignore:
-      - 'doc/**'
   workflow_dispatch:
+  pull_request:
     paths-ignore:
       - 'doc/**'
 
