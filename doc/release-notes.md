@@ -25,13 +25,13 @@ Version 1.1.0 reintroduces the Alert System. The Alert System, originally implem
 
 Node operators are required to run the Alert System in conjunction with the BSV Node. Node operators who do not interact with the Alert System risk being banned and/or having their blocks rejected by node operators who do.
 
-For non-mining businesses that insist on continuing to run the node software, we strongly encourage installation and connection of the Alert System to remain in sync with the valid longest chain. For non-mining businesses that do not want to stand up the Alert System, we recommend modifying the following configuration in your `bitcoin.conf` file:
-```bash
-enableassumewhitelistedblockdepth=0
-assumewhitelistedblockdepth=0
-```
+Detailed instructions on how to run the Alert System are available here: [node.bitcoinsv.io/sv-node/alert-system](https://node.bitcoinsv.io/sv-node/alert-system).
 
-Detailed instructions on how to run the Alert System are available at: [node.bitcoinsv.io/sv-node/alert-system](https://node.bitcoinsv.io/sv-node/alert-system)
+## Network Access Rules
+The BSV Association is also releasing the BSV Blockchain Network Access Rules. The Network Access Rules formalize the terms and conditions for operating a node on the BSV Blockchain. Read more about the Network access rules here: [bsvblockchain.org/network-access-rules](https://bsvblockchain.org/network-access-rules).
+
+## Updated Open BSV License
+The Open BSV License has been updated to version 5 and is available here: [github.com/bitcoin-sv/bitcoin-sv/blob/v1.1.0/LICENSE](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.1.0/LICENSE).
 
 ## Other items
 
