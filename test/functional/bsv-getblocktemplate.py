@@ -28,7 +28,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
         tx = CTransaction()
         for depend in depends:
             tx.vin.append(CTxIn(COutPoint(depend.sha256, 0), b''))
-        tx.vout.append(CTxOut(int(100), CScript([OP_RETURN,  b"a" * size])))
+        tx.vout.append(CTxOut(int(100), CScript([OP_RETURN, b"a" * size])))
         tx.rehash()
         return tx
 

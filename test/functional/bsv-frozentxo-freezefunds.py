@@ -176,7 +176,7 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
         assert_equal(result["numRemovedEntries"], 0)
 
         self.log.info("Unfreezing all frozen funds except policy frozen ones")
-        result = self.nodes[0].clearBlacklists({"removeAllEntries": True,  "keepExistingPolicyEntries": True})
+        result = self.nodes[0].clearBlacklists({"removeAllEntries": True, "keepExistingPolicyEntries": True})
         assert_equal(result["numRemovedEntries"], 4) # 4 consensus + 0 policy
 
         result = self.nodes[0].queryBlacklist()

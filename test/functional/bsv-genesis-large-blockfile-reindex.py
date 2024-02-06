@@ -66,7 +66,7 @@ class LargeBlockFileReindex(ComparisonTestFramework):
         yield test
 
         # Create transaction that will almost fill block file when next block will be generated (~130 MB)
-        tx1 = create_transaction(out[0].tx, out[0].n, b"", ONE_MEGABYTE * 120,  CScript([OP_FALSE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 120))]))
+        tx1 = create_transaction(out[0].tx, out[0].n, b"", ONE_MEGABYTE * 120, CScript([OP_FALSE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 120))]))
         self.test.connections[0].send_message(msg_tx(tx1))
         # Wait for transaction processing
         self.check_mempool(node, [tx1], timeout=6000)

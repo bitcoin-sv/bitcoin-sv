@@ -122,7 +122,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
         with self.run_node_with_connections(description,
                                             0,
-                                            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2),  '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'],
+                                            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2), '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'],
                                             self.num_peers) as connections:
 
             connection = connections[0]

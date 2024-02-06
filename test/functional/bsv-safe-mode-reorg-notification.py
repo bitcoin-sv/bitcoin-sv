@@ -48,7 +48,7 @@ class SafeModeReogNotification(BitcoinTestFramework):
         self.serverThread.join()
 
     def make_handler(self, *a, **kw):
-        return WebhookHandler(self,  *a, **kw)
+        return WebhookHandler(self, *a, **kw)
 
     def set_test_params(self):
         self.setup_clean_chain = True

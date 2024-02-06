@@ -340,7 +340,7 @@ def main():
               config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console, solo_position_start)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
+def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tmpdir, jobs=1, enable_coverage=False, args=[], build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])

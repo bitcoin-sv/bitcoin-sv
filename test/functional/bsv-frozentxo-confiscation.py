@@ -562,11 +562,11 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         self.log.info("Freezing TXO on both nodes")
         enforce_at_height = current_block_height + 1 # mempool height
-        self._freeze_txo(node,  frozen_tx, enforce_at_height)
+        self._freeze_txo(node, frozen_tx, enforce_at_height)
         self._freeze_txo(node1, frozen_tx, enforce_at_height)
 
         self.log.info("Whitelisting confiscation transaction on one node but not on the other")
-        self._whitelistTx(node,  confiscate_tx, enforce_at_height)
+        self._whitelistTx(node, confiscate_tx, enforce_at_height)
 
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted on one node, but not on the other node")
         node.rpc.sendrawtransaction(ToHex(confiscate_tx))
@@ -578,7 +578,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(node.rpc.getrawmempool(), [])
 
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE, OP_NOP])) # must use a different confiscation tx so that it is relayed again to node1 (because the first one was rejected)
-        self._whitelistTx(node,  confiscate_tx, enforce_at_height)
+        self._whitelistTx(node, confiscate_tx, enforce_at_height)
         self._whitelistTx(node1, confiscate_tx, enforce_at_height+1) # whitelisted, but not at current mempool height
 
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted on one node, but not on the other node")
@@ -593,7 +593,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE, OP_NOP, OP_NOP])) # must use a different confiscation tx
         self.log.info("Whitelisting confiscation transaction on both nodes")
-        self._whitelistTx(node,  confiscate_tx, enforce_at_height)
+        self._whitelistTx(node, confiscate_tx, enforce_at_height)
         self._whitelistTx(node1, confiscate_tx, enforce_at_height)
 
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted on both nodes")

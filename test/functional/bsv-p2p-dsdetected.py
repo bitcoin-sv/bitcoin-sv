@@ -330,7 +330,7 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Webhook should not receive the notification if we send dsdetected message with the valid proof, but transaction is a coinbase transaction
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA,           blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(0, blockB.vtx[0], blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[1].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)

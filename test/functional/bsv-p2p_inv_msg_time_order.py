@@ -75,7 +75,7 @@ class P2PInvMsgTimeOrder(BitcoinTestFramework):
 
             # Due to asynchronous validation we can not expect that an order of receiving transactions is the same as order of sending.
             for txid in transaction_list_by_time:
-                wait_until(lambda:  txid in txinvs, lock=mininode_lock, timeout=20)
+                wait_until(lambda: txid in txinvs, lock=mininode_lock, timeout=20)
 
             with mininode_lock:
                 # Assert the number of received transactions is the same as the number of sent transactions.

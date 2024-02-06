@@ -97,7 +97,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
 
             # Add big output if requested
             if (add_op_return_size > 0):
-                tx.vout.append(CTxOut(int(0), CScript([OP_RETURN,  b"a" * add_op_return_size])))
+                tx.vout.append(CTxOut(int(0), CScript([OP_RETURN, b"a" * add_op_return_size])))
 
             tx.rehash()
             txs.append(tx)

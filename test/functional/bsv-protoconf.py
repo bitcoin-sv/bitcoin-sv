@@ -5,7 +5,7 @@
 from test_framework.mininode import CInv, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, logger, NodeConn, NodeConnCB, \
     NetworkThread, msg_protoconf, CProtoconf, msg_inv
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, assert_greater_than,  p2p_port
+from test_framework.util import assert_equal, assert_greater_than, p2p_port
 from math import ceil
 
 

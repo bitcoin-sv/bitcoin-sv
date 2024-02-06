@@ -155,13 +155,13 @@ class AuthConnTestReputation(BitcoinTestFramework):
             'publicIP': '127.0.0.1',
             'publicPort': str(rpc_port(nodenum)),
             'minerKeys': signWithService,
-            'revocationKeys':  None,
+            'revocationKeys': None,
             'prev_minerKeys': None,
             'prev_revocationKeys': None,
             'pubCompromisedMinerKeyHex': None
         }
 
-        http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum],  height))
+        http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum], height))
         response = http_conns[nodenum].getresponse()
         scriptPubKey = response.read()
         scriptPubKey = scriptPubKey.decode('ascii')

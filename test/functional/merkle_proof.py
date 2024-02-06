@@ -178,8 +178,8 @@ class MerkleProofTest(BitcoinTestFramework):
         assert(self.check_equivalence(a, b))
 
         # We can't get the proof if we specify a non-existent block
-        assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof,  txid_spent, "1234567890abcdef1234567890abcdef")
-        assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof2,  "1234567890abcdef1234567890abcdef", txid_spent)
+        assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof, txid_spent, "1234567890abcdef1234567890abcdef")
+        assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getmerkleproof2, "1234567890abcdef1234567890abcdef", txid_spent)
 
         # We can get the proof if the transaction is unspent
         self.verify_merkle_proof(txid_unspent, hash_of_block_501, 0)

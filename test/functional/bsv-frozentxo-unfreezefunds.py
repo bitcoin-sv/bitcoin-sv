@@ -100,7 +100,7 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         assert_equal(len(result["funds"]), 2)
         funds = sorted(result["funds"], key=lambda f: f["txOut"]["txId"])
         assert_equal(funds[0], {"txOut": {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
-        assert_equal(funds[1], {"txOut": {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "vout": 0},                                                                                         "blacklist": ["policy"]})
+        assert_equal(funds[1], {"txOut": {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "vout": 0}, "blacklist": ["policy"]})
 
         self.log.info("Unfreezing fund on policy level...")
         result = self.nodes[0].removeFromPolicyBlacklist({
