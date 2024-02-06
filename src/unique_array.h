@@ -39,14 +39,14 @@ public:
 
     const value_type* data() const { return p_.get(); }
     
-    iterator begin() { return &p_[0]; }
-    iterator end() { return &p_[size_]; }
+    iterator begin() { return p_.get(); }
+    iterator end() { return p_.get() + size_; }
     
-    const_iterator begin() const { return &p_[0]; }
-    const_iterator end() const { return &p_[size_]; }
+    const_iterator begin() const { return p_.get(); }
+    const_iterator end() const { return p_.get() + size_; }
 
-    const_iterator cbegin() const { return &p_[0]; }
-    const_iterator cend() const { return &p_[size_]; }
+    const_iterator cbegin() const { return p_.get(); }
+    const_iterator cend() const { return p_.get() + size_; }
     
     const value_type& operator[](size_t i) const { return p_[i]; }
 
