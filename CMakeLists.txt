@@ -75,7 +75,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
                     " with enable_tsan enabled!")
         endif()
         set(CMAKE_CXX_FLAGS
-            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined")
+            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined -fno-sanitize-recover=all")
         set(CMAKE_LINKER_FLAGS
             "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined")
     endif()
