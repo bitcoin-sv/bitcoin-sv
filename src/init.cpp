@@ -564,6 +564,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                 "the getrawtransaction rpc call (default: %d)"),
                               DEFAULT_TXINDEX));
     strUsage += HelpMessageOpt(
+        "-preferredblockfilesize", strprintf(_("Preferred size (in bytes) of a single datafile containing "
+        "blocks. When this size is reached, new datafile is created. If preferred size is less than "
+        "size of a single block, block will still be stored, meaning datafile size can be larger than "
+        "preferred size. (default: %u)."), DEFAULT_PREFERRED_BLOCKFILE_SIZE));
+    strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
         "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
