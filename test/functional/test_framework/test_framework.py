@@ -649,7 +649,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - 2 binaries: 1 test binary, 1 ref binary
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
-    def __init__(self, destAddress = '127.0.0.1'):
+    def __init__(self, destAddress='127.0.0.1'):
         super(ComparisonTestFramework, self).__init__()
         self.chain = ChainManager()
         self.destAddr = destAddress

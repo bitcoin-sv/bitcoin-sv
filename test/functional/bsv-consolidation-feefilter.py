@@ -25,7 +25,7 @@ def getInputScriptPubKey(node, input, index):
     return tx.vout[index].scriptPubKey
 
 
-def expectedInvsReceived(invsExpected, testnode, timeout = 60):
+def expectedInvsReceived(invsExpected, testnode, timeout=60):
     expectedSet = set(invsExpected)
     for x in range(timeout):
         with mininode_lock:

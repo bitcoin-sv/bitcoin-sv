@@ -54,7 +54,7 @@ class Send_node():
         self.p2p.wait_for_verack()
         self._register_on_reject()
 
-    def send_block(self, block, expect_tip, expect_reject = False):
+    def send_block(self, block, expect_tip, expect_reject=False):
         self.p2p.send_and_ping(msg_block(block))
 
         if expect_reject:
@@ -149,7 +149,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
         return block
 
-    def _mine_and_send_block(self, tx, node, expect_reject = False, expect_tip = None):
+    def _mine_and_send_block(self, tx, node, expect_reject=False, expect_tip=None):
         block = self._mine_block(tx)
 
         expect_tip = expect_tip if expect_tip != None else block.hash
@@ -176,7 +176,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
         return block
 
-    def _create_tx_mine_block_and_freeze_tx(self, node, spendable_out, stop = None):
+    def _create_tx_mine_block_and_freeze_tx(self, node, spendable_out, stop=None):
         freeze_tx = self._create_tx(spendable_out, b'', CScript([OP_TRUE]))
         self.log.info(f"Mining block with transaction {freeze_tx.hash} whose output will be frozen later")
         self._mine_and_send_block(freeze_tx, node)

@@ -546,7 +546,7 @@ class P2PAssociation(BitcoinTestFramework):
 
         # Add another node, configured to only support the Default stream policy
         self.add_node(3,
-                      extra_args = ['-whitelist=127.0.0.1', '-multistreampolicies=Default'],
+                      extra_args=['-whitelist=127.0.0.1', '-multistreampolicies=Default'],
                       init_data_dir=True)
         self.start_node(3)
 

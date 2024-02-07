@@ -105,7 +105,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             connect_nodes_bi(self.nodes, 0, 1)
 
             # test ratio between size of input script and size of output script
-            tx_hex = self.create_and_sign_tx(node, 1, min_confirmations = 1)
+            tx_hex = self.create_and_sign_tx(node, 1, min_confirmations=1)
             tx = FromHex(CTransaction(), tx_hex)
             tx.rehash()
             sin = len(getInputScriptPubKey(node, tx.vin[0], 0))
@@ -117,17 +117,17 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
             # FAILING CONDITION: input_sizes <= consolidation_factor * output_size
             # We assume scriptSig ~ 4 * scriptPubKey
-            tx_hex = self.create_and_sign_tx(node, in_count = enough_inputs - 1, min_confirmations = enough_confirmations)
+            tx_hex = self.create_and_sign_tx(node, in_count=enough_inputs - 1, min_confirmations=enough_confirmations)
             assert_raises_rpc_error(-26, "66: mempool min fee not met", node.sendrawtransaction, tx_hex)
             self.log.info("test 1: PASS")
 
             # FAILING CONDITION: not enough input confirmations
-            tx_hex = self.create_and_sign_tx(node, in_count = enough_inputs, min_confirmations = enough_confirmations - 1)
+            tx_hex = self.create_and_sign_tx(node, in_count=enough_inputs, min_confirmations=enough_confirmations - 1)
             assert_raises_rpc_error(-26, "66: mempool min fee not met", node.sendrawtransaction, tx_hex)
             self.log.info("test 2: PASS")
 
             # ALL CONDITIONS MET: must succeed
-            tx_hex = self.create_and_sign_tx(node, in_count = enough_inputs, min_confirmations = enough_confirmations)
+            tx_hex = self.create_and_sign_tx(node, in_count=enough_inputs, min_confirmations=enough_confirmations)
             txid = node.sendrawtransaction(tx_hex)
             node.generate(1)
             tx = node.getrawtransaction(txid, 1)

@@ -86,7 +86,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             money_to_spend = money_to_spend - 1000  # one satoshi to fee
             tx = create_transaction(spend.tx, spend.n, b"", money_to_spend, self.locking_script)
             self.sign_tx(tx, spend.tx, spend.n,
-                         key = self.coinbase_key if i != bad_transaction else self.wrong_key)
+                         key=self.coinbase_key if i != bad_transaction else self.wrong_key)
             tx.rehash()
             txns = ok if i < bad_transaction else bad if i == bad_transaction else orphan
             txns.append(tx)

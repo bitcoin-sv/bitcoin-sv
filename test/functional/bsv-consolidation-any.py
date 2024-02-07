@@ -54,7 +54,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         assert(int(network_info['minconfconsolidationinput']) == 5)
         assert(network_info['acceptnonstdconsolidationinput'] is True)
 
-    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations, is_donation = False):
+    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations, is_donation=False):
 
         utxos = []
         addr = node.getnewaddress()
@@ -125,7 +125,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         return tx
 
-    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam, is_donation = False):
+    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam, is_donation=False):
 
         utx = self.create_utxos_value100000(node, in_count, in_size, min_confirmations, is_donation)
         sum_values_sats = 0
@@ -216,9 +216,9 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      in_count=enough_inputs,
                                                      out_count=output_count,
                                                      in_size=enough_cumulated_inputsize,
-                                                     out_size = cumulated_outputsize,
+                                                     out_size=cumulated_outputsize,
                                                      min_confirmations=enough_confirmations,
-                                                     spam = not_spam
+                                                     spam=not_spam
                                                      )
                     txid = node.sendrawtransaction(tx_hex)
                     node.generate(1)
@@ -228,13 +228,13 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     self.log.info("test 1 - all consolidation conditions met:PASS")
 
                     tx_hex = self.create_and_sign_tx(node,
-                                                     in_count = 1,
-                                                     out_count = 1,
-                                                     in_size = single_output_script_size,
-                                                     out_size = single_output_script_size,
-                                                     min_confirmations = 0,
-                                                     spam = not_spam,
-                                                     is_donation = True
+                                                     in_count=1,
+                                                     out_count=1,
+                                                     in_size=single_output_script_size,
+                                                     out_size=single_output_script_size,
+                                                     min_confirmations=0,
+                                                     spam=not_spam,
+                                                     is_donation=True
                                                      )
                     txid = node.sendrawtransaction(tx_hex)
                     node.generate(1)

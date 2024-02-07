@@ -37,7 +37,7 @@ class Send_node():
         self.tmpdir = tmpdir
         self.log = log
 
-    def send_block(self, block, expect_reject = False):
+    def send_block(self, block, expect_reject=False):
         self.rpc.submitblock(ToHex(block))
 
         if expect_reject:
@@ -103,7 +103,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
 
         return create_transaction(tx_out.tx, tx_out.n, unlock_script, 1, lock)
 
-    def _mine_and_send_block(self, tx, node, expect_reject = False):
+    def _mine_and_send_block(self, tx, node, expect_reject=False):
         block = self.chain.next_block(self.block_count)
 
         self.chain.update_block(self.block_count, [tx] if tx else [])

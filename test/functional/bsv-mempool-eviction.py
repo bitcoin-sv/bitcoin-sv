@@ -38,7 +38,7 @@ class Evictions(BitcoinTestFramework):
     def tx_size(self, tx):
         return len(tx.serialize())
 
-    def create_tx(self, outpoints, noutput, feerate, totalSize = 0, size_of_nonpayin_txs=0):
+    def create_tx(self, outpoints, noutput, feerate, totalSize=0, size_of_nonpayin_txs=0):
         tx = CTransaction()
         total_input = 0
         for parent_tx, n in outpoints:

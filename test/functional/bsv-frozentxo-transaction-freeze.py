@@ -42,10 +42,10 @@ class Send_node():
         self.tmpdir = tmpdir
         self.log = log
 
-    def send_block(self, block, expect_reject = False):
+    def send_block(self, block, expect_reject=False):
         raise NotImplementedError()
 
-    def send_tx(self, tx, expect_reject = False):
+    def send_tx(self, tx, expect_reject=False):
         raise NotImplementedError()
 
     def check_frozen_tx_log(self, hash):
@@ -67,7 +67,7 @@ class RPC_send_node(Send_node):
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         super().__init__(tmpdir, log, node_no, p2p_connection, rpc_connection)
 
-    def send_block(self, block, expect_reject = False):
+    def send_block(self, block, expect_reject=False):
         self.rpc.submitblock(ToHex(block))
 
         if expect_reject:
@@ -76,7 +76,7 @@ class RPC_send_node(Send_node):
             assert_equal(block.hash, self.rpc.getbestblockhash())
             assert(self.check_frozen_tx_log(block.hash) == False)
 
-    def send_tx(self, tx, expect_reject = False):
+    def send_tx(self, tx, expect_reject=False):
         if expect_reject:
             assert_raises_rpc_error(
                 -26,
@@ -97,7 +97,7 @@ class P2P_send_node(Send_node):
             self.rejected_txs.append(msg)
         self.p2p.connection.cb.on_reject = on_reject
 
-    def send_block(self, block, expect_reject = False):
+    def send_block(self, block, expect_reject=False):
         self.p2p.send_and_ping(msg_block(block))
 
         if expect_reject:
@@ -107,7 +107,7 @@ class P2P_send_node(Send_node):
             assert_equal(block.hash, self.rpc.getbestblockhash())
             assert(self.check_frozen_tx_log(block.hash) == False)
 
-    def send_tx(self, tx, expect_reject = False):
+    def send_tx(self, tx, expect_reject=False):
         self.p2p.send_and_ping(msg_tx(tx))
 
         if expect_reject:
@@ -172,7 +172,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
 
         return tx
 
-    def _mine_and_send_block(self, tx, node, expect_reject = False):
+    def _mine_and_send_block(self, tx, node, expect_reject=False):
         block = self.chain.next_block(self.block_count)
 
         self.chain.update_block(self.block_count, [tx] if tx else [])
