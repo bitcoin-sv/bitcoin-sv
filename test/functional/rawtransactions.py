@@ -49,7 +49,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         addr = conn.getnewaddress()
         outputs[addr] = satoshi_round(send_value)
         outputs["data"] = bytes_to_hex_str(bytearray(999000))
-        raw= conn.createrawtransaction(inputs, outputs)
+        raw = conn.createrawtransaction(inputs, outputs)
         return conn.signrawtransaction(raw)["hex"]
 
     # Get vout id for specific value from given transaction

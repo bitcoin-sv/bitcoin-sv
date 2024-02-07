@@ -14,7 +14,7 @@ from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, OP_
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import create_transaction
 
-CHUNK_SIZE=len(CScript([b"a" * 500]))
+CHUNK_SIZE = len(CScript([b"a" * 500]))
 
 
 class TestNode(NodeConnCB):
@@ -57,7 +57,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
                 value = utxo['amount']
 
             if simple:
-                tx =create_transaction(tx_to_spend, vout, unlock_script, value - target_script_size - 2000)
+                tx = create_transaction(tx_to_spend, vout, unlock_script, value - target_script_size - 2000)
                 tx.rehash()
                 return tx
 
@@ -127,8 +127,8 @@ class MaxScriptSizeTest(BitcoinTestFramework):
             block_id = node.generate(1)
             mempool1 = node.getrawmempool()
 
-            assert len(mempool0) == len_mem0, "There is/are " + str(len(mempool0))+ " transaction(s) in mempool before the latest block was generated. Should be " + str(len_mem0)
-            assert len(mempool1) == len_mem1, "There is/are " + str(len(mempool1))+ " transaction(s) in mempool after the latest block was generated. Should be " + str(len_mem1)
+            assert len(mempool0) == len_mem0, "There is/are " + str(len(mempool0)) + " transaction(s) in mempool before the latest block was generated. Should be " + str(len_mem0)
+            assert len(mempool1) == len_mem1, "There is/are " + str(len(mempool1)) + " transaction(s) in mempool after the latest block was generated. Should be " + str(len_mem1)
             if len_mem0 > 0:
                 return block_id, mempool0[0]
             else:

@@ -171,7 +171,7 @@ class BitcoinTestFramework():
             # so that they will not be killed when Python exists.
             TestNode_process_list.clear()
 
-        if len(TestNode_process_list)>0:
+        if len(TestNode_process_list) > 0:
             self.log.warning("%i process(es) started by test are still running and will be killed." % len(TestNode_process_list))
             if success != TestStatus.FAILED:
                 self.log.error("Because not all started processes were properly stopped, test is considered to have failed!")

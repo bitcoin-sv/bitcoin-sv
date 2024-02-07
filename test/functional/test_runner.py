@@ -213,7 +213,7 @@ def main():
         else:
             console = sys.stdout.isatty()
     else:
-        console = args.output_type==1
+        console = args.output_type == 1
 
     # Create a set to store arguments and create the passon string
     tests = set(arg for arg in unknown_args if arg[:2] != "--")
@@ -477,7 +477,7 @@ class TestHandler:
         self.ts = time.time()
         self.console = console
         self.test_count = 0
-        self.solo_position_start=solo_position_start
+        self.solo_position_start = solo_position_start
         # In case there is a graveyard of zombie bitcoinds, we can apply a
         # pseudorandom offset to hopefully jump over them.
         # (625 is PORT_RANGE/MAX_NODES)

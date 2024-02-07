@@ -146,7 +146,7 @@ def strip_common_prefix(names):
 
 
 def assert_eq(a, b):
-    assert (a==b), f"{a} != {b}"
+    assert (a == b), f"{a} != {b}"
 
 
 assert_eq(strip_common_prefix(["a/b"]), ["a"])

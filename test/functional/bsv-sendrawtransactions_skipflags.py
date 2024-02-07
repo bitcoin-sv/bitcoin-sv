@@ -190,7 +190,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
             txSigned = FromHex(CTransaction(), txHex)
             if target_tx_size != 0:
                 padding_size = (2*target_tx_size - len(ToHex(txSigned)))//2
-                txSigned.vout.append(CTxOut(1000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] *(padding_size)])))
+                txSigned.vout.append(CTxOut(1000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] * (padding_size)])))
             txHex = ToHex(tx)
             tx = FromHex(CTransaction(), txHex)
 
@@ -199,7 +199,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
             if target_tx_size != 0 and len(txSigned.serialize()) > target_tx_size:
                 while True:
-                    padding_size-=1
+                    padding_size -= 1
                     txSigned.vout[-1] = (CTxOut(1000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] * padding_size])))
                     txSigned = FromHex(CTransaction(), self.nodes[0].signrawtransaction(ToHex(txSigned))['hex'])
                     txSigned.rehash()
@@ -275,7 +275,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
     def prepare_base_txs(self, utxos, target_tx_size=0, target_script_size=0, lock_script=None):
         txs = [self.create_customscripts_tx(utxo, target_tx_size=target_tx_size, target_script_size=target_script_size, lock_script=lock_script) for utxo in utxos]
         txids = [self.nodes[0].sendrawtransaction(ToHex(tx), False, False) for tx in txs]
-        return [{'txid': txids[i], 'vout': 0, 'amount': txs[i].vout[0].nValue/ COIN} for i in range(len(txs))]
+        return [{'txid': txids[i], 'vout': 0, 'amount': txs[i].vout[0].nValue / COIN} for i in range(len(txs))]
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations, script=None, utxo=None):
         utxos = []
@@ -408,7 +408,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None, {"datacarriersize": 99000}, None, None, None]
 
         self.create_transactions_and_send_with_overridden_config(utxos[i_utxo:i_utxo+16], tx_params, config_overrides_increase, overrides_pertx, invalid_txs=invalid_txs)
-        i_utxo+=16
+        i_utxo += 16
 
         invalid_txs = (falses(4)
                        + [{'reject_reason': "datacarrier-size-exceeded"} for _ in range(4)]

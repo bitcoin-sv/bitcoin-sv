@@ -84,7 +84,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # limit the duration of freeze
         self.log.info(f"Freezing TXO {first_frozen_tx.hash} on consensus blacklist until height {freeze_for_two_blocks}")
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
                     "txOut": {

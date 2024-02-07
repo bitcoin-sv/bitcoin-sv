@@ -154,7 +154,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         node.setmocktime(activation_time + 5)
         block1Hash = node.generate(1)[0]
         block1Hex = node.getblock(block1Hash, False)
-        block1Size = len(block1Hex) /2 # Hex encoded
+        block1Size = len(block1Hex) / 2 # Hex encoded
 
         # Check if block was mined with the correct time (mpt == activation_time)
         block1Header = node.getblockheader(block1Hash)
@@ -171,11 +171,11 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         node.setmocktime(activation_time + 6)
         block2Hash = node.generate(1)[0]
         block2hex = node.getblock(block2Hash, False)
-        block2size = len(block2hex) /2 # Hex encoded
+        block2size = len(block2hex) / 2 # Hex encoded
 
         # Check if block was mined at the correct time (mpt = activation_time + 1)
         block2Header = node.getblockheader(block2Hash)
-        assert(block2Header['mediantime'] == activation_time +1)
+        assert(block2Header['mediantime'] == activation_time + 1)
         assert(block2Header['time'] == activation_time + 6)
 
         # Mining should not consume too much of data

@@ -35,7 +35,7 @@ class P2PPendingResponses(BitcoinTestFramework):
                 self.command = request_command.encode("ascii")
 
             def serialize(self):
-                return b'\xCF\x07\x81\x11\x01' + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' +b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11'
+                return b'\xCF\x07\x81\x11\x01' + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11'
 
         with self.run_node_with_connections("P2PPendingResponses", node_index=0, cb_class=NodeConnCBWithHeadersCount, args=node_args, number_of_connections=1) as conns:
             conn = conns[0]
@@ -70,7 +70,7 @@ class P2PPendingResponses(BitcoinTestFramework):
                 assert num_sent_before_disconnect > 0
                 # Wait until node closes the connection
                 # NOTE: We cannot wait for disconnect in mininode because that would require enabling reading from socket and if we do that, disconnect may not happen.
-                wait_until(lambda: len(conn.rpc.getpeerinfo())==0, check_interval=1)
+                wait_until(lambda: len(conn.rpc.getpeerinfo()) == 0, check_interval=1)
             else:
                 # If disconnect is not expected, we should be able to send all requests even without reading the responses
                 assert num_sent_before_disconnect == num_requests

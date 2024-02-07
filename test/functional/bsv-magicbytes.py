@@ -12,7 +12,7 @@ from test_framework.util import connect_nodes_bi, wait_until
 class MagicBytes(BitcoinTestFramework):
 
     def set_test_params(self):
-        self._magicbyte='0a0b0c0d'
+        self._magicbyte = '0a0b0c0d'
         self.num_nodes = 2
         self._extra_args_same = [['-magicbytes={}'.format(self._magicbyte)]]*self.num_nodes
         self._extra_args_diff = [[], ['-magicbytes={}'.format(self._magicbyte)]]

@@ -78,7 +78,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
     def _wait_for_block_status(self, node, blockhash, status):
         def wait_predicate():
             for tips in node.rpc.getchaintips():
-                if (status=="" or tips["status"] == status) and tips["hash"] == blockhash:
+                if (status == "" or tips["status"] == status) and tips["hash"] == blockhash:
                     return True
             return False
         wait_until(wait_predicate, check_interval=0.15, timeout=10)

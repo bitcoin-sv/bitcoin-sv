@@ -219,7 +219,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - None txn is rejected with a reason 'too-long-validation-time' (not moved into the non-std queue).
         #
         # The number of txs used in the test case.
-        tc1_txs_num=10
+        tc1_txs_num = 10
         # Select funding transactions to use:
         # - tc1_txs_num funding transactions are needed in this test case.
         spend_txs = out[0:tc1_txs_num]
@@ -246,7 +246,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # All txns are then forwarded to the non-standard validation queue where the validation timeout is longer (sufficient).
         #
         # The number of txs used in the test case.
-        tc2_txs_num=10
+        tc2_txs_num = 10
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
         spend_txs = out[tc1_txs_num:tc1_txs_num+1]
@@ -274,7 +274,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # All txns are then forwarded to the non-standard validation queue where the validation timeout is longer (sufficient).
         #
         # The number of txs used in the test case.
-        tc3_txs_num=10
+        tc3_txs_num = 10
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
         spend_txs = out[tc1_txs_num+1:tc1_txs_num+2]
@@ -307,7 +307,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - reject messages are created for each and every txn.
         #
         # The number of txs used in the test case.
-        tc4_txs_num=10
+        tc4_txs_num = 10
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
         spend_txs = out[tc1_txs_num+2:tc1_txs_num+3]
@@ -336,8 +336,8 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - the set of std and non-std txs is shuffled before sending it to the node.
         #
         # The number of txs used in the test case.
-        tc5_1_txs_num=100
-        tc5_2_txs_num=10
+        tc5_1_txs_num = 100
+        tc5_2_txs_num = 10
         # Select funding transactions to use:
         # - tc5_1_txs_num+1 funding transactions are needed in this test case.
         spend_txs = out[tc1_txs_num+3:tc1_txs_num+3+tc5_1_txs_num]

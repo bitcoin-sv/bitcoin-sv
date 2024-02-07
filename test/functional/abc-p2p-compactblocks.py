@@ -76,7 +76,7 @@ class FullBlockTest(ComparisonTestFramework):
 
     def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
         # RPC timeout needs to be high because in debug build invalidateblock can take >90s to complete
-        timewait=150
+        timewait = 150
         return super().add_node(i, extra_args, rpchost, timewait, binary, init_data_dir)
 
     def run_test(self):

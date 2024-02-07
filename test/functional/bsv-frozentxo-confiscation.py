@@ -220,7 +220,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         if stop_height != None:
             enforceAtHeight["stop"] = stop_height
 
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
                     "txOut": {
@@ -508,7 +508,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         # transactions without any input should be detected when whitelisting
         ctx0 = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
-        ctx0.vin=[]
+        ctx0.vin = []
         ctx0.rehash()
         result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": ToHex(ctx0)}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': ctx0.hash}, 'reason': 'confiscation transaction is not valid'}])
@@ -731,7 +731,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
         self.log.info("Checking that confiscation transaction is removed from mempool if blacklist is cleared")
-        result=node.rpc.clearBlacklists({"removeAllEntries": True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
         assert_equal(node.rpc.getrawmempool(), [])
 
@@ -742,7 +742,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
         self.log.info("Checking that confiscation transaction is removed from mempool if confiscation whitelist is cleared")
-        result=node.rpc.clearConfiscationWhitelist()
+        result = node.rpc.clearConfiscationWhitelist()
         assert_equal(result["numFrozenBackToConsensus"], 1)
         assert_equal(result["numUnwhitelistedTxs"], 1)
         assert_equal(node.rpc.getrawmempool(), [])

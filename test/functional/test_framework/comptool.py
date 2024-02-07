@@ -223,8 +223,8 @@ class TestManager():
                 # after we receive pong we need to check that there are no async
                 # block/transaction processes still running
                 for c in self.connections:
-                    res=c.rpc.getblockchainactivity()
-                    if sum(res.values())>0:
+                    res = c.rpc.getblockchainactivity()
+                    if sum(res.values()) > 0:
                         # this node is still processing some block/transaction
                         return False
                 return True

@@ -265,7 +265,7 @@ def send_by_headers(conn, blocks, do_send_blocks):
         headers_message.headers = [CBlockHeader(b) for b in blocks]
         conn.send_message(headers_message)
         if do_send_blocks:
-            wait_until(lambda: len(hash_block_map)==0, label="wait until all blocks are sent")
+            wait_until(lambda: len(hash_block_map) == 0, label="wait until all blocks are sent")
 
 
 def chain_tip_status_equals(conn, hash, status):
@@ -492,7 +492,7 @@ class TxCreator:
 
             if type(input) is tuple:
                 l = len(input)
-                assert l>=2 and l<=4
+                assert l >= 2 and l <= 4
 
                 spend_tx = input[0]
 
@@ -502,16 +502,16 @@ class TxCreator:
                 if n < 0:
                     n += len(spend_tx.vout)
 
-                if l>=3:
+                if l >= 3:
                     private_key = input[2]
 
-                if l>=4:
+                if l >= 4:
                     sighash_flags = input[3]
             else:
                 spend_tx = input
                 # Find the first output that is not provably non-spendable
-                while n<len(spend_tx.vout) and len(spend_tx.vout[n].scriptPubKey)>=2 and spend_tx.vout[n].scriptPubKey[0]==OP_FALSE and spend_tx.vout[n].scriptPubKey[1]==OP_RETURN:
-                    n+=1
+                while n < len(spend_tx.vout) and len(spend_tx.vout[n].scriptPubKey) >= 2 and spend_tx.vout[n].scriptPubKey[0] == OP_FALSE and spend_tx.vout[n].scriptPubKey[1] == OP_RETURN:
+                    n += 1
                 assert n < len(spend_tx.vout)
 
             spent_outputs.append(SpentOutput(spend_tx, n, private_key, sighash_flags))
@@ -635,8 +635,8 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
 def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, start_block=5000, node=None):
     # Create a new block
     block = chain.next_block
-    save_spendable_output=chain.save_spendable_output
-    get_spendable_output=chain.get_spendable_output
+    save_spendable_output = chain.save_spendable_output
+    get_spendable_output = chain.get_spendable_output
     if block_0:
         save_spendable_output()
     # Now we need that block to mature so we can spend the coinbase.

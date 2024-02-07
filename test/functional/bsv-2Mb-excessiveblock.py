@@ -58,16 +58,16 @@ class BSV2MBlocks(ComparisonTestFramework):
         self.test.connections[0].send_message(msg_block((self.chain.tip)))
         self.test.wait_for_disconnections()
         assert(self.test.test_nodes[0].closed)# disconnected
-        assert(len(self.nodes[0].listbanned())>0)# After, list of banned nodes is not empty
+        assert(len(self.nodes[0].listbanned()) > 0)# After, list of banned nodes is not empty
         logger.info("Banned node : {}".format(self.nodes[0].listbanned()))
 
         # Test to reconnect after being banned
         self.restart_network()
-        has_been_banned=False
+        has_been_banned = False
         try:
             self.test.wait_for_verack(5)
         except:
-            has_been_banned=True
+            has_been_banned = True
         assert(has_been_banned)
         logger.info("Test banning excessive block size : PASS")
 

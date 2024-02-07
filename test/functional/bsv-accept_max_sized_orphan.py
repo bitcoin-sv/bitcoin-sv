@@ -65,7 +65,7 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
             before = conn.rpc.getorphaninfo()["size"]
             conn.send_message(msg_tx(tx_orphan))
             # Making sure parent is not sent right away for bitcond to detect an orphan
-            wait_until(lambda: conn.rpc.getorphaninfo()["size"]>before, timeout=2)
+            wait_until(lambda: conn.rpc.getorphaninfo()["size"] > before, timeout=2)
 
             after = conn.rpc.getorphaninfo()["size"]
             assert_equal(before + 1, after)

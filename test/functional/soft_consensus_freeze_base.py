@@ -187,7 +187,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
             enforce_at_height = [{"start": 0}]
 
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist {stop}")
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
                     "txOut": {

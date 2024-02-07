@@ -2173,7 +2173,7 @@ class NodeConnCB():
                 self.last_message[command] = message
                 self.msg_timestamp[command] = time.time()
                 self.msg_index[command] = self.time_index
-                self.time_index +=1
+                self.time_index + = 1
                 getattr(self, 'on_' + command)(conn, message)
             except:
                 print("ERROR delivering %s (%s)" % (repr(message),

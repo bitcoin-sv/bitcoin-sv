@@ -52,7 +52,7 @@ WRONG_IP2 = 0x7F000004
 # Returns True if host (str) responds to a ping6 request.
 def ping6(host):
     # option for the number of packets
-    param = '-n' if platform.system().lower()=='windows' else '-c'
+    param = '-n' if platform.system().lower() == 'windows' else '-c'
 
     # building the command. Ex: "ping -c 1 google.com"
     command = ['ping6', param, '1', host]

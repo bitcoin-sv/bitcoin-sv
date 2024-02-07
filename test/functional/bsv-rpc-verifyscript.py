@@ -74,7 +74,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_equal(len(result), N)
         for i in range(N):
             if result[i]["result"] != expected_result[i]:
-                raise AssertionError("Unexpected script verification result "+str(i)+"! Expected '"+expected_result[i]+"' got " +str(result[i]))
+                raise AssertionError("Unexpected script verification result "+str(i)+"! Expected '"+expected_result[i]+"' got " + str(result[i]))
         return result
 
     def verifyscript_check_ok(self, node, scripts, *args):

@@ -244,7 +244,7 @@ class InvalidTx(BitcoinTestFramework):
                                     conn.rpc.sendrawtransaction, ToHex(invalid_tx2))
 
             self.assert_number_of_files(6) #three from previous run, three from this
-            filenames =self.assert_number_of_files_with_substring_in_name(3, invalid_tx2.hash)  # three from this run should have txid
+            filenames = self.assert_number_of_files_with_substring_in_name(3, invalid_tx2.hash)  # three from this run should have txid
 
             for fn in filenames:
                 self.check_stored_tx_file(filename=fn, tx=invalid_tx2, block=block, rejectionFlags=["isInvalid"],

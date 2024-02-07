@@ -241,8 +241,8 @@ class PTVP2PTest(ComparisonTestFramework):
         # - 1 peer connected to node0
         #
         # The number of txs used in the test case.
-        tc1_txchains_num=100
-        tc1_tx_chain_length=50
+        tc1_txchains_num = 100
+        tc1_tx_chain_length = 50
         # Select funding transactions to use:
         # - tc1_txchains_num funding transactions are needed in this test case.
         spend_txs = self.get_front_slice(out, tc1_txchains_num)
@@ -270,7 +270,7 @@ class PTVP2PTest(ComparisonTestFramework):
         # - 1 peer connected to node0
         #
         # The number of txs used in the test case.
-        tc2_txs_num=2400
+        tc2_txs_num = 2400
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
         spend_txs = self.get_front_slice(out, 1)
@@ -296,8 +296,8 @@ class PTVP2PTest(ComparisonTestFramework):
         # From the double spends set only 1 txn is accepted by the mempool.
         #
         # The number of txs used in the test case.
-        tc3_txs_num=2400
-        ds_txs_num=100
+        tc3_txs_num = 2400
+        ds_txs_num = 100
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
         spend_txs = self.get_front_slice(out, 1)
@@ -326,9 +326,9 @@ class PTVP2PTest(ComparisonTestFramework):
         # All input txs are randomly suffled before sending.
         #
         # The number of txs used in the test case.
-        tc4_1_txs_num=10
-        tc4_2_txs_num=2400
-        ds_txs_num=100
+        tc4_1_txs_num = 10
+        tc4_2_txs_num = 2400
+        ds_txs_num = 100
         # Select funding transactions to use:
         # - tc4_1_txs_num+1 funding transactions are needed in this test case.
         spend_txs = self.get_front_slice(out, tc4_1_txs_num)
@@ -361,10 +361,10 @@ class PTVP2PTest(ComparisonTestFramework):
         # - Valid non-standard txs are sent first, then double spend txs (this approach maximises a ratio of 'txn-double-spend-detected' reject msgs)
         #
         # The number of txs used in a single subset.
-        tc5_txs_num=2400
-        ds_txs_num=100
+        tc5_txs_num = 2400
+        ds_txs_num = 100
         # The number of subsets used in the test case.
-        tc5_num_of_subsets=10
+        tc5_num_of_subsets = 10
         # Select funding transactions to use:
         # - tc5_num_of_subsets funding transaction are needed in this test case.
         spend_txs = self.get_front_slice(out, tc5_num_of_subsets)
@@ -395,10 +395,10 @@ class PTVP2PTest(ComparisonTestFramework):
         # - in this case 'txn-mempool-conflict' reject reason will mostly occur
         #
         # The number of txs used in a single subset.
-        tc6_txs_num=2400
-        ds_txs_num=100
+        tc6_txs_num = 2400
+        ds_txs_num = 100
         # The number of subsets used in the test case.
-        tc6_num_of_subsets=10
+        tc6_num_of_subsets = 10
         # Select funding transactions to use:
         # - tc6_num_of_subsets funding transaction are needed in this test case.
         spend_txs = self.get_front_slice(out, tc6_num_of_subsets)

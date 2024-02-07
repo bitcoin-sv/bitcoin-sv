@@ -164,7 +164,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self._mine_and_send_block(freeze_tx, node)
 
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist")
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
                     "txOut": {

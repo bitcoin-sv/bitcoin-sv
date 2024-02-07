@@ -62,7 +62,7 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         self.start_node(1)
 
         self.log.info(f"Freezing TXO {frozen_tx.hash},0 on consensus blacklist on second node")
-        result=self.nodes[1].addToConsensusBlacklist({
+        result = self.nodes[1].addToConsensusBlacklist({
             "funds": [
                 {
                     "txOut": {

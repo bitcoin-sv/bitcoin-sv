@@ -588,9 +588,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Test case config
         num_of_chains = 10
         chain_length = 100
-        allowhighfees=False
-        dontcheckfee=False
-        listunconfirmedancestors=False
+        allowhighfees = False
+        dontcheckfee = False
+        listunconfirmedancestors = False
         # Node's config
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
@@ -619,9 +619,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Test case config
         num_of_chains = 10
         chain_length = 100
-        allowhighfees=True
-        dontcheckfee=True
-        listunconfirmedancestors=True
+        allowhighfees = True
+        dontcheckfee = True
+        listunconfirmedancestors = True
         # Node's config
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
