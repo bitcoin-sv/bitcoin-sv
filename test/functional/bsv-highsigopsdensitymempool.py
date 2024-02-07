@@ -47,7 +47,7 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         # send 10 transactions with normal sigops density
         txsBasics = []
         for j in range(10):
-            txBasic = create_transaction(out[i+j+1].tx, out[i+j+1].n, b'', 100000, CScript([2, OP_CHECKMULTISIG]))
+            txBasic = create_transaction(out[i + j + 1].tx, out[i + j + 1].n, b'', 100000, CScript([2, OP_CHECKMULTISIG]))
             self.test.connections[0].send_message(msg_tx(txBasic))
             txsBasics.append(txBasic)
         # check that transactions are in mempool

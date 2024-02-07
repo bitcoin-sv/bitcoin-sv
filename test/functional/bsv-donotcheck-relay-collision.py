@@ -52,13 +52,13 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         self.extra_args = [
             [
                 "-whitelist=127.0.0.1",
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats) / COIN),
             ],
             [
                 "-whitelist=127.0.0.1",
                 "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
-                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats) / COIN),
             ]
         ]
 
@@ -84,7 +84,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         high_fee_index = 3
         nb_test_transactions = 4
 
-        utxos = create_confirmed_utxos(Decimal(1000)/Decimal(COIN), node1, nb_test_transactions, age=101)
+        utxos = create_confirmed_utxos(Decimal(1000) / Decimal(COIN), node1, nb_test_transactions, age=101)
         sync_blocks(self.nodes)
         test_node.clear_invs()
 

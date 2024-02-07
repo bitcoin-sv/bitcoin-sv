@@ -129,14 +129,14 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         txs = self.make_transactions(nrTransactions, self.data_carrier_size)
 
         # Bring mock time close to the activation time, so that node will not reject block with time-too-new
-        node.setmocktime(activation_time-1)
+        node.setmocktime(activation_time - 1)
 
         # Create and submit 6 empty block with [activation_time-1 .. activation_time+4] to bring MPT to activation_time-1
         for i in range(6):
-            self.mine_empty_block(activation_time-1 + i)
+            self.mine_empty_block(activation_time - 1 + i)
 
         mpt = node.getblockheader(node.getbestblockhash())['mediantime']
-        assert_equal(mpt, activation_time-1)
+        assert_equal(mpt, activation_time - 1)
 
         # Send all of the transactions:
         for tx in txs:

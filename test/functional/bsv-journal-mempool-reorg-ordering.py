@@ -138,7 +138,7 @@ def create_tx(utxos, n_outputs, fee_delta=0):
         tx.vin.append(CTxIn(COutPoint(utxo.tx.sha256, utxo.ndx), b"", 0xffffffff))
         total_input += utxo.tx.vout[utxo.ndx].nValue
 
-    amount_per_output = total_input // n_outputs - len(utxos)*300 - n_outputs*200 - 100 - fee_delta
+    amount_per_output = total_input // n_outputs - len(utxos) * 300 - n_outputs * 200 - 100 - fee_delta
 
     new_utxos = []
 
@@ -167,7 +167,7 @@ def split(utxos, n_inputs, n_outputs, fee_delta=0):
 def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fee_delta=0):
 
     for ndx in range(0, len(utxos), n_inputs):
-        tx, xx = create_tx(utxos[ndx: ndx+n_inputs], n_outputs, fee_delta)
+        tx, xx = create_tx(utxos[ndx: ndx + n_inputs], n_outputs, fee_delta)
         if new_utxos is not None:
             new_utxos.extend(xx)
         if transactions is not None:
@@ -198,7 +198,7 @@ def chop(x, n=2):
     def gen():
         m = len(x) / n
         i = 0
-        for _ in range(n-1):
+        for _ in range(n - 1):
             yield x[round(i):round(i + m)]
             i += m
         yield x[round(i):]
@@ -310,9 +310,9 @@ class tx_set(set):
             last = None
             for i in sorted(map(v.index, elements.intersection(v))):
                 if last is None:
-                    last = slice(i, i+1)
+                    last = slice(i, i + 1)
                 elif last.stop == i:
-                    last = slice(last.start, i+1)
+                    last = slice(last.start, i + 1)
                 else:
                     yield last
                     last = None
@@ -323,7 +323,7 @@ class tx_set(set):
             for s in slices:
                 start = str(s.start) if s.start > 0 else ""
                 stop = str(s.stop) if s.start > 0 or s.stop < len(v) else ""
-                yield f"{n}[{start}:{stop}]" if s.start+1 != s.stop else f"{n}[{s.start}]"
+                yield f"{n}[{start}:{stop}]" if s.start + 1 != s.stop else f"{n}[{s.start}]"
         return " ".join(show_slices(find_slices()))
 
 

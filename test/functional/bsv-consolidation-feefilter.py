@@ -64,8 +64,8 @@ class FeeFilterTest(BitcoinTestFramework):
             [
                 "-whitelist=127.0.0.1",
                 "-whitelistforcerelay=1"
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=10",
                 "-acceptnonstdtxn=1",
                 "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
@@ -74,8 +74,8 @@ class FeeFilterTest(BitcoinTestFramework):
             [
                 "-whitelist=127.0.0.1",
                 "-whitelistforcerelay=1"
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=10",
                 "-acceptnonstdtxn=1",
                 "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
@@ -181,7 +181,7 @@ class FeeFilterTest(BitcoinTestFramework):
         # tx3 is not relayed as modified fees < feefilter
         # tx4 is relayed, as node1's txfee is set high enough - control tx
 
-        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+1))
+        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats + 1))
         test_node.clear_invs()
 
         txid3 = node1.sendrawtransaction(tx_hex3)

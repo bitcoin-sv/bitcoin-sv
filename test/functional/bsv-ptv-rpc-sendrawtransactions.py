@@ -130,7 +130,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         result = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
         if listunconfirmedancestors:
             assert_equal(len(result), 1)
-            assert_equal(len(result['unconfirmed']), num_of_chains*chain_length)
+            assert_equal(len(result['unconfirmed']), num_of_chains * chain_length)
             first_in_chain = 0
             expected_ancestors = []
             # A map of transactions and their known parents to be checked in 'vin'
@@ -274,7 +274,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             # Send a txn, one by one, through p2p interface.
             conn.send_message(msg_tx(tx))
         # Check if there is an expected number of transactions in the orphan p2p buffer.
-        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length - 1, timeout=timeout)
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # Submits the txchain without the parent transaction.
         rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
@@ -286,7 +286,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # The mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # The p2p orphan buffer must contain 'chain_length-1' transactions.
-        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length-1)
+        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length - 1)
 
     # Submit transactions (via rpc interface) which are already known:
     # (a) received earlier through the p2p interface and detected as p2p orphans
@@ -303,7 +303,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             # Send a txn, one by one, through p2p interface.
             conn.send_message(msg_tx(tx))
         # Check if there is an expected number of transactions in the p2p orphan pool.
-        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length - 1, timeout=timeout)
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # Insert the parent tx at the front of the input array.
         rpc_txs_bulk_input.insert(0, {'hex': ToHex(txchain[0]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})

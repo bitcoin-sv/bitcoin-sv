@@ -55,10 +55,10 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput - fee, CScript([b"X", OP_DROP, OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput - fee, CScript([b"X", OP_DROP, OP_TRUE])))
 
         if additional_output_size:
-            tx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, b"X"*additional_output_size])))
+            tx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, b"X" * additional_output_size])))
 
         tx.rehash()
         return tx
@@ -73,7 +73,7 @@ class BlockDownloadTimeout(BitcoinTestFramework):
         tx_target_size = block_target_size // n_txs
 
         for n in range(n_txs):
-            tx = self.create_tx([(funding_tx, n)], 1, 2*tx_target_size, tx_target_size)
+            tx = self.create_tx([(funding_tx, n)], 1, 2 * tx_target_size, tx_target_size)
             block.vtx.append(tx)
         block.hashMerkleRoot = block.calc_merkle_root()
         block.calc_sha256()
@@ -165,7 +165,7 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             self.stop_node(1)
             self.stop_node(2)
 
-        block = self.create_block(funding_tx=funding_tx_1, block_target_size=10*ONE_MEGABYTE,
+        block = self.create_block(funding_tx=funding_tx_1, block_target_size=10 * ONE_MEGABYTE,
                                   prev_hash=int(last_block_info["hash"], 16), prev_height=last_block_info["height"], prev_time=last_block_info["time"])
 
         block_bytes = block.serialize()
@@ -214,7 +214,7 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             cmd_timeout_base=100000, # we are in IBD so this param is not relevant
             cmd_timeout_base_ibd=cmd_total_timeout, # we are in IBD
             cmd_timeout_per_peer=100000, # we are sending on only one connection so this param is not relevant
-            mocktime=int(time()+48*60*60), # make node go 48 hours into future to put it in the IBD
+            mocktime=int(time() + 48 * 60 * 60), # make node go 48 hours into future to put it in the IBD
             expect_timeout=True,
         )
 
@@ -227,22 +227,22 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             cmd_timeout_base=1, # we are in IBD so this param is not relevant
             cmd_timeout_base_ibd=cmd_total_timeout, # we are in IBD
             cmd_timeout_per_peer=1, # we are sending on only one connection so this param is not relevant
-            mocktime=int(time()+48*60*60), # make node go 48 hours into future to put it in the IBD
+            mocktime=int(time() + 48 * 60 * 60), # make node go 48 hours into future to put it in the IBD
             expect_timeout=False,
         )
 
         """ CASE 3 """
         block_2 = self.create_block(funding_tx=funding_tx_2,
-                                    block_target_size=10*ONE_MEGABYTE,
+                                    block_target_size=10 * ONE_MEGABYTE,
                                     prev_hash=int(last_block_info["hash"], 16),
                                     prev_height=last_block_info["height"],
                                     prev_time=last_block_info["time"])
 
         block_3 = self.create_block(funding_tx=funding_tx_3,
-                                    block_target_size=10*ONE_MEGABYTE,
+                                    block_target_size=10 * ONE_MEGABYTE,
                                     prev_hash=int(block_2.hash, 16),
-                                    prev_height=last_block_info["height"]+1,
-                                    prev_time=last_block_info["time"]+1)
+                                    prev_height=last_block_info["height"] + 1,
+                                    prev_time=last_block_info["time"] + 1)
 
         self.test_send_block_to_node(
             label="Two connections, on both connections we are sending blocks, sending slowly, timeout occures",
@@ -250,9 +250,9 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             block=block,
             send_rate=target_send_rate_slow,
             expected_time_to_send=TARGET_SENDING_TIME_SLOW,
-            cmd_timeout_base=cmd_total_timeout//2, # half of the timeout is contributed by the base
+            cmd_timeout_base=cmd_total_timeout // 2, # half of the timeout is contributed by the base
             cmd_timeout_base_ibd=100000, # we are not in IBD so this param is not relevant
-            cmd_timeout_per_peer=cmd_total_timeout//2, # another half of the timeout is contributed by the additional (single) per peer
+            cmd_timeout_per_peer=cmd_total_timeout // 2, # another half of the timeout is contributed by the additional (single) per peer
             additional_conn_blocks=[block_2, block_3], # blocks to send on through additional connection
             additional_conn_send_rate=target_send_rate_slow,
             expect_timeout=True,
@@ -264,9 +264,9 @@ class BlockDownloadTimeout(BitcoinTestFramework):
             block=block,
             send_rate=target_send_rate_fast,
             expected_time_to_send=TARGET_SENDING_TIME_FAST,
-            cmd_timeout_base=cmd_total_timeout//2, # half of the timeout is contributed by the base
+            cmd_timeout_base=cmd_total_timeout // 2, # half of the timeout is contributed by the base
             cmd_timeout_base_ibd=1, # we are not in IBD so this param is not relevant
-            cmd_timeout_per_peer=cmd_total_timeout//2, # another half of the timeout is contributed by the additional (single) per peer
+            cmd_timeout_per_peer=cmd_total_timeout // 2, # another half of the timeout is contributed by the additional (single) per peer
             additional_conn_blocks=[block_2, block_3], # blocks to send on through additional connection
             additional_conn_send_rate=target_send_rate_slow,
             expect_timeout=False,

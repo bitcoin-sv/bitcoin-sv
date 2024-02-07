@@ -71,8 +71,8 @@ class BSVGenesisActivation(ComparisonTestFramework):
         b108_rejected = self.chain.update_block(2, [tx1])
         self.log.info("Created block %s on height %d that tries to spend from block on height %d.",
                       b108_rejected.hash,
-                      self.genesisactivationheight-1,
-                      self.genesisactivationheight-1)
+                      self.genesisactivationheight - 1,
+                      self.genesisactivationheight - 1)
         yield self.rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
 
         # Rewind bad block (height is 107).

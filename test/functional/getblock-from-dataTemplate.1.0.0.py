@@ -23,8 +23,8 @@ class GetBlockRPCTest(BitcoinTestFramework):
         #copy pregenerated data with node version 1.0.0 to tmpdir
         for i in range(self.num_nodes):
             initialize_datadir(self.options.tmpdir, i)
-            from_dir = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../../test/functional/data/dataTemplate.1.0.0/node"+str(i)+"/regtest")
-            to_dir = os.path.join(self.options.tmpdir, "node"+str(i)+"/regtest")
+            from_dir = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../../test/functional/data/dataTemplate.1.0.0/node" + str(i) + "/regtest")
+            to_dir = os.path.join(self.options.tmpdir, "node" + str(i) + "/regtest")
             shutil.copytree(from_dir, to_dir)
 
     def run_test(self):

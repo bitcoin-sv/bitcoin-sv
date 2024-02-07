@@ -218,7 +218,7 @@ class ZMQNewTopicsTest (BitcoinTestFramework):
         # Checking that all three blocks from the longer chain are published along with all the transactions
         # 2 notifications (hash+raw) for coinbase tx, sent tx and block -- 6 per added block +
         # 2 notifications (hash+raw) per tx from the disconnected block
-        for i in range(numberOfBlocks * 6 + 2*len(txhashes_sent0)):
+        for i in range(numberOfBlocks * 6 + 2 * len(txhashes_sent0)):
             msg = self.zmqSubSocket.recv_multipart()
             topic = msg[0]
             body = msg[1]

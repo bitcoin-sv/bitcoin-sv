@@ -71,7 +71,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
         depending_txs_hash = [tx.hash for tx in txs]
         for i in range(len(template['transactions'])):
             if template['transactions'][i]['hash'] in depending_txs_hash:
-                depending_indices.append(i+1)
+                depending_indices.append(i + 1)
 
         for tmpl_tx in template['transactions']:
             if tmpl_tx['hash'] == dependingTx.hash:
@@ -123,7 +123,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
 
             # Create large transaction that depends on previous two transactions.
             # If transaction pubkey contains 1/2 of BUFFER_SIZE_HttpTextWriter of data, it means that final result will for sure be chunked.
-            largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter/2), transactions)
+            largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter / 2), transactions)
             connection.cb.send_message(msg_tx(largeTx))
             self.check_mempool(self.nodes[0], [largeTx])
 

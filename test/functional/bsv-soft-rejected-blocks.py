@@ -177,7 +177,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
                     'numblocks': 0
                 })
                 continue
-            raise AssertionError("Unexpected soft rejected block: "+h)
+            raise AssertionError("Unexpected soft rejected block: " + h)
 
         # Reconsider block b2 soft rejected until it has more than 1 descendant on the same chain (decrease number of descendants).
         self.nodes[0].acceptblock(b2_hash, 1)

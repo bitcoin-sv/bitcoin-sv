@@ -46,13 +46,13 @@ class Evictions(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput, CScript([OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput, CScript([OP_TRUE])))
 
         if totalSize:
             tx.rehash()
             missingSize = totalSize - self.tx_size(tx)
             assert missingSize >= 0
-            tx.vout[0].scriptPubKey = CScript([b"X"*(missingSize - 10), OP_DROP, OP_TRUE])
+            tx.vout[0].scriptPubKey = CScript([b"X" * (missingSize - 10), OP_DROP, OP_TRUE])
 
         tx.rehash()
         overall_size = self.tx_size(tx) + size_of_nonpayin_txs
@@ -122,12 +122,12 @@ class Evictions(BitcoinTestFramework):
             group1tx1 = self.create_tx([(funding_tx, 0)], noutput=1, feerate=0, totalSize=ONE_MEGABYTE)
             group1tx2 = self.create_tx([(group1tx1, 0)], noutput=2, feerate=0, totalSize=ONE_MEGABYTE)
             group1paying = self.create_tx([(group1tx2, 0)], noutput=1, feerate=1.4, totalSize=ONE_MEGABYTE,
-                                          size_of_nonpayin_txs=self.tx_size(group1tx1)+self.tx_size(group1tx2))
+                                          size_of_nonpayin_txs=self.tx_size(group1tx1) + self.tx_size(group1tx2))
 
             group2tx1 = self.create_tx([(group1tx2, 1)], noutput=1, feerate=0, totalSize=ONE_MEGABYTE)
             group2tx2 = self.create_tx([(group2tx1, 0)], noutput=1, feerate=0, totalSize=ONE_MEGABYTE)
             group2paying = self.create_tx([(group2tx2, 0)], noutput=1, feerate=1.6, totalSize=ONE_MEGABYTE,
-                                          size_of_nonpayin_txs=self.tx_size(group2tx1)+self.tx_size(group2tx2))
+                                          size_of_nonpayin_txs=self.tx_size(group2tx1) + self.tx_size(group2tx2))
 
             tx1 = self.create_tx([(funding_tx, 2)], noutput=1, feerate=1.1, totalSize=ONE_MEGABYTE)
             tx2 = self.create_tx([(tx1, 0)], noutput=1, feerate=1.8, totalSize=ONE_MEGABYTE)

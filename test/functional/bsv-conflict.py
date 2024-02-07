@@ -33,7 +33,7 @@ class Conflict(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput - 1000, CScript([b"X"*200, OP_DROP, OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput - 1000, CScript([b"X" * 200, OP_DROP, OP_TRUE])))
 
         tx.rehash()
         return tx

@@ -85,7 +85,7 @@ class BSVsendrawtransactionsCollided(BitcoinTestFramework):
         assert_equal(response["invalid"][0]["txid"] in collidedtx_hashes, True)
         assert_equal(response["invalid"][0]["collidedWith"][0]["txid"] == tx1.hash, True)
         assert_equal(response["invalid"][0]["collidedWith"][0]["hex"] == tx1_hex, True)
-        assert_equal(response["invalid"][0]["collidedWith"][0]["size"], len(tx1_hex)//2)
+        assert_equal(response["invalid"][0]["collidedWith"][0]["size"], len(tx1_hex) // 2)
 
         assert_equal(response["invalid"][1]["txid"] in collidedtx_hashes, True)
         assert_equal(response["invalid"][1]["collidedWith"][0]["txid"] == tx1.hash, True)

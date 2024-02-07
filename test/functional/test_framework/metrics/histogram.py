@@ -103,7 +103,7 @@ def read_histograms(name: str, *, dataset=None, offset: int = 0) -> Iterator[His
             if b >= 0:
                 line = line.replace(bug, "")
                 found = line.find(pattern)
-            histogram = line[found+3:].strip()
+            histogram = line[found + 3:].strip()
             parts = line[:found].strip().split()
             #, {"Histogram":Histogram}
             yield HistogramLog(dataset if dataset is not None else name,
@@ -204,7 +204,7 @@ def plot_percentiles(ax, ls, *, key):
 #                plt.annotate(f"{100*xy[1]:.3f}% < {xy[0]}", xy)
     plt.title(key(ls[0]))
     plt.yscale("logit")
-    plt.ylim((1e-1, 1-1e-6))
+    plt.ylim((1e - 1, 1 - 1e - 6))
 
 
 def prefix(l):

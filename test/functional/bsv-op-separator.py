@@ -42,7 +42,7 @@ def make_separator_tx(tx_to_spend, key_for_tx_to_spend, n_sgnings):
     script_list = []
     for i in range(n_sgnings - 1):
         k = CECKey()
-        k.set_secretbytes(b"x" * (i+1))
+        k.set_secretbytes(b"x" * (i + 1))
         keys.append(k)
         script_list.extend([k.get_pubkey(), OP_CHECKSIGVERIFY, OP_CODESEPARATOR])
 

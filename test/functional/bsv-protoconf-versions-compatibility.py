@@ -199,7 +199,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
         def send_oversized_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1
-            conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH+1))
+            conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1))
         test_node.send_protoconf = send_oversized_protoconf
 
         with run_connection(test_node, "oversized protoconf"):

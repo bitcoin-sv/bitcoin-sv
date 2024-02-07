@@ -132,7 +132,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
 
         """Test case 3"""
         # bring both nodes on same height
-        self.nodes[1].invalidateblock(block_hashes[len(block_hashes)-2])
+        self.nodes[1].invalidateblock(block_hashes[len(block_hashes) - 2])
         self.nodes[0].generate(4)
         sync_blocks(self.nodes)
         unspent = self.nodes[0].listunspent()[0]
@@ -163,7 +163,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         tx2.vin = [CTxIn(COutPoint(int(tx_spendable_output.hash, 16), 0))]
 
         tx_hex = self.nodes[1].signrawtransaction(ToHex(tx2))['hex']
-        tx2_size = len(tx_hex)/2
+        tx2_size = len(tx_hex) / 2
         tx2 = FromHex(CTransaction(), tx_hex)
         tx2.rehash()
         self.nodes[1].sendrawtransaction(tx_hex, True)
@@ -222,7 +222,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         tx2.vin = [CTxIn(COutPoint(int(tx_spendable_output.hash, 16), 0))]
 
         tx_hex = self.nodes[1].signrawtransaction(ToHex(tx2))['hex']
-        tx2_size = len(tx_hex)/2
+        tx2_size = len(tx_hex) / 2
         tx2 = FromHex(CTransaction(), tx_hex)
         tx2.rehash()
         self.nodes[1].sendrawtransaction(tx_hex, True)

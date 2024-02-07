@@ -100,7 +100,7 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
 
         # all blocks are unfrozen
         new_valid_tip = self._mine_and_send_block(None, node)
-        self.nodes[1].waitforblockheight(last_valid_tip_height+6)
+        self.nodes[1].waitforblockheight(last_valid_tip_height + 6)
         assert_equal(new_valid_tip.hash, self.nodes[0].getbestblockhash())
         assert_equal(new_valid_tip.hash, self.nodes[1].getbestblockhash())
 

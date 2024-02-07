@@ -86,7 +86,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
                 if time.time() - time_start > 20:
                     # We had many unsuccessful restart attempts, disable -dbcrashratio for some time
                     print("Restarting with -dbcrashnotbefore, node %s" % node_index)
-                    self.start_node(node_index, extra_args=self.extra_args[node_index] + ["-dbcrashnotbefore="+str(math.ceil(time.time()+20))])
+                    self.start_node(node_index, extra_args=self.extra_args[node_index] + ["-dbcrashnotbefore=" + str(math.ceil(time.time() + 20))])
                 else:
                     self.start_node(node_index, extra_args=self.extra_args[node_index])
                 self.nodes[node_index].waitforblockheight(expected_tip)

@@ -63,7 +63,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
         for i in range(num_transactions):
             tx = CTransaction()
             tx.vin.append(CTxIn(COutPoint(ftx.sha256, i), b''))
-            tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
+            tx.vout.append(CTxOut(out_value - 1000, CScript([OP_TRUE])))
             tx.rehash()
             txs.append(tx)
 

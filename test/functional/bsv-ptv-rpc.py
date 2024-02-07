@@ -103,7 +103,7 @@ class PTVRPCTests(ComparisonTestFramework):
         for tx in txchain[1:]:
             conn.send_message(msg_tx(tx))
         # The orphan pool must contain 'chain_length-1' orphan transactions.
-        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length - 1, timeout=timeout)
         assert_equal(conn.rpc.getblockchainactivity()["transactions"], 0)
         # The mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
@@ -128,7 +128,7 @@ class PTVRPCTests(ComparisonTestFramework):
         for tx in txchain[1:]:
             conn.send_message(msg_tx(tx))
         # The orphan pool must contain 'chain_length-1' orphan transactions.
-        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length - 1, timeout=timeout)
         assert_equal(conn.rpc.getblockchainactivity()["transactions"], 0)
         # The mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
@@ -140,7 +140,7 @@ class PTVRPCTests(ComparisonTestFramework):
         # At this stage the mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # The p2p orphan pool must contain 'chain_length-1' transactions.
-        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length-1)
+        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length - 1)
 
         return txchain
 

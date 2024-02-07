@@ -31,7 +31,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
     def _split_int(n, n_parts):
         rest = n
         step = n // n_parts
-        for _ in range(n_parts-1):
+        for _ in range(n_parts - 1):
             yield step
             rest -= step
         yield rest

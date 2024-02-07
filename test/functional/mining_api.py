@@ -274,7 +274,7 @@ class MiningTest(BitcoinTestFramework):
         for i in range(0, num_transactions):
             utx = get_any_unspent(node.listunspent(), threshold_amount=1.0)
             inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
-            outputs = {node.getnewaddress(): utx['amount']-relay_fee}
+            outputs = {node.getnewaddress(): utx['amount'] - relay_fee}
             rawtx = node.createrawtransaction(inputs, outputs)
             signed = node.signrawtransaction(rawtx)
             node.sendrawtransaction(signed["hex"])

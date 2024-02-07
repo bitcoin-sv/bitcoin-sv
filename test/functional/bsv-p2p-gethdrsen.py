@@ -140,7 +140,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             txsInSecondBlock = 18
             second_block, second_coinbase_tx = self.send_block(unspent_txns[3:])
 
-            assert_equal(startingHeight+2, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
+            assert_equal(startingHeight + 2, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
 
             self.send_gethdrsen(hash_at_120)
             self.test_node.cb.wait_for_hdrsen()
@@ -160,7 +160,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
             # Send block with coinbase transaction larger than 1MB.
             big_coinbase_tx = self.send_block(unspent_txns, bigCoinbaseTx=True)
-            assert_equal(startingHeight+3, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
+            assert_equal(startingHeight + 3, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
 
             # Obtain hdrsen for block with big coinbase transaction.
             self.send_gethdrsen(hash_at_122)

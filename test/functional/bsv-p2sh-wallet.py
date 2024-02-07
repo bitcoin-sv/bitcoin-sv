@@ -79,7 +79,7 @@ class P2SH(ComparisonTestFramework):
             redeem_script_hash = hash160(redeem_script)
             p2sh_script = CScript([OP_HASH160, redeem_script_hash, OP_EQUAL])
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
-                                               value=output.tx.vout[0].nValue-100,
+                                               value=output.tx.vout[0].nValue - 100,
                                                private_key=self.coinbase_key,
                                                script=p2sh_script)
 
@@ -93,7 +93,7 @@ class P2SH(ComparisonTestFramework):
         current_height = node1.getblockcount()
 
         for i in range(self.genesisactivationheight - current_height):
-            block(101+i, coinbase_pubkey=self.coinbase_pubkey)
+            block(101 + i, coinbase_pubkey=self.coinbase_pubkey)
             test.blocks_and_transactions.append([self.chain.tip, True])
             self.chain.save_spendable_output()
         yield test

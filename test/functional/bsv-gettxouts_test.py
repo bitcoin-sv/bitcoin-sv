@@ -33,12 +33,12 @@ class GettxoutsTest(BitcoinTestFramework):
             utxos_list.append({"txid": utxo["txid"], "n": utxo["vout"]})
 
         for i in range(len(utxos)):
-            gettxouts_res = self.nodes[0].gettxouts(utxos_list[:i+1], ["*"], True)
+            gettxouts_res = self.nodes[0].gettxouts(utxos_list[:i + 1], ["*"], True)
             # compare values for each result
-            for j in range(i+1):
+            for j in range(i + 1):
                 assert_equal(gettxouts_res["txouts"][j]["confirmations"], gettxout_results[j]["confirmations"])
                 assert_equal(gettxouts_res["txouts"][j]["scriptPubKey"], gettxout_results[j]["scriptPubKey"]["hex"])
-                assert_equal(gettxouts_res["txouts"][j]["scriptPubKeyLen"], len(gettxout_results[j]["scriptPubKey"]["hex"])/2)
+                assert_equal(gettxouts_res["txouts"][j]["scriptPubKeyLen"], len(gettxout_results[j]["scriptPubKey"]["hex"]) / 2)
                 assert_equal(gettxouts_res["txouts"][j]["value"], gettxout_results[j]["value"])
                 assert_equal(gettxouts_res["txouts"][j]["isStandard"], True)  # all transactions above are standard
 

@@ -248,7 +248,7 @@ class TestManager():
         # Processing gets slower with the amount of blocks (0.008 s/block @ 200 blocks, 0.035 s/block @ 1000 blocks)
         # We use a slightly higher value of 0.05s + an extra 30s for good measure.
         if timeout_to_requested_block is None:
-            timeout_to_requested_block = 0.05*num_blocks+30
+            timeout_to_requested_block = 0.05 * num_blocks + 30
 
         wait_until(blocks_requested, timeout=timeout_to_requested_block, lock=mininode_lock)
 
@@ -277,7 +277,7 @@ class TestManager():
         # --> error if not requested
         # Observed data shows that during testing some responses take up to 2 seconds.
         # Timeout of 3s plus an extra 30s for good measure
-        wait_until(transaction_requested, timeout=3*num_events+30, lock=mininode_lock)
+        wait_until(transaction_requested, timeout=3 * num_events + 30, lock=mininode_lock)
 
         # We must wait for node to finish processing transactions before 'mempool' p2p message is sent
         [c.cb.send_ping(self.ping_counter) for c in self.connections]

@@ -599,13 +599,13 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
     conn.rpc.log.info(f"Creating {num_blocks} blocks after current tip (height={tip_height}, hash={tip_hash})")
     blocks = []
     for i in range(num_blocks):
-        txcb = create_coinbase(tip_height+1)
+        txcb = create_coinbase(tip_height + 1)
         if scriptPubKey != None:
             txcb.vout[0].scriptPubKey = scriptPubKey
         else:
             txcb.vout[0].scriptPubKey = CScript([OP_TRUE])
         txcb.rehash()
-        block = create_block(int(tip_hash, 16), txcb, tip_time+1)
+        block = create_block(int(tip_hash, 16), txcb, tip_time + 1)
         block.nNonce = 0
         block.solve()
         conn.cb.send_message(msg_block(block))
@@ -658,7 +658,7 @@ def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, start_block=5
     for i in range(no_outputs):
         out.append(get_spendable_output())
 
-    return test, out, start_block+no_blocks
+    return test, out, start_block + no_blocks
 
 ### Helper to build chain
 

@@ -75,7 +75,7 @@ class P2PPendingResponses(BitcoinTestFramework):
                 # If disconnect is not expected, we should be able to send all requests even without reading the responses
                 assert num_sent_before_disconnect == num_requests
                 self.log.info("Waiting until node receives all requests")
-                wait_until(lambda: count_log_msg(conn.rpc, log_msg_request_received) == initial_request_cnt+num_requests, check_interval=1)
+                wait_until(lambda: count_log_msg(conn.rpc, log_msg_request_received) == initial_request_cnt + num_requests, check_interval=1)
                 # Check that connection was not closed
                 assert_equal(len(conn.rpc.getpeerinfo()), 1)
 

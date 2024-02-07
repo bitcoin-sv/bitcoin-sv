@@ -184,10 +184,10 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
 
     def _remove_last_block(self):
         # remove last block from chain manager
-        del self.chain.block_heights[self.chain.blocks[self.block_count-1].sha256]
-        del self.chain.blocks[self.block_count-1]
+        del self.chain.block_heights[self.chain.blocks[self.block_count - 1].sha256]
+        del self.chain.blocks[self.block_count - 1]
         self.block_count -= 1
-        self.chain.set_tip(self.block_count-1)
+        self.chain.set_tip(self.block_count - 1)
 
     def _test_policy_freeze(self, spendable_out, node):
         self.log.info("*** Performing policy freeze checks")
@@ -214,7 +214,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         node.send_tx(spend_frozen_tx, True)
         assert_equal(node.rpc.getrawmempool(), [])
         assert(node.check_frozen_tx_log(spend_frozen_tx.hash))
-        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+spend_frozen_tx.hash))
+        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + spend_frozen_tx.hash))
 
         self.log.info(f"Mining block with transaction {spend_frozen_tx.hash} spending frozen TXO {freeze_tx.hash},0 and checking that is accepted")
         self._mine_and_send_block(spend_frozen_tx, node)
@@ -241,7 +241,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Checking that transaction {spend_frozen_tx2.hash} is removed from mempool")
         assert_equal(node.rpc.getrawmempool(), [])
         assert(node.check_frozen_tx_log(spend_frozen_tx2.hash))
-        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+spend_frozen_tx2.hash))
+        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + spend_frozen_tx2.hash))
 
         self.log.info(f"Unfreezing TXO {spend_frozen_tx.hash},0 from policy blacklist")
         result = node.rpc.removeFromPolicyBlacklist({
@@ -281,7 +281,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             node.send_tx(tx, True)
             assert_equal(node.rpc.getrawmempool(), [])
             assert(node.check_frozen_tx_log(tx.hash))
-            assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+tx.hash))
+            assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + tx.hash))
 
         # Helper to send tx and check it is accepted
         def SendTxAndCheckAccepted(tx):
@@ -296,7 +296,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             self._mine_and_send_block(tx, node, True)
             assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
             assert(node.check_frozen_tx_log(self.chain.tip.hash))
-            assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
+            assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
             self._remove_last_block()
 
         # Helper to mine block with tx and check it is accepted
@@ -385,7 +385,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
                         "txId": spend_frozen_tx2.hash,
                         "vout": 0
                     },
-                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
+                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height + 2}],
                     "policyExpiresWithConsensus": False
                 }]
         })
@@ -411,7 +411,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
                         "txId": spend_frozen_tx2.hash,
                         "vout": 0
                     },
-                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
+                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height + 2}],
                     "policyExpiresWithConsensus": True
                 }]
         })
@@ -441,7 +441,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
                             "txId": tx.hash,
                             "vout": 0
                         },
-                        "enforceAtHeight": [{"start": h+1, "stop": h+3}, {"start": h+5, "stop": h+7}],
+                        "enforceAtHeight": [{"start": h + 1, "stop": h + 3}, {"start": h + 5, "stop": h + 7}],
                         "policyExpiresWithConsensus": False
                     }]
             })

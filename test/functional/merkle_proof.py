@@ -246,7 +246,7 @@ class MerkleProofTest(BitcoinTestFramework):
         # Verify that Merkle Tree disk size is at least the size of Merkle Trees we just stored
         assert_greater_than(disk_size, calculated_merkle_tree_disk_size)
         # Number of data files should be at least calculated_merkle_tree_disk_size/preferred_file_size
-        assert_greater_than(number_of_data_files, calculated_merkle_tree_disk_size/(30 * 1024))
+        assert_greater_than(number_of_data_files, calculated_merkle_tree_disk_size / (30 * 1024))
 
         # Delete index to test recreation of index when node is started again
         self.log.info("Restarting nodes to remove Merkle Trees index...")

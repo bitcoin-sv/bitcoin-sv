@@ -70,7 +70,7 @@ class PTVTxnChains(ComparisonTestFramework):
         for tx in range(len(txchains)):
             conn.send_message(msg_tx(txchains[tx]))
         # Check if the validation queues are empty.
-        wait_for_ptv_completion(conn, num_of_chains*chain_length, timeout=timeout)
+        wait_for_ptv_completion(conn, num_of_chains * chain_length, timeout=timeout)
         # Check if required transactions are accepted by the mempool.
         self.check_mempool(conn.rpc, txchains, timeout)
 

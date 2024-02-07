@@ -39,7 +39,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.chain = ChainManager()
         self.extra_args_common = ["-whitelist=127.0.0.1", "-minrelaytxfee=0", "-minminingtxfee=0", "-limitfreerelay=999999"]
         self.extra_args = [self.extra_args_common,
-                           self.extra_args_common+["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=5"]]
+                           self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=5"]]
         self.block_count = 0
 
     def _init(self):
@@ -148,7 +148,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Restarting node with options -enableassumewhitelistedblockdepth=0, -assumewhitelistedblockdepth=0")
         node.rpc.stop_node()
         node.rpc.wait_until_stopped()
-        node.rpc.start(True, self.extra_args[0]+["-enableassumewhitelistedblockdepth=0", "-assumewhitelistedblockdepth=0"])
+        node.rpc.start(True, self.extra_args[0] + ["-enableassumewhitelistedblockdepth=0", "-assumewhitelistedblockdepth=0"])
         node.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -161,7 +161,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Restarting node with options -enableassumewhitelistedblockdepth=1, -assumewhitelistedblockdepth=1")
         node.rpc.stop_node()
         node.rpc.wait_until_stopped()
-        node.rpc.start(True, self.extra_args[0]+["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=1"])
+        node.rpc.start(True, self.extra_args[0] + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=1"])
         node.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -174,7 +174,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Restarting node with options -enableassumewhitelistedblockdepth=1, -assumewhitelistedblockdepth=0")
         node.rpc.stop_node()
         node.rpc.wait_until_stopped()
-        node.rpc.start(True, self.extra_args[0]+["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=0"])
+        node.rpc.start(True, self.extra_args[0] + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=0"])
         node.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 

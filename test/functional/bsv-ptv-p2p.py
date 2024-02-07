@@ -78,7 +78,7 @@ class PTVP2PTest(ComparisonTestFramework):
                 tx.vout.extend((CTxOut(out_val, locking_script),) * factor)
                 tx.vin.append(CTxIn(COutPoint(prev_tx.sha256, n), unlocking_script, 0xffffffff))
                 # Use the first unspent txn as a common input for all double spend transactions.
-                if num_of_ds_txs and len(ds_txs) < num_of_ds_txs-1 and len(gen_txs):
+                if num_of_ds_txs and len(ds_txs) < num_of_ds_txs - 1 and len(gen_txs):
                     tx.vin.append(CTxIn(COutPoint(prev_txs[0].sha256, 0), unlocking_script, 0xffffffff))
                     tx.calc_sha256()
                     ds_txs.append(tx)
@@ -102,7 +102,7 @@ class PTVP2PTest(ComparisonTestFramework):
             # Create a new transaction.
             tx = create_transaction(spend.tx, spend.n, unlocking_script, money_to_spend, locking_script)
             # Extend the number of outputs to the required size.
-            tx.vout.extend(tx.vout * (factor-1))
+            tx.vout.extend(tx.vout * (factor - 1))
             # Sign txn.
             self.sign_tx(tx, spend.tx, spend.n)
             tx.rehash()
@@ -178,9 +178,9 @@ class PTVP2PTest(ComparisonTestFramework):
                 conn.send_message(msg_tx(tx))
         # Return ds set if was requested.
         if len(ds_txs):
-            return nonstd_txs+additional_txs, ds_txs, rejected_txs
+            return nonstd_txs + additional_txs, ds_txs, rejected_txs
 
-        return nonstd_txs+additional_txs, rejected_txs
+        return nonstd_txs + additional_txs, rejected_txs
 
     # This scenario is being used to generate and send multiple subsets of non-standard txs in test cases.
     # - scenario2 is used to prepare the required size of the set
@@ -258,10 +258,10 @@ class PTVP2PTest(ComparisonTestFramework):
                                             number_of_connections=1) as (conn,):
             # Run test case.
             std_txs = self.run_scenario1(conn, spend_txs, tc1_txchains_num, tc1_tx_chain_length, self.locking_script_1, 5000000000, 1)
-            wait_for_ptv_completion(conn, tc1_txchains_num*tc1_tx_chain_length)
+            wait_for_ptv_completion(conn, tc1_txchains_num * tc1_tx_chain_length)
             # Check if required transactions are accepted by the mempool.
             self.check_mempool(conn.rpc, std_txs, timeout=30)
-            assert_equal(conn.rpc.getmempoolinfo()['size'], tc1_txchains_num*tc1_tx_chain_length)
+            assert_equal(conn.rpc.getmempoolinfo()['size'], tc1_txchains_num * tc1_tx_chain_length)
 
         #
         # Test Case 2 (TC2).
@@ -308,11 +308,11 @@ class PTVP2PTest(ComparisonTestFramework):
                                             number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, _ = self.run_scenario2(conn, spend_txs, tc3_txs_num, self.locking_script_2, ds_txs_num)
-            wait_for_ptv_completion(conn, len(nonstd_txs)+1)
+            wait_for_ptv_completion(conn, len(nonstd_txs) + 1)
             # All txs from the nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=30)
             # There is one more transaction in the mempool, which is a random txn from the ds_txs set
-            assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs)+1)
+            assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs) + 1)
             # Only one txn is allowed to be in the mempool from the given ds set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), 1)
 
@@ -343,11 +343,11 @@ class PTVP2PTest(ComparisonTestFramework):
             std_txs = self.get_txchains_n(tc4_1_txs_num, 1, spend_txs, CScript(), self.locking_script_1, 2000000, 10)
             # Create and send generated txs.
             std_and_nonstd_txs, ds_txs, _ = self.run_scenario2(conn, spend_txs2, tc4_2_txs_num, self.locking_script_2, ds_txs_num, std_txs, shuffle_txs=True)
-            wait_for_ptv_completion(conn, len(std_and_nonstd_txs)+1)
+            wait_for_ptv_completion(conn, len(std_and_nonstd_txs) + 1)
             # All txs from the std_and_nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, std_and_nonstd_txs, timeout=30)
             # There is one more transaction in the mempool. It is a random txn from the ds_txs set
-            assert_equal(conn.rpc.getmempoolinfo()['size'], len(std_and_nonstd_txs)+1)
+            assert_equal(conn.rpc.getmempoolinfo()['size'], len(std_and_nonstd_txs) + 1)
             # Only one txn is allowed to be accepted by the mempool, from the given double spends txn set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), 1)
 
@@ -369,17 +369,17 @@ class PTVP2PTest(ComparisonTestFramework):
         # - tc5_num_of_subsets funding transaction are needed in this test case.
         spend_txs = self.get_front_slice(out, tc5_num_of_subsets)
         args = ['-checkmempool=0', '-persistmempool=0']
-        with self.run_node_with_connections('TC5: {} non-std txs ({} double spends) used.'.format(tc5_txs_num*tc5_num_of_subsets, ds_txs_num*tc5_num_of_subsets),
+        with self.run_node_with_connections('TC5: {} non-std txs ({} double spends) used.'.format(tc5_txs_num * tc5_num_of_subsets, ds_txs_num * tc5_num_of_subsets),
                                             0,
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc5_txs_num, self.locking_script_2, ds_txs_num)
-            wait_for_ptv_completion(conn, len(nonstd_txs)+tc5_num_of_subsets, check_interval=0.5)
+            wait_for_ptv_completion(conn, len(nonstd_txs) + tc5_num_of_subsets, check_interval=0.5)
             # All txs from the nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=60)
             # There are tc5_num_of_subsets more transaction in the mempool (random txns from the ds_txs set)
-            assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs)+tc5_num_of_subsets)
+            assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs) + tc5_num_of_subsets)
             # Only tc5_num_of_subsets txns are allowed to be in the mempool from the given ds set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), tc5_num_of_subsets)
 
@@ -403,17 +403,17 @@ class PTVP2PTest(ComparisonTestFramework):
         # - tc6_num_of_subsets funding transaction are needed in this test case.
         spend_txs = self.get_front_slice(out, tc6_num_of_subsets)
         args = ['-checkmempool=0', '-persistmempool=0']
-        with self.run_node_with_connections('TC6: {} non-std txs ({} double spends) used (shuffled set).'.format(tc6_txs_num*tc6_num_of_subsets, ds_txs_num*tc6_num_of_subsets),
+        with self.run_node_with_connections('TC6: {} non-std txs ({} double spends) used (shuffled set).'.format(tc6_txs_num * tc6_num_of_subsets, ds_txs_num * tc6_num_of_subsets),
                                             0,
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc6_txs_num, self.locking_script_2, ds_txs_num, shuffle_txs=True)
-            wait_for_ptv_completion(conn, len(nonstd_txs)+tc6_num_of_subsets, check_interval=0.5)
+            wait_for_ptv_completion(conn, len(nonstd_txs) + tc6_num_of_subsets, check_interval=0.5)
             # All txs from the nonstd_txs result set should be accepted
             self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=60)
             # There are tc6_num_of_subsets more transaction in the mempool (random txns from the ds_txs set)
-            assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs)+tc6_num_of_subsets)
+            assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs) + tc6_num_of_subsets)
             # Only tc6_num_of_subsets txns are allowed to be in the mempool from the given ds set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), tc6_num_of_subsets)
 

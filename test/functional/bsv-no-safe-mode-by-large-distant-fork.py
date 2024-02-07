@@ -42,7 +42,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
         MIN_FORK_LENGTH = 3
         MIN_FORK_DIFFERENCE = 1
 
-        args = [f"-safemodemaxforkdistance = {MAX_FORK_DISTANCE}",
+        args = [f"-safemodemaxforkdistance={MAX_FORK_DISTANCE}",
                 f"-safemodeminforklength={MIN_FORK_LENGTH}",
                 f"-safemodeminblockdifference={MIN_FORK_DIFFERENCE}", ]
 

@@ -134,21 +134,21 @@ class BsvProtoconfTest(BitcoinTestFramework):
                                                                                               maxInvElements))
         ### TEST WITH maxInvElements - 1, maxInvElements and maxInvElements + 1
         # 1. Send bitcoind Inv message that is smaller than max_recv_payload_length.
-        logger.info("Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements-1, maxInvElements))
+        logger.info("Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements - 1, maxInvElements))
         test_node.send_message(msg_inv([CInv(CInv.TX, i) for i in range(0, maxInvElements - 1)]))
         test_node.sync_with_ping()
         assert_equal(len(self.nodes[0].listbanned()), 0)  # not banned
 
         # 2. Send bitcoind Inv message that is equal to max_recv_payload_length.
         logger.info("Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements, maxInvElements))
-        test_node.send_message(msg_inv([CInv(CInv.TX, maxInvElements+i) for i in range(0, maxInvElements)]))
+        test_node.send_message(msg_inv([CInv(CInv.TX, maxInvElements + i) for i in range(0, maxInvElements)]))
         test_node.sync_with_ping()
         assert_equal(len(self.nodes[0].listbanned()), 0)  # not banned
 
         # 3. Send bitcoind Inv message that is larger than max_recv_payload_length.
         logger.info("Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements + 1, maxInvElements))
         logger.info("Expecting to be banned...")
-        test_node.send_message(msg_inv([CInv(CInv.TX, 2*maxInvElements+i) for i in range(0, maxInvElements + 1)]))
+        test_node.send_message(msg_inv([CInv(CInv.TX, 2 * maxInvElements + i) for i in range(0, maxInvElements + 1)]))
         test_node.wait_for_disconnect()
         assert (self.nodes[0].closed)  # disconnected
         assert_equal(len(self.nodes[0].listbanned()), 1)  # banned
@@ -169,23 +169,23 @@ class BsvProtoconfTest(BitcoinTestFramework):
         maxInvElements = CInv.estimateMaxInvElements(test_node.max_recv_payload_length)
 
         # Send enough inv messages to fill the queue in bitcoind
-        for n in range(0, 4*recvinvqueuefactor):
-            test_node.send_message(msg_inv([CInv(CInv.TX, n*maxInvElements+i) for i in range(0, maxInvElements)]))
+        for n in range(0, 4 * recvinvqueuefactor):
+            test_node.send_message(msg_inv([CInv(CInv.TX, n * maxInvElements + i) for i in range(0, maxInvElements)]))
             test_node.sync_with_ping()
             assert_equal(len(self.nodes[0].listbanned()), 0)
             test_node.wait_for_getdata()
 
         # check if we have all the inv messages
-        assert_equal(sum(test_node.wanted_inv_lengths), maxInvElements*4*recvinvqueuefactor)
+        assert_equal(sum(test_node.wanted_inv_lengths), maxInvElements * 4 * recvinvqueuefactor)
 
         # send additional inv messages
-        test_node.send_message(msg_inv([CInv(CInv.TX, 4*recvinvqueuefactor * maxInvElements + i) for i in range(0, maxInvElements)]))
+        test_node.send_message(msg_inv([CInv(CInv.TX, 4 * recvinvqueuefactor * maxInvElements + i) for i in range(0, maxInvElements)]))
         test_node.sync_with_ping()
         assert_equal(len(self.nodes[0].listbanned()), 0)
         test_node.wait_for_getdata()
 
         # check that the number of inv messages doesn't match anymore (we annouced more invs that the node can remember and ask for)
-        assert_greater_than(maxInvElements*(4*recvinvqueuefactor+1), sum(test_node.wanted_inv_lengths))
+        assert_greater_than(maxInvElements * (4 * recvinvqueuefactor + 1), sum(test_node.wanted_inv_lengths))
         self.stop_node(0)
         logger.info("recvinvqueuefactor test finished successfully\n")
 
@@ -194,9 +194,9 @@ class BsvProtoconfTest(BitcoinTestFramework):
         # Send 1 MiB inv with maxprotocolrecvpayloadlength set to defaults
         self.run_maxprotocolrecvpayloadlength_test(CInv.estimateMaxInvElements(ONE_MiB))
         # Send 3 MiB inv with maxprotocolrecvpayloadlength set to 500 MiB
-        self.run_maxprotocolrecvpayloadlength_test(CInv.estimateMaxInvElements(3*ONE_MiB), 500*ONE_MiB)
+        self.run_maxprotocolrecvpayloadlength_test(CInv.estimateMaxInvElements(3 * ONE_MiB), 500 * ONE_MiB)
         # Run ban test sends 3 INVs with sizes (max-1, max, max+1). In the last attempt it should be banned
-        self.run_ban_test(2*ONE_MiB)
+        self.run_ban_test(2 * ONE_MiB)
         # Send many INV messages and check when they fill up queue in bitcoind and some of them get missing
         self.run_recvinvqueuefactor_test(ONE_MiB, 2)
 

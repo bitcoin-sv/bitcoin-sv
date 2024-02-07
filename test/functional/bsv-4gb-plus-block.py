@@ -115,8 +115,8 @@ class BigBlockTests(BitcoinTestFramework):
 
             conn.send_message(msg_tx(tx))
             wait_until(lambda: tx.hash in conn.rpc.getrawmempool(), timeout=int(360 * self.options.timeoutfactor))
-            logger.info("Submitted txn {} of {}".format(i+1, num_of_transactions))
-            assert conn.rpc.getmempoolinfo()['size'] == i+1
+            logger.info("Submitted txn {} of {}".format(i + 1, num_of_transactions))
+            assert conn.rpc.getmempoolinfo()['size'] == i + 1
 
             spendtx = tx
 
@@ -160,7 +160,7 @@ class BigBlockTests(BitcoinTestFramework):
             self.nodes[0].generate(1)
             assert(self.nodes[0].getmempoolinfo()['size'] == 0)
             logger.info("Waiting for block to arrive at test")
-            wait_until(lambda: newVerConn.cb.block_count == old_block_count+1, timeout=int(1200 * self.options.timeoutfactor))
+            wait_until(lambda: newVerConn.cb.block_count == old_block_count + 1, timeout=int(1200 * self.options.timeoutfactor))
 
             # Look for log message saying we won't send to old peer
             wait_until(lambda: check_for_log_msg(self, "cannot be sent because it exceeds max P2P message limit", "/node0"))

@@ -78,11 +78,11 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         tx = CTransaction()
         total_input = 0
         for parent_tx, n in outpoints:
-            tx.vin.append(CTxIn(COutPoint(parent_tx.sha256, n), CScript([b"0"*72]), 0xffffffff))
+            tx.vin.append(CTxIn(COutPoint(parent_tx.sha256, n), CScript([b"0" * 72]), 0xffffffff))
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput, CScript(pre_script + [self.public_key, OP_CHECKSIG])))
+            tx.vout.append(CTxOut(total_input // noutput, CScript(pre_script + [self.public_key, OP_CHECKSIG])))
 
         tx.rehash()
 
@@ -166,12 +166,12 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
             # create all blocks needed for this test
             block_a1 = self.make_block(a1_txs, root_hash, root_height, root_time)
-            block_b1 = self.make_block(long_eval_txs[0*TX_COUNT: 1*TX_COUNT], root_hash, root_height, root_time)
-            block_b2 = self.make_block(long_eval_txs[1*TX_COUNT: 2*TX_COUNT], block_b1.hash, root_height+1, root_time+100)
-            block_c1 = self.make_block(long_eval_txs[2*TX_COUNT: 3*TX_COUNT], root_hash, root_height, root_time)
-            block_c2 = self.make_block(long_eval_txs[3*TX_COUNT: 4*TX_COUNT], block_c1.hash, root_height+1, root_time+101)
-            block_d1 = self.make_block(long_eval_txs[4*TX_COUNT: 5*TX_COUNT], root_hash, root_height, root_time)
-            block_d2 = self.make_block(long_eval_txs[5*TX_COUNT: 6*TX_COUNT], block_d1.hash, root_height+1, root_time+102)
+            block_b1 = self.make_block(long_eval_txs[0 * TX_COUNT: 1 * TX_COUNT], root_hash, root_height, root_time)
+            block_b2 = self.make_block(long_eval_txs[1 * TX_COUNT: 2 * TX_COUNT], block_b1.hash, root_height + 1, root_time + 100)
+            block_c1 = self.make_block(long_eval_txs[2 * TX_COUNT: 3 * TX_COUNT], root_hash, root_height, root_time)
+            block_c2 = self.make_block(long_eval_txs[3 * TX_COUNT: 4 * TX_COUNT], block_c1.hash, root_height + 1, root_time + 101)
+            block_d1 = self.make_block(long_eval_txs[4 * TX_COUNT: 5 * TX_COUNT], root_hash, root_height, root_time)
+            block_d2 = self.make_block(long_eval_txs[5 * TX_COUNT: 6 * TX_COUNT], block_d1.hash, root_height + 1, root_time + 102)
 
             conn.send_message(msg_block(block_a1))
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=0.3)

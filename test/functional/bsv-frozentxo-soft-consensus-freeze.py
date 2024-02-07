@@ -191,8 +191,8 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         assert (block_before_frozen_blocks_hash == node.rpc.getbestblockhash())
 
         # create coinbase output that pays to much
-        invalid_coinbase_tx = create_coinbase(height=node.rpc.getblockcount()+1, outputValue=300)
-        invalid_block = create_block(int(last_soft_frozen_hash, 16), invalid_coinbase_tx, last_soft_frozen_time+1)
+        invalid_coinbase_tx = create_coinbase(height=node.rpc.getblockcount() + 1, outputValue=300)
+        invalid_block = create_block(int(last_soft_frozen_hash, 16), invalid_coinbase_tx, last_soft_frozen_time + 1)
         invalid_block.solve()
         node.p2p.send_and_ping(msg_block(invalid_block))
         assert(node.check_log(f"ConnectBlock {invalid_block.hash} failed \\(bad-cb-amount \\(code 16\\)\\)"))
@@ -302,7 +302,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         frozen_block = self._mine_block(spend_frozen_tx)
         frozen_block.vtx[0].vout[0].nValue = 300 * COIN # coinbase that pays too much
         frozen_block.vtx[0].rehash()
-        self.chain.update_block(self.block_count-1, [])
+        self.chain.update_block(self.block_count - 1, [])
         self.submit_block_and_check_tip(node, frozen_block, last_valid_block.hash)
 
         # next 4 blocks would also be considered soft consensus frozen and must not become new tip
@@ -329,7 +329,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         frozen_block.vtx.extend([valid_tx])
         invalid_tx = self._create_tx(PreviousSpendableOutput(valid_tx, 0), CScript([OP_FALSE]), CScript([OP_TRUE]))
         frozen_block.vtx.extend([invalid_tx])
-        self.chain.update_block(self.block_count-1, [])
+        self.chain.update_block(self.block_count - 1, [])
         self.submit_block_and_check_tip(node, frozen_block, last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)

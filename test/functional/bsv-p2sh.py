@@ -41,7 +41,7 @@ class P2SH(ComparisonTestFramework):
         spent_p2sh_tx = CTransaction()
         spent_p2sh_tx.vin.append(
             CTxIn(COutPoint(p2sh_tx_to_spend.sha256, 0), b''))
-        spent_p2sh_tx.vout.append(CTxOut(p2sh_tx_to_spend.vout[0].nValue-100, output_script))
+        spent_p2sh_tx.vout.append(CTxOut(p2sh_tx_to_spend.vout[0].nValue - 100, output_script))
         # Sign the transaction using the redeem script
         sighash = SignatureHashForkId(
             self.redeem_script, spent_p2sh_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, p2sh_tx_to_spend.vout[0].nValue)
@@ -71,7 +71,7 @@ class P2SH(ComparisonTestFramework):
         def new_P2SH_tx():
             output = coinbase_utxos.pop(0)
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
-                                               value=output.tx.vout[0].nValue-100,
+                                               value=output.tx.vout[0].nValue - 100,
                                                private_key=self.coinbase_key,
                                                script=self.p2sh_script)
 

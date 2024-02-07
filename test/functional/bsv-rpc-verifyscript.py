@@ -42,22 +42,22 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
     # Return a transaction that spends given anyone-can-spend coinbase and provides
     # several outputs that can be used in test to verify scripts
     def create_test_tx(self, coinbase_tx):
-        assert_equal(coinbase_tx.vout[0].nValue, 50*COIN) # we expect 50 coins
+        assert_equal(coinbase_tx.vout[0].nValue, 50 * COIN) # we expect 50 coins
 
         tx = CTransaction()
         tx.vin.append(CTxIn(COutPoint(coinbase_tx.sha256, 0), b"", 0xffffffff))
 
         # Simple anyone-can-spend output
-        tx.vout.append(CTxOut(int(1*COIN), CScript([OP_TRUE])))
+        tx.vout.append(CTxOut(int(1 * COIN), CScript([OP_TRUE])))
 
         # Output using standard P2PKH script
-        tx.vout.append(CTxOut(int(1*COIN), CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])))
+        tx.vout.append(CTxOut(int(1 * COIN), CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])))
 
         # Another simple anyone-can-spend output
-        tx.vout.append(CTxOut(int(1*COIN), CScript([OP_TRUE])))
+        tx.vout.append(CTxOut(int(1 * COIN), CScript([OP_TRUE])))
 
         # Final output provides remaining coins and is not needed by test
-        tx.vout.append(CTxOut(int(47*COIN), CScript([OP_FALSE])))
+        tx.vout.append(CTxOut(int(47 * COIN), CScript([OP_FALSE])))
 
         tx.rehash()
         return tx
@@ -74,14 +74,14 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_equal(len(result), N)
         for i in range(N):
             if result[i]["result"] != expected_result[i]:
-                raise AssertionError("Unexpected script verification result "+str(i)+"! Expected '"+expected_result[i]+"' got " + str(result[i]))
+                raise AssertionError("Unexpected script verification result " + str(i) + "! Expected '" + expected_result[i] + "' got " + str(result[i]))
         return result
 
     def verifyscript_check_ok(self, node, scripts, *args):
-        return self.verifyscript_check(node, len(scripts)*["ok"], scripts, *args)
+        return self.verifyscript_check(node, len(scripts) * ["ok"], scripts, *args)
 
     def verifyscript_check_error(self, node, scripts, *args):
-        return self.verifyscript_check(node, len(scripts)*["error"], scripts, *args)
+        return self.verifyscript_check(node, len(scripts) * ["error"], scripts, *args)
 
     def run_test(self):
         node = self.nodes[0]
@@ -102,7 +102,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         #
         # Check parameter parsing
         #
-        tx0 = create_tx(tx_test, 0, 1*COIN)
+        tx0 = create_tx(tx_test, 0, 1 * COIN)
         assert_raises_rpc_error(-8, "Missing required argument", node.verifyscript) # 1st parameter scripts is required and must be JSON array of objects
         assert_raises_rpc_error(-1, None, node.verifyscript, "abc")
         assert_raises_rpc_error(-1, None, node.verifyscript, 123)
@@ -148,16 +148,16 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_raises_rpc_error(-8, "Missing scripts[0].txo.value", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "height": 0}}])
         assert_raises_rpc_error(-8, "Missing scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1}}])
         assert_raises_rpc_error(-8, "must be hexadecimal string", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "01abc", "value": 1, "height": 0}}]) # lock must be hexstring
-        self.verifyscript_check_ok(node, [{"tx": ToHex(create_transaction(tx_test, 0, CScript([OP_TRUE]), 1*COIN)), "n": 0, "txo": {"lock": "", "value": 1*COIN, "height": 0}}]) # empty lock script is valid
+        self.verifyscript_check_ok(node, [{"tx": ToHex(create_transaction(tx_test, 0, CScript([OP_TRUE]), 1 * COIN)), "n": 0, "txo": {"lock": "", "value": 1 * COIN, "height": 0}}]) # empty lock script is valid
         assert_raises_rpc_error(-8, "Invalid value for scripts[0].txo.value", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": -1, "height": 0}}]) # value must be non-negative integer
         assert_raises_rpc_error(-8, "Invalid value for scripts[0].txo.height", node.verifyscript, [{"tx": ToHex(tx0), "n": 0, "txo": {"lock": "00", "value": 1, "height": -2}}]) # height must be non-negative integer or -1
 
-        assert_raises_rpc_error(-8, "Unable to find TXO spent by transaction scripts[0].tx", node.verifyscript, [{"tx": ToHex(create_tx(tx0, 0, 1*COIN)), "n": 0}]) # Check that non-existent coin is detected
+        assert_raises_rpc_error(-8, "Unable to find TXO spent by transaction scripts[0].tx", node.verifyscript, [{"tx": ToHex(create_tx(tx0, 0, 1 * COIN)), "n": 0}]) # Check that non-existent coin is detected
 
         #
         # Check verification of a valid P2PKH script
         #
-        tx1 = create_tx(tx_test, 1, 1*COIN)
+        tx1 = create_tx(tx_test, 1, 1 * COIN)
         self.sign_tx(tx1, tx_test, 1)
         expected_flags = 81931 # this is the expected value for automatically determined script verification flags
         res = self.verifyscript_check_ok(node, [
@@ -217,9 +217,9 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert("flags" not in res[4])
 
         # Changing the output value must make the script invalid
-        tx2 = create_tx(tx_test, 1, 1*COIN)
+        tx2 = create_tx(tx_test, 1, 1 * COIN)
         self.sign_tx(tx2, tx_test, 1)
-        tx2.vout[0].nValue = int(0.9*COIN)
+        tx2.vout[0].nValue = int(0.9 * COIN)
         self.verifyscript_check_error(node, [
             {
                 "tx": ToHex(tx2),
@@ -237,10 +237,10 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         #
         # Check that TXO is also found in mempool
         #
-        tx3 = create_tx(tx_test, 0, 1*COIN)
+        tx3 = create_tx(tx_test, 0, 1 * COIN)
         node.sendrawtransaction(ToHex(tx3), False, True)
         assert_equal(node.getrawmempool(), [tx3.hash])
-        tx4 = create_tx(tx3, 0, 1*COIN)
+        tx4 = create_tx(tx3, 0, 1 * COIN)
         self.verifyscript_check_ok(node, [{"tx": ToHex(tx4), "n": 0}])
 
         #
@@ -250,7 +250,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         # Generating one more block should place us one block below genesis activation
         # but mempool should be already be at genesis height.
         node.generate(1)
-        assert_equal(node.getblockcount(), self.genesisactivationheight-1)
+        assert_equal(node.getblockcount(), self.genesisactivationheight - 1)
 
         # Flags should now also include SCRIPT_GENESIS and SCRIPT_VERIFY_SIGPUSHONLY
         # but not SCRIPT_UTXO_AFTER_GENESIS, because TXO is still before genesis.
@@ -265,7 +265,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         assert_equal(node.getblockcount(), self.genesisactivationheight) # tip should now be at genesis height
 
         # Transaction spending coin that was created after genesis
-        tx5 = create_tx(tx4, 0, 1*COIN)
+        tx5 = create_tx(tx4, 0, 1 * COIN)
 
         # Now flags should (besides SCRIPT_GENESIS and SCRIPT_VERIFY_SIGPUSHONLY) also
         # include SCRIPT_UTXO_AFTER_GENESIS, because TXO is also after genesis.
@@ -282,8 +282,8 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         self.restart_node(0, self.extra_args[0] + ["-maxstdtxvalidationduration=100", "-maxnonstdtxvalidationduration=101", "-maxscriptsizepolicy=0", "-maxscriptnumlengthpolicy=250000"])
 
         # Create, send and mine transaction with large anyone-can-spend lock script
-        tx6 = create_tx(tx_test, 2, 1*COIN)
-        tx6.vout[0] = CTxOut(int(1*COIN), CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE]))
+        tx6 = create_tx(tx_test, 2, 1 * COIN)
+        tx6.vout[0] = CTxOut(int(1 * COIN), CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE]))
         tx6.rehash()
         node.sendrawtransaction(ToHex(tx6), False, True)
         assert_equal(node.getrawmempool(), [tx6.hash])
@@ -293,7 +293,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
         # This transaction should take more than 100ms and less than 2000ms to verify
         # NOTE: If verification takes more or less time than this, some of the checks below will fail.
         #       This can, for example, happen on a very fast, very slow or busy machine.
-        tx7 = create_tx(tx6, 0, 1*COIN)
+        tx7 = create_tx(tx6, 0, 1 * COIN)
 
         # First tx is small and should be successfully verified.
         # Second tx is big and its verification should timeout.

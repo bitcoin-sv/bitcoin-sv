@@ -49,17 +49,17 @@ class StallingTest(ComparisonTestFramework):
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         block(0)
         yield self.accepted()
-        test, out, _ = prepare_init_chain(self.chain, self.num_blocks, self.num_blocks+1)
+        test, out, _ = prepare_init_chain(self.chain, self.num_blocks, self.num_blocks + 1)
         yield test
 
         # Create 1GB block
-        block(1, spend=out[0], block_size=1*ONE_GIGABYTE)
+        block(1, spend=out[0], block_size=1 * ONE_GIGABYTE)
         yield self.accepted(420) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
         # Create long chain of smaller blocks
         test = TestInstance(sync_every_block=False)
         for i in range(self.num_blocks):
-            block(6000 + i, spend=out[i + 1], block_size=64*ONE_KILOBYTE)
+            block(6000 + i, spend=out[i + 1], block_size=64 * ONE_KILOBYTE)
             test.blocks_and_transactions.append([self.chain.tip, True])
         yield test
 
@@ -86,7 +86,7 @@ class StallingTest(ComparisonTestFramework):
         self.log.info("Starting IBD")
         connect_nodes(self.nodes, 0, 2)
         connect_nodes(self.nodes, 1, 2)
-        self.sync_all(timeout=240*self.options.timeoutfactor) # larger timeout is needed to prevent timeouts on busy machine and debug builds
+        self.sync_all(timeout=240 * self.options.timeoutfactor) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
         # Check we didn't hit a stall for node2
         assert(not check_for_log_msg(self, "stalling block download", "/node2"))

@@ -80,7 +80,7 @@ class PBVReorgShutdown(BitcoinTestFramework):
         self.log.info("waiting for block height 101 via rpc")
         self.nodes[0].waitforblockheight(101)
 
-        tip_block_num = block_count-1
+        tip_block_num = block_count - 1
 
         # left branch
         block2 = self.chain.next_block(block_count, spend=out[0], extra_txns=8)

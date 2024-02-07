@@ -61,7 +61,7 @@ class BSVGetBlock(ComparisonTestFramework):
             assert_equal(response.getheader('content-length'), str(block_size))
             assert_equal(block.serialize(), response.read())
         elif form == "hex":
-            assert_equal(response.getheader('content-length'), str(block_size*2))
+            assert_equal(response.getheader('content-length'), str(block_size * 2))
             assert_equal(ToHex(block), response.read().decode('utf-8'))
 
     def run_test(self):

@@ -300,7 +300,7 @@ def main():
         for timeout_test in TIMEOUT_FACTOR_FOR_TESTS.keys():
             if timeout_test in test_list:
                 test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}"
-                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1])) # noqa
+                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors) - 1])) # noqa
 
     else:
         try:

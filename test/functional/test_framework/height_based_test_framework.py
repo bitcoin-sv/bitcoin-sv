@@ -236,7 +236,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
     def _make_first_block(self, connection):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         if self.tip_time is None:
-            self.tip_time = tip["time"]+1
+            self.tip_time = tip["time"] + 1
         else:
             self.tip_time += 1
 
@@ -255,12 +255,12 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         with connection.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(txs, reasons):
                 del rejects[:]
-                block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs+[tx])
+                block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs + [tx])
 
                 if tx:
                     blk_ht = tip["height"]
                     self.log.info(f"Created a block {loghash(block.hash)} to check rejects at height {blk_ht + 1}")
-                    for txn in block_txs+[tx]:
+                    for txn in block_txs + [tx]:
                         self.log.info(f".... and added transactions to block {loghash(txn.hash)}")
 
                 wait_until(lambda: len(rejects) == 1 and rejects[0].data == block.sha256,
@@ -303,7 +303,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         # Observed data shows that during testing in debug mode it takes about 0.1s to process one block
         # We use double the amount of 0.2s plus extra 30s for good measure
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=0.2*n_blocks+30, check_interval=0.2, label="Waiting for block to become current tip")
+                   timeout=0.2 * n_blocks + 30, check_interval=0.2, label="Waiting for block to become current tip")
 
         return coinbases, block
 
@@ -388,7 +388,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             self._new_block_check_reject(conn, txs=txs, reasons=reasons, label=f"At \"{test.NAME}\" {label}", block_txs=tx_col.mempool_txs)
 
         if tx_col.block_valid_txs:
-            self._new_block_check_accept(conn, txs=tx_col.mempool_txs+tx_col.block_valid_txs, label=f"At \"{test.NAME}\" {label}")
+            self._new_block_check_accept(conn, txs=tx_col.mempool_txs + tx_col.block_valid_txs, label=f"At \"{test.NAME}\" {label}")
             self.log.info(f"Invalidating the block {loghash(conn.rpc.getbestblockhash())} to confirm the txs are back to mempool")
             conn.rpc.invalidateblock(conn.rpc.getbestblockhash())
 
@@ -415,7 +415,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
     def run_test(self):
 
         def multiplyArg(arg, factor):
-            return arg.split("=")[0] + "=" + str(int(int(arg.split("=")[1])*factor))
+            return arg.split("=")[0] + "=" + str(int(int(arg.split("=")[1]) * factor))
 
         self.stop_node(0)
         for test in self._gen_tests:
@@ -438,17 +438,17 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                     new_maxnonstdtxvalidationduration = new_maxnonstdtxvalidationduration[0]
                     if (DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION * 1000 <= new_maxnonstdtxvalidationduration):
                         self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration+1} ms.")
-                        test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration+1))
+                        test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration + 1))
 
             with self.run_node_with_connections(title=test.NAME,
                                                 node_index=0,
                                                 args=test.ARGS,
-                                                number_of_connections=1+len(test.ADDITIONAL_CONNECTIONS)) as conns:
+                                                number_of_connections=1 + len(test.ADDITIONAL_CONNECTIONS)) as conns:
 
                 self.log.info("")
-                self.log.info("*"*100)
+                self.log.info(" * " * 100)
                 self.log.info(f"Starting test \"{test.NAME}\"")
-                self.log.info("*"*100)
+                self.log.info(" * " * 100)
 
                 conn = conns[0]
                 additional_conns = {name: c for name, c in zip(test.ADDITIONAL_CONNECTIONS, conns)}
@@ -480,4 +480,4 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 conn.rpc.invalidateblock(first_block.hash)
                 del self._coinbases[:]
                 self.log.info(f"Finishing test \"{test.NAME}\"")
-                self.log.info(f"="*100)
+                self.log.info(f"=" * 100)

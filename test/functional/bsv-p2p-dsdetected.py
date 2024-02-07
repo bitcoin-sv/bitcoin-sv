@@ -134,7 +134,7 @@ class DSDetectedTests(BitcoinTestFramework):
         nBranches = random.randint(2, maxNumberOfBranches)
         branches = []
         # Each branch will spend the same output, but for diversity each will spend a different amount (fraction of an output value)
-        valueFraction = 1.0/(nBranches+1.0)
+        valueFraction = 1.0 / (nBranches + 1.0)
         valueFactor = 1.0
         last_block_time = commonBlock.nTime
         for _ in range(nBranches):
@@ -159,7 +159,7 @@ class DSDetectedTests(BitcoinTestFramework):
                 branch.append(previousBlock)
             # Last block should contain a double-spend transaction but we intentionally spend a different amount for each to make transactions unique
             valueFactor = valueFactor - valueFraction
-            dsTx = create_tx(spendTransaction, spendOutput, int(valueFactor*spendTransaction.vout[spendOutput].nValue))
+            dsTx = create_tx(spendTransaction, spendOutput, int(valueFactor * spendTransaction.vout[spendOutput].nValue))
             branch[-1].vtx.append(dsTx)
             branch[-1].hashMerkleRoot = branch[-1].calc_merkle_root()
             branch[-1].solve()
@@ -206,11 +206,11 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Create a block with a transaction spending coinbaseTx of a previous block and making multiple outputs for future transactions to spend
         utxoBlock, _ = make_block(connection, parent_block=block101)
-        utxoTx = create_tx(coinbaseTx, 0, 1*COIN)
+        utxoTx = create_tx(coinbaseTx, 0, 1 * COIN)
 
         # Create additional 48 outputs (we let 1 COIN as fee)
         for _ in range(48):
-            utxoTx.vout.append(CTxOut(1*COIN, CScript([OP_TRUE])))
+            utxoTx.vout.append(CTxOut(1 * COIN, CScript([OP_TRUE])))
         # Add to block
         utxoTx.rehash()
 
@@ -238,9 +238,9 @@ class DSDetectedTests(BitcoinTestFramework):
         blockA, _ = make_block(connection, parent_block=utxoBlock)
         blockB, _ = make_block(connection, parent_block=utxoBlock)
         blockF, _ = make_block(connection, parent_block=utxoBlock)
-        txA = create_tx(utxoBlock.vtx[1], 0, int(0.8*COIN))
-        txB = create_tx(utxoBlock.vtx[1], 0, int(0.9*COIN))
-        txF = create_tx(utxoBlock.vtx[1], 0, int(0.7*COIN))
+        txA = create_tx(utxoBlock.vtx[1], 0, int(0.8 * COIN))
+        txB = create_tx(utxoBlock.vtx[1], 0, int(0.9 * COIN))
+        txF = create_tx(utxoBlock.vtx[1], 0, int(0.7 * COIN))
         txA.rehash()
         txB.rehash()
         txF.rehash()
@@ -338,7 +338,7 @@ class DSDetectedTests(BitcoinTestFramework):
         # Webhook should not receive the notification if we send dsdetected message with transactions that are not double spending
         # Create a block similar as before, but with a transaction spending a different utxo
         blockC, _ = make_block(connection, parent_block=utxoBlock)
-        txC = create_tx(utxoBlock.vtx[1], 1, int(0.7*COIN))
+        txC = create_tx(utxoBlock.vtx[1], 1, int(0.7 * COIN))
         blockC.vtx.append(txC)
         blockC.hashMerkleRoot = blockC.calc_merkle_root()
         blockC.solve()

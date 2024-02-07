@@ -56,7 +56,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
             "-acceptnonstdtxn=0"])
 
         dust_threshold_sats = 1
-        amount_is_not_dust = Decimal(dust_threshold_sats)/COIN
+        amount_is_not_dust = Decimal(dust_threshold_sats) / COIN
         amount_is_dust = Decimal(0.0)
 
         # Test: Wallet will allow sending amount which meets dust threshold

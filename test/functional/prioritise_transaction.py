@@ -30,11 +30,11 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         node = self.nodes[0]
         self.txouts = gen_return_txouts()
 
-        utxo = create_confirmed_utxos(Decimal(1000)/Decimal(COIN), node, 1, age=101)[0]
+        utxo = create_confirmed_utxos(Decimal(1000) / Decimal(COIN), node, 1, age=101)[0]
 
         relayfeerate = self.nodes[0].getnetworkinfo()['relayfee']
 
-        ESTIMATED_TX_SIZE_IN_KB = Decimal(385)/Decimal(ONE_KILOBYTE)
+        ESTIMATED_TX_SIZE_IN_KB = Decimal(385) / Decimal(ONE_KILOBYTE)
 
         relayfee = ESTIMATED_TX_SIZE_IN_KB * relayfeerate
 

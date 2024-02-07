@@ -1373,8 +1373,8 @@ class msg_revokemid():
         revocationMessage = deser_string(f)
         sig1Len = revocationMessage[0]
         self.sig1 = revocationMessage[1:sig1Len]
-        sig2Len = revocationMessage[1+sig1Len]
-        self.sig2 = revocationMessage[1+sig1Len+1:]
+        sig2Len = revocationMessage[1 + sig1Len]
+        self.sig2 = revocationMessage[1 + sig1Len + 1:]
 
     def serialize(self):
         r = b""
@@ -2173,7 +2173,7 @@ class NodeConnCB():
                 self.last_message[command] = message
                 self.msg_timestamp[command] = time.time()
                 self.msg_index[command] = self.time_index
-                self.time_index + = 1
+                self.time_index += 1
                 getattr(self, 'on_' + command)(conn, message)
             except:
                 print("ERROR delivering %s (%s)" % (repr(message),
