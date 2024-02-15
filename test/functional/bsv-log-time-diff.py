@@ -21,6 +21,7 @@ import glob
 #    6. Peer2 sends block b2.
 #    7. Bitcoind logs that more honest block with the same height was received.
 
+
 class LogTimeDiffTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -89,6 +90,7 @@ class LogTimeDiffTest(BitcoinTestFramework):
                     break
 
             assert_equal(time_difference_log_found, True)
+
 
 if __name__ == '__main__':
     LogTimeDiffTest().main()

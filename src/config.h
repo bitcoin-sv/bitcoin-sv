@@ -35,6 +35,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 class CChainParams;
 struct DefaultBlockSizeParams;
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
 class Config : public boost::noncopyable, public CScriptConfig {
 public:
     virtual uint64_t GetMaxBlockSize() const = 0;
@@ -198,6 +199,7 @@ protected:
     virtual ~Config() = default;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor, cppcoreguidelines-special-member-functions)
 class ConfigInit : public Config {
 public:
     // used to specify default block size related parameters
@@ -373,6 +375,7 @@ public:
     virtual bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) = 0;
 
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
     ~ConfigInit() = default;
 };
 
@@ -962,7 +965,7 @@ public:
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        maxTxSizePolicy = value;
+        maxTxSizePolicy = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
@@ -970,7 +973,7 @@ public:
     bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        minConsolidationFactor = value;
+        minConsolidationFactor = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMinConsolidationFactor() const override { return minConsolidationFactor; }
@@ -978,7 +981,7 @@ public:
     bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        maxConsolidationInputScriptSize = value;
+        maxConsolidationInputScriptSize = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMaxConsolidationInputScriptSize() const override { return maxConsolidationInputScriptSize; }
@@ -986,7 +989,7 @@ public:
     bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        minConfConsolidationInput = value;
+        minConfConsolidationInput = static_cast<uint64_t>(value);
         return false;
     }
     uint64_t GetMinConfConsolidationInput() const override { return minConfConsolidationInput; }
@@ -1220,6 +1223,7 @@ public:
         return true;
     }
     uint64_t GetMaxMempoolSizeDisk() const override {
+        // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
         return DEFAULT_MAX_MEMPOOL_SIZE * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR * ONE_MEGABYTE;
     }
 
@@ -1237,6 +1241,7 @@ public:
 
         return true;
     }
+    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override

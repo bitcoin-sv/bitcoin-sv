@@ -26,9 +26,11 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg, sync_blocks
-from test_framework.mininode import ( NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
-        CTxIn, CTxOut, FromHex, ToHex)
-import time, copy
+from test_framework.mininode import (NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
+                                     CTxIn, CTxOut, FromHex, ToHex)
+import time
+import copy
+
 
 class NonFinalP2PTest(BitcoinTestFramework):
 
@@ -69,7 +71,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
     def create_funding_txn(self, out_value):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -108,7 +110,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
 
         # Create finalising txn.
         finaltx = copy.deepcopy(tx)
-        finaltx.vin[0].nSequence = 0xFFFFFFFF;
+        finaltx.vin[0].nSequence = 0xFFFFFFFF
         finaltx.rehash()
 
         # Send finalising txn to node0. It should be forwarded over P2P to node1.
@@ -177,6 +179,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
         self.test_case(rpc.sendrawtransaction)
         # Use sendrawtransactions rpc interface.
         self.test_case(rpc.sendrawtransactions)
+
 
 if __name__ == '__main__':
     NonFinalP2PTest().main()

@@ -11,6 +11,7 @@ from test_framework.util import wait_until, check_for_log_msg
 
 import time
 
+
 class msg_emptypayload():
     command = b"reject"
 
@@ -19,6 +20,7 @@ class msg_emptypayload():
 
     def serialize(self):
         return b""
+
 
 class TestEmptyPayload(BitcoinTestFramework):
 
@@ -33,6 +35,7 @@ class TestEmptyPayload(BitcoinTestFramework):
             conn.send_message(msg_emptypayload())
             wait_until(lambda: check_for_log_msg(self, "Unparseable reject message received", "/node0"), timeout=10)
             time.sleep(2)
+
 
 if __name__ == '__main__':
     TestEmptyPayload().main()

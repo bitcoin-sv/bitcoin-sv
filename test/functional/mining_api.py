@@ -20,6 +20,7 @@ from decimal import Decimal
 import math
 import time
 
+
 def get_any_unspent(listunspent, threshold_amount=0.0):
     if len(listunspent) == 0:
         raise AssertionError(
@@ -29,6 +30,7 @@ def get_any_unspent(listunspent, threshold_amount=0.0):
             return utx
     raise AssertionError(
         'Could not find any unspent with threshold={}'.format(threshold_amount))
+
 
 # Split some UTXOs into some number of spendable outputs
 def split_utxos(fee, node, count, utxos, nodes):
@@ -72,6 +74,7 @@ def split_utxos(fee, node, count, utxos, nodes):
     utxos = node.listunspent()
     return utxos
 
+
 # Feed some UTXOs into a nodes mempool
 def fill_mempool(fee, node, utxos):
     addr = node.getnewaddress()
@@ -91,11 +94,13 @@ def fill_mempool(fee, node, utxos):
         if num_sent % 10000 == 0:
             print("Num sent: {}".format(num_sent))
 
+
 # Connect each node to each other node
 def connect_nodes_mesh(nodes):
     for i in range(len(nodes)):
         for j in range(i + 1, len(nodes)):
             connect_nodes_bi(nodes, i, j)
+
 
 # The main test class
 class MiningTest(BitcoinTestFramework):
@@ -124,19 +129,22 @@ class MiningTest(BitcoinTestFramework):
         # Submit with wrong ID
         self.log.info("Submitting to wrong node with unknown ID")
         assert_raises_rpc_error(-22, "Block candidate ID not found",
-            otherNode.submitminingsolution, {'id': candidate['id'], 'nonce': block.nNonce})
+                                otherNode.submitminingsolution,
+                                {'id': candidate['id'], 'nonce': block.nNonce})
 
         # Omit nonce
         self.log.info("Submitting without nonce")
         assert_raises_rpc_error(-22, "nonce not found",
-            blockNode.submitminingsolution, {'id': candidate['id']})
+                                blockNode.submitminingsolution,
+                                {'id': candidate['id']})
 
         # Bad coinbase
         self.log.info("Submitting with bad coinbase")
         assert_raises_rpc_error(-22, "coinbase decode failed",
-            blockNode.submitminingsolution, {'id': candidate['id'],
-                                             'nonce': block.nNonce,
-                                             'coinbase': 'ALoadOfRubbish'})
+                                blockNode.submitminingsolution,
+                                {'id': candidate['id'],
+                                 'nonce': block.nNonce,
+                                 'coinbase': 'ALoadOfRubbish'})
 
         # Bad POW
         self.log.info("Submitting with bad POW")
@@ -150,7 +158,6 @@ class MiningTest(BitcoinTestFramework):
                                                        'coinbase': '{}'.format(ToHex(coinbase_tx))})
         assert submitResult == 'high-hash'
 
-
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
         self.relayfee = Decimal("250") / 100000000
@@ -160,7 +167,6 @@ class MiningTest(BitcoinTestFramework):
         # Create a lot of transactions from the UTXOs
         newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, self.nodes)
         fill_mempool(self.relayfee, node, newutxos)
-
 
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
@@ -188,7 +194,7 @@ class MiningTest(BitcoinTestFramework):
         if(get_coinbase):
             assert 'coinbase' in candidate
         else:
-            assert not 'coinbase' in candidate
+            assert 'coinbase' not in candidate
         assert 'coinbaseValue' in candidate
         assert 'version' in candidate
         assert 'nBits' in candidate
@@ -202,7 +208,6 @@ class MiningTest(BitcoinTestFramework):
 
         # submitResult is bool True for success, false if failure
         assert submitResult
-
 
     def test_mine_from_old_mining_candidate(self, blockNode, get_coinbase):
 
@@ -226,7 +231,6 @@ class MiningTest(BitcoinTestFramework):
 
             candidate = candidate_new
             sync_blocks(self.nodes)
-
 
     def test_optional_validation(self):
         # Start 2 nodes, 1 with validation enabled the other disabled
@@ -307,7 +311,7 @@ class MiningTest(BitcoinTestFramework):
         self.test_mine_from_old_mining_candidate(blockNode, True)
 
         self.sync_all()
-        
+
         self.test_mine_from_old_mining_candidate(blockNode, False)
 
         self.test_additional_fields(txnNode)

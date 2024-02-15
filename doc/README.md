@@ -16,7 +16,7 @@ Bitcoin SV is only supported on the Linux and docker platforms at this time.
 
 To run Bitcoin SV on Linux:
 
-* ensure that your system meets the minimum recommended [system requirements](https://bitcoinsv.io/2019/08/02/bitcoin-sv-node-system-requirements/)
+* ensure that your system meets the minimum recommended [system requirements](system-requirements.md)
 * unpack the files into a directory
 * run `bin/bitcoind`
 

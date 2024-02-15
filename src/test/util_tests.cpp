@@ -285,7 +285,7 @@ BOOST_AUTO_TEST_CASE(util_IsHexNumber) {
 }
 
 BOOST_AUTO_TEST_CASE(util_seed_insecure_rand) {
-    SeedInsecureRand(true);
+    FastRandomContext local_rand_ctx(true);
     for (int mod = 2; mod < 11; mod++) {
         int mask = 1;
         // Really rough binomal confidence approximation.
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(util_seed_insecure_rand) {
         for (int i = 0; i < 10000; i++) {
             uint32_t rval;
             do {
-                rval = insecure_rand() & mask;
+                rval = local_rand_ctx.rand32() & mask;
             } while (rval >= (uint32_t)mod);
             count += rval == 0;
         }

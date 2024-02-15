@@ -19,14 +19,14 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes=1
-   
+
     def run_test(self):
         #assert_equal(self.nodes[0].getconnectioncount(), 2)
         self._test_sendheadersban()
-        
+
     def _test_sendheadersban(self):
 
-    # Setup the p2p connections and start up the network thread.
+        # Setup the p2p connections and start up the network thread.
         inv_node = TestNode()
         test_node = TestNode()
 
@@ -50,7 +50,6 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         inv_node.sync_with_ping()
         test_node.sync_with_ping()
 
-        
         peerInfoPreSendHeaderMsg=self.nodes[0].getpeerinfo()
         #print ([peer['banscore'] for peer in peerInfoPreSendHeaderMsg])
         #print (peerInfoPreSendHeaderMsg[1]['banscore'])
@@ -60,9 +59,9 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         peerInfoPostSendHeaderMsg=self.nodes[0].getpeerinfo()
         #print (peerInfoPostSendHeaderMsg[1]['banscore'])
         assert_greater_than(peerInfoPostSendHeaderMsg[1]['banscore'],peerInfoPreSendHeaderMsg[1]['banscore'])
-    
-        return  
+
+        return
+
 
 if __name__ == '__main__':
     TestSendHeadersBanScore().main()
-

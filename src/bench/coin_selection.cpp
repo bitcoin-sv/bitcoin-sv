@@ -41,13 +41,16 @@ static void CoinSelection(benchmark::State &state) {
     std::vector<COutput> vCoins;
     LOCK(wallet.cs_wallet);
 
-    while (state.KeepRunning()) {
-        // Empty wallet.
-        for (COutput output : vCoins) {
+    auto ClearCoins = [&vCoins]() {
+        for (auto& output : vCoins) {
             delete output.tx;
         }
-
         vCoins.clear();
+    };
+
+    while (state.KeepRunning()) {
+        // Empty wallet.
+        ClearCoins();
 
         // Add coins.
         for (int i = 0; i < 1000; i++)
@@ -62,6 +65,8 @@ static void CoinSelection(benchmark::State &state) {
         assert(nValueRet == 1003 * COIN);
         assert(setCoinsRet.size() == 2);
     }
+
+    ClearCoins();
 }
 
 BENCHMARK(CoinSelection)

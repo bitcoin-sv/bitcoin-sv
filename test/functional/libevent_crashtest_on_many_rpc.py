@@ -24,7 +24,7 @@ class RpcFloddingTest (BitcoinTestFramework):
     def run_test(self):
 
         #
-        # low-level check for http persistent connection 
+        # low-level check for http persistent connection
         #
         url = urllib.parse.urlparse(self.nodes[0].url)
         authpair = url.username + ':' + url.password
@@ -38,12 +38,11 @@ class RpcFloddingTest (BitcoinTestFramework):
         assert(conn.sock != None)
         # according to http/1.1 connection must still be open!
 
-
         # communication will crash in following while loop if libevent-2.1.7 is used. 2.1.11 will not crash
         # looping with 100 will sometimes succeed and sometimes fail with libevent-2.1.7 hence using 2000
         for _ in range(2000):
             r = requests.get("http://" + url.hostname + ":" + str(url.port), auth=(url.username, url.password), data=json.dumps({}))
 
+
 if __name__ == '__main__':
     RpcFloddingTest().main()
-

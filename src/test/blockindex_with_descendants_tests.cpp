@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "blockindex_with_descendants.h"
+#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -165,8 +166,9 @@ BOOST_AUTO_TEST_CASE(basic) {
     // Sanity check that we created all blocks we intended
     BOOST_REQUIRE_EQUAL( b.mapBlockIndex.size(), N );
 
+    ResetGlobalRandomContext();
     // Perform all checks for various order of block index objects
-    std::mt19937 random(1); // always use the same seed for consistent results
+    std::mt19937 random(insecure_rand()); // always use the same seed for consistent results
     for(int i=0; i<1000; ++i)
     {
         // Create BlockIndexWithDescendants object for specified block, iterate over all descendant blocks,

@@ -178,7 +178,8 @@ public:
 /**
  * Stochastical (IP) address manager
  */
-class CAddrMan {
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
+class CAddrMan { // NOLINT(cppcoreguidelines-special-member-functions)
 private:
     //! critical section to protect the inner data structures
     mutable CCriticalSection cs;
@@ -199,12 +200,14 @@ private:
     int nTried;
 
     //! list of "tried" buckets
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     int vvTried[ADDRMAN_TRIED_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
     //! number of (unique) "new" entries
     int nNew;
 
     //! list of "new" buckets
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     int vvNew[ADDRMAN_NEW_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
     //! last time Good was called (memory only)
@@ -340,6 +343,7 @@ public:
         }
         for (int bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
             int nSize = 0;
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             for (int i = 0; i < ADDRMAN_BUCKET_SIZE; i++) {
                 if (vvNew[bucket][i] != -1) nSize++;
             }
@@ -350,6 +354,7 @@ public:
                     s << nIndex;
                 }
             }
+            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 
@@ -358,9 +363,9 @@ public:
 
         Clear();
 
-        uint8_t nVersion;
+        uint8_t nVersion; // NOLINT(cppcoreguidelines-init-variables)
         s >> nVersion;
-        uint8_t nKeySize;
+        uint8_t nKeySize; // NOLINT(cppcoreguidelines-init-variables)
         s >> nKeySize;
         if (nKeySize != 32)
             throw std::ios_base::failure(
@@ -389,6 +394,7 @@ public:
             CAddrInfo &info = mapInfo[n];
             s >> info;
             mapAddr[info] = n;
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             info.nRandomPos = vRandom.size();
             vRandom.push_back(n);
             if (nVersion != 1 || nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
@@ -397,7 +403,9 @@ public:
                 // reference based on their primary source address.
                 int nUBucket = info.GetNewBucket(nKey);
                 int nUBucketPos = info.GetBucketPosition(nKey, true, nUBucket);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 if (vvNew[nUBucket][nUBucketPos] == -1) {
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                     vvNew[nUBucket][nUBucketPos] = n;
                     info.nRefCount++;
                 }
@@ -412,12 +420,15 @@ public:
             s >> info;
             int nKBucket = info.GetTriedBucket(nKey);
             int nKBucketPos = info.GetBucketPosition(nKey, false, nKBucket);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             if (vvTried[nKBucket][nKBucketPos] == -1) {
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 info.nRandomPos = vRandom.size();
                 info.fInTried = true;
                 vRandom.push_back(nIdCount);
                 mapInfo[nIdCount] = info;
                 mapAddr[info] = nIdCount;
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 vvTried[nKBucket][nKBucketPos] = nIdCount;
                 nIdCount++;
             } else {
@@ -439,9 +450,11 @@ public:
                         info.GetBucketPosition(nKey, true, bucket);
                     if (nVersion == 1 &&
                         nUBuckets == ADDRMAN_NEW_BUCKET_COUNT &&
+                        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                         vvNew[bucket][nUBucketPos] == -1 &&
                         info.nRefCount < ADDRMAN_NEW_BUCKETS_PER_ADDRESS) {
                         info.nRefCount++;
+                        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                         vvNew[bucket][nUBucketPos] = nIndex;
                     }
                 }
@@ -474,11 +487,13 @@ public:
         nKey = GetRandHash();
         for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
             for (size_t entry = 0; entry < ADDRMAN_BUCKET_SIZE; entry++) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 vvNew[bucket][entry] = -1;
             }
         }
         for (size_t bucket = 0; bucket < ADDRMAN_TRIED_BUCKET_COUNT; bucket++) {
             for (size_t entry = 0; entry < ADDRMAN_BUCKET_SIZE; entry++) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 vvTried[bucket][entry] = -1;
             }
         }
@@ -490,6 +505,7 @@ public:
         nLastGood = 1;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CAddrMan() { Clear(); }
 
     ~CAddrMan() { nKey.SetNull(); }

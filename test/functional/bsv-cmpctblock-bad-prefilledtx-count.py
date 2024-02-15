@@ -9,17 +9,19 @@ Test: cmpctblock P2P message with large prefilled tx count.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 
+
 class MsgCmpctBlockBadPrefilledTxCount():
     command = b"cmpctblock"
 
     def serialize(self):
         r = b""
-        r += bytes([0xff] * 88 ) # blockheader and nonce
+        r += bytes([0xff] * 88) # blockheader and nonce
         r += bytes([0])          # shortid count
         r += bytes([0xff, 0xff, 0xff, 0xff,
                     0xff, 0xff, 0xff, 0xff,
                     0x01]) # large prefilled tx count (<= std::vector::max_size())
         return r
+
 
 class CmpctBlockBadPrefilledTxCountTest(BitcoinTestFramework):
 
@@ -34,6 +36,7 @@ class CmpctBlockBadPrefilledTxCountTest(BitcoinTestFramework):
             conn.send_message(MsgCmpctBlockBadPrefilledTxCount())
             wait_until(lambda: check_for_log_msg(self, "reason: Over-long", "/node0"),
                        timeout=3)
+
 
 if __name__ == '__main__':
     CmpctBlockBadPrefilledTxCountTest().main()

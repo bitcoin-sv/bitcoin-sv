@@ -28,6 +28,7 @@ class CBlockStreamReader;
  * Maximum amount of time that a block timestamp is allowed to exceed the
  * current network-adjusted time before the block will be accepted.
  */
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
 
 /**
@@ -286,7 +287,7 @@ public:
  *       This is not reflected in CBlockIndex state and can only be queried by
  *       calling IsInExplicitSoftConsensusFreeze() or IsInSoftConsensusFreeze()
  */
-class CBlockIndex {
+class CBlockIndex { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     template<typename T> struct UnitTestAccess;
     class TemporaryBlockIndex;
@@ -532,6 +533,7 @@ public:
 
         if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
         {
+            // NOLINTNEXTLINE(performance-move-const-arg)
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
         }
@@ -709,7 +711,8 @@ public:
     int64_t GetBlockTime() const { return int64_t(nTime); }
 
     int64_t GetBlockTimeMax() const { return int64_t(nTimeMax); }
-
+    
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int64_t GetHeaderReceivedTime() const { return nTimeReceived; }
 
     int64_t GetReceivedTimeDiff() const {
@@ -729,6 +732,7 @@ public:
         }
 
         const auto n{block_times.size() / 2};
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         std::nth_element(begin(block_times), begin(block_times) + n,
                          end(block_times));
         return block_times[n];
@@ -1152,6 +1156,7 @@ private:
  * checks if block is a valid candidate for potential later inclusion.
  * Class is also used in unit tests.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CBlockIndex::TemporaryBlockIndex
 {
 public:

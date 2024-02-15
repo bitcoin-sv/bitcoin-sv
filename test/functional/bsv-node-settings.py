@@ -12,10 +12,12 @@ from collections import defaultdict
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, check_for_log_msg, wait_until
 
+
 def scale_params(*params, scale):
     if isinstance(params, str):
         params = params.split()
     return ((param, scale) for param in params)
+
 
 class BSVNodeSettings(BitcoinTestFramework):
 
@@ -127,6 +129,7 @@ class BSVNodeSettings(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "-dustrelayfee", "/node0"))
         wait_until(lambda: check_for_log_msg(self, "-dustlimitfactor", "/node0"))
         wait_until(lambda: check_for_log_msg(self, "-blockmintxfee", "/node0"))
+
 
 if __name__ == '__main__':
     BSVNodeSettings().main()

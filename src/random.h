@@ -46,6 +46,7 @@ private:
     bool requires_seed;
     ChaCha20 rng;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t bytebuf[64];
     int bytebuf_size;
 
@@ -58,6 +59,7 @@ private:
         if (requires_seed) {
             RandomSeed();
         }
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         rng.Output(bytebuf, sizeof(bytebuf));
         bytebuf_size = sizeof(bytebuf);
     }
@@ -78,6 +80,7 @@ public:
         if (bytebuf_size < 8) {
             FillByteBuffer();
         }
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         uint64_t ret = ReadLE64(bytebuf + 64 - bytebuf_size);
         bytebuf_size -= 8;
         return ret;
@@ -103,7 +106,7 @@ public:
     /** Generate a random integer in the range [0..range). */
     uint64_t randrange(uint64_t range) {
         --range;
-        int bits = CountBits(range);
+        int bits = CountBits(range); // NOLINT(*-narrowing-conversions)
         while (true) {
             uint64_t ret = randbits(bits);
             if (ret <= range) {

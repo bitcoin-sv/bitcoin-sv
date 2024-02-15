@@ -15,6 +15,7 @@ from test_framework.util import assert_equal
 from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import msg_tx
 
+
 class BSVGenesisActivationTransactions(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -45,7 +46,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
@@ -70,6 +71,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         assert_equal(node.getblock(node.getbestblockhash())['height'], 103)
 
         self.assert_rejected_transaction(out[2])
+
 
 if __name__ == '__main__':
     BSVGenesisActivationTransactions().main()

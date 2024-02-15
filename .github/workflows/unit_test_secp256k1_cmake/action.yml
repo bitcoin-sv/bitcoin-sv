@@ -1,0 +1,13 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Unit test secp256k1'
+description:  'Unit test secp256k1'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        src/secp256k1/src/exhaustive_tests 
+        src/secp256k1/src/tests 
+      shell: bash
+

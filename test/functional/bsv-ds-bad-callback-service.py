@@ -3,7 +3,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import threading, json
+import threading
+import json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
@@ -28,6 +29,7 @@ Test badly behaving double-spend endpoints:
 # 127.0.0.1 as network-order bytes
 LOCAL_HOST_IP = 0x7F000001
 WRONG_IP = 0x7F000002
+
 
 class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
@@ -56,7 +58,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
         tx = CTransaction()
         tx.vin = inputs
         tx.vout = outputs
-        tx_hex =  self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
+        tx_hex = self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
         tx = FromHex(CTransaction(), tx_hex)
 
         self.node0.send_message(msg_tx(tx))
@@ -209,6 +211,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
             self.check_tx_not_received(tx_hash)
 
             self.kill_server()
+
 
 if __name__ == '__main__':
     DoubleSpendHandlerErrors().main()

@@ -8,6 +8,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than,  p2p_port
 from math import ceil
 
+
 class BsvProtoconfTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -41,10 +42,12 @@ class BsvProtoconfTest(BitcoinTestFramework):
         # Create a connection and connect to the node
         test_node = NodeConnCB()
         test_node.wanted_inv_lengths = []
+
         def on_getdata(conn, message):
             test_node.wanted_inv_lengths.append(len(message.inv))
         test_node.on_getdata = on_getdata
         # Send protoconf message from python node to bitcoind node
+
         def send_protoconf_default_msg_length(conn):
             conn.send_message(msg_protoconf(CProtoconf(1, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)))
         test_node.send_protoconf = send_protoconf_default_msg_length
@@ -143,7 +146,7 @@ class BsvProtoconfTest(BitcoinTestFramework):
         assert_equal(len(self.nodes[0].listbanned()), 0)  # not banned
 
         # 3. Send bitcoind Inv message that is larger than max_recv_payload_length.
-        logger.info( "Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements + 1, maxInvElements))
+        logger.info("Sending inv message with: {} elements. Max allowed : {}".format(maxInvElements + 1, maxInvElements))
         logger.info("Expecting to be banned...")
         test_node.send_message(msg_inv([CInv(CInv.TX, 2*maxInvElements+i) for i in range(0, maxInvElements + 1)]))
         test_node.wait_for_disconnect()
@@ -196,6 +199,7 @@ class BsvProtoconfTest(BitcoinTestFramework):
         self.run_ban_test(2*ONE_MiB)
         # Send many INV messages and check when they fill up queue in bitcoind and some of them get missing
         self.run_recvinvqueuefactor_test(ONE_MiB, 2)
+
 
 if __name__ == '__main__':
     BsvProtoconfTest().main()

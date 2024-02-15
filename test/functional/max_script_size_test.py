@@ -15,6 +15,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import create_transaction
 
 CHUNK_SIZE=len(CScript([b"a" * 500]))
+
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -173,7 +175,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         add_to_block_and_send(txs=[tx1, tx2], len_mem0=2)
 
         # Create 4 txs with small lock scripts, to test large unlock scripts
-        tx3 = new_tx(utxos[8], target_script_size=500, lock_script=CScript( [OP_DROP] * ((int)(floor(MAX_SCRIPT_SIZE_BEFORE_GENESIS / CHUNK_SIZE + 2))) + [OP_TRUE]))
+        tx3 = new_tx(utxos[8], target_script_size=500, lock_script=CScript([OP_DROP] * ((int)(floor(MAX_SCRIPT_SIZE_BEFORE_GENESIS / CHUNK_SIZE + 2))) + [OP_TRUE]))
         tx4 = new_tx(utxos[9], target_script_size=500, lock_script=CScript([OP_DROP] * ((int)(floor((MAX_SCRIPT_SIZE_BEFORE_GENESIS+1) / CHUNK_SIZE + 2))) + [OP_TRUE]))
         tx5 = new_tx(utxos[10], target_script_size=500, lock_script=CScript([OP_DROP] * ((int)(floor(MAX_SCRIPT_SIZE_BEFORE_GENESIS / CHUNK_SIZE + 2))) + [OP_TRUE]))
         tx6 = new_tx(utxos[11], target_script_size=500, lock_script=CScript([OP_DROP] * ((int)(floor((MAX_SCRIPT_SIZE_BEFORE_GENESIS+1) / CHUNK_SIZE + 2))) + [OP_TRUE]))

@@ -42,6 +42,7 @@ private:
      * Just store the serialized data.
      * Its length can very cheaply be computed from the first byte.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t vch[65];
 
     //! Compute the length of a pubkey with a given first byte.
@@ -56,33 +57,45 @@ private:
 
 public:
     //! Construct an invalid public key.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CPubKey() { Invalidate(); }
 
     //! Initialize a public key using begin/end iterators to byte data.
     template <typename T> void Set(const T pbegin, const T pend) {
-        int len = pend == pbegin ? 0 : GetLen(pbegin[0]);
+        auto len = pend == pbegin ? 0u : GetLen(pbegin[0]);
         if (len && len == (pend - pbegin))
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             memcpy(vch, (uint8_t *)&pbegin[0], len);
         else
             Invalidate();
     }
 
     //! Construct a public key using begin/end iterators to byte data.
-    template <typename T> CPubKey(const T pbegin, const T pend) {
+    template <typename T> 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    CPubKey(const T pbegin, const T pend) {
         Set(pbegin, pend);
     }
 
     //! Construct a public key from a byte vector.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CPubKey(const std::vector<uint8_t> &_vch) { Set(_vch.begin(), _vch.end()); }
 
     //! Simple read-only vector-like interface to the pubkey data.
     unsigned int size() const { return GetLen(vch[0]); }
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     const uint8_t *begin() const { return vch; }
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     const uint8_t *end() const { return vch + size(); }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     const uint8_t &operator[](unsigned int pos) const { return vch[pos]; }
 
     //! Comparator implementation.
     friend bool operator==(const CPubKey &a, const CPubKey &b) {
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         return a.vch[0] == b.vch[0] && memcmp(a.vch, b.vch, a.size()) == 0;
     }
     friend bool operator!=(const CPubKey &a, const CPubKey &b) {
@@ -90,6 +103,7 @@ public:
     }
     friend bool operator<(const CPubKey &a, const CPubKey &b) {
         return a.vch[0] < b.vch[0] ||
+               // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
                (a.vch[0] == b.vch[0] && memcmp(a.vch, b.vch, a.size()) < 0);
     }
 
@@ -97,15 +111,17 @@ public:
     template <typename Stream> void Serialize(Stream &s) const {
         unsigned int len = size();
         ::WriteCompactSize(s, len);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((char *)vch, len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
         unsigned int len = ::ReadCompactSize(s);
         if (len <= 65) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
             s.read((char *)vch, len);
         } else {
             // invalid pubkey, skip available data
-            char dummy;
+            char dummy; // NOLINT(cppcoreguidelines-init-variables)
             while (len--)
                 s.read(&dummy, 1);
             Invalidate();
@@ -113,9 +129,11 @@ public:
     }
 
     //! Get the KeyID of this public key (hash of its serialization)
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     CKeyID GetID() const { return CKeyID(Hash160(vch, vch + size())); }
 
     //! Get the 256-bit hash of this public key.
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     uint256 GetHash() const { return Hash(vch, vch + size()); }
 
     /*
@@ -156,8 +174,10 @@ public:
                 const ChainCode &cc) const;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct CExtPubKey {
     uint8_t nDepth;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t vchFingerprint[4];
     unsigned int nChild;
     ChainCode chaincode;
@@ -171,7 +191,9 @@ struct CExtPubKey {
                a.pubkey == b.pubkey;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Decode(const uint8_t code[BIP32_EXTKEY_SIZE]);
     bool Derive(CExtPubKey &out, unsigned int nChild) const;
 
@@ -183,16 +205,22 @@ struct CExtPubKey {
     template <typename Stream> void Serialize(Stream &s) const {
         unsigned int len = BIP32_EXTKEY_SIZE;
         ::WriteCompactSize(s, len);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Encode(code);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((const char *)&code[0], len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
         unsigned int len = ::ReadCompactSize(s);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
         if (len != BIP32_EXTKEY_SIZE)
             throw std::runtime_error("Invalid extended key size\n");
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.read((char *)&code[0], len);
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Decode(code);
     }
 };

@@ -36,6 +36,7 @@ class StreamPolicyFactory
   private:
 
     // Maker for a policy
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class MakerBase
     {
       public:

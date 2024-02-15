@@ -180,6 +180,7 @@ public:
             : mCollidedWithTransaction{ collidedWithTransaction }
         {}
 
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
         std::vector<CollidedWith>& mCollidedWithTransaction;
 
         friend class InvalidTxnInfo;
@@ -285,6 +286,7 @@ namespace InvalidTxnPublisher
         std::time_t mRejectionTime;
     };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class CInvalidTxnSink
     {
     protected:
@@ -294,6 +296,7 @@ namespace InvalidTxnPublisher
             constexpr int64_t APPROXIMATE_SIZE_NO_HEX = 500; // roughly size of the json file without transaction hex
             if (writeTxHex)
             {
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 return invalidTxnInfo.GetTotalTransactionSize() * 2 + APPROXIMATE_SIZE_NO_HEX;
             }
             return APPROXIMATE_SIZE_NO_HEX;
@@ -309,6 +312,7 @@ namespace InvalidTxnPublisher
 
 // Class used for asynchronous publishing invalid transactions to different sinks, 
 // thread safe
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CInvalidTxnPublisher
 {
 public:
@@ -379,7 +383,9 @@ class CScopedBlockOriginRegistry
     BlockOriginRegistry::const_iterator mThisItem;
 
     // registering origin of the block (from which peer, rpc)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     inline static BlockOriginRegistry mRegistry;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     inline static std::mutex mRegistryGuard;
 
 public:

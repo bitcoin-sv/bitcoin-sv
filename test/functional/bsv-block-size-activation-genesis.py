@@ -5,7 +5,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
 Test excessiveblocksize that is a required parameter. Blocks should be accepted at set value.
-Note we don't test oversized blocks as such peers are banned 
+Note we don't test oversized blocks as such peers are banned
 """
 
 from test_framework.test_framework import ComparisonTestFramework
@@ -35,7 +35,7 @@ class BSVBlockSizeTest(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
@@ -53,13 +53,14 @@ class BSVBlockSizeTest(ComparisonTestFramework):
 
         # Current block height is 104
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight - 1)
-        
+
         # Send proper sized block that should be accepted
         block(2, spend=out[1], block_size=self.maxBlockSize)
         yield self.accepted()
 
         # Current block height is 105 - genesis
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight)
+
 
 if __name__ == '__main__':
     BSVBlockSizeTest().main()

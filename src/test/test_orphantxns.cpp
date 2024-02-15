@@ -371,7 +371,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_getcollectedtxdata) {
     static constexpr int K=10;
     for (int i=0; i<K; ++i) {
         auto rand_iter { vExpectedTxData.begin() };
-        std::advance(rand_iter, GetRandInt(vExpectedTxData.size()-1));
+        std::advance(rand_iter, InsecureRandRange(vExpectedTxData.size()-1));
         orphanTxns.eraseCollectedTxDataFromTxns({rand_iter->mTxId});
         vExpectedTxData.erase(rand_iter);
     }

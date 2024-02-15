@@ -18,6 +18,7 @@ from test_framework.util import wait_until, p2p_port
 
 import random
 
+
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 class TestNode(NodeConnCB):
 
@@ -39,6 +40,7 @@ class TestNode(NodeConnCB):
             self.last_block = None
             self.last_blocktxn = None
 
+
 class MaxBlockTxn(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -51,7 +53,7 @@ class MaxBlockTxn(ComparisonTestFramework):
 
     def get_tests(self):
         # Out of IBD
-        self.chain.set_genesis_hash( int(self.nodes[0].getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
         block = self.chain.next_block
         block(0)
         yield self.accepted()
@@ -92,6 +94,7 @@ class MaxBlockTxn(ComparisonTestFramework):
         wait_until(lambda: peer.last_block != None)
         assert(peer.last_block.block.sha256 == b1.sha256)
         peer.clear_block_data()
+
 
 if __name__ == '__main__':
     MaxBlockTxn().main()

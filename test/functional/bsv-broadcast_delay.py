@@ -33,6 +33,7 @@ class NetworkThreadPinging(Thread):
     def stop(self):
         self.conn = None
 
+
 class BroadcastDelayTest(BitcoinTestFramework):
 
     # ensure funding and returns  given number of transcations without submitting them
@@ -48,7 +49,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
 
         # fund the transcation:
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = node.signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -67,7 +68,6 @@ class BroadcastDelayTest(BitcoinTestFramework):
             txs.append(tx)
 
         return txs
-
 
     def set_test_params(self):
         self.num_nodes = 1
@@ -109,7 +109,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
                 syncThr.join()
 
         # Make some transactions to work with.
-        txs =  self.make_transactions(50)
+        txs = self.make_transactions(50)
         self.stop_node(0)
 
         # Use small poll timeout to minimize errors in elapsed time measurement
@@ -142,6 +142,6 @@ class BroadcastDelayTest(BitcoinTestFramework):
                 assert(propagation_delay < datetime.timedelta(milliseconds=1500)) # allow variation of +-500ms
                 assert(propagation_delay > datetime.timedelta(milliseconds=500))
 
+
 if __name__ == '__main__':
     BroadcastDelayTest().main()
-

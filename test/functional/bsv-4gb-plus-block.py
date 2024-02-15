@@ -34,6 +34,7 @@ from test_framework.blocktools import create_block, create_coinbase, create_tx
 
 from operator import itemgetter
 
+
 class MyConnCB(NodeConnCB):
 
     def __init__(self):
@@ -53,10 +54,11 @@ class MyConnCB(NodeConnCB):
         request = False
         for i in message.inv:
             if i.type != 1:
-                request = True;
+                request = True
                 break
         if request:
             super().on_inv(conn, message)
+
 
 class BigBlockTests(BitcoinTestFramework):
 
@@ -69,12 +71,12 @@ class BigBlockTests(BitcoinTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
 
-        self.nodeArgs = [ '-genesisactivationheight=1',
-                          '-blockmaxsize={}'.format(ONE_GIGABYTE * 5),
-                          '-maxmempool=10000',
-                          '-maxnonstdtxvalidationduration=100000',
-                          '-maxtxnvalidatorasynctasksrunduration=100001',
-                          '-blockdownloadtimeoutbasepercent=300' ]
+        self.nodeArgs = ['-genesisactivationheight=1',
+                         '-blockmaxsize={}'.format(ONE_GIGABYTE * 5),
+                         '-maxmempool=10000',
+                         '-maxnonstdtxvalidationduration=100000',
+                         '-maxtxnvalidatorasynctasksrunduration=100001',
+                         '-blockdownloadtimeoutbasepercent=300']
 
         self.extra_args = [self.nodeArgs] * self.num_nodes
 
@@ -129,7 +131,7 @@ class BigBlockTests(BitcoinTestFramework):
         # Disconnect node1 and node2 for now
         disconnect_nodes_bi(self.nodes, 1, 2)
 
-        connArgs = [ { "versionNum":MY_VERSION }, { "versionNum":70015 } ]
+        connArgs = [{"versionNum":MY_VERSION}, {"versionNum":70015}]
         with self.run_node_with_connections("Test old and new protocol versions", 0, self.nodeArgs, number_of_connections=2,
                                             connArgs=connArgs, cb_class=MyConnCB) as (newVerConn,oldVerConn):
             assert newVerConn.connected
@@ -177,6 +179,6 @@ class BigBlockTests(BitcoinTestFramework):
             # Verify node1 also got the big block
             assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
+
 if __name__ == '__main__':
     BigBlockTests().main()
-

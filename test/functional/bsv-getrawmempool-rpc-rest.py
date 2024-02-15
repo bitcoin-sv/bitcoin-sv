@@ -11,6 +11,7 @@ from test_framework.script import CScript, OP_TRUE, OP_RETURN
 import http.client
 import urllib.parse
 
+
 def http_get_call(host, port, path, response_object=0):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path)
@@ -19,6 +20,7 @@ def http_get_call(host, port, path, response_object=0):
         return conn.getresponse()
 
     return conn.getresponse().read().decode('utf-8')
+
 
 class GetRawMempoolTest(BitcoinTestFramework):
     FORMAT_SEPARATOR = "."
@@ -102,8 +104,9 @@ class GetRawMempoolTest(BitcoinTestFramework):
             assert_equal(mempool[largeTx.hash]["size"] > txSize, True)
 
             # /rest/mempool/contents REST call
-            json_string = http_get_call(
-            url.hostname, url.port, '/rest/mempool/contents' + self.FORMAT_SEPARATOR + 'json')
+            json_string = http_get_call(url.hostname,
+                                        url.port,
+                                        '/rest/mempool/contents' + self.FORMAT_SEPARATOR + 'json')
             json_obj = json.loads(json_string)
             self.check_getRawMempool(json_obj, transactions + [largeTx])
             assert_equal(mempool[transactions[0].hash]["depends"], [])
@@ -144,6 +147,7 @@ class GetRawMempoolTest(BitcoinTestFramework):
             assert_equal(batch[2]["error"], None)
             assert_equal(batch[3]["error"], None)
             assert_equal(batch[4]["error"], None)
+
 
 if __name__ == '__main__':
     GetRawMempoolTest().main()

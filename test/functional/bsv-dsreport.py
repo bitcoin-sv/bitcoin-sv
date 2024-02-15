@@ -3,7 +3,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import threading, json
+import threading
+import json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
@@ -47,6 +48,7 @@ SKIP_IP = 0x7F000003
 # 127.0.0.4 as network-order bytes
 WRONG_IP2 = 0x7F000004
 
+
 # Returns True if host (str) responds to a ping6 request.
 def ping6(host):
     # option for the number of packets
@@ -63,8 +65,10 @@ def ping6(host):
 
     return success
 
+
 class HTTPServerV6(HTTPServer):
-        address_family = socket.AF_INET6
+    address_family = socket.AF_INET6
+
 
 class DoubleSpendReport(BitcoinTestFramework):
 
@@ -108,7 +112,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx = CTransaction()
         tx.vin = inputs
         tx.vout = outputs
-        tx_hex =  self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
+        tx_hex = self.nodes[0].signrawtransaction(ToHex(tx))["hex"]
         tx = FromHex(CTransaction(), tx_hex)
 
         self.node0.send_message(msg_tx(tx))
@@ -178,7 +182,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         ]
         self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "Already notified about txn {}".format(tx1.hash), "/node0"))
-
 
         # tx4 is not dsnt enabled, and gets accepted to the mempool
         vin = [
@@ -354,7 +357,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         # Create funding transactions that will provide funds for other transcations
         ftx = CTransaction()
         ftx.vout.append(CTxOut(1000000, CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -400,7 +403,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxOut(25, CScript([OP_TRUE]))
         ]
         tx3 = self.create_and_send_transaction(vin, vout)
-        
+
         wait_until(lambda: check_for_log_msg(self, "Script verification for double-spend was cancelled", "/node0"))
 
         # Wait for the callback service to process requests
@@ -457,7 +460,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1 for double-spend enabled txn {}".format(tx3.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Skipping notification to duplicate endpoint 127.0.0.1", "/node0"))
 
-
     # Test that proof is not sent if callback server does not want it.
     def check_ds_enabled_no_proof(self, utxo):
 
@@ -470,7 +472,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
-
 
         # spend the same output as tx1 (double spend)
         vin = [
@@ -496,7 +497,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx1.rehash()
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
 
-
         # spend the same output as tx1 (double spend)
         vin = [
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
@@ -521,7 +521,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                                        '-dsattemptqueuemaxmemory=1KB',
                                        '-dsnotifylevel=2'])
         self.createConnection()
- 
+
         assert(not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
 
         # tx1 is dsnt-enabled
@@ -577,7 +577,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.check_invalid_transactions(utxo[13])
 
         self.check_multiple_callback_services(utxo[14:16])
-        
+
         self.check_long_lasting_transactions()
 
         self.kill_server()

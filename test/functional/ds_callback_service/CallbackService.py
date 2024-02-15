@@ -7,33 +7,42 @@ from http.server import BaseHTTPRequestHandler
 from enum import Enum
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
-import json, time
+import json
+import time
+
 
 class RECEIVE(Enum):
     YES = 1
     NO = 0
+
 
 class STATUS(Enum):
     SUCCESS = 0
     CLIENT_ERROR = 1
     SERVER_ERROR = 2
 
+
 class RESPONSE_TIME(Enum):
     FAST = 0
     SLOW = 10
     SLOWEST = 70
 
+
 class FLAG(Enum):
     YES = 1
     NO = 0
+
 
 expectedProofs = []
 receivedProofs = []
 
 # Function to reset the expected/received proofs
+
+
 def reset_proofs():
     expectedProofs = []
     receivedProofs = []
+
 
 class CallbackService(BaseHTTPRequestHandler):
 
@@ -87,7 +96,7 @@ class CallbackService(BaseHTTPRequestHandler):
                     self.send_header('x-bsv-dsnt', 0)
                     self.end_headers()
                     return
-                
+
         elif (len(request) == 4):
             dsnt = request[1]
             ver = request[2]

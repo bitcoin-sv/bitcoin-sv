@@ -19,21 +19,24 @@ from test_framework.mininode import ToHex
 import http.client
 import urllib.parse
 
+
 def http_get_call(host, port, path):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path)
 
     return conn.getresponse()
 
+
 def checkJsonBlock(json_obj, showTxDetails, hash):
     assert_equal(json_obj['hash'], hash)
     assert_equal("hash" in json_obj["tx"][0], showTxDetails)
+
 
 class BSVGetBlock(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        self.setup_clean_chain = True        
+        self.setup_clean_chain = True
         self.FORMAT_SEPARATOR = "."
 
     def getBlock(self, block, block_size, form):
@@ -60,13 +63,13 @@ class BSVGetBlock(ComparisonTestFramework):
         elif form == "hex":
             assert_equal(response.getheader('content-length'), str(block_size*2))
             assert_equal(ToHex(block), response.read().decode('utf-8'))
-            
+
     def run_test(self):
         self.test.run()
 
     def get_tests(self):
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
@@ -112,9 +115,9 @@ class BSVGetBlock(ComparisonTestFramework):
 
         #check errors still work
         batch = self.nodes[0].batch([self.nodes[0].getblock.get_request(block.hash),
-                          self.nodes[0].getblock.get_request("somehash"),
-                          self.nodes[0].getblockcount.get_request(),
-                          self.nodes[0].undefinedmethod.get_request()])
+                                     self.nodes[0].getblock.get_request("somehash"),
+                                     self.nodes[0].getblockcount.get_request(),
+                                     self.nodes[0].undefinedmethod.get_request()])
 
         checkJsonBlock(batch[0]["result"], False, block.hash)
         assert_equal(batch[0]["error"], None)
@@ -123,6 +126,7 @@ class BSVGetBlock(ComparisonTestFramework):
         assert_equal(batch[2]["error"], None)
         assert_equal(batch[3]["result"], None)
         assert_equal(batch[3]["error"]["message"], "Method not found")
+
 
 if __name__ == '__main__':
     BSVGetBlock().main()

@@ -59,8 +59,17 @@ class TestNode():
         self.coverage_dir = coverage_dir
         # Most callers will just need to add extra args to the standard list below. For those callers that need more flexibity, they can just set the args property directly.
         self.extra_args = extra_args
-        self.args = self.binary + ["-datadir=" + self.datadir, "-server", "-keypool=1", "-discover=0", "-rest", "-logtimemicros",
-                     "-debug", "-debugexclude=libevent", "-debugexclude=leveldb", "-mocktime=" + str(mocktime), "-uacomment=testnode%d" % i]
+        self.args = self.binary + ["-datadir=" + self.datadir,
+                                   "-server",
+                                   "-keypool=1",
+                                   "-discover=0",
+                                   "-rest",
+                                   "-logtimemicros",
+                                   "-debug",
+                                   "-debugexclude=libevent",
+                                   "-debugexclude=leveldb",
+                                   "-mocktime=" + str(mocktime),
+                                   "-uacomment=testnode%d" % i]
 
         self.cli = TestNodeCLI(
             os.getenv("BITCOINCLI", "bitcoin-cli"), self.datadir)
@@ -97,7 +106,7 @@ class TestNode():
             while configFileArg:
                 allSetArgs += ["-" + configFileArg.rstrip()]
                 configFileArg = configFile.readline()
-        
+
         allSetArgs += inputArgs
 
         for currentArg in allSetArgs:
@@ -109,8 +118,8 @@ class TestNode():
                 if checkRequiredAt == -1:
                     checkRequiredAt = len(requiredArg)
                 if requiredArg[:checkRequiredAt] == currentArg[:checkCurentAt]:
-                   requiredArgs.remove(requiredArg)
-                   break
+                    requiredArgs.remove(requiredArg)
+                    break
 
         return inputArgs + requiredArgs
 
@@ -264,8 +273,6 @@ class TestNodeCLI():
         return json.loads(cli_stdout, parse_float=decimal.Decimal)
 
 
-
-
 def TestNode_kill_running_processes():
     """ Kill all started external processes that are still running in reverse order they were added to array """
     for p in reversed(TestNode_process_list):
@@ -274,5 +281,6 @@ def TestNode_kill_running_processes():
             p.kill()
             p.wait(timeout=1)
     TestNode_process_list.clear()
+
 
 atexit.register(TestNode_kill_running_processes)

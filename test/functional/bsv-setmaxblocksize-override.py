@@ -14,6 +14,7 @@ from test_framework.cdefs import (ONE_MEGABYTE)
 
 import os
 
+
 # Check excessiveblocksize configuration override
 class BSVEbsOverridden(BitcoinTestFramework):
 

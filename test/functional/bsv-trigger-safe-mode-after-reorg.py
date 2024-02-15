@@ -4,9 +4,9 @@
 """
 Test entering and exiting of safe mode by large invalid branch where data of first branch block arrives last
 Scenario:
-1. Generate two valid branches. 
+1. Generate two valid branches.
 2. Send first branch and check that it is active
-3. Send second branch that has more pow. 
+3. Send second branch that has more pow.
 4. Wait for reorg to finish and check that second branch is active and first is valid fork.
 5. Validate that node enters safe mode.
 6. Send additional blocks of second branch. Base of first fork is now too far from active tip to cause safe mode.
@@ -19,6 +19,7 @@ from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_FORK_LENGTH, SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE
+
 
 class TriggerSafeModeAfterReorg(BitcoinTestFramework):
 
@@ -74,6 +75,7 @@ class TriggerSafeModeAfterReorg(BitcoinTestFramework):
 
             # we should exit safe mode because fork base is too far from active tip
             assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
+
 
 if __name__ == '__main__':
     TriggerSafeModeAfterReorg().main()

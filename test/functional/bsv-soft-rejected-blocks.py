@@ -95,7 +95,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # This block must be in list of blocks considered soft rejected and explicitly marked as such.
         assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
-        
+
         # Check other data (besides block hash) returned by getsoftrejectedblocks
         assert_equal(self.nodes[0].getsoftrejectedblocks(True), [{
             'blockhash': b2_hash,
@@ -148,7 +148,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), b4_hash)
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash, b4_hash})
         assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
-        
+
         # Check other data (besides block hash) returned by getsoftrejectedblocks
         for b in self.nodes[0].getsoftrejectedblocks(False):
             # NOTE: Must check each one separately, because the order in array is unspecified
@@ -282,12 +282,12 @@ class SoftRejectedBlocks(BitcoinTestFramework):
 
         self.nodes[0].acceptblock(b1_hash)
         self.nodes[0].acceptblock(b2_hash)
-        
+
         # b3 cannot be marked as soft rejected for 1 or more blocks because that would
         # affect b4, which is already soft rejected
         assert_raises_rpc_error(-1, "Error marking block as soft rejected", self.nodes[
             0].softrejectblock, b3_hash, 1)
-        
+
         # ... and the same for b2 but 2 or more blocks
         assert_raises_rpc_error(-1, "Error marking block as soft rejected", self.nodes[
             0].softrejectblock, b2_hash, 2)
@@ -295,12 +295,12 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # b3 can be marked as soft rejected for 0 subsequent blocks
         self.nodes[0].softrejectblock(b3_hash, 0)
         self.nodes[0].acceptblock(b3_hash)
-        
+
         # ... so can b2, but for 0 or 1 subsequent blocks
         self.nodes[0].softrejectblock(b2_hash, 0)
         self.nodes[0].softrejectblock(b2_hash, 1)
         self.nodes[0].acceptblock(b2_hash)
-        
+
         # finish cleaning up so that there are no soft rejected blocks
         self.nodes[0].acceptblock(b4_hash)
         assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), set())
@@ -501,8 +501,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b3_hash})
         assert_equal(self.nodes[0].getblockcount(), 3)
         assert_equal(self.nodes[0].getbestblockhash(), b3_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash});
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash});
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
 
         # Extend soft rejection of block 2 so that it does affect the chain tip
         self.nodes[0].softrejectblock(b2_hash, 1)
@@ -511,8 +511,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b1_hash, b3_hash})
         assert_equal(self.nodes[0].getblockcount(), 1)
         assert_equal(self.nodes[0].getbestblockhash(), b1_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash});
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash});
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash})
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
 
         # Reduce soft rejection of block 2 so that it longer affects the chain tip
         self.nodes[0].acceptblock(b2_hash, 0)
@@ -521,8 +521,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b3_hash})
         assert_equal(self.nodes[0].getblockcount(), 3)
         assert_equal(self.nodes[0].getbestblockhash(), b3_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash});
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash});
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash})
 
         # Mark block 3 as soft rejected
         self.nodes[0].softrejectblock(b3_hash, 2)
@@ -531,8 +531,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b1_hash, b3_hash})
         assert_equal(self.nodes[0].getblockcount(), 1)
         assert_equal(self.nodes[0].getbestblockhash(), b1_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash});
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash});
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash})
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash})
 
         # Generate another block on node1, which should implicitly be considered soft rejected on node0
         b4_hash = self.nodes[1].generate(1)[0]
@@ -542,8 +542,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b1_hash, b4_hash})
         assert_equal(self.nodes[0].getblockcount(), 1)
         assert_equal(self.nodes[0].getbestblockhash(), b1_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash, b4_hash});
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash});
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash, b4_hash})
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b2_hash, b3_hash})
 
         # Unmark block 2 as soft rejected
         self.nodes[0].acceptblock(b2_hash)
@@ -552,8 +552,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b2_hash, b4_hash})
         assert_equal(self.nodes[0].getblockcount(), 2)
         assert_equal(self.nodes[0].getbestblockhash(), b2_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b3_hash, b4_hash});
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b3_hash});
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), {b3_hash, b4_hash})
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), {b3_hash})
 
         # Unmark block 3 as soft rejected
         self.nodes[0].acceptblock(b3_hash)
@@ -562,8 +562,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         assert_equal(self.chain_tips_hashes(self.nodes[0]), {b4_hash})
         assert_equal(self.nodes[0].getblockcount(), 4)
         assert_equal(self.nodes[0].getbestblockhash(), b4_hash)
-        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), set());
-        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), set());
+        assert_equal(self.soft_rej_blocks_hashes(self.nodes[0]), set())
+        assert_equal(self.marked_as_soft_rej_blocks_hashes(self.nodes[0]), set())
 
     def test_blocktree(self):
         """
@@ -592,7 +592,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             #      5 7
             chain = ChainManager()
             genesis_hash = self.nodes[0].getbestblockhash()
-            chain.set_genesis_hash( int(genesis_hash, 16) )
+            chain.set_genesis_hash(int(genesis_hash, 16))
             _, out, _ = prepare_init_chain(chain, 200, 12, block_0=False, start_block=1001, node=conn0.cb)
             conn0.cb.sync_with_ping()
 
@@ -604,11 +604,12 @@ class SoftRejectedBlocks(BitcoinTestFramework):
 
             def new_blk(idx, prev_idx):
                 chain.set_tip(prev_idx)
-                b = chain.next_block(idx, spend=out[idx]) # spend output with the same index as block
-                                                          # NOTE: We don't really care about spending outputs in this test.
-                                                          #       Spending different outputs is only used as a convenient way
-                                                          #       to make two blocks different if they have the same parent.
-                conn0.cb.send_message( msg_block(b) ) # send block to node
+                # spend output with the same index as block
+                # NOTE: We don't really care about spending outputs in this test.
+                #       Spending different outputs is only used as a convenient way
+                #       to make two blocks different if they have the same parent.
+                b = chain.next_block(idx, spend=out[idx])
+                conn0.cb.send_message(msg_block(b)) # send block to node
                 conn0.cb.sync_with_ping() # wait until node has processed the block
                 self.log.debug("Created block: idx=%i prev=%i hash=%s" % (idx, prev_idx, b.hash))
 
@@ -621,8 +622,6 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             new_blk(7, 6)
             new_blk(8, 1)
             new_blk(9, 8)
-
-
 
             # Block 5 should be tip of the active chain (it its highest and was received before 7, which is at the same height)
             assert_equal(self.nodes[0].getbestblockhash(), chain.blocks[5].hash)
@@ -750,7 +749,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
 
             # create and send block (child of b3) containing an invalid txn
             b4a_invalid = create_block(int(b3_hash, 16), create_coinbase(103))
-            b4a_invalid.vtx.append( create_transaction(tx_spendable, 0, CScript([OP_RETURN]), 100000) ) # invalid unlock script
+            b4a_invalid.vtx.append(create_transaction(tx_spendable, 0, CScript([OP_RETURN]), 100000)) # invalid unlock script
             b4a_invalid.hashMerkleRoot = b4a_invalid.calc_merkle_root()
             b4a_invalid.solve()
             b4a_invalid.rehash()
@@ -764,7 +763,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             Verify we have the expected tip after calling acceptblock on chain
             where we received invalid block.
 
-            b1->b2->b3; softrejectblock(b2,2); send b4_invalid made on top of b3;
+            b1->b2->b3; softrejectblock(b2,2); send b4_invalid made on top of b3
             acceptblock(b2); assert b3 is active
         """
         self.nodes[0].generate(101)

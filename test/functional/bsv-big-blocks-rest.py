@@ -14,17 +14,19 @@ from test_framework.cdefs import ONE_MEGABYTE
 import http.client
 import urllib.parse
 
+
 def http_get_call(host, port, path):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path)
 
     return conn.getresponse()
 
+
 class BSVBigBlockRestCall(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        self.setup_clean_chain = True        
+        self.setup_clean_chain = True
         self.FORMAT_SEPARATOR = "."
         self.extra_args = [['-whitelist=127.0.0.1', '-rpcservertimeout=1000', '-blocksizeactivationtime=10']]
 
@@ -46,7 +48,7 @@ class BSVBigBlockRestCall(ComparisonTestFramework):
 
     def get_tests(self):
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
@@ -64,6 +66,7 @@ class BSVBigBlockRestCall(ComparisonTestFramework):
 
         # getting big block with REST should not fail
         self.getLargeBlockWithoutFailing(maxBlock.hash, blockSize)
+
 
 if __name__ == '__main__':
     BSVBigBlockRestCall().main()

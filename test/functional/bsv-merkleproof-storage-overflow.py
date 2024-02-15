@@ -13,6 +13,7 @@ create a merkle tree that has memory requirements below available and check that
 create a merkle tree that has memory requirements above available and check that error log is emitted
 '''
 
+
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -82,6 +83,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert not self.find_overflow_message_in_logs()
         self.create_merkleproof (True)
         assert self.find_overflow_message_in_logs()
+
 
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

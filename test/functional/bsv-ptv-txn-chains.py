@@ -13,6 +13,7 @@ from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx
 import multiprocessing
 
+
 class PTVTxnChains(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -23,7 +24,9 @@ class PTVTxnChains(ComparisonTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.locking_script = CScript([self.coinbase_pubkey, OP_CHECKSIG])
-        self.extra_args = [['-debug', '-genesisactivationheight=%d' % self.genesisactivationheight]] * self.num_nodes
+        self.extra_args = [['-debug',
+                            '-maxorphantxsize=10MB',
+                            '-genesisactivationheight=%d' % self.genesisactivationheight]] * self.num_nodes
 
     def run_test(self):
         self.test.run()
@@ -73,6 +76,7 @@ class PTVTxnChains(ComparisonTestFramework):
 
     def get_tests(self):
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         # Shorthand for functions
@@ -108,7 +112,9 @@ class PTVTxnChains(ComparisonTestFramework):
         # Each thread from the validaiton thread pool should have an assigned chain of txns to process.
         args = ['-maxorphantxsize=0', '-txnvalidationasynchrunfreq=100', '-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('Scenario 1: {} chains of length 10. Storing orphans is disabled.'.format(num_of_threads),
-                0, args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_threads, 10, out, timeout=20)
 
@@ -119,7 +125,9 @@ class PTVTxnChains(ComparisonTestFramework):
                 '-limitancestorcount=20', '-checkmempool=0', '-persistmempool=0'
                 '-maxstdtxvalidationduration=100']
         with self.run_node_with_connections('Scenario 2: {} chains of length 20. Storing orphans is disabled.'.format(num_of_threads),
-                0, args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_threads, 20, out, timeout=30)
 
@@ -131,9 +139,12 @@ class PTVTxnChains(ComparisonTestFramework):
         args = ['-maxorphantxsize=10', '-txnvalidationasynchrunfreq=0',
                 '-limitancestorcount=50', '-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections("Scenario 3: 100 chains of length 50. Storing orphans is enabled.",
-                0, args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, 100, 50, out, timeout=60)
+
 
 if __name__ == '__main__':
     PTVTxnChains().main()

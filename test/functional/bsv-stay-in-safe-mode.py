@@ -17,7 +17,10 @@ from test_framework.blocktools import make_block, send_by_headers, wait_for_tip,
 from test_framework.mininode import msg_block
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
-import glob, shutil, os
+import glob
+import shutil
+import os
+
 
 class StayInSafeMode(BitcoinTestFramework):
 
@@ -104,6 +107,7 @@ class StayInSafeMode(BitcoinTestFramework):
         self.run_test_case("Send headers from second branch first and then active chain. Do not wait between sending.", order=-1, wait=False)
         self.run_test_case("Send active chain first and then headers from second branch. Wait between sending.", order=1, wait=True, numberOfSafeModeLevelChanges=2)
         self.run_test_case("Send headers from second branch first and then active chain. Wait between sending.", order=-1, wait=True)
+
 
 if __name__ == '__main__':
     StayInSafeMode().main()

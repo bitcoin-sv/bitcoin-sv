@@ -43,9 +43,11 @@ class RejectResult():
     def __repr__(self):
         return '%i:%s' % (self.code, self.reason or '*')
 
+
 class DiscardResult():
     """Outcome that expects the silent discarding of a transaction."""
     pass
+
 
 class TestNode(NodeConnCB):
 
@@ -308,7 +310,7 @@ class TestManager():
                 if c.cb.bestblockhash == blockhash:
                     return ('Block was not rejected: %064x' % (blockhash), False)
 
-                if not blockhash in c.cb.block_reject_map:
+                if blockhash not in c.cb.block_reject_map:
                     return ('Block not in reject map: %064x' % (blockhash), True)
 
                 if not outcome.match(c.cb.block_reject_map[blockhash]):
@@ -376,7 +378,7 @@ class TestManager():
                     if txhash in c.cb.tx_reject_map:
                         logger.error('Tx in reject map: %064x' % (txhash))
                         return False
-                    return not txhash in c.cb.lastInv
+                    return txhash not in c.cb.lastInv
                 elif ((txhash in c.cb.lastInv) != outcome):
                     return False
             return True

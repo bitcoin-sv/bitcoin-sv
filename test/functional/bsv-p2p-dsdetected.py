@@ -16,10 +16,11 @@ import os
 import random
 import threading
 
+
 # A dummy webhook service that accepts POST request and stores the JSON string sent
 # This JSON string can then be retrieved through GET request for evaluation.
 class WebHookService(BaseHTTPRequestHandler):
-    
+
     # On every POST/GET new WebHookService instance is created. To be able to share the last JSON received between instances, static variable is used.
     lastReceivedJSON = None
 
@@ -54,11 +55,14 @@ class WebHookService(BaseHTTPRequestHandler):
     def log_request(self, code):
         return
 
+
 class fake_msg_dsdetected():
     command = b"dsdetected"
+
     def serialize(self):
         r = os.urandom(random.randint(100, 1000))
         return r
+
 
 class DSDetectedTests(BitcoinTestFramework):
 
@@ -119,7 +123,7 @@ class DSDetectedTests(BitcoinTestFramework):
     # commonBlock should be a CBlock() instance.
     # txsWithUtxos should be an array of transactions [CTransaction()]. Each transaction should have spendable outputs.
     def createRandomBlockTree(self, maxNumberOfBranches, maxNumberOfBlocksPerBranch, commonBlock, txsWithUtxos):
-        
+
         # Select a random transaction which output we will double-spend
         spendTransaction = txsWithUtxos[random.randrange(len(txsWithUtxos))]
         spendOutput = random.randrange(len(spendTransaction.vout))
@@ -190,7 +194,6 @@ class DSDetectedTests(BitcoinTestFramework):
 
         send_by_headers(connection, [initialBlock], do_send_blocks=True)
         wait_for_tip(connection, initialBlock.hash)
-
 
         node.generate(101)
         block101hex = node.getblock(node.getbestblockhash(), False)
@@ -263,20 +266,20 @@ class DSDetectedTests(BitcoinTestFramework):
         # Webhook should not receive the notification if we send dsdetected message with two block details and one is containing no headers.
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
-            BlockDetails([                    ], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
+            BlockDetails([], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message where last headers in block details do not have a common previous block hash.
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)   ], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(utxoBlock)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message where block details does not have headers in proper order.
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)                         ], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(utxoBlock), CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
@@ -284,7 +287,7 @@ class DSDetectedTests(BitcoinTestFramework):
         # Webhook should not receive the notification if we send dsdetected message with the empty merkle proof.
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
-            BlockDetails([CBlockHeader(blockB)], DSMerkleProof(                                                                      ))])
+            BlockDetails([CBlockHeader(blockB)], DSMerkleProof())])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
@@ -311,14 +314,14 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Webhook should not receive the notification if we send dsdetected message with the wrong merkle proof (merkle root validation should fail)
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256 )])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockA.hashMerkleRoot)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message with the merkle proof having an additional unexpected node (merkle root validation should fail)
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256                                        )])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txB, blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[0].sha256), MerkleProofNode(blockA.hashMerkleRoot)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)

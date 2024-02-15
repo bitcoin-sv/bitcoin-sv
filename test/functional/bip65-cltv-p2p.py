@@ -90,7 +90,7 @@ class BIP65Test(BitcoinTestFramework):
         for i in range((CLTV_HEIGHT - 2) // 10):
             self.coinbase_blocks += self.nodes[0].generate(10)
         self.coinbase_blocks += self.nodes[0].generate(rem)
-        
+
         self.nodeaddress = self.nodes[0].getnewaddress()
 
         self.log.info(

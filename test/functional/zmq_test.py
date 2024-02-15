@@ -60,7 +60,6 @@ class ZMQTest (BitcoinTestFramework):
         assert_equal({'notification': 'pubrawtx',
                       'address': address} in active_notifications, True)
 
-
     def _zmq_test(self):
         genhashes = self.nodes[0].generate(1)
         self.sync_all()

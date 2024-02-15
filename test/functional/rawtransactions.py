@@ -31,8 +31,11 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.num_nodes = 4
         self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
         self.extra_args = [['-persistmempool=0'],['-persistmempool=0'],['-persistmempool=0'],
-                            ['-persistmempool=0', '-maxmempool=300', '-maxmempoolsizedisk=0', f"-minminingtxfee={self.relayfee}"
-                                     , f"-mindebugrejectionfee={self.relayfee}"]]
+                           ['-persistmempool=0',
+                            '-maxmempool=300',
+                            '-maxmempoolsizedisk=0',
+                            f"-minminingtxfee={self.relayfee}",
+                            f"-mindebugrejectionfee={self.relayfee}"]]
 
     def setup_network(self, split=False):
         super().setup_network()
@@ -254,9 +257,9 @@ class RawTransactionsTest(BitcoinTestFramework):
             "vout": 0,
         }]
         outputs = {
-                self.nodes[0].getnewaddress(): 0.5,
-                "data": 'ffffffff'
-            }
+            self.nodes[0].getnewaddress(): 0.5,
+            "data": 'ffffffff'
+        }
         rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
         tx = CTransaction()
         f = BytesIO(hex_str_to_bytes(rawtx))
@@ -306,7 +309,6 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(self.nodes[3].gettransaction(txid2)["txid"], txid2)
 
-        
         #
         # Submit transaction without checking fee 2/2 #
         #
@@ -327,7 +329,7 @@ class RawTransactionsTest(BitcoinTestFramework):
             rawTxn = self.nodes[3].createrawtransaction(inputs, outputs)
             signedTxn = self.nodes[3].signrawtransaction(rawTxn)["hex"]
             self.nodes[3].sendrawtransaction(signedTxn, False, False)
-        
+
         # create new transaction
         mempoolsize = self.nodes[3].getmempoolinfo()['size']
         signedTxn = self.make_data_transaction(self.nodes[3], utxos.pop())
@@ -350,7 +352,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         txid1 = self.nodes[3].decoderawtransaction(txnhex1)["txid"]
         txid2 = self.nodes[3].decoderawtransaction(txnhex2)["txid"]
         # Check fee.
-        rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': False }, {'hex': txnhex2, 'dontcheckfee': False}])
+        rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': False}, {'hex': txnhex2, 'dontcheckfee': False}])
         assert_equal(len(rejectedTxns), 1)
         assert_equal(len(rejectedTxns['invalid']), 2)
         assert_equal(rejectedTxns['invalid'][0]['reject_code'], 66)
@@ -359,7 +361,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(txid1 not in mempool)
         assert(txid2 not in mempool)
         # Don't check fee.
-        rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True }, {'hex': txnhex2, 'dontcheckfee': True}])
+        rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True}, {'hex': txnhex2, 'dontcheckfee': True}])
         assert_equal(len(rejectedTxns), 0)
         mempool = self.nodes[3].getrawmempool()
         assert(txid1 in mempool)
@@ -381,20 +383,21 @@ class RawTransactionsTest(BitcoinTestFramework):
         # - contain "unconfirmed" array of elements with:
         #   - "txid" of the specified transaction
         #   - "ancestors" as an array of transaction's unconfirmed ancestors each containing its txid and inputs
-        unconfirmed = self.nodes[0].sendrawtransactions([{'hex': child_tx, 'listunconfirmedancestors': True }])
+        unconfirmed = self.nodes[0].sendrawtransactions([{'hex': child_tx, 'listunconfirmedancestors': True}])
         wait_until(lambda: unconfirmed["unconfirmed"][0]["txid"] in self.nodes[0].getrawmempool())
         assert_equal(len(unconfirmed), 1)
         assert_equal(len(unconfirmed["unconfirmed"]), 1)
         assert_equal(len(unconfirmed["unconfirmed"][0]["ancestors"]), 2)
         ancestors_txids = []
         for ancestor in unconfirmed["unconfirmed"][0]["ancestors"]:
-          ancestors_txids.append(ancestor["txid"])
-          assert_equal(len(ancestor["vin"]), 1)
-          vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
-          assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
-          assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
+            ancestors_txids.append(ancestor["txid"])
+            assert_equal(len(ancestor["vin"]), 1)
+            vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
+            assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
+            assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
         assert(parent_tx_1 in ancestors_txids)
         assert(parent_tx_2 in ancestors_txids)
+
 
 if __name__ == '__main__':
     RawTransactionsTest().main()

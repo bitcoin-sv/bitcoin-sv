@@ -28,8 +28,7 @@ namespace
             block.vtx[j] = MakeTransactionRef(std::move(mtx));
         }
 
-        std::random_device rd {};
-        std::mt19937 mt { rd() };
+        std::mt19937 mt { insecure_rand() };
         std::uniform_real_distribution<float> dist { 1, static_cast<float>(block.vtx.size()) };
         std::vector<size_t> indexes {};
         for(size_t i = 0; i < NumDatarefTx; ++i)

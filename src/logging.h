@@ -19,7 +19,7 @@ static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = false;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
 
-extern bool fLogIPs;
+extern bool fLogIPs; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 namespace BCLog {
 
@@ -56,12 +56,13 @@ enum LogFlags : uint32_t {
     ALL = ~uint32_t(0),
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Logger {
 private:
     /**
      * Name of the log file
      */
-    const char* const fileName;
+    const char* const fileName; // NOLINT (cppcoreguidelines-avoid-const-or-ref-data-members)
 
     FILE *fileout = nullptr;
     std::mutex mutexDebugLog;

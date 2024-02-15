@@ -40,6 +40,7 @@
 #include <boost/thread.hpp>
 
 #include <cassert>
+#include <cstdint>
 
 using namespace mining;
 
@@ -1042,7 +1043,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFlushOnClose) {
     wtx.BindWallet(this);
     bool fInsertedNew = ret.second;
     if (fInsertedNew) {
-        wtx.nTimeReceived = GetAdjustedTime();
+        wtx.nTimeReceived = static_cast<unsigned int>(GetAdjustedTime());
         wtx.nOrderPos = IncOrderPosNext(&walletdb);
         wtxOrdered.insert(std::make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
         wtx.nTimeSmart = ComputeTimeSmart(wtx);
@@ -1376,7 +1377,7 @@ void CWallet::BlockConnected(
         SyncTransaction(ptx);
     }
     for (size_t i = 0; i < pblock->vtx.size(); i++) {
-        SyncTransaction(pblock->vtx[i], pindex, i);
+        SyncTransaction(pblock->vtx[i], pindex, static_cast<int>(i));
     }
 }
 
@@ -2342,7 +2343,7 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
                 vCoins.push_back(COutput(
-                    pcoin, i, nDepth,
+                    pcoin, static_cast<int>(i), nDepth,
                     ((mine & ISMINE_SPENDABLE) != ISMINE_NO) ||
                         (coinControl && coinControl->fAllowWatchOnly &&
                          (mine & ISMINE_WATCH_SOLVABLE) != ISMINE_NO),
@@ -2434,7 +2435,7 @@ bool CWallet::SelectCoinsMinConf(
             continue;
         }
 
-        int i = output.i;
+        auto i = static_cast<unsigned int>(output.i);
         Amount n = pcoin->tx->vout[i].nValue;
 
         std::pair<Amount, std::pair<const CWalletTx *, unsigned int>> coin =
@@ -2529,8 +2530,9 @@ bool CWallet::SelectCoins(
                 continue;
             }
 
-            nValueRet += out.tx->tx->vout[out.i].nValue;
-            setCoinsRet.insert(std::make_pair(out.tx, out.i));
+            auto i = static_cast<unsigned int>(out.i);
+            nValueRet += out.tx->tx->vout[i].nValue;
+            setCoinsRet.insert(std::make_pair(out.tx, i));
         }
 
         return (nValueRet >= nTargetValue);
@@ -2634,8 +2636,9 @@ bool CWallet::FundTransaction(CMutableTransaction &tx, Amount &nFeeRet,
     // Turn the txout set into a CRecipient vector.
     for (size_t idx = 0; idx < tx.vout.size(); idx++) {
         const CTxOut &txOut = tx.vout[idx];
+        int i = static_cast<int>(idx);
         CRecipient recipient = {txOut.scriptPubKey, txOut.nValue,
-                                setSubtractFeeFromOutputs.count(idx) == 1};
+                                setSubtractFeeFromOutputs.count(i) == 1};
         vecSend.push_back(recipient);
     }
 
@@ -2745,7 +2748,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     // e.g. high-latency mix networks and some CoinJoin implementations, have
     // better privacy.
     if (GetRandInt(10) == 0) {
-        txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
+        txNew.nLockTime = static_cast<uint32_t>(std::max(0, (int)txNew.nLockTime - GetRandInt(100)));
     }
 
     assert(txNew.nLockTime <= static_cast<uint32_t>(chainActive.Height()));
@@ -3015,7 +3018,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             SigHashType sigHashType = SigHashType().withForkId();
 
             CTransaction txNewConst(txNew);
-            int nIn = 0;
+            unsigned int nIn = 0;
             for (const auto &coin : setCoins) {
                 const CScript &scriptPubKey =
                     coin.first->tx->vout[coin.second].scriptPubKey;
@@ -3374,7 +3377,7 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize) {
     }
 
     // Top up key pool
-    unsigned int nTargetSize;
+    int64_t nTargetSize;
     if (kpSize > 0) {
         nTargetSize = kpSize;
     } else {
@@ -3913,7 +3916,7 @@ void CWallet::GetKeyBirthTimes(
  * https://github.com/bitcoin/bitcoin/pull/1393.
  */
 unsigned int CWallet::ComputeTimeSmart(const CWalletTx &wtx) const {
-    unsigned int nTimeSmart = wtx.nTimeReceived;
+    int64_t nTimeSmart = wtx.nTimeReceived;
     if (!wtx.hashUnset()) {
         if (auto index = mapBlockIndex.Get(wtx.hashBlock); index)
         {
@@ -3955,7 +3958,7 @@ unsigned int CWallet::ComputeTimeSmart(const CWalletTx &wtx) const {
                       wtx.GetId().ToString(), wtx.hashBlock.ToString());
         }
     }
-    return nTimeSmart;
+    return static_cast<unsigned int>(nTimeSmart);
 }
 
 bool CWallet::AddDestData(const CTxDestination &dest, const std::string &key,

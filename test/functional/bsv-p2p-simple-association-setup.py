@@ -10,6 +10,7 @@ from test_framework.streams import StreamType, BlockPriorityStreamPolicy, Defaul
 
 # Test functionality within the test framework for simply creating P2P associations to nodes
 
+
 # Subclass association callback type to get notifications we are interested in
 class MyAssociationCB(AssociationCB):
     def __init__(self):
@@ -23,6 +24,7 @@ class MyAssociationCB(AssociationCB):
         self.pong_count += 1
         self.pong_stream = stream.stream_type
 
+
 class P2PSimpleAssociation(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -32,7 +34,7 @@ class P2PSimpleAssociation(BitcoinTestFramework):
 
     def run_test(self):
         # Setup 2 associations; one with BlockPriority policy and one with Default policy
-        associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
+        associations_stream_policies = [BlockPriorityStreamPolicy(), DefaultStreamPolicy()]
         with self.run_node_with_associations("Simple Association Setup", 0, [], associations_stream_policies, cb_class=MyAssociationCB) as associations:
 
             # Check we got an association ID and some known stream policies back
@@ -59,6 +61,7 @@ class P2PSimpleAssociation(BitcoinTestFramework):
                     assert_equal(association.callbacks.pong_stream, StreamType.DATA1)
                 elif type(association.stream_policy) is DefaultStreamPolicy:
                     assert_equal(association.callbacks.pong_stream, StreamType.GENERAL)
+
 
 if __name__ == '__main__':
     P2PSimpleAssociation().main()

@@ -254,9 +254,32 @@ BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
     BOOST_CHECK_EQUAL(keys.size(), 0U);
 }
 
+namespace  {
+    class DeterministicUUIDGenerator
+    {
+    private:
+        boost::mt19937 random_generator;
+        using uuid_random_generator_type = boost::uuids::basic_random_generator<boost::mt19937>;
+        uuid_random_generator_type uuid_random_generator;
+
+    public:
+        using result_type = uuid_random_generator_type::result_type;
+
+        DeterministicUUIDGenerator()
+            : random_generator(insecure_rand())
+            , uuid_random_generator(random_generator)
+        {}
+
+        result_type operator()()
+        {
+            return uuid_random_generator();
+        }
+    };
+}
+
 BOOST_AUTO_TEST_CASE(GetSetXrefKey)
 {
-    boost::uuids::random_generator gen;
+    DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
     BOOST_CHECK_NE(to_string(uuid), to_string(xref));
@@ -270,7 +293,7 @@ BOOST_AUTO_TEST_CASE(GetSetXrefKey)
 
 BOOST_AUTO_TEST_CASE(RemoveXrefKey)
 {
-    boost::uuids::random_generator gen;
+    DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
 
@@ -284,7 +307,7 @@ BOOST_AUTO_TEST_CASE(RemoveXrefKey)
 
 BOOST_AUTO_TEST_CASE(AutoRemoveXrefKey)
 {
-    boost::uuids::random_generator gen;
+    DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
     const auto entries = GetABunchOfEntries(1);
@@ -518,8 +541,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
 
 BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 {
-    std::random_device rndev;
-    std::mt19937 generator(rndev());
+    std::mt19937 generator(insecure_rand());
 
     auto entries = GetABunchOfEntries(541);
     const auto middle = entries.begin() + entries.size() / 2;
@@ -566,7 +588,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 
 BOOST_AUTO_TEST_CASE(AsyncGetSetXrefKey)
 {
-    boost::uuids::random_generator gen;
+    DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
     BOOST_CHECK_NE(to_string(uuid), to_string(xref));
@@ -580,7 +602,7 @@ BOOST_AUTO_TEST_CASE(AsyncGetSetXrefKey)
 
 BOOST_AUTO_TEST_CASE(AsyncRemoveXrefKey)
 {
-    boost::uuids::random_generator gen;
+    DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
 
@@ -594,7 +616,7 @@ BOOST_AUTO_TEST_CASE(AsyncRemoveXrefKey)
 
 BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
 {
-    boost::uuids::random_generator gen;
+    DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
     auto entries = GetABunchOfEntries(1);

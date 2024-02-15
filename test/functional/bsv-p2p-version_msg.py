@@ -12,6 +12,7 @@ from test_framework.util import assert_equal, connect_nodes, p2p_port, check_for
 
 import struct
 
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -20,6 +21,7 @@ class TestNode(NodeConnCB):
     def on_reject(self, conn, message):
         super().on_reject(conn, message)
         self.last_reject = message
+
 
 class msg_version_bad(msg_version):
     def __init__(self):
@@ -40,6 +42,7 @@ class msg_version_bad(msg_version):
             struct.pack("<Q", self.nExtraEntropy)
         ))
         return r
+
 
 class P2PVersion(BitcoinTestFramework):
 
@@ -81,6 +84,7 @@ class P2PVersion(BitcoinTestFramework):
 
         # Check clear log message was generated
         assert check_for_log_msg(self, "Failed to process version: (Badly formatted association ID", "/node0")
+
 
 if __name__ == '__main__':
     P2PVersion().main()

@@ -10,9 +10,9 @@
 
 namespace
 {
-    struct RegtestingSetup : public TestingSetup
+    struct RegtestingSetup : public BasicTestingSetup
     {
-        RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST)
+        RegtestingSetup() : BasicTestingSetup(CBaseChainParams::REGTEST)
         {
         }
     };
@@ -30,6 +30,15 @@ namespace
         uint64_t writtenRandomTxIndex;
     };
 
+    // NOTE function returns value in range [1, range]
+    // use with caution on array indices
+    template<uint64_t range>
+    uint64_t InsecureRandRangeNonZero()
+    {
+        static_assert(range >= 1, "Invalid range");
+        return InsecureRandRange(range) + 1;
+    }
+
     CBlock CreateRandomBlock(const uint64_t numberOfTransactions)
     {
         CBlock block;
@@ -37,7 +46,7 @@ namespace
         block.nVersion = 42;
         block.hashPrevBlock = InsecureRand256();
         block.nBits = 0x207fffff;
-        
+        BOOST_REQUIRE(numberOfTransactions > 0);
         for (size_t i = 0; i < numberOfTransactions; ++i)
         {
             CMutableTransaction tx;
@@ -62,6 +71,7 @@ namespace
         BOOST_CHECK(dataToStore.writtenMerkleRoot == BlockMerkleRoot(block));
         uint64_t indexOfRandomTx = InsecureRandRange(block.vtx.size());
         dataToStore.writtenRandomTxIndex = indexOfRandomTx;
+        BOOST_REQUIRE(indexOfRandomTx < block.vtx.size());
         dataToStore.writtenRandomTxHash = block.vtx[indexOfRandomTx]->GetId();
         writtenData.push_back(dataToStore);
     }
@@ -114,10 +124,10 @@ BOOST_AUTO_TEST_CASE(write_read_test)
 
     std::vector<WrittenData> writtenDataToCheck;
     // Create some random blocks and write their Merkle Trees to disk
-    int32_t numberOfBlocks = static_cast<int32_t>(InsecureRandRange(100));
+    int32_t numberOfBlocks = static_cast<int32_t>(InsecureRandRangeNonZero<100>());
     for (int32_t i = 0; i < numberOfBlocks; ++i)
     {
-        CBlock block = CreateRandomBlock(InsecureRandRange(20000));
+        CBlock block = CreateRandomBlock(InsecureRandRangeNonZero<20000>());
         CMerkleTree merkleTree(block.vtx, block.GetHash(), i);
         BOOST_CHECK(merkleTreeStore.StoreMerkleTree(testConfig, merkleTree, i));
 

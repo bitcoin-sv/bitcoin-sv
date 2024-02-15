@@ -10,9 +10,10 @@ import time
 
 # This test checks different cases of handling mempool requests.
 # If a peer is not whitelisted:
-    # If rejectmempoolrequest=true (default value), mempool request is always rejected.
-    # If rejectmempoolrequest=false mempool request is rejected only if peerbloomfilters=0.
+#     If rejectmempoolrequest=true (default value), mempool request is always rejected.
+#     If rejectmempoolrequest=false mempool request is rejected only if peerbloomfilters=0.
 # Is a peer is whitelisted, mempool request is never rejected.
+
 
 class P2PMempoolTests(BitcoinTestFramework):
     def set_test_params(self):
@@ -51,6 +52,7 @@ class P2PMempoolTests(BitcoinTestFramework):
 
         for test_case in test_cases:
             runTestWithParams(test_case[0], test_case[1], test_case[2])
+
 
 if __name__ == '__main__':
     P2PMempoolTests().main()

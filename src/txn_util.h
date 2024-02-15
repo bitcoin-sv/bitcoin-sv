@@ -15,6 +15,7 @@
  *
  * It is a wrapper over an unordered set which provides mt support.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxIdTracker final
 {
   public:
@@ -30,6 +31,7 @@ class CTxIdTracker final
         std::unique_lock lock {mMtx};
         return mTxIds.insert(txid).second;
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     bool Insert(TxId&& txid) {
         std::unique_lock lock {mMtx};
         return mTxIds.insert(txid).second;

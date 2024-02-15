@@ -13,6 +13,7 @@ namespace Consensus {
 /**
  * Parameters that influence chain consensus.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct Params {
     uint256 hashGenesisBlock;
     int nSubsidyHalvingInterval;

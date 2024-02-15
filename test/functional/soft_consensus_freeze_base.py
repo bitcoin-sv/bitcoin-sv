@@ -24,6 +24,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import create_transaction
 from test_framework.script import CScript, OP_TRUE
 
+
 class Send_node():
     rejected_blocks = []
 
@@ -87,6 +88,7 @@ class Send_node():
                 self.log.debug("Found line in bitcoind.log: %s", line.strip())
                 return True
         return False
+
 
 class SoftConsensusFreezeBase(BitcoinTestFramework):
 
@@ -169,8 +171,8 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         old_tip = self.chain.tip
         block = self._mine_and_send_block(tx, node, True, node.rpc.getbestblockhash())
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash));
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash));
+        assert(node.check_frozen_tx_log(self.chain.tip.hash))
+        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
 
         return block
 
@@ -187,15 +189,15 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist {stop}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": enforce_at_height,
-                "policyExpiresWithConsensus": False
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": enforce_at_height,
+                    "policyExpiresWithConsensus": False
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         return freeze_tx
@@ -204,7 +206,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         node.rpc.submitblock(block.serialize().hex())
         if expect_tip == None:
             expect_tip = block.hash
-        assert_equal( expect_tip, node.rpc.getbestblockhash() )
+        assert_equal(expect_tip, node.rpc.getbestblockhash())
 
     def get_chain_tip(self):
         block_number = self.block_count - 1

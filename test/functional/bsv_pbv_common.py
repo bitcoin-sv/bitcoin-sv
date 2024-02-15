@@ -7,8 +7,10 @@ Helper functions for bsv-pbv-*.py tests
 
 from test_framework.util import wait_until
 
+
 def wait_for_waiting_blocks(hashes, node, log):
     oldArray = []
+
     def should_wait():
         nonlocal oldArray
         blocks = node.getwaitingblocks()
@@ -18,8 +20,10 @@ def wait_for_waiting_blocks(hashes, node, log):
         return hashes.issubset(blocks)
     wait_until(should_wait)
 
+
 def wait_for_validating_blocks(hashes, node, log):
     oldArray = []
+
     def should_wait():
         nonlocal oldArray
         blocks = node.getcurrentlyvalidatingblocks()
@@ -29,8 +33,10 @@ def wait_for_validating_blocks(hashes, node, log):
         return hashes.issubset(blocks)
     wait_until(should_wait)
 
+
 def wait_for_not_validating_blocks(hashes, node, log):
     oldArray = []
+
     def should_wait():
         nonlocal oldArray
         blocks = node.getcurrentlyvalidatingblocks()

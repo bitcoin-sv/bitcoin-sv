@@ -14,6 +14,7 @@ from test_framework.test_framework import ChainManager
 from test_framework.util import assert_equal, connect_nodes, disconnect_nodes
 import time
 
+
 class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
 
     def set_test_params(self):
@@ -38,14 +39,14 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
 
         spendable_out = self.chain.get_spendable_output()
 
-        frozen_tx = self._create_tx_mine_block_and_freeze_tx( node, spendable_out )
+        frozen_tx = self._create_tx_mine_block_and_freeze_tx(node, spendable_out)
 
         last_valid_tip_hash = node.rpc.getbestblockhash()
         last_valid_tip_height = node.rpc.getblockcount()
 
         # this block must not become tip because it contains a transaction trying to spend consensus frozen output
-        spend_frozen_tx = self._create_tx( PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]) )
-        self._mine_and_check_rejected( node, spend_frozen_tx )
+        spend_frozen_tx = self._create_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
+        self._mine_and_check_rejected(node, spend_frozen_tx)
 
         # child blocks are still considered frozen
         self._mine_and_send_block(None, node, False, last_valid_tip_hash)
@@ -63,14 +64,14 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         self.log.info(f"Freezing TXO {frozen_tx.hash},0 on consensus blacklist on second node")
         result=self.nodes[1].addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : frozen_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            }]
+                {
+                    "txOut" : {
+                        "txId" : frozen_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
+                }]
         })
         assert_equal(result["notProcessed"], [])
 
@@ -102,6 +103,7 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         self.nodes[1].waitforblockheight(last_valid_tip_height+6)
         assert_equal(new_valid_tip.hash, self.nodes[0].getbestblockhash())
         assert_equal(new_valid_tip.hash, self.nodes[1].getbestblockhash())
+
 
 if __name__ == '__main__':
     FrozenTXOSoftConsensusFreezeStartup().main()

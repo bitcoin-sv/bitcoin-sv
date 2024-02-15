@@ -7,6 +7,7 @@ from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.script import CScript, OP_CAT, OP_DUP
 from test_framework.cdefs import MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, MAX_STACK_ELEMENTS_BEFORE_GENESIS, ELEMENT_OVERHEAD
 
+
 class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
     # In all test cases, we have 2 elements on stack, which means that we have to add 2*32 bytes for covering ELEMENT_OVERHEAD
     MAX_STACK_MEMORY_USAGE_POLICY = 500
@@ -74,8 +75,9 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              p2p_reject_reason=b'mandatory-script-verify-flag-failed (Stack size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
-    
+
     ]
+
 
 class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
@@ -100,6 +102,7 @@ class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):
                              block_reject_reason=None
                              ),
     ]
+
 
 class MaxStackSizeTest(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']

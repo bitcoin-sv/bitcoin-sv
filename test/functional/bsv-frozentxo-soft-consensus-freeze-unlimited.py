@@ -16,6 +16,7 @@ from test_framework.blocktools import PreviousSpendableOutput
 from test_framework.mininode import msg_headers
 from test_framework.script import CScript, OP_TRUE
 
+
 class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
     def set_test_params(self):
@@ -33,7 +34,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         frozen_tx = self._create_tx_mine_block_and_freeze_tx(node, spendable_out)
 
         # block is rejected as consensus freeze is in effect for parent transaction
-        spend_frozen_tx = self._create_tx( PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]) )
+        spend_frozen_tx = self._create_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
         self._mine_and_check_rejected(node, spend_frozen_tx)
 
         # this block will still be frozen
@@ -47,26 +48,26 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         node.restart_node()
 
-        first_frozen_tx = self._create_tx_mine_block_and_freeze_tx( node, spendable_out )
+        first_frozen_tx = self._create_tx_mine_block_and_freeze_tx(node, spendable_out)
 
         last_valid_tip_hash = node.rpc.getbestblockhash()
 
         # this block is rejected as consensus freeze is in effect for parent transaction
-        first_spend_frozen_tx = self._create_tx( PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]) )
+        first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
         self.log.info(f"Mining block with transaction {first_spend_frozen_tx.hash} spending TXO {first_spend_frozen_tx.vin[0].prevout.hash:064x},{first_spend_frozen_tx.vin[0].prevout.n}")
-        first_frozen_block = self._mine_block( first_spend_frozen_tx )
+        first_frozen_block = self._mine_block(first_spend_frozen_tx)
 
         self.log.info(f"Mining descendants of block {first_frozen_block.hash}")
         subsequent_frozen_blocks = []
         for i in range(14): # since we cannot check unlimited number of blocks, number 14 was chosen arbitrarily and we assume it is close enough to infinity for the purpose of this test
-            subsequent_frozen_blocks.append( self._mine_block(None) )
+            subsequent_frozen_blocks.append(self._mine_block(None))
 
         # Send block headers first to check that they are also all correctly marked as frozen after the actual block is received.
         self.log.info(f"Sending headers for block {first_frozen_block.hash} and descendants")
         msg_hdrs = msg_headers()
-        msg_hdrs.headers.append( first_frozen_block )
-        msg_hdrs.headers.extend( subsequent_frozen_blocks )
-        node.p2p.send_and_ping( msg_hdrs )
+        msg_hdrs.headers.append(first_frozen_block)
+        msg_hdrs.headers.extend(subsequent_frozen_blocks)
+        node.p2p.send_and_ping(msg_hdrs)
         # check that headers were received
         for tip in node.rpc.getchaintips():
             if tip["status"] == "active" and tip["hash"] == last_valid_tip_hash:
@@ -92,8 +93,9 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         spendable_out_1 = self.chain.get_spendable_output()
         spendable_out_2 = self.chain.get_spendable_output()
 
-        self._test_minimal_freeze( spendable_out_1, send_node )
-        self._test_unlimited_freeze( spendable_out_2, send_node )
+        self._test_minimal_freeze(spendable_out_1, send_node)
+        self._test_unlimited_freeze(spendable_out_2, send_node)
+
 
 if __name__ == '__main__':
     FrozenTXOSoftConsensusFreeze().main()

@@ -14,14 +14,13 @@ import re
 from test_framework.util import get_srcdir
 
 # Slurp in policy.h contents
-_policy_h_fh = open(os.path.join(get_srcdir(), 'src', 'policy',
-                                    'policy.h'), 'rt')
+_policy_h_fh = open(os.path.join(get_srcdir(), 'src', 'policy', 'policy.h'), 'rt')
 _policy_h_contents = _policy_h_fh.read()
 _policy_h_fh.close()
 
 # Slurp in chainparams.cpp contents
-_chainparams_cpp_fh = open(os.path.join(get_srcdir(), 'src', 
-                                    'chainparams.cpp'), 'rt')
+_chainparams_cpp_fh = open(os.path.join(get_srcdir(), 'src',
+                                        'chainparams.cpp'), 'rt')
 _chainparams_cpp_contents = _chainparams_cpp_fh.read()
 _chainparams_cpp_fh.close()
 
@@ -32,43 +31,46 @@ _consensus_h_contents = _consensus_h_fh.read()
 _consensus_h_fh.close()
 
 # Slurp in script.h contents
-_script_h_fh = open(os.path.join(get_srcdir(), 'src', 'script',
-                                    'script.h'), 'rt')
+_script_h_fh = open(os.path.join(get_srcdir(), 'src', 'script', 'script.h'),'rt')
 _script_h_contents = _script_h_fh.read()
 _script_h_fh.close()
 
 # Slurp in limitedstack.h contents
 _limitedstack_h_fh = open(os.path.join(get_srcdir(), 'src', 'script',
-                                    'limitedstack.h'), 'rt')
+                                       'limitedstack.h'), 'rt')
 _limitedstack_h_contents = _limitedstack_h_fh.read()
 _limitedstack_h_fh.close()
 
 # Slurp in validation.h contents
 _validation_h_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'validation.h'), 'rt')
+                                     'validation.h'), 'rt')
 _validation_h_contents = _validation_h_fh.read()
 _validation_h_fh.close()
 
 # Slurp in text_writer.h contents
 _textwriter_h_fh = open(os.path.join(get_srcdir(), 'src', 'rpc',
-                                    'text_writer.h'), 'rt')
+                                     'text_writer.h'), 'rt')
 _textwriter_h_contents = _textwriter_h_fh.read()
 _textwriter_h_fh.close()
 
 # Slurp in txn_validation_config.h contents
-_txnvalidationconfig_h_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'txn_validation_config.h'), 'rt')
+_txnvalidationconfig_h_fh = open(os.path.join(get_srcdir(),
+                                              'src',
+                                              'txn_validation_config.h'), 'rt')
 _txnvalidationconfig_h_contents = _txnvalidationconfig_h_fh.read()
 _txnvalidationconfig_h_fh.close()
 
 # Slurp in txn_validator.h contents
-_txnvalidator_h_fh = open(os.path.join(get_srcdir(), 'src',
-                                    'txn_validator.h'), 'rt')
+_txnvalidator_h_fh = open(os.path.join(get_srcdir(),
+                                       'src',
+                                       'txn_validator.h'), 'rt')
 _txnvalidator_h_contents = _txnvalidator_h_fh.read()
 _txnvalidator_h_fh.close()
 
+
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
+
 
 INT64_MAX = 2**63-1
 UINT32_MAX = 2**32-1
@@ -77,26 +79,34 @@ ONE_KILOBYTE = 1000
 ONE_MEGABYTE = 1000000
 ONE_GIGABYTE = 1000000000
 
+
 def _extractPolicyValue(name):
     return int(eval(re.search(name + ' = (.+);', _policy_h_contents).group(1)))
+
 
 def _extractChainParamsValue(name):
     return eval(re.search('#define ' + name + ' (.+)', _chainparams_cpp_contents).group(1))
 
+
 def _extractScriptValue(name):
     return int(eval(re.search(name + ' = (.+);', _script_h_contents).group(1)))
+
 
 def _extractLimitedStackValue(name):
     return int(eval(re.search(name + ' = (.+);', _limitedstack_h_contents).group(1)))
 
+
 def _extractValidationValue(name):
     return int(eval(re.search(name + ' = (.+);', _validation_h_contents).group(1)))
+
 
 def _extractTextWriterValue(name):
     return int(eval(re.search(name + ' = (.+);', _textwriter_h_contents).group(1)))
 
+
 def _extractTxnValidationConfigValue(name):
     return int(eval(re.search(name + " =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
+
 
 def _extractTxnValidatorValue(name):
     return int(eval(re.search(name + " \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))
@@ -109,7 +119,7 @@ LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE
 
 # Default settings for maximum allowed size for a block, in bytes - berfore and after activation of new rules
 REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = _extractPolicyValue('REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME')
-REGTEST_DEFAULT_MAX_BLOCK_SIZE =  _extractPolicyValue('REGTEST_DEFAULT_MAX_BLOCK_SIZE')
+REGTEST_DEFAULT_MAX_BLOCK_SIZE = _extractPolicyValue('REGTEST_DEFAULT_MAX_BLOCK_SIZE')
 REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = _extractPolicyValue('REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE')
 REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = _extractPolicyValue('REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER')
 
@@ -157,7 +167,7 @@ MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSEN
 #Gracefull period for genesis activation where nodes will not be banned for certain ops
 GENESIS_GRACEFULL_ACTIVATION_PERIOD = _extractPolicyValue('GENESIS_GRACEFULL_ACTIVATION_PERIOD')
 
-# Maximum number of non-push operations per script before GENESIS 
+# Maximum number of non-push operations per script before GENESIS
 MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = _extractConsensusValue('MAX_OPS_PER_SCRIPT_BEFORE_GENESIS')
 
 MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = _extractScriptValue('MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS')
@@ -171,9 +181,9 @@ MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LE
 
 # Maximum length of numbers used in scripts after genesis
 MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS')
-DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS  = _extractPolicyValue('DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS')
+DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = _extractPolicyValue('DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS')
 
-MIN_TTOR_VALIDATION_DISTANCE  = _extractValidationValue('MIN_TTOR_VALIDATION_DISTANCE')
+MIN_TTOR_VALIDATION_DISTANCE = _extractValidationValue('MIN_TTOR_VALIDATION_DISTANCE')
 
 SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = _extractValidationValue('SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE')
 SAFE_MODE_DEFAULT_MIN_FORK_LENGTH = _extractValidationValue('SAFE_MODE_DEFAULT_MIN_FORK_LENGTH')
@@ -196,7 +206,7 @@ if __name__ == "__main__":
     print("COINBASE_MATURITY = %d (blocks)" % COINBASE_MATURITY)
     print("MAX_TX_SIZE_POLICY_BEFORE_GENESIS = %d" % MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
     print("DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = %d" % DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
-    print("MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)    
+    print("MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
     print("MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS)
     print("GENESIS_ACTIVATION_HEIGHT_REGTEST = %d" % GENESIS_ACTIVATION_HEIGHT_REGTEST)
     print("MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = %d" % MAX_OPS_PER_SCRIPT_BEFORE_GENESIS)

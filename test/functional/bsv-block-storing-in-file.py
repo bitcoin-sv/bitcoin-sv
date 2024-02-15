@@ -24,6 +24,8 @@ During initialization it:
 - fills remote node's blockfile with more than 1MB of contents so
   that the next block will always go into the beginning of the second blockfile
 """
+
+
 class RunnerNode(NodeConnCB):
     def __init__(self, remote_node, node_number):
         super(RunnerNode,self).__init__()
@@ -40,7 +42,7 @@ class RunnerNode(NodeConnCB):
     def finish_setup_after_network_is_started(self, tmp_dir):
         self.wait_for_verack()
 
-        self.chain.set_genesis_hash( int(self.remote_node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.remote_node.getbestblockhash(), 16))
 
         # Build the blockchain
         self.tip = int(self.remote_node.getbestblockhash(), 16)
@@ -83,9 +85,9 @@ class BlockStoringInFile(BitcoinTestFramework):
         self.preferred_blockfile_size += 1
 
         self.extra_args = ['-whitelist=127.0.0.1',
-                    "-excessiveblocksize=%d" % self.excessive_block_size,
-                    "-preferredblockfilesize=%d" % self.preferred_blockfile_size,
-                    "-blockmaxsize=%d" % self.mining_block_max_size]
+                           "-excessiveblocksize=%d" % self.excessive_block_size,
+                           "-preferredblockfilesize=%d" % self.preferred_blockfile_size,
+                           "-blockmaxsize=%d" % self.mining_block_max_size]
 
     def setup_network(self):
         self.add_nodes(self.num_nodes)
@@ -104,10 +106,14 @@ class BlockStoringInFile(BitcoinTestFramework):
     def __count_blk_files(self, block_number, expected_number_of_files, node_number):
         blockfile_count = len(glob.glob(self.options.tmpdir + "/node" + str(node_number) + "/regtest/blocks/blk0000*.dat"))
 
-        assert blockfile_count == expected_number_of_files, ("unexpected blockfile count for block: " + str(block_number) +
-            "; node: " + str(node_number) +
-            "; expected: " + str(expected_number_of_files) +
-            "; got: " + str(blockfile_count))
+        assert blockfile_count == expected_number_of_files, ("unexpected blockfile count for block: "
+                                                             + str(block_number)
+                                                             + "; node: "
+                                                             + str(node_number)
+                                                             + "; expected: "
+                                                             + str(expected_number_of_files)
+                                                             + "; got: "
+                                                             + str(blockfile_count))
 
     def __compare_local_and_remote_block_size(self, local_block, remote_node):
         remote_best_block_hash = remote_node.getbestblockhash()
@@ -118,7 +124,7 @@ class BlockStoringInFile(BitcoinTestFramework):
         assert_equal(remote_block['size'], len(local_block.serialize()))
 
     def __send_and_test_block(self, runner_node, block_size, expected_number_of_files):
-        local_block, block_number = runner_node.create_and_send_block(block_size);
+        local_block, block_number = runner_node.create_and_send_block(block_size)
         self.__compare_local_and_remote_block_size(local_block, runner_node.remote_node)
         self.__count_blk_files(block_number, expected_number_of_files, runner_node.node_number)
 
@@ -147,6 +153,7 @@ class BlockStoringInFile(BitcoinTestFramework):
         self.__test_two_blocks_less_than_preferred_file_size_in_single_file(self.runner_nodes[0])
         self.__test_one_block_in_file_second_block_exceeds_preferred_file_size(self.runner_nodes[1])
         self.__test_block_larger_than_preferred_file_size(self.runner_nodes[2])
+
 
 if __name__ == '__main__':
     BlockStoringInFile().main()

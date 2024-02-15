@@ -10,7 +10,7 @@ Scenario:
 3. Send transaction TX1 to N1. N0 should receive notification for this transaction.
 4. Generate another block on N1 which consist of coinbase transaction and previously created transaction TX1.
    N0 should receive notification for only coinbase transaction and for new block. TX1 notification should not be duplicated.
-5. Shut down N1. 
+5. Shut down N1.
 6. Create 2 blocks on N0, each containing one coinbase and one normal transaction.
    Receive notifications for these transactions and blocks.
 7. Shut down N0 and restart N1.
@@ -138,7 +138,6 @@ class ZMQNewTopicsTest (BitcoinTestFramework):
 
         connect_nodes_bi(self.nodes, nodeNumber, connectingNodeNumber)
         self.test_activenotifications()
-
 
     def _zmq_test(self):
         genhashes = self.nodes[1].generate(1)

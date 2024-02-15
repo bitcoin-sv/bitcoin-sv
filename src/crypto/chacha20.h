@@ -11,6 +11,7 @@
 /** A PRNG class for ChaCha20. */
 class ChaCha20 {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint32_t input[16];
 
 public:

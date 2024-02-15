@@ -13,6 +13,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
 
 _lan_ip = None
+
+
 def get_lan_ip():
     global _lan_ip
     if _lan_ip: return _lan_ip
@@ -44,6 +46,7 @@ def make_coinbase(connection):
     wait_until(lambda: connection.rpc.getbestblockhash() == block.hash, timeout=10)
 
     return coinbase_tx, coinbase_key
+
 
 def create_parent_tx(tx_to_spend, key_for_tx_to_spend, n_outputs, invalidity=None):
     tx = CTransaction()
@@ -135,11 +138,13 @@ class InvalidTx(BitcoinTestFramework):
         conn_sending.rpc.generate(100)
 
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         conn_sending.cb.on_reject = on_reject
 
         relayed_txs = []
+
         def on_inv(conn, msg):
             for i in msg.inv:
                 if i.type == 1:
@@ -171,13 +176,11 @@ class InvalidTx(BitcoinTestFramework):
 
         return parent_tx1, parent_tx2, orphans, rejected_txs
 
-
     def check_rejected(self, rejected_txs, should_be_rejected_tx_set):
         wait_until(lambda: {tx.data for tx in rejected_txs} == {o.sha256 for o in should_be_rejected_tx_set}, timeout=20)
 
     def check_relayed(self, relayed_txs, should_be_relayed_tx_set):
         wait_until(lambda: set(relayed_txs) == {o.sha256 for o in should_be_relayed_tx_set}, timeout=20)
-
 
     def run_invalid_tx_scenarios(self):
 
@@ -227,7 +230,6 @@ class InvalidTx(BitcoinTestFramework):
             sending_conn.rpc.clearbanned()
             assert len(relayed_txs) == 0, "No tx should be relayed."
 
-
     def run_invalid_orphans_scenarios(self):
 
         with self.run_node_with_connections("Scenario 1: Valid orphans", 0, ['-mindebugrejectionfee=0.0000025'],
@@ -252,13 +254,12 @@ class InvalidTx(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, orphans + [parent_tx1, parent_tx2])
             assert len(rejected_txs) == 0, "No transactions should be rejected!"
 
-
         with self.run_node_with_connections("Scenario 2: low fee orphans", 0, ['-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             parent_tx1, parent_tx2, orphans, rejected_txs = self.prepare_parents_and_children(conn,
-                                                                                parent_invalidity=None,
-                                                                                children_invalidity="low_fee")
+                                                                                              parent_invalidity=None,
+                                                                                              children_invalidity="low_fee")
 
             # sending orphans
             for tx in orphans:
@@ -281,13 +282,12 @@ class InvalidTx(BitcoinTestFramework):
             self.check_rejected(rejected_txs, orphans)
             assert conn.connected, "We should still be connected (not banned)."
 
-
         with self.run_node_with_connections("Scenario 3: invalid signature orphans", 0, ['-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             parent_tx1, parent_tx2, orphans, rejected_txs = self.prepare_parents_and_children(conn,
-                                                                                parent_invalidity=None,
-                                                                                children_invalidity="bad_signature")
+                                                                                              parent_invalidity=None,
+                                                                                              children_invalidity="bad_signature")
 
             # sending orphans
             for tx in orphans:
@@ -309,15 +309,14 @@ class InvalidTx(BitcoinTestFramework):
             assert len(conn.rpc.listbanned()) == 1 # and banned
             conn.rpc.clearbanned()
 
-
         # the banscore is set to 101 because rejection of the tx with invalid signature brings 100 points,
         # we don't want to be banned as result of only one tx
         with self.run_node_with_connections("Scenario 4: bad signature parent", 0, ['-banscore=101','-mindebugrejectionfee=0.0000025'],
-                                            number_of_connections=1, ip=get_lan_ip()) as (conn, ):
+                                            number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             valid_parent_tx, invalid_parent_tx, orphans, rejected_txs = self.prepare_parents_and_children(conn,
-                                                                                parent_invalidity="bad_signature",
-                                                                                children_invalidity=None)
+                                                                                                          parent_invalidity="bad_signature",
+                                                                                                          children_invalidity=None)
 
             for tx in orphans:
                 conn.send_message(msg_tx(tx))
@@ -336,11 +335,9 @@ class InvalidTx(BitcoinTestFramework):
             sleep(1)
             assert len(conn.rpc.listbanned()) == 0  # not banned
 
-
     def run_test(self):
         self.run_invalid_tx_scenarios()
         self.run_invalid_orphans_scenarios()
-
 
 
 if __name__ == '__main__':

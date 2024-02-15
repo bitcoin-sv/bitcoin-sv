@@ -11,12 +11,13 @@ from test_framework.util import assert_equal, wait_until
 from test_framework.comptool import TestInstance, RejectResult, DiscardResult
 import time
 
+
 class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.genesisactivationheight = 600 
+        self.genesisactivationheight = 600
         self.extra_args = [['-debug', '-peerbloomfilters=1', '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-maxmempoolnonfinal=0', '-rejectmempoolrequest=0']] * self.num_nodes
 
@@ -67,6 +68,7 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
         # The transactions should be (silently) rejected because the pool is full.
         yield TestInstance([[tx1, DiscardResult()]])
         assert(tx1.hash not in self.nodes[0].getrawnonfinalmempool())
+
 
 if __name__ == '__main__':
     BSVGenesis_NonFinalPoolLimit().main()

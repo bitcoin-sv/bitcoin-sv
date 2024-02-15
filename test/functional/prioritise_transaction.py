@@ -14,6 +14,7 @@ from test_framework.mininode import COIN
 from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, ONE_KILOBYTE
 import decimal
 
+
 class PrioritiseTransactionTest(BitcoinTestFramework):
 
     def setup_network(self):
@@ -24,7 +25,7 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         self.num_nodes = 1
 
     def run_test(self):
-        self.start_node(0, ["-minminingtxfee=0.00003"] )
+        self.start_node(0, ["-minminingtxfee=0.00003"])
 
         node = self.nodes[0]
         self.txouts = gen_return_txouts()
@@ -39,7 +40,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
 
         low_paying_txs = []
 
-
         # let's create a chain of three low paying transactions and sent them to the node, they end up in the mempool
         for _ in range(3):
             inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]}]
@@ -52,7 +52,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
             assert txid in node.getrawmempool()
             tx_info = node.getrawtransaction(txid, True)
             utxo = {"txid":txid, "vout":0, "amount":tx_info["vout"][0]["value"]}
-
 
         node.generate(1)
 
@@ -74,7 +73,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         assert low_paying_txs[2] in rawmempool
 
         self.stop_node(0)
-
 
 
 if __name__ == '__main__':

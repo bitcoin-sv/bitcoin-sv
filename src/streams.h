@@ -29,7 +29,9 @@
 template <typename Stream> class OverrideStream {
     Stream *stream;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 
 public:
@@ -91,13 +93,19 @@ public:
         assert(nPos <= vchData.size());
         size_t nOverwrite = std::min(nSize, vchData.size() - nPos);
         if (nOverwrite) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(vchData.data() + nPos,
+                   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                    reinterpret_cast<const uint8_t *>(pch), nOverwrite);
         }
         if (nOverwrite < nSize) {
             vchData.insert(vchData.end(),
+                           // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+                           // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                            reinterpret_cast<const uint8_t *>(pch) + nOverwrite,
                            reinterpret_cast<const uint8_t *>(pch) + nSize);
+                           // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                           // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
         }
         nPos += nSize;
     }
@@ -114,9 +122,11 @@ public:
     }
 
 private:
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
     const int nVersion;
     std::vector<uint8_t> &vchData;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
     size_t nPos;
 };
 
@@ -147,38 +157,45 @@ public:
     typedef vector_type::const_iterator const_iterator;
     typedef vector_type::reverse_iterator reverse_iterator;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     explicit CDataStream(int nTypeIn, int nVersionIn) {
         Init(nTypeIn, nVersionIn);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CDataStream(const_iterator pbegin, const_iterator pend, int nTypeIn,
                 int nVersionIn)
         : vch(pbegin, pend) {
         Init(nTypeIn, nVersionIn);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CDataStream(const char *pbegin, const char *pend, int nTypeIn,
                 int nVersionIn)
         : vch(pbegin, pend) {
         Init(nTypeIn, nVersionIn);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CDataStream(const vector_type &vchIn, int nTypeIn, int nVersionIn)
         : vch(vchIn.begin(), vchIn.end()) {
         Init(nTypeIn, nVersionIn);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CDataStream(const std::vector<char> &vchIn, int nTypeIn, int nVersionIn)
         : vch(vchIn.begin(), vchIn.end()) {
         Init(nTypeIn, nVersionIn);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CDataStream(const std::vector<uint8_t> &vchIn, int nTypeIn, int nVersionIn)
         : vch(vchIn.begin(), vchIn.end()) {
         Init(nTypeIn, nVersionIn);
     }
 
     template <typename... Args>
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CDataStream(int nTypeIn, int nVersionIn, Args &&... args) {
         Init(nTypeIn, nVersionIn);
         ::SerializeMany(*this, std::forward<Args>(args)...);
@@ -206,8 +223,10 @@ public:
     //
     // Vector subset
     //
+    // NOLINTBEGIN(*-narrowing-conversions)
     const_iterator begin() const { return vch.begin() + nReadPos; }
     iterator begin() { return vch.begin() + nReadPos; }
+    // NOLINTEND(*-narrowing-conversions)
     const_iterator end() const { return vch.end(); }
     iterator end() { return vch.end(); }
     size_type size() const { return vch.size() - nReadPos; }
@@ -228,7 +247,9 @@ public:
     void insert(iterator it, size_type n, char x) {
         vch.insert(it, n, x);
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     value_type *data() { return vch.data() + nReadPos; }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const value_type *data() const { return vch.data() + nReadPos; }
 
     void insert(iterator it, std::vector<char>::const_iterator first,
@@ -239,7 +260,7 @@ public:
         }
 
         assert(last - first > 0);
-        if (it == vch.begin() + nReadPos &&
+        if (it == vch.begin() + nReadPos && // NOLINT(*-narrowing-conversions)
             span <= nReadPos) {
             // special case for inserting at the front when there's room
             nReadPos -= span;
@@ -256,10 +277,11 @@ public:
         }
 
         assert(last - first > 0);
-        if (it == vch.begin() + nReadPos &&
+        if (it == vch.begin() + nReadPos && // NOLINT(*-narrowing-conversions)
             span <= nReadPos) {
             // special case for inserting at the front when there's room
             nReadPos -= span;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(&vch[nReadPos], &first[0], span);
         } else {
             vch.insert(it, first, last);
@@ -267,7 +289,7 @@ public:
     }
 
     iterator erase(iterator it) {
-        if (it == vch.begin() + nReadPos) {
+        if (it == vch.begin() + nReadPos) { // NOLINT(*-narrowing-conversions)
             // special case for erasing from the front
             if (++nReadPos >= vch.size()) {
                 // whenever we reach the end, we take the opportunity to clear
@@ -275,14 +297,14 @@ public:
                 nReadPos = 0;
                 return vch.erase(vch.begin(), vch.end());
             }
-            return vch.begin() + nReadPos;
+            return vch.begin() + nReadPos; // NOLINT(*-narrowing-conversions)
         } else {
             return vch.erase(it);
         }
     }
 
     iterator erase(iterator first, iterator last) {
-        if (first == vch.begin() + nReadPos) {
+        if (first == vch.begin() + nReadPos) { // NOLINT(*-narrowing-conversions)
             // special case for erasing from the front
             if (last == vch.end()) {
                 nReadPos = 0;
@@ -296,7 +318,7 @@ public:
     }
 
     inline void Compact() {
-        vch.erase(vch.begin(), vch.begin() + nReadPos);
+        vch.erase(vch.begin(), vch.begin() + nReadPos); // NOLINT(*-narrowing-conversions)
         nReadPos = 0;
     }
 
@@ -311,7 +333,7 @@ public:
     // Stream subset
     //
     bool eof() const { return size() == 0; }
-    int in_avail() { return size(); }
+    int in_avail() { return size(); } // NOLINT(*-narrowing-conversions)
 
     void SetType(int n) { nType = n; }
     int GetType() const { return nType; }
@@ -359,11 +381,13 @@ public:
 
     void write(const char *pch, size_t nSize) {
         // Write to the end of the buffer
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         vch.insert(vch.end(), pch, pch + nSize);
     }
 
     template <typename Stream> void Serialize(Stream &s) const {
         // Special case: stream << stream concatenates like stream += stream
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         if (!vch.empty()) s.write((char *)&vch[0], vch.size() * sizeof(vch[0]));
     }
 
@@ -395,7 +419,7 @@ public:
         }
 
         for (size_type i = 0, j = 0; i != size(); i++) {
-            vch[i] ^= key[j++];
+            vch[i] ^= key[j++]; // NOLINT(*-narrowing-conversions)
 
             // This potentially acts on very many bytes of data, so it's
             // important that we calculate `j`, i.e. the `key` index in this way
@@ -413,6 +437,7 @@ public:
  * you're returning the file pointer, return file.release(). If you need to
  * close the file early, use file.reset() instead of fclose(file).
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CAutoFile {
 private:
     int nType;
@@ -477,9 +502,11 @@ public:
         if (!file)
             throw std::ios_base::failure(
                 "CAutoFile::ignore: file handle is nullptr");
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t data[4096];
         while (nSize > 0) {
             size_t nNow = std::min<size_t>(nSize, sizeof(data));
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             if (fread(data, 1, nNow, file.get()) != nNow)
                 throw std::ios_base::failure(
                     feof(file.get()) ? "CAutoFile::ignore: end of file"
@@ -523,6 +550,7 @@ public:
  * Will automatically close the file when it goes out of scope if not null. If
  * you need to close the file early, use file.fclose() instead of fclose(file).
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CBufferedFile {
 private:
     // Disallow copies
@@ -601,6 +629,7 @@ public:
             if (nNow + nReadPos > nSrcPos) nNow = nSrcPos - nReadPos;
             memcpy(pch, &vchBuf[pos], nNow);
             nReadPos += nNow;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             pch += nNow;
             nSize -= nNow;
         }
@@ -676,6 +705,7 @@ private:
  * exception is thrown and stream should not be used after that point as it will
  * be in an invalid state.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CForwardReadonlyStream
 {
 public:
@@ -701,6 +731,7 @@ public:
  * exception is thrown and stream should not be used after that point as it will
  * be in an invalid state.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CForwardAsyncReadonlyStream
 {
 public:
@@ -728,6 +759,7 @@ public:
  * underlying FILE pointer. File pointer is closed once the CFileReader instance
  * gets out of scope.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CFileReader
 {
 public:
@@ -769,6 +801,7 @@ private:
  * underlying FILE pointer - it's up to the file pointer provider to close it
  * afterwards.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CNonOwningFileReader
 {
 public:
@@ -835,6 +868,7 @@ public:
 
         size_t read =
             Reader::Read(
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 reinterpret_cast<char*>(mBuffer.data()),
                 maxConsumable);
 
@@ -888,6 +922,7 @@ public:
 
             size_t read =
                 Reader::Read(
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                     reinterpret_cast<char*>(mBuffer.data()),
                     mPendingReadSize);
 
@@ -937,6 +972,7 @@ public:
         if(mData.size() > mConsumed)
         {
             size_t consume = std::min(mData.size() - mConsumed, maxSize);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             const uint8_t* start = mData.data() + mConsumed;
             mConsumed += consume;
 
@@ -974,6 +1010,7 @@ public:
         if(mData->size() > mConsumed)
         {
             size_t consume = std::min(mData->size() - mConsumed, maxSize);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             const uint8_t* start = mData->data() + mConsumed;
             mConsumed += consume;
 

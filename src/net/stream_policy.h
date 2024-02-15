@@ -13,13 +13,14 @@
 #include <string>
 
 class CConnman;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
 /**
  * A stream policy defines how a collection of streams to a peer are utilised.
  * For example; What streams are established? Which stream is used to send
  * particular message types? What order are received messages processed in?
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class StreamPolicy
 {
   public:

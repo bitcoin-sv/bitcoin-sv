@@ -42,7 +42,6 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-
     def mine_transactions(self, conn, txs):
         last_block_info = conn.rpc.getblock(conn.rpc.getbestblockhash())
         block = create_block(int(last_block_info["hash"], 16),
@@ -99,6 +98,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             relayfee = 0.501  # in satoshi per byte
 
             rejected_txs = []
+
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
             conn.cb.on_reject = on_reject
@@ -126,10 +126,8 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             for tx in secondary_mempool_chain[:-1]:
                 conn.send_message(msg_tx(tx))
 
-
             # all transactions that are sent should en up in the mempool, chains are at the limit
             check_mempool_equals(conn.rpc, primary_mempool_chain[:-1] + secondary_mempool_chain[:-1])
-
 
             # now send transactions that try to extend chain over the limit, should be rejected
             for tx_to_reject in [primary_mempool_chain[-1], secondary_mempool_chain[-1]]:
@@ -138,7 +136,6 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
                 assert_equal(rejected_txs[0].data, tx_to_reject.sha256)
                 assert_equal(rejected_txs[0].reason, b'too-long-mempool-chain')
                 rejected_txs.clear()
-
 
             # lets mine transactions from beggining of the chain, this will shorten the chains
             block = self.mine_transactions(conn, [primary_mempool_chain[0], secondary_mempool_chain[0]])
@@ -180,10 +177,10 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, [])
 
             rejected_txs = []
+
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
             conn.cb.on_reject = on_reject
-
 
             mining_fee = 1.001 # in satoshi per byte
             relayfee = 0.501  # in satoshi per byte
@@ -245,7 +242,6 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
 
             # mine all txs from mempool to ensure empty mempool for the next test case
             self.mine_transactions(conn, [tx1, tx2, tx3, tx4, tx5, tx6])
-
 
     def run_test(self):
         funding_tx = self._prepare_node()

@@ -31,10 +31,13 @@ public:
     int64_t nBanUntil;
     uint8_t banReason;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBanEntry() { SetNull(); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBanEntry(int64_t nCreateTimeIn) {
         SetNull();
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         nCreateTime = nCreateTimeIn;
     }
 
@@ -73,6 +76,7 @@ typedef std::map<CSubNet, CBanEntry> banmap_t;
 class CAddrDB {
 private:
     fs::path pathAddr;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CChainParams &chainParams;
 
 public:
@@ -86,6 +90,7 @@ public:
 class CBanDB {
 private:
     fs::path pathBanlist;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CChainParams &chainParams;
 
 public:

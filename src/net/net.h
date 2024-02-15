@@ -58,7 +58,7 @@
 #include <boost/signals2/signal.hpp>
 
 class CAddrMan;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CNode;
 class CScheduler;
 class CTxIdTracker;
@@ -94,6 +94,8 @@ static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 static const int DEFAULT_MAX_OUTBOUND_CONNECTIONS = 8;
 /** Maximum number of addnode outgoing nodes */
 static const uint16_t DEFAULT_MAX_ADDNODE_CONNECTIONS = 8;
+/** Maximum number of incoming connections from same address */
+static const uint16_t DEFAULT_MAX_CONNECTIONS_FROM_ADDR = 0;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -106,7 +108,12 @@ static const bool DEFAULT_UPNP = false;
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** The default for -maxuploadtarget. 0 = Unlimited */
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
+/** The default for -maxpendingresponses_getheaders. 0 = Unlimited */
+static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHEADERS = 0;
+/** The default for -maxpendingresponses_gethdrsen. 0 = Unlimited */
+static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN = 0;
 /** The default timeframe for -maxuploadtarget. 1 day. */
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MAX_UPLOAD_TIMEFRAME = 60 * 60 * 24;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
@@ -133,7 +140,9 @@ static const unsigned int DEFAULT_BLOCK_TXN_MAX_PERCENT = 99;
 static const bool DEFAULT_FORCEDNSSEED = true;
 
 // Maximum sizes of queued messages for receiving and sending
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
 static const size_t DEFAULT_MAXSENDBUFFER_MULTIPLIER = 10;
 
@@ -146,15 +155,16 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 // Multiple streams enabled by default
 static const bool DEFAULT_STREAMS_ENABLED = true;
 // Default prioritised list of stream policies to use
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const std::string DEFAULT_STREAM_POLICY_LIST =
     std::string{BlockPriorityStreamPolicy::POLICY_NAME} + "," +
     std::string{DefaultStreamPolicy::POLICY_NAME};
 
 // Parallel block fetch timeout for slow peers (in seconds)
 static const unsigned int DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT = 30;
-// Parralel block fetch maximum number of requests for a single block to different peers
+// Parallel block fetch maximum number of requests for a single block to different peers
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const size_t DEFAULT_MAX_BLOCK_PARALLEL_FETCH = 3;
-
 /**
  * Default maximum amount of concurrent async tasks per node before node message
  * processing is skipped until the amount is freed up again.
@@ -220,6 +230,7 @@ class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CSerializedNetMsg
 {
 public:
@@ -244,6 +255,7 @@ public:
         // Only calculate message hash for non-extended messages
         if(! CMessageHeader::IsExtended(mSize))
         {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             mHash = ::Hash(data.data(), data.data() + data.size());
         }
         mData = std::make_unique<CVectorStream>(std::move(data));
@@ -278,6 +290,14 @@ private:
     uint256 mHash {};
     size_t mSize {0};
     std::unique_ptr<CForwardAsyncReadonlyStream> mData {nullptr};
+
+public:
+    // If specified, this function will be called to create a CVectorStream object which will be
+    // added to the P2P sending queue to send P2P header of this P2P message.
+    // Otherwise (empty function), CVectorStream object will be created in a default way.
+    // The purpose of this is to be able to create an object of derived class with additional
+    // functionality (e.g. detect when the message was sent in the destructor).
+    std::function< std::unique_ptr<CVectorStream> (std::vector<uint8_t>&& serialisedHeader) > headerStreamCreator;
 };
 
 class CConnman {
@@ -293,6 +313,7 @@ public:
         ServiceFlags nLocalServices = NODE_NONE;
         ServiceFlags nRelevantServices = NODE_NONE;
         int nMaxConnections = 0;
+        int nMaxConnectionsFromAddr = 0;
         int nMaxOutbound = 0;
         int nMaxAddnode = 0;
         int nMaxFeeler = 0;
@@ -348,7 +369,8 @@ public:
     DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
-    template <typename Callable> void ForEachNode(Callable&& func) const {
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    template <typename Callable> void ForEachNode(Callable&& func) const { 
         LOCK(cs_vNodes);
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
@@ -358,6 +380,7 @@ public:
 
     /** Call the specified function for each node in parallel */
     template <typename Callable>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     auto ParallelForEachNode(Callable&& func)
         -> std::vector<std::future<std::invoke_result_t<Callable, const CNodePtr&>>>
     {
@@ -388,7 +411,7 @@ public:
     /** Call the specified function for parallel validation */
     template <typename Callable>
     auto ParallelTxnValidation(
-            Callable&& func,
+            Callable&& func, // NOLINT(cppcoreguidelines-missing-std-forward)
             const Config* config,
             CTxMemPool *pool,
             TxInputDataSPtrVec& vNewTxns,
@@ -568,6 +591,7 @@ public:
     // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
     // times maximum async requests that a node may have active at any given
     // time.
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class CAsyncTaskPool
     {
     public:
@@ -726,6 +750,7 @@ private:
     std::shared_ptr<CSemaphore> semOutbound {nullptr};
     std::shared_ptr<CSemaphore> semAddnode {nullptr};
     int nMaxConnections;
+    int nMaxConnectionsFromAddr;
     int nMaxOutbound;
     int nMaxAddnode;
     int nMaxFeeler;
@@ -776,6 +801,7 @@ private:
     /** Invalid transaction publisher*/
     CInvalidTxnPublisher mInvalidTxnPublisher;
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
 void MapPort(bool fUseUPnP);
@@ -842,20 +868,24 @@ bool IsReachable(const CNetAddr &addr);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer,
                          ServiceFlags nLocalServices);
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern bool fDiscover;
 extern bool fListen;
 extern bool fRelayTxes;
 
 extern CCriticalSection cs_invQueries;
 extern std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 struct LocalServiceInfo {
     int nScore;
     int nPort;
 };
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /** Information about a peer */
 class CNode : public std::enable_shared_from_this<CNode>
@@ -1000,6 +1030,94 @@ public:
     bool protoconfReceived {false};
     /** Maximum size for data that is allowed to be sent to the client */
     uint32_t maxRecvPayloadLength {0};
+
+    /**
+     * Number of outgoing response messages created by processing specific types of P2P requests
+     * that are still stored in the P2P sending queue waiting to be sent to the requesting peer.
+     */
+    class MonitoredPendingResponses
+    {
+    public:
+        class PendingResponses
+        {
+        public:
+            // NOTE: Relaxed memory order can be used because this is not a synchronization primitive
+            //       and only counter atomicity and its modification order consistency are needed.
+            //       In other words, a thread that calls IsBelowLimit() only needs to see the value
+            //       of a counter that was modified by a thread that last called Increment() or
+            //       Decrement(). It does not depend on and consequently does not need to observe
+            //       changes in other memory locations.
+
+            /**
+             * Increments the pending responses count.
+             *
+             * This is intended to be called by the processor of the P2P request when the
+             * response is added to the sending queue.
+             */
+            void Increment()
+            {
+                counter.fetch_add(1, std::memory_order_relaxed);
+            }
+
+            /**
+             * Decrements the pending responses count.
+             *
+             * This is intended to be called when the response message is removed from the sending queue.
+             */
+            void Decrement()
+            {
+                counter.fetch_sub(1, std::memory_order_relaxed);
+            }
+
+            /**
+             * Returns true if current number of pending responses is below allowed limit and false otherwise.
+             *
+             * This is intended to be called by the processor of the P2P request before it starts processing
+             * a new request.
+             *
+             * @param[out] numPendingResponses Will be set to current number of pending responses.
+             *
+             * @note Because checking the value is done independently of its modification, actual number of
+             *       pending responses could become a bit higher than specified maximum if used concurrently.
+             *       E.g. Two threads simultaneously check this value, they both get max-1, and they both
+             *       proceed to call Increment() resulting in value=max+1. It is assumed that this is not a
+             *       problem.
+             */
+            bool IsBelowLimit(unsigned int& numPendingResponses) const
+            {
+                if(max_allowed==0)
+                {
+                    return true;
+                }
+
+                unsigned int n = counter.load(std::memory_order_relaxed);
+                numPendingResponses = n;
+                return n < max_allowed;
+            }
+
+            /**
+             * Returns maximum allowed pending responses. 0 means checking is disabled.
+             */
+            unsigned int GetMaxAllowed() const
+            {
+                return max_allowed;
+            }
+
+        private:
+            friend MonitoredPendingResponses;
+            PendingResponses(unsigned int max_allowed);
+
+            std::atomic<unsigned int> counter {0};
+            const unsigned int max_allowed;
+        };
+
+        PendingResponses getheaders;
+        PendingResponses gethdrsen;
+
+    private:
+        friend CNode;
+        MonitoredPendingResponses();
+    } pendingResponses;
 
     /** Constructor for producing CNode shared pointer instances */
     template<typename ... Args>

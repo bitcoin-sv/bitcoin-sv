@@ -38,7 +38,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
         pass
 
 
-
 class SafeModeIBDTest(BitcoinTestFramework):
 
     def start_server(self):
@@ -90,7 +89,7 @@ class SafeModeIBDTest(BitcoinTestFramework):
         assert len(self.webhook_messages) == 0
 
         # start second node with 48 hours in the furture. this will trigger initial block download mode
-        self.start_node(1, extra_args=[f"-mocktime={int(time.time()) + 48*60*60}", f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode", ])
+        self.start_node(1, extra_args=[f"-mocktime={int(time.time()) + 48*60*60}", f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode",])
         connect_nodes(self.nodes, 0, 1)
 
         # wait until nodes sync themselves
@@ -106,6 +105,7 @@ class SafeModeIBDTest(BitcoinTestFramework):
         assert len(self.webhook_messages) == 0
 
         self.kill_server()
+
 
 if __name__ == '__main__':
     SafeModeIBDTest().main()

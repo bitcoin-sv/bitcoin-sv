@@ -16,12 +16,14 @@ from test_framework.util import assert_raises_rpc_error, connect_nodes_bi, disco
 from test_framework.mininode import FromHex, CTransaction, COIN
 from decimal import Decimal
 
+
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
     raw = node.getrawtransaction(txid)
     tx = FromHex(CTransaction(), raw)
     tx.rehash()
     return tx.vout[index].scriptPubKey
+
 
 class ConsolidationP2PKHTest(BitcoinTestFramework):
 
@@ -32,19 +34,22 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
         self.minrelaytxfee_sats = 250
-        self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=2",
-            "-acceptnonstdtxn=1",
-            ],[
-            "-whitelist=127.0.0.1",
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            #"-minconsolidationfactor=10", # test default consolidation factor
-            "-acceptnonstdtxn=1",
-        ]]
+        self.extra_args = [
+            [
+                "-whitelist=127.0.0.1",
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minconsolidationfactor=2",
+                "-acceptnonstdtxn=1",
+            ],
+            [
+                "-whitelist=127.0.0.1",
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                #"-minconsolidationfactor=10", # test default consolidation factor
+                "-acceptnonstdtxn=1",
+            ]
+        ]
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations):
 
@@ -93,7 +98,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
             # Disconnect nodes before each generate RPC. On a busy environment generate
             # RPC might not create the provided number of blocks. While nodes are communicating
-            # P2P messages can cause generateBlocks function to skip a block. Check the comment 
+            # P2P messages can cause generateBlocks function to skip a block. Check the comment
             # in generateBlocks function for details.
             disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(300)
@@ -129,7 +134,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             confirmations = tx.get('confirmations', 0)
             assert_equal (confirmations, 1)
             self.log.info ("test 3: PASS")
-            # Blocks must be synced because we do not want to start generating new blocks on node1 in the next loop iteration 
+            # Blocks must be synced because we do not want to start generating new blocks on node1 in the next loop iteration
             # before node1 has received all blocks generated on node0 and all pending P2P block requests have completed.
             sync_blocks(self.nodes)
 
@@ -157,6 +162,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.assert_start_raises_init_error(
             0, self.extra_args[0],
             'Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time')
+
 
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

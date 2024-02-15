@@ -328,7 +328,8 @@ public:
                 {6, uint256S("00000000764a4ff15c2645e8ede0d0f2af169f7a517dd94a6778684ed85a51e4")},
                 {7, uint256S("000000001f15fe3dac966c6bb873c63348ca3d877cd606759d26bd9ad41e5545")},
                 {8, uint256S("0000000074230d332b2ed9d87af3ad817b6f2616c154372311c9b2e4f386c24c")},
-                {9, uint256S("00000000ca21de811f04f5ec031aa3a102f8e27f2a436cde588786da1996ec9b")}
+                {9, uint256S("00000000ca21de811f04f5ec031aa3a102f8e27f2a436cde588786da1996ec9b")},
+                {10, uint256S("0000000046ceee1b7d771594c6c75f11f14f96822fd520e86ec5c703ec231e87")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{

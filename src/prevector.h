@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef _BITCOIN_PREVECTOR_H_
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 #define _BITCOIN_PREVECTOR_H_
 
 #include <cassert>
@@ -45,6 +46,8 @@
  * The data type T must be movable by memmove/realloc(). Once we switch to C++,
  * move constructors can be used instead.
  */
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 template <unsigned int N, typename T, typename Size = uint64_t,
           typename Diff = int64_t>
 class prevector {
@@ -258,6 +261,7 @@ public:
 private:
     size_type _size;
     union direct_or_indirect {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         char direct[sizeof(T) * N];
         struct {
             size_type capacity;
@@ -266,15 +270,19 @@ private:
     } _union;
 
     T *direct_ptr(difference_type pos) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<T *>(_union.direct) + pos;
     }
     const T *direct_ptr(difference_type pos) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<const T *>(_union.direct) + pos;
     }
     T *indirect_ptr(difference_type pos) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<T *>(_union.other.indirect) + pos;
     }
     const T *indirect_ptr(difference_type pos) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<const T *>(_union.other.indirect) + pos;
     }
     bool is_direct() const { return _size <= N; }
@@ -286,6 +294,7 @@ private:
                 T *src = indirect;
                 T *dst = direct_ptr(0);
                 memcpy(dst, src, size() * sizeof(T));
+                // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
                 free(indirect);
                 _size -= N + 1;
             }
@@ -296,15 +305,19 @@ private:
                 // allocator or new/delete so that handlers are called as
                 // necessary, but performance would be slightly degraded by
                 // doing so.
+                // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
                 _union.other.indirect = static_cast<char *>(realloc(
                     _union.other.indirect, ((size_t)sizeof(T)) * new_capacity));
                 assert(_union.other.indirect);
                 _union.other.capacity = new_capacity;
             } else {
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                 char *new_indirect = static_cast<char *>(
+                    // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
                     malloc(((size_t)sizeof(T)) * new_capacity));
                 assert(new_indirect);
                 T *src = direct_ptr(0);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 T *dst = reinterpret_cast<T *>(new_indirect);
                 memcpy(dst, src, size() * sizeof(T));
                 _union.other.indirect = new_indirect;
@@ -380,6 +393,7 @@ public:
         }
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
 
     prevector &operator=(const prevector<N, T, Size, Diff> &other) {
@@ -397,6 +411,7 @@ public:
         return *this;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector &operator=(prevector<N, T, Size, Diff> &&other) {
         swap(other);
         return *this;
@@ -530,6 +545,7 @@ public:
 
     const T &back() const { return *item_ptr(size() - 1); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap, performance-noexcept-swap)
     void swap(prevector<N, T, Size, Diff> &other) {
         std::swap(_union, other._union);
         std::swap(_size, other._size);
@@ -538,6 +554,7 @@ public:
     ~prevector() {
         clear();
         if (!is_direct()) {
+            // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
             free(_union.other.indirect);
             _union.other.indirect = nullptr;
         }
@@ -599,5 +616,7 @@ public:
 
     const value_type *data() const { return item_ptr(0); }
 };
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)
 
 #endif

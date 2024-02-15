@@ -11,6 +11,7 @@ from test_framework.util import assert_equal
 
 import os
 
+
 class BSVRequiredParams(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -35,6 +36,7 @@ class BSVRequiredParams(BitcoinTestFramework):
         nodeInfo = self.nodes[0].getinfo()
         # Check that unlimited value was set (excessiveblocksize=0)
         assert_equal(nodeInfo["maxblocksize"], REGTEST_DEFAULT_MAX_BLOCK_SIZE)
+
 
 if __name__ == '__main__':
     BSVRequiredParams().main()

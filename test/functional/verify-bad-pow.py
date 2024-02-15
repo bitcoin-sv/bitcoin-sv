@@ -8,9 +8,10 @@ from test_framework.mininode import *
 from test_framework.util import *
 
 # This test checks verifyblockcandidate RPC call. VerifyBlock tests a block template for validity without a valid PoW.
-# Test scenario: a block with invalid POW is created. 
+# Test scenario: a block with invalid POW is created.
 #   Submitblock RPC call should return 'high-hash' failure, which means POW was invalid.
 #   VerifyBlock should return no failure.
+
 
 class VerifyWithoutPowTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -32,6 +33,7 @@ class VerifyWithoutPowTest(BitcoinTestFramework):
 
         submitResult = node.verifyblockcandidate(ToHex(block))
         assert submitResult == None
+
 
 if __name__ == '__main__':
     VerifyWithoutPowTest().main()

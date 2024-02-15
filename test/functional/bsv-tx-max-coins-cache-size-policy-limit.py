@@ -34,7 +34,7 @@ class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):
         block = self.chain.next_block
 
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         test, out, _ = prepare_init_chain(self.chain, 105, 105, block_0=False)
 
@@ -63,7 +63,6 @@ class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):
         tx1.calc_sha256()
         self.log.info(tx1.hash)
         yield TestInstance([[tx1, RejectResult(16, b'bad-txns-inputs-too-large')]])
-
 
 
 if __name__ == '__main__':

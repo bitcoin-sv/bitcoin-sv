@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <vector>
 
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t DEFAULT_MAX_TIME_ADJUSTMENT = 70 * 60;
 
 class CNetAddr;
@@ -28,6 +29,7 @@ public:
     CMedianFilter(unsigned int size, T initial_value) : nSize(size) {
         vValues.reserve(size);
         vValues.push_back(initial_value);
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         vSorted = vValues;
     }
 

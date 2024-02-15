@@ -21,7 +21,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
     bsv::instruction last_instruction;
     const auto it_end{end_instructions()};
 
-    int32_t scopeLevel {0};
+    int64_t scopeLevel {0};
 
     for(auto it{begin_instructions()}; it != it_end; ++it)
     {

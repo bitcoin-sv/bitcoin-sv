@@ -22,6 +22,7 @@ from test_framework.util import wait_until, check_mempool_equals
 # For Debug build, recommended timeoutfactor is 3.
 # For Debug build with sanitizers enabled, recommended timeoutfactor is 5.
 
+
 class Evictions(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -94,7 +95,6 @@ class Evictions(BitcoinTestFramework):
             second_block.solve()
             conn.send_message(msg_block(second_block))
             wait_until(lambda: conn.rpc.getbestblockhash() == second_block.hash, check_interval=1)
-
 
             #mature the coinbase
             conn.rpc.generate(100)
@@ -193,9 +193,7 @@ class Evictions(BitcoinTestFramework):
                 # when there are still some secondary mempool transaction in the mempool
                 if len(txs_in_mempool & set(secondaryMempoolTxs)) != 0:
                     # the mempoolminfee should not exceed minminingtxfee
-                    assert  conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['minminingtxfee']
-
-
+                    assert conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['minminingtxfee']
 
         with self.run_node_with_connections("Restart the node with using the disk for storing transactions.",
                                             0, ["-minminingtxfee=0.00001", # 1 satoshi/byte
@@ -220,7 +218,7 @@ class Evictions(BitcoinTestFramework):
 
             #now we have room for some more txs
             for _ in range(3):
-                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoint_to_spend,], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)
@@ -249,6 +247,7 @@ class Evictions(BitcoinTestFramework):
 
             # make sure that we are using the tx database
             assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
+
 
 if __name__ == '__main__':
     Evictions().main()

@@ -10,6 +10,7 @@
  * Class must be defined outside config.h as it is used by a dynamic library
  * (libbitcoinconsensus) which is not connected to the rest of bitcoin code.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CScriptConfig
 {
 public:

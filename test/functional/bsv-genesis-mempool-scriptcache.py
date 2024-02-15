@@ -28,11 +28,13 @@ from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, msg_block, mininode_lock
 from time import sleep
 
+
 def add_tx_to_block(block, txs):
     block.vtx.extend(txs)
     block.hashMerkleRoot = block.calc_merkle_root()
     block.calc_sha256()
     block.solve()
+
 
 class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
@@ -49,7 +51,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
@@ -92,9 +94,10 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         # Now send tx1 and tx2 again, but this time in block. Block should be rejected.
         block = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
         add_tx_to_block(block, [tx1,tx2])
-        
+
         rejected_blocks = []
         rejected_txs = []
+
         def on_reject(conn, msg):
             if (msg.message == b'block'):
                 rejected_blocks.append(msg)
@@ -150,13 +153,13 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         # Send tx4 again, this time in block. Block should be rejected.
         block = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
         add_tx_to_block(block, [tx4])
-       
+
         self.test.connections[0].send_message(msg_block(block))
 
         # Wait for hash in rejected blocks
         wait_until(lambda: block.sha256 in [msg.data for msg in rejected_blocks], timeout=5, lock=mininode_lock)
         assert_equal(False, block.hash == node.getbestblockhash())
-        
+
         ########## SCENARIO 3
 
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight - 1)
@@ -183,6 +186,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         node.invalidateblock(node.getbestblockhash())
         assert_equal(False, tx5.hash in node.getrawmempool())
         assert_equal(False, tx6.hash in node.getrawmempool())
+
 
 if __name__ == '__main__':
     BSVGenesisMempoolScriptCache().main()

@@ -42,6 +42,7 @@ from test_framework.mininode import msg_tx, msg_block, ToHex
 import random
 import itertools
 
+
 class RPCSendRawTransactions(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -149,15 +150,15 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                     # we expect to have increasing number of unconfirmed ancestors by each transaction in this chain
                     assert_equal(len(tx['ancestors']), len(expected_ancestors))
                     for ancestor in tx['ancestors']:
-                      assert(ancestor['txid'] in expected_ancestors)
-                      # each ancestor has 1 input
-                      assert_equal(len(ancestor['vin']), 1)
-                      # check input
-                      if ancestor['txid'] in parentsMap:
-                        assert_equal(ancestor['vin'][0]['txid'], parentsMap[ancestor['txid']])
+                        assert(ancestor['txid'] in expected_ancestors)
+                        # each ancestor has 1 input
+                        assert_equal(len(ancestor['vin']), 1)
+                        # check input
+                        if ancestor['txid'] in parentsMap:
+                            assert_equal(ancestor['vin'][0]['txid'], parentsMap[ancestor['txid']])
                 expected_ancestors.append(tx['txid'])
                 if parentTxId:
-                  parentsMap[tx['txid']] = parentTxId
+                    parentsMap[tx['txid']] = parentTxId
             # Each chain should have one transaction (first in chain) without any unconfirmed ancestors
             assert_equal(first_in_chain, num_of_chains)
         else:
@@ -198,7 +199,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         #
         assert_raises_rpc_error(
             -8, "Invalid parameter: An empty json object", conn.rpc.sendrawtransactions, [{}])
-        
+
         #
         # Missing the hex string of the raw transaction.
         #
@@ -352,6 +353,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             self.log.info("====== rejected_txns[%s] = %s", k, v)
         assert_equal(len(rejected_txns), 1)
         assert_equal(len(rejected_txns['invalid']), len(bad) + len(orphan))
+
         def reject_reason(x):
             return x['reject_reason']
         invalid = {k: list(v)
@@ -379,7 +381,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         block.solve()
 
         return block
-
 
     # Test an attempt to submit transactions (via rpc interface) which are already mined
     def run_scenario6(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=30):
@@ -470,6 +471,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
     def get_tests(self):
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         # Shorthand for functions
@@ -498,7 +500,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
         self.stop_node(0)
 
-
         #====================================================================
         # Valid test cases.
         # - a bulk submit of txns through sendrawtransactions rpc interface
@@ -523,7 +524,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1: {} chains of length {}. Default params for rpc call.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, useRpcWithDefaults=True, timeout=20)
 
@@ -544,7 +547,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS2: {} chains of length {}. Shuffled txs. Default params for rpc call.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, useRpcWithDefaults=True, shuffle_txs=True, timeout=20)
 
@@ -566,7 +571,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS3: {} chains of length {}. Default params for rpc call.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, useRpcWithDefaults=True, timeout=30)
 
@@ -590,8 +597,14 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS4: {} chains of length {}. allowhighfees={}, dontcheckfee={}, listunconfirmedancestors{}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee), str(listunconfirmedancestors)),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+        with self.run_node_with_connections('TS4: {} chains of length {}. allowhighfees={}, dontcheckfee={}, listunconfirmedancestors{}.'.format(num_of_chains,
+                                                                                                                                                 chain_length,
+                                                                                                                                                 str(allowhighfees),
+                                                                                                                                                 str(dontcheckfee),
+                                                                                                                                                 str(listunconfirmedancestors)),
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, allowhighfees, dontcheckfee, listunconfirmedancestors, timeout=20)
 
@@ -615,8 +628,14 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-limitancestorcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS5: {} chains of length {}. allowhighfees={}, dontcheckfee={}, listunconfirmedancestors{}.'.format(num_of_chains, chain_length, str(allowhighfees), str(dontcheckfee), str(listunconfirmedancestors)),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+        with self.run_node_with_connections('TS5: {} chains of length {}. allowhighfees={}, dontcheckfee={}, listunconfirmedancestors{}.'.format(num_of_chains,
+                                                                                                                                                 chain_length,
+                                                                                                                                                 str(allowhighfees),
+                                                                                                                                                 str(dontcheckfee),
+                                                                                                                                                 str(listunconfirmedancestors)),
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, allowhighfees, dontcheckfee, listunconfirmedancestors, timeout=20)
 
@@ -637,8 +656,11 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-maxnonstdtxnsperthreadratio=0', # Do not take any non-std txs for processing (from the ptv queues).
                 '-checkmempool=0',
                 '-persistmempool=0']
-        with self.run_node_with_connections('TS6: {} chains of length {}. Process duplicates received through rpc'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+        with self.run_node_with_connections('TS6: {} chains of length {}. Process duplicates received through rpc'.format(num_of_chains,
+                                                                                                                          chain_length),
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario3(conn, num_of_chains, chain_length, out, timeout=30)
 
@@ -656,12 +678,16 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS6_1: {} chains of length {}. Process duplicates received through rpc'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario3_1(conn, chain_length, out, timeout=30)
         # dontcheckfee=True
         with self.run_node_with_connections('TS6_1: {} chains of length {}. Process duplicates received through rpc (dontcheckfee=True)'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario3_1(conn, chain_length, out, dontcheckfee=True, timeout=30)
 
@@ -681,12 +707,16 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         args = ['-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS6_2: {} chains of length {}. Process duplicates received through rpc'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario3_2(conn, chain_length, out, timeout=30)
         # dontcheckfee=True
         with self.run_node_with_connections('TS6_2: {} chains of length {}. Process duplicates received through rpc (dontcheckfee=True)'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario3_2(conn, chain_length, out, dontcheckfee=True, timeout=30)
 
@@ -706,7 +736,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS7: Invalid conditions',
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario2(conn, timeout=20)
 
@@ -724,7 +756,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS8: {} chains of length {}. Test duplicated inputs.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario4(conn, num_of_chains, chain_length, out, timeout=20)
 
@@ -744,7 +778,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS9: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario5(conn, num_of_chains, chain_length, out, reverseOrder=False, timeout=30)
 
@@ -765,7 +801,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS10: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario5(conn, num_of_chains, chain_length, out, reverseOrder=True, timeout=30)
 
@@ -781,7 +819,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS11: {} chains of length {}. Pre-mined txs. Default params for rpc call.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario6(conn, num_of_chains, chain_length, out, timeout=20)
 
@@ -808,26 +848,35 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         out = out[1:] # skip the spent coin from the previous test case
         tc_desc = '{} chain of length {}. Child tx2 is detected as p2p orphan tx, then parent tx1 is received in the next block, then tx2 is resubmitted through rpc'.format(1, 2)
         with self.run_node_with_connections('TS12a: ' + tc_desc,
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario7(conn, out, conn.rpc.sendrawtransactions, timeout=20) # dontcheckfee=False
         # dontcheckfee=True
         out = out[1:] # skip the spent coin from the previous test case
         with self.run_node_with_connections('TS12b: ' + tc_desc,
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario7(conn, out, conn.rpc.sendrawtransactions, dontcheckfee=True, timeout=20)
         out = out[1:] # skip the spent coin from the previous test case
         with self.run_node_with_connections('TS12c: ' + tc_desc,
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario7(conn, out, conn.rpc.sendrawtransaction, timeout=20) # dontcheckfee=False
         # dontcheckfee=True
         out = out[1:] # skip the spent coin from the previous test case
         with self.run_node_with_connections('TS12d: ' + tc_desc,
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario7(conn, out, conn.rpc.sendrawtransaction, dontcheckfee=True, timeout=20)
+
 
 if __name__ == '__main__':
     RPCSendRawTransactions().main()

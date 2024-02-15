@@ -13,6 +13,7 @@ from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_e
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
 
+
 class ConsolidationP2PKHTest(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -22,25 +23,28 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
         self.minrelaytxfee_sats = 250
-        self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-txindex=1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=2",
-            "-maxconsolidationinputscriptsize=151",
-            "-minconfconsolidationinput=5",
-            "-acceptnonstdtxn=1",
-            "-acceptnonstdconsolidationinput=1"
-            ],[
-            "-whitelist=127.0.0.1",
-            "-txindex=1",
-            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-acceptnonstdconsolidationinput=1"
-        ]]
+        self.extra_args = [
+            [
+                "-whitelist=127.0.0.1",
+                "-txindex=1",
+                "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minconsolidationfactor=2",
+                "-maxconsolidationinputscriptsize=151",
+                "-minconfconsolidationinput=5",
+                "-acceptnonstdtxn=1",
+                "-acceptnonstdconsolidationinput=1"
+            ],
+            [
+                "-whitelist=127.0.0.1",
+                "-txindex=1",
+                "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minconsolidationfactor=10",
+                "-acceptnonstdtxn=1",
+                "-acceptnonstdconsolidationinput=1"
+            ]
+        ]
 
     def test_extra_args_values (self):
         # Check that all exra args are read correction
@@ -78,7 +82,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 # amounting to roughly 10000 satoshis
                 for i in range(len(u.vout)):
                     uu = u.vout[i]
-                    if uu.nValue <=  self.utxo_test_sats and uu.nValue > self.utxo_test_sats // 2:
+                    if uu.nValue <= self.utxo_test_sats and uu.nValue > self.utxo_test_sats // 2:
                         tx.vin.append(CTxIn(COutPoint(uint256_from_str(hex_str_to_bytes(u.hash)[::-1]), i), b''))
                         break
 
@@ -176,7 +180,6 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             tx.vout.append(CTxOut(amount, scriptPubKey))
             sum_values_sats = sum_values_sats - amount
 
-
         assert (is_donation or check_size == out_size)
         tx.rehash()
         return ToHex(tx)
@@ -197,11 +200,11 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     self.minConfirmations = int(network_info['minconfconsolidationinput'])
                     self.acceptNonStandardInputs = network_info['acceptnonstdconsolidationinput']
                     self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
-                    self.log.info ("scriptSig limit: {}".format( self.scriptSigSpam))
-                    self.log.info("minimum input confirmations: {}".format( self.minConfirmations))
-                    self.log.info("accept non-std consolidation inputs: {}".format( self.acceptNonStandardInputs))
-                    self.log.info ("output_count: {}".format( output_count))
-                    self.log.info ("single_output_script_size: {}".format( single_output_script_size))
+                    self.log.info ("scriptSig limit: {}".format(self.scriptSigSpam))
+                    self.log.info("minimum input confirmations: {}".format(self.minConfirmations))
+                    self.log.info("accept non-std consolidation inputs: {}".format(self.acceptNonStandardInputs))
+                    self.log.info ("output_count: {}".format(output_count))
+                    self.log.info ("single_output_script_size: {}".format(single_output_script_size))
 
                     enough_inputs = output_count * self.consolidation_factor
                     not_spam = self.scriptSigSpam
@@ -239,6 +242,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     confirmations = tx.get('confirmations', 0)
                     assert_equal (confirmations, 1)
                     self.log.info("test 2 - donation with one input and one output:PASS")
+
 
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

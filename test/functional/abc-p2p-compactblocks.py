@@ -18,6 +18,7 @@ from test_framework.blocktools import *
 import time
 from test_framework.script import *
 
+
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 class TestNode(NodeConnCB):
 
@@ -83,7 +84,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.test.run()
 
     def get_tests(self):
-        self.chain.set_genesis_hash( int(self.nodes[0].getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
@@ -94,7 +95,7 @@ class FullBlockTest(ComparisonTestFramework):
         test, out, _ = prepare_init_chain(self.chain, 99, 100)
 
         yield test
-        
+
         # Check that compact block also work for big blocks
         node = self.nodes[0]
         peer = TestNode()

@@ -81,11 +81,9 @@ class ProxyTest(BitcoinTestFramework):
         # this is because the proxy to use is based on CService.GetNetwork(),
         # which return NET_UNROUTABLE for localhost
         args = [
-            ['-listen', '-proxy=%s:%i' %
-                (self.conf1.addr), '-proxyrandomize=1'],
-           ['-listen', '-proxy=%s:%i' %
-               (self.conf2.addr), '-proxyrandomize=1'],
-           []
+            ['-listen', '-proxy=%s:%i' % (self.conf1.addr), '-proxyrandomize=1'],
+            ['-listen', '-proxy=%s:%i' % (self.conf2.addr), '-proxyrandomize=1'],
+            []
         ]
         if self.have_ipv6:
             args[2] = ['-listen', '-proxy=[%s]:%i' %

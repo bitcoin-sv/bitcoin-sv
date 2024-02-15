@@ -8,7 +8,8 @@ Test GetArgAsBytes human readable unit parser with -maxmempool parameter.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
-import  os
+import os
+
 
 class GetArgAsBytesTest(BitcoinTestFramework):
 
@@ -39,7 +40,7 @@ class GetArgAsBytesTest(BitcoinTestFramework):
         self.stop_node(0)
         self.start_node(0, extra_args=["-maxmempool=300000kB"])
         assert_equal(self.nodes[0].getmempoolinfo()["maxmempool"], 300000000)
-        
+
         # MB
         self.stop_node(0)
         self.start_node(0, extra_args=["-maxmempool=300MB"])
@@ -54,7 +55,7 @@ class GetArgAsBytesTest(BitcoinTestFramework):
         self.stop_node(0)
         self.start_node(0, extra_args=["-maxmempool=300000KiB"])
         assert_equal(self.nodes[0].getmempoolinfo()["maxmempool"], 307200000)
-        
+
         # MiB
         self.stop_node(0)
         self.start_node(0, extra_args=["-maxmempool=300MiB"])
@@ -64,6 +65,7 @@ class GetArgAsBytesTest(BitcoinTestFramework):
         self.stop_node(0)
         self.start_node(0, extra_args=["-maxmempool=0.3GiB"])
         assert_equal(self.nodes[0].getmempoolinfo()["maxmempool"], 322122547)
+
 
 if __name__ == '__main__':
     GetArgAsBytesTest().main()

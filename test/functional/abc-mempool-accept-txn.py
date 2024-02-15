@@ -23,6 +23,7 @@ TXNS_TOO_MANY_SIGOPS_ERROR = b'bad-txns-too-many-sigops'
 RPC_TXNS_TOO_MANY_SIGOPS_ERROR = "64: " + \
     TXNS_TOO_MANY_SIGOPS_ERROR.decode("utf-8")
 
+
 class FullBlockTest(ComparisonTestFramework):
 
     # Can either run this test as 1 node with expected answers, or two and compare them.
@@ -106,7 +107,7 @@ class FullBlockTest(ComparisonTestFramework):
         # Too many sigops in one p2sh script
         too_many_p2sh_sigops_mempool = CScript(
             [OP_CHECKSIG] * (p2sh_sigops_limit_mempool + 1))
-        
+
         # A transaction with this output script can't get into the mempool
         assert_raises_rpc_error(-26, RPC_TXNS_TOO_MANY_SIGOPS_ERROR, node.sendrawtransaction,
                                 ToHex(spend_p2sh_tx(p2sh_tx, too_many_p2sh_sigops_mempool)))

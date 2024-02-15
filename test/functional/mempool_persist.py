@@ -58,7 +58,7 @@ class MempoolPersistTest(BitcoinTestFramework):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
         ftxHex = self.nodes[2].signrawtransaction(ftxHex)['hex']
         self.nodes[2].sendrawtransaction(ftxHex)
         ftx = FromHex(CTransaction(), ftxHex)
@@ -67,7 +67,7 @@ class MempoolPersistTest(BitcoinTestFramework):
         # Create & send a couple of non-final txns.
         for i in range(2):
             parent_txid = ftx.sha256
-            send_value = out_value - 500;
+            send_value = out_value - 500
             non_final_tx = CTransaction()
             non_final_tx.vin.append(CTxIn(COutPoint(parent_txid, i), b'', 0x01))
             non_final_tx.vout.append(CTxOut(int(send_value), CScript([OP_TRUE])))

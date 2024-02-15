@@ -11,6 +11,7 @@ from test_framework.util import wait_until, check_for_log_msg
 
 import struct
 
+
 class msg_emptycmdmsg():
     command = b'\x00'
 
@@ -19,6 +20,7 @@ class msg_emptycmdmsg():
 
     def serialize(self):
         return struct.pack("<I", self.payload)
+
 
 class TestEmptyCmd(BitcoinTestFramework):
 
@@ -33,6 +35,6 @@ class TestEmptyCmd(BitcoinTestFramework):
             conn.send_message(msg_emptycmdmsg())
             wait_until(lambda: check_for_log_msg(self, "Unknown command \"\" from peer=0", "/node0"), timeout=10)
 
+
 if __name__ == '__main__':
     TestEmptyCmd().main()
-

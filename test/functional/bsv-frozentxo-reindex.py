@@ -28,6 +28,7 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.script import CScript, OP_TRUE
 
+
 class Send_node():
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         self.p2p = p2p_connection
@@ -43,7 +44,7 @@ class Send_node():
             assert(self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False);
+            assert(self.check_frozen_tx_log(block.hash) == False)
 
     def check_frozen_tx_log(self, hash):
         for line in open(glob.glob(self.tmpdir + f"/node{self.node_no}" + "/regtest/blacklist.log")[0]):
@@ -58,6 +59,7 @@ class Send_node():
                 self.log.debug("Found line in bitcoind.log: %s", line.strip())
                 return True
         return False
+
 
 class FrozenTXOReindex(BitcoinTestFramework):
 
@@ -125,8 +127,8 @@ class FrozenTXOReindex(BitcoinTestFramework):
         old_tip = self.chain.tip
         rejected_block_hash = self._mine_and_send_block(tx, node, True)
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash));
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash));
+        assert(node.check_frozen_tx_log(self.chain.tip.hash))
+        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
 
         # remove rejected block from test node - the only remaining copy after this point is on remote node disk
         self._remove_last_block()
@@ -141,13 +143,13 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on policy blacklist")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                }
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    }
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         spend_frozen_tx = self._create_tx(PreviousSpendableOutput(freeze_tx, 0), b'', CScript([OP_TRUE]))
@@ -164,15 +166,15 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         spend_frozen_tx = self._create_tx(PreviousSpendableOutput(freeze_tx, 0), b'', CScript([OP_TRUE]))
@@ -212,7 +214,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
         assert_equal(send_node.rpc.getbestblockhash(), old_tip_hash)
 
         # Unfreeze and reconsider block to show that the block was still stored on disk
-        result = self.nodes[0].clearBlacklists( { "removeAllEntries": True } )
+        result = self.nodes[0].clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
 
         self.stop_node(0)
@@ -222,6 +224,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
 
         self.log.info(send_node.rpc.getblockchaininfo())
         assert_equal(send_node.rpc.getbestblockhash(), rejected_block_hash)
+
 
 if __name__ == '__main__':
     FrozenTXOReindex().main()

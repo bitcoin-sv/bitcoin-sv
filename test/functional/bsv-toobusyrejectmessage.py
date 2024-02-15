@@ -18,6 +18,7 @@ import datetime
 #   Node A sends HEADERS message to bitcoind. Bitcoind sends GetData to node A.
 #   Node A sends REJECT_TOOBUSY message. Bitcoind waits and asks again after 5 seconds.
 
+
 class TooBusyRejectMsgTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -41,6 +42,7 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
 
         askedFor = {}
         rejectSent = False
+
         def on_getdata(conn, message):
             if (conn in askedFor):
                 askedFor[conn] += 1
@@ -51,7 +53,6 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             if not rejectSent:
                 rejectSent = True
                 conn.send_message(msg_reject(message=b"getdata", code=self.REJECT_TOOBUSY, reason=b"node too busy"))
-
 
         with self.run_node_with_connections("Scenario 1: sending TOOBUSY reject message with 2 nodes", 0, [], self.num_peers) as connections:
             block = self.prepareBlock()
@@ -95,6 +96,7 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
 
             assert_equal(next(iter(askedFor.values())), 2)
             assert_equal(len(askedFor), 1)
+
 
 if __name__ == '__main__':
     TooBusyRejectMsgTest().main()

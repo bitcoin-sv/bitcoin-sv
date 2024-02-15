@@ -12,6 +12,7 @@ from test_framework.blocktools import assert_equal
 # 3. Check that sending GETDATA of unknown transaction returns NOTFOUND message.
 # 4. Check that sending GETDATA of known transaction returns TX message.
 
+
 class GetDataTest(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -24,16 +25,19 @@ class GetDataTest(BitcoinTestFramework):
         with self.run_node_with_connections("send GETDATA messages and check responses", 0, [], 1) as p2p_connections:
 
             receivedBlocks = set()
+
             def on_block(conn, message):
                 nonlocal receivedBlocks
                 receivedBlocks.add(message.block.hash)
 
             receivedTxs = set()
+
             def on_tx(conn, message):
                 nonlocal receivedTxs
                 receivedTxs.add(message.tx.hash)
 
             receivedTxsNotFound = set()
+
             def on_notfound(conn, message):
                 nonlocal receivedTxsNotFound
                 for inv in message.inv:
@@ -69,6 +73,7 @@ class GetDataTest(BitcoinTestFramework):
             connection.cb.send_message(msg_getdata([CInv(CInv.TX, int(known_hash, 16))]))
             wait_until(lambda: known_hash in receivedTxs)
             assert_equal(len(receivedTxs), 1)
+
 
 if __name__ == '__main__':
     GetDataTest().main()

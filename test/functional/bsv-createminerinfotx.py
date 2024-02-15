@@ -23,6 +23,8 @@ import json
 - Stop/Restart nodes and check if the further minerinfo transactions can be created which
   proves the funding chain was persisted
 '''
+
+
 class AllKeys:
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("01")
@@ -31,6 +33,7 @@ class AllKeys:
         self.prev_revocationKeys = MinerIdKeys("04")
         self.compromisedKeys = MinerIdKeys("06")
         self.fundingKeys = MinerIdKeys("10")
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -78,7 +81,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
         fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
@@ -94,15 +97,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # create a dummy transaction to compare behaviour
         height = self.nodes[0].getblockcount() + 1
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[0],
-                'publicIP': '127.0.0.1',
-                'publicPort': '8333',
-                'minerKeys': allKeys.minerIdKeys,
-                'revocationKeys': allKeys.revocationKeys,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
+            'height': height,
+            'name': self.miner_names[0],
+            'publicIP': '127.0.0.1',
+            'publicPort': '8333',
+            'minerKeys': allKeys.minerIdKeys,
+            'revocationKeys': allKeys.revocationKeys,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         # create json with bad syntax. 'height' is wrongly a string here
         if test_case == self.TEST_call_create_with_bad_json_synatx:
@@ -125,7 +129,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         else:
             jsonOverrideWithBadSyntax = None
 
-
         scriptPubKey = create_miner_info_scriptPubKey (
             params=minerinfotx_parameters,
             json_override_string=jsonOverrideWithBadSyntax)
@@ -146,7 +149,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         except Exception as e:
             if test_case != self.TEST_call_create_with_bad_json_synatx:
                 raise e
-            code = -1;
+            code = -1
             message = "failed to extract miner info document from scriptPubKey: doc parse error - ill-formed json"
             if code != e.error["code"]:
                 raise AssertionError(
@@ -212,7 +215,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         assert(tx0 == None)
         assert(tx1 == None)
 
-
     def run_test(self):
         # create bip32 keys
         allKeys = AllKeys()
@@ -242,7 +244,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         disconnect_nodes_bi(self.nodes, 0, 1)
         connect_nodes_bi(self.nodes, 0, 1)
         self.one_test(allKeys, fundingSeedTx, self.TEST_call_create)
-
 
 
 if __name__ == '__main__':

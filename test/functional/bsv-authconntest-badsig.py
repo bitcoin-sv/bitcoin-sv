@@ -18,22 +18,24 @@ import http.client as httplib
 import os
 
 '''
-this test is identical to bsv-authconntest.py but the signature is corrupted purpusefully 
+this test is identical to bsv-authconntest.py but the signature is corrupted purpusefully
 to assert that authentication fails because of this.
 '''
 
+
 class AllKeys:
     last_seed_number = 1
+
     def __init__(self):
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class AuthConnTestReputation(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-
 
         args = ['-mineridreputation_m=1', '-mineridreputation_n=10', '-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003']
         self.extra_args = [args + ['-mineridgeneratorurl=http://127.0.0.1:9002', '-mineridgeneratoralias=testMiner0'],
@@ -85,7 +87,6 @@ class AuthConnTestReputation(BitcoinTestFramework):
             f.write("debug=1\n")
             f.write("port=" + str(p2p_port(1)) + "\n")
             f.write("shrinkdebugfile=0\n")
-
 
     def make_block_with_coinbase(self, conn_rpc):
         tip = conn_rpc.getblock(conn_rpc.getbestblockhash())
@@ -149,15 +150,16 @@ class AuthConnTestReputation(BitcoinTestFramework):
             return signature
 
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[nodenum],
-                'publicIP': '127.0.0.1',
-                'publicPort': str(rpc_port(nodenum)),
-                'minerKeys': signWithService,
-                'revocationKeys':  None,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
+            'height': height,
+            'name': self.miner_names[nodenum],
+            'publicIP': '127.0.0.1',
+            'publicPort': str(rpc_port(nodenum)),
+            'minerKeys': signWithService,
+            'revocationKeys':  None,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum],  height))
         response = http_conns[nodenum].getresponse()
@@ -182,7 +184,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         assert(txid in block['tx'])
 
     def isAuthenticated (self, nodenum):
-        peerinfo = self.nodes[nodenum].getpeerinfo();
+        peerinfo = self.nodes[nodenum].getpeerinfo()
         if len(peerinfo) > 1:
             if (peerinfo[1]["authconn"]):
                 return True
@@ -291,6 +293,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         assert (not self.isAuthenticated(0))
         # this must fail because we provided bad signature
         assert (not self.isAuthenticated(1))  # node0 good and authenticated after reconnection
+
 
 if __name__ == '__main__':
     AuthConnTestReputation().main()

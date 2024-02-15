@@ -37,6 +37,7 @@ def http_get_call(host, port, path, response_object=0):
 
     return conn.getresponse().read().decode('utf-8')
 
+
 def http_get_call_with_headers(host, port, path, headers, response_object=0):
     conn = http.client.HTTPConnection(host, port)
     conn.request('GET', path, None, headers)
@@ -409,7 +410,7 @@ class RESTTest (BitcoinTestFramework):
             url.hostname, url.port, '/rest/block/' + newblockhash[0] + self.FORMAT_SEPARATOR + 'json')
         json_obj = json.loads(json_string)
         for tx in json_obj['tx']:
-            if not 'coinbase' in tx['vin'][0]:  # exclude coinbase
+            if 'coinbase' not in tx['vin'][0]:  # exclude coinbase
                 assert_equal(tx['txid'] in txs, True)
 
         # check the same but without tx details

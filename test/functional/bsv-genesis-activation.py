@@ -32,6 +32,7 @@ from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import msg_tx
 from time import sleep
 
+
 class BSVGenesisActivation(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -48,7 +49,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
         block = self.chain.next_block
 
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
@@ -69,7 +70,9 @@ class BSVGenesisActivation(ComparisonTestFramework):
         tx1 = create_transaction(tx0, 0, b'\x51', 1, CScript([OP_TRUE]))
         b108_rejected = self.chain.update_block(2, [tx1])
         self.log.info("Created block %s on height %d that tries to spend from block on height %d.",
-            b108_rejected.hash, self.genesisactivationheight-1, self.genesisactivationheight-1)
+                      b108_rejected.hash,
+                      self.genesisactivationheight-1,
+                      self.genesisactivationheight-1)
         yield self.rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
 
         # Rewind bad block (height is 107).
@@ -88,7 +91,9 @@ class BSVGenesisActivation(ComparisonTestFramework):
         tx1 = create_transaction(tx0, 0, b'\x51', 1, CScript([OP_TRUE]))
         b109_rejected = self.chain.update_block(4, [tx1])
         self.log.info("Created block %s on height %d that tries to spend from block on height %d.",
-            b109_rejected.hash, self.genesisactivationheight, self.genesisactivationheight - 1)
+                      b109_rejected.hash,
+                      self.genesisactivationheight,
+                      self.genesisactivationheight - 1)
         yield self.rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
 
         # Rewind bad block (height is 108).
@@ -103,9 +108,10 @@ class BSVGenesisActivation(ComparisonTestFramework):
         tx1 = create_transaction(tx0, 0, b'\x51', 1, CScript([OP_TRUE]))
         b109_accepted = self.chain.update_block(5, [tx1])
         self.log.info("Created block %s on height %d that tries to spend from block on height %d.",
-            b109_accepted.hash, self.genesisactivationheight, self.genesisactivationheight)
+                      b109_accepted.hash,
+                      self.genesisactivationheight,
+                      self.genesisactivationheight)
         yield self.accepted()
-
 
         #############
 
@@ -121,7 +127,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
 
         node.invalidateblock(hashToHex(b108.sha256))
 
-         # tx0 and tx1 are not in mempool (mempool is deleted when 108 is invalidated)
+        # tx0 and tx1 are not in mempool (mempool is deleted when 108 is invalidated)
         assert_equal(False, tx0.hash in node.getrawmempool())
         assert_equal(False, tx1.hash in node.getrawmempool())
 
@@ -135,6 +141,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
 
         # Now we are at height 108.
         assert_equal(node.getblock(node.getbestblockhash())['height'], 108)
+
 
 if __name__ == '__main__':
     BSVGenesisActivation().main()

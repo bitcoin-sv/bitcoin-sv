@@ -339,6 +339,7 @@ def initialize_datadir(dirname, n):
         f.write("shrinkdebugfile=0\n")
     return datadir
 
+
 def get_datadir_path(dirname, n):
     return os.path.join(dirname, "node" + str(n))
 
@@ -376,6 +377,7 @@ def set_node_times(nodes, t):
     for node in nodes:
         node.setmocktime(t)
 
+
 # Disconnects only the outbound connection "from_connection -> node_num"
 # If nodes were connected with connect_nodes_bi (default setup_network) use disconnect_nodes_bi to completely split the nodes if needed
 def disconnect_nodes(from_connection, node_num):
@@ -390,11 +392,13 @@ def disconnect_nodes(from_connection, node_num):
     else:
         raise AssertionError("timed out waiting for disconnect")
 
+
 # Disconnects both outbound and inbound connections between nodes[node_a_index] and nodes[node_b_index]
 # Inbound connection on one node is implicitly closed as a result of closing the outbound connection on the other node
 def disconnect_nodes_bi(nodes, node_a_index, node_b_index):
     disconnect_nodes(nodes[node_a_index], node_b_index)
     disconnect_nodes(nodes[node_b_index], node_a_index)
+
 
 # Returns False if node has -multistreams=0 set
 def is_multistreams_enabled(node):
@@ -403,6 +407,7 @@ def is_multistreams_enabled(node):
             checkValueAt = extra_arg.find("=") + 1
             return int(extra_arg[checkValueAt:])
     return True
+
 
 # Returns the number of additional stream policies used by connecting nodes.
 def number_of_additional_streams(from_node, to_node):
@@ -415,12 +420,13 @@ def number_of_additional_streams(from_node, to_node):
                 additional_streams = []
                 if policy_from_node == "BlockPriority":
                     additional_streams = BlockPriorityStreamPolicy().additional_streams
-                elif  policy_from_node == "Default":
+                elif policy_from_node == "Default":
                     additional_streams = DefaultStreamPolicy().additional_streams
                 else:
                     raise AssertionError("Connecting test nodes are using an unexpected stream policy %s" % (policy_from_node))
                 return len(additional_streams)
     return 0
+
 
 # Connects two nodes and waits for connection to be established
 # Set wait_multistreams to False to skip waiting for multistreams connection establishment
@@ -441,9 +447,11 @@ def connect_nodes(nodes, from_node_num, to_node_num, wait_multistreams=True):
     number_of_streams = number_of_additional_streams(nodes[from_node_num], nodes[to_node_num]) + 1
     wait_until(lambda: all(peer['version'] != 0 and (not multiStreamsEnabled or subver not in peer['subver'] or (peer['associd'] != 'Not-Set' and len(peer['streams']) == number_of_streams)) for peer in nodes[from_node_num].getpeerinfo()))
 
+
 def connect_nodes_bi(nodes, a, b):
     connect_nodes(nodes, a, b)
     connect_nodes(nodes, b, a)
+
 
 def connect_nodes_mesh(nodes, bi=False):
     for i in range(len(nodes)):
@@ -452,6 +460,7 @@ def connect_nodes_mesh(nodes, bi=False):
                 connect_nodes_bi(nodes, i, j)
             else:
                 connect_nodes(nodes, i, j)
+
 
 def sync_blocks(rpc_connections, *, wait=1, timeout=60):
     """
@@ -513,6 +522,7 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
         timeout -= wait
     raise AssertionError("Mempool sync failed")
 
+
 def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0.1):
     try:
         wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool},
@@ -528,17 +538,20 @@ def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0
             rpc.log.info("Transactions that should not be in the mempool: " + str(list(unexpected)))
         raise
 
+
 # The function checks if transaction/block was rejected
 # The actual reject reason is checked if specified
 def wait_for_reject_message(conn, reject_reason=None, timeout=5):
-    wait_until(lambda: ('reject' in list(conn.cb.last_message.keys()) and (
-                reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)), timeout=timeout)
+    wait_until(lambda: ('reject' in list(conn.cb.last_message.keys())
+                        and (reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)),
+               timeout=timeout)
     if conn.cb.last_message['reject'].message == b'tx':
         conn.rpc.log.info('Transaction rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
     else:
         conn.rpc.log.info('Block rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
 
     conn.cb.last_message.pop('reject', None)
+
 
 # The function checks that transaction/block was not rejected
 def ensure_no_rejection(conn):
@@ -547,6 +560,7 @@ def ensure_no_rejection(conn):
     wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message[
         'reject'].reason == None, timeout=5)
     conn.rpc.log.info('Not rejected -- OK')
+
 
 # Transaction/Block functions
 #############################
@@ -666,10 +680,9 @@ def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
 
     return (txid, signresult["hex"], fee)
 
+
 # Helper to create at least "count" utxos
 # Pass in a fee that is sufficient for relay and mining new transactions.
-
-
 def create_confirmed_utxos(fee, node, count, age=101, nodes=None):
 
     to_generate = int(0.5 * count) + age
@@ -709,10 +722,9 @@ def create_confirmed_utxos(fee, node, count, age=101, nodes=None):
     assert(len(utxos) >= count)
     return utxos
 
+
 # Create large OP_RETURN txouts that can be appended to a transaction
 # to make it large (helper for constructing large transactions).
-
-
 def gen_return_txouts():
     # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
     # So we have big transactions (and therefore can't fit very many into each block)
@@ -741,10 +753,9 @@ def create_tx(node, coinbase, to_address, amount):
     assert_equal(signresult["complete"], True)
     return signresult["hex"]
 
+
 # Create a spend of each passed-in utxo, splicing in "txouts" to each raw
 # transaction to make it large.  See gen_return_txouts() above.
-
-
 def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
     addr = node.getnewaddress()
     txids = []
@@ -858,6 +869,7 @@ def check_for_log_msg(rpc, log_msg, node_dir=None):
                 return True
     return False
 
+
 def count_log_msg(rpc, log_msg, node_dir=None):
     """
     Checks for number of occurrences of the log_msg in the bitcoind.log
@@ -880,8 +892,10 @@ def count_log_msg(rpc, log_msg, node_dir=None):
     rpc.log.info(f'String "{log_msg}"" found in {count} lines')
     return count
 
+
 def hashToHex(hash):
     return format(hash, '064x')
+
 
 def check_zmq_test_requirements(configfile, skip_test_exception):
     # Check that bitcoin has been built with ZMQ enabled
@@ -904,6 +918,7 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
     except ImportError:
         raise Exception("pyzmq module not available.")
 
+
 def wait_for_ptv_completion(conn, exp_mempool_size, check_interval=0.1, timeout=60):
     """
     The invocation of this function waits until the following conditions are met:
@@ -913,8 +928,9 @@ def wait_for_ptv_completion(conn, exp_mempool_size, check_interval=0.1, timeout=
     - not sending all txs to the node through the connection
     """
     wait_until(lambda: conn.rpc.getmempoolinfo()['size'] >= exp_mempool_size,
-                    check_interval=check_interval, timeout=timeout)
+               check_interval=check_interval, timeout=timeout)
     conn.rpc.waitforptvcompletion()
+
 
 def wait_for_txn_propagator(node):
     # Wait for this node's transactions propagator to finish relaying transactions to other nodes.

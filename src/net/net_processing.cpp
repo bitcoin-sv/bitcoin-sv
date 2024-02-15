@@ -2808,6 +2808,95 @@ std::optional<const CBlockIndex*> GetFirstBlockIndexFromLocatorNL(const CBlockLo
     return pindex;
 }
 
+/**
+ * Helper class template used to create CVectorStream objects that will track number of pending responses.
+ *
+ * It is used in ProcessGetHeadersMessage() and ProcessGetHeadersEnrichedMessage().
+ *
+ * @tparam PMemPendingResponses Pointer to data member in CNode::MonitoredPendingResponses that keeps count of pending
+ *                              responses for the specific request type (e.g. &CNode::MonitoredPendingResponses::getheaders
+ *                              for getheaders P2P requests).
+ */
+template<CNode::MonitoredPendingResponses::PendingResponses CNode::MonitoredPendingResponses::* PMemPendingResponses>
+class CreateHeaderStreamWithPendingResponsesCounting
+{
+public:
+    explicit CreateHeaderStreamWithPendingResponsesCounting(const CNodePtr& pfrom)
+    : pfrom_weak( pfrom )
+    {}
+
+    std::unique_ptr<CVectorStream> operator()(std::vector<uint8_t>&& serialisedHeader)
+    {
+        struct CVectorStream_WithPendingResponsesCounting : CVectorStream
+        {
+            /**
+             * Constructor forwards the data to constructor of CVectorStream and increments the pending responses count.
+             *
+             * This object is intended to be constructed when the response is added to the sending queue.
+             *
+             * @param data
+             * @param pfrom_weak0
+             */
+            CVectorStream_WithPendingResponsesCounting(std::vector<uint8_t>&& data, CNodePtr::weak_type&& pfrom_weak0)
+            : CVectorStream(std::move(data))
+            , pfrom_weak(std::move(pfrom_weak0))
+            {
+                // When the header stream object is created, the response is considered to be pending.
+                // Note that this will happen during the call to connman.PushMessage() that adds the message to the sending P2P queue.
+                if(auto pfrom = this->pfrom_weak.lock())
+                {
+                    (pfrom->pendingResponses.*PMemPendingResponses).Increment();
+                }
+            }
+
+            CVectorStream_WithPendingResponsesCounting(CVectorStream_WithPendingResponsesCounting&&) = delete; // no copying or moving
+
+            /**
+             * Destructor decrements the pending responses count.
+             *
+             * This object is intended to be destroyed when the response is taken out from the sending queue.
+             */
+            ~CVectorStream_WithPendingResponsesCounting()
+            {
+                // When the header stream object is destroyed, the response is considered to be sent.
+                // If connection is still alive, number of pending responses is decremented. If it is not,
+                // nothing is done since the counter does not exist anymore.
+                // Note that the sender of the request did not yet receive the response at this time and it
+                // is (probably) still in the TCP send buffer (which may contain several responses that
+                // are not yet received by the sender of the request). Actual response payload may also be
+                // stored in a different message (immediately after this one) that is still in the sending
+                // queue. In addition, this object may also be destroyed even without sending the response
+                // (e.g. if connection is closed).
+                // All this means that the value in member PMemPendingResponses may be a bit lower than
+                // the number of responses the sender still has to receive. But this doesn't matter because
+                // we're only interested in detecting too large number of responses still waiting in the
+                // sending queue.
+                if(auto pfrom = pfrom_weak.lock())
+                {
+                    (pfrom->pendingResponses.*PMemPendingResponses).Decrement();
+                }
+            }
+
+            /**
+             * Return the memory used by this object
+             */
+            size_t GetEstimatedMaxMemoryUsage() const override
+            {
+                // Used memory reported by the base class must be adjusted to account for additional
+                // data member in this class.
+                return this->CVectorStream::GetEstimatedMaxMemoryUsage() + (sizeof(*this) - sizeof(CVectorStream));
+            }
+
+            CNodePtr::weak_type pfrom_weak;
+        };
+
+        return std::make_unique<CVectorStream_WithPendingResponsesCounting>( std::move(serialisedHeader), std::move(pfrom_weak) );
+    }
+
+private:
+    CNodePtr::weak_type pfrom_weak;
+};
+
 } // anonymous namespace
 
 /**
@@ -2818,6 +2907,22 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
                                      msg_buffer& vRecv,
                                      CConnman& connman)
 {
+    if(unsigned int n; !pfrom->fWhitelisted && !pfrom->pendingResponses.getheaders.IsBelowLimit(n))
+    {
+        // If number of pending responses is too large, the request is ignored and the peer is disconnected.
+        // NOTE: Because we check if the number of pending responses is below limit before adding a new response,
+        //       it is possible that the number becomes a bit higher than specified maximum. E.g.: If two threads
+        //       running at the same time both see max-1 pending responses, they will both proceed to add a new
+        //       response, which will result in max+1 pending responses. But this is OK, since we don't need to
+        //       enforce the exact maximum. If, on the other hand, an exact maximum would need to be enforced
+        //       (e.g. no more than one pending response guarantee), this would need to be addressed properly and
+        //       would probably introduce some performance overhead.
+        LogPrint(BCLog::NETMSG, "Ignoring getheaders and disconnecting the peer because there are too many (%d, max=%d) pending responses to previously received getheaders from peer=%d.\n",
+            n, pfrom->pendingResponses.getheaders.GetMaxAllowed(), pfrom->id);
+        pfrom->fDisconnect = true;
+        return;
+    }
+
     CBlockLocator locator;
     uint256 hashStop;
     vRecv >> locator >> hashStop;
@@ -2873,7 +2978,13 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
     // will re-announce the new block via headers (or compact blocks again)
     // in the SendMessages logic.
     state->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
-    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
+
+    auto msg = msgMaker.Make(NetMsgType::HEADERS, vHeaders);
+    if(!pfrom->fWhitelisted)
+    {
+        msg.headerStreamCreator = CreateHeaderStreamWithPendingResponsesCounting<&CNode::MonitoredPendingResponses::getheaders>(pfrom);
+    }
+    connman.PushMessage(pfrom, std::move(msg));
 }
 
 namespace {
@@ -3041,6 +3152,15 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
                                              CConnman& connman,
                                              const Config& config)
 {
+    if(unsigned int n; !pfrom->fWhitelisted && !pfrom->pendingResponses.gethdrsen.IsBelowLimit(n))
+    {
+        // Same comment applies as in ProcessGetHeadersMessage().
+        LogPrint(BCLog::NETMSG, "Ignoring gethdrsen and disconnecting the peer because there are too many (%d, max=%d) pending responses to previously received gethdrsen from peer=%d.\n",
+            n, pfrom->pendingResponses.gethdrsen.GetMaxAllowed(), pfrom->id);
+        pfrom->fDisconnect = true;
+        return;
+    }
+
     CBlockLocator locator;
     uint256 hashStop;
     vRecv >> locator >> hashStop;
@@ -3140,7 +3260,12 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
     assert(state);
     state->pindexBestHeaderSent = lastBlockIndex;
 
-    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::HDRSEN, vHeadersEnriched));
+    auto msg = msgMaker.Make(NetMsgType::HDRSEN, vHeadersEnriched);
+    if(!pfrom->fWhitelisted)
+    {
+        msg.headerStreamCreator = CreateHeaderStreamWithPendingResponsesCounting<&CNode::MonitoredPendingResponses::gethdrsen>(pfrom);
+    }
+    connman.PushMessage(pfrom, std::move(msg));
 }
 
 /**

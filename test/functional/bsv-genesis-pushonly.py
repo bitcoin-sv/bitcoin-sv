@@ -14,6 +14,7 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, hashToHex
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 
+
 class BSVGenesisActivation(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -30,7 +31,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
         block = self.chain.next_block
 
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
@@ -65,6 +66,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
 
         # transaction_op_add_accepted should not be in mempool (individual transactions are always checked against pushonly)
         assert(transaction_op_add_accepted.hash not in set(node.getrawmempool()))
+
 
 if __name__ == '__main__':
     BSVGenesisActivation().main()

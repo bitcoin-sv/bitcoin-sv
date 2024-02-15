@@ -12,6 +12,7 @@ from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
+
 def make_coinbase(connection):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"
     tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
@@ -69,7 +70,6 @@ def spend_separator_tx(tx_sep_tx, keys_for_sep_tx):
 
     tx.vin.append(CTxIn(COutPoint(tx_sep_tx.sha256, 0), b"", 0xffffffff))
 
-
     k = CECKey()
     k.set_secretbytes(b"horsebattery")
 
@@ -111,7 +111,7 @@ class InvalidTx(BitcoinTestFramework):
 
     def run_test(self):
         with self.run_node_with_connections("Scenario 1", 0, ['-acceptnonstdtxn=1'], number_of_connections=1) as (conn,):
-            coinbase_tx, coinbase_key =  make_coinbase(conn)
+            coinbase_tx, coinbase_key = make_coinbase(conn)
             conn.rpc.generate(100)
 
             sep_tx, sep_keys = make_separator_tx(coinbase_tx, coinbase_key, 5)

@@ -2,10 +2,20 @@
 # Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from .mininode import (NodeConn, NodeConnCB, msg_createstream, msg_block, msg_cmpctblock,
-    msg_blocktxn, msg_getblocktxn, msg_headers, msg_getheaders, msg_ping, msg_pong)
+from .mininode import (NodeConn,
+                       NodeConnCB,
+                       msg_createstream,
+                       msg_block,
+                       msg_cmpctblock,
+                       msg_blocktxn,
+                       msg_getblocktxn,
+                       msg_headers,
+                       msg_getheaders,
+                       msg_ping,
+                       msg_pong)
 from .util import p2p_port
 from .streams import StreamType
+
 
 # Association callbacks
 class AssociationCB():
@@ -246,4 +256,3 @@ class Association():
 
         # Send message
         stream.send_message(msg)
-

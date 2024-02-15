@@ -1266,12 +1266,19 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
         }
     }
 
+    int nConnectionsFromAddr = 0;
     bool whitelisted = hListenSocket.whitelisted || IsWhitelistedRange(addr);
     {
         LOCK(cs_vNodes);
         for (const CNodePtr& pnode : vNodes) {
             if (pnode->fInbound) {
                 nInbound++;
+                if (!whitelisted) {
+                    auto& nodeAddr = pnode->GetAssociation().GetPeerAddr();
+                    if (static_cast<const CNetAddr&>(nodeAddr) == static_cast<const CNetAddr&>(addr)) {
+                        nConnectionsFromAddr++;
+                    }
+                }
             }
         }
     }
@@ -1311,6 +1318,13 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
 
     if (IsBanned(addr) && !whitelisted) {
         LogPrint(BCLog::NETCONN, "connection from %s dropped (banned)\n", addr.ToString());
+        CloseSocket(hSocket);
+        return;
+    }
+
+    if (!whitelisted && nConnectionsFromAddr >= nMaxConnectionsFromAddr) {
+        LogPrint(BCLog::NETCONN, "connection from %s dropped: too many connections from the same address\n",
+                 static_cast<const CNetAddr&>(addr).ToString());
         CloseSocket(hSocket);
         return;
     }
@@ -2468,6 +2482,7 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     nRelevantServices = connOptions.nRelevantServices;
     nLocalServices = connOptions.nLocalServices;
     nMaxConnections = connOptions.nMaxConnections;
+    nMaxConnectionsFromAddr = connOptions.nMaxConnectionsFromAddr;
     nMaxOutbound = std::min((connOptions.nMaxOutbound), nMaxConnections);
     nMaxAddnode = connOptions.nMaxAddnode;
     nMaxFeeler = connOptions.nMaxFeeler;
@@ -2936,6 +2951,17 @@ void CConnman::PeerAvgBandwithCalc()
         pnode->GetAssociation().AvgBandwithCalc();
     }
 }
+
+
+CNode::MonitoredPendingResponses::PendingResponses::PendingResponses(unsigned int max_allowed)
+: max_allowed(max_allowed)
+{}
+
+CNode::MonitoredPendingResponses::MonitoredPendingResponses()
+: getheaders( static_cast<unsigned int>(gArgs.GetArg("-maxpendingresponses_getheaders", DEFAULT_MAXPENDINGRESPONSES_GETHEADERS)) )
+, gethdrsen( static_cast<unsigned int>(gArgs.GetArg("-maxpendingresponses_gethdrsen", DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN)) )
+{}
+
 
 CNode::CNode(
     NodeId idIn,

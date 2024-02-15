@@ -18,6 +18,7 @@ from test_framework.util import assert_equal, assert_raises_rpc_error
 import decimal
 import random
 
+
 def send_tx_with_data(node, utxo, fee, data_size):
     assert(data_size > 24)
     send_value = utxo['amount'] - fee
@@ -31,6 +32,7 @@ def send_tx_with_data(node, utxo, fee, data_size):
     rawTxn = node.createrawtransaction(inputs, outputs)
     signedTxn = node.signrawtransaction(rawTxn)["hex"]
     return node.sendrawtransaction(signedTxn)
+
 
 class MempoolEvictionPriorityTest(BitcoinTestFramework):
     mempool_size = 300
@@ -100,6 +102,7 @@ class MempoolEvictionPriorityTest(BitcoinTestFramework):
         for txid in cheap_txids:
             assert(txid not in mempool)
         self.log.info("All transactions with insufficient fee were evicted.")
+
 
 if __name__ == '__main__':
     MempoolEvictionPriorityTest().main()

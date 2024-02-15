@@ -4,7 +4,7 @@
 
 """
 Start up nodes, feed in some transactions, use the mining API to
-mine some blocks, verify all nodes accept the mined blocks and 
+mine some blocks, verify all nodes accept the mined blocks and
 check if merkleproof returned by getblockheader RPC function and
 /rest/headers/extended REST call is valid.
 """
@@ -19,6 +19,7 @@ import math
 import json
 import http.client
 import urllib.parse
+
 
 # Split some UTXOs into some number of spendable outputs
 def split_utxos(fee, node, count, utxos, sync_nodes):
@@ -59,6 +60,7 @@ def split_utxos(fee, node, count, utxos, sync_nodes):
     utxos = node.listunspent()
     return utxos
 
+
 # Feed some UTXOs into a nodes mempool
 def fill_mempool(fee, node, utxos):
     addr = node.getnewaddress()
@@ -77,6 +79,7 @@ def fill_mempool(fee, node, utxos):
         num_sent += 1
         if num_sent % 10000 == 0:
             print("Num sent: {}".format(num_sent))
+
 
 # The main test class
 class BSVBlockWithCBProof(BitcoinTestFramework):
@@ -100,7 +103,6 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         # Create a lot of transactions from the UTXOs
         newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, sync_nodes=self.nodes)
         fill_mempool(self.relayfee, node, newutxos)
-
 
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
@@ -129,7 +131,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         if(get_coinbase):
             assert 'coinbase' in candidate
         else:
-            assert not 'coinbase' in candidate
+            assert 'coinbase' not in candidate
         assert 'coinbaseValue' in candidate
         assert 'version' in candidate
         assert 'nBits' in candidate
@@ -143,30 +145,30 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         # submitResult is bool True for success, if failure error is returned
         assert_equal(submitResult, True)
 
-    # Return JSON header obtained via REST call /rest/headers/extended 
+    # Return JSON header obtained via REST call /rest/headers/extended
     def call_rest_headers_extended_json(self, node, hash):
         FORMAT_SEPARATOR = "."
         url = urllib.parse.urlparse(node.url)
         conn = http.client.HTTPConnection(url.hostname, url.port)
         conn.request('GET', '/rest/headers/extended/1/' + hash + FORMAT_SEPARATOR + "json")
-        
+
         response = conn.getresponse()
         assert_equal(response.status, 200)
-        
+
         return json.loads(response.read().decode('utf-8'), parse_float=Decimal)
 
-    # Helper to check if JSON extended header returned via rest call matches hdr 
+    # Helper to check if JSON extended header returned via rest call matches hdr
     def check_rest_header_extendeded_json(self, node, hash, hdr_expected):
         hdrs_rest = self.call_rest_headers_extended_json(node, hash)
         assert_equal(len(hdrs_rest), 1)
         assert_equal(hdrs_rest[0], hdr_expected)
-        
+
     def check_node(self, node, block_hash):
         obj = node.getblock(block_hash, 2)
         hdr = node.getblockheader(block_hash, 2)
         self.check_rest_header_extendeded_json(node, block_hash, hdr) # header returned via rest call must be the same
         assert_equal(hdr["tx"][0], obj["tx"][0]) # coinbase transaction must also be returned in a header
-        assert(len( hdr["merkleproof"]) > 0)
+        assert(len(hdr["merkleproof"]) > 0)
         # check if merkle root is correct by calculating root from merkleproof tree and coinbase tx hash
         root_hash = merkle_root_from_merkle_proof(int(obj["tx"][0]["hash"],16), hdr["merkleproof"])
         assert_equal(root_hash, int(obj["merkleroot"],16))
@@ -180,12 +182,13 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         self.check_node(blockNode, bestHash)
         # also check in 2nd node that received the newly mined block if merkleeproof is present and if it's correct
         self.check_node(txnNode, bestHash)
-        
+
         self.test_mine_block(txnNode, blockNode, False)
         bestHash = blockNode.getbestblockhash()
         self.check_node(blockNode, bestHash)
         # also check in 2nd node that received the newly mined block if merkleeproof is present and if it's correct
         self.check_node(txnNode, bestHash)
+
 
 if __name__ == '__main__':
     BSVBlockWithCBProof().main()

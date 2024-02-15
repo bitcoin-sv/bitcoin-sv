@@ -26,19 +26,19 @@ b. node mines a block [expect: tip header]
 c. for N in 1, ..., 10:
    * for announce-type in {inv, header}
      - peer mines N blocks, announces with announce-type
-       [ expect: getheaders/getdata or getdata, deliver block(s) ]
-     - node mines a block [ expect: 1 header ]
+       [expect: getheaders/getdata or getdata, deliver block(s)]
+     - node mines a block [expect: 1 header]
 
 Part 3: Headers announcements stop after large reorg and resume after getheaders or inv from peer.
 - For response-type in {inv, getheaders}
-  * node mines a 7 block reorg [ expect: headers announcement of 8 blocks ]
-  * node mines an 8-block reorg [ expect: inv at tip ]
-  * peer responds with getblocks/getdata [expect: inv, blocks ]
-  * node mines another block [ expect: inv at tip, peer sends getdata, expect: block ]
-  * node mines another block at tip [ expect: inv ]
+  * node mines a 7 block reorg [expect: headers announcement of 8 blocks]
+  * node mines an 8-block reorg [expect: inv at tip]
+  * peer responds with getblocks/getdata [expect: inv, blocks]
+  * node mines another block [expect: inv at tip, peer sends getdata, expect: block]
+  * node mines another block at tip [expect: inv]
   * peer responds with getheaders with an old hashstop more than 8 blocks back [expect: headers]
-  * peer requests block [ expect: block ]
-  * node mines another block at tip [ expect: inv, peer sends getdata, expect: block ]
+  * peer requests block [expect: block]
+  * node mines another block at tip [expect: inv, peer sends getdata, expect: block]
   * peer sends response-type [expect headers if getheaders, getheaders/getdata if mining new block]
   * node mines 1 block [expect: 1 header, peer responds with getdata]
 
@@ -276,8 +276,9 @@ class SendHeadersTest(BitcoinTestFramework):
                 test_node.wait_for_getdata([new_block.sha256])
                 test_node.send_message(msg_block(new_block))
                 test_node.sync_with_ping()  # make sure this block is processed
-                inv_node.check_last_announcement(inv=[new_block.hash])  # wait until inv for this block is received before continuing so that
-                                                                        # it does not arrive later while we're already expecting the next one
+                # wait until inv for this block is received before continuing so that
+                # it does not arrive later while we're already expecting the next one
+                inv_node.check_last_announcement(inv=[new_block.hash])
                 inv_node.clear_last_announcement()
                 test_node.clear_last_announcement()
 

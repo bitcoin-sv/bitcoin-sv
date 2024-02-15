@@ -20,6 +20,7 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
 from test_framework.mininode import msg_tx, wait_until
 
+
 class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -36,7 +37,7 @@ class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
@@ -66,6 +67,7 @@ class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
         assert_equal(len(tx), 3)
         assert_equal(tx1.hash, tx[1])
         assert_equal(tx2.hash, tx[2])
+
 
 if __name__ == '__main__':
     BSVGenesisActivationTransactionsBeforeAfter().main()

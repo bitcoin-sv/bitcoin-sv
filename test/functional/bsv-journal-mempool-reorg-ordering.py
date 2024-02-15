@@ -44,6 +44,7 @@ from test_framework.util import wait_until
 
 _cntr = 1
 
+
 def new_key():
     k = CECKey()
     global _cntr
@@ -58,16 +59,20 @@ class UTXO:
         self.ndx = ndx
         self.key = key
 
+
 _cntr2 = 1
+
 
 def get_tip(connection):
     return connection.rpc.getblock(connection.rpc.getbestblockhash())
+
 
 def get_block_hash(block):
     if isinstance(block, dict):
         return block["hash"]
     else:
         return block.hash
+
 
 def knows_of_block(connection, block):
     def predicate(*, _block_hash=get_block_hash(block)):
@@ -81,6 +86,7 @@ def knows_of_block(connection, block):
             return False
     return predicate
 
+
 def block_is_tip(connection, block):
     def predicate(*, _block_hash=get_block_hash(block)):
         ret = connection.rpc.getbestblockhash() == _block_hash
@@ -88,6 +94,7 @@ def block_is_tip(connection, block):
             print(f"node tip is block {_block_hash}")
         return ret
     return predicate
+
 
 def make_and_send_block_ex(connection, vtx, *, tip=None, wait_for_tip=True):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"
@@ -119,6 +126,7 @@ def make_and_send_block_ex(connection, vtx, *, tip=None, wait_for_tip=True):
 
     return UTXO(coinbase_tx, 0, coinbase_key), connection.rpc.getblock(get_block_hash(block))
 
+
 def make_and_send_block(connection, vtx, *, tip=None, wait_for_tip=True):
     return make_and_send_block_ex(connection, vtx, tip, wait_for_tip)[0]
 
@@ -147,12 +155,14 @@ def create_tx(utxos, n_outputs, fee_delta=0):
 
     return tx, new_utxos
 
+
 def split(utxos, n_inputs, n_outputs, fee_delta=0):
     new_utxos = []
     transactions = []
     for _ in split_iter(utxos, n_inputs, n_outputs, new_utxos, transactions, fee_delta):
         pass
     return transactions, new_utxos
+
 
 def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fee_delta=0):
 
@@ -164,6 +174,7 @@ def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fe
             transactions.append(tx)
         yield tx, xx
 
+
 def make_tx_chain(utxo, chain_length, fee_delta=0):
     def gen():
         utxos = [utxo]
@@ -171,6 +182,7 @@ def make_tx_chain(utxo, chain_length, fee_delta=0):
             tx, utxos = create_tx(utxos, 1, fee_delta=fee_delta)
             yield tx
     return list(gen())
+
 
 def chop(x, n=2):
     """Chop sequence into n approximately equal slices
@@ -182,6 +194,7 @@ def chop(x, n=2):
     x = list(x)
     if n < 2:
         return [x]
+
     def gen():
         m = len(x) / n
         i = 0
@@ -191,6 +204,7 @@ def chop(x, n=2):
         yield x[round(i):]
     return list(gen())
 
+
 def splice(*iters):
     """
     >>> print(*splice('abc', 'de', 'f'))
@@ -199,10 +213,11 @@ def splice(*iters):
     nothing = object()
     return (x
             for x in itertools.chain(
-                    *itertools.zip_longest(
-                        *iters,
-                        fillvalue=nothing))
+                *itertools.zip_longest(
+                    *iters,
+                    fillvalue=nothing))
             if x is not nothing)
+
 
 def make_blocks_from(conn, root_block, nblocks, *txs_lists, wait_for_tip=True):
     def gen(root_block, nblocks):
@@ -214,7 +229,7 @@ def make_blocks_from(conn, root_block, nblocks, *txs_lists, wait_for_tip=True):
 
 def submit_to_mempool(conn, *txs_lists):
     txs = list(splice(*txs_lists))
-    expected_mempool_size = conn.rpc.getmempoolinfo()["size"]  + len(txs)
+    expected_mempool_size = conn.rpc.getmempoolinfo()["size"] + len(txs)
     for tx in txs:
         conn.send_message(msg_tx(tx))
     # All planned transactions should be accepted into the mempool
@@ -229,11 +244,13 @@ class property_dict(dict):
 def tx_ids(txs):
     return [tx if isinstance(tx, str) else tx.hash for tx in txs]
 
+
 class tx_set_context(dict):
     def __init__(self, context={}, **subsets):
         context = dict(context)
         context.update(subsets)
         super().__init__((k, tx_ids(v)) for k,v in context.items())
+
 
 class tx_set(set):
     def __init__(self, _members=(), *, _name=None):
@@ -301,6 +318,7 @@ class tx_set(set):
                     last = None
             if last is not None:
                 yield last
+
         def show_slices(slices):
             for s in slices:
                 start = str(s.start) if s.start > 0 else ""
@@ -309,13 +327,12 @@ class tx_set(set):
         return " ".join(show_slices(find_slices()))
 
 
-
 c = property_dict(A="abc", B="def", C="ghi", Z="xyz")
 e = tx_set(c.A + c.B + c.C, _name="'e'")
 a = tx_set("abcdegixyq", _name="'a'")
 
-# assert e == a, e.explain(a, context=c)
 
+# assert e == a, e.explain(a, context=c)
 class ReorgTests(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -328,23 +345,19 @@ class ReorgTests(BitcoinTestFramework):
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
-
-
     def run_test(self):
 
         with self.run_node_with_connections("Xxxxxxxxxxxxx",
                                             0,
-                                             ["-checkmempool=1",
+                                            ["-checkmempool=1",
                                              '-whitelist=127.0.0.1',
                                              '-genesisactivationheight=1',
-                                             '-jbafillafternewblock=1'
-                                             ],
+                                             '-jbafillafternewblock=1'],
                                             number_of_connections=1) as (conn,):
             self.log.info("making coinbase")
             fee_delta = 10
             utxo, _ = make_and_send_block_ex(conn, [])
             conn.rpc.generate(110)
-
 
             # we will mine two competing chains, old and new
             # the old one will be one block longer than the new
@@ -369,7 +382,6 @@ class ReorgTests(BitcoinTestFramework):
 
             for strategy, case_utxo in zip(reorg_strategies, case_utxos):
                 self.check_reorg_cases(conn, root_block_data, strategy, case_utxo=case_utxo, fee_delta=fee_delta)
-
 
     def check_reorg_cases(self, conn, root_block_data, instigate_reorg, case_utxo, fee_delta):
         self.log.info("Check reorg cases with %s", instigate_reorg.__name__)
@@ -428,7 +440,6 @@ class ReorgTests(BitcoinTestFramework):
                                              chains.Iy,
                                              wait_for_tip=False)
 
-
         self.log.info("check tip before reorg")
         expected_tip = chain_to_be_invalidated[-1]
         actual_tip = get_tip(conn)
@@ -469,6 +480,7 @@ class ReorgTests(BitcoinTestFramework):
                                   _name='expected_mempool')
 
         assert expected_mempool == actual_mempool, expected_mempool.explain(actual_mempool, context=chains)
+
 
 if __name__ == '__main__':
     ReorgTests().main()

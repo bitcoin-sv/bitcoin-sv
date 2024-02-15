@@ -31,6 +31,7 @@ from test_framework.script import *
 from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB
 from time import sleep
 
+
 class CheckSigTest(ComparisonTestFramework):
     # Can either run this test as 1 node with expected answers, or two and compare them.
     # Change the "outcome" variable from each TestInstance object to only do the comparison.
@@ -78,7 +79,6 @@ class CheckSigTest(ComparisonTestFramework):
         b2 = block(2, spend=out[1], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         yield self.rejected(RejectResult(16, b'bad-blk-sigops'))
 
-
         # Test 5
         # Test that a block with a lot of checkmultisigs is ok
 
@@ -109,8 +109,6 @@ class CheckSigTest(ComparisonTestFramework):
         tip(5)
         b7 = block(7)
         yield self.accepted()
-
-
 
         logger.info("Genesis is enabled, all the following blocks should be accepted")
 
@@ -150,7 +148,6 @@ class CheckSigTest(ComparisonTestFramework):
         lots_of_checksigs = CScript([OP_CHECKSIG] * MAX_BLOCK_SIGOPS_PER_MB)
         b14 = block(14, spend=out[14], script=lots_of_checksigs, block_size=ONE_MEGABYTE+500, extra_sigops=MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS-MAX_BLOCK_SIGOPS_PER_MB)
         yield self.accepted()
-
 
 
 if __name__ == '__main__':

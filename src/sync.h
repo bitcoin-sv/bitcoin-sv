@@ -81,12 +81,14 @@ static inline void AssertLockHeldInternal(const char *pszName,
                                           void *cs) {}
 static inline void DeleteLock(void *cs) {}
 #endif
+// NOLINTNEXTLINE(bugprone-macro-parentheses)
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 /**
  * Wrapped boost mutex: supports recursive locking, but no waiting
  * TODO: We should move away from using the recursive lock by default.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCriticalSection : public AnnotatedMixin<boost::recursive_mutex> {
 public:
     ~CCriticalSection() { DeleteLock((void *)this); }
@@ -105,7 +107,9 @@ void PrintLockContention(const char *pszName, const char *pszFile, int nLine);
 #endif
 
 /** Wrapper around boost::unique_lock<Mutex> */
-template <typename Mutex> class SCOPED_LOCKABLE CMutexLock {
+template <typename Mutex>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+class SCOPED_LOCKABLE CMutexLock {
 private:
     boost::unique_lock<Mutex> lock;
 
@@ -170,6 +174,7 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
 #define TRY_LOCK(cs, name)                                                     \
     CCriticalBlock name(cs, #cs, __FILE__, __LINE__, true)
 
+// NOLINTBEGIN(bugprone-macro-parentheses)
 #define ENTER_CRITICAL_SECTION(cs)                                             \
     {                                                                          \
         EnterCritical(#cs, __FILE__, __LINE__, (void *)(&cs));                 \
@@ -181,6 +186,7 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
         (cs).unlock();                                                         \
         LeaveCritical();                                                       \
     }
+// NOLINTEND(bugprone-macro-parentheses)
 
 class CSemaphore {
 private:
@@ -216,6 +222,7 @@ public:
 };
 
 /** RAII-style semaphore lock */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CSemaphoreGrant {
 private:
     std::shared_ptr<CSemaphore> sem {nullptr};
@@ -249,6 +256,7 @@ public:
     CSemaphoreGrant() = default;
 
     CSemaphoreGrant(const std::shared_ptr<CSemaphore>& sema, bool fTry = false)
+        // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
         : sem(sema), fHaveGrant(false) {
         if (fTry)
             TryAcquire();
@@ -256,6 +264,7 @@ public:
             Acquire();
     }
 
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     ~CSemaphoreGrant() { Release(); }
 
     operator bool() { return fHaveGrant; }

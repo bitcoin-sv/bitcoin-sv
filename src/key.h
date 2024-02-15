@@ -32,16 +32,17 @@
 typedef std::vector<uint8_t, secure_allocator<uint8_t>> CPrivKey;
 
 /** An encapsulated private key. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CKey {
 private:
     //! Whether this private key is valid. We check for correctness when
     //! modifying the key data, so fValid should always correspond to the actual
     //! state.
-    bool fValid;
+    bool fValid; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     //! Whether the public key corresponding to this private key is (to be)
     //! compressed.
-    bool fCompressed;
+    bool fCompressed; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     //! The actual byte data
     std::vector<uint8_t, secure_allocator<uint8_t>> keydata;
@@ -67,6 +68,7 @@ public:
     //! Initialize using begin and end iterators to byte data.
     template <typename T>
     void Set(const T pbegin, const T pend, bool fCompressedIn) {
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (size_t(pend - pbegin) != keydata.size()) {
             fValid = false;
         } else if (Check(&pbegin[0])) {
@@ -81,6 +83,7 @@ public:
     //! Simple read-only vector-like interface.
     unsigned int size() const { return (fValid ? keydata.size() : 0); }
     const uint8_t *begin() const { return keydata.data(); }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t *end() const { return keydata.data() + size(); }
 
     //! Check whether this private key is valid.
@@ -142,6 +145,7 @@ public:
 
 struct CExtKey {
     uint8_t nDepth;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t vchFingerprint[4];
     unsigned int nChild;
     ChainCode chaincode;
@@ -155,7 +159,9 @@ struct CExtKey {
                a.key == b.key;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Decode(const uint8_t code[BIP32_EXTKEY_SIZE]);
     bool Derive(CExtKey &out, unsigned int nChild) const;
     CExtPubKey Neuter() const;
@@ -163,16 +169,24 @@ struct CExtKey {
     template <typename Stream> void Serialize(Stream &s) const {
         unsigned int len = BIP32_EXTKEY_SIZE;
         ::WriteCompactSize(s, len);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Encode(code);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((const char *)&code[0], len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
         unsigned int len = ::ReadCompactSize(s);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
         if (len != BIP32_EXTKEY_SIZE)
             throw std::runtime_error("Invalid extended key size\n");
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.read((char *)&code[0], len);
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         Decode(code);
     }
 };

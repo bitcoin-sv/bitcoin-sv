@@ -63,6 +63,7 @@
 #endif
 #include "warnings.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -682,6 +683,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxoutboundconnections=<n>",
         strprintf(_("Maintain at most <n> outbound connections to peers (default: %u)"),
                   DEFAULT_MAX_OUTBOUND_CONNECTIONS));
+    strUsage += HelpMessageOpt(
+        "-maxconnectionsfromaddr=<n>",
+        strprintf(_("Maximum number of inbound connections from a single address "
+                    "(not applicable to whitelisted peers) 0 = unrestricted (default: %d)"),
+                  DEFAULT_MAX_CONNECTIONS_FROM_ADDR));
+    strUsage += HelpMessageOpt(
+        "-maxconnections=<n>",
+        strprintf(_("Maintain at most <n> connections to peers (default: %d)"),
+                  DEFAULT_MAX_PEER_CONNECTIONS));
     strUsage +=
         HelpMessageOpt("-maxreceivebuffer=<n>",
                        strprintf(_("Maximum per-connection receive buffer "
@@ -798,6 +808,20 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Tries to keep outbound traffic under the given target (in "
                     "MiB per 24h), 0 = no limit (default: %d). The value may be given in megabytes or with unit (KiB, MiB, GiB)."),
                   DEFAULT_MAX_UPLOAD_TARGET));
+    strUsage += HelpMessageOpt(
+        "-maxpendingresponses_getheaders=<n>",
+        strprintf(_("Maximum allowed number of pending responses in the sending queue for received GETHEADERS P2P requests before "
+                    "the connection is closed. Not applicable to whitelisted peers. 0 = no limit (default: %d). Main purpose of "
+                    "this setting is to limit memory usage. The specified value should be small (e.g. ~50) since in practice connected "
+                    "peers do not need to send many GETHEADERS requests in parallel."),
+                  DEFAULT_MAXPENDINGRESPONSES_GETHEADERS));
+    strUsage += HelpMessageOpt(
+        "-maxpendingresponses_gethdrsen=<n>",
+        strprintf(_("Maximum allowed number of pending responses in the sending queue for received GETHDRSEN P2P requests before "
+                    "the connection is closed. Not applicable to whitelisted peers. 0 = no limit (default: %d). Main purpose of "
+                    "this setting is to limit memory usage. The specified value should be small (e.g. ~10) since in practice connected "
+                    "peers do not need to send many GETHDRSEN requests in parallel."),
+                  DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN));
 
 #ifdef ENABLE_WALLET
     strUsage += CWallet::GetWalletHelpString(showDebug);
@@ -1920,6 +1944,7 @@ namespace { // Variables internal to initialization process only
 
 ServiceFlags nRelevantServices = NODE_NETWORK;
 int nMaxConnections;
+int nMaxConnectionsFromAddr;
 int nMaxOutboundConnections;
 int nFD;
 ServiceFlags nLocalServices = NODE_NETWORK;
@@ -2017,10 +2042,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
                                           : 0),
         size_t(1));
-    
-    if(gArgs.IsArgSet("-maxconnections"))
-        LogPrintf("Warning: configuration parameter -maxconnections was removed\n");
-    
+
+    const int nUserMaxConnections =
+        static_cast<int>(gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS));
+    nMaxConnections = std::max(nUserMaxConnections, 0);
+
     const int nUserMaxOutboundConnections = gArgs.GetArg(
         "-maxoutboundconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
 
@@ -2029,22 +2055,32 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     const uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
-
-    const auto fds_required{MIN_CORE_FILEDESCRIPTORS + nBind + 
-                            maxAddNodeConnections + nUserMaxOutboundConnections}; 
-    nFD = RaiseFileDescriptorLimit(fds_required);
+    nMaxConnections =
+        std::max(std::min(nMaxConnections,
+                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
+                 0);
+    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-
-    nMaxConnections = std::max(0, 
-                               nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections); 
+    nMaxConnections =
+        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
+    if (nMaxConnections < nUserMaxConnections)
+        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
+                                "because of system limitations."),
+                              nUserMaxConnections, nMaxConnections));
 
     nMaxOutboundConnections = std::clamp(nUserMaxOutboundConnections, 0, nMaxConnections);
     if(nMaxOutboundConnections < nUserMaxOutboundConnections) 
         InitWarning(strprintf("Reducing -maxoutboundconnections from %d to %d, "
                               "because of system limitations",
                               nUserMaxOutboundConnections, nMaxOutboundConnections));
-         
+
+    nMaxConnectionsFromAddr = static_cast<int>(gArgs.GetArg("-maxconnectionsfromaddr", DEFAULT_MAX_CONNECTIONS_FROM_ADDR));
+    nMaxConnectionsFromAddr = std::clamp(nMaxConnectionsFromAddr, 0, INT32_MAX);
+    if (nMaxConnectionsFromAddr == 0) {
+        nMaxConnectionsFromAddr = INT32_MAX;
+    }
+
     // Step 3: parameter-to-internal-flags
     if (gArgs.IsArgSet("-debug")) {
         // Special-case: if -debug=0/-nodebug is set, turn off debugging
@@ -3411,6 +3447,19 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             gArgs.GetArgAsBytes("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET, ONE_MEBIBYTE);
     }
 
+    if (gArgs.IsArgSet("-maxpendingresponses_getheaders")) {
+        auto v = gArgs.GetArg("-maxpendingresponses_getheaders", -1);
+        if (v<0 || v>std::numeric_limits<unsigned int>::max()) {
+            return InitError( strprintf(_("Invalid value for -maxpendingresponses_getheaders: '%s'"), gArgs.GetArg("-maxpendingresponses_getheaders", "")) );
+        }
+    }
+    if (gArgs.IsArgSet("-maxpendingresponses_gethdrsen")) {
+        auto v = gArgs.GetArg("-maxpendingresponses_gethdrsen", -1);
+        if (v<0 || v>std::numeric_limits<unsigned int>::max()) {
+            return InitError( strprintf(_("Invalid value for -maxpendingresponses_gethdrsen: '%s'"), gArgs.GetArg("-maxpendingresponses_gethdrsen", "")) );
+        }
+    }
+
     // Step 7: load block chain
 
     fReindex = gArgs.GetBoolArg("-reindex", false);
@@ -3749,6 +3798,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     connOptions.nLocalServices = nLocalServices;
     connOptions.nRelevantServices = nRelevantServices;
     connOptions.nMaxConnections = nMaxConnections;
+    connOptions.nMaxConnectionsFromAddr = nMaxConnectionsFromAddr;
     connOptions.nMaxOutbound = nMaxOutboundConnections;
     connOptions.nMaxAddnode = config.GetMaxAddNodeConnections();
     connOptions.nMaxFeeler = 1;

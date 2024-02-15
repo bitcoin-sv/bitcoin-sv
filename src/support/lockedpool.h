@@ -15,6 +15,7 @@
  * OS-dependent allocation and deallocation of locked/pinned memory pages.
  * Abstract base class.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class LockedPageAllocator {
 public:
     virtual ~LockedPageAllocator() {}
@@ -46,6 +47,7 @@ public:
 /**
  * An arena manages a contiguous region of memory by dividing it into chunks.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Arena {
 public:
     Arena(void *base, size_t size, size_t alignment);
@@ -122,6 +124,7 @@ private:
  * in themselves sensitive information, as to conserve precious locked memory.
  * In some operating systems the amount of memory that can be locked is small.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class LockedPool {
 public:
     /**
@@ -130,6 +133,7 @@ public:
      * and deallocation overhead. Setting it too high allocates more locked
      * memory from the OS than strictly necessary.
      */
+    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     static const size_t ARENA_SIZE = 256 * 1024;
     /**
      * Chunk alignment. Another compromise. Setting this too high will waste
@@ -191,10 +195,12 @@ private:
     std::unique_ptr<LockedPageAllocator> allocator;
 
     /** Create an arena from locked pages */
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class LockedPageArena : public Arena {
     public:
         LockedPageArena(LockedPageAllocator *alloc_in, void *base_in,
                         size_t size, size_t align);
+        // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
         ~LockedPageArena();
 
     private:
@@ -241,8 +247,10 @@ private:
     static void CreateInstance();
     /** Called when locking fails, warn the user here */
     static bool LockingFailed();
-
+ 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static LockedPoolManager *_instance;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::once_flag init_flag;
 };
 

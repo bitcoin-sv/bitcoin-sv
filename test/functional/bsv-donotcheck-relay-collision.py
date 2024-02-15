@@ -13,6 +13,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
 
+
 # Wait up to 60 secs to see if the testnode has received all the expected invs
 def allInvsMatch(invsExpected, testnode):
     for x in range(60):
@@ -44,20 +45,22 @@ class NoCheckCollisionTest(BitcoinTestFramework):
     def created_signed_transaction(self, sats, node):
         utxo = create_confirmed_utxos(sats, node, 1, age=101)[0]
 
-
     def set_test_params(self):
         self.num_nodes = 2
         self.mining_relay_factor = 4
         self.minrelaytxfee_sats = 250
-        self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
-            ],[
-            "-whitelist=127.0.0.1",
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
-            "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
-        ]]
+        self.extra_args = [
+            [
+                "-whitelist=127.0.0.1",
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+            ],
+            [
+                "-whitelist=127.0.0.1",
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+            ]
+        ]
 
     def run_test(self):
         node1 = self.nodes[1]
@@ -153,6 +156,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         confirmations = tx.get('confirmations', 0)
         assert_equal(confirmations, 1)
         self.log.info("test 3 - low fee donotcheck tx was minded:PASS")
+
 
 if __name__ == '__main__':
     NoCheckCollisionTest().main()

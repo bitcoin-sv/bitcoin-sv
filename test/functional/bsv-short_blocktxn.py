@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 from test_framework.mininode import ser_uint256
 
+
 class msg_shortblocktxn():
     command = b"blocktxn"
 
@@ -24,6 +25,7 @@ class msg_shortblocktxn():
         r += bytes([0xff])
         return r
 
+
 class TestShortBlocktxn(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -36,6 +38,7 @@ class TestShortBlocktxn(BitcoinTestFramework):
         with self.run_node_with_connections("Short blocktxn test", 0, [], 1) as (conn,):
             conn.send_message(msg_shortblocktxn())
             wait_until(lambda: check_for_log_msg(self, "shorter than its ", "/node0"), timeout=10)
+
 
 if __name__ == '__main__':
     TestShortBlocktxn().main()

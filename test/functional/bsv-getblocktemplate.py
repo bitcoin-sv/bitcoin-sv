@@ -10,8 +10,10 @@ from test_framework.script import CScript, OP_TRUE, OP_RETURN
 from test_framework.cdefs import BUFFER_SIZE_HttpTextWriter
 from binascii import b2a_hex
 
+
 def b2x(b):
     return b2a_hex(b).decode('ascii')
+
 
 class GetBlockTemplateRPCTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -91,7 +93,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
         assert_equal(self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'] + 1, template['height'])
 
     def run_test(self):
-        
+
         self.stop_node(0)
         with self.run_node_with_connections("test getblocktemplate RPC call", 0, ["-minminingtxfee=0.0000001"], 1) as connections:
 
@@ -124,7 +126,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter/2), transactions)
             connection.cb.send_message(msg_tx(largeTx))
             self.check_mempool(self.nodes[0], [largeTx])
-           
+
             # Check getblocktemplate response.
             template = self.nodes[0].getblocktemplate()
             self.checkBlockTemplate(template, transactions, largeTx)
@@ -134,9 +136,11 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             rsp = self.nodes[0].getblocktemplate({'data': b2x(block.serialize()), 'mode': 'proposal'})
             assert_equal(rsp, "inconclusive-not-best-prevblk")
 
-
-            assert_raises_rpc_error(-22, "Block decode failed", self.nodes[0].getblocktemplate,
-                                {'data': b2x(block.serialize()[:-1]), 'mode': 'proposal'})
+            assert_raises_rpc_error(-22,
+                                    "Block decode failed",
+                                    self.nodes[0].getblocktemplate,
+                                    {'data': b2x(block.serialize()[:-1]),
+                                     'mode': 'proposal'})
 
             # Test getblocktemplate in a batch
             batch = self.nodes[0].batch([
@@ -151,6 +155,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             assert_equal(batch[2]["error"], None)
             assert_equal(batch[3]["error"]["message"], "Method not found")
             assert_equal(batch[3]["result"], None)
+
 
 if __name__ == '__main__':
     GetBlockTemplateRPCTest().main()

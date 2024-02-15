@@ -16,12 +16,14 @@ Test if consolidation transactions pass the feefilter
 # For Debug build, recommended timeoutfactor is 4.
 # For Debug build with sanitizers enabled, recommended timeoutfactor is 5.
 
+
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
     raw = node.getrawtransaction(txid)
     tx = FromHex(CTransaction(), raw)
     tx.rehash()
     return tx.vout[index].scriptPubKey
+
 
 def expectedInvsReceived(invsExpected, testnode, timeout = 60):
     expectedSet = set(invsExpected)
@@ -31,6 +33,7 @@ def expectedInvsReceived(invsExpected, testnode, timeout = 60):
                 return True
         time.sleep(1)
     return False
+
 
 class TestNode(NodeConnCB):
     def __init__(self):
@@ -46,6 +49,7 @@ class TestNode(NodeConnCB):
         with mininode_lock:
             self.txinvs = []
 
+
 class FeeFilterTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
@@ -56,25 +60,28 @@ class FeeFilterTest(BitcoinTestFramework):
         self.minrelaytxfee_sats = 250
 
     def setup_nodes(self):
-        self.extra_args = [[
-            "-whitelist=127.0.0.1",
-            "-whitelistforcerelay=1"
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
-            "-txindex=1"
-            ],[
-            "-whitelist=127.0.0.1",
-            "-whitelistforcerelay=1"
-            "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-            "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
-            "-minconsolidationfactor=10",
-            "-acceptnonstdtxn=1",
-            "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
-            "-txindex=1"
-        ]]
+        self.extra_args = [
+            [
+                "-whitelist=127.0.0.1",
+                "-whitelistforcerelay=1"
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minconsolidationfactor=10",
+                "-acceptnonstdtxn=1",
+                "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+                "-txindex=1"
+            ],
+            [
+                "-whitelist=127.0.0.1",
+                "-whitelistforcerelay=1"
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minconsolidationfactor=10",
+                "-acceptnonstdtxn=1",
+                "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
+                "-txindex=1"
+            ]
+        ]
 
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
@@ -114,8 +121,6 @@ class FeeFilterTest(BitcoinTestFramework):
 
         rawtx = node.createrawtransaction(inputs, outputs)
         return node.signrawtransaction(rawtx)['hex']
-
-
 
     def run_test(self):
         node1 = self.nodes[1]
@@ -188,6 +193,7 @@ class FeeFilterTest(BitcoinTestFramework):
         # Check that tx3 was not relayed to test_node but tx4 was
         assert(expectedInvsReceived([txid4], test_node, 60))
         assert(not expectedInvsReceived([txid3], test_node, 5))
+
 
 if __name__ == '__main__':
     FeeFilterTest().main()

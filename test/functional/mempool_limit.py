@@ -13,6 +13,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import create_confirmed_utxos, satoshi_round, bytes_to_hex_str, assert_equal
 import decimal
 
+
 def send_tx_with_data(node, utxo, fee, data_size):
     send_value = utxo['amount'] - fee
     inputs = []
@@ -25,6 +26,7 @@ def send_tx_with_data(node, utxo, fee, data_size):
     signedTxn = node.signrawtransaction(rawTxn)["hex"]
 
     return node.sendrawtransaction(signedTxn)
+
 
 class MempoolLimitTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -73,6 +75,7 @@ class MempoolLimitTest(BitcoinTestFramework):
 
         txdata = self.nodes[0].gettransaction(firstTxId)
         assert(txdata['confirmations'] == 0)  # confirmation should still be 0
+
 
 if __name__ == '__main__':
     MempoolLimitTest().main()

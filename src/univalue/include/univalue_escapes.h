@@ -1,6 +1,7 @@
 // Automatically generated file. Do not modify.
 #ifndef BITCOIN_UNIVALUE_UNIVALUE_ESCAPES_H
 #define BITCOIN_UNIVALUE_UNIVALUE_ESCAPES_H
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-*)
 static const char *escapes[256] = {
 	"\\u0000",
 	"\\u0001",

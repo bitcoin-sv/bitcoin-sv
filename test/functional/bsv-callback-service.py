@@ -3,7 +3,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import threading, json
+import threading
+import json
 import http.client as httplib
 from functools import partial
 from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG
@@ -13,6 +14,7 @@ from test_framework.util import assert_equal
 '''
 Test the mock double-spend notification endpoint server.
 '''
+
 
 class CallBackServiceTest():
     def start_server(self):
@@ -175,6 +177,7 @@ class CallBackServiceTest():
         resp.read()
 
         self.kill_server()
+
 
 if __name__ == '__main__':
     CallBackServiceTest().main()

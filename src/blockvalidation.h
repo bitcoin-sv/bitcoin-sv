@@ -50,7 +50,7 @@ private:
     mutable std::mutex mMutexWaitAfterValidation;
 
 public:
-    class CScopeGuard
+    class CScopeGuard // NOLINT(cppcoreguidelines-special-member-functions)
     {
     public:
         CScopeGuard(CBlockValidationStatus& instance, const CBlockIndex& index)
@@ -88,7 +88,9 @@ public:
         }
 
     private:
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members) 
         CBlockValidationStatus& mInstance;
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members) 
         const CBlockIndex& mIndex;
     };
 
@@ -118,6 +120,7 @@ public:
         std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
 
         int count =
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             std::count_if(
                 mCurrentlyValidatingBlocks.begin(),
                 mCurrentlyValidatingBlocks.end(),
@@ -177,7 +180,7 @@ public:
 
         // if blockHash is not in mWaitAfterValidation
         // then we break while loop
-        do
+        do // NOLINT(cppcoreguidelines-avoid-do-while) 
         {
             {
                 std::scoped_lock lockGuard(mMutexWaitAfterValidation);

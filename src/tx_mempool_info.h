@@ -101,16 +101,22 @@ private:
     // Wrapper that enables us to use TxMempoolInfo implicit copy/move
     // construction and assignment.
     // Class guarantees that once the value is set it won't be overwritten.
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class AtomicTxRef
     {
     public:
         AtomicTxRef() = default;
         AtomicTxRef( CTransactionRef ref ) noexcept
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
             : mValue{ ref }
         {}
+        
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
         AtomicTxRef(AtomicTxRef&& other)
             : mValue{ std::atomic_load( &other.mValue ) }
         {}
+        
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
         AtomicTxRef& operator=(AtomicTxRef&& other)
         {
             mValue = std::atomic_load( &other.mValue );
@@ -119,6 +125,8 @@ private:
         AtomicTxRef(const AtomicTxRef& other)
             : mValue{ std::atomic_load( &other.mValue ) }
         {}
+    
+        // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
         AtomicTxRef& operator=(const AtomicTxRef& other)
         {
             mValue = std::atomic_load( &other.mValue );

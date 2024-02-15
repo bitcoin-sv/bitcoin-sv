@@ -16,8 +16,8 @@
 //! These need to be macros, as clientversion.cpp's and bitcoin*-res.rc's voodoo
 //! requires it
 #define CLIENT_VERSION_MAJOR 1
-#define CLIENT_VERSION_MINOR 0
-#define CLIENT_VERSION_REVISION 16
+#define CLIENT_VERSION_MINOR 1
+#define CLIENT_VERSION_REVISION 0 
 #define CLIENT_VERSION_BUILD 0
 
 //! Set to true for release, false for prerelease or test build
@@ -27,7 +27,7 @@
  * Copyright year (2009-this)
  * Todo: update this when changing our copyright comments in the source
  */
-#define COPYRIGHT_YEAR 2023
+#define COPYRIGHT_YEAR 2024
 
 #endif // HAVE_CONFIG_H
 
@@ -61,6 +61,7 @@
  * is shifted in the way the lowest version of Bitcoin SV is still higher 
  * than the highest calculated version in the traditional Bitcoin.
  */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 const int _SV_VERSION_SHIFT = 100000000;
 static const int CLIENT_VERSION = _SV_VERSION_SHIFT +
     1000000 * CLIENT_VERSION_MAJOR + 10000 * CLIENT_VERSION_MINOR +

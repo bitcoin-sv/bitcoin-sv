@@ -25,6 +25,7 @@
 // jWriter.writeEndArray();
 // jWriter.writeEndObject();
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CJSONWriter
 {
 public:
@@ -110,6 +111,7 @@ private:
         for (size_t i = 0; i < inS.size(); i++)
         {
             unsigned char ch = inS[i];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             const char* escStr = escapes[ch];
 
             if (escStr)
@@ -118,7 +120,7 @@ private:
             }
             else
             {
-                outS += ch;
+                outS += ch; // NOLINT(*-narrowing-conversions)
             }
         }
 
@@ -127,7 +129,8 @@ private:
 
     void indentStr();
     void createTag(const std::string& tag, bool incrementLevel, const std::string& objectName = "");
-
+    
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     CTextWriter& jWriter;
     bool _prettyIndent;
     int _indentSize;

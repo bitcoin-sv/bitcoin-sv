@@ -109,18 +109,18 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         ctx = self._create_tx(tx_out, unlock, lock)
 
         # Insert OP_RETURN output that makes this a confiscation transaction.
-        ctx.vout.insert( 0, CTxOut(0, CScript( CTX_OP_RETURN + [
+        ctx.vout.insert(0, CTxOut(0, CScript(CTX_OP_RETURN + [
             b'\x01' +                       # protocol version number
             hash160(b'confiscation order')  # hash of confiscation order document
-        ])) )
+        ])))
         ctx.rehash()
 
         return ctx
 
     def _create_and_send_tx(self, node):
-        tx = self._create_tx( self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG]) ) # TXO with standard P2PKH script that can normally only be spent if private key is known
+        tx = self._create_tx(self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) # TXO with standard P2PKH script that can normally only be spent if private key is known
         self.log.info(f"Sending transaction {tx.hash} and generating a new block")
-        node.rpc.sendrawtransaction( ToHex(tx) )
+        node.rpc.sendrawtransaction(ToHex(tx))
         assert_equal(node.rpc.getrawmempool(), [tx.hash])
         node.rpc.generate(1)
         assert_equal(node.rpc.getrawmempool(), [])
@@ -209,9 +209,8 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         node.rpc.generate(1)
         best_block_hash = node.rpc.getbestblockhash()
         self._wait_for_block_status(node1, best_block_hash, "active")
-        assert_equal( len(node1.rpc.getchaintips()), 1 ) # there should now be only one chain
+        assert_equal(len(node1.rpc.getchaintips()), 1) # there should now be only one chain
         node1.rpc.acceptblock(block.hash) # remove (now redundant) soft rejection
-
 
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
@@ -230,8 +229,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self._wait_for_block_status(node1, best_block_hash, "")
         time.sleep(1)
         assert_equal(root_block_hash, node1.rpc.getbestblockhash())
-        
-        
+
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -240,7 +238,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         initialize_datadir(self.options.tmpdir, 1)
 
         self.log.info("Starting node1 with option -assumewhitelistedblockdepth=6")
-        node1.rpc.start(True, self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=6"]) 
+        node1.rpc.start(True, self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=6"])
         node1.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -249,8 +247,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self._wait_for_block_status(node1, best_block_hash, "")
         time.sleep(1)
         assert_equal(root_block_hash, node1.rpc.getbestblockhash())
-        
-        
+
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
         node1.rpc.wait_until_stopped()
@@ -261,17 +258,16 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Starting node1 with option -assumewhitelistedblockdepth=5")
         node1.rpc.start(True) # option -assumewhitelistedblockdepth=5 is already included in extra_args for this node
         node1.rpc.wait_for_rpc_connection()
-        
+
         self.log.info("Mining 1 block on node1 before connecting it to network to check that option assumewhitelistedblockdepth works in case of a large reorg")
         node1.rpc.generate(1)
-        
+
         self.log.info("Connecting node 1 to network")
         connect_nodes_bi(self.nodes, 0, 1)
 
         self.log.info("Checking that node1 successfully reorgs to the tip of the chain")
         self._wait_for_block_status(node1, best_block_hash, "active")
         assert_equal(best_block_hash, node1.rpc.getbestblockhash())
-
 
         self.log.info("Stopping node1, clearing and reinitializing its data directory")
         node1.rpc.stop_node()
@@ -288,7 +284,6 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Checking that IBD finishes successfully at the tip of the chain")
         self._wait_for_block_status(node1, best_block_hash, "active")
         assert_equal(best_block_hash, node1.rpc.getbestblockhash())
-
 
         self.log.info("Checking that verifychain find no issues")
         assert node1.rpc.verifychain(4, 0)

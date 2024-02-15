@@ -12,8 +12,10 @@
 
 // Type erased class that is constructed/implemented with a parser object
 // appropriate to the message defined in the p2p message header command field. 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class msg_parser 
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     struct msg_parser_concept
     {
         // return bytes_read, bytes_required

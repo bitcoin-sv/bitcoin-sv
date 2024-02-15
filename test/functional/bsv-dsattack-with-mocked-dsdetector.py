@@ -27,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import http.client as httplib
 from functools import partial
 
+
 class MockDsdetector():
     def __init__(self, testRig, node):
         self.peer = NodeConnCB()
@@ -89,6 +90,7 @@ class MockDsdetector():
                             spent_inputs.append({'txid':txraw['txid'], 'tx':txA, 'utxo':utxoA, 'block':blockA})
 
         return ds_counter
+
 
 class Exchange():
     def __init__(self, testRig, node):
@@ -168,6 +170,7 @@ class WebHookService(BaseHTTPRequestHandler):
     def log_request(self, code):
         return
 
+
 class User:
 
     def __init__(self, secret_bytes):
@@ -195,12 +198,12 @@ class User:
                 output['value'] = float(output['value'])
             text = json.dumps(tx_json, indent=4)
             print("ds transaction:", text)
-        
+
         return tx
 
     def __sign_tx(self, sign_tx, spend_tx, n):
-        sighash = SignatureHashForkId( spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue )
-        sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey ])
+        sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+        sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
 
 #
 ### END MOCKING CLASSES
@@ -238,13 +241,12 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         scriptPubKey = CScript([OP_DUP, OP_HASH160, hash160(attacker.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])
         for i in range(self.nbDoubleSpends):
-            funding_tx.vout.append(CTxOut(funding_amount, scriptPubKey)) 
+            funding_tx.vout.append(CTxOut(funding_amount, scriptPubKey))
 
         funding_tx.rehash()
         funding_txid = node.sendrawtransaction(ToHex(funding_tx), False, True)
         assert_equal(node.getrawmempool(), [funding_txid])
         return funding_tx
-
 
     def run_test(self):
 
@@ -337,7 +339,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         lastblock0 = node0.getbestblockhash()
         lastblock1 = node1.getbestblockhash()
         assert(lastblock0 == lastblock1)
-        
+
         self.log.info("check that double spends have been removed")
         assert (dsdetector.CheckForDoubleSpends(self.nodes[0:2]) == 0)
 
@@ -358,6 +360,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert (balance != None)
 
         exchange.stop_webhook_server()
+
 
 if __name__ == '__main__':
     CompetingChainsTest().main()

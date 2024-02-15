@@ -15,6 +15,7 @@ from test_framework.util import assert_equal, assert_raises_rpc_error, wait_unti
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, ToHex
 
+
 class PTVRPCTests(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -135,14 +136,13 @@ class PTVRPCTests(ComparisonTestFramework):
         # The parent tx from the chain is skipped.
         for tx in txchain[1:]:
             assert_raises_rpc_error(
-                    -25, "Missing inputs", conn.rpc.sendrawtransaction, ToHex(tx), allowhighfees, dontcheckfee)
+                -25, "Missing inputs", conn.rpc.sendrawtransaction, ToHex(tx), allowhighfees, dontcheckfee)
         # At this stage the mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # The p2p orphan pool must contain 'chain_length-1' transactions.
         assert_equal(conn.rpc.getorphaninfo()["size"], chain_length-1)
 
         return txchain
-
 
     # An extension to the scenario1.
     # - submit txns through p2p interface
@@ -180,6 +180,7 @@ class PTVRPCTests(ComparisonTestFramework):
 
     def get_tests(self):
         rejected_txs = []
+
         def on_reject(conn, msg):
             rejected_txs.append(msg)
         # Shorthand for functions
@@ -226,12 +227,16 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, pausedp2p=True)
         # dontcheckfee=True
         with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc (dontcheckfee=True).'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out, dontcheckfee=True, pausedp2p=True)
 
@@ -248,12 +253,16 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1_1: {} chain of length {}. Test duplicates resubmitted via rpc.'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_1(conn, chain_length, out)
         # dontcheckfee=True
         with self.run_node_with_connections('TS1_1: {} chain of length {}. Test duplicates resubmitted via rpc (dontcheckfee=True).'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_1(conn, chain_length, out, dontcheckfee=True)
 
@@ -270,12 +279,16 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1_2: {} chain of length {}. Test orphans resubmitted via rpc.'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_2(conn, chain_length, out)
         # dontcheckfee=True
         with self.run_node_with_connections('TS1_2: {} chain of length {}. Test orphans resubmitted via rpc.'.format(1, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1_2(conn, chain_length, out, dontcheckfee=True)
 
@@ -294,9 +307,12 @@ class PTVRPCTests(ComparisonTestFramework):
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS2: {} chains of length {}. Test duplicates and generate a new block.'.format(num_of_chains, chain_length),
-                0, args + self.default_args, number_of_connections=1) as (conn,):
+                                            0,
+                                            args + self.default_args,
+                                            number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario2(conn, num_of_chains, chain_length, out)
+
 
 if __name__ == '__main__':
     PTVRPCTests().main()

@@ -37,6 +37,7 @@ uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       const PrecomputedTransactionData *cache = nullptr,
                       bool enabledSighashForkid = true);
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BaseSignatureChecker {
 public:
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
@@ -60,7 +61,9 @@ class TransactionSignatureChecker : public BaseSignatureChecker {
 private:
     const CTransaction *txTo;
     unsigned int nIn;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Amount amount;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const PrecomputedTransactionData *txdata;
 
 protected:
@@ -70,9 +73,11 @@ protected:
 
 public:
     TransactionSignatureChecker(const CTransaction *txToIn, unsigned int nInIn,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
                                 const Amount amountIn)
         : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
     TransactionSignatureChecker(const CTransaction *txToIn, unsigned int nInIn,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
                                 const Amount amountIn,
                                 const PrecomputedTransactionData &txdataIn)
         : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
@@ -85,10 +90,12 @@ public:
 
 class MutableTransactionSignatureChecker : public TransactionSignatureChecker {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CTransaction txTo;
 
 public:
     MutableTransactionSignatureChecker(const CMutableTransaction *txToIn,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
                                        unsigned int nInIn, const Amount amount)
         : TransactionSignatureChecker(&txTo, nInIn, amount), txTo(*txToIn) {}
 };

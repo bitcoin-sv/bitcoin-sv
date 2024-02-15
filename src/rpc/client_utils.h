@@ -23,6 +23,7 @@ UniValue RPCConvertNamedValues(const std::string &strMethod,
  */
 UniValue ParseNonRFCJSONValue(const std::string &strVal);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 int AppInitRPC(int argc, char *argv[], const std::string& usage, const std::function<std::string(void)>& help); 
 
 // Exit codes are EXIT_SUCCESS, EXIT_FAILURE, CONTINUE_EXECUTION 
@@ -45,6 +46,7 @@ public:
     explicit CConnectionTimeout(const std::string& msg) : CConnectionFailed{msg} {}
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 static const char DEFAULT_RPCCONNECT[] = "127.0.0.1";
 static const int DEFAULT_HTTP_CLIENT_TIMEOUT = 900;
 static const bool DEFAULT_NAMED = false;

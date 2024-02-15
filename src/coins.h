@@ -38,7 +38,7 @@ class CoinWithScript;
  * NOTE: Only CoinImpl instances that contain the script and are not spent
  *       can be serialized.
  */
-class CoinImpl
+class CoinImpl // NOLINT(cppcoreguidelines-special-member-functions)
 {
     /**
      * Unspent transaction output that is only set if coin instance is storage
@@ -72,6 +72,7 @@ class CoinImpl
 public:
     CoinImpl() : storage{CTxOut{}}, out{&storage.value()} {}
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : storage{CTxOut{amount, {}}}
         , out{&storage.value()}
@@ -80,7 +81,8 @@ public:
         , mScriptSize{scriptSize}
     {}
 
-    CoinImpl(CoinImpl&& other) noexcept
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
+    CoinImpl(CoinImpl&& other) // NOLINT(bugprone-exception-escape)
         : storage{std::move(other.storage)}
         , out{storage.has_value() ? &storage.value() : other.out}
         , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
@@ -92,7 +94,8 @@ public:
 
     static CoinImpl FromCoinWithScript(CoinWithScript&& other) noexcept;
 
-    CoinImpl& operator=(CoinImpl&& other) noexcept
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
+    CoinImpl& operator=(CoinImpl&& other) // NOLINT(bugprone-exception-escape)
     {
         storage = std::move(other.storage);
         out = (storage.has_value() ? &storage.value() : other.out);
@@ -256,6 +259,7 @@ public:
  * - VARINT((coinbase ? 1 : 0) | (height << 1))
  * - the non-spent CTxOut (via CTxOutCompressor)
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CoinWithScript : private CoinImpl
 {
 public:
@@ -265,10 +269,12 @@ public:
     CoinWithScript(const CoinWithScript&) = delete;
     CoinWithScript& operator=(const CoinWithScript&) = delete;
 
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     CoinWithScript(CoinWithScript&& coin) noexcept
         : CoinImpl{std::move(coin)}
     {}
 
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     CoinWithScript(CoinImpl&& coin) noexcept
         : CoinImpl{std::move(coin)}
     {}
@@ -283,7 +289,8 @@ public:
         return {std::move(outIn), nHeightIn, IsCoinbase, IsConfiscation};
     }
 
-    CoinWithScript& operator=(CoinWithScript&& other)
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
+    CoinWithScript& operator=(CoinWithScript&& other) // NOLINT(bugprone-exception-escape)
     {
         static_cast<CoinImpl&>(*this) = std::move(other);
 
@@ -314,6 +321,7 @@ private:
     friend CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept;
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 inline CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept
 {
     return std::move( other ).ToCoinImpl();
@@ -380,6 +388,7 @@ using CCoinsMap = std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpoint
  * Implementations of this interface provide basic functionality that is needed
  * by CCoinsViewCache.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class ICoinsView {
 protected:
     //! As we use CCoinsViews polymorphically, have protected destructor as we
@@ -404,6 +413,7 @@ protected:
 /**
  * Coins view that never contains coins - dummy.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:
@@ -474,6 +484,7 @@ private:
 };
 
 // Interface for CoinsViewCache and CoinsViewCache::Shard
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class ICoinsViewCache
 {
 public:
@@ -501,6 +512,7 @@ public:
  * - owning coins without script that were spent with through SpendCoin()
  * - owning coins with script added to this cache through AddCoin()
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCoinsViewCache : public ICoinsViewCache
 {
 public:
@@ -719,6 +731,7 @@ public:
         {
             GetBestBlock();
             mView = &mViewEmpty;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
             const_cast<ICoinsView*>( mSourceView )->ReleaseLock();
         }
     }
@@ -742,6 +755,7 @@ public:
             return true;
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         const_cast<ICoinsView*>( mSourceView )->ReLock();
 
         if(mSourceView->GetBestBlock() != GetBestBlock())
@@ -763,6 +777,7 @@ public:
     * with the number of requested threads == 1).
     */
     template<typename Callable, typename... Args>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     auto RunSharded(uint16_t num, Callable&& call, Args&&... args)
         -> std::vector<typename std::invoke_result<Callable, uint16_t, Shard&, Args...>::type> 
     {
@@ -778,6 +793,7 @@ public:
         {
             // RAII class to ensure we always recombine the shards when we leave this method.
             // Must be declared above the thread pool so it's destroyed after.
+            // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
             class ShardsRAII
             {
               public:
@@ -797,6 +813,7 @@ public:
                     LogPrint(BCLog::BENCH, "        - Fold Shards: %.2fms\n", 0.001 * foldTime);
                 }
               private:
+                // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members) 
                 std::vector<Shard>& mShards;
             } foldShards {mShards};
 
@@ -830,7 +847,7 @@ public:
     }
 
 private:
-
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     inline static CCoinsViewEmpty mViewEmpty;
 
 protected:

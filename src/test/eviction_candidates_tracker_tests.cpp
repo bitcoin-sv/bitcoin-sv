@@ -383,7 +383,7 @@ BOOST_AUTO_TEST_CASE(performance, * boost::unit_test::disabled()) {
             inMempoolInputs.emplace_back(inputs.front());
             inputs.pop_front();
         }
-        auto tx = MakeEntry(double(std::rand()) / double(RAND_MAX) + 0.5, {}, inMempoolInputs, OUTPUTS_PER_TX, 1);
+        auto tx = MakeEntry(double(insecure_rand()) / double(RAND_MAX) + 0.5, {}, inMempoolInputs, OUTPUTS_PER_TX, 1);
         for(size_t outp = 0; outp < OUTPUTS_PER_TX; outp++)
         {
             inputs.emplace_back(tx.GetSharedTx(), static_cast<int>(outp));

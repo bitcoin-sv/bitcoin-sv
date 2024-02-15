@@ -12,6 +12,7 @@
 #include <vector>
 
 template <typename T>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct zero_after_free_allocator : public std::allocator<T> {
     typedef std::allocator<T> base;
     zero_after_free_allocator() throw() {}
@@ -21,6 +22,7 @@ struct zero_after_free_allocator : public std::allocator<T> {
     zero_after_free_allocator(const zero_after_free_allocator<U> &a) throw()
         : base(a) {}
     ~zero_after_free_allocator() throw() {}
+    // NOLINTNEXTLINE(bugprone-reserved-identifier)
     template <typename _Other> struct rebind {
         typedef zero_after_free_allocator<_Other> other;
     };

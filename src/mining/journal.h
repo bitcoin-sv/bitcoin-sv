@@ -91,7 +91,7 @@ class CJournal final
     TransactionList mTransactions {};
 
     // Convenience accessor to fetch the given multi-index index
-    template<unsigned I>
+    template<int I>
     const typename TransactionList::nth_index<I>::type& index() const
     {
         return mTransactions.get<I>();
@@ -147,7 +147,10 @@ class CJournal final
 
         ReadLock(const ReadLock&) = delete;
         ReadLock& operator=(const ReadLock&) = delete;
+
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
         ReadLock(ReadLock&& that);
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
         ReadLock& operator=(ReadLock&& that);
 
         // Get start/end indexes for our underlying sequence

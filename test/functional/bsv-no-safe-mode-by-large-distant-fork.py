@@ -4,9 +4,9 @@
 """
 Test that large distant fork does not cause safe mode.
 Scenario:
-1. Generate two long branches. Second branch has invalid first block. 
+1. Generate two long branches. Second branch has invalid first block.
 2. Send first branch and check that it is active.
-3. Send headers only of second branch with more POW. 
+3. Send headers only of second branch with more POW.
 4. Validate that active tip is from first branch and second branch tip has status headers-only.
 5. Validate that node is not in safe mode
 6. Send data of second branch.
@@ -22,6 +22,7 @@ from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 from test_framework.util import wait_until, assert_equal
+
 
 class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
 
@@ -69,7 +70,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
             send_by_headers(conn2, branch_2_blocks, do_send_blocks=False)
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
             wait_for_tip_status(conn1, branch_2_blocks[-1].hash, "headers-only")
-    
+
             # we should not be in safe mode (distance to the fork is too large)
             assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 
@@ -110,7 +111,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
             # second branch should now be invalid
             wait_for_tip_status(conn1, branch_2_blocks[-1].hash, "invalid")
             wait_for_tip(conn1, branch_1_blocks[-1].hash)
-            
+
             # we should not be in safe mode
             assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
 

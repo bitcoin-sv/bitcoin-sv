@@ -14,6 +14,7 @@ from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE, DEFAULT_MIN_BLOCKS_
 from test_framework.script import CScript, CTransaction, CTxOut, OP_TRUE
 from test_framework.mininode import FromHex, CBlock, msg_gethdrsen
 
+
 class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
 
     def create_transaction(self, prevtx, number_of_outputs, sig, value, scriptPubKey=CScript()):
@@ -35,7 +36,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         self.chain.tip = blockTip
         self.chain.block_heights[blockTip.sha256] = blockHeight
 
-    # Take care...if too many blocks will be required then the function will run out of coins 
+    # Take care...if too many blocks will be required then the function will run out of coins
     # the reason is that it currently takes coins only from 1 CB transaction
     def create_big_blocks(self, spendableCB_Tx, num_of_blocks, tx_count_per_block, node, conn):
         fee = satoshi_round(Decimal(((ONE_MEGABYTE + 100) * tx_count_per_block * 0.00000001)))
@@ -66,17 +67,17 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
                 n += 1
             node.generate(1)
             self.sync_chain_tip_with_node(node)
-    
+
     def set_test_params(self):
         self.num_nodes = 1
-        self.setup_clean_chain = True        
+        self.setup_clean_chain = True
         self.FORMAT_SEPARATOR = "."
-        self.extra_args = [['-whitelist=127.0.0.1', 
-                            '-rpcservertimeout=5000', 
-                            '-acceptnonstdtxn', 
-                            '-genesisactivationheight=1', 
-                            '-maxtxnvalidatorasynctasksrunduration=3600001', 
-                            '-maxnonstdtxvalidationduration=3600000', 
+        self.extra_args = [['-whitelist=127.0.0.1',
+                            '-rpcservertimeout=5000',
+                            '-acceptnonstdtxn',
+                            '-genesisactivationheight=1',
+                            '-maxtxnvalidatorasynctasksrunduration=3600001',
+                            '-maxnonstdtxvalidationduration=3600000',
                             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
                             '-preferredblockfilesize=%d' % ONE_MEGABYTE,
                             '-prune=1']]
@@ -88,8 +89,8 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-        
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
+
         # Create a new block
         block(0)
         self.chain.save_spendable_output()
@@ -103,7 +104,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
             self.chain.save_spendable_output()
 
         yield test
-        
+
         # collect spendable outputs now to avoid cluttering the code later on
         out = []
         for i in range(50):
@@ -139,13 +140,14 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         assert("merkleproof" not in bigBlockHeader)
 
         # P2P message gethdrsen should also return hdrsen message without Merkle proof and coinbase transaction for pruned block
-        self.test.connections[0].send_message( msg_gethdrsen(locator_have=[], hashstop=int(bigBlockHash,16)) )
+        self.test.connections[0].send_message(msg_gethdrsen(locator_have=[], hashstop=int(bigBlockHash,16)))
         self.test.test_nodes[0].wait_for_hdrsen(5)
-        assert_equal( len(self.test.test_nodes[0].last_message.get("hdrsen").headers), 1 )
+        assert_equal(len(self.test.test_nodes[0].last_message.get("hdrsen").headers), 1)
         headerEnriched = self.test.test_nodes[0].last_message.get("hdrsen").headers[0]
         headerEnriched.rehash()
         assert_equal(headerEnriched.hash, bigBlockHash)
         assert(headerEnriched.coinbaseTxProof is None)
+
 
 if __name__ == '__main__':
     BSVMerkleProofInPrunedBlock().main()

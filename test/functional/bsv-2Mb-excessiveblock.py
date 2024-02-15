@@ -16,6 +16,7 @@ import time
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 
+
 class BSV2MBlocks(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -34,7 +35,7 @@ class BSV2MBlocks(ComparisonTestFramework):
 
     def get_tests(self):
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
@@ -80,6 +81,7 @@ class BSV2MBlocks(ComparisonTestFramework):
         # Check we can still mine a good size block
         block(3, spend=out[1], block_size=self.excessive_block_size)
         yield self.accepted()
+
 
 if __name__ == '__main__':
     BSV2MBlocks().main()

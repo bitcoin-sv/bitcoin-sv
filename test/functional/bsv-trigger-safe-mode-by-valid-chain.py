@@ -18,6 +18,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal, p2p_port
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_FORK_LENGTH, SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE
 
+
 class TriggerSafeModeByValidChain(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -75,6 +76,7 @@ class TriggerSafeModeByValidChain(BitcoinTestFramework):
 
             # we should exit safe mode because fork base is too far from active tip
             assert not conn1.rpc.getsafemodeinfo()["safemodeenabled"]
+
 
 if __name__ == '__main__':
     TriggerSafeModeByValidChain().main()

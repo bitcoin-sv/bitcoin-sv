@@ -8,6 +8,7 @@
 #include <string>
 #include <fstream>
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTextWriter
 {
 public:
@@ -55,6 +56,7 @@ private:
     std::string strBuffer;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CHttpTextWriter : public CTextWriter
 {
 public:
@@ -86,6 +88,7 @@ public:
 
 private:
     static constexpr size_t BUFFER_SIZE = ONE_MEGABYTE;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     HTTPRequest& _request;
     std::string strBuffer;
 
@@ -123,6 +126,7 @@ private:
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CFileTextWriter : public CTextWriter
 {
 public:

@@ -4,14 +4,14 @@
 """
 Test entering and exiting of safe mode by large invalid branch where data of first branch block arrives last
 Scenario:
-1. Generate two branches. Main branch has 10 blocks, alternative branch has 30 blocks. First block of alternative 
+1. Generate two branches. Main branch has 10 blocks, alternative branch has 30 blocks. First block of alternative
    branch is invalid.
 2. Send whole main branch
 3. Send only header of first block of alternative branch
 4. Send alternative branch blocks 2 - 20 with data. Validate that node enters safe mode (with UNKNOWN safe mode level)
 5. Send alternative branch blocks 21 - 30 but only headers. This should not change anything regarding safe mode.
 6. Send alternative branch first block data. This should mark branch as invalid and change safe mode level to INVALID
-7. Extend main branch by 15 blocks. This should cause that node exits safe mode because alternative branch is 
+7. Extend main branch by 15 blocks. This should cause that node exits safe mode because alternative branch is
    no longer SAFE_MODE_MIN_POW_DIFFERENCE blocks ahead
 """
 from time import sleep
@@ -21,6 +21,7 @@ from test_framework.blocktools import make_block, send_by_headers, wait_for_tip,
 from test_framework.mininode import msg_block
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
+
 
 class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
 
@@ -72,8 +73,6 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
                 self.log.info(e.error["message"])
                 assert e.error["message"] == "Safe mode: Warning: The network does not appear to agree with the local blockchain! Still waiting for block data for more details."
 
-
-
             # send headers only for the rest of the second branch
             send_by_headers(conn2, branch_2_blocks[20:], do_send_blocks=False)
 
@@ -123,13 +122,14 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
 
             # send additional blocks with data to active chain
             send_by_headers(conn1, branch_1_aditional_blocks, do_send_blocks=True)
-            
-            # check that active tip is from branch 1 
+
+            # check that active tip is from branch 1
             wait_for_tip(conn1, branch_1_aditional_blocks[-1].hash)
 
-            # we are not in the Safe mode any more fork is no longer 6 blocks ahead of 
+            # we are not in the Safe mode any more fork is no longer 6 blocks ahead of
             # active chain
             conn1.rpc.getbalance()
+
 
 if __name__ == '__main__':
     TriggerSafeModeByIvalidChain().main()

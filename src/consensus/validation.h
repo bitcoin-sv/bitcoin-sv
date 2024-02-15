@@ -109,11 +109,13 @@ public:
     bool ScriptsChecked() const { return fScriptsChecked; }
 
     void SetMissingInputs() { fMissingInputs = true; }
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     void SetDoubleSpendDetected(std::set<CTransactionRef>&& collidedWithTx)
     {
         mCollidedWithTx.merge( collidedWithTx );
         fDoubleSpendDetected = true;
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     void SetMempoolConflictDetected(std::set<CTransactionRef>&& collidedWithTx)
     {
         mCollidedWithTx.merge( collidedWithTx );

@@ -15,6 +15,7 @@ from test_framework.script import *
 
 SPEND_OUTPUT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 
+
 class P2SH(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -24,7 +25,7 @@ class P2SH(ComparisonTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.genesisactivationheight = 203
-         # Build the redeem script, hash it, use hash to create the p2sh script
+        # Build the redeem script, hash it, use hash to create the p2sh script
         self.redeem_script = CScript([self.coinbase_pubkey, OP_2DUP, OP_CHECKSIGVERIFY, OP_CHECKSIG])
         self.p2sh_script = CScript([OP_HASH160, hash160(self.redeem_script), OP_EQUAL])
         self.extra_args = [['-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',
@@ -32,7 +33,6 @@ class P2SH(ComparisonTestFramework):
 
     def run_test(self):
         self.test.run()
-
 
     # Creates a new transaction using a p2sh transaction as input
     def spend_p2sh_tx(self, p2sh_tx_to_spend, output_script=SPEND_OUTPUT, privateKey=None):
@@ -54,7 +54,7 @@ class P2SH(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # Create and mature coinbase txs
         test = TestInstance(sync_every_block=False)
@@ -81,8 +81,6 @@ class P2SH(ComparisonTestFramework):
         self.chain.update_block(200, p2sh_txs)
         yield self.accepted()
 
-
-
         coinbase_to_p2sh_tx = new_P2SH_tx()
 
         # rpc tests
@@ -94,8 +92,10 @@ class P2SH(ComparisonTestFramework):
         wrongPrivateKey.set_secretbytes(b"wrongkeysecret")
         wrongkey_txn = self.spend_p2sh_tx(p2sh_txs[0], privateKey=wrongPrivateKey)
         # A transaction with this output script can't get into the mempool
-        assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed",
-            node.sendrawtransaction, ToHex(wrongkey_txn))
+        assert_raises_rpc_error(-26,
+                                "mandatory-script-verify-flag-failed",
+                                node.sendrawtransaction,
+                                ToHex(wrongkey_txn))
 
         # A transaction with this output script can get into the mempool
         correctkey_tx = self.spend_p2sh_tx(p2sh_txs[1])
@@ -130,8 +130,10 @@ class P2SH(ComparisonTestFramework):
         wrongPrivateKey.set_secretbytes(b"wrongkeysecret")
         wrongkey_txn = self.spend_p2sh_tx(p2sh_txs[2], privateKey=wrongPrivateKey)
         # A transaction with this output script can't get into the mempool
-        assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed",
-            node.sendrawtransaction, ToHex(wrongkey_txn))
+        assert_raises_rpc_error(-26,
+                                "mandatory-script-verify-flag-failed",
+                                node.sendrawtransaction,
+                                ToHex(wrongkey_txn))
 
         # We can spend old P2SH transactions
         correctkey_tx = self.spend_p2sh_tx(p2sh_txs[3])

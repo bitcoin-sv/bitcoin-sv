@@ -47,12 +47,14 @@ def new_block(connection, txs=[], valid_coinbase=False, wait_for_confirmation=Tr
 
     return coinbase_tx, block
 
+
 def make_invalid_tx(tx_to_spend, output_ndx):
     tx = CTransaction()
     tx.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, output_ndx), b"", 0xffffffff))
     tx.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 2000, CScript([OP_FALSE])))
     tx.rehash()
     return tx
+
 
 def make_invalid_p2sh_tx(tx_to_spend, output_ndx):
     tx = CTransaction()
@@ -61,12 +63,14 @@ def make_invalid_p2sh_tx(tx_to_spend, output_ndx):
     tx.rehash()
     return tx
 
+
 def make_large_invalid_tx(tx_to_spend, output_ndx):
     tx = CTransaction()
     tx.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, output_ndx), b"", 0xffffffff))
     tx.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 2000000, CScript([bytes(1000000), OP_DROP, OP_FALSE])))
     tx.rehash()
     return tx
+
 
 class InvalidTx(BitcoinTestFramework):
 
@@ -180,12 +184,11 @@ class InvalidTx(BitcoinTestFramework):
 
         return data
 
-
     def run_test(self):
 
         invalid_coinbases = []
         valid_coinbases = []
-        with self.run_node_with_connections("Preparaton", 0, ["-genesisactivationheight=1"], 1) as (conn, ):
+        with self.run_node_with_connections("Preparaton", 0, ["-genesisactivationheight=1"], 1) as (conn,):
             for _ in range(5):
                 coinbase, _ = new_block(conn, valid_coinbase=False, wait_for_confirmation=True)
                 invalid_coinbases.append(coinbase)
@@ -204,7 +207,7 @@ class InvalidTx(BitcoinTestFramework):
                                              "-invalidtxsink=ZMQ",
                                              "-invalidtxsink=FILE",
                                              f"-zmqpubinvalidtx={self.address}"],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             self.zmqSubSocket.connect(self.address)
             invalid_tx1 = make_invalid_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx1], wait_for_confirmation=False)
@@ -233,7 +236,7 @@ class InvalidTx(BitcoinTestFramework):
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
                                              "-invalidtxsink=FILE",],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             invalid_tx2 = make_invalid_p2sh_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx2], wait_for_confirmation=False)
             conn.send_message(msg_tx(invalid_tx2))
@@ -255,7 +258,7 @@ class InvalidTx(BitcoinTestFramework):
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
                                              "-invalidtxsink=FILE",],
-                                            1) as (conn, ):
+                                            1) as (conn,):
 
             valid_tx_1 = create_transaction(valid_coinbases[0], 0, CScript(), valid_coinbases[0].vout[0].nValue - 200)
             valid_tx_2 = create_transaction(valid_coinbases[1], 0, CScript(), valid_coinbases[0].vout[0].nValue - 200)
@@ -283,8 +286,6 @@ class InvalidTx(BitcoinTestFramework):
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size == 0, "Nothing to free."
 
-
-
         with self.run_node_with_connections("Scenario 4: Limiting file size and putting three large (1MB each) transactions, "
                                             "only first two txs are saved through file sink, last is ignored, "
                                             "maximal zmq message size is limited, messages should be smaller",
@@ -298,7 +299,7 @@ class InvalidTx(BitcoinTestFramework):
                                              f"-zmqpubinvalidtx={self.address}",
                                              "-invalidtxzmqmaxmessagesize=1",
                                              ],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             self.zmqSubSocket.connect(self.address)
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size == 0, "Freed size must zero, dumped transactions are deleted in last test."
@@ -339,7 +340,7 @@ class InvalidTx(BitcoinTestFramework):
                                              f"-zmqpubinvalidtx={self.address}",
                                              "-invalidtxzmqmaxmessagesize=0",
                                              ],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             self.zmqSubSocket.connect(self.address)
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size > 0, "Freed size must be larger than zero."
@@ -370,7 +371,6 @@ class InvalidTx(BitcoinTestFramework):
                 msg = self.zmqSubSocket.recv_multipart()
                 # maximal zmq tx size is set to msximal value so messages will contain tx hex (tx hex > 2MB)
                 assert len(msg[1]) > 2 * ONE_MEGABYTE
-
 
         with self.run_node_with_connections("Scenario 6: ",
                                             0,
@@ -403,14 +403,13 @@ class InvalidTx(BitcoinTestFramework):
             # transactions are sent from different connections so they must have different addresses
             assert data1["address"] != data2["address"]
 
-
         shutil.rmtree(invalidtxsfolder)
 
         with self.run_node_with_connections("Scenario 7: Sink is not specified, folder should not be created",
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000"],
-                                            1) as (conn, ):
+                                            1) as (conn,):
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[1], 0)
             new_block(conn, [invalid_tx1], wait_for_confirmation=False)
             sleep(1)

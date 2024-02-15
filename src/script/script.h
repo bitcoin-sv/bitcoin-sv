@@ -104,13 +104,19 @@ public:
             insert(end(), uint8_t(b.size()));
         } else if (b.size() <= 0xffff) {
             insert(end(), OP_PUSHDATA2);
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[2];
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             WriteLE16(data, b.size());
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             insert(end(), data, data + sizeof(data));
         } else {
             insert(end(), OP_PUSHDATA4);
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[4];
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             WriteLE32(data, b.size());
+            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
             insert(end(), data, data + sizeof(data));
         }
         insert(end(), b.begin(), b.end());
@@ -201,12 +207,12 @@ public:
         if (b.empty()) return nFound;
         CScript result;
         iterator pc = begin(), pc2 = begin();
-        opcodetype opcode;
-        do {
+        opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
+        do { // NOLINT(cppcoreguidelines-avoid-do-while)
             result.insert(result.end(), pc2, pc);
             while (static_cast<size_t>(end() - pc) >= b.size() &&
                    std::equal(b.begin(), b.end(), pc)) {
-                pc = pc + b.size();
+                pc = pc + b.size(); // NOLINT(*-narrowing-conversions)
                 ++nFound;
             }
             pc2 = pc;
@@ -319,6 +325,7 @@ constexpr bool IsMinerInfo(const std::span<const uint8_t> script)
 
 size_t CountOp(std::span<const uint8_t>, opcodetype);
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CReserveScript {
 public:
     CScript reserveScript;

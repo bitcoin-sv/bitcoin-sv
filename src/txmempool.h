@@ -44,7 +44,7 @@
 class CAutoFile;
 class CBlockIndex;
 class CEvictionCandidateTracker;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CoinsDB;
 class CoinsDBView;
 class CAsyncMempoolTxDB;
@@ -59,12 +59,12 @@ struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)
     // of this tx given our view of block chain history
-    int32_t height;
-    int64_t time;
+    int32_t height; // NOLINT(cppcoreguidelines-use-default-member-init)
+    int64_t time; // NOLINT(cppcoreguidelines-use-default-member-init)
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
     // values are still valid even after a reorg.
-    const CBlockIndex *maxInputBlock;
+    const CBlockIndex *maxInputBlock; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     LockPoints() : height(0), time(0), maxInputBlock(nullptr) {}
 };
@@ -139,6 +139,7 @@ public:
  * limit the amount of work we're willing to do to avoid consuming too much
  * CPU.)
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxMemPoolEntry {
 private:
     CTransactionWrapperRef tx;
@@ -221,6 +222,7 @@ public:
 };
 
 struct update_fee_delta {
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     update_fee_delta(Amount _feeDelta) : feeDelta(_feeDelta) {}
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateFeeDelta(feeDelta); }
@@ -235,6 +237,7 @@ struct update_lock_points {
     void operator()(CTxMemPoolEntry &e) { e.UpdateLockPoints(lp); }
 
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const LockPoints &lp;
 };
 
@@ -329,8 +332,11 @@ std::ostream& operator<<(std::ostream&, const MemPoolRemovalReason&);
 struct DisconnectedBlockTransactions;
 
 struct CTransactionConflictData {
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CTransaction* const conflictedWith;
     const uint256* const blockhash;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
+
     CTransactionConflictData(const CTransaction* conflictedWith_, const uint256* blockhash_)
     : conflictedWith{conflictedWith_}
     , blockhash{blockhash_}
@@ -419,6 +425,7 @@ using CTransactionConflict = std::optional<CTransactionConflictData>;
  * entry as "dirty", and set the feerate for sorting purposes to be equal the
  * feerate of the transaction without any descendants.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxMemPool {
 private:
     static constexpr int MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO = 1000;
@@ -596,6 +603,7 @@ private:
         uint64_t cachedSecondaryInnerUsage;
 
         public:
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         SecondaryMempoolStats()
         {
             Clear();
@@ -645,8 +653,10 @@ public:
     void SuspendSanityCheck() { suspendSanityCheck.store(true); }
     void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
     CFeeRate GetBlockMinTxFee() const { return blockMinTxfee; };
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     void SetMinDebugRejectionFee(CFeeRate feerate) { minDebugRejectionFee = feerate; };
     CFeeRate GetMinDebugRejectionFee() const { return minDebugRejectionFee; };
 
@@ -818,6 +828,7 @@ private:
     std::once_flag db_initialized {};
     std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic_int mempoolTxDB_uniqueInit;
     int mempoolTxDB_uniqueSuffix {mempoolTxDB_uniqueInit.fetch_add(1)};
 
@@ -1033,6 +1044,7 @@ public:
      *
      * @note This class is non-moveable and non-copyable.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class Snapshot final
     {
         // Only CTxMemPool is allowed to call the constructor.
@@ -1329,16 +1341,19 @@ class CPFPGroup
     // txid of the groups paying transaction
     TxId payingTxId {};
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic<uint64_t> counter;
     mining::GroupID groupId {};
 
 public:
-
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : evaluationParams{evalParams}
         , transactions{txs}
         , groupId{counter++}
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         payingTxId = transactions.back()->GetTxId();
     }
 
@@ -1368,6 +1383,7 @@ public:
  *   + CTxnDoubleSpendDetector::insertTxnInputs  - this is final check, executed
  *     while holding double spend detector lock
  */
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CCoinsViewMemPool : public ICoinsView {
 private:
     const CTxMemPool &mempool;
@@ -1429,6 +1445,7 @@ private:
 // multi_index tag names
 struct txid_index {};
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct DisconnectedBlockTransactions {
     typedef boost::multi_index_container<
         CTransactionRef, boost::multi_index::indexed_by<

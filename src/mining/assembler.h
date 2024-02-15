@@ -5,7 +5,7 @@
 
 #include "primitives/block.h"
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CBlockIndex;
 
 namespace mining
@@ -31,6 +31,7 @@ public:
  * The Block Assembler assembles a new block. It collects transactions from the mempool, prioritizes them, and ensures
  * that all required ancestors are present.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BlockAssembler {
 public:
     BlockAssembler(const Config& config);
@@ -61,6 +62,7 @@ protected:
     void FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn, const Amount& blockFees) const;
 
     // Keep reference to the global config
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Config& mConfig;
 };
 

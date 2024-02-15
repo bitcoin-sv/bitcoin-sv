@@ -5,6 +5,7 @@ from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.script import CScript, OP_DROP, OP_1, OP_CHECKSEQUENCEVERIFY, OP_CHECKLOCKTIMEVERIFY
 
+
 class SunsetCSVCLVTest(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
     NAME = "Sunseting CSV and CLV when Genesis is active"

@@ -92,7 +92,9 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
 from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_getdata, msg_tx, CInv, mininode_lock
-import time, copy
+import time
+import copy
+
 
 class MyNode(TestNode):
     def __init__(self, block_store, tx_store, blocks_recvd):
@@ -102,7 +104,7 @@ class MyNode(TestNode):
     def on_block(self, conn, message):
         super().on_block(conn, message)
 
-        block = message.block;
+        block = message.block
         block.rehash()
         self.blocks_recvd[block.sha256] = block
 
@@ -116,6 +118,7 @@ class MyNode(TestNode):
             elif x.type == CInv.BLOCK:
                 # Request block
                 self.conn.send_message(msg_getdata([CInv(x.type, x.hash)]))
+
 
 class MyTestManager(TestManager):
     def __init__(self, testgen, datadir):
@@ -131,12 +134,13 @@ class MyTestManager(TestManager):
             # Make sure the TestNode (callback class) has a reference to its associated NodeConn
             test_node.add_connection(self.connections[-1])
 
+
 class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.genesisactivationheight = 600 
+        self.genesisactivationheight = 600
         self.extra_args = [['-debug', '-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1', '-checknonfinalfreq=100',
                             '-mempoolexpirynonfinal=1', '-maxgenesisgracefulperiod=0',
@@ -334,7 +338,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         tx3_update1.rehash()
         tx3_update2.rehash()
         tx3_update3.rehash()
-        updateHashes = { tx3_update1.hash, tx3_update2.hash, tx3_update3.hash };
+        updateHashes = {tx3_update1.hash, tx3_update2.hash, tx3_update3.hash}
         yield TestInstance([[tx3_update1, None], [tx3_update2, None], [tx3_update3, None]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)
@@ -352,8 +356,8 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         # Send an invalid update in a single txn which wants to update both txn4 and txn5. It will be rejected.
         tx4_tx5_invalid = copy.deepcopy(tx4)
         tx4_tx5_invalid.vin.append(tx5.vin[0])
-        tx4_tx5_invalid.vin[0].nSequence += 1;
-        tx4_tx5_invalid.vin[1].nSequence += 1;
+        tx4_tx5_invalid.vin[0].nSequence += 1
+        tx4_tx5_invalid.vin[1].nSequence += 1
         tx4_tx5_invalid.rehash()
         yield TestInstance([[tx4_tx5_invalid, RejectResult(16, b'bad-txn-update')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
@@ -364,7 +368,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         # Send an invalid update for txn4 which changes the number of inputs. It will be rejected.
         tx4_invalid = copy.deepcopy(tx4)
         tx4_invalid.vin.append(spend_tx8.vin[0])
-        tx4_invalid.vin[0].nSequence += 1;
+        tx4_invalid.vin[0].nSequence += 1
         tx4_invalid.rehash()
         yield TestInstance([[tx4_invalid, RejectResult(16, b'bad-txn-update')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
@@ -503,6 +507,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx8, DiscardResult()]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert(tx8.hash in nonfinalmempool)
+
 
 if __name__ == '__main__':
     BSVGenesis_Restore_nLockTime_nSequence().main()

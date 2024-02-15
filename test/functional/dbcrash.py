@@ -317,5 +317,6 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
 
             self.start_node(i, extra_args=self.base_args)
 
+
 if __name__ == "__main__":
     ChainstateWriteCrashTest().main()

@@ -13,6 +13,8 @@
 #include <string>
 #include <type_traits>
 
+// NOLINTBEGIN(performance-unnecessary-value-param)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Amount {
 private:
     int64_t amount;
@@ -141,8 +143,8 @@ public:
     }
 };
 
-static const Amount COIN(100000000);
-static const Amount CENT(1000000);
+static const Amount COIN(100000000); // NOLINT(cert-err58-cpp)
+static const Amount CENT(1000000);   // NOLINT(cert-err58-cpp)
 
 extern const std::string CURRENCY_UNIT;
 
@@ -156,7 +158,7 @@ extern const std::string CURRENCY_UNIT;
  * critical; in unusual circumstances like a(nother) overflow bug that allowed
  * for the creation of coins out of thin air modification could lead to a fork.
  */
-static const Amount MAX_MONEY = 21000000 * COIN;
+static const Amount MAX_MONEY = 21000000 * COIN; // NOLINT(cert-err58-cpp)
 inline bool MoneyRange(const Amount nValue) {
     return (nValue >= Amount(0) && nValue <= MAX_MONEY);
 }
@@ -214,5 +216,6 @@ public:
         READWRITE(nSatoshisPerK);
     }
 };
+// NOLINTEND(performance-unnecessary-value-param)
 
 #endif //  BITCOIN_AMOUNT_H

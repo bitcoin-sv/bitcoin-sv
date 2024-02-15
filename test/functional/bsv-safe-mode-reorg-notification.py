@@ -16,7 +16,7 @@ from test_framework.util import wait_until
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
-    
+
     def __init__(self, test, *a, **kw):
         self.test = test
         super(WebhookHandler, self).__init__(*a, **kw)
@@ -49,7 +49,6 @@ class SafeModeReogNotification(BitcoinTestFramework):
 
     def make_handler(self, *a, **kw):
         return WebhookHandler(self,  *a, **kw)
-
 
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -106,7 +105,6 @@ class SafeModeReogNotification(BitcoinTestFramework):
             if numberofdisconnectedblocks is not None:
                 assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == numberofdisconnectedblocks
 
-
     def run_test(self):
 
         self.PORT = 8765
@@ -158,12 +156,10 @@ class SafeModeReogNotification(BitcoinTestFramework):
             # last block caused an reorg, check if got correct notification
             self.check_last_webhook_msg_reorged_from(main_chain[-1].hash, len(main_chain))
 
-
             # extending the new chain, just enough to be able to triger the safe mode after sending headers
             new_chain_extension = self.make_chain(conn, new_chain[-1], SAFE_MODE_DEFAULT_MIN_FORK_LENGTH)
             expected_new_chain_ext_fork_data = {"forkfirstblock": new_chain_extension[0].hash, "tips": {new_chain_extension[-1].hash},
                                                 "lastcommonblock": new_chain[-1].hash}
-
 
             # sending the new chain extension
             send_by_headers(conn, new_chain_extension, do_send_blocks=False)
@@ -196,6 +192,7 @@ class SafeModeReogNotification(BitcoinTestFramework):
             self.check_last_webhook_msg_reorged_from(new_chain_extension[-1].hash, len(new_chain_extension))
 
         self.kill_server()
+
 
 if __name__ == '__main__':
     SafeModeReogNotification().main()

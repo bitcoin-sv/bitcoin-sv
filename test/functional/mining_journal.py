@@ -20,6 +20,7 @@ from test_framework.blocktools import merkle_root_from_merkle_proof, create_bloc
 import math
 import random
 
+
 class MyNode(NodeConnCB):
     def __init__(self):
         super().__init__()
@@ -38,7 +39,7 @@ class MyNode(NodeConnCB):
         super().on_block(conn, message)
 
         if(self.setup_finished):
-            block = message.block;
+            block = message.block
             block.rehash()
 
             for txn in block.vtx:
@@ -105,7 +106,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
         input_amount = utxo['amount']
 
         chain_len = 1
-        reqd_chain_len = random.randint(1, ancestor_depth);
+        reqd_chain_len = random.randint(1, ancestor_depth)
         for addr in addrs:
             if num_reqd == 0 or reqd_chain_len == 0:
                 break
@@ -113,7 +114,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             inputs = []
             inputs.append({"txid": input_txid, "vout": input_vout})
             outputs = {}
-            pad_size = random.randint(0, max_pad_size);
+            pad_size = random.randint(0, max_pad_size)
             bytes_used = 70 + pad_size
 
             # Estimate fee we need
@@ -139,7 +140,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             # Setup for next txn in chain
             input_txid = decoded_raw["txid"]
             for i in range(len(decoded_raw["vout"])):
-                value =  decoded_raw["vout"][i]["value"]
+                value = decoded_raw["vout"][i]["value"]
                 if(value > 0):
                     input_vout = i
                     break
@@ -147,6 +148,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             chain_len += 1
             num_reqd -= 1
             reqd_chain_len -= 1
+
 
 def mempool_sizes(nodes):
     res = ""
@@ -167,7 +169,7 @@ class MiningJournal(BitcoinTestFramework):
                             '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool',
-                            "-checkmempool=1", ]] * self.num_nodes
+                            "-checkmempool=1",]] * self.num_nodes
         self.conncbs = []
         self.num_utxos = 5000
         self.ancestor_depth = 25
@@ -221,7 +223,6 @@ class MiningJournal(BitcoinTestFramework):
         # Fee for txns
         self.relayfee = Decimal("250") / COIN
 
-
     # Fill the mempool with some different kinds of txns and check the journal accurately tracks it
     def test_initial_mempool(self, txnNode, numTxns=100, mainTest=False):
         if mainTest:
@@ -231,7 +232,6 @@ class MiningJournal(BitcoinTestFramework):
         fill_mempool(self.relayfee, self.nodes[txnNode], numTxns, self.ancestor_depth)
         info = self.nodes[txnNode].getmempoolinfo()
         assert_equal(info["size"], info["journalsize"])
-
 
     # Check the next mining candidate looks correct given the current contents of the journal
     def check_mining_candidate(self, txnNode):
@@ -268,7 +268,6 @@ class MiningJournal(BitcoinTestFramework):
             self.sync_all([[self.nodes[txnNode]]])
             info = self.nodes[txnNode].getmempoolinfo()
             assert_equal(info["size"], info["journalsize"])
-
 
     # Invalidate some blocks to force a reorg and check the mempool, journal and mining candidate
     # all still look correct
@@ -343,7 +342,7 @@ class MiningJournal(BitcoinTestFramework):
         # Sleep to ensure the node has fully restarted before we stop it again,
         # otherwise the test framework treats it as a test failure
         time.sleep(5)
- 
+
     # Test the RPC rebuildJounral command
     def test_rebuild(self, rebuildNode):
         self.log.info("Testing journal rebuild...")
@@ -356,7 +355,6 @@ class MiningJournal(BitcoinTestFramework):
         self.nodes[rebuildNode].rebuildjournal()
         status = self.nodes[rebuildNode].checkjournal()
         assert(status["ok"])
-
 
     def run_test(self):
 
@@ -382,6 +380,6 @@ class MiningJournal(BitcoinTestFramework):
         # Shutdown/restart with mempool persist
         self.test_shutdown_restart(0)
 
+
 if __name__ == '__main__':
     MiningJournal().main()
-

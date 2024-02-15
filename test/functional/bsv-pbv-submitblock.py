@@ -47,6 +47,7 @@ from bsv_pbv_common import (
     wait_for_validating_blocks
 )
 
+
 class PBVSubmitBlock(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -128,6 +129,7 @@ class PBVSubmitBlock(BitcoinTestFramework):
         node2.send_and_ping(msg_getheaders(locator_have=[int(self.nodes[0].getbestblockhash(), 16)]))
         receivedAnnouncement = False
         waiting_for_announcement_block_hash = block2_hard.sha256
+
         def on_cmpctblock(conn, message):
             nonlocal receivedAnnouncement
             message.header_and_shortids.header.calc_sha256()
@@ -148,8 +150,9 @@ class PBVSubmitBlock(BitcoinTestFramework):
         submitblock_thread.start()
 
         # because self.nodes[0] rpc is blocked we use another rpc client
-        rpc_client = get_rpc_proxy(rpc_url(get_datadir_path(self.options.tmpdir, 0), 0), 0,
-                             coveragedir=self.options.coveragedir)
+        rpc_client = get_rpc_proxy(rpc_url(get_datadir_path(self.options.tmpdir, 0), 0),
+                                   0,
+                                   coveragedir=self.options.coveragedir)
 
         wait_for_validating_blocks({block2_hard.hash, block4_hard.hash}, rpc_client, self.log)
 
@@ -190,6 +193,7 @@ class PBVSubmitBlock(BitcoinTestFramework):
 
         # easier block should still be on tip
         assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
+
 
 if __name__ == '__main__':
     PBVSubmitBlock().main()

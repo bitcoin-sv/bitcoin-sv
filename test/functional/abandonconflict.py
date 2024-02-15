@@ -99,7 +99,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         ) + self.nodes[0].getbalance()
         assert_equal(unconfbalance, newbalance)
         # Also shouldn't show up in listunspent
-        assert(not txABC2 in [utxo["txid"]
+        assert(txABC2 not in [utxo["txid"]
                               for utxo in self.nodes[0].listunspent(0)])
         balance = newbalance
 

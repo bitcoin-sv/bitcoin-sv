@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 from test_framework.mininode import ser_uint256
 
+
 class msg_badblocktxn():
     command = b"blocktxn"
 
@@ -29,8 +30,9 @@ class msg_badblocktxn():
                     0x00, 0x00, 0x00, 0x00, # Txn 1 locktime
                     0x00, 0x00, 0x00, 0x00  # Txn 2 Version
                                             # Rest of txn2 is missing
-                ])
+                    ])
         return r
+
 
 class TestIncompleteTxnList(BitcoinTestFramework):
 
@@ -45,6 +47,7 @@ class TestIncompleteTxnList(BitcoinTestFramework):
             conn.send_message(msg_badblocktxn())
 
             wait_until(lambda: check_for_log_msg(self, "parsing error: index out of bounds", "/node0"), timeout=10)
+
 
 if __name__ == '__main__':
     TestIncompleteTxnList().main()

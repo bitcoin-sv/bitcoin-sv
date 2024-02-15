@@ -9,7 +9,8 @@
 // Helpers for use with std::unique_ptr to enable RAII closing of FILE*
 struct CloseFileDeleter
 {
-    void operator()(FILE* file) { ::fclose(file); }
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    void operator()(FILE* file) { ::fclose(file); } // NOLINT(cert-err33-c)
 };
 using UniqueCFile = std::unique_ptr<FILE, CloseFileDeleter>;
 

@@ -8,9 +8,10 @@ from test_framework.util import sync_blocks, p2p_port, wait_until, hashToHex
 import time
 
 '''
-FeeFilterTest -- test relaying zero fee paying transactions when the 
+FeeFilterTest -- test relaying zero fee paying transactions when the
 minimum mining fee is also set to zero and the relaying fee is left at default (also zero)
 '''
+
 
 def send_zero_fee_tx_funded_from(node):
     tx_id = node.sendtoaddress(node.getnewaddress(), 1)
@@ -30,6 +31,7 @@ def send_zero_fee_tx_funded_from(node):
         signed = node.signrawtransaction(rawtx)
         return node.sendrawtransaction(signed["hex"])
 
+
 # Wait up to 60 secs to see if the testnode has received all the expected invs
 def allInvsMatch(invsExpected, testnode):
     for x in range(5):
@@ -39,6 +41,7 @@ def allInvsMatch(invsExpected, testnode):
                 return True
         time.sleep(1)
     return False
+
 
 class TestNode(NodeConnCB):
     def __init__(self):
@@ -63,7 +66,6 @@ class FeeFilterTest(BitcoinTestFramework):
         self.extra_args = [[],[]]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
-
 
     def run_test(self):
         node1 = self.nodes[1]
@@ -98,5 +100,7 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: {t for t in zero_txids}.issubset(set(node0.getrawmempool())), timeout=10)
         assert (not allInvsMatch(zero_txids, test_node))
         test_node.clear_invs()
+
+
 if __name__ == '__main__':
     FeeFilterTest().main()

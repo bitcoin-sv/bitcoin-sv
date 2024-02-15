@@ -26,6 +26,7 @@ namespace std
  * A TxId is the identifier of a transaction. Currently identical to TxHash but
  * differentiated for type safety.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct TxId : public uint256 {
     TxId() = default;
     explicit TxId(const uint256 &b) : uint256{b} {}
@@ -137,13 +138,16 @@ public:
      */
     static inline constexpr int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     CTxIn() { nSequence = SEQUENCE_FINAL; }
 
     explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(),
                    uint32_t nSequenceIn = SEQUENCE_FINAL)
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : prevout(prevoutIn), scriptSig(scriptSigIn), nSequence(nSequenceIn) {}
     CTxIn(TxId prevTxId, uint32_t nOut, CScript scriptSigIn = CScript(),
           uint32_t nSequenceIn = SEQUENCE_FINAL)
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : CTxIn(COutPoint(prevTxId, nOut), scriptSigIn, nSequenceIn) {}
 
     ADD_SERIALIZE_METHODS
@@ -167,6 +171,7 @@ public:
 
 size_t ser_size(const CTxIn&);
 
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class Config; // declared in config.h, but including the header file here brings in additional problem
 /**
  * An output of a transaction.  It contains the public key that the next input
@@ -179,7 +184,9 @@ public:
 
     CTxOut() { SetNull(); }
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CTxOut(Amount nValueIn, CScript scriptPubKeyIn)
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : nValue(nValueIn), scriptPubKey(scriptPubKeyIn) {}
 
     ADD_SERIALIZE_METHODS
@@ -272,13 +279,16 @@ public:
     // actually immutable; deserialization and assignment are implemented,
     // and bypass the constness. This is safe, as they update the entire
     // structure, including the hash.
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int32_t nVersion;
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const uint32_t nLockTime;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 private:
     /** Memory only. */
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const uint256 hash;
 
     uint256 ComputeHash() const;
@@ -361,6 +371,7 @@ public:
     }
 
     template <typename Stream>
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CMutableTransaction(deserialize_type, Stream &s) {
         Unserialize(s);
     }
@@ -390,6 +401,7 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn) {
 }
 
 /** Precompute sighash midstate to avoid quadratic hashing */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct PrecomputedTransactionData {
     uint256 hashPrevouts, hashSequence, hashOutputs;
 

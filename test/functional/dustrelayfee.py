@@ -34,6 +34,7 @@ def create_zero_fee_tx_funded_from(node, tx_id, small_value):
     signed = node.signrawtransaction(rawtx)
     return signed["hex"]
 
+
 class DustRelayFeeTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -47,7 +48,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
     # - node accepts tx output which meets dust threshold
     def test_node_with_fees(self, nodeid):
         node = self.nodes[nodeid]
-        
+
         # Check that nodes agree before shutting one off
         sync_blocks(self.nodes[nodeid:], timeout=20)
 
@@ -102,6 +103,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
 
         # 1. Default settings of BSV node before Genesis release
         self.test_node_with_fees(0)
+
 
 if __name__ == '__main__':
     DustRelayFeeTest().main()

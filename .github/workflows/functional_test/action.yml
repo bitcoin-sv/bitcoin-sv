@@ -1,0 +1,26 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Functional test'
+description:  'Functional test'
+inputs:
+  tag:
+    description: Docker image tag e.g. Ubuntu_22.04
+    required: true
+  toolset:
+    description: Toolset e.g. gcc, clang 
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        ./test/functional/test_runner.py --failfast --extended --jobs=5 --output-type=0
+      shell: bash
+    - name: Artifact upload
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.tag }}-${{ inputs.toolset }}
+        path: |
+          /tmp/bitcoin_test_runner_*
+          !/tmp/bitcoin_test_runner_*/.lock

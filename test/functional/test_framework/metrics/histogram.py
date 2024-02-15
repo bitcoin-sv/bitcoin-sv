@@ -28,6 +28,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt             # type: ignore
 import numpy as np                          # type: ignore
 
+
 class Histogram(dict):
     def __init__(self, data, maxVal=None, maxCount=None):
         super().__init__(data)
@@ -115,6 +116,7 @@ def parse(log: HistogramLog) -> HistogramLog:
     ts = dateutil.parser.parse(log.ts)
     return HistogramLog(log.dataset, ts, log.name, Histogram.parse(log.histogram))
 
+
 def percentile_range(nines=6, steps=5):
     pct = decimal.Decimal(0)
     delta = decimal.Decimal(1)
@@ -125,6 +127,7 @@ def percentile_range(nines=6, steps=5):
         for _ in range(steps):
             pct += step
             yield pct
+
 
 def strip_common_prefix(names):
     names = list(names)
@@ -141,8 +144,10 @@ def strip_common_prefix(names):
 
     return [name[cp:] for name in names]
 
+
 def assert_eq(a,b):
     assert (a==b), f"{a} != {b}"
+
 
 assert_eq(strip_common_prefix(["a/b"]), ["a"])
 assert_eq(strip_common_prefix(["", ""]), ["", ""])
@@ -150,10 +155,13 @@ assert_eq(strip_common_prefix(["a", "a"]), ["", ""])
 assert_eq(strip_common_prefix(["ab", "ac"]), ["b", "c"])
 assert_eq(strip_common_prefix(["ab"]), ["ab"])
 
+
 def flip(names):
     return [name[::-1] for name in names]
 
+
 assert_eq(flip(["ab", "ac"]), ["ba", "ca"])
+
 
 def unique_parts(names):
     names = list(map(str, names))
@@ -161,8 +169,10 @@ def unique_parts(names):
     ret = flip(strip_common_prefix(flip(front)))
     return ret
 
+
 assert_eq(unique_parts(["ab1c", "ad2c"]), ["b1", "d2"])
 assert_eq(unique_parts(["a/b/c"]), ["a"])
+
 
 def plot_histogram(ax, ls, *, bins=20):
     hide_overmax = ls[0].name.lower().endswith("_us")
@@ -177,6 +187,7 @@ def plot_histogram(ax, ls, *, bins=20):
     hists = [list(hist) for hist in hists]
     plt.hist([bin[:-1] for bin in bins], bins[0], weights=hists, label=unique_parts(l.dataset for l in ls), log=True)
     plt.title(ls[0].name)
+
 
 def plot_percentiles(ax, ls, *, key):
     pr = list(percentile_range(12, 5))
@@ -195,8 +206,10 @@ def plot_percentiles(ax, ls, *, key):
     plt.yscale("logit")
     plt.ylim((1e-1,1-1e-6))
 
+
 def prefix(l):
     return l.name
+
 
 def prefix_t(l):
     return l.name.replace("_CPU_", ".").replace("_TIME_", ".")
@@ -221,13 +234,14 @@ def load_histograms(fs: List[str], histogram_filter: HistogramFilter) -> List[Hi
 def grouped(hists: List[HistogramLog], key):
     return dict((k, list(g))
                 for k, g in itertools.groupby(
-                        sorted(hists,
-                               key=key),
-                        key=key)
+                    sorted(hists, key=key),
+                    key=key)
                 )
+
 
 def histogram_filter_all(h: HistogramLog) -> bool:
     return True
+
 
 def histogram_filter_matching(substr: str) -> HistogramFilter:
     if substr:
@@ -236,6 +250,7 @@ def histogram_filter_matching(substr: str) -> HistogramFilter:
         return matching
     else:
         return histogram_filter_all
+
 
 def show_percentiles(logs, *,
                      key=prefix_t,
@@ -248,6 +263,7 @@ def show_percentiles(logs, *,
         plot_percentiles(ax, v, key=key)
         plt.grid(which='major', axis='both')
         plt.legend()
+
 
 def show_histograms(logs, *, key=prefix,
                     histogram_filter: HistogramFilter = histogram_filter_all):
@@ -281,7 +297,6 @@ def plot_last_experiment():
     show_percentiles(fs)
 
 
-
 def main():
     from docopt import docopt                          # type: ignore
     args = docopt(__doc__, version="0.1")
@@ -299,6 +314,6 @@ def main():
 
     plt.show()
 
+
 if __name__ == "__main__":
     main()
-

@@ -37,6 +37,7 @@ dnsseed_map = {
     "testnet3" : dnsseeds_testnet
 }
 
+
 class SeedNodeConn(NodeConn):
 
     def handle_error(self):
@@ -61,6 +62,7 @@ class SeedNode(NodeConnCB):
         conn.nServices = message.nServices
         if self.log:
             print(message.strSubVer.decode("utf-8"))
+
 
 def check_seeds(network, dnsseeds, print_out=False):
     seeds_count = 0
@@ -106,6 +108,7 @@ def check_seeds(network, dnsseeds, print_out=False):
         return True
     else:
         return False
+
 
 if __name__ == "__main__":
     network = "mainnet"

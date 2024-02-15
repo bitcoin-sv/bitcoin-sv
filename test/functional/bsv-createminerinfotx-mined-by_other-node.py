@@ -18,8 +18,11 @@ This test checks a condition, where a valid minerinfo transactions becomes inval
 role of a minerinfo transaction. This transaction is still a valid transaction and must
 still be considered as a valid member of the funding chain created by the minerinfo transactions.
 '''
+
+
 class AllKeys:
     last_seed_number = 1
+
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 1))
         self.revocationKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 2))
@@ -28,6 +31,7 @@ class AllKeys:
         self.compromisedKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 5))
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -73,7 +77,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
         fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
@@ -92,16 +96,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         height = node.getblockcount() + 1
 
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[nodenum],
-                'publicIP': '127.0.0.1',
-                'publicPort': '8333',
-                'minerKeys': allKeys.minerIdKeys,
-                'revocationKeys': allKeys.revocationKeys,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
-
+            'height': height,
+            'name': self.miner_names[nodenum],
+            'publicIP': '127.0.0.1',
+            'publicPort': '8333',
+            'minerKeys': allKeys.minerIdKeys,
+            'revocationKeys': allKeys.revocationKeys,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
@@ -196,6 +200,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
         minerinfotx, _ = self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)
+
 
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

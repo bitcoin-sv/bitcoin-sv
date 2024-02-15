@@ -3,6 +3,7 @@ from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut,ToHex
 from test_framework.script import CScript, OP_TRUE
 from test_framework.util import assert_equal, assert_raises_rpc_error
 
+
 class GettxoutsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -23,8 +24,9 @@ class GettxoutsTest(BitcoinTestFramework):
         # Compare gettxouts results to results from gettxout RPC function
         gettxout_results = []
         for i in range(len(utxos)):
-            gettxout_results.append(self.nodes[0].gettxout(txid=utxos[i]["txid"], n=utxos[i]["vout"],
-                                              include_mempool=True))
+            gettxout_results.append(self.nodes[0].gettxout(txid=utxos[i]["txid"],
+                                                           n=utxos[i]["vout"],
+                                                           include_mempool=True))
 
         utxos_list = []
         for utxo in utxos:

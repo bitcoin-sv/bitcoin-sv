@@ -14,6 +14,7 @@ from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_ADD,
 from test_framework.blocktools import create_transaction
 import codecs
 
+
 class JournalReorg(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -23,13 +24,13 @@ class JournalReorg(BitcoinTestFramework):
                             '-debug=journal',
                             '-blockassembler=journaling',
                             '-genesisactivationheight=400',
-                            '-maxgenesisgracefulperiod=0' ],
+                            '-maxgenesisgracefulperiod=0'],
                            ['-whitelist=127.0.0.1',
                             '-checkmempool=1',
                             '-debug=journal',
                             '-blockassembler=journaling',
                             '-genesisactivationheight=403',
-                            '-maxgenesisgracefulperiod=0' ]]
+                            '-maxgenesisgracefulperiod=0']]
 
     def mine_big_txns(self, node):
         # Mine 25 blocks with big txns
@@ -60,7 +61,6 @@ class JournalReorg(BitcoinTestFramework):
         fee = Decimal(0.0000025) #node.getnetworkinfo()['relayfee']
         send_value1 = int((spendTxn['amount'] - fee) * 100000000)
         send_value2 = int((spendTxn['amount'] - fee*2) * 100000000)
-
 
         txOpAdd1 = CTransaction()
         txOpAdd1.vin.append(CTxIn(COutPoint(int(spendTxn["txid"], 16), spendTxn["vout"]), b'', 0xffffffff))
@@ -104,7 +104,7 @@ class JournalReorg(BitcoinTestFramework):
         for node in self.nodes:
             # Disconnect nodes before each generate RPC. On a busy environment generate
             # RPC might not create the provided number of blocks. While nodes are communicating
-            # P2P messages can cause generateBlocks function to skip a block. Check the comment 
+            # P2P messages can cause generateBlocks function to skip a block. Check the comment
             # in generateBlocks function for details.
             disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(150)
@@ -113,7 +113,7 @@ class JournalReorg(BitcoinTestFramework):
 
         # Wait for coinbase to mature
         for node in self.nodes:
-           # Disconnect nodes for the same reason as above.
+            # Disconnect nodes for the same reason as above.
             disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(50)
             connect_nodes_bi(self.nodes, 0, 1)
@@ -139,6 +139,7 @@ class JournalReorg(BitcoinTestFramework):
 
         # check we didn't hit a reorg error
         assert(not check_for_log_msg(self, "ERROR: Failed to find and remove txn", "/node1"))
+
 
 if __name__ == '__main__':
     JournalReorg().main()

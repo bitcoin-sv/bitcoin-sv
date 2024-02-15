@@ -34,6 +34,7 @@ public:
 
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(
+            // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
             s, VARINT( (pcoin->IsConfiscation() ? 0x100000000ll : 0ll) + pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0) ));
         if (pcoin->GetHeight() > 0) {
             // Required to maintain compatibility with older undo format.
@@ -52,6 +53,7 @@ public:
     template <typename Stream> void Unserialize(Stream &s) {
         uint64_t nCode = 0;
         ::Unserialize(s, VARINT(nCode));
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int32_t nHeight = static_cast<uint32_t>(nCode & 0xffffffff) / 2;
         bool fCoinBase = nCode & 1;
         bool fConfiscation = nCode & 0x100000000ull;
@@ -59,7 +61,7 @@ public:
             // Old versions stored the version number for the last spend of a
             // transaction's outputs. Non-final spends were indicated with
             // height = 0.
-            int nVersionDummy = 0;
+            [[maybe_unused]] int nVersionDummy = 0;
             ::Unserialize(s, VARINT(nVersionDummy));
         }
 
@@ -70,6 +72,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const size_t MAX_INPUTS_PER_TX =
     MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
 

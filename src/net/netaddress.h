@@ -28,6 +28,7 @@ enum Network {
 class CNetAddr {
 protected:
     // in network byte order
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t ip[16] = {0};
     // for scoped/link-local ipv6 addresses
     uint32_t scopeId{0};
@@ -108,6 +109,7 @@ protected:
     /// Network (base) address
     CNetAddr network;
     /// Netmask, in network byte order
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t netmask[16];
     /// Is this value valid? (only used to signal parse errors)
     bool valid;

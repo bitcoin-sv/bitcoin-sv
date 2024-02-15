@@ -23,8 +23,8 @@
 #ifdef __GNUC__
 #define GCC_WARNINGS_PUSH _Pragma("GCC diagnostic push")
 #define GCC_WARNINGS_POP _Pragma("GCC diagnostic pop")
-#define DETAIL__GCC_WARNINGS_IGNORE(x) _Pragma(#x)
-#define GCC_WARNINGS_IGNORE(w) DETAIL__GCC_WARNINGS_IGNORE(GCC diagnostic ignored #w)
+#define DETAIL_GCC_WARNINGS_IGNORE(x) _Pragma(#x)
+#define GCC_WARNINGS_IGNORE(w) DETAIL_GCC_WARNINGS_IGNORE(GCC diagnostic ignored #w)
 #else
 #define GCC_WARNINGS_PUSH
 #define GCC_WARNINGS_IGNORE(w)
@@ -35,8 +35,8 @@
 #ifdef __clang__
 #define CLANG_WARNINGS_PUSH _Pragma("clang diagnostic push")
 #define CLANG_WARNINGS_POP _Pragma("clang diagnostic pop")
-#define DETAIL__CLANG_WARNINGS_IGNORE(x) _Pragma(#x)
-#define CLANG_WARNINGS_IGNORE(w) DETAIL__CLANG_WARNINGS_IGNORE(clang diagnostic ignored #w)
+#define DETAIL_CLANG_WARNINGS_IGNORE(x) _Pragma(#x)
+#define CLANG_WARNINGS_IGNORE(w) DETAIL_CLANG_WARNINGS_IGNORE(clang diagnostic ignored #w)
 #else
 #define CLANG_WARNINGS_PUSH
 #define CLANG_WARNINGS_IGNORE(w)

@@ -12,10 +12,11 @@ from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashFor
 
 SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 
+
 class TxSizeConsensusCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Max consensus tx size"
-    _UTXO_KEY = make_key()    
+    _UTXO_KEY = make_key()
     ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxnonstdtxvalidationduration=5001']
 
     def get_transactions_for_test(self, tx_collection, coinbases):
@@ -25,8 +26,8 @@ class TxSizeConsensusCaseTest(GenesisHeightTestsCaseBase):
             tx_collection.add_tx(tx)
             tx = new_transaction(self._UTXO_KEY, utxos.pop(0), MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS + 1)
             tx_collection.add_tx(tx,
-               p2p_reject_reason = b'flexible-bad-txns-oversize',
-               block_reject_reason=b'bad-txns-oversize')
+                                 p2p_reject_reason = b'flexible-bad-txns-oversize',
+                                 block_reject_reason=b'bad-txns-oversize')
 
         if tx_collection.label == "MEMPOOL AT GENESIS":
             utxos, data = self.utxos["MEMPOOL AT GENESIS"]

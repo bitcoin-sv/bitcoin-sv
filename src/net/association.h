@@ -17,7 +17,7 @@
 class AssociationStats;
 class CConnman;
 class CNode;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CSerializedNetMsg;
 
 /**
@@ -128,6 +128,7 @@ class Association
     // Helper functions for running something over all streams that returns a result
     template <typename Callable,
               std::enable_if_t<!std::is_void_v<std::invoke_result_t<Callable, const StreamPtr&>>, int> = 0>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     std::vector<std::invoke_result_t<Callable, StreamPtr&>> ForEachStream(Callable&& func) const
     {
         std::vector<std::invoke_result_t<Callable, const StreamPtr&>> res {};
@@ -144,6 +145,7 @@ class Association
     // Helper functions for running something over all streams that returns void
     template <typename Callable,
               std::enable_if_t<std::is_void_v<std::invoke_result_t<Callable, const StreamPtr&>>, int> = 0>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void ForEachStream(Callable&& func) const
     {
         LOCK(cs_mStreams);
@@ -155,6 +157,7 @@ class Association
     // Non-const version
     template <typename Callable,
               std::enable_if_t<std::is_void_v<std::invoke_result_t<Callable, StreamPtr&>>, int> = 0>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     void ForEachStream(Callable&& func)
     {
         LOCK(cs_mStreams);

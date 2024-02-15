@@ -15,57 +15,67 @@
 #include "compat/endian.h"
 
 static inline uint16_t ReadLE16(const uint8_t *ptr) {
-    uint16_t x;
+    uint16_t x; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy((char *)&x, ptr, 2);
     return le16toh(x);
 }
 
 static inline uint32_t ReadLE32(const uint8_t *ptr) {
-    uint32_t x;
+    uint32_t x; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy((char *)&x, ptr, 4);
     return le32toh(x);
 }
 
 static inline uint64_t ReadLE64(const uint8_t *ptr) {
-    uint64_t x;
+    uint64_t x; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy((char *)&x, ptr, 8);
     return le64toh(x);
 }
 
 static inline void WriteLE16(uint8_t *ptr, uint16_t x) {
     uint16_t v = htole16(x);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy(ptr, (char *)&v, 2);
 }
 
 static inline void WriteLE32(uint8_t *ptr, uint32_t x) {
     uint32_t v = htole32(x);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy(ptr, (char *)&v, 4);
 }
 
 static inline void WriteLE64(uint8_t *ptr, uint64_t x) {
     uint64_t v = htole64(x);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy(ptr, (char *)&v, 8);
 }
 
 static inline uint32_t ReadBE32(const uint8_t *ptr) {
-    uint32_t x;
+    uint32_t x; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy((char *)&x, ptr, 4);
     return be32toh(x);
 }
 
 static inline uint64_t ReadBE64(const uint8_t *ptr) {
-    uint64_t x;
+    uint64_t x; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy((char *)&x, ptr, 8);
     return be64toh(x);
 }
 
 static inline void WriteBE32(uint8_t *ptr, uint32_t x) {
     uint32_t v = htobe32(x);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy(ptr, (char *)&v, 4);
 }
 
 static inline void WriteBE64(uint8_t *ptr, uint64_t x) {
     uint64_t v = htobe64(x);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     memcpy(ptr, (char *)&v, 8);
 }
 

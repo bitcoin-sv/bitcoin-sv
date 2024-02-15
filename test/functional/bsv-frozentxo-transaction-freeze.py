@@ -33,6 +33,7 @@ from test_framework.script import CScript, OP_NOP, OP_TRUE, OP_CHECKSIG, Signatu
 from test_framework.key import CECKey
 from test_framework.address import key_to_p2pkh
 
+
 class Send_node():
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         self.p2p = p2p_connection
@@ -61,6 +62,7 @@ class Send_node():
                 return True
         return False
 
+
 class RPC_send_node(Send_node):
     def __init__(self, tmpdir, log, node_no, p2p_connection, rpc_connection):
         super().__init__(tmpdir, log, node_no, p2p_connection, rpc_connection)
@@ -72,7 +74,7 @@ class RPC_send_node(Send_node):
             assert(self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False);
+            assert(self.check_frozen_tx_log(block.hash) == False)
 
     def send_tx(self, tx, expect_reject = False):
         if expect_reject:
@@ -83,6 +85,7 @@ class RPC_send_node(Send_node):
                 ToHex(tx))
         else:
             self.rpc.sendrawtransaction(ToHex(tx))
+
 
 class P2P_send_node(Send_node):
     rejected_txs = []
@@ -110,7 +113,6 @@ class P2P_send_node(Send_node):
         if expect_reject:
             self._reject_check(tx)
 
-
     def _reject_check(self, tx):
         self.p2p.wait_for_reject()
 
@@ -120,6 +122,7 @@ class P2P_send_node(Send_node):
 
         self.rejected_txs = []
         self.p2p.message_count["reject"] = 0
+
 
 class FrozenTXOTransactionFreeze(BitcoinTestFramework):
 
@@ -186,7 +189,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.block_count -= 1
         self.chain.set_tip(self.block_count-1)
 
-
     def _test_policy_freeze(self, spendable_out, node):
         self.log.info("*** Performing policy freeze checks")
 
@@ -197,13 +199,13 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on policy blacklist")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                }
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    }
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         spend_frozen_tx = self._create_tx(PreviousSpendableOutput(freeze_tx, 0), b'', CScript([OP_TRUE]))
@@ -211,8 +213,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         # must not be accepted as parent transaction is frozen
         node.send_tx(spend_frozen_tx, True)
         assert_equal(node.rpc.getrawmempool(), [])
-        assert(node.check_frozen_tx_log(spend_frozen_tx.hash));
-        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+spend_frozen_tx.hash));
+        assert(node.check_frozen_tx_log(spend_frozen_tx.hash))
+        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+spend_frozen_tx.hash))
 
         self.log.info(f"Mining block with transaction {spend_frozen_tx.hash} spending frozen TXO {freeze_tx.hash},0 and checking that is accepted")
         self._mine_and_send_block(spend_frozen_tx, node)
@@ -227,30 +229,30 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {spend_frozen_tx.hash},0 on policy blacklist")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx.hash,
-                    "vout" : 0
-                }
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx.hash,
+                        "vout" : 0
+                    }
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info(f"Checking that transaction {spend_frozen_tx2.hash} is removed from mempool")
         assert_equal(node.rpc.getrawmempool(), [])
-        assert(node.check_frozen_tx_log(spend_frozen_tx2.hash));
-        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+spend_frozen_tx2.hash));
+        assert(node.check_frozen_tx_log(spend_frozen_tx2.hash))
+        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+spend_frozen_tx2.hash))
 
         self.log.info(f"Unfreezing TXO {spend_frozen_tx.hash},0 from policy blacklist")
         result = node.rpc.removeFromPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx.hash,
-                    "vout" : 0
-                }
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx.hash,
+                        "vout" : 0
+                    }
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         self.log.info(f"Sending transaction {spend_frozen_tx2.hash} again and checking that it is accepted")
@@ -260,16 +262,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Checking that transaction {spend_frozen_tx2.hash} is removed from mempool if TXO is re-frozen")
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx.hash,
-                    "vout" : 0
-                }
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx.hash,
+                        "vout" : 0
+                    }
+                }]
+        })
         assert_equal(result["notProcessed"], [])
         assert_equal(node.rpc.getrawmempool(), [])
-
 
     def _test_consensus_freeze(self, spendable_out, node):
         self.log.info("*** Performing consensus freeze checks")
@@ -279,8 +280,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             self.log.info(f"Sending transaction {tx.hash} spending TXO {tx.vin[0].prevout.hash:064x},{tx.vin[0].prevout.n} and checking that it is rejected")
             node.send_tx(tx, True)
             assert_equal(node.rpc.getrawmempool(), [])
-            assert(node.check_frozen_tx_log(tx.hash));
-            assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+tx.hash));
+            assert(node.check_frozen_tx_log(tx.hash))
+            assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*"+tx.hash))
 
         # Helper to send tx and check it is accepted
         def SendTxAndCheckAccepted(tx):
@@ -294,8 +295,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             old_tip = self.chain.tip
             self._mine_and_send_block(tx, node, True)
             assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-            assert(node.check_frozen_tx_log(self.chain.tip.hash));
-            assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash));
+            assert(node.check_frozen_tx_log(self.chain.tip.hash))
+            assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
             self._remove_last_block()
 
         # Helper to mine block with tx and check it is accepted
@@ -316,15 +317,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": 0}],
-                "policyExpiresWithConsensus": False
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": 0}],
+                    "policyExpiresWithConsensus": False
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         # must not be accepted as parent transaction is frozen
@@ -340,15 +341,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist at height {enforce_height}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : freeze_tx.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height}],
-                "policyExpiresWithConsensus": False
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : freeze_tx.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height}],
+                    "policyExpiresWithConsensus": False
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         # must not be accepted even if consensus blacklist is not yet enforced
@@ -361,15 +362,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {spend_frozen_tx2.hash},0 on consensus blacklist at height {enforce_height}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx2.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height}],
-                "policyExpiresWithConsensus": False
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx2.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height}],
+                    "policyExpiresWithConsensus": False
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         # block is rejected as consensus freeze is enforced at this height
@@ -379,15 +380,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus blacklist at height {enforce_height+2}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx2.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
-                "policyExpiresWithConsensus": False
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx2.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
+                    "policyExpiresWithConsensus": False
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         MineEmptyBlock()
@@ -405,15 +406,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus and policy blacklist at height {enforce_height+2}")
         result=node.rpc.addToConsensusBlacklist({
             "funds": [
-            {
-                "txOut" : {
-                    "txId" : spend_frozen_tx2.hash,
-                    "vout" : 0
-                },
-                "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
-                "policyExpiresWithConsensus": True
-            }]
-        });
+                {
+                    "txOut" : {
+                        "txId" : spend_frozen_tx2.hash,
+                        "vout" : 0
+                    },
+                    "enforceAtHeight": [{"start": enforce_height, "stop": enforce_height+2}],
+                    "policyExpiresWithConsensus": True
+                }]
+        })
         assert_equal(result["notProcessed"], [])
 
         # must be accepted because policy blacklist enforcement expires with consensus at this height
@@ -423,7 +424,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         # block is accepted as consensus freeze is not enforced anymore at this height
         spend_frozen_tx3_4 = self._create_tx(PreviousSpendableOutput(spend_frozen_tx2, 0), b'', CScript([OP_TRUE, OP_NOP, OP_NOP, OP_NOP, OP_NOP]))
         MineAndCheckAccepted(spend_frozen_tx3_4)
-
 
         self.log.info("*** Performing consensus freeze checks with several block height enforcement intervals")
 
@@ -436,15 +436,15 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             self.log.info(f"Freezing TXO {tx.hash},0 on consensus blacklist at heights [{h+1}, {h+3}), [{h+5}, {h+7})")
             result=node.rpc.addToConsensusBlacklist({
                 "funds": [
-                {
-                    "txOut" : {
-                        "txId" : tx.hash,
-                        "vout" : 0
-                    },
-                    "enforceAtHeight": [{"start": h+1, "stop": h+3}, {"start": h+5, "stop": h+7}],
-                    "policyExpiresWithConsensus": False
-                }]
-            });
+                    {
+                        "txOut" : {
+                            "txId" : tx.hash,
+                            "vout" : 0
+                        },
+                        "enforceAtHeight": [{"start": h+1, "stop": h+3}, {"start": h+5, "stop": h+7}],
+                        "policyExpiresWithConsensus": False
+                    }]
+            })
             assert_equal(result["notProcessed"], [])
             tx2=self._create_tx(PreviousSpendableOutput(tx, 0), b'', CScript([OP_TRUE]))
             self.log.info(f"Creating transaction {tx2.hash} spending TXO {tx.vin[0].prevout.hash:064x},{tx.vin[0].prevout.n}")
@@ -486,7 +486,6 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         SendTxAndCheckRejected(tx) # tx is rejected because policy freeze also applies after enforcement intervals if policyExpiresWithConsensus=false
         MineAndCheckAccepted(tx) # block is accepted after the last interval
 
-
     def run_test(self):
 
         node = self._init()
@@ -506,6 +505,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         rpc_send_node = RPC_send_node(self.options.tmpdir, self.log, 0, node, self.nodes[0])
         self._test_policy_freeze(out_policy_freeze_txo_rpc, rpc_send_node)
         self._test_consensus_freeze(out_consensus_freeze_txo_rpc, rpc_send_node)
+
 
 if __name__ == '__main__':
     FrozenTXOTransactionFreeze().main()

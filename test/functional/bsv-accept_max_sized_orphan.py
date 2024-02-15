@@ -15,6 +15,7 @@ from test_framework.cdefs import DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS
 
 import time
 
+
 def make_new_block(connection):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"
     tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
@@ -26,6 +27,7 @@ def make_new_block(connection):
     wait_until(lambda: connection.rpc.getbestblockhash() == block.hash, timeout=10)
     return coinbase_tx
 
+
 def make_big_orphan(tx_parent, size_bytes):
     add_bytes = size_bytes
     diff = size_bytes
@@ -35,6 +37,7 @@ def make_big_orphan(tx_parent, size_bytes):
         diff = size_bytes - len(tx_child.serialize())
         add_bytes += diff
     return tx_child
+
 
 class TestMaxSizedOrphan(BitcoinTestFramework):
 
@@ -69,6 +72,7 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
 
             conn.send_message(msg_tx(tx_parent))
             check_mempool_equals(conn.rpc, [tx_parent, tx_orphan])
+
 
 if __name__ == '__main__':
     TestMaxSizedOrphan().main()

@@ -9,7 +9,7 @@
 
 #include <memory>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
 namespace mining
 {
@@ -37,6 +37,7 @@ class CMiningFactory
   private:
 
     // Keep reference to the global config
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Config& mConfig;
 
     // A single journaling block assember; only created if configured appropriately.
@@ -51,6 +52,7 @@ const enumTableT<CMiningFactory::BlockAssemblerType>& enumTable(CMiningFactory::
 constexpr CMiningFactory::BlockAssemblerType DEFAULT_BLOCK_ASSEMBLER_TYPE { CMiningFactory::BlockAssemblerType::JOURNALING };
 
 // A global unique mining factory
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 inline std::unique_ptr<CMiningFactory> g_miningFactory {nullptr};
 
 }

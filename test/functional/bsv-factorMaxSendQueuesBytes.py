@@ -42,9 +42,11 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         numberOfRejectedMsgs = 0
         numberOfReceivedBlocks = 0
+
         def on_block(conn, message):
-            nonlocal numberOfReceivedBlocks 
+            nonlocal numberOfReceivedBlocks
             numberOfReceivedBlocks += 1
+
         def on_reject(conn, message):
             assert_equal(message.code, REJECT_TOOBUSY)
             nonlocal numberOfRejectedMsgs
@@ -93,20 +95,22 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
     def run_test(self):
         node = self.prepareChain()
 
-         # Mine a big block.
+        # Mine a big block.
         oldBlock = self.mineBigBlock(node)
-        
+
         # Mine another big block so that the previous block is not the tip of chain.
         newBlock = self.mineBigBlock(node)
-        
+
         self.stop_node(0)
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factormaxsendqueuesbytes=num_peers.
-        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead), 
+        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead),
                 "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500',
                 '-maxsendbuffer=1000']
-        with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers", 0,
-            args+["-factormaxsendqueuesbytes={}".format(self.num_peers)], self.num_peers) as connections:
+        with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers",
+                                            0,
+                                            args+["-factormaxsendqueuesbytes={}".format(self.num_peers)],
+                                            self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksParallel, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
@@ -116,8 +120,10 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Scenario 2: Blocks from bitcoind should not be sent in parallel because factormaxsendqueuesbytes=1
         # only allows one 5MB to be downloaded at once.
-        with self.run_node_with_connections("should not be sent in parallel because factormaxsendqueuesbytes=1", 0,
-            args+["-factormaxsendqueuesbytes=1"], self.num_peers) as connections:
+        with self.run_node_with_connections("should not be sent in parallel because factormaxsendqueuesbytes=1",
+                                            0,
+                                            args+["-factormaxsendqueuesbytes=1"],
+                                            self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksSeries, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
@@ -143,14 +149,17 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Scenario 4: Blocks from bitcoind should be sent in parallel, because there is no limit on whitelisted peers
         # requesting most recent block even if queue is full.
-        with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block", 0,
-            args+["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"], self.num_peers) as connections:
+        with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block",
+                                            0,
+                                            args+["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"],
+                                            self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(connections, newBlock)
             logger.info("finished requestBlock duration %s s", time.time() - start)
             assert_equal(self.num_peers, numberOfReceivedBlocksNewBlock)
             assert_equal(0, numberOfRejectedMsgs)
+
 
 if __name__ == '__main__':
     MaxSendQueuesBytesTest().main()

@@ -9,6 +9,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
 
+
 class P2PTxnPropagation(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -50,7 +51,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
         for peer in peerinfo:
             txninvsize = peer['txninvsize']
             if(txninvsize > 0):
-                return False;
+                return False
         return True
 
     # For checking the txns make it into all peers mempools
@@ -103,6 +104,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
 
         self.test_full_transactions()
         self.test_basic_transactions()
+
 
 if __name__ == '__main__':
     P2PTxnPropagation().main()

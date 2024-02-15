@@ -39,7 +39,7 @@ class DecodeRawTransactionsTest(BitcoinTestFramework):
         assert_equal(decodedrawtx1["hex"], rawtx1)
         decodedrawtx2 = self.nodes[0].decoderawtransaction(rawtx2)
         assert_equal(decodedrawtx2["hex"], rawtx2)
-        
+
         batch = self.nodes[0].batch([self.nodes[0].decoderawtransaction.get_request(rawtx1), self.nodes[0].decoderawtransaction.get_request(rawtx2)])
         assert_equal(batch[0]["result"]["hex"], rawtx1)
         assert_equal(batch[1]["result"]["hex"], rawtx2)
@@ -69,6 +69,7 @@ class DecodeRawTransactionsTest(BitcoinTestFramework):
         assert_equal(getrawtx1, rawtx1_signed["hex"])
         getrawtx2 = self.nodes[0].getrawtransaction(rawtx2_sent)
         assert_equal(getrawtx2, rawtx2_signed["hex"])
+
 
 if __name__ == '__main__':
     DecodeRawTransactionsTest().main()

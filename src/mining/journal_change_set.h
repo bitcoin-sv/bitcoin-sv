@@ -40,6 +40,7 @@ const enumTableT<JournalUpdateReason>& enumTable(JournalUpdateReason);
 * transaction) to ensure the journal accurately reflects the state
 * of the mempool at all times without having "intermediate" states.
 */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CJournalChangeSet final
 {
   public:

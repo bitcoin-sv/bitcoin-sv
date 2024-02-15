@@ -16,6 +16,7 @@ import time
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 
+
 class BSV128MBlocks(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -28,18 +29,17 @@ class BSV128MBlocks(ComparisonTestFramework):
 
     def run_test(self):
         self.extra_args = [['-whitelist=127.0.0.1',
-                    "-excessiveblocksize=%d" % self.options.excessive_block_size]]
+                            "-excessiveblocksize=%d" % self.options.excessive_block_size]]
         self.nodes[0].setexcessiveblock(self.options.excessive_block_size)
         self.test.run()
 
     def get_tests(self):
         self.log.info("Testing with -excessiveblocksize set to {} MB ({} bytes)"
-            .format(
-                (self.options.excessive_block_size/ONE_MEGABYTE),
-                self.options.excessive_block_size))
+                      .format((self.options.excessive_block_size/ONE_MEGABYTE),
+                              self.options.excessive_block_size))
 
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
@@ -69,6 +69,7 @@ class BSV128MBlocks(ComparisonTestFramework):
         # Check we can still mine a good size block
         block(3, spend=out[1], block_size=self.options.excessive_block_size)
         yield self.accepted()
+
 
 if __name__ == '__main__':
     BSV128MBlocks().main()

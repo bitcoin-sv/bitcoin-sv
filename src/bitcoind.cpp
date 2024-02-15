@@ -48,7 +48,7 @@ void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellation
 
     // Tell the main threads to shutdown.
     while (!shutdownToken.IsCanceled()) {
-        MilliSleep(200);
+        MilliSleep(200); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
     }
     if (threadGroup) {
         Interrupt(*threadGroup);
@@ -60,6 +60,9 @@ void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellation
 //
 // Start
 //
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 bool AppInit(int argc, char *argv[]) {
     RenameThread("main");
     boost::thread_group threadGroup;
@@ -95,12 +98,13 @@ bool AppInit(int argc, char *argv[]) {
             strUsage += "\n" + HelpMessage(HMM_BITCOIND, config);
         }
 
-        fprintf(stdout, "%s", strUsage.c_str());
+        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT(cert-err33-c)
         return true;
     }
 
     try {
         if (!fs::is_directory(GetDataDir(false))) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr,
                     "Error: Specified data directory \"%s\" does not exist.\n",
                     gArgs.GetArg("-datadir", "").c_str());
@@ -109,6 +113,7 @@ bool AppInit(int argc, char *argv[]) {
         try {
             gArgs.ReadConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME));
         } catch (const std::exception &e) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Error reading configuration file: %s\n", e.what());
             return false;
         }
@@ -117,6 +122,7 @@ bool AppInit(int argc, char *argv[]) {
         try {
             SelectParams(ChainNameFromCommandLine());
         } catch (const std::exception &e) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Error: %s\n", e.what());
             return false;
         }
@@ -127,6 +133,7 @@ bool AppInit(int argc, char *argv[]) {
         // maxstackmemoryusageconsensus and excessiveblocksize are required parameters
         if (!gArgs.IsArgSet("-maxstackmemoryusageconsensus") || !gArgs.IsArgSet("-excessiveblocksize"))
         {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Mandatory consensus parameter is not set. In order to start bitcoind you must set the "
                             "following consensus parameters: \"excessiveblocksize\" and "
                             "\"maxstackmemoryusageconsensus\". In order to start bitcoind with no limits you can set "
@@ -138,6 +145,7 @@ bool AppInit(int argc, char *argv[]) {
         }
         if (!gArgs.IsArgSet("-minminingtxfee"))
         {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Mandatory policy parameter is not set. In order to start bitcoind you must set the "
                             "following policy parameters: \"minminingtxfee\"");
             return false;
@@ -151,6 +159,7 @@ bool AppInit(int argc, char *argv[]) {
                 fCommandLine = true;
 
         if (fCommandLine) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Error: There is no RPC client functionality in "
                             "bitcoind anymore. Use the bitcoin-cli utility "
                             "instead.\n");
@@ -178,16 +187,19 @@ bool AppInit(int argc, char *argv[]) {
         }
         if (gArgs.GetBoolArg("-daemon", false)) {
 #if HAVE_DECL_DAEMON
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stdout, "Bitcoin server starting\n");
 
             // Daemonize
             if (daemon(1, 0)) {
                 // don't chdir (1), do close FDs (0)
+                // NOLINTNEXTLINE(cert-err33-c)
                 fprintf(stderr, "Error: daemon() failed: %s\n",
                         strerror(errno));
                 return false;
             }
 #else
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(
                 stderr,
                 "Error: -daemon is not supported on this operating system\n");
@@ -219,8 +231,10 @@ bool AppInit(int argc, char *argv[]) {
 
     return fRet;
 }
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) { // NOLINT(bugprone-exception-escape)
     SetupEnvironment();
 
     // Connect bitcoind signal handlers

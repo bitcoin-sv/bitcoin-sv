@@ -22,6 +22,8 @@ Reconnect and continue mining on both nodes
 The two funding seeds are the two outputs of a coinbase signed with different keys
 to ensure the funding chains are different
 '''
+
+
 class AllKeys:
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("01")
@@ -32,6 +34,7 @@ class AllKeys:
         self.fundingKey0 = MinerIdKeys("10")
         self.fundingKey1 = MinerIdKeys("11")
 
+
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
@@ -41,7 +44,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         args = [
             '-mindebugrejectionfee=0',
             '-paytxfee=0.00003'
-        ] 
+        ]
 
         self.extra_args = [args,args]
 
@@ -80,7 +83,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': key.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
         fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
@@ -95,15 +98,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # create the minerinfodoc transaction and ensure it is in the mempool
         height = self.nodes[winner].getblockcount() + 1
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[winner],
-                'publicIP': '127.0.0.1',
-                'publicPort': '8333',
-                'minerKeys': allKeys.minerIdKeys,
-                'revocationKeys': allKeys.revocationKeys,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
+            'height': height,
+            'name': self.miner_names[winner],
+            'publicIP': '127.0.0.1',
+            'publicPort': '8333',
+            'minerKeys': allKeys.minerIdKeys,
+            'revocationKeys': allKeys.revocationKeys,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
         txid = self.nodes[winner].createminerinfotx(bytes_to_hex_str(scriptPubKey))
@@ -130,7 +134,6 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             self.sync_all()
             assert(len(self.nodes[looser].getrawmempool()) == 0)
             assert(bhash == self.nodes[looser].getbestblockhash())
-
 
     def run_test(self):
         # create bip32 keys

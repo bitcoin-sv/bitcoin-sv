@@ -7,7 +7,7 @@
 #include "txn_util.h"
 #include <enum_cast.h>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class TransactionSpecificConfig;
 
 // Enumerate possible txn's source type
@@ -47,6 +47,7 @@ class CNode;
  * This class is used to provide an input data to the TxnValidator.
  * It includes a pointer to a transaction and it's associated data.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CTxInputData final {
 public:
     // Constructor
@@ -171,6 +172,7 @@ private:
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     bool mfOrphan {false};
     bool mfTxIdStored {false};
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::shared_ptr<const TransactionSpecificConfig> mConfig;
 };
 

@@ -1,0 +1,21 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+FROM debian:11
+
+ENV TZ=Europe/London
+
+RUN set -xeu \
+    && apt-get update && apt-get install -y \
+    build-essential libtool autotools-dev automake \ 
+    cmake clang-tidy ninja-build \
+    python3 pkg-config \
+    libssl-dev libevent-dev bsdmainutils \
+    libdb-dev libdb++-dev \
+    libboost-all-dev \
+    libminiupnpc-dev \
+    libzmq3-dev \
+    python3-ecdsa python3-zmq python3-bip32utils \
+    git \
+    gcc-10 g++-10
+

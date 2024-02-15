@@ -24,7 +24,7 @@ struct CDNSSeedData {
 };
 
 struct SeedSpec6 {
-    uint8_t addr[16];
+    uint8_t addr[16]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     uint16_t port;
 };
 
@@ -89,6 +89,7 @@ public:
     std::string NetworkIDString() const { return strNetworkID; }
     const std::vector<CDNSSeedData> &DNSSeeds() const { return vSeeds; }
     const std::vector<uint8_t> &Base58Prefix(Base58Type type) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         return base58Prefixes[type];
     }
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }
@@ -105,6 +106,7 @@ public:
 
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CChainParams() {}
 
     Consensus::Params consensus;
@@ -113,6 +115,7 @@ protected:
     int nDefaultPort;
     int32_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
     CBlock genesis;

@@ -24,7 +24,7 @@
 class CConnman;
 class CNetAddr;
 class CNode;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CSerializedNetMsg;
 class StreamStats;
 

@@ -181,5 +181,6 @@ class PBVWithSigOps(BitcoinTestFramework):
         assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
         node0.connection.close()
 
+
 if __name__ == '__main__':
     PBVWithSigOps().main()

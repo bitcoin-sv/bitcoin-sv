@@ -47,7 +47,7 @@ class CChainParams;
 class CConnman;
 class CFrozenTXOCheck;
 class CInv;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CScriptCheck;
 class CTxMemPool;
 struct CTxnHandlers;
@@ -81,11 +81,14 @@ static const bool DEFAULT_REJECTMEMPOOLREQUEST = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr Amount DEFAULT_MIN_RELAY_TX_FEE(250);
 //! -maxtxfee default
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const Amount DEFAULT_TRANSACTION_MAXFEE(COIN / 10);
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
 /** -maxtxfee will warn if called with a higher fee than this amount (in
  * satoshis */
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const uint64_t DEFAULT_ANCESTOR_LIMIT = 10000;
@@ -189,6 +192,7 @@ static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD = 600;  // percent
 *   (i.e. 5 min)*/
 static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 50; // percent
 
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
@@ -228,6 +232,7 @@ constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
 /** Default for -detectselfishmining. */
 static const bool DEFAULT_DETECT_SELFISH_MINING = false;
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
@@ -275,6 +280,7 @@ extern bool fHavePruned;
 extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 /** Default value for minimum number of blocks to keep */
 static const int32_t DEFAULT_MIN_BLOCKS_TO_KEEP = 288;
 /** Lowest value of MIN_BLOCKS_TO_KEEP */
@@ -302,6 +308,7 @@ enum FlushStateMode {
  * the prune to be one 128MB block file + added 15% undo data = 147MB greater
  * for a total of 545MB.
  */
+// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
 /** get number of blocks that are currently being processed */
@@ -357,13 +364,13 @@ bool CheckBlockTTOROrder(const CBlock& block);
 
 class BlockValidationOptions {
 private:
-    bool checkPoW : 1;
-    bool checkMerkleRoot : 1;
+    bool checkPoW : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool checkMerkleRoot : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
 
     // If true; force block to be flagged as checked
-    bool markChecked : 1;
+    bool markChecked : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
     // If false, check for max block size is skipped in CheckBlock().
-    bool checkMaxBlockSize : 1;
+    bool checkMaxBlockSize : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
 
 public:
     BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}, checkMaxBlockSize{true}
@@ -407,6 +414,7 @@ public:
 /**
  * Keeping status of currently validating blocks and blocks that we wait after validation
  */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CBlockValidationStatus blockValidationStatus;
 
 /**
@@ -1010,12 +1018,14 @@ private:
     bool consensus = false;
 
 public:
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
                  const CTransaction &txToIn, unsigned int nInIn,
                  uint32_t nFlagsIn, bool cacheIn,
                  const PrecomputedTransactionData& txdataIn)
         : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
           nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
+          // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
           error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn), config(configIn), consensus(consensusIn) {}
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
@@ -1088,6 +1098,7 @@ bool RewindBlockIndex(const Config &config);
  * RAII wrapper for VerifyDB: Verify consistency of the block and coin
  * databases.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CVerifyDB {
 public:
     CVerifyDB();
@@ -1142,6 +1153,7 @@ void InvalidateBlocksFromConfig(const Config &config);
 bool ResetBlockFailureFlags(CBlockIndex *pindex);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CChain chainActive;
 
 /** Global variable that points to the active CCoinsProvider (protected by cs_main)
@@ -1151,6 +1163,7 @@ extern std::unique_ptr<CoinsDB> pcoinsTip;
 /** Global variable that points to the active block tree (protected by cs_main)
  */
 extern CBlockTreeDB *pblocktree;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * Return the MTP and spend height, which is one more than the inputs.GetBestBlock().

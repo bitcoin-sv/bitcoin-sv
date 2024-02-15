@@ -16,6 +16,8 @@ import os
 '''
 Test handling of the MinerID revokeminerid RPC interface.
 '''
+
+
 class RovokeMinerIdRpc(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -162,7 +164,7 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
             block = make_miner_id_block(p2p_0, minerIdParams, utxo=utxos.pop())
             p2p_0.send_message(msg_block(block))
             wait_until(lambda: self.nodes[0].getbestblockhash() == block.hash)
- 
+
             minerIdParams = {
                 'height': self.nodes[0].getblockcount() + 1,
                 'minerKeys': self.minerIdKeys[2],
@@ -214,9 +216,9 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
             wait_until(lambda: self.nodes[0].getmineridinfo(revokedMinerId)['minerIdState'] == 'REVOKED')
             wait_until(lambda: self.nodes[1].getmineridinfo(revokedMinerId)['minerIdState'] == 'REVOKED')
             wait_until(lambda: self.nodes[2].getmineridinfo(revokedMinerId)['minerIdState'] == 'REVOKED')
- 
+
             self.test_invalid_input(p2p_0)
+
 
 if __name__ == '__main__':
     RovokeMinerIdRpc().main()
-

@@ -8,21 +8,21 @@ withFailedParent to fork blocks with invalid ancestors. In that case getchaintip
 status headers-only but it should be invalid.
 
 Pre-generated chain contains active chain with height 12, valid fork of 5 blocks, invalid fork of 20 blocks
-that has status headers-only in old version (it has data of first 15 blocks and only headers for the rest, 
-first block is invalid) and another invalid fork of 5 blocks (headers only) that starts at block 12 
+that has status headers-only in old version (it has data of first 15 blocks and only headers for the rest,
+first block is invalid) and another invalid fork of 5 blocks (headers only) that starts at block 12
 of first invalid fork and has status headers-only in old version.
 
 Chain schema:
 
               H-H..H-T4
-             /    
-   I-B-B-B..B-B-H-H-H...H-T3 
+             /
+   I-B-B-B..B-B-H-H-H...H-T3
   /
 B-B-B......B-B-T1
   \
    B-...B-T2
 
-* B - Block, I - Invalid block, H - Block header, Tn - Tip 
+* B - Block, I - Invalid block, H - Block header, Tn - Tip
 
 T1 status = active, old status = active, hash = 7da1d835f7759f97958fb878d040f25847e4c43c1081781bdf23e4d4eafb641d
 T2 status = valid-fork, old status = valid-fork, hash = 058af9eeaf5cc2916afd0e4cc37efa7dedc5038d3826e728b73eef050569a517
@@ -38,6 +38,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.blocktools import wait_for_tip, wait_for_tip_status
 
+
 class UpdateInvalidChainAtStartup(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -52,15 +53,16 @@ class UpdateInvalidChainAtStartup(BitcoinTestFramework):
             initialize_datadir(self.options.tmpdir, i)
             from_dir = os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../../test/functional/data/dataTemplate_InvalidateChain/node"+str(i)+"/regtest")
             to_dir = os.path.join(self.options.tmpdir, "node"+str(i)+"/regtest")
-            shutil.copytree(from_dir, to_dir)    
+            shutil.copytree(from_dir, to_dir)
 
     def run_test(self):
 
-        # check tip statuses after node start 
+        # check tip statuses after node start
         wait_for_tip(self.nodes[0], "7da1d835f7759f97958fb878d040f25847e4c43c1081781bdf23e4d4eafb641d")
         wait_for_tip_status(self.nodes[0], "058af9eeaf5cc2916afd0e4cc37efa7dedc5038d3826e728b73eef050569a517", "valid-fork")
         wait_for_tip_status(self.nodes[0], "129cae8395e28cdf8acda1e78853d45b037b4945edc7f13e799db2ab5354488f", "invalid")
         wait_for_tip_status(self.nodes[0], "4fdd65af7b30f80d97b89d7584ac66a6e5d5f81ce971b218b7380202a076146c", "invalid")
+
 
 if __name__ == '__main__':
     UpdateInvalidChainAtStartup().main()

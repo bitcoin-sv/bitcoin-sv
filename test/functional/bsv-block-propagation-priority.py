@@ -21,6 +21,7 @@ from test_framework.util import wait_until, assert_equal, assert_greater_than
 
 from itertools import islice
 
+
 # Create initial funding transaction
 def make_funding_transaction(node, n_outputs=30, value=100000000):
 
@@ -38,6 +39,7 @@ def make_funding_transaction(node, n_outputs=30, value=100000000):
     node.generate(1)
 
     return ftx
+
 
 # Generate a list of transactions
 def transaction_generator(funding_tx, count=-1, exp_rate=30):
@@ -134,7 +136,7 @@ class BlockPriorityTest(BitcoinTestFramework):
             wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns, timeout=(240 * self.options.timeoutfactor))
 
         # Restart node with associations
-        associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
+        associations_stream_policies = [BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy()]
         extra_args = [
             '-whitelist=127.0.0.1',
             '-mindebugrejectionfee=0.00000250'

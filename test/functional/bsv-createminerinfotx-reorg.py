@@ -18,8 +18,11 @@ Test two nodes mining with different minerid's and forking.
 Both nodes need to be able to continue creating minerinfo transactions.
 After a reorg they still should be able to continue mining further minerinfo transactions.
 '''
+
+
 class AllKeys:
     last_seed_number = 1
+
     def __init__(self):
         self.minerIdKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 1))
         self.revocationKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 2))
@@ -28,6 +31,7 @@ class AllKeys:
         self.compromisedKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 5))
         self.fundingKeys = MinerIdKeys("0{}".format(AllKeys.last_seed_number + 6))
         AllKeys.last_seed_number += 6 + 1
+
 
 class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -68,7 +72,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
         fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
@@ -87,16 +91,16 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         height = node.getblockcount() + 1
 
         minerinfotx_parameters = {
-                'height': height,
-                'name': self.miner_names[nodenum],
-                'publicIP': '127.0.0.1',
-                'publicPort': '8333',
-                'minerKeys': allKeys.minerIdKeys,
-                'revocationKeys': allKeys.revocationKeys,
-                'prev_minerKeys': None,
-                'prev_revocationKeys': None,
-                'pubCompromisedMinerKeyHex': None }
-
+            'height': height,
+            'name': self.miner_names[nodenum],
+            'publicIP': '127.0.0.1',
+            'publicPort': '8333',
+            'minerKeys': allKeys.minerIdKeys,
+            'revocationKeys': allKeys.revocationKeys,
+            'prev_minerKeys': None,
+            'prev_revocationKeys': None,
+            'pubCompromisedMinerKeyHex': None
+        }
 
         scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
         txid = node.createminerinfotx(bytes_to_hex_str(scriptPubKey))
@@ -146,12 +150,11 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.nodes[1].generate(1)
         self.sync_all()
 
-
         # mine minerid blocks and sync
         self.one_test(allKeys0, nodenum=0)
-        sync_blocks(self.nodes) 
+        sync_blocks(self.nodes)
         self.one_test(allKeys0, nodenum=0, do_mining=True)
-        # disconnect and mine independently. 
+        # disconnect and mine independently.
         # make the second nodes chain the longest
         forkHeight = self.nodes[0].getblockcount()
         disconnect_nodes_bi(self.nodes,0,1)
@@ -174,7 +177,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # mined by the second node
         connect_nodes_bi(self.nodes,0,1)
         sync_blocks(self.nodes)
-        
+
         # no change for the second node which has the longer chain
         assert(last_block1 == self.nodes[1].getbestblockhash())
         assert(last_height1 == self.nodes[1].getblockcount())
@@ -211,6 +214,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
         self.one_test(allKeys1, 1)
         sync_blocks(self.nodes)
+
 
 if __name__ == '__main__':
     CreateMinerInfoTest().main()

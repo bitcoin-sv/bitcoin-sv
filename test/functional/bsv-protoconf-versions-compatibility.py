@@ -17,7 +17,7 @@ class CProtoconfWithZeroFields():
 
     def __init__(self):
         self.number_of_fields = 0
-        
+
     def deserialize(self, f):
         self.number_of_fields = struct.unpack("<i", f.read(4))[0]
 
@@ -30,6 +30,7 @@ class CProtoconfWithZeroFields():
         return "CProtoconf(number_of_fields=%064x)" \
             % (self.number_of_fields)
 
+
 # New class that represents Protoconf upgraded with a new field,
 # not implemented by current version of bitcoind
 class CProtoconfWithNewField(mininode.CProtoconf):
@@ -37,11 +38,11 @@ class CProtoconfWithNewField(mininode.CProtoconf):
     def __init__(self, number_of_fields=2, max_recv_payload_length=0, new_property=0):
         super().__init__(number_of_fields, max_recv_payload_length)
         self.new_property = new_property
-        
+
     def deserialize(self, f):
         super().deserialize(f)
         self.new_property = struct.unpack("<i", f.read(4))[0]
-        
+
     def serialize(self):
         r = super().serialize()
         r += struct.pack("<i", self.new_property)
@@ -50,6 +51,7 @@ class CProtoconfWithNewField(mininode.CProtoconf):
     def __repr__(self):
         return "CProtoconfWithNewField(number_of_fields=%064x max_recv_payload_length=%064x new_property=%064x)" \
             % (self.number_of_fields, self.max_recv_payload_length, self.new_property)
+
 
 # msg that represents largest protoconf message, whereas size is configurable
 class msg_protoconf_largest():
@@ -66,6 +68,7 @@ class msg_protoconf_largest():
 
     def __repr__(self):
         return "msg_protoconf(data=%s)" % (repr(self.data))
+
 
 class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
@@ -92,7 +95,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             logger.debug("before %s", title)
             yield
             logger.debug("after %s", title)
-  
+
             connections[0].close()
             del connections
             thr.join()
@@ -105,6 +108,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 1. test
         # Send protoconf with 0 fields. Bitcoind should disconnect the node, since minimum number of fields is 1
         test_node = mininode.NodeConnCB()
+
         def send_protoconf(conn):
             conn.send_message(mininode.msg_protoconf(CProtoconfWithZeroFields()))
         test_node.send_protoconf = send_protoconf
@@ -115,10 +119,10 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             assert(self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 0)
 
-
         # 2. test
         # Send protoconf with 1B of max_recv_payload_length. Node should be disconnected, since minimum message size is 1MiB
         test_node = mininode.NodeConnCB()
+
         def send_protoconf_1B(conn):
             conn.send_message(mininode.msg_protoconf(mininode.CProtoconf(1, 1)))
         test_node.send_protoconf = send_protoconf_1B
@@ -132,11 +136,13 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 3. test
         # Send protoconf with numberOfFields=2. max_recv_payload_length should be parsed correctly.
         test_node = mininode.NodeConnCB()
+
         def send_protoconf_2Fields(conn):
             conn.send_message(mininode.msg_protoconf(CProtoconfWithNewField(2, MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT, 5)))
         test_node.send_protoconf = send_protoconf_2Fields
 
         wanted_inv_lengths = []
+
         def on_getdata(conn, message):
             wanted_inv_lengths.append(len(message.inv))
         test_node.on_getdata = on_getdata
@@ -157,7 +163,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             test_node.wait_for_protoconf()
             max_recv_payload_length = test_node.last_message["protoconf"].protoconf.max_recv_payload_length
             assert_equal(max_recv_payload_length, mininode.MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)
-            maxInvElements =  mininode.CInv.estimateMaxInvElements(max_recv_payload_length)
+            maxInvElements = mininode.CInv.estimateMaxInvElements(max_recv_payload_length)
             logger.info("Received bitcoind max message size: {} B, which represents {} elements. ".format(max_recv_payload_length, maxInvElements))
 
             # 3.2. Send bitcoind Inv message (should be 2MiB)
@@ -170,17 +176,18 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             # 3.4. We should receive 2 GetData messages with (1 * 1024 * 1024 + 4 + 32)B size (29127 elements).
             assert_equal(wanted_inv_lengths[0], expected_inv_len)
             assert_equal(wanted_inv_lengths[1], expected_inv_len)
-            assert_equal(len(wanted_inv_lengths), 2)    
+            assert_equal(len(wanted_inv_lengths), 2)
 
         ########
         # 4.test
         # Send protoconf that is LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH of size
         test_node = mininode.NodeConnCB()
+
         def send_largest_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
             conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH))
         test_node.send_protoconf = send_largest_protoconf
-   
+
         with run_connection(test_node, "largest protoconf"):
             test_node.wait_for_verack()
             test_node.sync_with_ping()
@@ -189,6 +196,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         # 5.test
         # Send protoconf that is larger that LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
         test_node = mininode.NodeConnCB()
+
         def send_oversized_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1
             conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH+1))

@@ -1,0 +1,19 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Build autotools'
+description:  'Build autotools'
+inputs:
+  build_type:
+    description: Build type (Release/Debug/etc)
+    required: false
+    default: 'Release'
+
+runs:
+  using: "composite"
+  steps:
+    - run: |
+          ./autogen.sh; 
+          ./configure --enable-zmq --enable-werror
+          make -j$(nproc --all)
+      shell: bash

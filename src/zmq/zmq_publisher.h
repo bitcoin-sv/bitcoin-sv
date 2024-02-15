@@ -37,7 +37,10 @@ private:
         ZMQMessage(void* socketPointer, const std::string& topic,  const void* data, size_t size, uint32_t nSequence) : 
             socketPointer(socketPointer),
             topic(topic),
+            // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             data(std::vector<std::byte>(reinterpret_cast<const std::byte*>(data), reinterpret_cast<const std::byte*>(data) + size)),
+            // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
             nSequence(nSequence)
         {}
 

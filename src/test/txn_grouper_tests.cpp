@@ -12,7 +12,7 @@ namespace
     // Random TxId
     TxId GetRandTxId()
     {
-        return TxId {GetRandHash()};
+        return TxId {InsecureRand256()};
     }
     
     // Make random transaction
@@ -66,9 +66,15 @@ namespace
 
         return true;
     }
+
+    struct RandomContextFixture {
+        RandomContextFixture() {
+            ResetGlobalRandomContext();
+        }
+    };
 }
 
-BOOST_AUTO_TEST_SUITE(txn_grouper)
+BOOST_FIXTURE_TEST_SUITE(txn_grouper, RandomContextFixture)
 
 // Base case - no transactions at all
 BOOST_AUTO_TEST_CASE(empty)

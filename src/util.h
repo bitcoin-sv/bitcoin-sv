@@ -45,6 +45,7 @@ public:
     boost::signals2::signal<std::string(const char *psz)> Translate;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CTranslationInterface translationInterface;
 
 extern const char *const BITCOIN_CONF_FILENAME;
@@ -55,6 +56,7 @@ extern const char *const BITCOIN_PID_FILENAME;
  * boost::optional result. If no translation slot is registered, nothing is
  * returned, and simply return the input.
  */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 inline std::string _(const char *psz) {
     boost::optional<std::string> rv = translationInterface.Translate(psz);
     return rv ? (*rv) : psz;
@@ -130,8 +132,10 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
+    // NOLINTNEXTLINE(cert-err58-cpp)
     static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void ParseParameters(int argc, const char *const argv[]);
     void ReadConfigFile(const std::string &confPath);
     std::vector<std::string> GetArgs(const std::string &strArg);
@@ -227,6 +231,7 @@ public:
     void ClearArg(const std::string &strArg);
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern ArgsManager gArgs;
 
 /**

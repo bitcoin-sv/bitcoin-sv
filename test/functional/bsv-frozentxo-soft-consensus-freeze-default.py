@@ -13,6 +13,7 @@ from test_framework.test_framework import ChainManager
 from test_framework.blocktools import PreviousSpendableOutput
 from test_framework.script import CScript, OP_TRUE
 
+
 class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
     def set_test_params(self):
@@ -25,11 +26,11 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
     def _test_default_freeze(self, spendable_out, node):
         self.log.info("*** Performing soft consensus freeze checks")
 
-        first_frozen_tx = self._create_tx_mine_block_and_freeze_tx( node, spendable_out )
+        first_frozen_tx = self._create_tx_mine_block_and_freeze_tx(node, spendable_out)
 
         # block is rejected as consensus freeze is in effect for parent transaction
-        first_spend_frozen_tx = self._create_tx( PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]) )
-        first_frozen_block = self._mine_and_check_rejected( node, first_spend_frozen_tx )
+        first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
+        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # both blocks are still frozen
         self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
@@ -54,7 +55,8 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         spendable_out_1 = self.chain.get_spendable_output()
 
-        self._test_default_freeze( spendable_out_1, send_node )
+        self._test_default_freeze(spendable_out_1, send_node)
+
 
 if __name__ == '__main__':
     FrozenTXOSoftConsensusFreeze().main()

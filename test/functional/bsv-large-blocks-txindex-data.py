@@ -34,19 +34,19 @@ class BlockFileStore(ComparisonTestFramework):
         self.nocleanup = True
         self.extra_args = [
             [
-            '-whitelist=127.0.0.1',
-            '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
-            '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-            '-maxmempool=%d' % (ONE_GIGABYTE * 10),
-            '-maxmempoolsizedisk=0',
-            '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
-            '-maxscriptsizepolicy=0',
-            '-maxstdtxvalidationduration=55000',
-            '-maxnonstdtxvalidationduration=55001',
-            '-maxtxnvalidatorasynctasksrunduration=55002',
-            '-rpcservertimeout=1000',
-            '-genesisactivationheight=%d' % self.genesisactivationheight,
-            "-txindex"
+                '-whitelist=127.0.0.1',
+                '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
+                '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
+                '-maxmempool=%d' % (ONE_GIGABYTE * 10),
+                '-maxmempoolsizedisk=0',
+                '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
+                '-maxscriptsizepolicy=0',
+                '-maxstdtxvalidationduration=55000',
+                '-maxnonstdtxvalidationduration=55001',
+                '-maxtxnvalidatorasynctasksrunduration=55002',
+                '-rpcservertimeout=1000',
+                '-genesisactivationheight=%d' % self.genesisactivationheight,
+                "-txindex"
             ]
         ]
 
@@ -59,7 +59,7 @@ class BlockFileStore(ComparisonTestFramework):
         block = self.chain.next_block
         node = get_rpc_proxy(self.nodes[0].url, 1, timeout=6000, coveragedir=self.nodes[0].coverage_dir)
 
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()

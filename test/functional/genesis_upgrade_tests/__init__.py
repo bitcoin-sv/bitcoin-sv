@@ -26,4 +26,3 @@ def tests():
 
         test_list.extend([klass for name, klass in inspect.getmembers(mod, tt)])
     return test_list
-

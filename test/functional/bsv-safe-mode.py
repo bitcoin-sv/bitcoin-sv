@@ -22,7 +22,7 @@ from test_framework.util import wait_until
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
-    
+
     def __init__(self, test, *a, **kw):
         self.test = test
         super(WebhookHandler, self).__init__(*a, **kw)
@@ -55,7 +55,6 @@ class SafeMode(BitcoinTestFramework):
 
     def make_handler(self, *a, **kw):
         return WebhookHandler(self,  *a, **kw)
-
 
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -156,13 +155,11 @@ class SafeMode(BitcoinTestFramework):
             low_height_difference_fork = self.make_chain(conn1, main_chain[0], low_height_difference_fork_len)
             expected_low_height_difference_fork_data = {"forkfirstblock": low_height_difference_fork[0].hash, "tips": {low_height_difference_fork[-1].hash}, "lastcommonblock": main_chain[0].hash}
 
-
             # send main branch that should be active chain
             send_by_headers(conn1, main_chain, do_send_blocks=True)
             wait_for_tip(conn1, main_chain[-1].hash)
             # no forks yes, not in the safe mode
             self.wait_for_safe_mode_data(conn1.rpc, []) # not in safe mode
-
 
             send_by_headers(conn1, distant_fork, do_send_blocks=False)
             wait_for_tip_status(conn1, distant_fork[-1].hash, "headers-only")
@@ -185,14 +182,12 @@ class SafeMode(BitcoinTestFramework):
                                                      expected_short_fork_data,
                                                      ])
 
-
         # stopping the node
         self.webhook_messages = []
         args_off_by_one = [f"-safemodemaxforkdistance={max_fork_distance-1}",
                            f"-safemodeminforklength={min_fork_len+1}",
                            f"-safemodeminblockdifference={max_height_difference+1}",
-                           f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode",
-                          ]
+                           f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode"]
 
         # Restaring the node with limits off by 1 so no fork satisfies safe mode activation criteria
         with self.run_node_with_connections("Preparation", 0, args_off_by_one,
@@ -284,7 +279,6 @@ class SafeMode(BitcoinTestFramework):
                                                      ])
             pass
 
-
     def run_test(self):
 
         self.PORT = 8765
@@ -296,6 +290,7 @@ class SafeMode(BitcoinTestFramework):
         self.run_rest_case(min_fork_len=10, max_height_difference=5, max_fork_distance=20)
 
         self.kill_server()
+
 
 if __name__ == '__main__':
     SafeMode().main()

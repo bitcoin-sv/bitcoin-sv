@@ -23,6 +23,7 @@ from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, check_for_log_msg
 from test_framework.mininode import msg_tx
 
+
 class BSVGenesisActivationTransactions(ComparisonTestFramework):
 
     def set_test_params(self):
@@ -39,11 +40,10 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         block(0)
         yield self.accepted()
-
 
         test, out, _ = prepare_init_chain(self.chain, 100, 100)
 
@@ -61,7 +61,8 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         assert_equal(len(tx), 2)
         assert_equal(tx1.hash, tx[1])
         self.log.info("Created transaction %s on height %d",
-            tx1.hash, self.genesisactivationheight-2)
+                      tx1.hash,
+                      self.genesisactivationheight-2)
 
         # Create transaction with OP_TRUE in the unlocking that tries to spend tx1.
         tx2 = create_transaction(tx1, 0, b'\x51', 1, CScript([OP_TRUE]))
@@ -74,7 +75,9 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         tx = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['tx']
         assert_equal(len(tx), 1)
         self.log.info("Created transaction %s on height %d that tries to spend transaction on height %d",
-            tx2.hash, self.genesisactivationheight-1, self.genesisactivationheight-2)
+                      tx2.hash,
+                      self.genesisactivationheight-1,
+                      self.genesisactivationheight-2)
 
         # Create transaction with OP_RETURN in the locking script.
         tx3 = create_transaction(out[2].tx, out[2].n, b"", 100000, CScript([OP_RETURN]))
@@ -94,7 +97,11 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         assert_equal(tx3.hash, tx[1])
         assert_equal(tx4.hash, tx[2])
         self.log.info("Created transactions %s and %s on height %d that tries to spend transaction on height %d",
-            tx3.hash, tx4.hash, self.genesisactivationheight, self.genesisactivationheight)
+                      tx3.hash,
+                      tx4.hash,
+                      self.genesisactivationheight,
+                      self.genesisactivationheight)
+
 
 if __name__ == '__main__':
     BSVGenesisActivationTransactions().main()

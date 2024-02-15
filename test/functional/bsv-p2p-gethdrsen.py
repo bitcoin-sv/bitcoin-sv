@@ -25,6 +25,7 @@ from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_p
 from test_framework.script import CScript, OP_RETURN, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 import math
 
+
 class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -36,17 +37,17 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-        
+
     # This function takes unspent transaction and returns transaction (pay to random address), second (optional)
     # parameter is fee that we want to pay for this transaction.
     def make_signed_tx(self, node, unspent_transaction, fee=10000):
         unspent_amount = int(unspent_transaction['amount']) * 100000000  # BTC to Satoshis
         ftx = CTransaction()
         ftx.vout.append(CTxOut(unspent_amount - fee, CScript([OP_DUP, OP_HASH160,
-                                                                 hex_str_to_bytes(
-                                                                     "ab812dc588ca9d5787dde7eb29569da63c3a238c"),
-                                                                 OP_EQUALVERIFY,
-                                                                 OP_CHECKSIG])))  # Pay to random address
+                                                              hex_str_to_bytes(
+                                                                  "ab812dc588ca9d5787dde7eb29569da63c3a238c"),
+                                                              OP_EQUALVERIFY,
+                                                              OP_CHECKSIG])))  # Pay to random address
         ftx.vin.append(CTxIn(COutPoint(uint256_from_str(hex_str_to_bytes(unspent_transaction["txid"])[::-1]),
                                        unspent_transaction["vout"])))
         ftx.rehash()
@@ -105,7 +106,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
         assert_equal(hdrsen.coinbaseTxProof.proof.txOrId, coinbase_tx.sha256)
         assert_equal(hdrsen.coinbaseTxProof.proof.target, block.sha256)
         assert_equal(len(hdrsen.coinbaseTxProof.proof.nodes), math.ceil(math.log2(num_of_txs)))
-    
+
         merkleProof = [format(x.value, '064x') for x in hdrsen.coinbaseTxProof.proof.nodes]
         calculatedRootHash = merkle_root_from_merkle_proof(hdrsen.coinbaseTxProof.tx.sha256, merkleProof)
         assert_equal(calculatedRootHash, hdrsen.hashMerkleRoot)
@@ -117,6 +118,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             self.test_node = connections[0]
 
             headersEnriched = []
+
             def on_hdrsen(conn, message):
                 for h in message.headers:
                     headersEnriched.append(h)
@@ -150,7 +152,6 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
             # Test second headersEnriched message.
             self.check_hdrsen_message(headersEnriched[1], txsInSecondBlock, second_coinbase_tx, second_block)
-
 
             #######################
             hash_at_122 = int(self.nodes[0].getbestblockhash(), 16)
@@ -188,6 +189,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             self.send_gethdrsen(hash_at_120, hash_at_121)
             self.test_node.cb.wait_for_hdrsen()
             assert_equal(len(headersEnriched), 1)
+
 
 if __name__ == '__main__':
     BsvHeadersEnrichedTest().main()

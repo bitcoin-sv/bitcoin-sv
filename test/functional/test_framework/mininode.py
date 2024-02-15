@@ -90,7 +90,7 @@ network_thread_loop_lock = RLock()
 # Network thread acquires network_thread_loop_lock at start of each iteration and releases
 # it at the end. Since the next iteration is run immediately after that, lock is acquired
 # almost all of the time making it difficult for other threads to also acquire this lock.
-# To work around this problem, NetworkThread first acquires network_thread_loop_intent_lock 
+# To work around this problem, NetworkThread first acquires network_thread_loop_intent_lock
 # and immediately releases it before acquiring network_thread_loop_lock.
 # Other threads (e.g. the ones calling NodeConn constructor) acquire both locks before
 # proceeding. The end result is that other threads wait at most one iteration of loop in
@@ -106,6 +106,7 @@ NETWORK_PORTS = {
 }
 
 # Serialization/deserialization tools
+
 
 def sha256(s):
     return hashlib.new('sha256', s).digest()
@@ -161,6 +162,7 @@ def ser_varint(v):
             return r[::-1] # Need as little-endian
         v = (v >> 7) - 1
         length += 1
+
 
 def deser_varint(f):
     ntot = 0
@@ -226,7 +228,7 @@ def deser_vector(f, c):
 @generator_based_serializator
 def ser_vector(l, ser_function_name=""):
     # using generator because of need for lazy evaluation
-    return (getattr(i, ser_function_name, i.serialize )() for i in l)
+    return (getattr(i, ser_function_name, i.serialize)() for i in l)
 
 
 def deser_uint256_vector(f):
@@ -279,22 +281,26 @@ def deser_varint_vector(f):
         r.append(t)
     return r
 
+
 def ser_varint_vector(l):
     r = ser_varint(len(l))
     for v in l:
         r += ser_varint(v)
     return r
 
+
 def deser_byte_array(s):
     b = bytearray()
     b.extend(s[1:])
     return b
 
+
 def ser_byte_array(s):
     return b"".join((
-            struct.pack("<B", 0),
-            s.bytes,
+        struct.pack("<B", 0),
+        s.bytes,
     ))
+
 
 def deser_optional(typename, f):
     hasVal = struct.unpack("<b", f.read(1))[0]
@@ -305,8 +311,9 @@ def deser_optional(typename, f):
     else:
         return None
 
+
 def ser_optional(o):
-    r = b"";
+    r = b""
     if(o):
         r += struct.pack("<b", 1)
         r += o.serialize()
@@ -314,16 +321,14 @@ def ser_optional(o):
         r += struct.pack("<b", 0)
     return r
 
+
 # Deserialize from a hex string representation (eg from RPC)
-
-
 def FromHex(obj, hex_string):
     obj.deserialize(BytesIO(hex_str_to_bytes(hex_string)))
     return obj
 
+
 # Convert a binary-serializable object to hex (eg for submission via RPC)
-
-
 def ToHex(obj):
     return bytes_to_hex_str(obj.serialize())
 
@@ -339,9 +344,11 @@ def serialise_uuid_associd(assocId):
         assocIdBytes = ser_string(assocIdPlusType)
     return assocIdBytes
 
+
 # Deserialise an association ID from the network into a UUID
 def deserialise_uuid_associd(raw):
     return uuid.UUID(bytes=raw[1:])
+
 
 # Create a new random association ID
 def create_association_id():
@@ -377,6 +384,7 @@ class CAddressInVersion(object):
     def __repr__(self):
         return "CAddressInVersion(nServices=%i ip=%s port=%i)" % (self.nServices, self.ip, self.port)
 
+
 # Handle new-style CAddress objects (with nTime)
 class CAddress():
     def __init__(self, ip="0.0.0.0", port=0):
@@ -404,6 +412,7 @@ class CAddress():
 
     def __repr__(self):
         return "CAddress(nServices=%i ip=%s port=%i time=%d)" % (self.nServices, self.ip, self.port, self.nTime)
+
 
 class CInv():
 
@@ -442,12 +451,13 @@ class CInv():
     def estimateMaxInvElements(max_payload_length=MAX_PROTOCOL_RECV_PAYLOAD_LENGTH):
         return int((max_payload_length - 8) / (4 + 32))
 
+
 class CProtoconf():
     def __init__(self, number_of_fields=2, max_recv_payload_length=0, stream_policies=b"Default"):
         self.number_of_fields = number_of_fields
         self.max_recv_payload_length = max_recv_payload_length
         self.stream_policies = stream_policies
-        
+
     def deserialize(self, f):
         self.number_of_fields = deser_compact_size(f)
         self.max_recv_payload_length = struct.unpack("<i", f.read(4))[0]
@@ -457,7 +467,7 @@ class CProtoconf():
     def serialize(self):
         r = b""
         r += ser_compact_size(self.number_of_fields)
-        r += struct.pack("<i", self.max_recv_payload_length) 
+        r += struct.pack("<i", self.max_recv_payload_length)
         if self.number_of_fields > 1:
             r += ser_string(self.stream_policies)
         return r
@@ -465,6 +475,7 @@ class CProtoconf():
     def __repr__(self):
         return "CProtoconf(number_of_fields=%064x max_recv_payload_length=%064x stream_policies=%s)" \
             % (self.number_of_fields, self.max_recv_payload_length, self.stream_policies)
+
 
 class CBlockLocator():
     def __init__(self, have=[]):
@@ -720,7 +731,7 @@ class TSCMerkleProof():
                 ser_uint256(self.value)
             ))
             return r
-        
+
         def __repr__(self):
             return "(%i, %064x)" % (self.type, self.value)
 
@@ -809,19 +820,18 @@ class CBlockHeaderEnriched(CBlockHeader):
         self.minerInfoProof = deser_optional(self.TxnAndProof, f)
 
     def serialize(self):
-        r = b"".join((
-            super(CBlockHeaderEnriched, self).serialize(),
-            ser_compact_size(self.nTx),
-            struct.pack("<b", self.noMoreHeaders),
-            ser_optional(self.coinbaseTxProof),
-            ser_optional(self.minerInfoProof)
-            ))
+        r = b"".join((super(CBlockHeaderEnriched, self).serialize(),
+                      ser_compact_size(self.nTx),
+                      struct.pack("<b", self.noMoreHeaders),
+                      ser_optional(self.coinbaseTxProof),
+                      ser_optional(self.minerInfoProof)))
         return r
 
     def __repr__(self):
         return "CBlockHeaderEnriched(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x nTx=%i noMoreHeaders=%i coinbaseTxProof=%s minerInfoProof=%s)" \
             % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce, self.nTx, self.noMoreHeaders, repr(self.coinbaseTxProof), repr(self.minerInfoProof))
+
 
 class CBlock(CBlockHeader):
 
@@ -1005,7 +1015,7 @@ class P2PHeaderAndShortIDs():
             self.header.serialize(),
             struct.pack("<Q", self.nonce),
             ser_compact_size(self.shortids_length),
-            b"".join( struct.pack("<Q", x)[0:6] for x in self.shortids), # We only want the first 6 bytes
+            b"".join(struct.pack("<Q", x)[0:6] for x in self.shortids), # We only want the first 6 bytes
             ser_vector(self.prefilled_txn),))
         return r
 
@@ -1020,10 +1030,9 @@ def calculate_shortid(k0, k1, tx_hash):
     expected_shortid &= 0x0000ffffffffffff
     return expected_shortid
 
+
 # This version gets rid of the array lengths, and reinterprets the differential
 # encoding into indices that can be used for lookup.
-
-
 class HeaderAndShortIDs():
     def __init__(self, p2pheaders_and_shortids=None):
         self.header = CBlockHeader()
@@ -1080,6 +1089,7 @@ class HeaderAndShortIDs():
     def __repr__(self):
         return "HeaderAndShortIDs(header=%s, nonce=%d, shortids=%s, prefilledtxn=%s" % (repr(self.header), self.nonce, repr(self.shortids), repr(self.prefilled_txn))
 
+
 # callback message for dsnt-enabled transactions
 class CallbackMessage():
 
@@ -1128,6 +1138,7 @@ class CallbackMessage():
         r += self.ser_addrs(self.ip_addresses)
         r += ser_varint_vector(self.inputs)
         return r
+
 
 class BlockTransactionsRequest():
 
@@ -1304,8 +1315,9 @@ class msg_createstream():
         ))
 
     def __repr__(self):
-        return "msg_createstream(assocID=%s stream_type=%i stream_policy=%s)" % (str(self.assocID), self.stream_type,
-            str(self.stream_policy))
+        return "msg_createstream(assocID=%s stream_type=%i stream_policy=%s)" % (str(self.assocID),
+                                                                                 self.stream_type,
+                                                                                 str(self.stream_policy))
 
 
 class msg_streamack():
@@ -1328,6 +1340,7 @@ class msg_streamack():
 
     def __repr__(self):
         return "msg_streamack(assocID=%s stream_type=%i)" % (str(self.assocID), self.stream_type)
+
 
 class msg_revokemid():
     command = b"revokemid"
@@ -1379,6 +1392,7 @@ class msg_revokemid():
 
         return r
 
+
 class msg_protoconf():
     command = b"protoconf"
 
@@ -1398,6 +1412,7 @@ class msg_protoconf():
 
     def __repr__(self):
         return "msg_protoconf(protoconf=%s)" % (repr(self.protoconf))
+
 
 class msg_authch():
     command = b"authch"
@@ -1421,6 +1436,7 @@ class msg_authch():
 
     def __repr__(self):
         return "msg_authch(nVersion=%d nMsgLen=%d msg=%064x)" % (self.nVersion, self.nMsgLen, self.msg)
+
 
 class msg_authresp():
     command = b"authresp"
@@ -1450,6 +1466,7 @@ class msg_authresp():
 
     def __repr__(self):
         return "msg_authresp(nPubKeyLen=%d pubKey=%s nClientNonce=%08x nSignLen=%d sign=%s)" % (self.nPubKeyLen, str(self.pubKey), self.nClientNonce, self.nSignLen, str(self.sign))
+
 
 class msg_addr():
     command = b"addr"
@@ -1481,7 +1498,7 @@ class msg_alert():
         return self.alert.serialize()
 
     def __repr__(self):
-        return "msg_alert(alert=%s)" % (repr(self.alert), )
+        return "msg_alert(alert=%s)" % (repr(self.alert),)
 
 
 class msg_inv():
@@ -1576,10 +1593,9 @@ class msg_block():
     def __repr__(self):
         return "msg_block(block=%s)" % (repr(self.block))
 
+
 # for cases where a user needs tighter control over what is sent over the wire
 # note that the user must supply the name of the command, and the data
-
-
 class msg_generic():
     def __init__(self, command, data=None):
         self.command = command
@@ -1752,6 +1768,7 @@ class msg_headers():
     def __repr__(self):
         return "msg_headers(headers=%s)" % repr(self.headers)
 
+
 # gethdrsen message has
 # number of entries
 # vector of hashes
@@ -1917,6 +1934,7 @@ class msg_blocktxn():
     def __repr__(self):
         return "msg_blocktxn(block_transactions=%s)" % (repr(self.block_transactions))
 
+
 class msg_notfound():
     command = b"notfound"
 
@@ -1957,6 +1975,7 @@ class MerkleProofNode():
     def __repr__(self):
         return "MerkleProofNode(type=%i node=%064x)" % (self.nodeType, self.node)
 
+
 # Base class for merkle proofs required in P2P messages
 class MerkleProof():
     def __init__(self, txIndex=0, tx=CTransaction(), merkleRoot=0, proof=None):
@@ -1993,6 +2012,7 @@ class MerkleProof():
     def __repr__(self):
         return "DSMerkleProof(txIndex=%i tx=%s merkleRoot=%064x proof=%s)" % (self.txIndex, repr(self.tx), self.merkleRoot, repr(self.proof))
 
+
 # Data for the merkle proof part of the double-spend detected P2P message
 class DSMerkleProof(MerkleProof):
     def __init__(self, txIndex=0, tx=CTransaction(), merkleRoot=0, proof=None, json_notification=None):
@@ -2016,6 +2036,7 @@ class DSMerkleProof(MerkleProof):
 
     def __repr__(self):
         return "DSMerkleProof(txIndex=%i tx=%s merkleRoot=%064x proof=%s)" % (self.txIndex, repr(self.tx), self.merkleRoot, repr(self.proof))
+
 
 # Data for the block details part of the double-spend detected P2P message
 class BlockDetails():
@@ -2045,6 +2066,7 @@ class BlockDetails():
 
     def __repr__(self):
         return "BlockDetails(blockHeaders=%s merkleProof=%s)" % (repr(self.blockHeaders), repr(self.merkleProof))
+
 
 # Double-spend detected P2P message
 class msg_dsdetected():
@@ -2391,7 +2413,6 @@ class RateLimiter:
         if prune_to_ndx is not None:
             del self.history[:prune_to_ndx + 1]
 
-
         if self.processed_in_last_measuring_period == 0:
             assert len(self.history) == 0, "History not empty when processed data is 0"
         else:
@@ -2414,8 +2435,6 @@ class RateLimiter:
 
 # The actual NodeConn class
 # This class provides an interface for a p2p connection to a specified node
-
-
 class NodeConn(asyncore.dispatcher):
     messagemap = {
         b"version": msg_version,
@@ -2711,9 +2730,12 @@ class NodeConn(asyncore.dispatcher):
 
 
 NetworkThread_should_stop = False
+
+
 def StopNetworkThread():
     global NetworkThread_should_stop
     NetworkThread_should_stop = True
+
 
 class NetworkThread(Thread):
 

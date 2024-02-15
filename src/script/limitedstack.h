@@ -68,6 +68,7 @@ public:
     friend class LimitedStack;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class LimitedStack
 {
 private:

@@ -12,6 +12,7 @@ from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUAL
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex
 from test_framework.authproxy import JSONRPCException
 
+
 class User:
 
     def __init__(self, secret_bytes):
@@ -39,12 +40,13 @@ class User:
                 output['value'] = float(output['value'])
             text = json.dumps(tx_json, indent=4)
             print("ds transaction:", text)
-        
+
         return tx
 
     def __sign_tx(self, sign_tx, spend_tx, n):
-        sighash = SignatureHashForkId( spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue )
-        sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey ])
+        sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+        sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
+
 
 class CompetingChainsTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -76,7 +78,7 @@ class CompetingChainsTest(BitcoinTestFramework):
 
         scriptPubKey = CScript([OP_DUP, OP_HASH160, hash160(attacker.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])
         for i in range(self.nbDoubleSpends):
-            funding_tx.vout.append(CTxOut(funding_amount, scriptPubKey)) 
+            funding_tx.vout.append(CTxOut(funding_amount, scriptPubKey))
 
         funding_tx.rehash()
         funding_txid = node.sendrawtransaction(ToHex(funding_tx), False, True)
@@ -105,7 +107,7 @@ class CompetingChainsTest(BitcoinTestFramework):
                         else:
                             spent_inputs.add(new_element)
         return ds_counter
-            
+
     def run_test(self):
 
         # Test 1:
@@ -159,7 +161,6 @@ class CompetingChainsTest(BitcoinTestFramework):
         self.log.info("check that funds have been double spent to different addresses")
         assert(self.contains_double_spends () == self.nbDoubleSpends)
 
-
         # Test 2.
         # 1. Progress the two competing chains in node0 and node1 to different lengths (configurable).
         #    node1 shall hold the longer chain and is the one controlled by the attacker.
@@ -189,7 +190,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         lastblock0 = node0.getbestblockhash()
         lastblock1 = node1.getbestblockhash()
         assert(lastblock0 == lastblock1)
-        
+
         self.log.info("check that double-spends have been removed")
         assert (self.contains_double_spends () == 0)
 
@@ -205,6 +206,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         node0.ignoresafemodeforblock(first_bad_block)
         balance = node0.rpc.getbalance()
         assert (balance != None)
+
 
 if __name__ == '__main__':
     CompetingChainsTest().main()

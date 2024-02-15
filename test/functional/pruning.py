@@ -30,7 +30,7 @@ TIMESTAMP_WINDOW = 2 * 60 * 60
 def calc_usage(blockdir):
     return sum(os.path.getsize(blockdir + f) for f in os.listdir(blockdir) if os.path.isfile(blockdir + f)) / (1024. * 1024.)
 
-            
+
 class PruneTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -478,7 +478,7 @@ class PruneTest(BitcoinTestFramework):
         self.mainchainhash2 = self.nodes[2].getblockhash(self.mainchainheight)
 
         self.log.info("Check that we can survive a 288 block reorg still")
-        (self.forkheight, self.forkhash) = self.reorg_test()  # (1033, )
+        (self.forkheight, self.forkhash) = self.reorg_test()  # (1033,)
         # Now create a 288 block reorg by mining a longer chain on N1
         # First disconnect N1
         # Then invalidate 1033 on main chain and 1032 on fork so height is 1032 on main chain
@@ -538,7 +538,7 @@ class PruneTest(BitcoinTestFramework):
         self.manual_test(4, use_timestamp=True)
 
         self.log.info("Test pruning with min blocks to keep")
-        self.minblocks_test(3);
+        self.minblocks_test(3)
 
         self.log.info("Test wallet re-scan")
         self.wallet_test()

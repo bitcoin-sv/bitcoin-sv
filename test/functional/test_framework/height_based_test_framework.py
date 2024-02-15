@@ -15,6 +15,7 @@ from test_framework.cdefs import DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION
 # For Debug build, recommended timeoutfactor is 2.
 # For Debug build with sanitizers enabled, recommended timeoutfactor is 3.
 
+
 class TxCollection:
 
     def __init__(self, height, label):
@@ -61,8 +62,8 @@ class HeightBasedTestsCase:
 
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
-    TESTING_HEIGHTS = [ (150,   None, "PREPARE"),
-                        (150, "TEST", None), ]
+    TESTING_HEIGHTS = [(150,   None, "PREPARE"),
+                       (150, "TEST", None),]
 
     def __init__(self):
         self.utxos = defaultdict(list)
@@ -123,16 +124,16 @@ class SimpleTestDefinition:
     def __init__(self, utxo_label, locking_script, label, unlocking_script,
                  p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None,
                  post_utxo_tx_creation=lambda tx: tx, post_test_tx_creation=lambda tx: tx):
-        self.scenario            = None
-        self.label               = label
-        self.locking_script      = locking_script
-        self.unlocking_script    = unlocking_script
-        self.utxo_label          = utxo_label
-        self.p2p_reject_reason   = p2p_reject_reason
+        self.scenario = None
+        self.label = label
+        self.locking_script = locking_script
+        self.unlocking_script = unlocking_script
+        self.utxo_label = utxo_label
+        self.p2p_reject_reason = p2p_reject_reason
         self.block_reject_reason = block_reject_reason
         self.test_tx_locking_script = test_tx_locking_script or CScript([OP_FALSE, OP_RETURN])
         self.funding_tx = None
-        self.test_tx    = None
+        self.test_tx = None
         self.post_utxo_tx_creation = post_utxo_tx_creation
         self.post_test_tx_creation = post_test_tx_creation
 
@@ -189,6 +190,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
                 tx.rehash()
                 self.log.info(f"Created Test Tx {loghash(tx.hash)} for scenario: \"{t.scenario or self.NAME}\" and for test_label: {t.label}")
                 tx_collection.add_tx(tx, t.p2p_reject_reason, t.block_reject_reason)
+
 
 class SimplifiedTestFramework(BitcoinTestFramework):
 
@@ -284,7 +286,6 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             connection.rpc.invalidateblock(block.hash)
         return coinbase_tx
 
-
     def _advance_in_main_chain(self, n_blocks, connection):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
 
@@ -313,16 +314,16 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
     def _process_rpc_rejects(self, connection, to_reject, reasons, error_codes, test_label, height_label):
         for tx, reason, error_code in zip(to_reject, reasons, error_codes):
-            exception_rised =  try_rpc(error_code, reason, connection.rpc.sendrawtransaction, ToHex(tx))
+            exception_rised = try_rpc(error_code, reason, connection.rpc.sendrawtransaction, ToHex(tx))
             assert exception_rised, f"Exception should be raised for {test_label}, {height_label}"
 
     def _process_rpc_accepts(self, connection, to_accept):
         for tx in to_accept:
             connection.rpc.sendrawtransaction(ToHex(tx)) # will raise if not successful
 
-
     def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label):
         rejects = []
+
         def on_reject(_, msg):
             rejects.append(msg)
 
@@ -350,7 +351,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         wait_until(tt,
                    timeout=(p2p_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
-                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept) }")
+                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept)}")
         self.check_mp()
 
     def _assert_height(self, connection, desired_height):
@@ -369,7 +370,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tx_col = TxCollection(height=height, label=label)
         test.get_transactions_for_test(tx_col, self._get_new_coinbase)
 
-        if not( tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs ):
+        if not(tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs):
             self.log.info(f"No transactions to test at height {label} height={height}")
 
         if tx_col.mempool_txs:
@@ -404,8 +405,6 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         if txs_to_be_in_the_next_block:
             self._new_block_check_accept(conn, txs=txs_to_be_in_the_next_block, label=f"At \"{test.NAME}\" {label}")
 
-
-
     def _do_prepare_for_height(self, conn, test, label, height, additional_conns):
         self.log.info(f"Preparing for {label} at height={height}")
         transactions_for_next_block = test.prepare_utxos_for_test(height=height, label=label,
@@ -432,7 +431,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
             # maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration
             # If we modiy maxnonstdtxvalidationduration due to slower circumstances, check if maxtxnvalidatorasynctasksrunduration should be implicitly increased.
-            if self.options.timeoutfactor > 1  and \
+            if self.options.timeoutfactor > 1 and \
                (not any("-maxtxnvalidatorasynctasksrunduration" in arg for arg in test.ARGS) and any("-maxnonstdtxvalidationduration" in arg for arg in test.ARGS)):
                 new_maxnonstdtxvalidationduration = [int(arg.split("=")[1]) for arg in test.ARGS if arg.startswith("-maxnonstdtxvalidationduration=")]
                 if len(new_maxnonstdtxvalidationduration) > 0:
@@ -482,4 +481,3 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 del self._coinbases[:]
                 self.log.info(f"Finishing test \"{test.NAME}\"")
                 self.log.info(f"="*100)
-

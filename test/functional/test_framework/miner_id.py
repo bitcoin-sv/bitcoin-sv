@@ -2,7 +2,7 @@
 # Copyright (c) 2022 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-''' 
+'''
 Bip32 Keys for MinerId and MinerIdInfo creation
 Usage:
     minerIdKeys = MinerIdKeys("0001")
@@ -22,6 +22,7 @@ from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, O
 from .util import hashToHex, satoshi_round, assert_equal
 from .blocktools import create_coinbase, create_block
 import copy
+
 
 class MinerIdKeys:
     ''' Bip32 Keys for MinerId '''
@@ -59,8 +60,7 @@ class MinerIdKeys:
         return self.sign_strmessage(message)
 
     def sign_strmessage(self, message):
-        hashToSign = sha256(message)
-        signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
+        signedMessage = self.sign_strmessage_bytes(message)
         return bytes_to_hex_str(signedMessage)
 
     def sign_hexmessage_bytes(self, message):
@@ -69,7 +69,11 @@ class MinerIdKeys:
 
     def sign_strmessage_bytes(self, message):
         hashToSign = sha256(message)
-        signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
+        while True:
+            signedMessage = self._signingKey.sign_digest(hashToSign, sigencode=ecdsa.util.sigencode_der)
+            # in miner_info.cpp there is similar check, we satisfy it here
+            if len(signedMessage) >= 69 and len(signedMessage) <= 72:
+                break
         return signedMessage
 
     def sign_tx_BIP143_with_forkid (self, tx_to_sign, txns_to_spend):
@@ -130,7 +134,7 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
 
     # Convert dictionary to json string
     if json_override_string != None:
-        infoDocJson = json_override_string 
+        infoDocJson = json_override_string
     else:
         infoDocJson = json.dumps(infoDoc, indent=0)
     infoDocJson = infoDocJson.replace('\n', '')
@@ -165,6 +169,7 @@ def create_miner_info_txn(connection, params, utxo):
     minerInfoTx.deserialize(BytesIO(hex_str_to_bytes(signed['hex'])))
     minerInfoTx.rehash()
     return minerInfoTx
+
 
 # Create dataref transaction
 def create_dataref_txn(connection, dataref_json, utxo):
@@ -227,6 +232,7 @@ def calc_blockbind_merkle_root(block):
 
     return block.get_merkle_root(hashes)
 
+
 # Make a V0.3 compliant miner ID coinbase transaction and miner-info transaction
 def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, minerInfoTx, makeValid):
     # Create miner-info txn if one not provided
@@ -278,6 +284,7 @@ def create_miner_id_coinbase_and_miner_info(connection, params, block, utxo, min
     block.hashMerkleRoot = block.calc_merkle_root()
     block.rehash()
 
+
 # Make a V0.3 compliant miner ID block
 def make_miner_id_block(connection, params, utxo=None, datarefTxns=None, minerInfoTx=None, parentBlock=None, makeValid=True, lastBlockTime=0, txns=None):
     if parentBlock is not None:
@@ -306,4 +313,3 @@ def make_miner_id_block(connection, params, utxo=None, datarefTxns=None, minerIn
     block.height = parentHeight + 1
     block.solve()
     return block
-

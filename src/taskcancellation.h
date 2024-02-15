@@ -70,6 +70,7 @@ namespace task
      * To create a new cancellation source static member function Make() should
      * be called.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class CCancellationSource : public std::enable_shared_from_this<CCancellationSource>
     {
     public:
@@ -128,7 +129,9 @@ namespace task
      * CCancellationSource but can additionally be set so that it auto cancels
      * after N wall time elapsed.
      */
-    template <typename Clock> class CTimedCancellationSourceT final : public CCancellationSource
+    template <typename Clock>
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+    class CTimedCancellationSourceT final : public CCancellationSource
     {
     public:
         static std::shared_ptr<CCancellationSource> Make(
@@ -161,6 +164,8 @@ namespace task
 
             return false;
         }
+
+        // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
         ~CTimedCancellationSourceT() {
             if (mBudget) {
                 mBudget->FillBudget(std::chrono::duration_cast<std::chrono::microseconds>(mStart_ + mCancelAfter - Clock::now()));

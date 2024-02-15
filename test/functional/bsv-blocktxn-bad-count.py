@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_for_log_msg
 from test_framework.mininode import ser_uint256
 
+
 class MsgBlockTxnBadCount():
     command = b"blocktxn"
 
@@ -24,6 +25,7 @@ class MsgBlockTxnBadCount():
                     0x01]) # large tx count (<= std::vector::max_size())
         return r
 
+
 class BlockTxnBadCount(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -37,6 +39,7 @@ class BlockTxnBadCount(BitcoinTestFramework):
             conn.send_message(MsgBlockTxnBadCount())
             wait_until(lambda: check_for_log_msg(self, "reason: Over-long", "/node0"),
                        timeout=3)
+
 
 if __name__ == '__main__':
     BlockTxnBadCount().main()

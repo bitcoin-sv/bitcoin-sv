@@ -24,32 +24,40 @@
 template <unsigned int BITS> class base_blob {
 protected:
     enum { WIDTH = BITS / 8 };
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t data[WIDTH];
 
 public:
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     base_blob() { memset(data, 0, sizeof(data)); }
     
     template<typename T>
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_blob(T first, T last)
     {
         assert(std::distance(first, last) == sizeof(data));
         std::copy(first, last, &data[0]);
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     explicit base_blob(const std::vector<uint8_t> &vch) {
         assert(vch.size() == sizeof(data));
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         memcpy(data, &vch[0], sizeof(data));
     }
 
     bool IsNull() const {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             if (data[i] != 0) return false;
         return true;
     }
 
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     void SetNull() { memset(data, 0, sizeof(data)); }
 
     inline int Compare(const base_blob &other) const {
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         return memcmp(data, other.data, sizeof(data));
     }
 
@@ -66,19 +74,24 @@ public:
     std::string GetHex() const {
         std::string hex(WIDTH * 2, 0);
         for(unsigned int i = 0; i < WIDTH; ++i) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             uint8_t c = data[WIDTH - i - 1];
+            // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
             hex[i * 2] = hexmap[c >> 4];
             hex[i * 2 + 1] = hexmap[c & 15];
+            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
         return hex;
     }
 
     void SetHex(const char *psz) {
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         memset(data, 0, sizeof(data));
         // skip leading spaces
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         while (isspace(*psz))
             ++psz;
-
+        
         // skip 0x
         if (psz[0] == '0' && tolower(psz[1]) == 'x')
             psz += 2;
@@ -89,6 +102,7 @@ public:
             ++psz;
 
         --psz;
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         uint8_t *p1 = data;
         uint8_t *pend = p1 + WIDTH;
         while (psz >= pbegin && p1 < pend) {
@@ -100,6 +114,7 @@ public:
                 ++p1;
             }
         }
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     void SetHex(const std::string &str) { SetHex(str.c_str()); };
 
@@ -114,11 +129,13 @@ public:
     unsigned int size() const { return sizeof(data); }
 
     uint64_t GetUint64(int pos) const {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const uint8_t *ptr = data + pos * 8;
         return ((uint64_t)ptr[0]) | ((uint64_t)ptr[1]) << 8 |
                ((uint64_t)ptr[2]) << 16 | ((uint64_t)ptr[3]) << 24 |
                ((uint64_t)ptr[4]) << 32 | ((uint64_t)ptr[5]) << 40 |
                ((uint64_t)ptr[6]) << 48 | ((uint64_t)ptr[7]) << 56;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template <typename Stream> void Serialize(Stream &s) const {
@@ -166,6 +183,7 @@ public:
      * appropriate when the value can easily be influenced from outside as e.g.
      * a network adversary could provide values to trigger worst-case behavior.
      */
+    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
     uint64_t GetCheapHash() const { return ReadLE64(data); }
 };
 

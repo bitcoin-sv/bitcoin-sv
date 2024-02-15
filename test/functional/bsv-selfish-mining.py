@@ -20,15 +20,17 @@ class SelfishMiningTest(BitcoinTestFramework):
         self.add_nodes(self.num_nodes)
         # Create nodes
         # Enable selfish mining detection.
-        # Set lowest time difference to 10 sec between the last block and last mempool 
+        # Set lowest time difference to 10 sec between the last block and last mempool
         # transaction for the block to be classified as selfishly mined.
-        # Set threshold of number of txs in mempool that are not included in received block 
+        # Set threshold of number of txs in mempool that are not included in received block
         # for the block to be classified as selfishly mined to 40%.
-        self.start_node(0, ['-detectselfishmining=1','-minblockmempooltimedifferenceselfish=10', '-selfishtxpercentthreshold=40',
-                           '-minminingtxfee=0.00000500','-fallbackfee=0.00000250'])
+        self.start_node(0, ['-detectselfishmining=1',
+                            '-minblockmempooltimedifferenceselfish=10',
+                            '-selfishtxpercentthreshold=40',
+                            '-minminingtxfee=0.00000500',
+                            '-fallbackfee=0.00000250'])
         self.start_node(1,['-minminingtxfee=0.00000500','-fallbackfee=0.00000250'])
         connect_nodes_bi(self.nodes, 0, 1)
-
 
     def run_test(self):
         node0 = self.nodes[0]
@@ -109,6 +111,7 @@ class SelfishMiningTest(BitcoinTestFramework):
         # Mine empty block - this is considered selfish mining.
         node1.generate(1)
         wait_until(lambda: check_for_log_msg(self, "7/7 transactions have a fee above the config blockmintxfee value. Block was either empty or none of its transactions are in our mempool.", "/node0"))
+
 
 if __name__ == '__main__':
     SelfishMiningTest().main()
