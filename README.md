@@ -19,7 +19,7 @@ Security is core to our values, and we value the input of security researchers a
 high standards of security and privacy for our users and the Bitcoin SV blockchain.
 
 To encourage ethical and responsible research into security vulnerabilities, the Bitcoin SV team, with support from 
-Coingeek Mining, has instituted a [Responsible Disclosure Policy](doc/rdp.md).
+Coingeek Mining, has instituted a **Responsible Disclosure Policy**. Please send an e-mail to <security@bitcoinsv.io> for details.
 
 Development Process
 -------------------
@@ -35,7 +35,6 @@ Contacting the Bitcoin SV Team
 If you want to report a non-confidential issue with Bitcoin SV, please use the 
 [GitHub issue system](https://github.com/bitcoin-sv/bitcoin-sv/issues).
 
-If you want to report a security vulnerability, please review the [Responsible Disclosure Policy](doc/rdp.md) and send
-e-mail to <security@bitcoinsv.io>.
+If you want to report a security vulnerability, please send an e-mail to <security@bitcoinsv.io>.
 
 For any other questions or issues, please send e-mail to <support@bitcoinsv.io>.
