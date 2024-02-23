@@ -57,7 +57,7 @@ class SpamLog(BitcoinTestFramework):
         logfile = "{}/node0/regtest/bitcoind.log".format(self.options.tmpdir)
         size = os.path.getsize(logfile)
         self.log.info("Logile size = {}".format(size))
-        assert(size < 1000000)
+        assert (size < 1000000)
 
 
 if __name__ == '__main__':

@@ -370,7 +370,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tx_col = TxCollection(height=height, label=label)
         test.get_transactions_for_test(tx_col, self._get_new_coinbase)
 
-        if not(tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs):
+        if not tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs:
             self.log.info(f"No transactions to test at height {label} height={height}")
 
         if tx_col.mempool_txs:

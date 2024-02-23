@@ -307,7 +307,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert (node1.getblockcount() == self.FORK_ROOT_HEIGHT + 1)
 
         self.log.info("check that funds have been double spent to different addresses")
-        assert(dsdetector.CheckForDoubleSpends(self.nodes[0:2]) == self.nbDoubleSpends)
+        assert (dsdetector.CheckForDoubleSpends(self.nodes[0:2]) == self.nbDoubleSpends)
 
         # Test 2.
         # 1. Progress the two competing chains in node0 and node1 to different lengths (configurable).
@@ -319,11 +319,11 @@ class CompetingChainsTest(BitcoinTestFramework):
         self.log.info("Mine lenChain0 blocks on node0")
 
         node0.generate(self.lenChain0 - 1)
-        assert(node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
+        assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
 
         self.log.info("Mine competing lenChain1 blocks on node1")
         node1.generate(self.lenChain1 - 1)
-        assert(node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
+        assert (node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
 
         self.log.info("Connect nodes to force a reorg")
         # note that reorg may not happen with next safe mode specification and
@@ -331,14 +331,14 @@ class CompetingChainsTest(BitcoinTestFramework):
         connect_nodes(self.nodes, 1, 0)
         sync_blocks(self.nodes[0:2])
         if self.lenChain1 > self.lenChain0:
-            assert(node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
+            assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
         else:
-            assert(node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
+            assert (node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
 
         self.log.info("check that both nodes have the same chains")
         lastblock0 = node0.getbestblockhash()
         lastblock1 = node1.getbestblockhash()
-        assert(lastblock0 == lastblock1)
+        assert (lastblock0 == lastblock1)
 
         self.log.info("check that double spends have been removed")
         assert (dsdetector.CheckForDoubleSpends(self.nodes[0:2]) == 0)

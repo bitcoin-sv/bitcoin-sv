@@ -56,7 +56,7 @@ class RunnerNode(NodeConnCB):
         # Create a new block - half of max block file size. Together with above blocks
         # this leaves less than 1MB of free space in the first block file
         self.create_and_send_block(ONE_MEGABYTE)
-        assert(
+        assert (
             len(glob.glob(tmp_dir + "/node" + str(self.node_number) + "/regtest/blocks/blk0000*.dat"))
             == 1) # sanity check that there is still only one file
 

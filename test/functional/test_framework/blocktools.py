@@ -125,7 +125,7 @@ def create_block_from_candidate(candidate, get_coinbase):
     block.nBits = int(candidate["nBits"], 16)
     block.nNonce = 0
 
-    if(get_coinbase):
+    if get_coinbase:
         coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
     else:
         coinbase_tx = create_coinbase(height=int(candidate["height"]) + 1)
@@ -179,7 +179,7 @@ def create_coinbase_P2SH(height, scriptHash, outputValue=50):
 # If the scriptPubKey is not specified, make it anyone-can-spend.
 def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx = CTransaction()
-    assert(n < len(prevtx.vout))
+    assert (n < len(prevtx.vout))
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
     tx.vout.append(CTxOut(value, scriptPubKey))
     tx.calc_sha256()

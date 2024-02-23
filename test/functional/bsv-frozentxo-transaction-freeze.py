@@ -71,10 +71,10 @@ class RPC_send_node(Send_node):
         self.rpc.submitblock(ToHex(block))
 
         if expect_reject:
-            assert(self.check_frozen_tx_log(block.hash))
+            assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) == False)
 
     def send_tx(self, tx, expect_reject=False):
         if expect_reject:
@@ -102,10 +102,10 @@ class P2P_send_node(Send_node):
 
         if expect_reject:
             self._reject_check(block)
-            assert(self.check_frozen_tx_log(block.hash))
+            assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) == False)
 
     def send_tx(self, tx, expect_reject=False):
         self.p2p.send_and_ping(msg_tx(tx))
@@ -213,8 +213,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         # must not be accepted as parent transaction is frozen
         node.send_tx(spend_frozen_tx, True)
         assert_equal(node.rpc.getrawmempool(), [])
-        assert(node.check_frozen_tx_log(spend_frozen_tx.hash))
-        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + spend_frozen_tx.hash))
+        assert (node.check_frozen_tx_log(spend_frozen_tx.hash))
+        assert (node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + spend_frozen_tx.hash))
 
         self.log.info(f"Mining block with transaction {spend_frozen_tx.hash} spending frozen TXO {freeze_tx.hash},0 and checking that is accepted")
         self._mine_and_send_block(spend_frozen_tx, node)
@@ -240,8 +240,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
 
         self.log.info(f"Checking that transaction {spend_frozen_tx2.hash} is removed from mempool")
         assert_equal(node.rpc.getrawmempool(), [])
-        assert(node.check_frozen_tx_log(spend_frozen_tx2.hash))
-        assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + spend_frozen_tx2.hash))
+        assert (node.check_frozen_tx_log(spend_frozen_tx2.hash))
+        assert (node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + spend_frozen_tx2.hash))
 
         self.log.info(f"Unfreezing TXO {spend_frozen_tx.hash},0 from policy blacklist")
         result = node.rpc.removeFromPolicyBlacklist({
@@ -280,8 +280,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             self.log.info(f"Sending transaction {tx.hash} spending TXO {tx.vin[0].prevout.hash:064x},{tx.vin[0].prevout.n} and checking that it is rejected")
             node.send_tx(tx, True)
             assert_equal(node.rpc.getrawmempool(), [])
-            assert(node.check_frozen_tx_log(tx.hash))
-            assert(node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + tx.hash))
+            assert (node.check_frozen_tx_log(tx.hash))
+            assert (node.check_log("Transaction was rejected because it tried to spend a frozen transaction output.*" + tx.hash))
 
         # Helper to send tx and check it is accepted
         def SendTxAndCheckAccepted(tx):
@@ -295,8 +295,8 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             old_tip = self.chain.tip
             self._mine_and_send_block(tx, node, True)
             assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-            assert(node.check_frozen_tx_log(self.chain.tip.hash))
-            assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
+            assert (node.check_frozen_tx_log(self.chain.tip.hash))
+            assert (node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
             self._remove_last_block()
 
         # Helper to mine block with tx and check it is accepted

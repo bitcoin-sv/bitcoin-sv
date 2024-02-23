@@ -50,7 +50,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
         peerinfo = self.nodes[0].getpeerinfo()
         for peer in peerinfo:
             txninvsize = peer['txninvsize']
-            if(txninvsize > 0):
+            if txninvsize > 0:
                 return False
         return True
 
@@ -58,7 +58,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
     def check_final_mempool(self):
         for n in range(0, self.num_nodes):
             mempoolsize = self.nodes[n].getmempoolinfo()['size']
-            if(mempoolsize != self.num_txns):
+            if mempoolsize != self.num_txns:
                 return False
         return True
 
@@ -86,8 +86,8 @@ class P2PTxnPropagation(BitcoinTestFramework):
         peerinfo = self.nodes[0].getpeerinfo()
         for peer in peerinfo:
             txninvsize = peer['txninvsize']
-            if(txninvsize > 0):
-                assert(txninvsize <= self.num_txns)
+            if txninvsize > 0:
+                assert (txninvsize <= self.num_txns)
 
         # Verify the txn propagation queue drains out
         wait_until(self.check_queue_drains)

@@ -118,7 +118,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         bigBlock = node.getblock(node.getbestblockhash(), 1)
         bigBlockHash = bigBlock["hash"]
         bigBlockHdr = node.getblockheader(node.getbestblockhash(), 2)
-        assert(len(bigBlockHdr["merkleproof"]) == 4)
+        assert (len(bigBlockHdr["merkleproof"]) == 4)
         rootHash = merkle_root_from_merkle_proof(int(bigBlock["tx"][0], 16), bigBlockHdr["merkleproof"])
         assert_equal(rootHash, int(bigBlock["merkleroot"], 16))
 
@@ -137,7 +137,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
 
         # After pruning getblockheader method should not have merkle proof and coinbase transaction
         bigBlockHeader = node.getblockheader(bigBlockHash, 2)
-        assert("merkleproof" not in bigBlockHeader)
+        assert ("merkleproof" not in bigBlockHeader)
 
         # P2P message gethdrsen should also return hdrsen message without Merkle proof and coinbase transaction for pruned block
         self.test.connections[0].send_message(msg_gethdrsen(locator_have=[], hashstop=int(bigBlockHash, 16)))
@@ -146,7 +146,7 @@ class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):
         headerEnriched = self.test.test_nodes[0].last_message.get("hdrsen").headers[0]
         headerEnriched.rehash()
         assert_equal(headerEnriched.hash, bigBlockHash)
-        assert(headerEnriched.coinbaseTxProof is None)
+        assert (headerEnriched.coinbaseTxProof is None)
 
 
 if __name__ == '__main__':

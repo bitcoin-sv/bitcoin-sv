@@ -173,7 +173,7 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
                 if "active" in chaintips_status and "invalid" in chaintips_status:
                     active_chain_tip_hash = chaintips[0]["hash"] if chaintips[0]["status"] == "active" else chaintips[1]["hash"]
                     invalid_fork_tip_hash = chaintips[0]["hash"] if chaintips[0]["status"] == "invalid" else chaintips[1]["hash"]
-                    assert(active_chain_tip_hash != invalid_fork_tip_hash)
+                    assert (active_chain_tip_hash != invalid_fork_tip_hash)
 
                     for block in blocks_invalid_ttor:
                         if block.hash == invalid_fork_tip_hash:

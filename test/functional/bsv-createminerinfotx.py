@@ -143,7 +143,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 disconnect_nodes_bi(self.nodes, 0, 1)
                 connect_nodes_bi(self.nodes, 0, 1)
                 sleep(4)
-                assert(txid not in self.nodes[0].getrawmempool())
+                assert (txid not in self.nodes[0].getrawmempool())
                 txid = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
 
         except Exception as e:
@@ -161,23 +161,23 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         if test_case == self.TEST_call_create_twice:
             txid_twice = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
-            assert(txid == txid_twice)
+            assert (txid == txid_twice)
 
         if test_case == self.TEST_call_replace:
             minerinfotx_parameters['publicPort'] = '8334' # vary the port to get a different txid
             scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
             txid_twice = self.nodes[0].replaceminerinfotx(bytes_to_hex_str(scriptPubKey))
-            assert(txid != txid_twice)
+            assert (txid != txid_twice)
             txid = txid_twice
 
         # ensure the minerinfotx was not relayed to the connected node
         wait_until(lambda: txid in self.nodes[0].getrawmempool(), timeout=10)
         sleep(0.3) # to give time for relaying
-        assert(txid not in self.nodes[1].getrawmempool())
+        assert (txid not in self.nodes[1].getrawmempool())
         tx0 = self.nodes[0].getminerinfotxid()
         tx1 = self.nodes[1].getminerinfotxid()
-        assert(tx0 == txid)
-        assert(tx1 == None)
+        assert (tx0 == txid)
+        assert (tx1 == None)
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
@@ -198,10 +198,10 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in self.nodes[0].getrawmempool())
+        assert (txid not in self.nodes[0].getrawmempool())
         bhash = self.nodes[0].getbestblockhash()
         block = self.nodes[0].getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
 
         # the connected node needs to validate the block containing
         # the minerinfotx successfully too.
@@ -212,8 +212,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         tx0 = self.nodes[0].getminerinfotxid()
         tx1 = self.nodes[1].getminerinfotxid()
-        assert(tx0 == None)
-        assert(tx1 == None)
+        assert (tx0 == None)
+        assert (tx1 == None)
 
     def run_test(self):
         # create bip32 keys

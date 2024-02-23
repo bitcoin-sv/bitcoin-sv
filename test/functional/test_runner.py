@@ -414,7 +414,7 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tm
             print(BOLD[1] + 'stdout:\n' + BOLD[0] + test_result.stdout + '\n')
             print(BOLD[1] + 'stderr:\n' + BOLD[0] + test_result.stderr + '\n')
 
-            if(fail_fast):
+            if fail_fast:
                 break
 
     runtime = int(time.time() - time0)

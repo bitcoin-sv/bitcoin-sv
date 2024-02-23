@@ -62,9 +62,9 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
 
         # check if hex data was parsed correctly
         txs_data = [tx['data'] for tx in template['transactions']]
-        assert(ToHex(dependingTx) in txs_data)
+        assert (ToHex(dependingTx) in txs_data)
         for tx in txs:
-            assert(ToHex(tx) in txs_data)
+            assert (ToHex(tx) in txs_data)
 
         # check dependencies
         depending_indices = []

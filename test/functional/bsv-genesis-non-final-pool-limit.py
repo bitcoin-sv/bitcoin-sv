@@ -67,7 +67,7 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
         tx1 = self.create_locked_transaction(spend_tx1, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0x00000003)
         # The transactions should be (silently) rejected because the pool is full.
         yield TestInstance([[tx1, DiscardResult()]])
-        assert(tx1.hash not in self.nodes[0].getrawnonfinalmempool())
+        assert (tx1.hash not in self.nodes[0].getrawnonfinalmempool())
 
 
 if __name__ == '__main__':

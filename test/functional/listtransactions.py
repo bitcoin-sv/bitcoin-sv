@@ -90,7 +90,7 @@ class ListTransactionsTest(BitcoinTestFramework):
         txid = self.nodes[1].sendtoaddress(multisig["address"], 0.1)
         self.nodes[1].generate(1)
         self.sync_all()
-        assert(
+        assert (
             len(self.nodes[0].listtransactions("watchonly", 100, 0, False)) == 0)
         assert_array_result(
             self.nodes[0].listtransactions("watchonly", 100, 0, True),

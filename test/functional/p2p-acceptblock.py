@@ -137,9 +137,9 @@ class AcceptBlockTest(BitcoinTestFramework):
                 assert_equal(result.get('num_tx'), None)
                 try:
                     result = self.nodes[0].getblock(x['hash'])
-                    assert(False)
+                    assert (False)
                 except JSONRPCException as e:
-                    assert(x['hash'] + ' not available' in repr(e))
+                    assert (x['hash'] + ' not available' in repr(e))
 
         for x in self.nodes[1].getchaintips():
             if x['hash'] == blocks_h2f[1].hash:

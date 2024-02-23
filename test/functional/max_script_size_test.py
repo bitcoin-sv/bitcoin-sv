@@ -62,7 +62,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
                 return tx
 
             tx = CTransaction()
-            if(lock_script != None):
+            if lock_script != None:
                 tx.vout.append(CTxOut(200000000, lock_script))
             else:
                 script = make_script(op_codes=op_codes, elem=elem, target_script_size=target_script_size)

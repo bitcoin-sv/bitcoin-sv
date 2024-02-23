@@ -87,7 +87,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         self.test.connections[0].send_message(msg_tx(tx4))
         # Make sure transactions are in mempool
         wait_until(lambda: len(self.nodes[0].getrawmempool()) >= 2, timeout=10)
-        assert({tx3.hash, tx4.hash} == set(self.nodes[0].getrawmempool()))
+        assert ({tx3.hash, tx4.hash} == set(self.nodes[0].getrawmempool()))
 
         # Mine block (height 104) with new transactions.
         self.nodes[0].generate(1)

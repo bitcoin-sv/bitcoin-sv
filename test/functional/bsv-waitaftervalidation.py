@@ -71,7 +71,7 @@ class WaitAfterValidation(BitcoinTestFramework):
 
         # sleep a bit and check that in the meantime validation hasn't proceeded
         time.sleep(1)
-        assert(block.hash != self.nodes[0].getbestblockhash())
+        assert (block.hash != self.nodes[0].getbestblockhash())
 
         # after validating the block we release its waiting status
         self.nodes[0].waitaftervalidatingblock(block.hash, "remove")

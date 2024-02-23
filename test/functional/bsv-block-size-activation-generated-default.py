@@ -59,13 +59,13 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         block = create_block(hashPrev, coinbase, nTime)
         block.solve()
         ret = node.submitblock(ToHex(block))
-        assert(ret is None)
+        assert (ret is None)
 
     # Ensure funding and returns given number of spend anyone transactions without submitting them
     def make_transactions(self, num_transactions, add_op_return_size=0): # TODO: Consolidate with bsv-broadcast_delay.py
 
         # Sanity check - estimate size  of funding transaction and check that it is not too big
-        assert(200 + num_transactions * 20 < MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
+        assert (200 + num_transactions * 20 < MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
 
         node = self.nodes[0]
         # Generate and age some blocks to have enough spendable coins
@@ -145,7 +145,7 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
         mempool_size_before = node.getmempoolinfo()['bytes']
 
         # Mempool should now contain enough transactions for two blocks
-        assert(mempool_size_before > DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE + DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
+        assert (mempool_size_before > DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE + DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
 
         # Mine the next block with unique block time. MPT before mining the block
         # will be activation_time - 1, so the old rules should apply
@@ -158,13 +158,13 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
 
         # Check if block was mined with the correct time (mpt == activation_time)
         block1Header = node.getblockheader(block1Hash)
-        assert(block1Header['mediantime'] == activation_time)
-        assert(block1Header['time'] == activation_time + 5)
+        assert (block1Header['mediantime'] == activation_time)
+        assert (block1Header['time'] == activation_time + 5)
 
         # Mining should not consume too much of data
-        assert(block1Size < DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE)
+        assert (block1Size < DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE)
         # Mining should consume almost whole block size
-        assert(block1Size > DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE - 2 * self.data_carrier_size)
+        assert (block1Size > DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE - 2 * self.data_carrier_size)
 
         # Mine another block with unique time. MPT before mining this block
         # should be activation_time. New rules should be activated for this block
@@ -175,13 +175,13 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
 
         # Check if block was mined at the correct time (mpt = activation_time + 1)
         block2Header = node.getblockheader(block2Hash)
-        assert(block2Header['mediantime'] == activation_time + 1)
-        assert(block2Header['time'] == activation_time + 6)
+        assert (block2Header['mediantime'] == activation_time + 1)
+        assert (block2Header['time'] == activation_time + 6)
 
         # Mining should not consume too much of data
-        assert(block2size < DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
+        assert (block2size < DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
         # Mining should consume almost whole block size
-        assert(block2size > DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER - 2 * self.data_carrier_size)
+        assert (block2size > DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER - 2 * self.data_carrier_size)
 
 
 if __name__ == '__main__':

@@ -116,10 +116,10 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in node.getrawmempool())
+        assert (txid not in node.getrawmempool())
         bhash = node.getbestblockhash()
         block = node.getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
 
     def run_test(self):
         # create bip32 keys
@@ -170,8 +170,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         last_height0 = self.nodes[0].getblockcount()
         last_height1 = self.nodes[1].getblockcount()
 
-        assert(last_block0 != last_block1)
-        assert(last_height0 != last_height1)
+        assert (last_block0 != last_block1)
+        assert (last_height0 != last_height1)
 
         # connect nodes. All nodes should now mine on the longer chain
         # mined by the second node
@@ -179,29 +179,29 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
 
         # no change for the second node which has the longer chain
-        assert(last_block1 == self.nodes[1].getbestblockhash())
-        assert(last_height1 == self.nodes[1].getblockcount())
+        assert (last_block1 == self.nodes[1].getbestblockhash())
+        assert (last_height1 == self.nodes[1].getblockcount())
 
         # but first node has now reorged to the first node
         last_block0 = self.nodes[0].getbestblockhash()
         last_height0 = self.nodes[0].getblockcount()
 
-        assert(last_height0 == last_height1)
-        assert(last_block0 == last_block1)
+        assert (last_height0 == last_height1)
+        assert (last_block0 == last_block1)
 
         # mine on the new chain. After syncing all blocks should share the same tip
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)
 
-        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        assert (self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # but we invalidate the longer chain and continue on the first one
         blockHash = self.nodes[1].getblockhash(forkHeight + 1)
         self.nodes[0].invalidateblock(blockHash)
         self.nodes[1].invalidateblock(blockHash)
         sync_blocks(self.nodes)
-        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        assert (self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)

@@ -111,7 +111,7 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
         return tx1.hash
 
     def check_ds_enabled_error_msg(self, utxo, log_msg):
-        assert(not check_for_log_msg(self, log_msg, "/node0"))
+        assert (not check_for_log_msg(self, log_msg, "/node0"))
         tx_hash = self.check_ds_enabled(utxo)
         wait_until(lambda: check_for_log_msg(self, log_msg, "/node0"), timeout=70)
         return tx_hash

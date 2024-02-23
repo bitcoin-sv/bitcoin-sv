@@ -303,7 +303,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         )
         txid2 = self.nodes[3].sendrawtransaction(tx_hex2, False, True)
         mempool = self.nodes[3].getrawmempool(False)
-        assert(txid2 in mempool)
+        assert (txid2 in mempool)
 
         self.nodes[3].generate(1)
         self.sync_all()
@@ -340,7 +340,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         txid_new = self.nodes[3].sendrawtransaction(signedTxn, False, True)
         mempoolsize_new = self.nodes[3].getmempoolinfo()['size']
         # with 'dontcheckfee' other txn should be evicted
-        assert(txid_new in self.nodes[3].getrawmempool())
+        assert (txid_new in self.nodes[3].getrawmempool())
         assert_equal(mempoolsize_new, mempoolsize)
 
         #
@@ -358,14 +358,14 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert_equal(rejectedTxns['invalid'][0]['reject_code'], 66)
         assert_equal(rejectedTxns['invalid'][0]['reject_reason'], "mempool min fee not met")
         mempool = self.nodes[3].getrawmempool()
-        assert(txid1 not in mempool)
-        assert(txid2 not in mempool)
+        assert (txid1 not in mempool)
+        assert (txid2 not in mempool)
         # Don't check fee.
         rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True}, {'hex': txnhex2, 'dontcheckfee': True}])
         assert_equal(len(rejectedTxns), 0)
         mempool = self.nodes[3].getrawmempool()
-        assert(txid1 in mempool)
-        assert(txid2 in mempool)
+        assert (txid1 in mempool)
+        assert (txid2 in mempool)
         # Test listunconfirmedancestors option
         # Create two parents and send one child
         parent_tx_1 = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("0.1"))
@@ -395,8 +395,8 @@ class RawTransactionsTest(BitcoinTestFramework):
             vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
             assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
             assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
-        assert(parent_tx_1 in ancestors_txids)
-        assert(parent_tx_2 in ancestors_txids)
+        assert (parent_tx_1 in ancestors_txids)
+        assert (parent_tx_2 in ancestors_txids)
 
 
 if __name__ == '__main__':

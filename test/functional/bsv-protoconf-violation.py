@@ -55,7 +55,7 @@ class BsvProtoconfViolationTest(BitcoinTestFramework):
         test_node.send_message(mininode.msg_protoconf())
         test_node.wait_for_disconnect()
 
-        assert(self.nodes[0].closed) # disconnected
+        assert (self.nodes[0].closed) # disconnected
         assert_equal(len(self.nodes[0].listbanned()), 0) # After, there are also zero banned node
 
 

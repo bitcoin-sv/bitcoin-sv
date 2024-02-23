@@ -158,7 +158,7 @@ def ser_varint(v):
     length = 0
     while True:
         r += struct.pack("<B", (v & 0x7F) | (0x80 if length > 0 else 0x00))
-        if(v <= 0x7F):
+        if v <= 0x7F:
             return r[::-1] # Need as little-endian
         v = (v >> 7) - 1
         length += 1
@@ -169,7 +169,7 @@ def deser_varint(f):
     while True:
         n = struct.unpack("<B", f.read(1))[0]
         ntot = (n << 7) | (n & 0x7F)
-        if((n & 0x80) == 0):
+        if (n & 0x80) == 0:
             return ntot
 
 
@@ -304,7 +304,7 @@ def ser_byte_array(s):
 
 def deser_optional(typename, f):
     hasVal = struct.unpack("<b", f.read(1))[0]
-    if(hasVal):
+    if hasVal:
         val = typename()
         val.deserialize(f)
         return val
@@ -314,7 +314,7 @@ def deser_optional(typename, f):
 
 def ser_optional(o):
     r = b""
-    if(o):
+    if o:
         r += struct.pack("<b", 1)
         r += o.serialize()
     else:
@@ -336,7 +336,7 @@ def ToHex(obj):
 # Serialise a UUID association ID as a stream of bytes for sending over the network
 def serialise_uuid_associd(assocId):
     assocIdBytes = bytes()
-    if(assocId):
+    if assocId:
         assocIdPlusType = b"".join((
             struct.pack("<B", 0),
             assocId.bytes
@@ -1352,7 +1352,7 @@ class msg_revokemid():
         self.sig1 = None
         self.sig2 = None
 
-        if(revocationKey and revocationPubKey and minerIdKey and minerIdPubKey and idToRevoke):
+        if revocationKey and revocationPubKey and minerIdKey and minerIdPubKey and idToRevoke:
             self.revocationPubKey = revocationPubKey
             self.minerIdPubKey = minerIdPubKey
             self.idToRevoke = idToRevoke
@@ -1364,7 +1364,7 @@ class msg_revokemid():
 
     def deserialize(self, f):
         version = struct.unpack("<i", f.read(4))[0]
-        if(version != 0):
+        if version != 0:
             raise ValueError("Bad version {0} in revokemid msg".format(version))
         self.revocationPubKey = f.read(33)
         self.minerIdPubKey = f.read(33)
@@ -1963,7 +1963,7 @@ class MerkleProofNode():
     def deserialize(self, f):
         self.nodeType = struct.unpack("<B", f.read(1))[0]
         # Currently only type 0 is supported (it means node is always uint256)
-        assert(self.nodeType == 0)
+        assert (self.nodeType == 0)
         self.node = deser_uint256(f)
 
     def serialize(self):
@@ -2023,7 +2023,7 @@ class DSMerkleProof(MerkleProof):
             self.txIndex = json_notification["index"]
             self.tx = FromHex(CTransaction(), json_notification["txOrId"])
             # Only merkleRoot target type is currently supported
-            assert(json_notification["targetType"] == "merkleRoot")
+            assert (json_notification["targetType"] == "merkleRoot")
             self.merkleRoot = uint256_from_str(hex_str_to_bytes(json_notification["target"])[::-1])
             self.proof = []
             for node in json_notification["nodes"]:
@@ -2032,7 +2032,7 @@ class DSMerkleProof(MerkleProof):
     def deserialize(self, f):
         super().deserialize(f)
         # Flags should always be 5
-        assert(self.flags == 5)
+        assert (self.flags == 5)
 
     def __repr__(self):
         return "DSMerkleProof(txIndex=%i tx=%s merkleRoot=%064x proof=%s)" % (self.txIndex, repr(self.tx), self.merkleRoot, repr(self.proof))
@@ -2481,7 +2481,7 @@ class NodeConn(asyncore.dispatcher):
 
     # Extended message command
     EXTMSG_COMMAND = b'extmsg\x00\x00\x00\x00\x00\x00'
-    assert(len(EXTMSG_COMMAND) == 12)
+    assert (len(EXTMSG_COMMAND) == 12)
 
     def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True,
                  versionNum=MY_VERSION, strSubVer=None, assocID=None, nullAssocID=False):
@@ -2512,7 +2512,7 @@ class NodeConn(asyncore.dispatcher):
             self.strSubVer = strSubVer
             self.assocID = assocID
 
-            if(assocID):
+            if assocID:
                 send_version = False
 
             if send_version:
@@ -2523,9 +2523,9 @@ class NodeConn(asyncore.dispatcher):
                 vt.addrTo.port = self.dstport
                 vt.addrFrom.ip = "0.0.0.0"
                 vt.addrFrom.port = 0
-                if(strSubVer):
+                if strSubVer:
                     vt.strSubVer = strSubVer
-                if(nullAssocID):
+                if nullAssocID:
                     vt.assocID = None
                 self.send_message(vt, True)
                 self.assocID = vt.assocID

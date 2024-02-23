@@ -116,7 +116,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         with run_connection(test_node, "0 fields"):
             test_node.wait_for_verack()
             test_node.wait_for_disconnect()
-            assert(self.nodes[0].closed)
+            assert (self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 0)
 
         # 2. test
@@ -130,7 +130,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         with run_connection(test_node, "too small protoconf"):
             test_node.wait_for_verack()
             test_node.wait_for_disconnect()
-            assert(self.nodes[0].closed)
+            assert (self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 0)
 
         # 3. test
@@ -205,7 +205,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         with run_connection(test_node, "oversized protoconf"):
             test_node.wait_for_verack()
             test_node.wait_for_disconnect()
-            assert(self.nodes[0].closed)
+            assert (self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 1)
 
 

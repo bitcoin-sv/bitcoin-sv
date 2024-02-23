@@ -158,7 +158,7 @@ class BigBlockTests(BitcoinTestFramework):
             old_block_count = newVerConn.cb.block_count
             logger.info("Mining a big block")
             self.nodes[0].generate(1)
-            assert(self.nodes[0].getmempoolinfo()['size'] == 0)
+            assert (self.nodes[0].getmempoolinfo()['size'] == 0)
             logger.info("Waiting for block to arrive at test")
             wait_until(lambda: newVerConn.cb.block_count == old_block_count + 1, timeout=int(1200 * self.options.timeoutfactor))
 
@@ -168,8 +168,8 @@ class BigBlockTests(BitcoinTestFramework):
             # Verify node2 gets the big block via a (not very) compact block
             wait_until(lambda: self.nodes[0].getbestblockhash() == self.nodes[2].getbestblockhash())
             peerinfo = self.nodes[2].getpeerinfo()
-            assert(peerinfo[0]['bytesrecv_per_msg']['cmpctblock'] > 0)
-            assert(peerinfo[0]['bytesrecv_per_msg']['blocktxn'] > 0)
+            assert (peerinfo[0]['bytesrecv_per_msg']['cmpctblock'] > 0)
+            assert (peerinfo[0]['bytesrecv_per_msg']['blocktxn'] > 0)
 
             # Reconnect node0 to node1
             logger.info("Syncing bitcoind nodes to big block")
@@ -177,7 +177,7 @@ class BigBlockTests(BitcoinTestFramework):
             self.sync_all(timeout=int(1200 * self.options.timeoutfactor))
 
             # Verify node1 also got the big block
-            assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+            assert (self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
 
 if __name__ == '__main__':

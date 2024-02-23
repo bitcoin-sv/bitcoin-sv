@@ -45,7 +45,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         small_data_size = 5000000
         firstTxId = send_tx_with_data(self.nodes[0], utxos.pop(), small_fee, small_data_size)
 
-        assert(firstTxId in self.nodes[0].getrawmempool())
+        assert (firstTxId in self.nodes[0].getrawmempool())
         self.log.info("First transaction %s successfully accepted to mempool.", firstTxId)
 
         # transactions with higher fee rate
@@ -66,15 +66,15 @@ class MempoolLimitTest(BitcoinTestFramework):
         lastTxId = send_tx_with_data(self.nodes[0], utxos.pop(), big_fee, small_data_size)
 
         # by now, the first transaction should be evicted, check confirmation state
-        assert(firstTxId not in self.nodes[0].getrawmempool())
+        assert (firstTxId not in self.nodes[0].getrawmempool())
         # last transaction should be in mempool because it has the highest fee
-        assert(lastTxId in self.nodes[0].getrawmempool())
+        assert (lastTxId in self.nodes[0].getrawmempool())
 
         self.log.info("First transaction %s evicted from mempool. Last sent transaction %s successfully accepted to mempool.", firstTxId, lastTxId)
         assert_equal(len(self.nodes[0].getrawmempool()), total_number_of_transactions)
 
         txdata = self.nodes[0].gettransaction(firstTxId)
-        assert(txdata['confirmations'] == 0)  # confirmation should still be 0
+        assert (txdata['confirmations'] == 0)  # confirmation should still be 0
 
 
 if __name__ == '__main__':

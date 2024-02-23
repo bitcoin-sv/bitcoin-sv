@@ -191,7 +191,7 @@ class MiningTest(BitcoinTestFramework):
         candidate = blockNode.getminingcandidate(get_coinbase)
         assert 'id' in candidate
         assert 'prevhash' in candidate
-        if(get_coinbase):
+        if get_coinbase:
             assert 'coinbase' in candidate
         else:
             assert 'coinbase' not in candidate

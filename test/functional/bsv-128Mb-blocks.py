@@ -55,11 +55,11 @@ class BSV128MBlocks(ComparisonTestFramework):
         yield self.accepted()
 
         # Oversized blocks will cause us to be disconnected
-        assert(not self.test.test_nodes[0].closed)
+        assert (not self.test.test_nodes[0].closed)
         block(2, spend=out[1], block_size=self.options.excessive_block_size + 1)
         self.test.connections[0].send_message(msg_block((self.chain.tip)))
         self.test.wait_for_disconnections()
-        assert(self.test.test_nodes[0].closed)
+        assert (self.test.test_nodes[0].closed)
 
         # Rewind bad block and remake connection to node
         self.chain.set_tip(1)

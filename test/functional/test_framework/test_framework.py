@@ -299,7 +299,7 @@ class BitcoinTestFramework():
             for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
                 wait_until(lambda: node.rpc.getinfo()["initcomplete"])
-                if(self.options.waitforpid):
+                if self.options.waitforpid:
                     print('Node {} started, pid is {}'.format(i, node.process.pid))
                     print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))
                     input()
@@ -369,7 +369,7 @@ class BitcoinTestFramework():
         if not args:
             args = [[]] * self.num_nodes
         else:
-            assert(len(args) == self.num_nodes)
+            assert (len(args) == self.num_nodes)
 
         self.start_nodes(args)
 

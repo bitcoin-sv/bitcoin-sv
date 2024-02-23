@@ -122,18 +122,18 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in self.nodes[winner].getrawmempool())
+        assert (txid not in self.nodes[winner].getrawmempool())
         bhash = self.nodes[winner].getbestblockhash()
         block = self.nodes[winner].getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
         if not oneNodeOnly:
             if winner == 0:
                 looser = 1
             else:
                 looser = 0
             self.sync_all()
-            assert(len(self.nodes[looser].getrawmempool()) == 0)
-            assert(bhash == self.nodes[looser].getbestblockhash())
+            assert (len(self.nodes[looser].getrawmempool()) == 0)
+            assert (bhash == self.nodes[looser].getbestblockhash())
 
     def run_test(self):
         # create bip32 keys

@@ -276,7 +276,7 @@ class TestNodeCLI():
 def TestNode_kill_running_processes():
     """ Kill all started external processes that are still running in reverse order they were added to array """
     for p in reversed(TestNode_process_list):
-        if(p.poll() is None):
+        if p.poll() is None:
             print("Killing sub-process " + str(p.pid))
             p.kill()
             p.wait(timeout=1)

@@ -28,7 +28,7 @@ class P2PConnections(BitcoinTestFramework):
         # connect every node to every other node
         for i in range(self.num_nodes):
             for j in range(self.num_nodes):
-                if(j != i):
+                if j != i:
                     connect_nodes_bi(self.nodes, i, j)
 
     def setup_network(self):

@@ -129,14 +129,14 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
             -8, "Invalid minerid key!", conn.rpc.getmineridinfo, "1")
         # Test a non-existing key.
         randombip32key = BIP32Key.fromEntropy(os.urandom(16))
-        assert(len(conn.rpc.getmineridinfo(bytes_to_hex_str(randombip32key.PublicKey()))) == 0)
+        assert (len(conn.rpc.getmineridinfo(bytes_to_hex_str(randombip32key.PublicKey()))) == 0)
 
     def check_getmineridinfo_result(self, actual, expected):
-        assert(actual["minerId"] == expected["minerId"])
-        assert(actual["minerIdState"] == expected["minerIdState"])
-        assert(actual["prevMinerId"] == expected["prevMinerId"])
-        assert(actual["revocationKey"] == expected["revocationKey"])
-        assert(actual["prevRevocationKey"] == expected["prevRevocationKey"])
+        assert (actual["minerId"] == expected["minerId"])
+        assert (actual["minerIdState"] == expected["minerIdState"])
+        assert (actual["prevMinerId"] == expected["prevMinerId"])
+        assert (actual["revocationKey"] == expected["revocationKey"])
+        assert (actual["prevRevocationKey"] == expected["prevRevocationKey"])
 
     def run_test(self):
 

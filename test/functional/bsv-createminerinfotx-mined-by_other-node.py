@@ -119,10 +119,10 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in node.getrawmempool())
+        assert (txid not in node.getrawmempool())
         bhash = node.getbestblockhash()
         block = node.getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
 
         return minerInfoTx, txid
 
@@ -161,39 +161,39 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         minerinfotx_saved, txid_saved = self.one_test(allKeys0, nodenum=0)
         sync_blocks([self.nodes[0], self.nodes[2]])
 
-        assert(self.nodes[0].getblockcount() == forkHeight + 1)
-        assert(self.nodes[1].getblockcount() == forkHeight)
-        assert(self.nodes[2].getblockcount() == forkHeight + 1)
+        assert (self.nodes[0].getblockcount() == forkHeight + 1)
+        assert (self.nodes[1].getblockcount() == forkHeight)
+        assert (self.nodes[2].getblockcount() == forkHeight + 1)
 
         # make the second nodes chain the longest
         minerinfotx, _ = self.one_test(allKeys1, 1)
         minerinfotx, _ = self.one_test(allKeys1, 1)
 
-        assert(self.nodes[0].getblockcount() == forkHeight + 1)
-        assert(self.nodes[1].getblockcount() == forkHeight + 2)
-        assert(self.nodes[2].getblockcount() == forkHeight + 1)
+        assert (self.nodes[0].getblockcount() == forkHeight + 1)
+        assert (self.nodes[1].getblockcount() == forkHeight + 2)
+        assert (self.nodes[2].getblockcount() == forkHeight + 1)
 
         # reconnect nodes and force reorg for nodes 0 and 2
         connect_nodes(self.nodes, 0, 1)
         connect_nodes(self.nodes, 1, 2)
         sync_blocks(self.nodes)
 
-        assert(self.nodes[0].getblockcount() == forkHeight + 2)
-        assert(self.nodes[1].getblockcount() == forkHeight + 2)
-        assert(self.nodes[2].getblockcount() == forkHeight + 2)
+        assert (self.nodes[0].getblockcount() == forkHeight + 2)
+        assert (self.nodes[1].getblockcount() == forkHeight + 2)
+        assert (self.nodes[2].getblockcount() == forkHeight + 2)
 
         # Manually insert miner-info txn from node0's lost block into node2's mempool
         self.nodes[2].sendrawtransaction(ToHex(minerinfotx_saved), True, True)
-        assert(txid_saved in self.nodes[2].getrawmempool())
+        assert (txid_saved in self.nodes[2].getrawmempool())
 
         # Mine the miner-info txn
         self.nodes[2].generate(1)
-        assert(txid_saved not in self.nodes[2].getrawmempool())
+        assert (txid_saved not in self.nodes[2].getrawmempool())
         sync_blocks(self.nodes)
 
-        assert(self.nodes[0].getblockcount() == forkHeight + 3)
-        assert(self.nodes[1].getblockcount() == forkHeight + 3)
-        assert(self.nodes[2].getblockcount() == forkHeight + 3)
+        assert (self.nodes[0].getblockcount() == forkHeight + 3)
+        assert (self.nodes[1].getblockcount() == forkHeight + 3)
+        assert (self.nodes[2].getblockcount() == forkHeight + 3)
 
         # Check node 0 can still fund another miner-info txn
         minerinfotx, _ = self.one_test(allKeys0, 0)

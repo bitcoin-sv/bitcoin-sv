@@ -77,9 +77,9 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(chaintxstats['time'], b1['time'])
         assert_equal(chaintxstats['txcount'], 2)
         assert_equal(chaintxstats['window_block_count'], 0)
-        assert('window_tx_count' not in chaintxstats)
-        assert('window_interval' not in chaintxstats)
-        assert('txrate' not in chaintxstats)
+        assert ('window_tx_count' not in chaintxstats)
+        assert ('window_interval' not in chaintxstats)
+        assert ('txrate' not in chaintxstats)
 
         assert_raises_rpc_error(-8, "Invalid block count: should be between 0 and the block's height - 1",
                                 self.nodes[0].getchaintxstats, 201)

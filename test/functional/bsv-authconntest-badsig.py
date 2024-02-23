@@ -178,10 +178,10 @@ class AuthConnTestReputation(BitcoinTestFramework):
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in node.getrawmempool())
+        assert (txid not in node.getrawmempool())
         bhash = node.getbestblockhash()
         block = node.getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
 
     def isAuthenticated(self, nodenum):
         peerinfo = self.nodes[nodenum].getpeerinfo()

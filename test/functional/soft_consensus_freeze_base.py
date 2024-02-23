@@ -60,10 +60,10 @@ class Send_node():
         if expect_reject:
             assert_equal(expect_tip, self.rpc.getbestblockhash())
             self.reject_check(block)
-            assert(self.check_frozen_tx_log(block.hash))
+            assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(expect_tip, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) == False)
 
     def reject_check(self, block):
         self.p2p.wait_for_reject()
@@ -171,8 +171,8 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         old_tip = self.chain.tip
         block = self._mine_and_send_block(tx, node, True, node.rpc.getbestblockhash())
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash))
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
+        assert (node.check_frozen_tx_log(self.chain.tip.hash))
+        assert (node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
 
         return block
 

@@ -38,7 +38,7 @@ class MyNode(NodeConnCB):
     def on_block(self, conn, message):
         super().on_block(conn, message)
 
-        if(self.setup_finished):
+        if self.setup_finished:
             block = message.block
             block.rehash()
 
@@ -125,7 +125,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             outputs[addr] = satoshi_round(send_value)
 
             # Maybe pad txn with OP_RETURN to increase its size
-            if(pad_size > max_pad_size / 2):
+            if pad_size > max_pad_size / 2:
                 mbytes = bytearray(pad_size)
                 outputs["data"] = bytes_to_hex_str(mbytes)
 
@@ -141,7 +141,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             input_txid = decoded_raw["txid"]
             for i in range(len(decoded_raw["vout"])):
                 value = decoded_raw["vout"][i]["value"]
-                if(value > 0):
+                if value > 0:
                     input_vout = i
                     break
             input_amount = send_value
@@ -349,12 +349,12 @@ class MiningJournal(BitcoinTestFramework):
 
         # Verify good state at start
         status = self.nodes[rebuildNode].checkjournal()
-        assert(status["ok"])
+        assert (status["ok"])
 
         # Rebuild and check again
         self.nodes[rebuildNode].rebuildjournal()
         status = self.nodes[rebuildNode].checkjournal()
-        assert(status["ok"])
+        assert (status["ok"])
 
     def run_test(self):
 

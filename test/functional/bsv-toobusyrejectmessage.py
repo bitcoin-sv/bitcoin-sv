@@ -92,7 +92,7 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
 
             end_test = datetime.datetime.now()
-            assert(end_test - begin_test > datetime.timedelta(seconds=5))
+            assert (end_test - begin_test > datetime.timedelta(seconds=5))
 
             assert_equal(next(iter(askedFor.values())), 2)
             assert_equal(len(askedFor), 1)

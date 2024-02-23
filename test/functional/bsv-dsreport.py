@@ -247,7 +247,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx8.hash), "/node0"))
         wait_until(lambda: self.check_tx_received(tx7.hash))
         wait_until(lambda: check_for_log_msg(self, "Txn {} is DS notification enabled on output 0".format(tx7.hash), "/node0"))
-        assert(not check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx7.hash), "/node0"))
+        assert (not check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx7.hash), "/node0"))
 
     # Check double-spend of mempool txn
     def check_ds_mempool_txn(self, utxo):
@@ -313,7 +313,7 @@ class DoubleSpendReport(BitcoinTestFramework):
     # Test that notifying callback server does not work for if double spend transaction has invalid script.
     def check_invalid_transactions(self, utxo):
 
-        assert(not check_for_log_msg(self, "Script verification for double-spend failed", "/node0"))
+        assert (not check_for_log_msg(self, "Script verification for double-spend failed", "/node0"))
 
         vin = [
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
@@ -352,7 +352,7 @@ class DoubleSpendReport(BitcoinTestFramework):
     # Also test setting dsnotifylevel
     def check_long_lasting_transactions(self):
 
-        assert(not check_for_log_msg(self, "Script verification for double-spend cancelled", "/node0"))
+        assert (not check_for_log_msg(self, "Script verification for double-spend cancelled", "/node0"))
 
         # Create funding transactions that will provide funds for other transcations
         ftx = CTransaction()
@@ -431,7 +431,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx2 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1 for double-spend enabled txn {}".format(tx1.hash), "/node0"))
-        if(os.name == "nt"):
+        if os.name == "nt":
             wait_until(lambda: check_for_log_msg(self, "Error sending notification to endpoint 127.0.0.2", "/node0"))
         else:
             wait_until(lambda: check_for_log_msg(self, "Timeout sending slow-queue notification to endpoint 127.0.0.2", "/node0"))
@@ -522,7 +522,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                                        '-dsnotifylevel=2'])
         self.createConnection()
 
-        assert(not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
+        assert (not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
 
         # tx1 is dsnt-enabled
         vin = [

@@ -155,7 +155,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 deprecation_log = True
                 #self.log.info("Found line: %s", line.strip())
                 break
-        assert(deprecation_log)
+        assert (deprecation_log)
 
         # Verify init error when deprecated and new option are used together
         self.extra_args[0].append("-minconfconsolidationinput=99")

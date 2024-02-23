@@ -175,7 +175,7 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid2 in node0.getrawmempool(), timeout=5)
 
         # Check that tx1 and tx2 were relayed to test_node
-        assert(expectedInvsReceived([txid1, txid2], test_node, 60))
+        assert (expectedInvsReceived([txid1, txid2], test_node, 60))
 
         # Now the feefilter is set to minminingtxfee+1;
         # tx3 is not relayed as modified fees < feefilter
@@ -191,8 +191,8 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid4 in node0.getrawmempool(), timeout=5)
 
         # Check that tx3 was not relayed to test_node but tx4 was
-        assert(expectedInvsReceived([txid4], test_node, 60))
-        assert(not expectedInvsReceived([txid3], test_node, 5))
+        assert (expectedInvsReceived([txid4], test_node, 60))
+        assert (not expectedInvsReceived([txid3], test_node, 5))
 
 
 if __name__ == '__main__':

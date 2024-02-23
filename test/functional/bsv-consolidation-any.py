@@ -49,10 +49,10 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
     def test_extra_args_values(self):
         # Check that all exra args are read correction
         network_info = self.nodes[0].getnetworkinfo()
-        assert(int(network_info['minconsolidationfactor']) == 2)
-        assert(int(network_info['maxconsolidationinputscriptsize']) == 151)
-        assert(int(network_info['minconfconsolidationinput']) == 5)
-        assert(network_info['acceptnonstdconsolidationinput'] is True)
+        assert (int(network_info['minconsolidationfactor']) == 2)
+        assert (int(network_info['maxconsolidationinputscriptsize']) == 151)
+        assert (int(network_info['minconfconsolidationinput']) == 5)
+        assert (network_info['acceptnonstdconsolidationinput'] is True)
 
     def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations, is_donation=False):
 

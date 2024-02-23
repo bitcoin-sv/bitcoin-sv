@@ -77,7 +77,7 @@ class WalletTest(BitcoinTestFramework):
         mempool_txid = self.nodes[0].sendtoaddress(
             self.nodes[2].getnewaddress(), 10)
         memory_after = self.nodes[0].getmemoryinfo()
-        assert(memory_before['locked']['used'] +
+        assert (memory_before['locked']['used'] +
                64 <= memory_after['locked']['used'])
 
         self.log.info("test gettxout (second part)")
@@ -206,7 +206,7 @@ class WalletTest(BitcoinTestFramework):
         assert_equal(set(relayed), {txid1, txid2})
         sync_mempools(self.nodes)
 
-        assert(txid1 in self.nodes[3].getrawmempool())
+        assert (txid1 in self.nodes[3].getrawmempool())
 
         # Exercise balance rpcs
         assert_equal(self.nodes[0].getwalletinfo()["unconfirmed_balance"], 1)
@@ -241,7 +241,7 @@ class WalletTest(BitcoinTestFramework):
             if uTx['txid'] == zeroValueTxid:
                 found = True
                 assert_equal(uTx['amount'], Decimal('0'))
-        assert(found)
+        assert (found)
 
         # do some -walletbroadcast tests
         self.stop_nodes()
@@ -325,7 +325,7 @@ class WalletTest(BitcoinTestFramework):
         self.nodes[1].importaddress(address_to_import)
 
         # 3. Validate that the imported address is watch-only on node1
-        assert(self.nodes[1].validateaddress(address_to_import)["iswatchonly"])
+        assert (self.nodes[1].validateaddress(address_to_import)["iswatchonly"])
 
         # 4. Check that the unspents after import are not spendable
         assert_array_result(self.nodes[1].listunspent(),
@@ -367,7 +367,7 @@ class WalletTest(BitcoinTestFramework):
                 addr = self.nodes[0].getaccountaddress(s)
                 label = self.nodes[0].getaccount(addr)
                 assert_equal(label, s)
-                assert(s in self.nodes[0].listaccounts().keys())
+                assert (s in self.nodes[0].listaccounts().keys())
         self.nodes[0].ensure_ascii = True  # restore to default
 
         # maintenance tests
@@ -433,8 +433,8 @@ class WalletTest(BitcoinTestFramework):
         # The tx will be stored in the wallet but not accepted to the mempool
         extra_txid = self.nodes[0].sendtoaddress(
             sending_addr, Decimal('0.0001'))
-        assert(extra_txid not in self.nodes[0].getrawmempool())
-        assert(extra_txid in [tx["txid"]
+        assert (extra_txid not in self.nodes[0].getrawmempool())
+        assert (extra_txid in [tx["txid"]
                               for tx in self.nodes[0].listtransactions()])
 
 

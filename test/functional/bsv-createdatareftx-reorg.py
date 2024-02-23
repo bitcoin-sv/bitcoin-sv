@@ -92,7 +92,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         wait_until(lambda: txid in node.getrawmempool())
         txid_test = node.getdatareftxid()
         self.single_dataref_txid = txid
-        assert(txid_test == txid)
+        assert (txid_test == txid)
 
         dataRefs = []
         for b in brfcDatas:
@@ -182,10 +182,10 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in node.getrawmempool())
+        assert (txid not in node.getrawmempool())
         bhash = node.getbestblockhash()
         block = node.getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
         return txid
 
     def run_test(self):
@@ -240,7 +240,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         datarefs = self.create_dataref_txn(self.nodes[0])
         minerinfo_tx = self.one_test(allKeys0, 0, datarefs=datarefs)
         dataref_tx = datarefs[0]['txid']
-        assert(self.second_spends_first(self.nodes[0], dataref_tx, minerinfo_tx))
+        assert (self.second_spends_first(self.nodes[0], dataref_tx, minerinfo_tx))
 
         # create more minerinfo txns
         self.one_test(allKeys0, 0, do_mining=False)
@@ -254,8 +254,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         last_height0 = self.nodes[0].getblockcount()
         last_height1 = self.nodes[1].getblockcount()
 
-        assert(last_block0 != last_block1)
-        assert(last_height0 != last_height1)
+        assert (last_block0 != last_block1)
+        assert (last_height0 != last_height1)
 
         # connect nodes. All nodes should now mine on the longer chain
         # mined by the second node
@@ -263,22 +263,22 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
 
         # no change for the second node which has the longer chain
-        assert(last_block1 == self.nodes[1].getbestblockhash())
-        assert(last_height1 == self.nodes[1].getblockcount())
+        assert (last_block1 == self.nodes[1].getbestblockhash())
+        assert (last_height1 == self.nodes[1].getblockcount())
 
         # but first node has now reorged to the second node
         last_block0 = self.nodes[0].getbestblockhash()
         last_height0 = self.nodes[0].getblockcount()
 
-        assert(last_height0 == last_height1)
-        assert(last_block0 == last_block1)
+        assert (last_height0 == last_height1)
+        assert (last_block0 == last_block1)
 
         # mine on the new chain. After syncing all blocks should share the same tip
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0)
         sync_blocks(self.nodes)
 
-        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        assert (self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # but we invalidate the longer chain and continue on the first one
         # we have to disconnect and connect again to force sync
@@ -288,7 +288,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         disconnect_nodes_bi(self.nodes, 0, 1)
         connect_nodes_bi(self.nodes, 0, 1)
         sync_blocks(self.nodes)
-        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        assert (self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         self.one_test(allKeys0, 0)
         self.one_test(allKeys0, 0)
@@ -306,15 +306,15 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         dataref_txid = self.single_dataref_txid
         dataref_dump = self.nodes[0].datarefindexdump()
         dataref_txids = [x['txid'] for x in dataref_dump]
-        assert(dataref_txid in dataref_txids)
+        assert (dataref_txid in dataref_txids)
 
         # check that miner info txns are not in the dataref dump
         minerinfo_txid = self.single_minerinfo_txid
         raw = self.nodes[0].getrawtransaction(minerinfo_txid, 1)
-        assert(raw['txid'] == minerinfo_txid)
+        assert (raw['txid'] == minerinfo_txid)
         minerinfo_dump = self.nodes[0].datarefindexdump()
         minerinfo_txids = [x['txid'] for x in minerinfo_dump]
-        assert(minerinfo_txid not in minerinfo_txids)
+        assert (minerinfo_txid not in minerinfo_txids)
 
         # check persistence of dataref transaction
         self.stop_nodes()
@@ -322,14 +322,14 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         dataref_txid = self.single_dataref_txid
         dataref_dump = self.nodes[0].datarefindexdump()
         dataref_txids = [x['txid'] for x in dataref_dump]
-        assert(dataref_txid in dataref_txids)
+        assert (dataref_txid in dataref_txids)
 
         # check deletion of dataref transaction
         dataref_txid = self.single_dataref_txid
         self.nodes[0].datareftxndelete(dataref_txid)
         dataref_dump = self.nodes[0].datarefindexdump()
         dataref_txids = [x['txid'] for x in dataref_dump]
-        assert(dataref_txid not in dataref_txids)
+        assert (dataref_txid not in dataref_txids)
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ import random
 
 
 def send_tx_with_data(node, utxo, fee, data_size):
-    assert(data_size > 24)
+    assert (data_size > 24)
     send_value = utxo['amount'] - fee
     inputs = []
     inputs.append({"txid": utxo["txid"], "vout": utxo["vout"]})
@@ -100,7 +100,7 @@ class MempoolEvictionPriorityTest(BitcoinTestFramework):
         self.log.info("%d transactions were evicted.", total_number_of_transactions - len(mempool))
 
         for txid in cheap_txids:
-            assert(txid not in mempool)
+            assert (txid not in mempool)
         self.log.info("All transactions with insufficient fee were evicted.")
 
 

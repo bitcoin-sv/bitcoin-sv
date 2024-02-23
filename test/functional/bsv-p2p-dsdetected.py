@@ -390,7 +390,7 @@ class DSDetectedTests(BitcoinTestFramework):
         peer.send_and_ping(dsdMessage)
         json_notification = self.get_JSON_notification()
         # remove diverentBlockHash so we can compare with the ds-message
-        assert(json_notification != None)
+        assert (json_notification != None)
         for e in json_notification['blocks']:
             del e['divergentBlockHash']
         assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))

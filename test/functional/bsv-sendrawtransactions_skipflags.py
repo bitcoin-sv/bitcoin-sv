@@ -171,7 +171,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         out_amount = 199000000
         while True:
             tx = CTransaction()
-            if(lock_script != None):
+            if lock_script != None:
                 tx.vout.append(CTxOut(int(int(utxo['amount'] * COIN) - target_script_size - 200000000 - len(lock_script)), lock_script))
             elif target_script_size != 0:
                 script = self.make_script(target_script_size=target_script_size, op_codes=op_codes, elem=elem)

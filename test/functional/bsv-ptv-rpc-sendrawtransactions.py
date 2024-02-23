@@ -95,7 +95,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
     # Create a required number of chains with equal length.
     def get_txchains_n(self, num_of_chains, chain_length, spend, *, num_of_bad_chains):
-        assert(0 <= num_of_bad_chains <= num_of_chains)
+        assert (0 <= num_of_bad_chains <= num_of_chains)
         if num_of_chains > len(spend):
             raise Exception('Insufficient number of spendable outputs.')
         txok = []
@@ -150,7 +150,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                     # we expect to have increasing number of unconfirmed ancestors by each transaction in this chain
                     assert_equal(len(tx['ancestors']), len(expected_ancestors))
                     for ancestor in tx['ancestors']:
-                        assert(ancestor['txid'] in expected_ancestors)
+                        assert (ancestor['txid'] in expected_ancestors)
                         # each ancestor has 1 input
                         assert_equal(len(ancestor['vin']), 1)
                         # check input

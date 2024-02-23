@@ -72,7 +72,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
             desired_scripts_size = total_bytes - 3000 + missing_bytes
 
-            del(tx.vout[1:])
+            del tx.vout[1:]
 
             self.fill_outputs(tx, n_outputs, script_op_codes, fund, desired_scripts_size)
 

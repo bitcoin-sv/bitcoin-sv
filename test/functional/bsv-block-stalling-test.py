@@ -89,7 +89,7 @@ class StallingTest(ComparisonTestFramework):
         self.sync_all(timeout=240 * self.options.timeoutfactor) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
         # Check we didn't hit a stall for node2
-        assert(not check_for_log_msg(self, "stalling block download", "/node2"))
+        assert (not check_for_log_msg(self, "stalling block download", "/node2"))
 
 
 if __name__ == '__main__':

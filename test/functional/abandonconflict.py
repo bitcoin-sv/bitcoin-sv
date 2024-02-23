@@ -35,7 +35,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
         newbalance = self.nodes[0].getbalance()
         # no more than fees lost
-        assert(balance - newbalance < Decimal("0.001"))
+        assert (balance - newbalance < Decimal("0.001"))
         balance = newbalance
 
         # Disconnect nodes so node0's transactions don't get into node1's mempool
@@ -99,7 +99,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         ) + self.nodes[0].getbalance()
         assert_equal(unconfbalance, newbalance)
         # Also shouldn't show up in listunspent
-        assert(txABC2 not in [utxo["txid"]
+        assert (txABC2 not in [utxo["txid"]
                               for utxo in self.nodes[0].listunspent(0)])
         balance = newbalance
 

@@ -123,7 +123,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
             with run_pinging_connection(connections[2]):
                 min_propagation_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Minimal propagation delay: %s", min_propagation_delay)
-                assert(min_propagation_delay < datetime.timedelta(milliseconds=200)) # minimal propagation delay must not be too large
+                assert (min_propagation_delay < datetime.timedelta(milliseconds=200)) # minimal propagation delay must not be too large
 
         # 2. Send 15 transactions with default broadcast delay (150ms) and calculate average broadcast delay
         with self.run_node_with_connections("calculating propagation delay (default)", 0,
@@ -131,16 +131,16 @@ class BroadcastDelayTest(BitcoinTestFramework):
             with run_pinging_connection(connections[2]):
                 propagation_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Propagation delay, expected 150ms: %s", propagation_delay)
-                assert(propagation_delay < datetime.timedelta(milliseconds=250)) # allow variation of +-100ms
-                assert(propagation_delay > datetime.timedelta(milliseconds=50))
+                assert (propagation_delay < datetime.timedelta(milliseconds=250)) # allow variation of +-100ms
+                assert (propagation_delay > datetime.timedelta(milliseconds=50))
 
         # 3. Send 15 transactions with broadcast delay 1s
         with self.run_node_with_connections("calculating propagation delay (1000ms)", 0, ['-broadcastdelay=1000'], self.num_peers) as connections:
             with run_pinging_connection(connections[2]):
                 propagation_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Propagation delay, expected 1000ms: %s", propagation_delay)
-                assert(propagation_delay < datetime.timedelta(milliseconds=1500)) # allow variation of +-500ms
-                assert(propagation_delay > datetime.timedelta(milliseconds=500))
+                assert (propagation_delay < datetime.timedelta(milliseconds=1500)) # allow variation of +-500ms
+                assert (propagation_delay > datetime.timedelta(milliseconds=500))
 
 
 if __name__ == '__main__':

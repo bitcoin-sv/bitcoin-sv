@@ -63,7 +63,7 @@ class SafeModeReogNotification(BitcoinTestFramework):
     def make_chain(self, conn, root_block, n_blocks):
         result = []
         last_block = root_block
-        while(len(result) < n_blocks):
+        while len(result) < n_blocks:
             last_block, self.last_block_time = make_block(conn, last_block, last_block_time=self.last_block_time)
             result.append(last_block)
         return result

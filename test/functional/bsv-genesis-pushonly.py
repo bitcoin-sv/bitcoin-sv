@@ -65,7 +65,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
         assert_equal(node.getblock(node.getbestblockhash())['height'], 102)
 
         # transaction_op_add_accepted should not be in mempool (individual transactions are always checked against pushonly)
-        assert(transaction_op_add_accepted.hash not in set(node.getrawmempool()))
+        assert (transaction_op_add_accepted.hash not in set(node.getrawmempool()))
 
 
 if __name__ == '__main__':

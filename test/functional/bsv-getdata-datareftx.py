@@ -45,7 +45,7 @@ class TestNode(NodeConnCB):
 
     def GetDatarefTx(self, txid):
         for msg in self.datarefTx:
-            if(msg.tx.hash == txid):
+            if msg.tx.hash == txid:
                 return msg
         return None
 
@@ -114,8 +114,8 @@ class GetdataDataref(BitcoinTestFramework):
             self.sync_all()
 
             minerids = self.nodes[0].dumpminerids()
-            assert(len(minerids['miners']) == 1)
-            assert(len(minerids['miners'][0]['minerids']) == 1)
+            assert (len(minerids['miners']) == 1)
+            assert (len(minerids['miners'][0]['minerids']) == 1)
 
             # Send getdata request for each dataref txn
             conn.send_message(msg_getdata([CInv(CInv.DATAREF_TX, dataref1.sha256), CInv(CInv.DATAREF_TX, dataref2.sha256)]))

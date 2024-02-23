@@ -121,7 +121,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
             signed_txns.append(signed_tx)
 
         # Test that all transactions are relayed (skip dummy tx)
-        assert(allInvsMatch(txnids[dummy_index + 1:], test_node))
+        assert (allInvsMatch(txnids[dummy_index + 1:], test_node))
         test_node.clear_invs()
 
         # resend low_fee and low_fee_nocheck transactions to node0 via sendrawtransaction even though
