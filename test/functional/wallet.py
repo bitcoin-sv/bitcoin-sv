@@ -435,7 +435,7 @@ class WalletTest(BitcoinTestFramework):
             sending_addr, Decimal('0.0001'))
         assert (extra_txid not in self.nodes[0].getrawmempool())
         assert (extra_txid in [tx["txid"]
-                              for tx in self.nodes[0].listtransactions()])
+                for tx in self.nodes[0].listtransactions()])
 
 
 if __name__ == '__main__':
