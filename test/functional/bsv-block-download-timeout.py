@@ -66,7 +66,7 @@ class BlockDownloadTimeout(BitcoinTestFramework):
     def create_block(self, funding_tx, block_target_size, prev_hash, prev_time, prev_height):
 
         block = create_block(prev_hash,
-                             coinbase=create_coinbase(height=prev_height + 1),#coinbase=create_coinbase(height= + 1),
+                             coinbase=create_coinbase(height=prev_height + 1), #coinbase=create_coinbase(height= + 1),
                              nTime=prev_time + 1)#nTime=last_block_info["time"] + 1)
 
         n_txs = len(funding_tx.vout)
