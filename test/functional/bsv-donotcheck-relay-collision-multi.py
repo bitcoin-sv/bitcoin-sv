@@ -130,7 +130,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         # if donotcheck is True, resending must succeed
         try:
             rejected_txns = node0.sendrawtransactions([{'hex': signed_txns[low_fee_index], 'dontcheckfee': False}]) # last param is donotcheck
-        except:
+        except Exception:
             self.log.info("test 0 - sent twice must be rejected:PASS")
 
         #low_fee_nocheck_txid_tmp = node0.sendrawtransaction(signed_txns[low_fee_nocheck_index], False, True)  # last param is donotcheck

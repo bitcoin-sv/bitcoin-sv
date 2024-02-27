@@ -460,7 +460,7 @@ class BIP68Test(BitcoinTestFramework):
         try:
             tx_id = self.nodes[1].sendrawtransaction(tx_signed)
             assert (before_activation == False)
-        except:
+        except Exception:
             assert (before_activation)
 
 

@@ -303,7 +303,7 @@ class BitcoinTestFramework():
                     print('Node {} started, pid is {}'.format(i, node.process.pid))
                     print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))
                     input()
-        except:
+        except Exception:
             # If one node failed to start, stop the others
             self.stop_nodes()
             raise

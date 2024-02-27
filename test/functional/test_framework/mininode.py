@@ -1247,9 +1247,9 @@ class msg_version():
                 try:
                     uuidBytes = deser_string(f)
                     self.assocID = deserialise_uuid_associd(uuidBytes)
-                except:
+                except Exception:
                     self.assocID = None
-            except:
+            except Exception:
                 self.nRelay = 0
         else:
             self.nRelay = 0
@@ -2175,7 +2175,7 @@ class NodeConnCB():
                 self.msg_index[command] = self.time_index
                 self.time_index += 1
                 getattr(self, 'on_' + command)(conn, message)
-            except:
+            except Exception:
                 print("ERROR delivering %s (%s)" % (repr(message),
                                                     sys.exc_info()[0]))
                 raise
@@ -2535,7 +2535,7 @@ class NodeConn(asyncore.dispatcher):
 
             try:
                 self.connect((dstaddr, dstport))
-            except:
+            except Exception:
                 self.handle_close()
             self.rpc = rpc
 
@@ -2566,7 +2566,7 @@ class NodeConn(asyncore.dispatcher):
         self.sendbuf = bytearray()
         try:
             self.close()
-        except:
+        except Exception:
             pass
         self.cb.on_close(self)
 
@@ -2617,7 +2617,7 @@ class NodeConn(asyncore.dispatcher):
                     next_chunk = min(next_chunk, len(self.sendbuf))
                     sent = self.send(self.sendbuf[:next_chunk])
                     self.send_data_rate_limiter.update_amount_processed(time_now, sent, 0.1)
-            except:
+            except Exception:
                 self.handle_close()
                 return
             del self.sendbuf[:sent]

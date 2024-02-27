@@ -55,7 +55,7 @@ def count_in_log(rpc, msg, node_dir, from_line=0):
                 try:
                     txid = re.match(".*txn= [a-f0-9]+", line).group(0).split(' ')[-1]
                     txes.add(txid)
-                except:
+                except Exception:
                     print(line)
     # Return number of distinct transaction ids that were rejected with specified reject message
     return len(txes)

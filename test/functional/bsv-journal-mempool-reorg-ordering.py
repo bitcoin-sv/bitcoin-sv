@@ -81,7 +81,7 @@ def knows_of_block(connection, block):
             print(f"node knows of block {tmp['hash']} by {_block_hash}")
             assert tmp["hash"] == _block_hash
             return True
-        except:
+        except Exception:
             print(f"node knows noting about block {_block_hash}")
             return False
     return predicate

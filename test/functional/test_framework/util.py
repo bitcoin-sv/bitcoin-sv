@@ -363,7 +363,7 @@ def get_auth_cookie(datadir):
                 split_userpass = userpass.split(':')
                 user = split_userpass[0]
                 password = split_userpass[1]
-        except: pass # any failures while reading the cookie file are treated as if the file was not there
+        except Exception: pass # any failures while reading the cookie file are treated as if the file was not there
     if user is None or password is None:
         raise ValueError("No RPC credentials")
     return user, password
@@ -527,7 +527,7 @@ def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0
     try:
         wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool},
                    timeout=timeout, check_interval=check_interval)
-    except:
+    except Exception:
         mempool = set(rpc.getrawmempool())
         expected = {t.hash for t in should_be_in_mempool}
         missing = expected - mempool

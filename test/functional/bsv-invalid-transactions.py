@@ -23,7 +23,7 @@ def get_lan_ip():
         # doesn't even have to be reachable
         s.connect(('10.255.255.255', 1))
         _lan_ip = s.getsockname()[0]
-    except:
+    except Exception:
         _lan_ip = '127.0.0.1'
     finally:
         s.close()

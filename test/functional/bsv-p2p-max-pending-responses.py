@@ -57,7 +57,7 @@ class P2PPendingResponses(BitcoinTestFramework):
                 try:
                     conn.send_message(msg_raw(request_command))
                     num_sent_before_disconnect = num_sent_before_disconnect + 1
-                except:
+                except Exception:
                     # If send_message() throws, connection was already closed.
                     # NOTE: This is unlikely to happen because requests can be sent much faster than the node can process them
                     #       and will be stored in received buffer until then.

@@ -66,7 +66,7 @@ class BSV2MBlocks(ComparisonTestFramework):
         has_been_banned = False
         try:
             self.test.wait_for_verack(5)
-        except:
+        except Exception:
             has_been_banned = True
         assert (has_been_banned)
         logger.info("Test banning excessive block size : PASS")
