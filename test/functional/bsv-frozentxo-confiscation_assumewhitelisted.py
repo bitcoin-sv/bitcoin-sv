@@ -48,7 +48,9 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.prvkey.set_secretbytes(b"horsebattery")
         self.pubkey = self.prvkey.get_pubkey()
 
-        class Node: pass # P2P connection is not needed, but we want RPC connection as member in node object for consistency with other confiscation tests
+        class Node:
+            pass # P2P connection is not needed, but we want RPC connection as member in node object for consistency with other confiscation tests
+
         node = Node()
         node.rpc = self.nodes[0]
         node1 = Node()

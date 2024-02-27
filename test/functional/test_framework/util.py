@@ -363,7 +363,9 @@ def get_auth_cookie(datadir):
                 split_userpass = userpass.split(':')
                 user = split_userpass[0]
                 password = split_userpass[1]
-        except Exception: pass # any failures while reading the cookie file are treated as if the file was not there
+        except Exception:
+            pass # any failures while reading the cookie file are treated as if the file was not there
+
     if user is None or password is None:
         raise ValueError("No RPC credentials")
     return user, password

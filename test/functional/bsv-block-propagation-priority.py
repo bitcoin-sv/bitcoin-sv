@@ -59,7 +59,9 @@ def transaction_generator(funding_tx, count=-1, exp_rate=30):
         new_generation = []
         for old_tx in last_generation:
             for new_tx in _children_tx_generator(old_tx, exp_rate):
-                if count == 0: return
+                if count == 0:
+                    return
+
                 count -= 1
                 new_generation.append(new_tx)
                 yield new_tx

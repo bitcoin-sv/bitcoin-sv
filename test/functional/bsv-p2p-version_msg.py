@@ -74,7 +74,8 @@ class P2PVersion(BitcoinTestFramework):
 
         # Check initial state
         dummyCB.wait_for_protoconf()
-        with mininode_lock: assert_equal(len(badConnCB.message_count), 0)
+        with mininode_lock:
+            assert_equal(len(badConnCB.message_count), 0)
 
         # Send a badly formatted version message
         badConn.send_message(msg_version_bad())

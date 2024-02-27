@@ -38,7 +38,9 @@ _lan_ip = None
 
 def get_lan_ip():
     global _lan_ip
-    if _lan_ip: return _lan_ip
+    if _lan_ip:
+        return _lan_ip
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable

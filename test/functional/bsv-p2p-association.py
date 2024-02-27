@@ -162,16 +162,26 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleFirstConnCB.wait_for_protoconf()
 
         # Check initial state
-        with mininode_lock: assert_equal(oldStyleConnCB.recvAssocID, None)
-        with mininode_lock: assert_equal(oldStyleConnCB.recvStreamPolicies, b'BlockPriority,Default')
-        with mininode_lock: assert_equal(newStyleConnCB.recvAssocID, newStyleConn.assocID)
-        with mininode_lock: assert_equal(newStyleConnCB.recvStreamPolicies, b'BlockPriority,Default')
-        with mininode_lock: assert_equal(newStyleFirstConnCB.recvAssocID, newStyleFirstConn.assocID)
-        with mininode_lock: assert_equal(newStyleFirstConnCB.recvStreamPolicies, b'BlockPriority,Default')
-        with mininode_lock: assert_equal(len(newStyleSecondConnCB.message_count), 0)
-        with mininode_lock: assert_equal(len(newStyleSecondConnCB_Data2.message_count), 0)
-        with mininode_lock: assert_equal(len(newStyleSecondConnCB_Data3.message_count), 0)
-        with mininode_lock: assert_equal(len(newStyleSecondConnCB_Data4.message_count), 0)
+        with mininode_lock:
+            assert_equal(oldStyleConnCB.recvAssocID, None)
+        with mininode_lock:
+            assert_equal(oldStyleConnCB.recvStreamPolicies, b'BlockPriority,Default')
+        with mininode_lock:
+            assert_equal(newStyleConnCB.recvAssocID, newStyleConn.assocID)
+        with mininode_lock:
+            assert_equal(newStyleConnCB.recvStreamPolicies, b'BlockPriority,Default')
+        with mininode_lock:
+            assert_equal(newStyleFirstConnCB.recvAssocID, newStyleFirstConn.assocID)
+        with mininode_lock:
+            assert_equal(newStyleFirstConnCB.recvStreamPolicies, b'BlockPriority,Default')
+        with mininode_lock:
+            assert_equal(len(newStyleSecondConnCB.message_count), 0)
+        with mininode_lock:
+            assert_equal(len(newStyleSecondConnCB_Data2.message_count), 0)
+        with mininode_lock:
+            assert_equal(len(newStyleSecondConnCB_Data3.message_count), 0)
+        with mininode_lock:
+            assert_equal(len(newStyleSecondConnCB_Data4.message_count), 0)
         expected = [
             {
                 'id': 0,                                 # oldStyleConn
@@ -254,10 +264,14 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: oldStyleConnCB.seen_block(tip), lock=mininode_lock, timeout=5)
         wait_until(lambda: newStyleConnCB.seen_block(tip), lock=mininode_lock, timeout=5)
         wait_until(lambda: newStyleFirstConnCB.seen_block(tip), lock=mininode_lock, timeout=5)
-        with mininode_lock: assert (not newStyleSecondConnCB.seen_block(tip))
-        with mininode_lock: assert (not newStyleSecondConnCB_Data2.seen_block(tip))
-        with mininode_lock: assert (not newStyleSecondConnCB_Data3.seen_block(tip))
-        with mininode_lock: assert (not newStyleSecondConnCB_Data4.seen_block(tip))
+        with mininode_lock:
+            assert (not newStyleSecondConnCB.seen_block(tip))
+        with mininode_lock:
+            assert (not newStyleSecondConnCB_Data2.seen_block(tip))
+        with mininode_lock:
+            assert (not newStyleSecondConnCB_Data3.seen_block(tip))
+        with mininode_lock:
+            assert (not newStyleSecondConnCB_Data4.seen_block(tip))
 
         # Send create new stream message
         newStyleSecondConn.send_message(msg_createstream(stream_type=StreamType.DATA1.value, stream_policy=b"BlockPriority", assocID=newStyleFirstConn.assocID))
@@ -330,13 +344,15 @@ class P2PAssociation(BitcoinTestFramework):
             },
         ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
-        with mininode_lock: assert (newStyleSecondConnCB.last_streamack is not None)
+        with mininode_lock:
+            assert (newStyleSecondConnCB.last_streamack is not None)
 
         # Send create stream with wrong association ID
         badStreamConn1.send_message(msg_createstream(stream_type=StreamType.DATA2.value, assocID=badStreamConn1.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleThirdConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
-        with mininode_lock: assert (newStyleThirdConnCB.last_streamack is None)
+        with mininode_lock:
+            assert (newStyleThirdConnCB.last_streamack is None)
         assert ("No node found with association ID" in str(newStyleThirdConnCB.last_reject.reason))
         # Connection will be closed
         wait_until(lambda: badStreamConn1.state == "closed", lock=mininode_lock, timeout=5)
@@ -345,7 +361,8 @@ class P2PAssociation(BitcoinTestFramework):
         badStreamConn5.send_message(msg_createstream(stream_type=StreamType.DATA2.value, assocID=""))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleSeventhConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
-        with mininode_lock: assert (newStyleSeventhConnCB.last_streamack is None)
+        with mininode_lock:
+            assert (newStyleSeventhConnCB.last_streamack is None)
         assert ("Badly formatted message" in str(newStyleSeventhConnCB.last_reject.reason))
         # Connection will be closed
         wait_until(lambda: badStreamConn5.state == "closed", lock=mininode_lock, timeout=5)
@@ -354,7 +371,8 @@ class P2PAssociation(BitcoinTestFramework):
         badStreamConn2.send_message(msg_createstream(stream_type=9, assocID=badStreamConn2.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleFourthConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
-        with mininode_lock: assert (newStyleFourthConnCB.last_streamack is None)
+        with mininode_lock:
+            assert (newStyleFourthConnCB.last_streamack is None)
         assert ("StreamType out of range" in str(newStyleFourthConnCB.last_reject.reason))
         # Connection will be closed
         wait_until(lambda: badStreamConn2.state == "closed", lock=mininode_lock, timeout=5)
@@ -363,7 +381,8 @@ class P2PAssociation(BitcoinTestFramework):
         badStreamConn3.send_message(msg_createstream(stream_type=StreamType.GENERAL.value, assocID=badStreamConn3.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleFifthConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
-        with mininode_lock: assert (newStyleFifthConnCB.last_streamack is None)
+        with mininode_lock:
+            assert (newStyleFifthConnCB.last_streamack is None)
         assert ("Attempt to overwrite existing stream" in str(newStyleFifthConnCB.last_reject.reason))
         # Connection will be closed
         wait_until(lambda: badStreamConn3.state == "closed", lock=mininode_lock, timeout=5)
@@ -372,7 +391,8 @@ class P2PAssociation(BitcoinTestFramework):
         badStreamConn4.send_message(msg_createstream(stream_type=StreamType.GENERAL.value, stream_policy=b"UnknownPolicy", assocID=badStreamConn3.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleSixthConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
-        with mininode_lock: assert (newStyleSixthConnCB.last_streamack is None)
+        with mininode_lock:
+            assert (newStyleSixthConnCB.last_streamack is None)
         assert ("Unknown stream policy name" in str(newStyleSixthConnCB.last_reject.reason))
         # Connection will be closed
         wait_until(lambda: badStreamConn4.state == "closed", lock=mininode_lock, timeout=5)
