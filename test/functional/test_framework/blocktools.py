@@ -740,7 +740,7 @@ class ChainManager():
             assert_equal(block_size, 0)
             block = create_block(base_block_hash, coinbase, block_time)
         else:
-            if type(spend) == list:
+            if isinstance(spend, list):
                 for s in spend:
                     coinbase.vout[0].nValue += s.tx.vout[s.n].nValue - 1
                     coinbase.rehash()

@@ -34,7 +34,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         return hashes
 
     def wait_for_chain_tips(self, conn, hashes):
-        assert (type(hashes) == type(set())) # hashes parameter must be a set
+        assert isinstance(hashes, set)
         wait_until(lambda: self.chain_tips_hashes(conn) == hashes)
 
     # Return a set containing hashes of all soft rejected blocks
