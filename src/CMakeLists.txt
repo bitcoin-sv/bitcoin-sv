@@ -733,6 +733,9 @@ AddClangTidy(bitcoind)
 if(BUILD_BITCOIN_CLI)
     AddClangTidy(bitcoin-cli)
 endif()
+if(BUILD_BITCOIN_MINER)
+    AddClangTidy(bitcoin-miner)
+endif()
 
 if (MSVC)
 	# prevents default build from running unit tests automaticaly
