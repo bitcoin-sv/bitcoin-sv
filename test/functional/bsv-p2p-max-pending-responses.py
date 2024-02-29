@@ -48,7 +48,10 @@ class P2PPendingResponses(BitcoinTestFramework):
 
             self.log.info("Disable reading from socket in mininode")
             conn.orig_conn_readable = conn.readable
-            def conn_readable_false(self): return False
+
+            def conn_readable_false(self):
+                return False
+
             conn.readable = types.MethodType(conn_readable_false, conn)
 
             num_sent_before_disconnect = 0

@@ -237,8 +237,11 @@ def submit_to_mempool(conn, *txs_lists):
 
 
 class property_dict(dict):
-    def __getattr__(self, k): return self.__getitem__(k)
-    def __setattr__(self, k, v): return self.__setitem__(k, v)
+    def __getattr__(self, k):
+        return self.__getitem__(k)
+
+    def __setattr__(self, k, v):
+        return self.__setitem__(k, v)
 
 
 def tx_ids(txs):

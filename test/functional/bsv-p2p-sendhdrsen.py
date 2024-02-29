@@ -33,7 +33,8 @@ class SPVNode(NodeConnCB):
         self.hdrsen.append(msg)
 
     def wait_for_hdrsen(self, timeout=5):
-        def test_function(): return len(self.hdrsen) > 0
+        def test_function():
+            return len(self.hdrsen) > 0
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         with mininode_lock:
             return self.hdrsen.pop(0)

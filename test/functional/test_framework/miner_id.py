@@ -38,14 +38,26 @@ class MinerIdKeys:
         self._signingKey = ecdsa.SigningKey.from_string(self._privateKeyBinary, curve=self._curve)
         self._verifyingKey = self._signingKey.get_verifying_key().to_string("compressed")
 
-    def privateKey(self): return self._privateKey
-    def signingKey(self): return self._signingKey
-    def verifyingKey(self): return self._verifyingKey
-    def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
-    def publicKeyBytes(self): return self._publicKey
-    def publicKeyHex(self): return bytes_to_hex_str(self._publicKey)
-    def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
-    def signingKeyHex(self): return bytes_to_hex_str(self._signingKey.to_string())
+    def privateKey(self):
+        return self._privateKey
+
+    def signingKey(self):
+        return self._signingKey
+
+    def verifyingKey(self):
+        return self._verifyingKey
+
+    def verifyingKeyHex(self):
+        return bytes_to_hex_str(self._verifyingKey)
+
+    def publicKeyBytes(self):
+        return self._publicKey
+
+    def publicKeyHex(self):
+        return bytes_to_hex_str(self._publicKey)
+
+    def signingKeyHex(self):
+        return bytes_to_hex_str(self._signingKey.to_string())
 
     def store_keys(self, tmpdir, nodenum):
         datapath = tmpdir + "/node{}/regtest".format(nodenum)

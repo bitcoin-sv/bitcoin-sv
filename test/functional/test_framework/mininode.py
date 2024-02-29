@@ -2198,49 +2198,71 @@ class NodeConnCB():
         self.connected = False
         self.connection = None
 
-    def on_addr(self, conn, message): pass
+    def on_addr(self, conn, message):
+        pass
 
-    def on_alert(self, conn, message): pass
+    def on_alert(self, conn, message):
+        pass
 
-    def on_block(self, conn, message): pass
+    def on_block(self, conn, message):
+        pass
 
-    def on_blocktxn(self, conn, message): pass
+    def on_blocktxn(self, conn, message):
+        pass
 
-    def on_cmpctblock(self, conn, message): pass
+    def on_cmpctblock(self, conn, message):
+        pass
 
-    def on_feefilter(self, conn, message): pass
+    def on_feefilter(self, conn, message):
+        pass
 
-    def on_getaddr(self, conn, message): pass
+    def on_getaddr(self, conn, message):
+        pass
 
-    def on_getblocks(self, conn, message): pass
+    def on_getblocks(self, conn, message):
+        pass
 
-    def on_getblocktxn(self, conn, message): pass
+    def on_getblocktxn(self, conn, message):
+        pass
 
-    def on_getdata(self, conn, message): pass
+    def on_getdata(self, conn, message):
+        pass
 
-    def on_getheaders(self, conn, message): pass
+    def on_getheaders(self, conn, message):
+        pass
 
-    def on_headers(self, conn, message): pass
+    def on_headers(self, conn, message):
+        pass
 
-    def on_gethdrsen(self, conn, message): pass
+    def on_gethdrsen(self, conn, message):
+        pass
 
-    def on_hdrsen(self, conn, message): pass
+    def on_hdrsen(self, conn, message):
+        pass
 
-    def on_mempool(self, conn): pass
+    def on_mempool(self, conn):
+        pass
 
-    def on_pong(self, conn, message): pass
+    def on_pong(self, conn, message):
+        pass
 
-    def on_reject(self, conn, message): pass
+    def on_reject(self, conn, message):
+        pass
 
-    def on_sendcmpct(self, conn, message): pass
+    def on_sendcmpct(self, conn, message):
+        pass
 
-    def on_sendheaders(self, conn, message): pass
+    def on_sendheaders(self, conn, message):
+        pass
 
-    def on_sendhdrsen(self, conn, message): pass
+    def on_sendhdrsen(self, conn, message):
+        pass
 
-    def on_tx(self, conn, message): pass
+    def on_tx(self, conn, message):
+        pass
 
-    def on_datareftx(self, conn, message): pass
+    def on_datareftx(self, conn, message):
+        pass
 
     def on_inv(self, conn, message):
         want = msg_getdata()
@@ -2258,11 +2280,14 @@ class NodeConnCB():
         conn.ver_recv = conn.ver_send
         self.verack_received = True
 
-    def on_streamack(self, conn, message): pass
+    def on_streamack(self, conn, message):
+        pass
 
-    def on_revokemid(self, conn, message): pass
+    def on_revokemid(self, conn, message):
+        pass
 
-    def on_protoconf(self, conn, message): pass
+    def on_protoconf(self, conn, message):
+        pass
 
     def on_version(self, conn, message):
         if message.nVersion >= 209:
@@ -2273,11 +2298,14 @@ class NodeConnCB():
             conn.ver_recv = conn.ver_send
         conn.nServices = message.nServices
 
-    def on_authch(self, conn, message): pass
+    def on_authch(self, conn, message):
+        pass
 
-    def on_authresp(self, conn, message): pass
+    def on_authresp(self, conn, message):
+        pass
 
-    def on_notfound(self, conn, message): pass
+    def on_notfound(self, conn, message):
+        pass
 
     def send_protoconf(self, conn):
         conn.send_message(msg_protoconf(CProtoconf(2, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, b"BlockPriority,Default")))
@@ -2288,7 +2316,8 @@ class NodeConnCB():
         self.connection = conn
 
     def wait_for_disconnect(self, timeout=60):
-        def test_function(): return not self.connected
+        def test_function():
+            return not self.connected
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     # Message receiving helper methods
@@ -2298,24 +2327,29 @@ class NodeConnCB():
             self.message_count.clear()
 
     def wait_for_block(self, blockhash, timeout=60):
-        def test_function(): return self.last_message.get(
-            "block") and self.last_message["block"].block.rehash() == blockhash
+        def test_function():
+            return self.last_message.get("block") \
+                and self.last_message["block"].block.rehash() == blockhash
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_getdata(self, timeout=60):
-        def test_function(): return self.last_message.get("getdata")
+        def test_function():
+            return self.last_message.get("getdata")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_getheaders(self, timeout=60):
-        def test_function(): return self.last_message.get("getheaders")
+        def test_function():
+            return self.last_message.get("getheaders")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_headers(self, timeout=60):
-        def test_function(): return self.last_message.get("headers")
+        def test_function():
+            return self.last_message.get("headers")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_hdrsen(self, timeout=60):
-        def test_function(): return self.last_message.get("hdrsen")
+        def test_function():
+            return self.last_message.get("hdrsen")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_inv(self, expected_inv, timeout=60, check_interval=0.05):
@@ -2324,25 +2358,30 @@ class NodeConnCB():
             raise NotImplementedError(
                 "wait_for_inv() will only verify the first inv object")
 
-        def test_function(): return self.last_message.get("inv") and \
-            self.last_message["inv"].inv[0].type == expected_inv[0].type and \
-            self.last_message["inv"].inv[0].hash == expected_inv[0].hash
+        def test_function():
+            return self.last_message.get("inv") \
+                and self.last_message["inv"].inv[0].type == expected_inv[0].type \
+                and self.last_message["inv"].inv[0].hash == expected_inv[0].hash
         wait_until(test_function, timeout=timeout, lock=mininode_lock, check_interval=check_interval)
 
     def wait_for_verack(self, timeout=60):
-        def test_function(): return self.message_count["verack"]
+        def test_function():
+            return self.message_count["verack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_reject(self, timeout=60):
-        def test_function(): return self.message_count["reject"]
+        def test_function():
+            return self.message_count["reject"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_protoconf(self, timeout=60):
-        def test_function(): return self.message_count["protoconf"]
+        def test_function():
+            return self.message_count["protoconf"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_streamack(self, timeout=60):
-        def test_function(): return self.message_count["streamack"]
+        def test_function():
+            return self.message_count["streamack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     # Message sending helper functions

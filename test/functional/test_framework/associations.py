@@ -21,30 +21,77 @@ from .streams import StreamType
 class AssociationCB():
 
     # Replace or override callbacks to get notified in a test
-    def on_addr(self, stream, message): pass
-    def on_alert(self, stream, message): pass
-    def on_block(self, stream, message): pass
-    def on_blocktxn(self, stream, message): pass
-    def on_cmpctblock(self, stream, message): pass
-    def on_feefilter(self, stream, message): pass
-    def on_getaddr(self, stream, message): pass
-    def on_getblocks(self, stream, message): pass
-    def on_getblocktxn(self, stream, message): pass
-    def on_getdata(self, stream, message): pass
-    def on_getheaders(self, stream, message): pass
-    def on_headers(self, stream, message): pass
-    def on_mempool(self, stream): pass
-    def on_ping(self, stream, message): pass
-    def on_pong(self, stream, message): pass
-    def on_reject(self, stream, message): pass
-    def on_sendcmpct(self, stream, message): pass
-    def on_sendheaders(self, stream, message): pass
-    def on_tx(self, stream, message): pass
-    def on_inv(self, stream, message): pass
-    def on_verack(self, stream, message): pass
-    def on_streamack(self, stream, message): pass
-    def on_version(self, stream, message): pass
-    def on_protoconf(self, stream, message): pass
+    def on_addr(self, stream, message):
+        pass
+
+    def on_alert(self, stream, message):
+        pass
+
+    def on_block(self, stream, message):
+        pass
+
+    def on_blocktxn(self, stream, message):
+        pass
+
+    def on_cmpctblock(self, stream, message):
+        pass
+
+    def on_feefilter(self, stream, message):
+        pass
+
+    def on_getaddr(self, stream, message):
+        pass
+
+    def on_getblocks(self, stream, message):
+        pass
+
+    def on_getblocktxn(self, stream, message):
+        pass
+
+    def on_getdata(self, stream, message):
+        pass
+
+    def on_getheaders(self, stream, message):
+        pass
+
+    def on_headers(self, stream, message):
+        pass
+
+    def on_mempool(self, stream):
+        pass
+
+    def on_ping(self, stream, message):
+        pass
+
+    def on_pong(self, stream, message):
+        pass
+
+    def on_reject(self, stream, message):
+        pass
+
+    def on_sendcmpct(self, stream, message):
+        pass
+
+    def on_sendheaders(self, stream, message):
+        pass
+
+    def on_tx(self, stream, message):
+        pass
+
+    def on_inv(self, stream, message):
+        pass
+
+    def on_verack(self, stream, message):
+        pass
+
+    def on_streamack(self, stream, message):
+        pass
+
+    def on_version(self, stream, message):
+        pass
+
+    def on_protoconf(self, stream, message):
+        pass
 
 
 # Simple wrapper for a single stream within an association

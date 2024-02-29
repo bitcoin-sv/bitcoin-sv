@@ -20,9 +20,11 @@ bord = ord
 if sys.version > '3':
     long = int
 
-    def bchr(x): return bytes([x])
+    def bchr(x):
+        return bytes([x])
 
-    def bord(x): return x
+    def bord(x):
+        return x
 
 MAX_SCRIPT_SIZE = 10000
 MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520
