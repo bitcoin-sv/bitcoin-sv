@@ -417,6 +417,15 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tm
             if fail_fast:
                 break
 
+    # Wait for all remaining tests to finish - very likely with fail_fast option
+    while len(running_jobs) > 0:
+        (name, _, proc, log_out, log_err) = running_jobs[0]
+        if proc.poll() is None:
+            print(f"wait {name}...")
+            proc.wait()
+        log_out.close(), log_err.close()
+        running_jobs.pop(0)
+
     runtime = int(time.time() - time0)
     print_results(test_results, max_len_name, runtime)
     save_results_as_junit(test_results, junitouput, runtime)
