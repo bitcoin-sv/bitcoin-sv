@@ -177,7 +177,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         tx0 = self.nodes[0].getminerinfotxid()
         tx1 = self.nodes[1].getminerinfotxid()
         assert (tx0 == txid)
-        assert (tx1 == None)
+        assert (tx1 is None)
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
@@ -212,8 +212,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         tx0 = self.nodes[0].getminerinfotxid()
         tx1 = self.nodes[1].getminerinfotxid()
-        assert (tx0 == None)
-        assert (tx1 == None)
+        assert (tx0 is None)
+        assert (tx1 is None)
 
     def run_test(self):
         # create bip32 keys

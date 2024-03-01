@@ -73,7 +73,7 @@ class MaxBlockTxn(ComparisonTestFramework):
         yield self.accepted()
 
         # Wait for block message for above block to arrive
-        wait_until(lambda: peer.last_block != None)
+        wait_until(lambda: peer.last_block is not None)
         assert (peer.last_block.block.sha256 == b1.sha256)
         peer.clear_block_data()
 
@@ -82,7 +82,7 @@ class MaxBlockTxn(ComparisonTestFramework):
         msg.block_txn_request = BlockTransactionsRequest(b1.sha256, [])
         msg.block_txn_request.from_absolute(sorted(random.sample(range(len(b1.vtx)), int(len(b1.vtx) / 2))))
         peer.send_message(msg)
-        wait_until(lambda: peer.last_blocktxn != None)
+        wait_until(lambda: peer.last_blocktxn is not None)
         assert (peer.last_blocktxn.block_transactions.blockhash == b1.sha256)
         peer.clear_block_data()
 
@@ -91,7 +91,7 @@ class MaxBlockTxn(ComparisonTestFramework):
         msg.block_txn_request = BlockTransactionsRequest(b1.sha256, [])
         msg.block_txn_request.from_absolute(range(len(b1.vtx)))
         peer.send_message(msg)
-        wait_until(lambda: peer.last_block != None)
+        wait_until(lambda: peer.last_block is not None)
         assert (peer.last_block.block.sha256 == b1.sha256)
         peer.clear_block_data()
 

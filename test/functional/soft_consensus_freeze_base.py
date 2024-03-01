@@ -152,7 +152,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
     def _mine_and_send_block(self, tx, node, expect_reject=False, expect_tip=None):
         block = self._mine_block(tx)
 
-        expect_tip = expect_tip if expect_tip != None else block.hash
+        expect_tip = expect_tip if expect_tip is not None else block.hash
 
         node.send_block(block, expect_tip, expect_reject)
 
@@ -181,7 +181,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         self.log.info(f"Mining block with transaction {freeze_tx.hash} whose output will be frozen later")
         self._mine_and_send_block(freeze_tx, node)
 
-        if stop != None:
+        if stop is not None:
             enforce_at_height = [{"start": 0, "stop": stop}]
         else:
             enforce_at_height = [{"start": 0}]
@@ -204,7 +204,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
     def submit_block_and_check_tip(self, node, block, expect_tip):
         node.rpc.submitblock(block.serialize().hex())
-        if expect_tip == None:
+        if expect_tip is None:
             expect_tip = block.hash
         assert_equal(expect_tip, node.rpc.getbestblockhash())
 

@@ -145,7 +145,7 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
         infoDoc['extensions'] = extensions
 
     # Convert dictionary to json string
-    if json_override_string != None:
+    if json_override_string is not None:
         infoDocJson = json_override_string
     else:
         infoDocJson = json.dumps(infoDoc, indent=0)

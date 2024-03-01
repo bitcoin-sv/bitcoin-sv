@@ -151,7 +151,7 @@ def create_coinbase(height, pubkey=None, outputValue=50):
     coinbaseoutput.nValue = outputValue * COIN
     halvings = int(height / 150)  # regtest
     coinbaseoutput.nValue >>= halvings
-    if (pubkey != None):
+    if (pubkey is not None):
         coinbaseoutput.scriptPubKey = CScript([pubkey, OP_CHECKSIG])
     else:
         coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
@@ -603,7 +603,7 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
     blocks = []
     for i in range(num_blocks):
         txcb = create_coinbase(tip_height + 1)
-        if scriptPubKey != None:
+        if scriptPubKey is not None:
             txcb.vout[0].scriptPubKey = scriptPubKey
         else:
             txcb.vout[0].scriptPubKey = CScript([OP_TRUE])
@@ -720,7 +720,7 @@ class ChainManager():
         return CScript([self._script_number, OP_RETURN])
 
     def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
-        if self.tip == None:
+        if self.tip is None:
             base_block_hash = self._genesis_hash
             block_time = int(time.time()) + 1
         else:
@@ -735,7 +735,7 @@ class ChainManager():
         coinbase = create_coinbase(height=height, pubkey=coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
         coinbase.rehash()
-        if spend == None:
+        if spend is None:
             # We need to have something to spend to fill the block.
             assert_equal(block_size, 0)
             block = create_block(base_block_hash, coinbase, block_time)
@@ -801,7 +801,7 @@ class ChainManager():
                     base_tx_size = len(tx.serialize())
 
                     # If a specific script is required, add it.
-                    if script != None:
+                    if script is not None:
                         extraCash, txout = CreateCTxOut(1, extraCash, script)
                         tx.vout.append(txout)
 
@@ -873,7 +873,7 @@ class ChainManager():
         if extra_sigops > 0:
             raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
-        if version != None:
+        if version is not None:
             block.nVersion = version
 
         # Do PoW, which is cheap on regnet

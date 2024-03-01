@@ -35,7 +35,7 @@ class RpcFloddingTest (BitcoinTestFramework):
         conn.request('POST', '/', '{"method": "getbestblockhash"}', headers)
         out1 = conn.getresponse().read()
         assert (b'"error":null' in out1)
-        assert (conn.sock != None)
+        assert (conn.sock is not None)
         # according to http/1.1 connection must still be open!
 
         # communication will crash in following while loop if libevent-2.1.7 is used. 2.1.11 will not crash

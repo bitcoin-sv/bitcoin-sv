@@ -172,7 +172,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
     def make_block_with_tx(self, node, tx, block_time_offset=None):
         block, _ = make_block(node.rpc)
-        if block_time_offset != None:
+        if block_time_offset is not None:
             # Changing the block time can be used to create block with same contents and different hash
             block.nTime += block_time_offset
         block.vtx.append(tx)
@@ -217,7 +217,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {tx.hash},0 on consensus blacklist at heights [{start_height},{stop_height})")
 
         enforceAtHeight = {"start": start_height}
-        if stop_height != None:
+        if stop_height is not None:
             enforceAtHeight["stop"] = stop_height
 
         result = node.rpc.addToConsensusBlacklist({

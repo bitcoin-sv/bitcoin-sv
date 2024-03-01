@@ -32,7 +32,7 @@ class VerifyWithoutPowTest(BitcoinTestFramework):
         assert submitResult == 'high-hash'
 
         submitResult = node.verifyblockcandidate(ToHex(block))
-        assert submitResult == None
+        assert submitResult is None
 
 
 if __name__ == '__main__':

@@ -205,7 +205,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         node0.invalidateblock(first_bad_block)
         node0.ignoresafemodeforblock(first_bad_block)
         balance = node0.rpc.getbalance()
-        assert (balance != None)
+        assert (balance is not None)
 
 
 if __name__ == '__main__':

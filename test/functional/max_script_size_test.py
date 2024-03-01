@@ -51,7 +51,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
 
     def run_test(self):
         def new_tx(utxo=None, target_script_size=20000, op_codes=[OP_TRUE], elem=[b"a" * 499, OP_DROP], target_tx_size=None, simple=False, lock_script=None, unlock_script=b""):
-            if utxo != None:
+            if utxo is not None:
                 tx_to_spend = utxo['txid']
                 vout = utxo['vout']
                 value = utxo['amount']
@@ -62,7 +62,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
                 return tx
 
             tx = CTransaction()
-            if lock_script != None:
+            if lock_script is not None:
                 tx.vout.append(CTxOut(200000000, lock_script))
             else:
                 script = make_script(op_codes=op_codes, elem=elem, target_script_size=target_script_size)
@@ -72,10 +72,10 @@ class MaxScriptSizeTest(BitcoinTestFramework):
                                                           "ab812dc588ca9d5787dde7eb29569da63c3a238c"),
                                                       OP_EQUALVERIFY,
                                                       OP_CHECKSIG])))
-            if target_tx_size != None:
+            if target_tx_size is not None:
                 padding_size = calc_needed_data_size(script, target_tx_size)
                 tx.vout.append(CTxOut(50000000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] * padding_size])))
-            if utxo == None:
+            if utxo is None:
                 txHex = node.fundrawtransaction(ToHex(tx), {'feeRate': 2, 'changePosition': len(tx.vout)})[
                     'hex']
             else:
@@ -111,8 +111,8 @@ class MaxScriptSizeTest(BitcoinTestFramework):
             return script
 
         def add_to_block_and_send(txs=None, utxo=None, i_utxo=0, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS, target_tx_size=None, len_mem0=1, len_mem1=0, valid=None):
-            if txs == None:
-                if utxo == None:
+            if txs is None:
+                if utxo is None:
                     tx = new_tx(utxo=utxos[i_utxo], target_script_size=target_script_size, target_tx_size=target_tx_size)
                 else:
                     tx = new_tx(utxo=utxo, target_script_size=target_script_size, target_tx_size=target_tx_size)
@@ -120,7 +120,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
             for tx in txs:
                 conn.send_message(msg_tx(tx))
 
-            if valid == None:
+            if valid is None:
                 valid = txs
             check_mempool_equals(node, valid)
             mempool0 = node.getrawmempool()

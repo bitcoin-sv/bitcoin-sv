@@ -97,7 +97,7 @@ class SafeModeReogNotification(BitcoinTestFramework):
     def check_last_webhook_msg_reorged_from(self, old_tip, numberofdisconnectedblocks=None):
         if old_tip is None:
             assert self.webhook_messages[-1]["reorg"]["happened"] == False
-            assert self.webhook_messages[-1]["reorg"]["oldtip"] == None
+            assert self.webhook_messages[-1]["reorg"]["oldtip"] is None
             assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == 0
         else:
             assert self.webhook_messages[-1]["reorg"]["happened"] == True

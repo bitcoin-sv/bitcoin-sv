@@ -87,7 +87,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
 
     def make_block_with_tx(self, node, tx, block_time_offset=None):
         block, _ = make_block(node.rpc)
-        if block_time_offset != None:
+        if block_time_offset is not None:
             # Changing the block time can be used to create block with same contents and different hash
             block.nTime += block_time_offset
         block.vtx.append(tx)

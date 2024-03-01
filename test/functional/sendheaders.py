@@ -126,8 +126,8 @@ class TestNode(NodeConnCB):
     # right header or the right inv
     # inv and headers should be lists of block hashes
     def check_last_announcement(self, headers=None, inv=None):
-        expect_headers = headers if headers != None else []
-        expect_inv = inv if inv != None else []
+        expect_headers = headers if headers is not None else []
+        expect_inv = inv if inv is not None else []
 
         def test_function():
             return self.block_announced

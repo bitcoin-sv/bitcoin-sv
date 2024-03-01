@@ -106,7 +106,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Wait for SENDCMPCT
         def received_sendcmpct():
-            return (peer.last_sendcmpct != None)
+            return (peer.last_sendcmpct is not None)
         wait_until(received_sendcmpct, timeout=30)
 
         sendcmpct = msg_sendcmpct()
@@ -116,7 +116,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Exchange headers
         def received_getheaders():
-            return (peer.last_getheaders != None)
+            return (peer.last_getheaders is not None)
         wait_until(received_getheaders, timeout=30)
 
         # Return the favor
@@ -124,7 +124,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Wait for the header list
         def received_headers():
-            return (peer.last_headers != None)
+            return (peer.last_headers is not None)
         wait_until(received_headers, timeout=30)
 
         # It's like we know about the same headers !
@@ -136,7 +136,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Checks the node to forward it via compact block
         def received_block():
-            return (peer.last_cmpctblock != None)
+            return (peer.last_cmpctblock is not None)
         wait_until(received_block, timeout=30)
 
         # Was it our block ?

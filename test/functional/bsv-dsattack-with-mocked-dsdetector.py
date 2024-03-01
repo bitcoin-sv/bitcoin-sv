@@ -154,7 +154,7 @@ class WebHookService(BaseHTTPRequestHandler):
     def do_GET(self):
         # This dummy service receives from this path only
         assert_equal(self.path, "/dsdetected/webhook/query")
-        if (WebHookService.lastReceivedJSON == None):
+        if (WebHookService.lastReceivedJSON is None):
             self.send_response(400, "No JSON received")
             self.end_headers()
             return
@@ -357,7 +357,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         while not exchange.CatchNotification_InvalidateIfRequired(node0, first_bad_block):
             time.sleep(1)
         balance = node0.rpc.getbalance()
-        assert (balance != None)
+        assert (balance is not None)
 
         exchange.stop_webhook_server()
 

@@ -545,7 +545,7 @@ def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0
 # The actual reject reason is checked if specified
 def wait_for_reject_message(conn, reject_reason=None, timeout=5):
     wait_until(lambda: ('reject' in list(conn.cb.last_message.keys())
-                        and (reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)),
+                        and (reject_reason is None or conn.cb.last_message['reject'].reason == reject_reason)),
                timeout=timeout)
     if conn.cb.last_message['reject'].message == b'tx':
         conn.rpc.log.info('Transaction rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
@@ -560,7 +560,7 @@ def ensure_no_rejection(conn):
     # wait 2 seconds for transaction/block before checking for reject message
     time.sleep(2)
     wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message[
-        'reject'].reason == None, timeout=5)
+        'reject'].reason is None, timeout=5)
     conn.rpc.log.info('Not rejected -- OK')
 
 

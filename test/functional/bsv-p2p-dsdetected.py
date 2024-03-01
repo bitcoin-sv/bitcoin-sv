@@ -39,7 +39,7 @@ class WebHookService(BaseHTTPRequestHandler):
     def do_GET(self):
         # This dummy service receives from this path only
         assert_equal(self.path, "/dsdetected/webhook/query")
-        if (WebHookService.lastReceivedJSON == None):
+        if (WebHookService.lastReceivedJSON is None):
             self.send_response(400, "No JSON received")
             self.end_headers()
             return
@@ -390,7 +390,7 @@ class DSDetectedTests(BitcoinTestFramework):
         peer.send_and_ping(dsdMessage)
         json_notification = self.get_JSON_notification()
         # remove diverentBlockHash so we can compare with the ds-message
-        assert (json_notification != None)
+        assert (json_notification is not None)
         for e in json_notification['blocks']:
             del e['divergentBlockHash']
         assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))
@@ -422,7 +422,7 @@ class DSDetectedTests(BitcoinTestFramework):
             # Notification should be received as generated dsdetected message is valid
             json_notification = self.get_JSON_notification()
             # remove diverentBlockHash so we can compare with the ds-message
-            assert (json_notification != None)
+            assert (json_notification is not None)
             for e in json_notification['blocks']:
                 del e['divergentBlockHash']
             assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))
