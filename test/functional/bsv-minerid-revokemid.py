@@ -94,16 +94,16 @@ class RevokeMid(BitcoinTestFramework):
             assert (len(minerids0['miners'][0]['minerids']) == 3)
             assert (len(minerids1['miners'][0]['minerids']) == 3)
             assert (len(minerids2['miners'][0]['minerids']) == 3)
-            assert (minerids0['miners'][0]['reputation']['void'] == False)
-            assert (minerids1['miners'][0]['reputation']['void'] == False)
-            assert (minerids2['miners'][0]['reputation']['void'] == False)
+            assert (minerids0['miners'][0]['reputation']['void'] is False)
+            assert (minerids1['miners'][0]['reputation']['void'] is False)
+            assert (minerids2['miners'][0]['reputation']['void'] is False)
 
             # Bad node steals honest nodes miner ID key and spoils their reputation
             minerIdParams['height'] = self.nodes[1].getblockcount() + 1
             badblock = make_miner_id_block(p2p_0, minerIdParams, utxo=utxos.pop(), makeValid=False)
             p2p_0.send_message(msg_block(badblock))
 
-            wait_until(lambda: self.nodes[0].dumpminerids()['miners'][0]['reputation']['void'] == True)
+            wait_until(lambda: self.nodes[0].dumpminerids()['miners'][0]['reputation']['void'] is True)
 
             # Honest node sends revokemid message to revoke their stolen key
             revokemid = msg_revokemid(self.minerIdRevocationKey.signingKey(), self.minerIdRevocationKey.publicKeyBytes(),
@@ -143,9 +143,9 @@ class RevokeMid(BitcoinTestFramework):
             assert (len(minerids0['miners'][0]['minerids']) == 4)
             assert (len(minerids1['miners'][0]['minerids']) == 4)
             assert (len(minerids2['miners'][0]['minerids']) == 4)
-            assert (minerids0['miners'][0]['reputation']['void'] == False)
-            assert (minerids1['miners'][0]['reputation']['void'] == False)
-            assert (minerids2['miners'][0]['reputation']['void'] == False)
+            assert (minerids0['miners'][0]['reputation']['void'] is False)
+            assert (minerids1['miners'][0]['reputation']['void'] is False)
+            assert (minerids2['miners'][0]['reputation']['void'] is False)
             assert (minerids0['miners'][0]['minerids'][0]['state'] == 'CURRENT')
             assert (minerids1['miners'][0]['minerids'][0]['state'] == 'CURRENT')
             assert (minerids2['miners'][0]['minerids'][0]['state'] == 'CURRENT')

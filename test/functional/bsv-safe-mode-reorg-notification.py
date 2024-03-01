@@ -74,9 +74,9 @@ class SafeModeReogNotification(BitcoinTestFramework):
             json_messages.append(self.webhook_messages[-1])
         for safe_mode_json in json_messages:
             if not forks:
-                assert safe_mode_json["safemodeenabled"] == False
+                assert safe_mode_json["safemodeenabled"] is False
             else:
-                assert safe_mode_json["safemodeenabled"] == True
+                assert safe_mode_json["safemodeenabled"] is True
                 assert len(forks) == len(safe_mode_json["forks"])
                 for fork_expected, fork_json in zip(forks, safe_mode_json["forks"]):
                     assert fork_expected["forkfirstblock"] == fork_json["forkfirstblock"]["hash"]
@@ -96,11 +96,11 @@ class SafeModeReogNotification(BitcoinTestFramework):
 
     def check_last_webhook_msg_reorged_from(self, old_tip, numberofdisconnectedblocks=None):
         if old_tip is None:
-            assert self.webhook_messages[-1]["reorg"]["happened"] == False
+            assert self.webhook_messages[-1]["reorg"]["happened"] is False
             assert self.webhook_messages[-1]["reorg"]["oldtip"] is None
             assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == 0
         else:
-            assert self.webhook_messages[-1]["reorg"]["happened"] == True
+            assert self.webhook_messages[-1]["reorg"]["happened"] is True
             assert self.webhook_messages[-1]["reorg"]["oldtip"]["hash"] == old_tip
             if numberofdisconnectedblocks is not None:
                 assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == numberofdisconnectedblocks

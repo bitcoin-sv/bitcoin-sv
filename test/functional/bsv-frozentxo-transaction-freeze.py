@@ -74,7 +74,7 @@ class RPC_send_node(Send_node):
             assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert (self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) is False)
 
     def send_tx(self, tx, expect_reject=False):
         if expect_reject:
@@ -105,7 +105,7 @@ class P2P_send_node(Send_node):
             assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert (self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) is False)
 
     def send_tx(self, tx, expect_reject=False):
         self.p2p.send_and_ping(msg_tx(tx))

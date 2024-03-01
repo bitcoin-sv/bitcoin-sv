@@ -74,7 +74,7 @@ class UnsolictedAddr(BitcoinTestFramework):
         time.sleep(60)
 
         for node in test_nodes:
-            assert (node.gotAddr == False)
+            assert (node.gotAddr is False)
 
 
 if __name__ == '__main__':
