@@ -494,8 +494,8 @@ class TxCreator:
             sighash_flags = SIGHASH_ALL
 
             if type(input) is tuple:
-                l = len(input)
-                assert l >= 2 and l <= 4
+                ip_len = len(input)
+                assert ip_len >= 2 and ip_len <= 4
 
                 spend_tx = input[0]
 
@@ -505,10 +505,10 @@ class TxCreator:
                 if n < 0:
                     n += len(spend_tx.vout)
 
-                if l >= 3:
+                if ip_len >= 3:
                     private_key = input[2]
 
-                if l >= 4:
+                if ip_len >= 4:
                     sighash_flags = input[3]
             else:
                 spend_tx = input

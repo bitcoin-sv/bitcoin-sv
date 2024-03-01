@@ -78,8 +78,8 @@ def spend_separator_tx(tx_sep_tx, keys_for_sep_tx):
     script_lists = [[]]
 
     for item in list(tx_sep_tx.vout[0].scriptPubKey):
-        for l in script_lists:
-            l.append(item)
+        for script in script_lists:
+            script.append(item)
         if item == OP_CODESEPARATOR:
             script_lists.append([])
 

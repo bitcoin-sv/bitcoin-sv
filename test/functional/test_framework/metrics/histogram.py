@@ -176,8 +176,8 @@ assert_eq(unique_parts(["a/b/c"]), ["a"])
 
 def plot_histogram(ax, ls, *, bins=20):
     hide_overmax = ls[0].name.lower().endswith("_us")
-    ps = [np.asarray(list(l.histogram.items_(hide_overmax))).transpose()
-          for l in ls]
+    ps = [np.asarray(list(x.histogram.items_(hide_overmax))).transpose()
+          for x in ls]
     minp = min(p[0].min() for p in ps)
     maxp = max(p[0].max() for p in ps)
     hs = [np.histogram(p[0], range=(minp, maxp), bins=bins, weights=p[1], density=False)
@@ -185,18 +185,18 @@ def plot_histogram(ax, ls, *, bins=20):
     hists, bins = list(zip(*hs))
     bins = [list(bin) for bin in bins]
     hists = [list(hist) for hist in hists]
-    plt.hist([bin[:-1] for bin in bins], bins[0], weights=hists, label=unique_parts(l.dataset for l in ls), log=True)
+    plt.hist([bin[:-1] for bin in bins], bins[0], weights=hists, label=unique_parts(x.dataset for x in ls), log=True)
     plt.title(ls[0].name)
 
 
 def plot_percentiles(ax, ls, *, key):
     pr = list(percentile_range(12, 5))
-    for l, p in zip(ls, unique_parts(l.dataset for l in ls)):
-        ps = list(l.histogram.percentiles(pr))
+    for x, p in zip(ls, unique_parts(l.dataset for x in ls)):
+        ps = list(x.histogram.percentiles(pr))
         if not ps:
             continue
         x, y = tuple(zip(*ps))
-        plt.plot(x, y, label=f"{p} - {l.name}")
+        plt.plot(x, y, label=f"{p} - {x.name}")
 #        for t in [1-3237/100000]:
 #            xy = [(x,y) for x,y in zip(ps, pr) if y >= t]
 #            if xy:
@@ -207,12 +207,12 @@ def plot_percentiles(ax, ls, *, key):
     plt.ylim((1e - 1, 1 - 1e - 6))
 
 
-def prefix(l):
-    return l.name
+def prefix(x):
+    return x.name
 
 
-def prefix_t(l):
-    return l.name.replace("_CPU_", ".").replace("_TIME_", ".")
+def prefix_t(x):
+    return x.name.replace("_CPU_", ".").replace("_TIME_", ".")
 
 
 HistogramFilter = Callable[[HistogramLog], bool]
@@ -257,7 +257,7 @@ def show_percentiles(logs, *,
                      histogram_filter: HistogramFilter = histogram_filter_all):
 
     for r, (k, v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
-        print("percentiles =======", k, [l.dataset for l in v])
+        print("percentiles =======", k, [x.dataset for x in v])
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         plot_percentiles(ax, v, key=key)
@@ -269,7 +269,7 @@ def show_histograms(logs, *, key=prefix,
                     histogram_filter: HistogramFilter = histogram_filter_all):
 
     for r, (k, v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
-        print("histogram =======", k, [l.dataset for l in v])
+        print("histogram =======", k, [x.dataset for x in v])
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         plot_histogram(ax, v)

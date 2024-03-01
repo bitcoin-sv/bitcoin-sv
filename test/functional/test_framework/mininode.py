@@ -120,16 +120,16 @@ def hash256(s):
     return sha256(sha256(s))
 
 
-def ser_compact_size(l):
+def ser_compact_size(n):
     r = b""
-    if l < 253:
-        r = struct.pack("B", l)
-    elif l < 0x10000:
-        r = struct.pack("<BH", 253, l)
-    elif l < 0x100000000:
-        r = struct.pack("<BI", 254, l)
+    if n < 253:
+        r = struct.pack("B", n)
+    elif n < 0x10000:
+        r = struct.pack("<BH", 253, n)
+    elif n < 0x100000000:
+        r = struct.pack("<BI", 254, n)
     else:
-        r = struct.pack("<BQ", 255, l)
+        r = struct.pack("<BQ", 255, n)
     return r
 
 
@@ -226,9 +226,9 @@ def deser_vector(f, c):
 # ser_function_name: Allow for an alternate serialization function on the
 # entries in the vector.
 @generator_based_serializator
-def ser_vector(l, ser_function_name=""):
+def ser_vector(v, ser_function_name=""):
     # using generator because of need for lazy evaluation
-    return (getattr(i, ser_function_name, i.serialize)() for i in l)
+    return (getattr(i, ser_function_name, i.serialize)() for i in v)
 
 
 def deser_uint256_vector(f):
@@ -241,8 +241,8 @@ def deser_uint256_vector(f):
 
 
 @generator_based_serializator
-def ser_uint256_vector(l):
-    return (ser_uint256(i) for i in l)
+def ser_uint256_vector(v):
+    return (ser_uint256(i) for i in v)
 
 
 def deser_string_vector(f):
@@ -255,8 +255,8 @@ def deser_string_vector(f):
 
 
 @generator_based_serializator
-def ser_string_vector(l):
-    return (ser_string(sv) for sv in l)
+def ser_string_vector(v):
+    return (ser_string(sv) for sv in v)
 
 
 def deser_int_vector(f):
@@ -269,8 +269,8 @@ def deser_int_vector(f):
 
 
 @generator_based_serializator
-def ser_int_vector(l):
-    return (struct.pack("<i", i) for i in l)
+def ser_int_vector(v):
+    return (struct.pack("<i", i) for i in v)
 
 
 def deser_varint_vector(f):
@@ -282,10 +282,10 @@ def deser_varint_vector(f):
     return r
 
 
-def ser_varint_vector(l):
-    r = ser_varint(len(l))
-    for v in l:
-        r += ser_varint(v)
+def ser_varint_vector(v):
+    r = ser_varint(len(v))
+    for i in v:
+        r += ser_varint(i)
     return r
 
 
