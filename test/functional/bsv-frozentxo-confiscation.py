@@ -648,7 +648,11 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.log.info(f"Sending transaction {spend_tx.hash} spending confiscated TXO {confiscate_tx.hash},1 and checking that it is rejected because output has not matured")
         assert_raises_rpc_error(-26, "bad-txns-premature-spend-of-confiscation", node.rpc.sendrawtransaction, ToHex(spend_tx))
 
-        spend_tx1 = self._create_tx(PreviousSpendableOutput(confiscate_tx, 1), b'', CScript([OP_TRUE, OP_NOP])) # Must use a different tx, otherwise node1 would immediately force relay it to node (because node is whitelisted), which would then not relay it below in test to node1 when it is received again via RPC and is valid.
+        # Must use a different tx, otherwise node1 would immediately force
+        # relay it to node (because node is whitelisted), which would then
+        # not relay it below in test to node1 when it is received again
+        # via RPC and is valid.
+        spend_tx1 = self._create_tx(PreviousSpendableOutput(confiscate_tx, 1), b'', CScript([OP_TRUE, OP_NOP]))
         self.log.info(f"Sending transaction {spend_tx1.hash} spending confiscated TXO {confiscate_tx.hash},1 via P2P to node1 and checking that it is not accepted because output has not matured")
         node1.send_and_ping(msg_tx(spend_tx1))
         time.sleep(1)

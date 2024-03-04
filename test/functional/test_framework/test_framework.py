@@ -98,7 +98,13 @@ class BitcoinTestFramework():
         parser.add_option("--tmpdir", dest="tmpdir",
                           help="Root directory for datadirs")
         parser.add_option("-l", "--loglevel", dest="loglevel", default="INFO",
-                          help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
+                          help=("log events at this level and higher to the"
+                                "console. Can be set to DEBUG, INFO, WARNING, "
+                                "ERROR or CRITICAL. Passing --loglevel DEBUG "
+                                "will output all logs to console. Note that "
+                                "logs at all levels are always written to the "
+                                "test_framework.log file in the temporary test"
+                                " directory."))
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
         parser.add_option("--portseed", dest="port_seed", default=os.getpid(), type='int',

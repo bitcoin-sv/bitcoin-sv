@@ -72,9 +72,28 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         result = self.nodes[0].queryBlacklist()
         assert_equal(len(result["funds"]), 3)
         funds = sorted(result["funds"], key=lambda f: f["txOut"]["txId"])
-        assert_equal(funds[0], {"txOut": {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
-        assert_equal(funds[1], {"txOut": {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
-        assert_equal(funds[2], {"txOut": {"txId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}], "policyExpiresWithConsensus": 1, "blacklist": ["policy", "consensus"]})
+        assert_equal(funds[0],
+                     {"txOut":
+                      {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 2147483647}],
+                      "policyExpiresWithConsensus": 0,
+                      "blacklist": ["policy", "consensus"]})
+
+        assert_equal(funds[1],
+                     {"txOut":
+                      {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
+                      "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
+
+        assert_equal(funds[2],
+                     {"txOut":
+                      {"txId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 1}, {"start": 2, "stop": 3}],
+                      "policyExpiresWithConsensus": 1,
+                      "blacklist": ["policy", "consensus"]})
 
         self.log.info("Cleanup expired consensus record #2 and update #1 from consensus to policy...")
 
@@ -99,7 +118,14 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         result = self.nodes[0].queryBlacklist()
         assert_equal(len(result["funds"]), 2)
         funds = sorted(result["funds"], key=lambda f: f["txOut"]["txId"])
-        assert_equal(funds[0], {"txOut": {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
+        assert_equal(funds[0],
+                     {"txOut":
+                      {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 2147483647}],
+                      "policyExpiresWithConsensus": 0,
+                      "blacklist": ["policy", "consensus"]})
+
         assert_equal(funds[1], {"txOut": {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "vout": 0}, "blacklist": ["policy"]})
 
         self.log.info("Unfreezing fund on policy level...")
@@ -148,7 +174,13 @@ class FrozenTXORPCUnfreezeFunds (BitcoinTestFramework):
         result = self.nodes[0].queryBlacklist()
         funds = result["funds"]
         assert_equal(len(funds), 1)
-        assert_equal(funds[0], {"txOut": {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
+        assert_equal(funds[0],
+                     {"txOut":
+                      {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 2147483647}],
+                      "policyExpiresWithConsensus": 0,
+                      "blacklist": ["policy", "consensus"]})
 
 
 if __name__ == '__main__':

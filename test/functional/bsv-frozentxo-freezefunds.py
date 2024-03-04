@@ -155,10 +155,36 @@ class FrozenTXORPCFreezeFunds (BitcoinTestFramework):
         result = self.nodes[0].queryBlacklist()
         assert_equal(len(result["funds"]), 4) # there should be 4 frozen funds
         funds = sorted(result["funds"], key=lambda f: f["txOut"]["txId"])
-        assert_equal(funds[0], {"txOut": {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
-        assert_equal(funds[1], {"txOut": {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
-        assert_equal(funds[2], {"txOut": {"txId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "vout": 0}, "enforceAtHeight": [{"start": 1, "stop": 2}, {"start": 11, "stop": 12}], "policyExpiresWithConsensus": 1, "blacklist": ["policy", "consensus"]})
-        assert_equal(funds[3], {"txOut": {"txId": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "vout": 0}, "enforceAtHeight": [{"start": 0, "stop": 2147483647}], "policyExpiresWithConsensus": 0, "blacklist": ["policy", "consensus"]})
+        assert_equal(funds[0],
+                     {"txOut":
+                      {"txId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 2147483647}],
+                      "policyExpiresWithConsensus": 0,
+                      "blacklist": ["policy", "consensus"]})
+
+        assert_equal(funds[1],
+                     {"txOut": {"txId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 2147483647}],
+                      "policyExpiresWithConsensus": 0,
+                      "blacklist": ["policy", "consensus"]})
+
+        assert_equal(funds[2],
+                     {"txOut":
+                      {"txId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 1, "stop": 2}, {"start": 11, "stop": 12}],
+                      "policyExpiresWithConsensus": 1,
+                      "blacklist": ["policy", "consensus"]})
+
+        assert_equal(funds[3],
+                     {"txOut":
+                      {"txId": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                       "vout": 0},
+                      "enforceAtHeight": [{"start": 0, "stop": 2147483647}],
+                      "policyExpiresWithConsensus": 0,
+                      "blacklist": ["policy", "consensus"]})
 
         # Freeze another TXO to policy blacklist. Needed by check of clearBlacklists
         self.nodes[0].addToPolicyBlacklist({

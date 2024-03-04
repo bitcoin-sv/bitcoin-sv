@@ -1020,7 +1020,14 @@ class P2PHeaderAndShortIDs():
         return r
 
     def __repr__(self):
-        return "P2PHeaderAndShortIDs(header=%s, nonce=%d, shortids_length=%d, shortids=%s, prefilled_txn_length=%d, prefilledtxn=%s" % (repr(self.header), self.nonce, self.shortids_length, repr(self.shortids), self.prefilled_txn_length, repr(self.prefilled_txn))
+        return ("P2PHeaderAndShortIDs(header=%s, nonce=%d, shortids_length=%d,"
+                " shortids=%s, prefilled_txn_length=%d, prefilledtxn=%s") \
+            % (repr(self.header),
+               self.nonce,
+               self.shortids_length,
+               repr(self.shortids),
+               self.prefilled_txn_length,
+               repr(self.prefilled_txn))
 
 # Calculate the BIP 152-compact blocks shortid for a given transaction hash
 
