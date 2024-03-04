@@ -916,7 +916,7 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
 
     # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
     try:
-        import zmq
+        import zmq  # noqa: F401
     except ImportError:
         raise Exception("pyzmq module not available.")
 

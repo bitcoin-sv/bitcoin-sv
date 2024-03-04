@@ -33,7 +33,6 @@ After node starts, statuses of invalid forks should be invalid instead of header
 """
 import shutil
 
-from time import sleep
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.blocktools import wait_for_tip, wait_for_tip_status

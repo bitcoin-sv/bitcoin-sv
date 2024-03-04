@@ -8,12 +8,10 @@ This test checks the behaviour of P2SH before and after genesis.
 """
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import TestInstance, RejectResult
 from test_framework.blocktools import *
 from test_framework.key import CECKey
 from test_framework.script import *
-
-from test_framework.util import assert_raises_message
 
 
 # In this test we are checking behavior of the Wallet when trying to spend pre and post genesis P2SH script

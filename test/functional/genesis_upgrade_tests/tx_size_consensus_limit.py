@@ -3,12 +3,9 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.cdefs import MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS
-from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase, GenesisHeightBasedSimpleTestsCase
+from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase
 from genesis_upgrade_tests.tx_size_policy_limit import new_transaction, make_key
-from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SignatureHash, SIGHASH_ALL, \
-    SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, OP_FALSE, OP_RETURN
 
 SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE, OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 

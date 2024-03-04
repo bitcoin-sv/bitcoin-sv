@@ -4,7 +4,6 @@
 
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.blocktools import create_block, create_coinbase
 from test_framework.util import *
 import time
 import os

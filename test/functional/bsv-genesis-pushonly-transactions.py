@@ -11,7 +11,6 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_ADD
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
-from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import msg_tx
 
 

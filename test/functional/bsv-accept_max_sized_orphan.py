@@ -13,8 +13,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_equal, check_mempool_equals
 from test_framework.cdefs import DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS
 
-import time
-
 
 def make_new_block(connection):
     "Create and send block with coinbase, returns conbase (tx, key) tuple"

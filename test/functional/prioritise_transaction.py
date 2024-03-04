@@ -11,8 +11,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 # FIXME: review how this test needs to be adapted w.r.t _LEGACY_MAX_BLOCK_SIZE
 from test_framework.mininode import COIN
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, ONE_KILOBYTE
-import decimal
+from test_framework.cdefs import ONE_KILOBYTE
 
 
 class PrioritiseTransactionTest(BitcoinTestFramework):

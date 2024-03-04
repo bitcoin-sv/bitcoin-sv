@@ -10,12 +10,11 @@ Check RPC call for verbosity levels 0 (HEX), 1 (JSON without transactions detail
 Content-length is never set for JSON, because we do not know the length of JSON response.
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import TestInstance
 from test_framework.blocktools import *
-from test_framework.util import assert_equal, assert_greater_than, json, assert_raises_process_error
-from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE
 from test_framework.mininode import ToHex
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal, assert_raises_rpc_error, json
+
 import http.client
 import urllib.parse
 

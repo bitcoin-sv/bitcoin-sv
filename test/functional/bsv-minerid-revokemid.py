@@ -8,7 +8,6 @@ from test_framework.util import create_confirmed_utxos, wait_until
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from decimal import Decimal
 
-import os
 import time
 
 '''

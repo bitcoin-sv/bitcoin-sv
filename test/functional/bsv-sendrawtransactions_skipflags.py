@@ -16,24 +16,22 @@ Second part: reorg scenario
 Check that the transaction specific config is not applied when reorg happens, so the transactions that were accepted
 when originally sent will now be rejected.
 """
-import json
 import random
 import glob
-from decimal import Decimal
 from math import floor, ceil
 from time import sleep
 import re
 
-from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD, DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
-from test_framework.mininode import NodeConn, NetworkThread, NodeConnCB, mininode_lock, FromHex
+from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD
+from test_framework.mininode import NodeConn, FromHex
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
-from test_framework.util import hex_str_to_bytes, assert_raises_rpc_error, assert_equal, wait_for_reject_message, \
-    wait_until, p2p_port, bytes_to_hex_str, connect_nodes_bi, hashToHex, satoshi_round, connect_nodes, sync_blocks
+from test_framework.util import hex_str_to_bytes, assert_raises_rpc_error, assert_equal, \
+    wait_until, p2p_port, bytes_to_hex_str, connect_nodes_bi, hashToHex, satoshi_round, sync_blocks
 from test_framework.script import OP_1, OP_FALSE, OP_RETURN, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, \
-    OP_EQUALVERIFY, OP_ADD, OP_CAT, OP_MUL
+    OP_EQUALVERIFY, OP_ADD, OP_CAT
 from test_framework.blocktools import COIN, CScript, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, ToHex, \
-    calc_needed_data_size, create_tx
+    calc_needed_data_size
 
 
 def getInputScriptPubKey(node, input, index):

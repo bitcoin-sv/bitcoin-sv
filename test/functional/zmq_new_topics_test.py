@@ -20,7 +20,6 @@ Scenario:
 11. N0 should receive 18 notifications: 6 per each new block (2 notifications (hash+raw) for coinbase tx, sent tx and block)
 
 """
-import os
 import struct
 
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
@@ -28,7 +27,7 @@ from test_framework.util import (assert_equal,
                                  bytes_to_hex_str,
                                  hash256,
                                  connect_nodes_bi,
-                                 check_zmq_test_requirements, zmq_port, wait_until)
+                                 check_zmq_test_requirements, zmq_port)
 
 
 class ZMQNewTopicsTest (BitcoinTestFramework):

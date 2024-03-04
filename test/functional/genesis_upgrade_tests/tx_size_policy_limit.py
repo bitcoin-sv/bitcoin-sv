@@ -3,12 +3,11 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.cdefs import DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS, MAX_TX_SIZE_POLICY_BEFORE_GENESIS
-from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase, GenesisHeightBasedSimpleTestsCase
-#from test_framework.hight_based_test_framework import SimpleTestDefinition
+from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SignatureHash, SIGHASH_ALL, \
-    SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SIGHASH_ALL, \
+    SIGHASH_FORKID
 
 SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE, OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 NEW_MAX_TX_SIZE_POLICY = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS * 2

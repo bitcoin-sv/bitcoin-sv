@@ -1,6 +1,6 @@
 from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
-from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_DROP
+from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP
 from test_framework.cdefs import MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS
 
 

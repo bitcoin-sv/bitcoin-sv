@@ -7,8 +7,7 @@ Test applying limit to the non-final pool size.
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, wait_until
-from test_framework.comptool import TestInstance, RejectResult, DiscardResult
+from test_framework.comptool import TestInstance, DiscardResult
 import time
 
 

@@ -5,8 +5,6 @@
 
 # Exercise the Bitcoin SV RPC calls.
 
-import time
-import random
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (assert_equal, assert_raises_rpc_error)
 from test_framework.cdefs import (ONE_MEGABYTE,

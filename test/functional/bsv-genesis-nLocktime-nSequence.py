@@ -91,7 +91,7 @@ from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
-from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_getdata, msg_tx, CInv, mininode_lock
+from test_framework.mininode import NodeConn, msg_getdata, CInv, mininode_lock
 import time
 import copy
 

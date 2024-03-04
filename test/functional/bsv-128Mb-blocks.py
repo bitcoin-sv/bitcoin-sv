@@ -9,10 +9,7 @@ flag we can actually process very big blocks.
 """
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error
-from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
-import time
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 

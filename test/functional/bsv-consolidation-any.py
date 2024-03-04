@@ -9,7 +9,7 @@ This test creates "spendable by anyone" scripts to easely tweak the script sizes
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_NOP, OP_DROP, OP_RETURN, OP_TRUE, OP_FALSE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
-from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
+from test_framework.util import satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
 

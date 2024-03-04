@@ -24,13 +24,12 @@ import socket
 from test_framework.test_framework import ComparisonTestFramework, wait_until
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
-from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, mininode_lock
 from test_framework.cdefs import GENESIS_GRACEFULL_ACTIVATION_PERIOD
 from test_framework.key import CECKey
 from time import sleep
-from test_framework.script import (CScript, SignatureHashForkId, OP_0, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE,
-                                   OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, SIGHASH_ALL, SIGHASH_FORKID, OP_NOP)
+from test_framework.script import (CScript, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE,
+                                   OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, OP_NOP)
 
 _lan_ip = None
 

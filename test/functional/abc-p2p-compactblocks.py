@@ -11,11 +11,10 @@ this one can be extended, to cover the checks done for bigger blocks
 (e.g. sigops limits).
 """
 
+from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
-from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
-import time
 from test_framework.script import *
 
 

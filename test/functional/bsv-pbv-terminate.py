@@ -33,8 +33,7 @@ from test_framework.mininode import (
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     assert_equal,
-    p2p_port,
-    wait_until
+    p2p_port
 )
 from bsv_pbv_common import (
     wait_for_waiting_blocks,

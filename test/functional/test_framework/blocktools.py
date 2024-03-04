@@ -5,12 +5,12 @@
 """Utilities for manipulating blocks and transactions."""
 from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.comptool import TestInstance
-from .cdefs import (MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, ONE_MEGABYTE,
-                    MAX_TX_SIZE_POLICY_BEFORE_GENESIS, DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
+from .cdefs import (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS,
+                    DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
 from .key import CECKey
 from .mininode import *
-from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_0
-from .util import assert_equal, assert_raises_rpc_error, hash256, satoshi_round, hex_str_to_bytes
+from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160
+from .util import assert_equal, hash256, satoshi_round, hex_str_to_bytes
 
 from collections import deque
 from decimal import Decimal

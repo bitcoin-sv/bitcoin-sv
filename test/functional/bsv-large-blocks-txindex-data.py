@@ -15,14 +15,12 @@ Scenario:
 
 """
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.script import CScript, OP_RETURN, OP_TRUE, OP_NOP, OP_FALSE
+from test_framework.script import CScript, OP_RETURN, OP_FALSE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, p2p_port
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.util import assert_equal
 from test_framework.mininode import msg_tx, CTransaction, FromHex
 from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE
-from test_framework.util import get_rpc_proxy, wait_until, sync_blocks
-from time import sleep
+from test_framework.util import get_rpc_proxy
 
 
 class BlockFileStore(ComparisonTestFramework):

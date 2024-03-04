@@ -1,10 +1,9 @@
-from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase, GenesisHeightBasedSimpleTestsCase
+from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
 from test_framework.cdefs import MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS
-from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SignatureHash, SIGHASH_ALL, \
-    SIGHASH_FORKID, OP_CHECKSIG, OP_0, OP_1, OP_CHECKMULTISIG, OP_TRUE, OP_DROP
+from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, \
+    SIGHASH_FORKID, OP_0, OP_1, OP_CHECKMULTISIG
 
 
 def make_key():

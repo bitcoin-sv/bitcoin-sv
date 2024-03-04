@@ -12,7 +12,6 @@ from decimal import Decimal
 
 import copy
 import ecdsa
-import os
 
 '''
 Test P2P handling of getdata requests for dataref txns.

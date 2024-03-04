@@ -5,7 +5,6 @@
 Base functions that are used by bsv-frozentxo-soft-consensus-freeze* tests.
 """
 
-import threading
 import glob
 import re
 

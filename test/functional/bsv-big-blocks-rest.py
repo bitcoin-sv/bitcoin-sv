@@ -7,8 +7,7 @@ Test that rest call for /rest/block/BLOCKHASH works for bigger blocks.
 """
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import TestInstance
-from test_framework.util import assert_equal, assert_greater_than, json
+from test_framework.util import assert_equal, json
 from test_framework.blocktools import prepare_init_chain
 from test_framework.cdefs import ONE_MEGABYTE
 import http.client

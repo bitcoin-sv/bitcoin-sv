@@ -10,12 +10,8 @@ Scenario:
 4. Send some more blocks of main chain so that alternative branch is no longer within SAFE_MODE_DEFAULT_MAX_VALID_FORK_DISTANCE distance
 5. Validate that node exited safe mode
 """
-from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status
-from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlockHeader
-from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, assert_equal, p2p_port
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MIN_FORK_LENGTH, SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE
 
 

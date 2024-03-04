@@ -5,7 +5,7 @@
 
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, hex_str_to_bytes, disconnect_nodes_bi, connect_nodes_bi, rpc_port, p2p_port
+from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, disconnect_nodes_bi, connect_nodes_bi, rpc_port, p2p_port
 from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG
 from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex, sha256
 from test_framework.blocktools import create_block, create_coinbase

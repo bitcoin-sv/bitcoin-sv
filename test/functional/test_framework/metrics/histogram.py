@@ -16,12 +16,10 @@ histograms and display them
 
 """
 import collections
-import datetime
 import dateutil.parser
 import decimal
 import itertools
 import os
-import pathlib
 from typing import Iterator, List, Callable
 from pathlib import Path
 

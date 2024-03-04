@@ -7,7 +7,6 @@ from time import sleep
 from test_framework.blocktools import calc_needed_data_size
 from test_framework.cdefs import MAX_SCRIPT_SIZE_BEFORE_GENESIS
 from test_framework.cdefs import ONE_MEGABYTE
-from test_framework.comptool import RejectResult
 from test_framework.mininode import *
 from test_framework.util import *
 from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, OP_EQUALVERIFY, OP_HASH160, OP_DUP, OP_TRUE, OP_DROP

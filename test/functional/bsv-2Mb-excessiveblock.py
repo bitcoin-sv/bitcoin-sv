@@ -9,8 +9,8 @@ After the banned time has passed, the connection will be able to retablished.
 """
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error
-from test_framework.comptool import TestManager, TestInstance, RejectResult, logger
+from test_framework.util import assert_equal
+from test_framework.comptool import logger
 from test_framework.blocktools import *
 import time
 from test_framework.script import *

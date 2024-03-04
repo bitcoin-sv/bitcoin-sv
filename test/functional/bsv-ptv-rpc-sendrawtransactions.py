@@ -33,7 +33,7 @@ Test a new rpc interface sendrawtransactions which allows a bulk submit of trans
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.util import assert_equal, assert_greater_than_or_equal, assert_raises_rpc_error, wait_until

@@ -4,7 +4,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import TestInstance, RejectResult
 from test_framework.blocktools import *
 import time
 

@@ -11,7 +11,6 @@
 # 4. See what happens...
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.authproxy import JSONRPCException
 from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.util import bytes_to_hex_str, create_confirmed_utxos, satoshi_round
 from test_framework.util import assert_equal, assert_raises_rpc_error

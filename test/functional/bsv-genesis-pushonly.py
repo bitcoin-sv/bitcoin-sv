@@ -12,7 +12,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_ADD
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, hashToHex
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import RejectResult
 
 
 class BSVGenesisActivation(ComparisonTestFramework):

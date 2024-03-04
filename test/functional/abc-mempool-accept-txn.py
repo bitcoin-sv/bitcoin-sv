@@ -10,12 +10,9 @@ It is derived from the much more complex p2p-fullblocktest.
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import (assert_raises_rpc_error, assert_equal)
-from test_framework.comptool import TestManager, TestInstance
 from test_framework.blocktools import *
-import time
 from test_framework.key import CECKey
 from test_framework.script import *
-import struct
 from test_framework.cdefs import MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS
 
 # Error for too many sigops in one TX

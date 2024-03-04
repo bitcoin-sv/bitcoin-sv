@@ -6,9 +6,9 @@ from time import sleep
 
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, NetworkThread, CInv
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG, \
-    OP_CODESEPARATOR, OP_TRUE, OP_VERIFY, OP_CHECKSIGVERIFY
+from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
+from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, \
+    SIGHASH_FORKID, OP_CHECKSIG, OP_CODESEPARATOR, OP_CHECKSIGVERIFY
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 

@@ -1,6 +1,6 @@
-from test_framework.cdefs import REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER, LEGACY_MAX_BLOCK_SIZE, ONE_GIGABYTE
+from test_framework.cdefs import REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER, ONE_GIGABYTE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import (assert_equal, assert_raises_rpc_error)
+from test_framework.util import assert_equal
 
 
 class BSV_RPC_MaxBlockSize_Test (BitcoinTestFramework):

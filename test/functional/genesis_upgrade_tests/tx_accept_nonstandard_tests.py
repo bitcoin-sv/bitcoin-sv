@@ -5,7 +5,8 @@
 from test_framework.key import CECKey
 from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
-from test_framework.script import CScript, OP_TRUE, OP_HASH160, OP_EQUAL, hash160, OP_FALSE, OP_RETURN, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, OP_TRUE, OP_HASH160, OP_EQUAL, \
+    hash160, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 
 
 def make_key(bytes=b"randombytes"):

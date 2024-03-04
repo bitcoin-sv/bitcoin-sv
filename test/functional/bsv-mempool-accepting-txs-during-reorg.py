@@ -4,7 +4,6 @@
 from time import sleep
 
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, \
     msg_headers

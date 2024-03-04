@@ -2,8 +2,7 @@
 # Copyright (c) 2020  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.blocktools import create_block, create_coinbase, create_transaction
-from test_framework.key import CECKey
+from test_framework.blocktools import create_block, create_coinbase
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, COIN
 from test_framework.script import CScript, OP_DROP, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework

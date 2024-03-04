@@ -22,7 +22,6 @@ ser_*, deser_*: functions that handle serialization/deserialization
 """
 
 import asyncore
-import binascii
 from codecs import encode
 from collections import defaultdict
 import copy

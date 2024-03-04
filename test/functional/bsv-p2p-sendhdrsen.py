@@ -5,14 +5,13 @@
 Check P2P message sendhdrsen
 """
 from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_branch
-from test_framework.miner_id import MinerIdKeys, make_miner_id_block, create_dataref_txn
+from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from test_framework.mininode import COIN, CBlock, CInv, CTxOut, FromHex, mininode_lock, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, msg_gethdrsen, msg_sendhdrsen, msg_sendheaders, NetworkThread, NodeConn, NodeConnCB, ToHex
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than, p2p_port, wait_until, sync_blocks
 
 import time
-import os
 
 
 class SPVNode(NodeConnCB):

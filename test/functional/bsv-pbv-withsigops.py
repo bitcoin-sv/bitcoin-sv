@@ -24,11 +24,10 @@ NOTE: Blocks have to be sent from the same node for the test to be deterministic
       otherwise it can happen that easier block is read from network before the
       hard one so the validation race condition can never (is harder to) occur
 """
-import time
 import glob
 
 from test_framework.blocktools import sign_tx
-from test_framework.blocktools import (create_block, create_coinbase, prepare_init_chain)
+from test_framework.blocktools import prepare_init_chain
 from test_framework.mininode import (
     NetworkThread,
     NodeConn,

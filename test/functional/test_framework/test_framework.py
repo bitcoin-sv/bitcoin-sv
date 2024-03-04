@@ -16,7 +16,7 @@ import tempfile
 import time
 import traceback
 import contextlib
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import NetworkThread, StopNetworkThread
 from .associations import Association, AssociationCB
 

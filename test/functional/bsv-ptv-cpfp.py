@@ -7,7 +7,7 @@ from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN, mininode_lock
 from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals, assert_greater_than
+from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals
 from decimal import Decimal
 import time
 import threading

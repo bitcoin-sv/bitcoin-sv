@@ -32,11 +32,9 @@ from test_framework.mininode import (
 from test_framework.script import (
     CScript,
     hash160,
-    OP_1,
     OP_CHECKSIG,
     OP_CHECKMULTISIG,
     OP_DUP,
-    OP_IF,
     OP_EQUAL,
     OP_EQUALVERIFY,
     OP_FALSE,

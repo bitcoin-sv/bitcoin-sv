@@ -25,11 +25,10 @@ Add a block with MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS sigops to check that max s
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import RejectResult
 from test_framework.blocktools import *
 from test_framework.script import *
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB
-from time import sleep
+from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB, ONE_MEGABYTE
 
 
 class CheckSigTest(ComparisonTestFramework):

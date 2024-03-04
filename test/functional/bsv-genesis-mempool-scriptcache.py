@@ -24,9 +24,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import *
 from test_framework.blocktools import create_transaction, create_block, create_coinbase, prepare_init_chain
 from test_framework.util import assert_equal, hashToHex, wait_until
-from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, msg_block, mininode_lock
-from time import sleep
 
 
 def add_tx_to_block(block, txs):

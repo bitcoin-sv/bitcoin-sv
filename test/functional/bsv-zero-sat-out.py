@@ -6,15 +6,13 @@ from decimal import Decimal
 from test_framework.blocktools import (
     make_block,
     create_block_from_candidate,
-    create_transaction,
-    PreviousSpendableOutput
+    create_transaction
 )
 from test_framework.key import CECKey
 from test_framework.mininode import (
     msg_block,
     msg_tx,
-    ToHex,
-    CTxOut
+    ToHex
 )
 from test_framework.script import (
     CScript,

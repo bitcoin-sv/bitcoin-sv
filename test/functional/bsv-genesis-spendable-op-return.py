@@ -3,15 +3,13 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 import json
 import urllib
-from time import sleep
 
 from rest import http_get_call
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, NetworkThread, CInv, \
-    ToHex
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG, \
-    OP_CODESEPARATOR, OP_TRUE, OP_VERIFY, OP_CHECKSIGVERIFY, OP_RETURN
+from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
+from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, \
+    SIGHASH_FORKID, OP_TRUE, OP_RETURN
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, bytes_to_hex_str
 

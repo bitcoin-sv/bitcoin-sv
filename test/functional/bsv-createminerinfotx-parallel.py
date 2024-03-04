@@ -3,15 +3,13 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.miner_id import create_miner_info_scriptPubKey, MinerIdKeys, make_miner_id_block
-from test_framework.test_framework import BitcoinTestFramework, sync_blocks
-from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, disconnect_nodes_bi, connect_nodes_bi, connect_nodes
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, disconnect_nodes_bi, connect_nodes_bi
 from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG
 from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.address import key_to_p2pkh
-from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE
 from pathlib import Path
-from time import sleep
 import json
 
 '''

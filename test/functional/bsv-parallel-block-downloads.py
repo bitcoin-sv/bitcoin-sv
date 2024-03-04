@@ -5,7 +5,7 @@
 Test parallel downloads for slow blocks.
 """
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, connect_nodes
+from test_framework.util import connect_nodes
 from test_framework.util import sync_blocks, disconnect_nodes_bi, mine_large_block, wait_until, check_for_log_msg
 
 

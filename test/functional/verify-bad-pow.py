@@ -2,7 +2,7 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.blocktools import create_coinbase, create_block_from_candidate, merkle_root_from_merkle_proof, solve_bad
+from test_framework.blocktools import create_block_from_candidate, solve_bad
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import *
 from test_framework.util import *

@@ -6,8 +6,6 @@ from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
-import decimal
-from test_framework.cdefs import DEFAULT_MAX_STD_TXN_VALIDATION_DURATION
 
 '''
 Test if consolidation transactions pass the feefilter

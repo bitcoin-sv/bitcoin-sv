@@ -6,10 +6,10 @@ Test stalling isn't triggered just for large blocks.
 """
 from test_framework.blocktools import prepare_init_chain
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_equal, p2p_port, connect_nodes
+from test_framework.util import connect_nodes
 from test_framework.comptool import TestInstance
-from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE, ONE_KILOBYTE
-from test_framework.util import get_rpc_proxy, wait_until, check_for_log_msg
+from test_framework.cdefs import ONE_GIGABYTE, ONE_KILOBYTE
+from test_framework.util import get_rpc_proxy, check_for_log_msg
 
 
 class StallingTest(ComparisonTestFramework):

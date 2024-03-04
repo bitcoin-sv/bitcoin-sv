@@ -11,13 +11,12 @@ Scenario:
 6. Check if block count is correct after reindex
 """
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.script import CScript, OP_RETURN, OP_TRUE, OP_NOP, OP_FALSE
+from test_framework.script import CScript, OP_RETURN, OP_FALSE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, assert_greater_than, p2p_port
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.util import assert_equal, assert_greater_than
 from test_framework.mininode import msg_tx
 from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE
-from test_framework.util import get_rpc_proxy, wait_until, sync_blocks
+from test_framework.util import get_rpc_proxy
 from time import sleep
 
 

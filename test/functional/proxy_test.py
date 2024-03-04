@@ -33,8 +33,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     PORT_MIN,
     PORT_RANGE,
-    assert_equal,
-    wait_until, check_for_log_msg)
+    assert_equal)
 from test_framework.netutil import test_ipv6_local
 
 RANGE_BEGIN = PORT_MIN + 2 * PORT_RANGE  # Start after p2p and rpc ports

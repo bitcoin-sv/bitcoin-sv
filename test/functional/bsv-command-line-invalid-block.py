@@ -2,13 +2,8 @@
 # Copyright (c) 2019  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from time import sleep
-import socket
-
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, ToHex
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG, OP_ADD
+from test_framework.mininode import msg_block
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, assert_raises_rpc_error
 

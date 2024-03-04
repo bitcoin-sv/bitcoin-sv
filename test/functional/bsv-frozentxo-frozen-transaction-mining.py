@@ -22,7 +22,6 @@
 - Make sure transactions do not appear in mempool of node0.
 - Make sure transactions do appear in mempool of node1.
 """
-import threading
 import glob
 import re
 import time

@@ -9,7 +9,6 @@ The test runs by using p2p connection for sending first and then re-runs with rp
 
 See comments and log entries in above functions for detailed description of steps performed in each test.
 """
-import threading
 import glob
 import re
 
@@ -29,9 +28,7 @@ from test_framework.mininode import (
 
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
-from test_framework.script import CScript, OP_NOP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
-from test_framework.key import CECKey
-from test_framework.address import key_to_p2pkh
+from test_framework.script import CScript, OP_NOP, OP_TRUE
 
 
 class Send_node():

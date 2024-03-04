@@ -16,7 +16,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import *
 from test_framework.util import *
 from test_framework.cdefs import (ONE_MEGABYTE)
-from test_framework.blocktools import merkle_root_from_merkle_proof, create_block_from_candidate
+from test_framework.blocktools import create_block_from_candidate
 import math
 import random
 

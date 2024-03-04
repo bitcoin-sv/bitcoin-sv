@@ -12,7 +12,7 @@
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_RETURN, CTransaction, CTxOut
 from test_framework.blocktools import assert_equal, CTxIn, COutPoint, prepare_init_chain
-from test_framework.comptool import TestInstance, TestNode, RejectResult
+from test_framework.comptool import TestInstance, RejectResult
 
 
 class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):

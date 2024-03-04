@@ -11,14 +11,12 @@ The aim of this test is to verify correctness of Parallel Transaction Validation
 #
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_ADD, OP_MUL
+from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_ADD
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
-from test_framework.util import assert_equal, assert_greater_than, wait_until, wait_for_ptv_completion
+from test_framework.util import assert_equal, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, CTransaction, CTxIn, CTxOut, COutPoint
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 import random
-import time
 
 
 class PTVP2PTest(ComparisonTestFramework):

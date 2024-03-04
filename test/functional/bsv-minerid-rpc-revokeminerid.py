@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import msg_block, NodeConnCB, sha256
+from test_framework.mininode import msg_block, sha256
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from test_framework.util import create_confirmed_utxos, wait_until, bytes_to_hex_str, assert_raises_rpc_error
 from decimal import Decimal

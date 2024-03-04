@@ -8,7 +8,7 @@ Test P2P version message error handling.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import mininode_lock, NetworkThread, NodeConn, NodeConnCB, wait_until, msg_version, ser_string
-from test_framework.util import assert_equal, connect_nodes, p2p_port, check_for_log_msg
+from test_framework.util import assert_equal, p2p_port, check_for_log_msg
 
 import struct
 

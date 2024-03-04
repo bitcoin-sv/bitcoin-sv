@@ -27,9 +27,8 @@ Genesis height is 109.
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, assert_raises_rpc_error, hashToHex
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.mininode import msg_tx
+from test_framework.util import assert_equal, hashToHex
+from test_framework.comptool import RejectResult
 from time import sleep
 
 

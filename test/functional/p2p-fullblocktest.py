@@ -7,7 +7,7 @@
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.blocktools import create_tx
 from test_framework.util import *
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import TestInstance, RejectResult
 from test_framework.blocktools import *
 import time
 from test_framework.key import CECKey

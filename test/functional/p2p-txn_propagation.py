@@ -7,7 +7,6 @@ Check the P2P transaction propagation changes.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-import time
 
 
 class P2PTxnPropagation(BitcoinTestFramework):

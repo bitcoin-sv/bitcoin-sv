@@ -6,8 +6,6 @@
 from test_framework import mininode
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-import time
-from test_framework.blocktools import create_block, create_coinbase
 
 
 class BsvProtoconfViolationTest(BitcoinTestFramework):

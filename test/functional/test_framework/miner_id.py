@@ -18,7 +18,7 @@ from pathlib import Path
 from bip32utils import BIP32Key
 from io import BytesIO
 from .mininode import sha256, hex_str_to_bytes, bytes_to_hex_str, ser_uint256, COutPoint, ToHex, CTransaction
-from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_TRUE, OP_RETURN, CTxOut
+from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_RETURN, CTxOut
 from .util import hashToHex, satoshi_round, assert_equal
 from .blocktools import create_coinbase, create_block
 import copy

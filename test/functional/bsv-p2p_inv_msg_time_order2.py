@@ -12,7 +12,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import *
 from test_framework.util import *
 from test_framework.script import *
-from time import sleep
 
 
 def invsOrderedbyTime(invListExpected, txinvs):
