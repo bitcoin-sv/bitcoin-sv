@@ -72,6 +72,7 @@ public:
     static const int CURRENT_VERSION = VERSION_HD_CHAIN_SPLIT;
     int nVersion;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CHDChain() { SetNull(); }
     ADD_SERIALIZE_METHODS
     template <typename Stream, typename Operation>
@@ -105,11 +106,14 @@ public:
     // Id of the HD masterkey used to derive this key.
     CKeyID hdMasterKeyID;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CKeyMetadata() { SetNull(); }
+    // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
     CKeyMetadata(int64_t nCreateTime_) {
         SetNull();
         nCreateTime = nCreateTime_;
     }
+    // NOLINTEND
 
     ADD_SERIALIZE_METHODS
 
@@ -138,6 +142,7 @@ public:
  * scope.
  * Optionally (on by default) it will flush to disk as well.
  */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CWalletDB {
 private:
     template <typename K, typename T>
@@ -263,6 +268,7 @@ public:
 
 private:
     CDB batch;
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
     CWalletDBWrapper &m_dbw;
 
     CWalletDB(const CWalletDB &);

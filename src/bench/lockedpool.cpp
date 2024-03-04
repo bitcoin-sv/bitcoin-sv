@@ -14,16 +14,19 @@
 #define MSIZE 2048
 
 static void LockedPool(benchmark::State &state) {
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
     void *synth_base = reinterpret_cast<void *>(0x08000000);
+    // NOLINTNEXTLINE (bugprone-implicit-widening-of-multiplication-result)
     const size_t synth_size = 1024 * 1024;
     Arena b(synth_base, synth_size, 16);
 
     std::vector<void *> addr;
     for (int x = 0; x < ASIZE; ++x)
-        addr.push_back(0);
+        addr.push_back(0); // NOLINT (performance-inefficient-vector-operation)
     uint32_t s = 0x12345678;
     while (state.KeepRunning()) {
         for (int x = 0; x < BITER; ++x) {
+            // NOLINTNEXTLINE (bugprone-narrowing-conversions)
             int idx = s & (addr.size() - 1);
             if (s & 0x80000000) {
                 b.free(addr[idx]);
@@ -41,4 +44,4 @@ static void LockedPool(benchmark::State &state) {
     addr.clear();
 }
 
-BENCHMARK(LockedPool)
+BENCHMARK(LockedPool) // NOLINT (cert-err58-cpp)

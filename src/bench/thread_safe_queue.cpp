@@ -19,11 +19,13 @@
 namespace {
     constexpr auto NUMBER_OF_WRITERS = 5;
     constexpr auto NUMBER_OF_ENTRIES = 100000;
+    // NOLINTNEXTLINE (bugprone-implicit-widening-of-multiplication-result)
     constexpr auto QUEUE_SIZE_LIMIT = NUMBER_OF_ENTRIES * NUMBER_OF_WRITERS * sizeof(std::uint64_t) / 2;
     constexpr auto DATA_END_MARKER = std::uint64_t(-1);
 
     using Queue = CThreadSafeQueue<std::uint64_t>;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
     struct BlockedLogger
     {
         using Cnt = std::unordered_map<const char*, int>;
@@ -34,6 +36,7 @@ namespace {
             {
                 for (const auto& [method, count] : counters)
                     std::cout << "Blocked in " << method << " " << count
+                    // NOLINTNEXTLINE (performance-avoid-endl)
                               << " times in " << thread_name << std::endl;
             }
         }
@@ -228,7 +231,9 @@ namespace {
     }
 } // anonymous namespace
 
+// NOLINTBEGIN (cert-err58-cpp)
 BENCHMARK(ThreadSafeQueue_SingleSingle);
 BENCHMARK(ThreadSafeQueue_MultiMulti);
 BENCHMARK(ThreadSafeQueue_SingleMulti);
 BENCHMARK(ThreadSafeQueue_MultiSingle);
+// NOLINTEND

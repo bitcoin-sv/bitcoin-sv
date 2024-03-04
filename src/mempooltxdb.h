@@ -25,6 +25,7 @@
  * The methods exposed by this class are safe to use from multiple threads
  * without synchronization.
  */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CMempoolTxDBReader {
 public:
     virtual ~CMempoolTxDBReader() = default;
@@ -88,11 +89,13 @@ public:
     /*
      * Used to retrieve transaction from the database.
      */
+    // NOLINTNEXTLINE (cppcoreguidelines-explicit-virtual-functions)
     virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override;
 
     /*
      * Checks if the transaction key is in the database.
      */
+    // NOLINTNEXTLINE (cppcoreguidelines-explicit-virtual-functions)
     virtual bool TransactionExists(const uint256 &txid) override;
 
     struct TxData
@@ -100,6 +103,7 @@ public:
         TxId txid;
         uint64_t size;
 
+        // NOLINTNEXTLINE (performance-move-const-arg)
         TxData(TxId&& txid_, uint64_t size_) : txid{std::move(txid_)}, size{size_} {}
         TxData(const TxId& txid_, uint64_t size_) : txid{txid_}, size{size_} {}
     };
@@ -173,6 +177,7 @@ public:
 
 
 /** Wrapper for CMempoolTxDB for asynchronous writes and deletes. */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CAsyncMempoolTxDB
 {
 public:

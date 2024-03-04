@@ -25,7 +25,7 @@ static void do_WriteToDBdataTx() {
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
     std::vector<CTransactionRef> txs;
-    for (std::vector<uint8_t> data :
+    for (std::vector<uint8_t> data : // NOLINT (performance-for-range-copy)
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
@@ -64,8 +64,8 @@ static void do_WriteToDBmultisig() {
     for (auto &key : scriptPubKeys) {
         key << OP_1;
     }
-    uint64_t i;
-    uint64_t j;
+    uint64_t i; // NOLINT (cppcoreguidelines-init-variables)
+    uint64_t j; // NOLINT (cppcoreguidelines-init-variables)
     CKey key;
     for (i = 0; i < keys.size(); i++) {
         key = keys[i];
@@ -77,6 +77,7 @@ static void do_WriteToDBmultisig() {
     }
     std::vector<CTransactionRef> txs;
     for (i = 0; i < scriptPubKeys.size(); i++) {
+        // NOLINTNEXTLINE (bugprone-narrowing-conversions)
         scriptPubKeys[i] << CScriptNum(keys_sizes[i]) << OP_CHECKMULTISIG;
         scriptPubKeys[i] << OP_1;
 
@@ -106,7 +107,7 @@ static void do_WriteToFileDataTx() {
     // std::vector<uint8_t> data100MB(100000000);
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
-    for (std::vector<uint8_t> data :
+    for (std::vector<uint8_t> data : // NOLINT (performance-for-range-copy)
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
@@ -137,7 +138,7 @@ static void do_WriteToSeparateFilesDatatx() {
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
     uint64_t i = 0;
-    for (std::vector<uint8_t> data :
+    for (std::vector<uint8_t> data : // NOLINT (performance-for-range-copy)
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
@@ -182,7 +183,9 @@ static void WriteToSeparateFilesDatatx(benchmark::State &state) {
     }
 }
 
+// NOLINTBEGIN (cert-err58-cpp)
 BENCHMARK(WriteToDBdataTx);
 BENCHMARK(WriteToDBmultisig);
 BENCHMARK(WriteToFileDataTx);
 BENCHMARK(WriteToSeparateFilesDatatx);
+// NOLINTEND

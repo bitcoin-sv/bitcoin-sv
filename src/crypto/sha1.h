@@ -11,7 +11,9 @@
 /** A hasher class for SHA1. */
 class CSHA1 {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint32_t s[5];
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t buf[64];
     uint64_t bytes;
 
@@ -20,6 +22,7 @@ public:
 
     CSHA1();
     CSHA1 &Write(const uint8_t *data, size_t len);
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]);
     CSHA1 &Reset();
 };

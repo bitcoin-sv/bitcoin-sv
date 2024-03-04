@@ -31,16 +31,20 @@
 #include <random>
 
 typedef CWallet *CWalletRef;
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
 extern std::vector<CWalletRef> vpwallets;
 
 /**
  * Settings
  */
+// NOLINTBEGIN (cppcoreguidelines-avoid-non-const-global-variables)
 extern CFeeRate payTxFee;
 extern bool bSpendZeroConfChange;
+// NOLINTEND
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
 //! -paytxfee default
+// NOLINTBEGIN (cert-err58-cpp)
 static const Amount DEFAULT_TRANSACTION_FEE(0);
 //! -fallbackfee default
 static const Amount DEFAULT_FALLBACK_FEE(20000);
@@ -50,6 +54,7 @@ static const Amount DEFAULT_TRANSACTION_MINFEE(1000);
 static const Amount MIN_CHANGE = CENT;
 //! final minimum change amount after paying for fees
 static const Amount MIN_FINAL_CHANGE = MIN_CHANGE / 2;
+// NOLINTEND
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
@@ -61,6 +66,7 @@ static const bool DEFAULT_DISABLE_WALLET = false;
 //! if set, all keys will be derived by using BIP32
 static const bool DEFAULT_USE_HD_WALLET = true;
 
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
 extern const char *DEFAULT_WALLET_DAT;
 
 class CBlockIndex;
@@ -139,6 +145,7 @@ public:
     std::string name;
     std::string purpose;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-prefer-member-initializer)
     CAddressBookData() { purpose = "unknown"; }
 
     typedef std::map<std::string, std::string> StringMap;
@@ -193,11 +200,13 @@ public:
      */
     int nIndex;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CMerkleTx() {
         SetTx(MakeTransactionRef());
         Init();
     }
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init
     CMerkleTx(CTransactionRef arg) {
         SetTx(std::move(arg));
         Init();
@@ -323,8 +332,10 @@ public:
     mutable Amount nAvailableWatchCreditCached;
     mutable Amount nChangeCached;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CWalletTx() { Init(nullptr); }
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init
     CWalletTx(const CWallet *pwalletIn, CTransactionRef arg)
         : CMerkleTx(std::move(arg)) {
         Init(pwalletIn);
@@ -475,12 +486,14 @@ public:
 
     COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn,
             bool fSolvableIn, bool fSafeIn) {
+        // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
         tx = txIn;
         i = iIn;
         nDepth = nDepthIn;
         fSpendable = fSpendableIn;
         fSolvable = fSolvableIn;
         fSafe = fSafeIn;
+        // NOLINTEND
     }
 
     std::string ToString() const;
@@ -527,6 +540,7 @@ public:
     int64_t nOrderPos;
     uint64_t nEntryNo;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CAccountingEntry() { SetNull(); }
 
     void SetNull() {
@@ -569,6 +583,7 @@ public:
             mapValue.clear();
             if (std::string::npos != nSepPos) {
                 CDataStream ss(
+                    // NOLINTNEXTLINE (bugprone-narrowing-conversions)
                     std::vector<char>(strComment.begin() + nSepPos + 1,
                                       strComment.end()),
                     s.GetType(), s.GetVersion());
@@ -591,8 +606,10 @@ private:
  * transactions and balances, and provides the ability to create new
  * transactions.
  */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CWallet final : public CCryptoKeyStore, public CValidationInterface {
 private:
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic<bool> fFlushScheduled;
 
     mutable std::mt19937 randomNumbers;
@@ -714,18 +731,21 @@ public:
     unsigned int nMasterKeyMaxID;
 
     // Create wallet with dummy database handle
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CWallet(const CChainParams &chainParams)
         : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chainParams) {
         SetNull();
     }
 
     // Create wallet with passed-in database handle
+    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     CWallet(const CChainParams &chainParams,
             std::unique_ptr<CWalletDBWrapper> dbw_in)
         : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chainParams) {
         SetNull();
     }
 
+    // NOLINTNEXTLINE (cppcoreguidelines-explicit-virtual-functions)
     ~CWallet() {
         delete pwalletdbEncryption;
         pwalletdbEncryption = nullptr;
@@ -953,8 +973,10 @@ public:
     template <typename ContainerType>
     bool DummySignTx(const Config& config, CMutableTransaction& txNew, const ContainerType& coins);
 
+    // NOLINTBEGIN (ppcoreguidelines-avoid-non-const-global-variable)
     static CFeeRate minTxFee;
     static CFeeRate fallbackFee;
+    // NOLINTEND
     Amount GetMinimumFee(unsigned int nTxBytes,
                          const CCoinControl &coin_control,
                          const CTxMemPool &pool);
@@ -1140,6 +1162,7 @@ public:
 };
 
 /** A key allocated from the key pool. */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CReserveKey final : public CReserveScript {
 protected:
     CWallet *pwallet;
@@ -1149,11 +1172,14 @@ protected:
 
 public:
     CReserveKey(CWallet *pwalletIn) {
+        // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
         nIndex = -1;
         pwallet = pwalletIn;
         fInternal = false;
+        // NOLINTEND
     }
 
+    // NOLINTNEXTLINE (cppcoreguidelines-explicit-virtual-functions)
     ~CReserveKey() { ReturnKey(); }
 
     void ReturnKey();

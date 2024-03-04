@@ -54,13 +54,14 @@ namespace benchmark {
         duration maxElapsed;
         time_point beginTime, lastTime;
         duration minTime, maxTime;
-        uint64_t count;
+        uint64_t count; // NOLINT (cppcoreguidelines-use-default-member-init)
         uint64_t countMask;
         uint64_t beginCycles;
         uint64_t lastCycles;
         uint64_t minCycles;
         uint64_t maxCycles;
     public:
+        // NOLINTBEGIN (cppcoreguidelines-pro-type-member-init)
         State(std::string _name, duration _maxElapsed) : name(_name), maxElapsed(_maxElapsed), count(0) {
             minTime = duration::max();
             maxTime = duration::zero();
@@ -68,6 +69,7 @@ namespace benchmark {
             maxCycles = std::numeric_limits<uint64_t>::min();
             countMask = 1;
         }
+        // NOLINTEND
         bool KeepRunning();
     };
 

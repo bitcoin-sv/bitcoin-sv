@@ -21,6 +21,7 @@
 
 namespace leveldb {
 
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class LEVELDB_EXPORT Iterator {
  public:
   Iterator();

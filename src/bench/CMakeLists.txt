@@ -19,6 +19,7 @@ add_executable(bench_bitcoin
         checkqueue.cpp
         $<$<BOOL:${BUILD_BITCOIN_WALLET}>:coin_selection.cpp>
         crypto_hash.cpp
+        cscript.cpp
         interpreter.cpp
         lockedpool.cpp
         mempool_eviction.cpp
@@ -39,3 +40,6 @@ target_link_libraries(bench_bitcoin
         leveldb
         univalue
         $<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
+
+include(ClangTidy)
+AddClangTidy(bench_bitcoin)

@@ -56,7 +56,9 @@ const std::vector<uint8_t> &GetObfuscateKey(const CDBWrapper &w);
 class CDataStreamInput
 {
     std::string_view buf;
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::vector<std::uint8_t>& obfuscate_key;
+    // NOLINTNEXTLINE (cppcoreguidelines-use-default-member-init)
     unsigned int nReadPos;
 
 public:
@@ -169,6 +171,7 @@ private:
 
         for (size_type i = 0, j = readPos % obfuscate_key.size(); i != bufSize; i++)
         {
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
             buf[i] ^= obfuscate_key[j++];
 
             // This potentially acts on very many bytes of data, so it's
@@ -187,12 +190,14 @@ class CDBBatch {
     friend class CDBWrapper;
 
 private:
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
     const CDBWrapper &parent;
     leveldb::WriteBatch batch;
 
     CDataStream ssKey;
     CDataStream ssValue;
 
+    // NOLINTNEXTLINE (cppcoreguidelines-use-default-member-init)
     size_t size_estimate;
 
 public:
@@ -285,6 +290,7 @@ public:
     template <typename K> bool GetKey(K &key) {
         leveldb::Slice slKey = piter->key();
         try {
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
             CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(),
                               SER_DISK, CLIENT_VERSION);
             ssKey >> key;
@@ -362,6 +368,7 @@ private:
 
 public:
     struct MaxFiles {
+        // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
         const size_t maxFiles;
         explicit MaxFiles(size_t maxFiles_) : maxFiles{maxFiles_} {}
         static MaxFiles Default() { return MaxFiles{64}; }
@@ -470,6 +477,7 @@ public:
     }
 
     CDBIterator *NewIterator() {
+        // NOLINTNEXTLINE (cppcoreguidelines-owning-memory)
         return new CDBIterator(*this, pdb->NewIterator(iteroptions));
     }
 

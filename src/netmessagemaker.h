@@ -42,6 +42,7 @@ public:
     }
 
 private:
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 };
 

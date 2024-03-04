@@ -15,6 +15,7 @@
 #include <boost/variant.hpp>
 
 /** A virtual base class for key stores */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CKeyStore {
 protected:
     mutable CCriticalSection cs_KeyStore;
@@ -65,7 +66,7 @@ public:
     bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey) override;
     bool GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const override;
     bool HaveKey(const CKeyID &address) const override {
-        bool result;
+        bool result; // NOLINT (cppcoreguidelines-init-variables)
         {
             LOCK(cs_KeyStore);
             result = (mapKeys.count(address) > 0);
@@ -94,6 +95,7 @@ public:
         }
         return false;
     }
+    // NOLINTBEGIN (cppcoreguidelines-explicit-virtual-functions)
     virtual bool AddCScript(const CScript &redeemScript) override;
     virtual bool HaveCScript(const CScriptID &hash) const override;
     virtual bool GetCScript(const CScriptID &hash,
@@ -103,6 +105,7 @@ public:
     virtual bool RemoveWatchOnly(const CScript &dest) override;
     virtual bool HaveWatchOnly(const CScript &dest) const override;
     virtual bool HaveWatchOnly() const override;
+    // NOLINTEND
 };
 
 typedef std::vector<uint8_t, secure_allocator<uint8_t>> CKeyingMaterial;

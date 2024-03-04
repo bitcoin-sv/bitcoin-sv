@@ -23,6 +23,7 @@
 static const unsigned int DEFAULT_WALLET_DBLOGSIZE = 100;
 static const bool DEFAULT_WALLET_PRIVDB = true;
 
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CDBEnv {
 private:
     bool fDbEnvInit;
@@ -87,6 +88,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
 extern CDBEnv bitdb;
 
 /**
@@ -142,6 +144,7 @@ private:
 };
 
 /** RAII class that provides access to a Berkeley database */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CDB {
 protected:
     Db *pdb;
@@ -205,10 +208,12 @@ public:
 
         // Unserialize value
         try {
+            // NOLINTBEGIN (cppcoreguidelines-pro-type-cstyle-cast)
             CDataStream ssValue((char *)datValue.get_data(),
                                 (char *)datValue.get_data() +
                                     datValue.get_size(),
                                 SER_DISK, CLIENT_VERSION);
+            // NOLINTEND
             ssValue >> value;
         } catch (const std::exception &) {
             return false;
@@ -216,7 +221,7 @@ public:
 
         // Clear and free memory
         memset(datValue.get_data(), 0, datValue.get_size());
-        free(datValue.get_data());
+        free(datValue.get_data()); // NOLINT (cppcoreguidelines-no-malloc)
         return (ret == 0);
     }
 
@@ -328,16 +333,20 @@ public:
         // Convert to streams
         ssKey.SetType(SER_DISK);
         ssKey.clear();
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast,)
         ssKey.write((char *)datKey.get_data(), datKey.get_size());
         ssValue.SetType(SER_DISK);
         ssValue.clear();
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast,)
         ssValue.write((char *)datValue.get_data(), datValue.get_size());
 
         // Clear and free memory
         memset(datKey.get_data(), 0, datKey.get_size());
         memset(datValue.get_data(), 0, datValue.get_size());
+        // NOLINTBEGIN (cppcoreguidelines-no-malloc)
         free(datKey.get_data());
         free(datValue.get_data());
+        // NOLINTEND
         return 0;
     }
 

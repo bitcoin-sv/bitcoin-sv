@@ -24,6 +24,7 @@
 
 namespace leveldb {
 
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class LEVELDB_EXPORT Slice {
  public:
   // Create an empty slice.
@@ -55,7 +56,7 @@ class LEVELDB_EXPORT Slice {
   // REQUIRES: n < size()
   char operator[](size_t n) const {
     assert(n < size());
-    return data_[n];
+    return data_[n]; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
   }
 
   // Change this slice to refer to an empty array
@@ -67,7 +68,7 @@ class LEVELDB_EXPORT Slice {
   // Drop the first "n" bytes from this slice.
   void remove_prefix(size_t n) {
     assert(n <= size());
-    data_ += n;
+    data_ += n; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
     size_ -= n;
   }
 

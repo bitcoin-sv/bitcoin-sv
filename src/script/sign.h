@@ -16,6 +16,7 @@ class CScript;
 class CTransaction;
 
 /** Virtual base class for signature creators. */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class BaseSignatureCreator {
 protected:
     const CKeyStore *keystore;
@@ -37,6 +38,7 @@ class TransactionSignatureCreator : public BaseSignatureCreator {
     unsigned int nIn;
     Amount amount;
     SigHashType sigHashType;
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
     const TransactionSignatureChecker checker;
 
 public:
@@ -55,6 +57,7 @@ class MutableTransactionSignatureCreator : public TransactionSignatureCreator {
 public:
     MutableTransactionSignatureCreator(const CKeyStore *keystoreIn,
                                        const CMutableTransaction *txToIn,
+                                       // NOLINTNEXTLINE (performance-unnecessary-value-param)
                                        unsigned int nInIn, const Amount amount,
                                        SigHashType sigHashTypeIn)
         : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amount,

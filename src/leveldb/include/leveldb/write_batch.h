@@ -30,8 +30,10 @@ namespace leveldb {
 
 class Slice;
 
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class LEVELDB_EXPORT WriteBatch {
  public:
+  // NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
   class LEVELDB_EXPORT Handler {
    public:
     virtual ~Handler();

@@ -26,6 +26,7 @@ class WriteBatch;
 // Abstract handle to particular state of a DB.
 // A Snapshot is an immutable object and can therefore be safely
 // accessed from multiple threads without any external synchronization.
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class LEVELDB_EXPORT Snapshot {
  protected:
   virtual ~Snapshot();
@@ -43,6 +44,7 @@ struct LEVELDB_EXPORT Range {
 // A DB is a persistent ordered map from keys to values.
 // A DB is safe for concurrent access from multiple threads without
 // any external synchronization.
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class LEVELDB_EXPORT DB {
  public:
   // Open the database with the specified "name".

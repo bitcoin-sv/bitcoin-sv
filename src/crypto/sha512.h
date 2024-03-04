@@ -11,7 +11,9 @@
 /** A hasher class for SHA-512. */
 class CSHA512 {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint64_t s[8];
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t buf[128];
     uint64_t bytes;
 
@@ -20,6 +22,7 @@ public:
 
     CSHA512();
     CSHA512 &Write(const uint8_t *data, size_t len);
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]);
     CSHA512 &Reset();
 };

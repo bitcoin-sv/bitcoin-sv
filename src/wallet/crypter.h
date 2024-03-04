@@ -56,8 +56,10 @@ public:
     CMasterKey() {
         // 25000 rounds is just under 0.1 seconds on a 1.86 GHz Pentium M
         // ie slightly lower than the lowest hardware we need bother supporting
+        // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
         nDeriveIterations = 25000;
         nDerivationMethod = 0;
+        // NOLINTEND
         vchOtherDerivationParameters = std::vector<uint8_t>(0);
     }
 };
@@ -69,6 +71,7 @@ class TestCrypter;
 }
 
 /** Encryption/decryption context with key information */
+// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CCrypter {
     // for test access to chKey/chIV
     friend class wallet_crypto::TestCrypter;
@@ -101,7 +104,7 @@ public:
     }
 
     CCrypter() {
-        fKeySet = false;
+        fKeySet = false; // NOLINT (cppcoreguidelines-prefer-member-initializer)
         vchKey.resize(WALLET_CRYPTO_KEY_SIZE);
         vchIV.resize(WALLET_CRYPTO_IV_SIZE);
     }
@@ -120,10 +123,10 @@ private:
 
     //! if fUseCrypto is true, mapKeys must be empty
     //! if fUseCrypto is false, vMasterKey must be empty
-    bool fUseCrypto;
+    bool fUseCrypto; // NOLINT (cppcoreguidelines-prefer-member-initializer)
 
     //! keeps track of whether Unlock has run a thorough check before
-    bool fDecryptionThoroughlyChecked;
+    bool fDecryptionThoroughlyChecked; // NOLINT (cppcoreguidelines-prefer-member-initializer)
 
 protected:
     bool SetCrypted();
@@ -142,7 +145,7 @@ public:
 
     bool IsLocked() const {
         if (!IsCrypted()) return false;
-        bool result;
+        bool result; // NOLINT (cppcoreguidelines-init-variables)
         {
             LOCK(cs_KeyStore);
             result = vMasterKey.empty();

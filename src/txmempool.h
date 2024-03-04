@@ -46,7 +46,7 @@ class CBlockIndex;
 class CEvictionCandidateTracker;
 class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CoinsDB;
-class CoinsDBView;
+class CoinsDBView; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CAsyncMempoolTxDB;
 
 /**
