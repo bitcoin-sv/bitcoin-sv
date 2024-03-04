@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pycodestyle:
+  flake8:
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
@@ -30,11 +30,11 @@ jobs:
         with:
           clean: ''
       - run: |
-          ./pycodestyle.sh 
+          flake8 test/functional 
         shell: bash
   
   autotools:
-    needs: pycodestyle
+    needs: flake8
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
@@ -60,7 +60,7 @@ jobs:
           toolset: ${{ matrix.toolset }}
 
   cmake:
-    needs: pycodestyle
+    needs: flake8
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]

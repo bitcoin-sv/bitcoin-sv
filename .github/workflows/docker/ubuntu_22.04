@@ -6,7 +6,8 @@ FROM ubuntu:22.04
 ENV TZ=Europe/London
 
 RUN set -xeu \
-    && apt-get update && apt-get install -y \
+    && apt-get update \
+    && apt-get install -y \
     build-essential libtool autotools-dev automake \ 
     cmake ninja-build \
     python3 pkg-config \
@@ -22,9 +23,10 @@ RUN set -xeu \
     gcc-12 g++-12 \
     pip 
 
-RUN set -xeu && pip install pycodestyle
+RUN set -xeu && pip install flake8
 
 RUN set -xeu \
+    && apt-get update \
     && apt-get install -y lsb-release wget software-properties-common gnupg \
     && wget https://apt.llvm.org/llvm.sh \
     && chmod +x llvm.sh \
