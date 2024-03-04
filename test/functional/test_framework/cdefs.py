@@ -105,11 +105,11 @@ def _extractTextWriterValue(name):
 
 
 def _extractTxnValidationConfigValue(name):
-    return int(eval(re.search(name + " =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
+    return int(eval(re.search(name + r" =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
 
 
 def _extractTxnValidatorValue(name):
-    return int(eval(re.search(name + " \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))
+    return int(eval(re.search(name + r" \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))
 
 
 # Extract relevant default values parameters

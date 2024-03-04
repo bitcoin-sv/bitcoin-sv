@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
-"""
+r"""
 Testing that we correctly reorg to longer chain even if we are still validating blocks
 on lower chains
 
