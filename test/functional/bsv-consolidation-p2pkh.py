@@ -151,7 +151,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.stop_nodes()
         deprecation_log = False
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-            if f"Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead" in line:
+            if "Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead" in line:
                 deprecation_log = True
                 #self.log.info("Found line: %s", line.strip())
                 break

@@ -58,7 +58,7 @@ class InvalidateBlock(BitcoinTestFramework):
         with self.run_node_with_connections("Invalidate block deep in the chain", 0, [f"-invalidateblock={generated_blocks[-90]}", "-reindex=1"], 1) as (conn,):
             self.confirm_tip(conn, generated_blocks[-91])
 
-        with self.run_node_with_connections("Try to Invalidate non-existing block", 0, [f"-invalidateblock=1000000000000000000000000000000000000000000000000000000000000000"], 1) as (conn,):
+        with self.run_node_with_connections("Try to Invalidate non-existing block", 0, ["-invalidateblock=1000000000000000000000000000000000000000000000000000000000000000"], 1) as (conn,):
             self.confirm_tip(conn, generated_blocks[-91])
             next_block = self.make_block(conn)
 

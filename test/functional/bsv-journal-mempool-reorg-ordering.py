@@ -297,7 +297,7 @@ class tx_set(set):
         if unexpected:
             if ret:
                 ret += "and "
-            ret += f"unexpected "
+            ret += "unexpected "
             for n, v in context.items():
                 if unexpected.intersection(v):
                     ret += self._explain_range(n, v, unexpected)

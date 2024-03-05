@@ -72,7 +72,9 @@ class SpendingOpReturnTx(BitcoinTestFramework):
             conn.cb.sync_with_ping()
 
             url = urllib.parse.urlparse(self.nodes[0].url)
-            json_mempool = json.loads(http_get_call(url.hostname, url.port, f'/rest/mempool/contents.json'))
+            json_mempool = json.loads(http_get_call(url.hostname,
+                                                    url.port,
+                                                    '/rest/mempool/contents.json'))
             json_tx = json.loads(http_get_call(url.hostname, url.port, f'/rest/getutxos/checkmempool/{tx_data.hash}-0.json'))
 
             assert len(json_mempool) == 1, f"Only one tx should be in mempool. Found {len(json_mempool)}"

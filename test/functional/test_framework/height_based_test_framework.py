@@ -480,4 +480,4 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 conn.rpc.invalidateblock(first_block.hash)
                 del self._coinbases[:]
                 self.log.info(f"Finishing test \"{test.NAME}\"")
-                self.log.info(f"=" * 100)
+                self.log.info("=" * 100)

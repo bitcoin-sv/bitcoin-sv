@@ -306,7 +306,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             assert_equal(node.rpc.getbestblockhash(), self.chain.tip.hash)
 
         def MineEmptyBlock():
-            self.log.info(f"Mining block with no transactions to increase height")
+            self.log.info("Mining block with no transactions to increase height")
             self._mine_and_send_block(None, node)
             assert_equal(node.rpc.getbestblockhash(), self.chain.tip.hash)
 

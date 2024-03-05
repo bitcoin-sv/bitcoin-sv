@@ -103,11 +103,11 @@ class InvalidTx(BitcoinTestFramework):
         wait_until(lambda: os.path.isdir(invalidtxsfolder),
                    check_interval=0.5,
                    timeout=30,
-                   label=f"waiting for folder to be created")
+                   label="waiting for folder to be created")
         wait_until(lambda: len([name for name in os.listdir(invalidtxsfolder)]) == number,
                    check_interval=0.5,
                    timeout=30,
-                   label=f"waiting for invalid transaction be written")
+                   label="waiting for invalid transaction be written")
         return [name for name in os.listdir(invalidtxsfolder)]
 
     def assert_number_of_files_with_substring_in_name(self, number, name_substring):
@@ -115,7 +115,7 @@ class InvalidTx(BitcoinTestFramework):
         wait_until(lambda: os.path.isdir(invalidtxsfolder),
                    check_interval=0.5,
                    timeout=30,
-                   label=f"waiting for folder to be created")
+                   label="waiting for folder to be created")
         wait_until(lambda: len([name for name in os.listdir(invalidtxsfolder) if name_substring in name]) == number,
                    check_interval=0.5,
                    timeout=30,

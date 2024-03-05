@@ -170,7 +170,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         text_block3 = "Verify 2000 txins"
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
             if text_activation in line:
-                self.log.info(f"block2_hard was not activated as block3_easy won the validation race")
+                self.log.info("block2_hard was not activated as block3_easy won the validation race")
             elif text_block2 in line:
                 line = line.split()
                 self.log.info(f"block2_hard took {line[len(line) - 1]} to verify")
