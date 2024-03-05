@@ -204,7 +204,7 @@ def plot_percentiles(ax, ls, *, key):
 #                plt.annotate(f"{100*xy[1]:.3f}% < {xy[0]}", xy)
     plt.title(key(ls[0]))
     plt.yscale("logit")
-    plt.ylim((1e - 1, 1 - 1e - 6))
+    plt.ylim((1e-1, 1 - 1e-6))
 
 
 def prefix(x):
