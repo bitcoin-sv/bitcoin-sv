@@ -29,16 +29,17 @@
 #include <boost/algorithm/string.hpp>
 #include "config.h"
 
-static bool fCreateBlank;
-static std::map<std::string, UniValue> registers;
+static bool fCreateBlank; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
+static std::map<std::string, UniValue> registers; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 
 // not in use but required by config.h dependency
-bool fRequireStandard = true;
+bool fRequireStandard = true; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 
 //
 // This function returns either one of EXIT_ codes when it's expected to stop
 // the process or CONTINUE_EXECUTION when it's expected to continue further.
 //
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
 static int AppInitRawTx(int argc, char *argv[]) {
     //
     // Parameters
@@ -50,7 +51,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
     try {
         SelectParams(ChainNameFromCommandLine());
     } catch (const std::exception &e) {
-        fprintf(stderr, "Error: %s\n", e.what());
+        fprintf(stderr, "Error: %s\n", e.what()); // NOLINT (cert-err33-c)
         return EXIT_FAILURE;
     }
 
@@ -67,7 +68,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
             "  bitcoin-tx [options] -create [commands]   " +
             _("Create hex-encoded bitcoin transaction") + "\n" + "\n";
 
-        fprintf(stdout, "%s", strUsage.c_str());
+        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT (cert-err33-c)
 
         strUsage = HelpMessageGroup(_("Options:"));
         strUsage += HelpMessageOpt("-?", _("This help message"));
@@ -78,7 +79,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
                                       "id of the resultant transaction."));
         AppendParamsHelpMessages(strUsage);
 
-        fprintf(stdout, "%s", strUsage.c_str());
+        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT (cert-err33-c)
 
         strUsage = HelpMessageGroup(_("Commands:"));
         strUsage += HelpMessageOpt("delin=N", _("Delete input N from TX"));
@@ -108,7 +109,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
                 _("prevtxs=JSON object") + ", " + _("privatekeys=JSON object") +
                 ". " + _("See signrawtransaction docs for format of sighash "
                          "flags, JSON objects."));
-        fprintf(stdout, "%s", strUsage.c_str());
+        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT (cert-err33-c)
 
         strUsage = HelpMessageGroup(_("Register Commands:"));
         strUsage +=
@@ -116,10 +117,10 @@ static int AppInitRawTx(int argc, char *argv[]) {
                            _("Load JSON file FILENAME into register NAME"));
         strUsage += HelpMessageOpt("set=NAME:JSON-STRING",
                                    _("Set register NAME to given JSON-STRING"));
-        fprintf(stdout, "%s", strUsage.c_str());
+        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT (cert-err33-c)
 
         if (argc < 2) {
-            fprintf(stderr, "Error: too few parameters\n");
+            fprintf(stderr, "Error: too few parameters\n"); // NOLINT (cert-err33-c)
             return EXIT_FAILURE;
         }
 
@@ -165,6 +166,7 @@ static void RegisterLoad(const std::string &strInput) {
     std::string key = strInput.substr(0, pos);
     std::string filename = strInput.substr(pos + 1, std::string::npos);
 
+    // NOLINTNEXTLINE (cppcoreguidelines-owning-memory)
     FILE *f = fopen(filename.c_str(), "r");
     if (!f) {
         std::string strErr = "Cannot open file " + filename;
@@ -174,17 +176,19 @@ static void RegisterLoad(const std::string &strInput) {
     // load file chunks into one big buffer
     std::string valStr;
     while ((!feof(f)) && (!ferror(f))) {
-        char buf[4096];
+        char buf[4096]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE (bugprone-narrowing-conversions)
         int bread = fread(buf, 1, sizeof(buf), f);
         if (bread <= 0) {
             break;
         }
 
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         valStr.insert(valStr.size(), buf, bread);
     }
 
     int error = ferror(f);
-    fclose(f);
+    fclose(f); // NOLINT (cert-err33-c)
 
     if (error) {
         std::string strErr = "Error reading file " + filename;
@@ -247,7 +251,7 @@ static void MutateTxAddInput(CMutableTransaction &tx,
 
     // extract and validate vout
     std::string strVout = vStrInputParts[1];
-    int vout = atoi(strVout);
+    int vout = atoi(strVout); // NOLINT (cert-err34-c)
     if ((vout < 0) || (vout > (int)maxVout)) {
         throw std::runtime_error("invalid TX input vout");
     }
@@ -316,6 +320,7 @@ static void MutateTxAddOutPubKey(CMutableTransaction &tx,
     bool bScriptHash = false;
     if (vStrInputParts.size() == 3) {
         std::string flags = vStrInputParts[2];
+        // NOLINTNEXTLINE (performance-faster-string-find)
         bScriptHash = (flags.find("S") != std::string::npos);
     }
 
@@ -375,12 +380,14 @@ static void MutateTxAddOutMultiSig(CMutableTransaction &tx,
     bool bScriptHash = false;
     if (vStrInputParts.size() == numkeys + 4) {
         std::string flags = vStrInputParts.back();
+        // NOLINTNEXTLINE (performance-faster-string-find)
         bScriptHash = (flags.find("S") != std::string::npos);
     } else if (vStrInputParts.size() > numkeys + 4) {
         // Validate that there were no more parameters passed
         throw std::runtime_error("Too many parameters");
     }
 
+    // NOLINTNEXTLINE (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
     CScript scriptPubKey = GetScriptForMultisig(required, pubkeys);
 
     if (bScriptHash) {
@@ -440,6 +447,7 @@ static void MutateTxAddOutScript(CMutableTransaction &tx,
     bool bScriptHash = false;
     if (vStrInputParts.size() == 3) {
         std::string flags = vStrInputParts.back();
+        // NOLINTNEXTLINE (performance-faster-string-find)
         bScriptHash = (flags.find("S") != std::string::npos);
     }
 
@@ -455,7 +463,7 @@ static void MutateTxAddOutScript(CMutableTransaction &tx,
 static void MutateTxDelInput(CMutableTransaction &tx,
                              const std::string &strInIdx) {
     // parse requested deletion index
-    int inIdx = atoi(strInIdx);
+    int inIdx = atoi(strInIdx); // NOLINT (cert-err34-c)
     if (inIdx < 0 || inIdx >= (int)tx.vin.size()) {
         std::string strErr = "Invalid TX input index '" + strInIdx + "'";
         throw std::runtime_error(strErr.c_str());
@@ -468,7 +476,7 @@ static void MutateTxDelInput(CMutableTransaction &tx,
 static void MutateTxDelOutput(CMutableTransaction &tx,
                               const std::string &strOutIdx) {
     // parse requested deletion index
-    int outIdx = atoi(strOutIdx);
+    int outIdx = atoi(strOutIdx); // NOLINT (cert-err34-c)
     if (outIdx < 0 || outIdx >= (int)tx.vout.size()) {
         std::string strErr = "Invalid TX output index '" + strOutIdx + "'";
         throw std::runtime_error(strErr.c_str());
@@ -479,7 +487,7 @@ static void MutateTxDelOutput(CMutableTransaction &tx,
 }
 
 static const unsigned int N_SIGHASH_OPTS = 12;
-static const struct {
+static const struct { // NOLINT (cppcoreguidelines-avoid-c-arrays)
     const char *flagStr;
     int flags;
 } sigHashOptions[N_SIGHASH_OPTS] = {
@@ -505,7 +513,9 @@ static bool findSigHashFlags(SigHashType &sigHashType,
     sigHashType = SigHashType();
 
     for (unsigned int i = 0; i < N_SIGHASH_OPTS; i++) {
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
         if (flagStr == sigHashOptions[i].flagStr) {
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-constant-array-index)
             sigHashType = SigHashType(sigHashOptions[i].flags);
             return true;
         }
@@ -519,7 +529,7 @@ static Amount AmountFromValue(const UniValue &value) {
         throw std::runtime_error("Amount is not a number or string");
     }
 
-    int64_t n;
+    int64_t n; // NOLINT (cppcoreguidelines-init-variables)
     if (!ParseFixedPoint(value.getValStr(), 8, &n)) {
         throw std::runtime_error("Invalid amount");
     }
@@ -579,7 +589,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     UniValue prevtxsObj = registers["prevtxs"];
 
     for (unsigned int previdx = 0; previdx < prevtxsObj.size(); previdx++) {
-        UniValue prevOut = prevtxsObj[previdx];
+        UniValue prevOut = prevtxsObj[previdx]; // NOLINT (performance-unnecessary-copy-initialization)
         if (!prevOut.isObject()) {
             throw std::runtime_error("expected prevtxs internal object");
         }
@@ -594,7 +604,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
 
         uint256 txid = ParseHashUV(prevOut["txid"], "txid");
 
-        int nOut = atoi(prevOut["vout"].getValStr());
+        int nOut = atoi(prevOut["vout"].getValStr()); // NOLINT (cert-err34-c)
         if (nOut < 0) {
             throw std::runtime_error("vout must be positive");
         }
@@ -609,6 +619,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 coin.has_value() && !coin->IsSpent() &&
                 coin->GetTxOut().scriptPubKey != scriptPubKey) {
                 std::string err("Previous output scriptPubKey mismatch:\n");
+                // NOLINTNEXTLINE (performance-inefficient-string-concatenation)
                 err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                       "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                 throw std::runtime_error(err);
@@ -749,24 +760,25 @@ static void OutputTxJSON(const CTransaction &tx) {
         });
 
     CStringWriter strWriter;
+    // NOLINTNEXTLINE (bugprone-implicit-widening-of-multiplication-result)
     strWriter.ReserveAdditional(tx.GetTotalSize() * 2);
     CJSONWriter jWriter(strWriter, true);
     TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
 
-    fprintf(stdout, "%s\n", strWriter.MoveOutString().c_str());
+    fprintf(stdout, "%s\n", strWriter.MoveOutString().c_str()); // NOLINT (cert-err33-c)
 }
 
 static void OutputTxHash(const CTransaction &tx) {
     // the hex-encoded transaction id.
     std::string strHexHash = tx.GetId().GetHex();
 
-    fprintf(stdout, "%s\n", strHexHash.c_str());
+    fprintf(stdout, "%s\n", strHexHash.c_str()); // NOLINT (cert-err33-c)
 }
 
 static void OutputTxHex(const CTransaction &tx) {
     std::string strHex = EncodeHexTx(tx);
 
-    fprintf(stdout, "%s\n", strHex.c_str());
+    fprintf(stdout, "%s\n", strHex.c_str()); // NOLINT (cert-err33-c)
 }
 
 static void OutputTx(const CTransaction &tx) {
@@ -780,11 +792,13 @@ static void OutputTx(const CTransaction &tx) {
 }
 
 static std::string readStdin() {
-    char buf[4096];
+    char buf[4096]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
     std::string ret;
 
     while (!feof(stdin)) {
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         size_t bread = fread(buf, 1, sizeof(buf), stdin);
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         ret.append(buf, bread);
         if (bread < sizeof(buf)) {
             break;
@@ -800,6 +814,7 @@ static std::string readStdin() {
     return ret;
 }
 
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
 static int CommandLineRawTx(int argc, char *argv[],
                             const CChainParams &chainParams) {
     std::string strPrint;
@@ -807,13 +822,14 @@ static int CommandLineRawTx(int argc, char *argv[],
     const Config &config = GlobalConfig::GetConfig();
     try {
         // Skip switches; Permit common stdin convention "-"
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
         while (argc > 1 && IsSwitchChar(argv[1][0]) && (argv[1][1] != 0)) {
             argc--;
             argv++;
         }
 
         CMutableTransaction tx;
-        int startArg;
+        int startArg; // NOLINT (cppcoreguidelines-init-variables)
 
         if (!fCreateBlank) {
             // require at least one param
@@ -822,7 +838,7 @@ static int CommandLineRawTx(int argc, char *argv[],
             }
 
             // param: hex-encoded bitcoin transaction
-            std::string strHexTx(argv[1]);
+            std::string strHexTx(argv[1]); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             // "-" implies standard input
             if (strHexTx == "-") {
@@ -839,7 +855,7 @@ static int CommandLineRawTx(int argc, char *argv[],
         }
 
         for (int i = startArg; i < argc; i++) {
-            std::string arg = argv[i];
+            std::string arg = argv[i]; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
             std::string key, value;
             size_t eqpos = arg.find('=');
             if (eqpos == std::string::npos) {
@@ -866,6 +882,7 @@ static int CommandLineRawTx(int argc, char *argv[],
     }
 
     if (strPrint != "") {
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-vararg)
         fprintf((nRet == 0 ? stdout : stderr), "%s\n", strPrint.c_str());
     }
 
