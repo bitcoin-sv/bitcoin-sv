@@ -6,7 +6,9 @@
 # Exercise the listreceivedbyaddress API
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_array_result
+
+from decimal import Decimal
 
 
 def get_sub_array_from_array(object_array, to_match):

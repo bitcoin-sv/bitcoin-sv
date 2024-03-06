@@ -11,7 +11,10 @@
  no effect on transactions which are already conflicted or abandoned.
 """
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, connect_nodes, \
+    disconnect_nodes_bi, sync_blocks, sync_mempools
+
+from decimal import Decimal
 
 
 class AbandonConflictTest(BitcoinTestFramework):

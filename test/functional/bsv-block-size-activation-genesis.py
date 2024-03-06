@@ -8,10 +8,10 @@ Test excessiveblocksize that is a required parameter. Blocks should be accepted 
 Note we don't test oversized blocks as such peers are banned
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.blocktools import *
-from test_framework.util import assert_equal
 from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.blocktools import prepare_init_chain
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal
 
 
 # Test the size of blocks

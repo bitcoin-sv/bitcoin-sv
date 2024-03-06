@@ -11,11 +11,15 @@ this one can be extended, to cover the checks done for bigger blocks
 (e.g. sigops limits).
 """
 
+from test_framework.blocktools import prepare_init_chain
 from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.mininode import CTxOut, HeaderAndShortIDs, mininode_lock, \
+    msg_cmpctblock, msg_sendcmpct, NodeConn, NodeConnCB
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
-from test_framework.blocktools import *
-from test_framework.script import *
+from test_framework.script import CScript, OP_RETURN
+from test_framework.util import p2p_port, wait_until
+
+import random
 
 
 # TestNode: A peer we use to send messages to bitcoind, and store responses.

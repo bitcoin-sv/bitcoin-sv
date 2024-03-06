@@ -40,12 +40,14 @@ bip112txs_vary_OP_CSV_9 - 16 txs with nSequence = 9 evaluated against varying {r
 bip112tx_special - test negative argument to OP_CSV
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
-from test_framework.mininode import ToHex, CTransaction
-from test_framework.blocktools import create_coinbase, create_block
 from test_framework.comptool import TestInstance
-from test_framework.script import *
+from test_framework.blocktools import create_coinbase, create_block
+from test_framework.mininode import ToHex, CTransaction
+from test_framework.script import CScript, OP_CHECKSEQUENCEVERIFY, OP_DROP
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal, hex_str_to_bytes
+
+from decimal import Decimal
 from io import BytesIO
 import time
 

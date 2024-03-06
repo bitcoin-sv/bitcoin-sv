@@ -17,11 +17,15 @@ TestNode behaves as follows:
     on_getdata: provide blocks via BlockStore
 """
 
-from .mininode import *
+from .mininode import CBlock, CBlockHeader, CInv, CTransaction, \
+    mininode_lock, msg_block, msg_inv, msg_getheaders, msg_headers, \
+    msg_mempool, msg_ping, NodeConn, NodeConnCB
 from .blockstore import BlockStore, TxStore
 from .util import p2p_port, wait_until
 
+from time import sleep
 import logging
+
 
 logger = logging.getLogger("TestFramework.comptool")
 
@@ -343,7 +347,7 @@ class TestManager():
                 # sleep for a while as the rejection message might have
                 # not been received yet due to the asynchronous nature
                 # of that message
-                time.sleep(0.5)
+                sleep(0.5)
 
             logger.error(error)
             return False

@@ -4,10 +4,12 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework import mininode
+from test_framework.comptool import logger
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-import struct
+from test_framework.util import assert_equal, p2p_port
+
 import contextlib
+import struct
 
 
 # New class that represents an invalid Protoconf msg with 0 fields.

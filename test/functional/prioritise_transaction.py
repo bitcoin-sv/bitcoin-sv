@@ -7,11 +7,13 @@
 # Test PrioritiseTransaction code
 #
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-# FIXME: review how this test needs to be adapted w.r.t _LEGACY_MAX_BLOCK_SIZE
-from test_framework.mininode import COIN
 from test_framework.cdefs import ONE_KILOBYTE
+from test_framework.mininode import COIN
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import create_confirmed_utxos, gen_return_txouts, satoshi_round
+# FIXME: review how this test needs to be adapted w.r.t _LEGACY_MAX_BLOCK_SIZE
+
+from decimal import Decimal
 
 
 class PrioritiseTransactionTest(BitcoinTestFramework):

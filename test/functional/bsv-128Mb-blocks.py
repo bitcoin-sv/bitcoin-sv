@@ -8,10 +8,10 @@ This test checks that by using the newly promoted -excessiveblocksize
 flag we can actually process very big blocks.
 """
 
+from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.blocktools import prepare_init_chain
+from test_framework.mininode import msg_block
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.blocktools import *
-from test_framework.script import *
-from test_framework.cdefs import (ONE_MEGABYTE)
 
 
 class BSV128MBlocks(ComparisonTestFramework):

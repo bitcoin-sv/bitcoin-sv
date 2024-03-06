@@ -3,17 +3,20 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import threading
-import json
-import http.client as httplib
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, \
+    STATUS, RESPONSE_TIME, FLAG
+from test_framework.mininode import CallbackMessage, COutPoint, \
+    CTransaction, CTxIn, CTxOut, FromHex, ToHex, msg_tx
+from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, check_for_log_msg, wait_until
+
 from functools import partial
 from http.server import HTTPServer
-from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import check_for_log_msg, assert_equal
-from test_framework.mininode import *
-from test_framework.script import *
 
+import http.client as httplib
+import json
+import threading
 import time
 
 '''

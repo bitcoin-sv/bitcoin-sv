@@ -3,9 +3,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 from test_framework.mininode import COIN
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, assert_fee_amount, \
+    assert_greater_than, assert_greater_than_or_equal, \
+    assert_raises_rpc_error, connect_nodes_bi, count_bytes
+
+from decimal import Decimal
 
 
 def get_unspent(listunspent, amount):

@@ -7,11 +7,13 @@
 This test checks the behaviour of P2SH before and after genesis.
 """
 
-from test_framework.test_framework import ComparisonTestFramework
+from test_framework.blocktools import create_and_sign_transaction
 from test_framework.comptool import TestInstance, RejectResult
-from test_framework.blocktools import *
 from test_framework.key import CECKey
-from test_framework.script import *
+from test_framework.mininode import COIN
+from test_framework.script import CScript, hash160, OP_EQUAL, OP_HASH160
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import hex_str_to_bytes
 
 
 # In this test we are checking behavior of the Wallet when trying to spend pre and post genesis P2SH script

@@ -32,10 +32,12 @@ Test is as follows:
 """
 import time
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, FromHex
 from test_framework.script import CScript, OP_TRUE
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, wait_until
+
+from decimal import Decimal
 
 
 class MempoolPersistTest(BitcoinTestFramework):

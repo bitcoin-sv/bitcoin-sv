@@ -25,8 +25,9 @@ Mine a >4GB block on the node.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.comptool import logger
 from test_framework.mininode import MY_VERSION, NodeConnCB, CTxOut, msg_tx, msg_block
-from test_framework.util import wait_until, logger, check_for_log_msg, connect_nodes, disconnect_nodes_bi, sync_blocks
+from test_framework.util import wait_until, check_for_log_msg, connect_nodes, disconnect_nodes_bi, sync_blocks
 from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_DROP, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE
 from test_framework.key import CECKey

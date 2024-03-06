@@ -4,16 +4,26 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.blocktools import create_tx
-from test_framework.util import *
+from test_framework.blocktools import create_coinbase, create_tx, \
+    create_and_sign_transaction, get_legacy_sigopcount_block, \
+    prepare_init_chain, PreviousSpendableOutput, sign_tx
+from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, \
+    MAX_BLOCK_SIGOPS_PER_MB, MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS
 from test_framework.comptool import TestInstance, RejectResult
-from test_framework.blocktools import *
-import time
 from test_framework.key import CECKey
-from test_framework.script import *
+from test_framework.mininode import CBlock, CBlockHeader, COIN, COutPoint, \
+    CTransaction, CTxIn, CTxOut, ser_uint256, uint256_from_compact, \
+    uint256_from_str
+from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
+    OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY, OP_ELSE, \
+    OP_ENDIF, OP_EQUAL, OP_FALSE, OP_HASH160, OP_IF, OP_INVALIDOPCODE, \
+    OP_RETURN, OP_TRUE, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal
+
+import copy
 import struct
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB
+import time
 
 
 '''

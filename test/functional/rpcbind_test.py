@@ -5,9 +5,14 @@
 
 # Test for -rpcbind, as well as -rpcallowip and -rpcconnect
 
+from test_framework.netutil import all_interfaces
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
-from test_framework.util import *
-from test_framework.netutil import *
+from test_framework.util import assert_equal, assert_raises_rpc_error, \
+    get_datadir_path, get_rpc_proxy, rpc_port, rpc_url
+from test_framework.netutil import addr_to_hex, get_bind_addrs
+
+import socket
+import sys
 
 
 class RPCBindTest(BitcoinTestFramework):

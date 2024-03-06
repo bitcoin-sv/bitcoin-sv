@@ -6,7 +6,7 @@
 # crash regression introduced by libevent-2.1.7
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import str_to_b64str
 
 import http.client
 import urllib.parse

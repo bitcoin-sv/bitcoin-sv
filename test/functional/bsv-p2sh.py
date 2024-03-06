@@ -7,12 +7,16 @@
 This test checks the behaviour of P2SH before and after genesis.
 """
 
-from test_framework.blocktools import *
+from test_framework.blocktools import create_and_sign_transaction
 from test_framework.comptool import TestInstance, RejectResult
 from test_framework.key import CECKey
-from test_framework.script import *
+from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
+    ToHex
+from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
+    OP_CHECKSIGVERIFY, OP_EQUAL, OP_FALSE, OP_HASH160, OP_RETURN, \
+    SignatureHashForkId, SIGHASH_FORKID, SIGHASH_ALL
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_raises_rpc_error
+from test_framework.util import assert_equal, assert_raises_rpc_error
 
 SPEND_OUTPUT = CScript([OP_FALSE, OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 

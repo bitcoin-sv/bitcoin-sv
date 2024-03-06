@@ -6,7 +6,9 @@ Check the P2P connection handling after moving to use shared_ptrs.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import connect_nodes, connect_nodes_bi, \
+    disconnect_nodes_bi, sync_blocks, wait_until
+
 import random
 
 

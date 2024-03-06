@@ -3,10 +3,13 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
+from test_framework.blocktools import create_block, create_coinbase, \
+    create_transaction
 from test_framework.comptool import TestInstance, RejectResult
-from test_framework.blocktools import *
+from test_framework.mininode import COIN
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal
+
 import copy
 import time
 

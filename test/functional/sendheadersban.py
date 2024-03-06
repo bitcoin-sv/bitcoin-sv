@@ -2,10 +2,12 @@
 # Copyright (c) 2018-2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-import time
-from test_framework.mininode import *
+from test_framework.mininode import msg_sendheaders, NetworkThread, \
+    NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_greater_than, p2p_port
+
+import time
 
 
 class TestNode(NodeConnCB):

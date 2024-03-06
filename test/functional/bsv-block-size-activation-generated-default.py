@@ -9,15 +9,18 @@ In short; if the user doesn't override things via the blockmaxsize
 parameter then after the NEW_BLOCKSIZE_ACTIVATION_TIME date the default generated block
 size should increase to DEFAULT_MAX_BLOCK_SIZE_*_AFTER
 """
-import math
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-from test_framework.mininode import *
+from test_framework.blocktools import create_block, create_coinbase
+from test_framework.cdefs import MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, \
+    REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER, \
+    REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE, \
+    REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME
+from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
+    FromHex, ToHex
 from test_framework.script import CScript, OP_TRUE, OP_RETURN
-from test_framework.blocktools import *
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal
 
-from test_framework.cdefs import (MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME,
-                                  REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE, REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
+import math
 
 DEFAULT_ACTIVATION_TIME = REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME # can be orverriden on command line
 DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE

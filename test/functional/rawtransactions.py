@@ -13,13 +13,14 @@
 #    - decoderawtransaction
 #    - getrawtransaction
 """
-from decimal import Decimal
-
 from test_framework.cdefs import ONE_KILOBYTE
+from test_framework.mininode import CTransaction, COIN, hex_str_to_bytes
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import CTransaction, COIN
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_raises_rpc_error, \
+    bytes_to_hex_str, connect_nodes_bi, create_confirmed_utxos, \
+    satoshi_round, wait_until
 
+from decimal import Decimal
 from io import BytesIO
 
 # Create one-input, one-output, no-fee transaction:

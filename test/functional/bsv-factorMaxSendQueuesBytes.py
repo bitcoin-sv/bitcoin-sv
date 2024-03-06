@@ -3,12 +3,16 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.mininode import *
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.cdefs import (ONE_MEGABYTE)
-from test_framework.util import *
 from test_framework.blocktools import ChainManager, prepare_init_chain
+from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.comptool import logger
+from test_framework.mininode import CInv, msg_block, msg_getdata, \
+    NetworkThread, NodeConn, NodeConnCB
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, assert_greater_than, \
+    p2p_port
 
+import time
 
 # This test checks input parameter factormaxsendqueuesbytes, which is setting maxSendQueuesBytes.
 # Scenario:
@@ -23,6 +27,7 @@ from test_framework.blocktools import ChainManager, prepare_init_chain
 # In cases 1. and 4., all peers should receive the block, in case 2. and 3., some peers receive blocks and other receive reject messages.
 # In case 2, downloads are in series, while in cases 1. and 4., downloads are in parallel.
 # Forth case is special because we are requesting the newest block. Download limitations for whitelisted peers do not apply.
+
 
 class MaxSendQueuesBytesTest(BitcoinTestFramework):
 

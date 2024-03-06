@@ -8,7 +8,9 @@ Blocks that were created before the introduction of CDiskBlockMetaData class, d
 import shutil
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, initialize_datadir
+
+import os
 
 
 class GetBlockRPCTest(BitcoinTestFramework):

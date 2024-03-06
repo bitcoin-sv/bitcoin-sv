@@ -23,12 +23,14 @@ Add a block with MAX_BLOCK_SIGOPS_PER_MB +1 sigops (OP_CHECKSIGVERIFY) at height
 Add a block with MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS sigops to check that max size is still allowed        -> OK
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
-from test_framework.comptool import RejectResult
-from test_framework.blocktools import *
-from test_framework.script import *
+from test_framework.blocktools import get_legacy_sigopcount_block, \
+    prepare_init_chain
 from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB, ONE_MEGABYTE
+from test_framework.comptool import logger, RejectResult
+from test_framework.script import CScript, OP_CHECKMULTISIG, OP_CHECKSIG, \
+    OP_CHECKSIGVERIFY
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal
 
 
 class CheckSigTest(ComparisonTestFramework):

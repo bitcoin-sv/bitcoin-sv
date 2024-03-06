@@ -2,8 +2,10 @@
 # Copyright (c) 2020 The Bitcoin SV developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-from test_framework.mininode import CInv, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, logger, NodeConn, NodeConnCB, \
-    NetworkThread, msg_protoconf, CProtoconf, msg_inv
+
+from test_framework.comptool import logger
+from test_framework.mininode import CInv, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, \
+    NodeConn, NodeConnCB, NetworkThread, msg_protoconf, CProtoconf, msg_inv
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than, p2p_port
 from math import ceil

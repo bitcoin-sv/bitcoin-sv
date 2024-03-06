@@ -20,11 +20,13 @@
 # 14. Invalidate block on height 104. tx5 and tx6 are in mempool.
 # 15. Invalidate block on height 103. tx5 and tx6 are deleted from mempool.
 
+from test_framework.blocktools import create_transaction, create_block, \
+    create_coinbase, prepare_init_chain
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.script import *
-from test_framework.blocktools import create_transaction, create_block, create_coinbase, prepare_init_chain
-from test_framework.util import assert_equal, hashToHex, wait_until
+from test_framework.script import CScript, OP_0, OP_1, OP_2, OP_2MUL, \
+    OP_ELSE, OP_ENDIF, OP_IF, OP_TRUE
 from test_framework.mininode import msg_tx, msg_block, mininode_lock
+from test_framework.util import assert_equal, hashToHex, wait_until
 
 
 def add_tx_to_block(block, txs):

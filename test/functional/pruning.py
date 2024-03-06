@@ -14,12 +14,14 @@
 # ********
 
 from test_framework.blocktools import mine_block_of_size
+from test_framework.cdefs import DEFAULT_MIN_BLOCKS_TO_KEEP, ONE_MEGABYTE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_greater_than, \
+    assert_raises_rpc_error, connect_nodes, mine_large_block, sync_blocks, wait_until
+
 from decimal import Decimal
 import time
 import os
-from test_framework.cdefs import DEFAULT_MIN_BLOCKS_TO_KEEP, ONE_MEGABYTE
 
 # Rescans start at the earliest block up to 2 hours before a key timestamp, so
 # the manual prune RPC avoids pruning blocks in the same window to be

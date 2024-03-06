@@ -4,20 +4,9 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Base class for RPC testing."""
 
-from collections import deque
-from enum import Enum
-import logging
-import optparse
-import os
-import pdb
-import shutil
-import sys
-import tempfile
-import time
-import traceback
-import contextlib
 from test_framework.comptool import TestManager, TestInstance
-from test_framework.mininode import NetworkThread, StopNetworkThread
+from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, StopNetworkThread
+
 from .associations import Association, AssociationCB
 
 from .authproxy import JSONRPCException
@@ -41,7 +30,22 @@ from .util import (
     wait_until
 )
 
-from test_framework.blocktools import *
+from test_framework.comptool import logger
+from test_framework.blocktools import ChainManager
+
+from collections import deque
+from enum import Enum
+
+import contextlib
+import logging
+import optparse
+import os
+import pdb
+import shutil
+import sys
+import tempfile
+import time
+import traceback
 
 
 class TestStatus(Enum):

@@ -3,17 +3,30 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Utilities for manipulating blocks and transactions."""
-from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.comptool import TestInstance
+
 from .cdefs import (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS,
-                    DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
+                    DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS,
+                    MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
+
 from .key import CECKey
-from .mininode import *
-from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160
-from .util import assert_equal, hash256, satoshi_round, hex_str_to_bytes
+
+from .mininode import CBlock, CBlockHeader, COIN, CTransaction, CTxIn, \
+    CTxOut, COutPoint, FromHex, ToHex, \
+    msg_block, msg_headers, \
+    ser_compact_size, ser_string, ser_uint256, \
+    uint256_from_str, uint256_from_compact
+
+from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, \
+    OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160
+from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+
+from .util import assert_equal, hash256, satoshi_round, hex_str_to_bytes, wait_until
 
 from collections import deque
 from decimal import Decimal
+from io import BytesIO
+from time import time
 
 
 # Create a block (with regtest difficulty)
@@ -52,7 +65,7 @@ def mine_block_of_size(node, size, utxos=None, fee=Decimal("0.00001"), genesisAc
         largetx = CTransaction()
         largetx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
 
-        maxtxnsize = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS if genesisActivated else DEFAULT_MAX_TX_SIZE_POLICY_BEFORE_GENESIS
+        maxtxnsize = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS if genesisActivated else MAX_TX_SIZE_POLICY_BEFORE_GENESIS
         maxtxnsize -= 180 # Existing txn size
         txnsize = maxtxnsize if size >= maxtxnsize else size
         largetx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0] * txnsize)])))
@@ -722,7 +735,7 @@ class ChainManager():
     def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
         if self.tip is None:
             base_block_hash = self._genesis_hash
-            block_time = int(time.time()) + 1
+            block_time = int(time()) + 1
         else:
             base_block_hash = self.tip.sha256
             block_time = self.tip.nTime + 1

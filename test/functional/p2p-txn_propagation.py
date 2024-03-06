@@ -6,7 +6,10 @@ Check the P2P transaction propagation changes.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, connect_nodes, \
+    random_transaction, sync_blocks, sync_mempools, wait_until
+
+from decimal import Decimal
 
 
 class P2PTxnPropagation(BitcoinTestFramework):

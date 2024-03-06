@@ -26,22 +26,16 @@ NOTE: Blocks have to be sent from the same node for the test to be deterministic
 """
 import glob
 
-from test_framework.blocktools import sign_tx
-from test_framework.blocktools import prepare_init_chain
-from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
-    msg_block,
-)
-from test_framework.test_framework import BitcoinTestFramework, ChainManager
-from test_framework.util import (
-    p2p_port,
-    assert_equal,
-    wait_until)
-from test_framework.script import *
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain, \
+    sign_tx
 from test_framework.key import CECKey
+from test_framework.mininode import CTransaction, msg_block, NetworkThread, \
+    NodeConn, NodeConnCB
+from test_framework.script import CScript, hash160, OP_CHECKSIG, OP_DROP, \
+    OP_DUP, OP_EQUALVERIFY, OP_HASH160, OP_TRUE, SIGHASH_FORKID, SIGHASH_ALL, \
+    SignatureHashForkId
+from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.util import p2p_port, assert_equal, wait_until
 
 
 class PreviousSpendableOutput:

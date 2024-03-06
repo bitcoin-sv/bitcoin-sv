@@ -2,12 +2,12 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.cdefs import MAX_TX_SIZE_POLICY_BEFORE_GENESIS
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
-from test_framework.mininode import *
-from test_framework.script import CScript, OP_RETURN, OP_FALSE
 from test_framework.blocktools import calc_needed_data_size
+from test_framework.cdefs import MAX_TX_SIZE_POLICY_BEFORE_GENESIS
+from test_framework.mininode import CTransaction, CTxOut, FromHex, msg_tx, ToHex
+from test_framework.script import CScript, OP_RETURN, OP_FALSE
+from test_framework.util import assert_equal
+from test_framework.test_framework import BitcoinTestFramework
 
 # Test the functionality -datacarriersize works as expected. It should accept both OP_RETURN and OP_FALSE, OP_RETURN
 # 1. Set -datacarriersize to 500B.

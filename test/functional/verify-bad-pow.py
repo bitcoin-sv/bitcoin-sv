@@ -4,8 +4,7 @@
 
 from test_framework.blocktools import create_block_from_candidate, solve_bad
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
-from test_framework.util import *
+from test_framework.mininode import ToHex
 
 # This test checks verifyblockcandidate RPC call. VerifyBlock tests a block template for validity without a valid PoW.
 # Test scenario: a block with invalid POW is created.

@@ -2,11 +2,14 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.mininode import *
-from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import create_block, create_coinbase, assert_equal
+from test_framework.comptool import logger
+from test_framework.mininode import mininode_lock, msg_block, CBlockHeader, msg_headers
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import wait_until
 
 import glob
+import time
 
 # This tests checks scenario of logging about more honest peers.
 # Scenario:

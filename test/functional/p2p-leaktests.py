@@ -10,9 +10,12 @@ received a VERACK.
 This test connects to a node and sends it a few messages, trying to intice it
 into sending us something it shouldn't."""
 
-from test_framework.mininode import *
+from test_framework.mininode import mininode_lock, msg_getaddr, msg_ping, \
+    msg_verack, NetworkThread, NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import p2p_port, wait_until
+
+import time
 
 banscore = 10
 

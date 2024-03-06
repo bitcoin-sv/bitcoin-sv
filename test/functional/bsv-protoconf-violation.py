@@ -4,8 +4,11 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework import mininode
+from test_framework.comptool import logger
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_greater_than, p2p_port
+
+import os
 
 
 class BsvProtoconfViolationTest(BitcoinTestFramework):

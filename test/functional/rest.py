@@ -6,14 +6,16 @@
 #
 # Test REST interface
 #
-
-
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-from struct import *
-from io import BytesIO
-from codecs import encode
+from test_framework.util import assert_equal, assert_greater_than, \
+    connect_nodes_bi, hex_str_to_bytes
 
+from codecs import encode
+from decimal import Decimal
+from io import BytesIO
+from struct import pack, unpack
+
+import json
 import http.client
 import urllib.parse
 

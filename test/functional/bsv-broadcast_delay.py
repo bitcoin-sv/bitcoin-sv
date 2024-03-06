@@ -3,11 +3,16 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
+from test_framework.mininode import CInv, COutPoint, CTransaction, CTxIn, \
+    CTxOut, FromHex, NetworkThread, msg_ping, msg_tx, ToHex
 from test_framework.script import CScript, OP_TRUE
-import datetime
+from test_framework.test_framework import BitcoinTestFramework
+
+from threading import Thread
+
 import contextlib
+import datetime
+import time
 
 # Test if the functionality -broadcastdelay works as expected.
 # Create 2 connections (connection1 and connection2) to bitcoind node and measure how long it takes for connection2 to receive a transaction that connection1 sends to bitcoind.

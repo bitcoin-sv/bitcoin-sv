@@ -4,14 +4,16 @@
 from math import floor
 from time import sleep
 
-from test_framework.blocktools import calc_needed_data_size
-from test_framework.cdefs import MAX_SCRIPT_SIZE_BEFORE_GENESIS
-from test_framework.cdefs import ONE_MEGABYTE
-from test_framework.mininode import *
-from test_framework.util import *
-from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, OP_EQUALVERIFY, OP_HASH160, OP_DUP, OP_TRUE, OP_DROP
+from test_framework.blocktools import calc_needed_data_size, create_transaction
+from test_framework.cdefs import MAX_SCRIPT_SIZE_BEFORE_GENESIS, ONE_MEGABYTE
+from test_framework.mininode import COutPoint, CTxIn, CTxOut, CTransaction, \
+    FromHex, mininode_lock, msg_tx, NetworkThread, NodeConn, NodeConnCB, \
+    ToHex, uint256_from_str
+from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, \
+    OP_EQUALVERIFY, OP_HASH160, OP_DUP, OP_TRUE, OP_DROP
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.blocktools import create_transaction
+from test_framework.util import assert_equal, check_mempool_equals, \
+    ensure_no_rejection, hex_str_to_bytes, p2p_port, wait_for_reject_message
 
 CHUNK_SIZE = len(CScript([b"a" * 500]))
 

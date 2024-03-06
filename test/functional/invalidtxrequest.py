@@ -3,11 +3,13 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.test_framework import ComparisonTestFramework
+from test_framework.blocktools import create_block, create_coinbase, \
+    create_transaction
 from test_framework.comptool import TestInstance, RejectResult
-from test_framework.blocktools import *
-import time
+from test_framework.mininode import COIN
+from test_framework.test_framework import ComparisonTestFramework
 
+import time
 
 '''
 In this test we connect to one node over p2p, and test tx requests.

@@ -11,12 +11,16 @@ this one can be extended, to cover the checks done for bigger blocks
 (e.g. sigops limits).
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import RejectResult
-from test_framework.blocktools import *
-from test_framework.key import CECKey
-from test_framework.script import *
+from test_framework.blocktools import prepare_init_chain
 from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB, ONE_MEGABYTE
+from test_framework.comptool import RejectResult
+from test_framework.key import CECKey
+from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
+    msg_block, ToHex
+from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
+    OP_CHECKSIGVERIFY, OP_EQUAL, OP_HASH160, OP_TRUE, SIGHASH_ALL, \
+    SIGHASH_FORKID, SignatureHashForkId
+from test_framework.test_framework import ComparisonTestFramework
 
 
 class FullBlockTest(ComparisonTestFramework):

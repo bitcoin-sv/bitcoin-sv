@@ -25,18 +25,18 @@
          - restart until recovery succeeds
          - check that utxo matches node3 using gettxoutsetinfo"""
 
+from test_framework.mininode import COIN, COutPoint, CTransaction, CTxIn, \
+    CTxOut, hex_str_to_bytes, ToHex
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, create_confirmed_utxos
+
+from decimal import Decimal
 import errno
 import http.client
 import random
 import sys
 import time
 import math
-from decimal import Decimal
-
-from test_framework.mininode import *
-from test_framework.script import *
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 
 HTTP_DISCONNECT_ERRORS = [http.client.CannotSendRequest]
 try:

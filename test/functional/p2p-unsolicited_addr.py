@@ -6,9 +6,11 @@
 Check that unsolicted ADDR messages don't get accepted and relayed.
 """
 
-from test_framework.mininode import *
+from test_framework.mininode import CAddress, msg_addr, NetworkThread, \
+    NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import connect_nodes_mesh, p2p_port
+
 import time
 
 

@@ -6,15 +6,16 @@
 Test that when prune is enabled on the node, RPC extended getheader and P2P gethdrsen do not return the merkle proof of a coinbase if the block was pruned.
 """
 
-from test_framework.test_framework import ComparisonTestFramework
+from test_framework.blocktools import CTxIn, COutPoint, \
+    merkle_root_from_merkle_proof
+from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE, \
+    DEFAULT_MIN_BLOCKS_TO_KEEP
 from test_framework.comptool import TestInstance
 from test_framework.util import assert_equal, assert_raises_rpc_error, \
     satoshi_round, Decimal, sync_blocks
-from test_framework.blocktools import CTxIn, COutPoint, msg_tx, \
-    merkle_root_from_merkle_proof
-from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE, DEFAULT_MIN_BLOCKS_TO_KEEP
+from test_framework.mininode import FromHex, CBlock, msg_gethdrsen, msg_tx
 from test_framework.script import CScript, CTransaction, CTxOut, OP_TRUE
-from test_framework.mininode import FromHex, CBlock, msg_gethdrsen
+from test_framework.test_framework import ComparisonTestFramework
 
 
 class BSVMerkleProofInPrunedBlock(ComparisonTestFramework):

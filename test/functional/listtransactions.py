@@ -5,9 +5,11 @@
 
 # Exercise the listtransactions API
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 from test_framework.mininode import CTransaction
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_array_result, hex_str_to_bytes
+
+from decimal import Decimal
 from io import BytesIO
 
 

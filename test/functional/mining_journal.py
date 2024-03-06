@@ -12,13 +12,20 @@ Note that most of the actual checking occurs inside the bitcoind process, we are
 setting up situations for that testing to happen here.
 '''
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
-from test_framework.util import *
-from test_framework.cdefs import (ONE_MEGABYTE)
+from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.blocktools import create_block_from_candidate
+from test_framework.mininode import COIN, NetworkThread, NodeConn, NodeConnCB, \
+    ToHex
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, assert_greater_than, \
+    bytes_to_hex_str, connect_nodes, create_confirmed_utxos, disconnect_nodes, \
+    p2p_port, satoshi_round, sync_blocks, wait_until
+
+from decimal import Decimal
+
 import math
 import random
+import time
 
 
 class MyNode(NodeConnCB):

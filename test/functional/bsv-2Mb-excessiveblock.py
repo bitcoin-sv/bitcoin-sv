@@ -8,13 +8,14 @@ This test checks that if a peer send and excessive block size, it will get banne
 After the banned time has passed, the connection will be able to retablished.
 """
 
+from test_framework.blocktools import prepare_init_chain
+from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.comptool import logger
+from test_framework.mininode import msg_block
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal
-from test_framework.comptool import logger
-from test_framework.blocktools import *
+
 import time
-from test_framework.script import *
-from test_framework.cdefs import (ONE_MEGABYTE)
 
 
 class BSV2MBlocks(ComparisonTestFramework):

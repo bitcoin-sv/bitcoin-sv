@@ -8,9 +8,14 @@ This is needed due to MAPI sending the same transaction to multiple nodes via se
 with parameter "donotcheckfee" set to True
 """
 
-from test_framework.mininode import *
+from test_framework.mininode import COIN, mininode_lock, NetworkThread, \
+    NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, create_confirmed_utxos, \
+    hashToHex, p2p_port, satoshi_round, sync_blocks
+
+from decimal import Decimal
+
 import time
 
 

@@ -2,10 +2,13 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
+    FromHex, hex_str_to_bytes, mininode_lock, msg_tx, ToHex, \
+    uint256_from_str
+from test_framework.script import CScript, OP_DUP, OP_EQUALVERIFY, \
+    OP_CHECKSIG, OP_HASH160
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-from test_framework.mininode import *
-from test_framework.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
+from test_framework.util import assert_equal, hashToHex, wait_until
 
 
 class P2PInvMsgTimeOrder(BitcoinTestFramework):
