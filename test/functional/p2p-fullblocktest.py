@@ -75,8 +75,13 @@ class FullBlockTest(ComparisonTestFramework):
 
     def get_tests(self):
         # shorthand for functions
-        block = lambda *a, **kw: self.chain.next_block(*a, coinbase_key=self.coinbase_key, simple_output=True, **kw)
-        create_and_sign_tx = lambda *a, **kw: create_and_sign_transaction(*a, private_key=self.coinbase_key, **({k: v for k, v in kw.items() if not k == 'private_key'}))
+        block = lambda *a, **kw: self.chain.next_block(*a, # noqa: E731
+                                                       coinbase_key=self.coinbase_key,
+                                                       simple_output=True,
+                                                       **kw)
+        create_and_sign_tx = lambda *a, **kw: create_and_sign_transaction(*a, # noqa: E731
+                                                                          private_key=self.coinbase_key,
+                                                                          **({k: v for k, v in kw.items() if not k == 'private_key'}))
         update_block = self.chain.update_block
         tip = self.chain.set_tip
         accepted = self.accepted
