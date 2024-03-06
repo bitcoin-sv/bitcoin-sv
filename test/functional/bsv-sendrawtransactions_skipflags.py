@@ -34,7 +34,6 @@ from test_framework.script import OP_1, OP_FALSE, OP_RETURN, OP_TRUE, OP_CHECKSI
     OP_EQUALVERIFY, OP_ADD, OP_CAT, OP_MUL
 from test_framework.blocktools import COIN, CScript, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, ToHex, \
     calc_needed_data_size, create_tx
-from test_framework.blocktools import create_transaction
 
 
 def getInputScriptPubKey(node, input, index):

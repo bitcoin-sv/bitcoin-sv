@@ -9,7 +9,7 @@ The aim of this test is to group an additional RPC test cases dependant on the P
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.util import assert_equal, assert_raises_rpc_error, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance

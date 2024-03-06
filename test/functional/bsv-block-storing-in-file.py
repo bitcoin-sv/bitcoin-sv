@@ -10,7 +10,6 @@ from test_framework.comptool import TestInstance
 from test_framework.cdefs import (ONE_MEGABYTE)
 from test_framework.blocktools import ChainManager, prepare_init_chain
 from test_framework.mininode import (NetworkThread, NodeConn, NodeConnCB, msg_block)
-from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (p2p_port, assert_equal)
 import glob
 import time

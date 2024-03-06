@@ -20,10 +20,10 @@ bord = ord
 if sys.version > '3':
     long = int
 
-    def bchr(x):
+    def bchr(x): # noqa: F811
         return bytes([x])
 
-    def bord(x):
+    def bord(x): # noqa: F811
         return x
 
 MAX_SCRIPT_SIZE = 10000
