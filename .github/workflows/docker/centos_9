@@ -17,6 +17,7 @@ RUN set -xeu \
     cppzmq-devel \
     python3 python3-ecdsa python3-zmq pip \
     git \
+    sysbench \
     && dnf clean all -y
 
 RUN set -xeu && pip install bip32utils

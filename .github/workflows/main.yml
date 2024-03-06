@@ -49,6 +49,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           clean: ''
+      - name: Benchmark
+        uses: ./.github/workflows/benchmark/ 
       - name: Build
         uses: ./.github/workflows/build_bitcoin_autotools
       - name: Unit test
@@ -81,6 +83,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           clean: ''
+      - name: Benchmark
+        uses: ./.github/workflows/benchmark/ 
       - name: Select toolset version
         uses: ./.github/workflows/select_toolset_version
         with: 
