@@ -47,7 +47,7 @@ class AssociationCB():
     def on_headers(self, stream, message):
         pass
 
-    def on_mempool(self, stream):
+    def on_mempool(self, stream, message):
         pass
 
     def on_ping(self, stream, message):
@@ -167,7 +167,7 @@ class StreamCB(NodeConnCB):
         stream = self.association.conn_to_stream_map[conn]
         self.association.callbacks.on_headers(stream, message)
 
-    def on_mempool(self, conn):
+    def on_mempool(self, conn, message):
         super().on_mempool(conn, message)
         stream = self.association.conn_to_stream_map[conn]
         self.association.callbacks.on_mempool(stream, message)

@@ -189,7 +189,7 @@ def plot_histogram(ax, ls, *, bins=20):
 
 def plot_percentiles(ax, ls, *, key):
     pr = list(percentile_range(12, 5))
-    for x, p in zip(ls, unique_parts(l.dataset for x in ls)):
+    for x, p in zip(ls, unique_parts(x.dataset for x in ls)):
         ps = list(x.histogram.percentiles(pr))
         if not ps:
             continue

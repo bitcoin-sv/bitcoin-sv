@@ -76,7 +76,7 @@ class CLazyNode(NodeConnCB):
     def on_ping(self, conn, message):
         self.bad_message(message)
 
-    def on_mempool(self, conn):
+    def on_mempool(self, conn, message):
         self.bad_message(message)
 
     def on_pong(self, conn, message):

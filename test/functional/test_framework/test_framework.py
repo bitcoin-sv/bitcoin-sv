@@ -439,7 +439,8 @@ class BitcoinTestFramework():
         # Allow associations to exchange their setup messages and fully initialise
         for association in associations:
             association.setup()
-        wait_until(lambda: len(self.nodes[node_index].getpeerinfo()) == len(associations))
+        number_of_associations = len(associations)
+        wait_until(lambda: len(self.nodes[node_index].getpeerinfo()) == number_of_associations)
 
         # Test can now proceed
         logger.debug("before %s", title)

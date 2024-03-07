@@ -1463,10 +1463,10 @@ class msg_authresp():
     def serialize(self):
         return b"".join((
             struct.pack("<I", self.nPubKeyLen),
-            ser_uint8_vector(self.PubKey),
+            ser_string(ser_byte_array(self.PubKey)),
             struct.pack("<Q", self.nClientNonce),
             struct.pack("<I", self.nSignLen),
-            ser_uint8_vector(self.sign),
+            ser_string(ser_byte_array(self.sign)),
         ))
 
     def __repr__(self):
@@ -2245,7 +2245,7 @@ class NodeConnCB():
     def on_hdrsen(self, conn, message):
         pass
 
-    def on_mempool(self, conn):
+    def on_mempool(self, conn, message):
         pass
 
     def on_pong(self, conn, message):
