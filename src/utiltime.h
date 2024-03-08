@@ -6,7 +6,9 @@
 #ifndef BITCOIN_UTILTIME_H
 #define BITCOIN_UTILTIME_H
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <cstdint>
+#include <sstream>
 #include <string>
 
 /**
@@ -28,6 +30,18 @@ int64_t GetLogTimeMicros();
 void SetMockTime(int64_t nMockTimeIn);
 void MilliSleep(int64_t n);
 
+// Convert nTime to ISO8601 date and time format in UTC. Parameter nTime is assumed to contain POSIX time. Returns empty string in case of error.
+std::string DateTimeFormatISO8601(int64_t nTime);
 std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime);
+
+class DateTimeFormatter
+{
+    std::locale locale_;
+
+public:
+    explicit DateTimeFormatter(const char* format);
+
+    std::ostringstream operator()(int64_t nTime) const;
+};
 
 #endif // BITCOIN_UTILTIME_H

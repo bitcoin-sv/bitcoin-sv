@@ -100,7 +100,7 @@ class CompactBlocksTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 2
-        self.extra_args = [[], ["-txindex"]]
+        self.extra_args = [["-maxblocktxnpercent=100"], ["-txindex", "-maxblocktxnpercent=100"]]
         self.utxos = []
 
     def build_block_on_tip(self, node):
@@ -275,6 +275,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         for i in range(num_transactions):
             txid = node.sendtoaddress(address, 0.1)
+            test_node.sync_with_ping()
             hex_tx = node.gettransaction(txid)["hex"]
             tx = FromHex(CTransaction(), hex_tx)
 
@@ -311,7 +312,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Now fetch the compact block using a normal non-announce getdata
         with mininode_lock:
             test_node.clear_block_announcement()
-            inv = CInv(4, block_hash)  # 4 == "CompactBlock"
+            inv = CInv(CInv.COMPACT_BLOCK, block_hash)
             test_node.send_message(msg_getdata([inv]))
 
         wait_until(test_node.received_block_announcement,
@@ -375,7 +376,7 @@ class CompactBlocksTest(BitcoinTestFramework):
                 test_node.last_message.pop("getdata", None)
 
             if announce == "inv":
-                test_node.send_message(msg_inv([CInv(2, block.sha256)]))
+                test_node.send_message(msg_inv([CInv(CInv.BLOCK, block.sha256)]))
                 wait_until(lambda: "getheaders" in test_node.last_message,
                            timeout=30, lock=mininode_lock)
                 test_node.send_header_for_blocks([block])
@@ -481,7 +482,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.utxos.append(
             [block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
         test_node.send_and_ping(msg_tx(block.vtx[1]))
-        assert(block.vtx[1].hash in node.getrawmempool())
+        wait_until(lambda: block.vtx[1].hash in node.getrawmempool(), timeout=120)
 
         # Prefill 4 out of the 6 transactions, and verify that only the one
         # that was not in the mempool is requested.
@@ -502,9 +503,8 @@ class CompactBlocksTest(BitcoinTestFramework):
             test_node.send_message(msg_tx(tx))
         test_node.sync_with_ping()
         # Make sure all transactions were accepted.
-        mempool = node.getrawmempool()
         for tx in block.vtx[1:]:
-            assert(tx.hash in mempool)
+            wait_until(lambda: tx.hash in node.getrawmempool(), timeout=120)
 
         # Clear out last request.
         with mininode_lock:
@@ -533,9 +533,8 @@ class CompactBlocksTest(BitcoinTestFramework):
             test_node.send_message(msg_tx(tx))
         test_node.sync_with_ping()
         # Make sure all transactions were accepted.
-        mempool = node.getrawmempool()
         for tx in block.vtx[1:6]:
-            assert(tx.hash in mempool)
+            wait_until(lambda: tx.hash in node.getrawmempool(), timeout=120)
 
         # Send compact block
         comp_block = HeaderAndShortIDs()
@@ -635,7 +634,7 @@ class CompactBlocksTest(BitcoinTestFramework):
                        timeout=30, lock=mininode_lock)
 
         test_node.clear_block_announcement()
-        test_node.send_message(msg_getdata([CInv(4, int(new_blocks[0], 16))]))
+        test_node.send_message(msg_getdata([CInv(CInv.COMPACT_BLOCK, int(new_blocks[0], 16))]))
         wait_until(lambda: "cmpctblock" in test_node.last_message,
                    timeout=30, lock=mininode_lock)
 
@@ -646,7 +645,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         test_node.clear_block_announcement()
         with mininode_lock:
             test_node.last_message.pop("block", None)
-        test_node.send_message(msg_getdata([CInv(4, int(new_blocks[0], 16))]))
+        test_node.send_message(msg_getdata([CInv(CInv.COMPACT_BLOCK, int(new_blocks[0], 16))]))
         wait_until(lambda: "block" in test_node.last_message,
                    timeout=30, lock=mininode_lock)
         with mininode_lock:
@@ -757,9 +756,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         for tx in block.vtx[1:]:
             delivery_peer.send_message(msg_tx(tx))
         delivery_peer.sync_with_ping()
-        mempool = node.getrawmempool()
         for tx in block.vtx[1:]:
-            assert(tx.hash in mempool)
+            wait_until(lambda: tx.hash in node.getrawmempool(), timeout=120)
 
         delivery_peer.send_and_ping(msg_cmpctblock(cmpct_block.to_p2p()))
         assert_equal(int(node.getbestblockhash(), 16), block.sha256)
@@ -869,8 +867,10 @@ class CompactBlocksTest(BitcoinTestFramework):
             self.ex_softfork_node, self.nodes[1], version=2)
         self.test_end_to_end_block_relay(
             self.nodes[0], [self.ex_softfork_node, self.test_node, self.old_node])
+        sync_blocks(self.nodes) # wait until node1 receives and processes this block otherwise we could create the next block using the wrong tip
         self.test_end_to_end_block_relay(
             self.nodes[1], [self.ex_softfork_node, self.test_node, self.old_node])
+        sync_blocks(self.nodes)
 
         self.log.info("\tTesting handling of invalid compact blocks...")
         self.test_invalid_tx_in_compactblock(self.nodes[0], self.test_node)

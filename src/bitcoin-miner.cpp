@@ -10,26 +10,18 @@
 ///////////////////////////////////#include "allowed_args.h"
 #include "arith_uint256.h"
 #include "chainparamsbase.h"
-#include "fs.h"
 #include "hash.h"
 #include "primitives/block.h"
-#include "rpc/client.h"
+#include "rpc/client_utils.h"
 #include "rpc/protocol.h"
 #include "streams.h"
 #include "sync.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
 #include <boost/thread.hpp>
-
-#include <cstdlib>
-#include <stdio.h>
-
-#include <event2/buffer.h>
-#include <event2/event.h>
+#include <random>
+#include <limits>
 #include <event2/http.h>
-#include <event2/keyvalq_struct.h>
-
 #include <univalue.h>
 
 using namespace std;
@@ -61,7 +53,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
-        if (((uint16_t *)phash)[15] == 0)
+        if (*std::next(phash->begin(), 31) == 0 && *std::next(phash->begin(), 30) == 0)
             return true;
 
         // If nothing found after trying for a while, return -1
@@ -205,10 +197,20 @@ void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes, size_t off
     coinbase_bytes[41] += sizeof(extra_nonce_type);
 }
 
+class RandomIntGenerator {
+    const uint32_t distributionMax = std::numeric_limits<uint32_t>::max();
+    std::uniform_int_distribution <uint32_t> dist{0, distributionMax};
+    std::random_device rd{};
+    std::mt19937 mt{rd()};
+public:
+    uint32_t operator ()() { return dist(mt);}
+};
+
 // WARNING: This methods "splits" coinbaseBytes and inserts space for an extra-nonce.
-static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coinbaseBytes, const std::vector<uint256> &merkleproof)
+static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coinbaseBytes, const std::vector<uint256> &merkleproof,
+                                        RandomIntGenerator & random_int_func)
 {
-    extra_nonce_type nExtraNonce = std::rand();
+    extra_nonce_type nExtraNonce = random_int_func();
     uint32_t nNonce = pblock->nNonce;
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
     bool found = false;
@@ -246,7 +248,7 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
         {
             ++nExtraNonce;
             unsigned char *pbytes = (unsigned char *)coinbaseBytes.data();            
-            *(extra_nonce_type *)(pbytes + offset_extra_nonce) = nExtraNonce;
+            memcpy(pbytes + offset_extra_nonce, &nExtraNonce, sizeof(nExtraNonce));
             uint256 hash;
             CHash256().Write(pbytes, coinbaseBytes.size()).Finalize(hash.begin());
 
@@ -305,7 +307,8 @@ static double GetDifficulty(uint64_t nBits)
     return dDiff;
 }
 
-static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found)
+static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found,
+                                            RandomIntGenerator & random_int_func)
 {
     UniValue tmp(UniValue::VOBJ);
     UniValue ret(UniValue::VARR);
@@ -338,7 +341,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         header.nVersion = blockversion;
     }
 
-    uint32_t startNonce = header.nNonce = std::rand();
+    uint32_t startNonce = header.nNonce = random_int_func();
     std::string candidateId = params["id"].get_str();
 
     printf("Mining: id: %s parent: %s bits: %x difficulty: %.8e time: %d\n", candidateId.c_str(),
@@ -354,7 +357,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         // request a new block).
         // header.nTime = (header.nTime < GetTime()) ? GetTime() : header.nTime;
 
-        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof);
+        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof, random_int_func);
     }
 
     // Leave if not found:
@@ -397,7 +400,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
         fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
         // Print some debug info if the block is rejected
         UniValue dbg = solution[0].get_obj();
-        fprintf(stderr, "id: %d  time: %d  nonce: %d  version: 0x%x\n", (unsigned int)dbg["id"].get_int64(),
+        fprintf(stderr, "id: %s  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_str().c_str(),
             (uint32_t)dbg["time"].get_int64(), (uint32_t)dbg["nonce"].get_int64(), (uint32_t)dbg["version"].get_int());
         fprintf(stderr, "coinbase: %s\n", dbg["coinbase"].get_str().c_str());
     }
@@ -418,7 +421,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
     return reply;
 }
 
-int CpuMiner(void)
+int CpuMiner(RandomIntGenerator & random_int_func)
 {
     int searchDuration = gArgs.GetArg("-duration", 30);
     int nblocks = gArgs.GetArg("-nblocks", -1); //-1 mine forever
@@ -542,7 +545,7 @@ int CpuMiner(void)
             else
             {
                 found = false;
-                mineresult = CpuMineBlock(searchDuration, result, found);
+                mineresult = CpuMineBlock(searchDuration, result, found, random_int_func);
                 if (!found)
                 {
                     // printf("Mining did not succeed\n");
@@ -555,25 +558,6 @@ int CpuMiner(void)
         }
     }
     return 0;
-}
-
-void static MinerThread()
-{
-    while (1)
-    {
-        try
-        {
-            CpuMiner();
-        }
-        catch (const std::exception &e)
-        {
-            PrintExceptionContinue(&e, "CommandLineRPC()");
-        }
-        catch (...)
-        {
-            PrintExceptionContinue(NULL, "CommandLineRPC()");
-        }
-    }
 }
 
 int main(int argc, char *argv[])
@@ -604,15 +588,32 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int nThreads = gArgs.GetArg("-cpus", 1);
+    int64_t nThreads {gArgs.GetArg("-cpus", 1)};
+
+    auto minerThread = []()  {
+        RandomIntGenerator generator;
+        while (1) {
+            try {
+                CpuMiner(generator);
+            }
+            catch (const std::exception &e) {
+                PrintExceptionContinue(&e, "CommandLineRPC()");
+            }
+            catch (...) {
+                PrintExceptionContinue(NULL, "CommandLineRPC()");
+            }
+        }
+    };
+
     boost::thread_group minerThreads;
-    for (int i = 0; i < nThreads - 1; i++)
-        minerThreads.create_thread(MinerThread);
+    for (int64_t i = 0; i < nThreads - 1; ++i)
+        minerThreads.create_thread(minerThread);
 
     int ret = EXIT_FAILURE;
     try
     {
-        ret = CpuMiner();
+        RandomIntGenerator generator;
+        ret = CpuMiner(generator);
     }
     catch (const std::exception &e)
     {

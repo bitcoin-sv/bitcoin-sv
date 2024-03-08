@@ -2,10 +2,12 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "blockencodings.h"
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
+#include "protocol.h"
 
 #include <cstdint>
 #include <limits>
@@ -20,12 +22,12 @@ namespace
     {
         ss.clear();
         ss << VARINT(std::numeric_limits<Unsigned>::max());
-        Unsigned j;
+        Unsigned j {0};
         ss >> VARINT(j);
         BOOST_CHECK_EQUAL(j, std::numeric_limits<Unsigned>::max());
         ss.clear();
         ss << VARINT(std::numeric_limits<Signed>::max());
-        Signed k;
+        Signed k {0};
         ss >> VARINT(k);
         BOOST_CHECK_EQUAL(k, std::numeric_limits<Signed>::max());
     }
@@ -49,7 +51,7 @@ public:
         : intval(intvalin), boolval(boolvalin),
           stringval(std::move(stringvalin)), charstrval(charstrvalin),
           txval(MakeTransactionRef(txvalin)) {}
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -60,7 +62,7 @@ public:
         READWRITE(txval);
     }
 
-    bool operator==(const CSerializeMethodsTestSingle &rhs) {
+    bool operator==(const CSerializeMethodsTestSingle &rhs) const {
         return intval == rhs.intval && boolval == rhs.boolval &&
                stringval == rhs.stringval &&
                strcmp(charstrval, rhs.charstrval) == 0 && *txval == *rhs.txval;
@@ -70,7 +72,7 @@ public:
 class CSerializeMethodsTestMany : public CSerializeMethodsTestSingle {
 public:
     using CSerializeMethodsTestSingle::CSerializeMethodsTestSingle;
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -94,18 +96,18 @@ BOOST_AUTO_TEST_CASE(sizes) {
     BOOST_CHECK_EQUAL(sizeof(char), GetSerializeSize(bool(0), 0));
 
     // Sanity-check GetSerializeSize and c++ type matching
-    BOOST_CHECK_EQUAL(GetSerializeSize(char(0), 0), 1);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int8_t(0), 0), 1);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint8_t(0), 0), 1);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int16_t(0), 0), 2);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint16_t(0), 0), 2);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int32_t(0), 0), 4);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint32_t(0), 0), 4);
-    BOOST_CHECK_EQUAL(GetSerializeSize(int64_t(0), 0), 8);
-    BOOST_CHECK_EQUAL(GetSerializeSize(uint64_t(0), 0), 8);
-    BOOST_CHECK_EQUAL(GetSerializeSize(float(0), 0), 4);
-    BOOST_CHECK_EQUAL(GetSerializeSize(double(0), 0), 8);
-    BOOST_CHECK_EQUAL(GetSerializeSize(bool(0), 0), 1);
+    BOOST_CHECK_EQUAL(GetSerializeSize(char(0), 0), 1U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int8_t(0), 0), 1U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint8_t(0), 0), 1U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int16_t(0), 0), 2U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint16_t(0), 0), 2U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int32_t(0), 0), 4U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint32_t(0), 0), 4U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(int64_t(0), 0), 8U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(uint64_t(0), 0), 8U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(float(0), 0), 4U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(double(0), 0), 8U);
+    BOOST_CHECK_EQUAL(GetSerializeSize(bool(0), 0), 1U);
 }
 
 BOOST_AUTO_TEST_CASE(floats_conversion) {
@@ -118,12 +120,12 @@ BOOST_AUTO_TEST_CASE(floats_conversion) {
     BOOST_CHECK_EQUAL(ser_uint32_to_float(0x40800000), 4.0F);
     BOOST_CHECK_EQUAL(ser_uint32_to_float(0x44444444), 785.066650390625F);
 
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.0F), 0x00000000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.5F), 0x3f000000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(1.0F), 0x3f800000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(2.0F), 0x40000000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(4.0F), 0x40800000);
-    BOOST_CHECK_EQUAL(ser_float_to_uint32(785.066650390625F), 0x44444444);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.0F), 0x00000000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(0.5F), 0x3f000000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(1.0F), 0x3f800000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(2.0F), 0x40000000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(4.0F), 0x40800000U);
+    BOOST_CHECK_EQUAL(ser_float_to_uint32(785.066650390625F), 0x44444444U);
 }
 
 BOOST_AUTO_TEST_CASE(doubles_conversion) {
@@ -234,16 +236,16 @@ BOOST_AUTO_TEST_CASE(varints) {
     {
         // Deserialising a larger value than can fit into any integral type
         ss.clear();
-        ss.insert(ss.end(), 64, 0x80);
-        uint32_t j;
+        ss.insert(ss.end(), 64, char(0x80));
+        uint32_t j = 0;
         BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
     }
 
     {
         // Deserialising a larger value than can fit into the given type
         ss.clear();
-        ss.insert(ss.end(), 4, 0xFF);
-        uint16_t j;
+        ss.insert(ss.end(), 4, char(0xFF));
+        uint16_t j = 0;
         BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
     }
 }
@@ -298,17 +300,6 @@ BOOST_AUTO_TEST_CASE(varints_bitpatterns) {
     ss << VARINT(0xffffffffffffffffULL);
     BOOST_CHECK_EQUAL(HexStr(ss), "80fefefefefefefefe7f");
     ss.clear();
-}
-
-static bool isTooLargeReadException(const std::ios_base::failure &ex) {
-    std::ios_base::failure expectedException(
-        "ReadCompactSize(): size too large");
-
-    // The string returned by what() can be different for different platforms.
-    // Instead of directly comparing the ex.what() with an expected string,
-    // create an instance of exception to see if ex.what() matches  the expected
-    // explanatory string returned by the exception instance.
-    return strcmp(expectedException.what(), ex.what()) == 0;
 }
 
 static bool isTooLargeWriteException(const std::ios_base::failure &ex) {
@@ -402,39 +393,39 @@ BOOST_AUTO_TEST_CASE(noncanonical) {
 BOOST_AUTO_TEST_CASE(insert_delete) {
     // Test inserting/deleting bytes.
     CDataStream ss(SER_DISK, 0);
-    BOOST_CHECK_EQUAL(ss.size(), 0);
+    BOOST_CHECK_EQUAL(ss.size(), 0U);
 
     ss.write("\x00\x01\x02\xff", 4);
-    BOOST_CHECK_EQUAL(ss.size(), 4);
+    BOOST_CHECK_EQUAL(ss.size(), 4U);
 
     char c = (char)11;
 
     // Inserting at beginning/end/middle:
     ss.insert(ss.begin(), c);
-    BOOST_CHECK_EQUAL(ss.size(), 5);
+    BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[0], c);
     BOOST_CHECK_EQUAL(ss[1], 0);
 
     ss.insert(ss.end(), c);
-    BOOST_CHECK_EQUAL(ss.size(), 6);
+    BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
     BOOST_CHECK_EQUAL(ss[5], c);
 
     ss.insert(ss.begin() + 2, c);
-    BOOST_CHECK_EQUAL(ss.size(), 7);
+    BOOST_CHECK_EQUAL(ss.size(), 7U);
     BOOST_CHECK_EQUAL(ss[2], c);
 
     // Delete at beginning/end/middle
     ss.erase(ss.begin());
-    BOOST_CHECK_EQUAL(ss.size(), 6);
+    BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[0], 0);
 
     ss.erase(ss.begin() + ss.size() - 1);
-    BOOST_CHECK_EQUAL(ss.size(), 5);
+    BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
 
     ss.erase(ss.begin() + 1);
-    BOOST_CHECK_EQUAL(ss.size(), 4);
+    BOOST_CHECK_EQUAL(ss.size(), 4U);
     BOOST_CHECK_EQUAL(ss[0], 0);
     BOOST_CHECK_EQUAL(ss[1], 1);
     BOOST_CHECK_EQUAL(ss[2], 2);
@@ -443,7 +434,7 @@ BOOST_AUTO_TEST_CASE(insert_delete) {
     // Make sure GetAndClear does the right thing:
     CSerializeData d;
     ss.GetAndClear(d);
-    BOOST_CHECK_EQUAL(ss.size(), 0);
+    BOOST_CHECK_EQUAL(ss.size(), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(class_methods) {
@@ -474,4 +465,209 @@ BOOST_AUTO_TEST_CASE(class_methods) {
     BOOST_CHECK(methodtest3 == methodtest4);
 }
 
+BOOST_AUTO_TEST_CASE(map_set_serialise) {
+    // Map
+    {
+        std::map<int, std::string> testMap {
+            { 1, "Entry1" },
+            { 2, "Entry2" },
+            { 3, "Entry3" },
+        };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
+        ss << testMap;
+
+        // Deserialise
+        decltype(testMap) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testMap == decoded);
+    }
+
+    // Unordered map
+    {
+        std::unordered_map<int, std::string> testMap {
+            { 1, "Entry1" },
+            { 2, "Entry2" },
+            { 3, "Entry3" },
+        };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
+        ss << testMap;
+
+        // Deserialise
+        decltype(testMap) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testMap == decoded);
+    }
+
+    // Set
+    {
+        std::set<std::string> testSet { "Entry1", "Entry2", "Entry3" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
+        ss << testSet;
+
+        // Deserialise
+        decltype(testSet) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testSet == decoded);
+    }
+
+    // Unordered set
+    {
+        std::unordered_set<std::string> testSet { "Entry1", "Entry2", "Entry3" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
+        ss << testSet;
+
+        // Deserialise
+        decltype(testSet) decoded {};
+        ss >> decoded;
+        BOOST_CHECK(testSet == decoded);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(optional_serialise) {
+    {
+        std::optional<std::string> testOpt { "TestString" };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
+        ss << testOpt;
+
+        // Deserialise
+        decltype(testOpt) decoded {};
+        ss >> decoded;
+        BOOST_CHECK_EQUAL(testOpt, decoded);
+    }
+
+    {
+        std::optional<std::string> testOpt { std::nullopt };
+
+        // Serialise
+        CDataStream ss(SER_DISK, 0);
+        BOOST_CHECK_EQUAL(ss.size(), 0U);
+        ss << testOpt;
+
+        // Deserialise
+        decltype(testOpt) decoded {};
+        ss >> decoded;
+        BOOST_CHECK_EQUAL(testOpt, decoded);
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
+
+
+BOOST_AUTO_TEST_SUITE(ser_size_tests)
+
+BOOST_AUTO_TEST_CASE(no_args_ser_size)
+{
+    BOOST_CHECK_EQUAL(0U, ser_size());
+}
+
+BOOST_AUTO_TEST_CASE(txin_ser_size)
+{
+    BOOST_CHECK_EQUAL(41U, ser_size(CTxIn{}));
+
+    const CTxIn cin;
+    BOOST_CHECK_EQUAL(41U, ser_size(cin));
+    
+    CTxIn in;
+    BOOST_CHECK_EQUAL(41U, ser_size(in));
+
+    const std::vector<uint8_t> v(0xfd);
+    CScript s{v.cbegin(), v.cend()};
+    in.scriptSig = s;
+    BOOST_CHECK_EQUAL(296U, ser_size(in));
+}
+
+BOOST_AUTO_TEST_CASE(txout_ser_size)
+{
+    BOOST_CHECK_EQUAL(9U, ser_size(CTxOut{}));
+
+    const CTxOut cout;
+    BOOST_CHECK_EQUAL(9U, ser_size(cout));
+
+    CTxOut out;
+    BOOST_CHECK_EQUAL(9U, ser_size(out));
+    
+    const std::vector<uint8_t> v(0xfd);
+    CScript s{v.cbegin(), v.cend()};
+    out.scriptPubKey = s;
+    BOOST_CHECK_EQUAL(264U, ser_size(out));
+}
+
+BOOST_AUTO_TEST_CASE(tx_ser_size)
+{
+    BOOST_CHECK_EQUAL(10U, ser_size(CTransaction{}));
+
+    const CTransaction ctx;
+    BOOST_CHECK_EQUAL(10U, ser_size(ctx));
+
+    CTransaction tx0;
+    BOOST_CHECK_EQUAL(10U, ser_size(tx0));
+    
+    CMutableTransaction mtx1;
+    mtx1.vin.resize(1);
+    mtx1.vout.resize(1);
+    CTransaction tx1{mtx1};
+    BOOST_CHECK_EQUAL(60U, ser_size(tx1));
+   
+    CMutableTransaction mtx2;
+    mtx2.vin.resize(0xfd);
+    mtx2.vout.resize(0xfd);
+    CTransaction tx2{mtx2};
+    BOOST_CHECK_EQUAL(12'664U, ser_size(tx2));
+}
+
+BOOST_AUTO_TEST_CASE(btx_ser_size)
+{
+    BOOST_CHECK_EQUAL(33U, ser_size(BlockTransactions{}));
+
+    const BlockTransactions cbtxs;
+    BOOST_CHECK_EQUAL(33U, ser_size(cbtxs));
+
+    BlockTransactions btxs0;
+    BOOST_CHECK_EQUAL(33U, ser_size(btxs0));
+
+    BlockTransactions btxs1;
+    btxs1.txn.push_back(std::make_shared<const CTransaction>());
+    BOOST_CHECK_EQUAL(43U, ser_size(btxs1));
+
+    BlockTransactions btxs2;
+    for(int i{}; i<0xfd; ++i)
+        btxs2.txn.push_back(std::make_shared<const CTransaction>());
+    BOOST_CHECK_EQUAL(2'565U, ser_size(btxs2));
+}
+
+BOOST_AUTO_TEST_CASE(cinv_ser_size)
+{
+    BOOST_CHECK_EQUAL(sizeof(CInv), ser_size(CInv{}));
+
+    CInv cinv;
+    BOOST_CHECK_EQUAL(sizeof(CInv), ser_size(cinv));
+
+    CInv inv;
+    BOOST_CHECK_EQUAL(sizeof(CInv), ser_size(inv));
+    
+    BOOST_CHECK_EQUAL(10*sizeof(CInv), ser_size(std::vector<CInv>(10)));
+    
+    const std::vector<CInv> cinvs(10);
+    BOOST_CHECK_EQUAL(10*sizeof(CInv), ser_size(cinvs));
+
+    std::vector<CInv> invs(10);
+    BOOST_CHECK_EQUAL(10*sizeof(CInv), ser_size(invs));
+}
+
+BOOST_AUTO_TEST_SUITE_END();
+

@@ -6,6 +6,8 @@
 #ifndef BITCOIN_PRIMITIVES_BLOCK_H
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
+#include <algorithm>
+
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
@@ -28,9 +30,10 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBlockHeader() { SetNull(); }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -41,6 +44,9 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
     }
+
+    // Returns header size in bytes
+    size_t GetHeaderSize();
 
     void SetNull() {
         nVersion = 0;
@@ -58,7 +64,25 @@ public:
     int64_t GetBlockTime() const { return (int64_t)nTime; }
 };
 
-class CBlock : public CBlockHeader {
+inline bool operator==(const CBlockHeader& a, const CBlockHeader& b)
+{
+    return a.nVersion == b.nVersion &&
+     a.hashPrevBlock == b.hashPrevBlock &&
+     a.hashMerkleRoot == b.hashMerkleRoot &&
+     a.nTime == b.nTime &&
+     a.nBits == b.nBits && 
+     a.nNonce == b.nNonce;
+}
+
+inline bool operator!=(const CBlockHeader& a, const CBlockHeader& b)
+{
+    return !(a == b);
+}
+
+std::ostream& operator<<(std::ostream&, const CBlockHeader&);
+
+class CBlock : public CBlockHeader 
+{
 public:
     // network and disk
     std::vector<CTransactionRef> vtx;
@@ -66,14 +90,16 @@ public:
     // memory only
     mutable bool fChecked;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBlock() { SetNull(); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CBlock(const CBlockHeader &header) {
         SetNull();
         *((CBlockHeader *)this) = header;
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -81,27 +107,15 @@ public:
         READWRITE(vtx);
     }
 
-    uint64_t GetHeightFromCoinbase() const // Returns the block's height as specified in its coinbase transaction
-    {
-        const CScript &sig = vtx[0]->vin[0].scriptSig;
+    int32_t
+    GetHeightFromCoinbase() const; // Returns the block's height as specified in
+                                   // its coinbase transaction
 
-        // Get length of height number
-        if(sig.empty())
-            throw std::runtime_error("Empty coinbase scriptSig");
-        uint8_t numlen = sig[0];
-        if(sig.size() - 1 < numlen)
-            throw std::runtime_error("Badly formated hight in coinbase");
+    // Get number of transactions in block
+    size_t GetTransactionCount();
 
-        // Parse height as CScriptNum
-        if (numlen == OP_0)
-            return 0;
-        if ((numlen >= OP_1) && (numlen <= OP_16))
-            return numlen - OP_1 + 1;
-        std::vector<unsigned char> heightScript(numlen);
-        copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
-        CScriptNum coinbaseHeight(heightScript, false, numlen);
-        return coinbaseHeight.getint();
-    }
+    // Returns block size in bytes without coinbase transaction
+    size_t GetSizeWithoutCoinbase();
 
     void SetNull() {
         CBlockHeader::SetNull();
@@ -121,7 +135,21 @@ public:
     }
 
     std::string ToString() const;
+
+    auto cbegin() const { return vtx.cbegin(); };
+    auto cend() const { return vtx.cend(); };
 };
+
+inline auto find_tx_by_id(const CBlock& block, const uint256& txid)
+{
+    return std::find_if(block.cbegin(),
+                        block.cend(),
+                        [&txid](const auto& tx) {
+                            return tx->GetId() == txid;
+                        });
+}
+
+size_t ser_size(const CBlock&);
 
 typedef std::shared_ptr<CBlock> CBlockRef;
 
@@ -135,9 +163,10 @@ struct CBlockLocator {
 
     CBlockLocator() {}
 
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     CBlockLocator(const std::vector<uint256> &vHaveIn) { vHave = vHaveIn; }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

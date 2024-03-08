@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019 Bitcoin Association
+# Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 """
@@ -7,36 +7,33 @@ Test mining RPCs
 
 Spin up some nodes, feed in some transactions, use the mining API to
 mine some blocks, verify all nodes accept the mined blocks.
+
+Also tests rpc call getminingcandidate to correctly return number of transactions and
+the candidate size
 """
 
-from test_framework.blocktools import create_coinbase
+from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad, create_block_from_candidate
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.comptool import TestManager, TestInstance
-from test_framework.mininode import *
-from test_framework.util import *
+from test_framework.mininode import CBlock, ToHex
+from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error, assert_equal, wait_until, sync_blocks, sync_mempools
+from decimal import Decimal
 import math
 import time
 
-# Calculate the merkle root for a block
-def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
-    merkleRootBytes = ser_uint256(coinbase_hash)
-    for mp in merkle_proof:
-        mp = int(mp, 16)
-        mpBytes = ser_uint256(mp)
-        merkleRootBytes = hash256(merkleRootBytes + mpBytes)
-        merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
-    return uint256_from_str(merkleRootBytes)
 
-# Do incorrect POW for block
-def solve_bad(block):
-    block.rehash()
-    target = uint256_from_compact(block.nBits)
-    while block.sha256 <= target:
-        block.nNonce += 1
-        block.rehash()
+def get_any_unspent(listunspent, threshold_amount=0.0):
+    if len(listunspent) == 0:
+        raise AssertionError(
+            'Could not find any utxo')
+    for utx in listunspent:
+        if utx['amount'] >= threshold_amount:
+            return utx
+    raise AssertionError(
+        'Could not find any unspent with threshold={}'.format(threshold_amount))
+
 
 # Split some UTXOs into some number of spendable outputs
-def split_utxos(fee, node, count, utxos):
+def split_utxos(fee, node, count, utxos, nodes):
     # Split each UTXO into this many outputs
     split_into = max(2, math.ceil(count / len(utxos)))
 
@@ -70,8 +67,13 @@ def split_utxos(fee, node, count, utxos):
         while (node.getmempoolinfo()['size'] > 0):
             node.generate(1)
 
+        # If running multiple nodes they have to be synced regularly to prevent simultaneous syncing of blocks and txs
+        if nodes is not None:
+            sync_blocks(nodes)
+
     utxos = node.listunspent()
     return utxos
+
 
 # Feed some UTXOs into a nodes mempool
 def fill_mempool(fee, node, utxos):
@@ -92,11 +94,13 @@ def fill_mempool(fee, node, utxos):
         if num_sent % 10000 == 0:
             print("Num sent: {}".format(num_sent))
 
+
 # Connect each node to each other node
 def connect_nodes_mesh(nodes):
     for i in range(len(nodes)):
         for j in range(i + 1, len(nodes)):
             connect_nodes_bi(nodes, i, j)
+
 
 # The main test class
 class MiningTest(BitcoinTestFramework):
@@ -125,19 +129,22 @@ class MiningTest(BitcoinTestFramework):
         # Submit with wrong ID
         self.log.info("Submitting to wrong node with unknown ID")
         assert_raises_rpc_error(-22, "Block candidate ID not found",
-            otherNode.submitminingsolution, {'id': candidate['id'], 'nonce': block.nNonce})
+                                otherNode.submitminingsolution,
+                                {'id': candidate['id'], 'nonce': block.nNonce})
 
         # Omit nonce
         self.log.info("Submitting without nonce")
         assert_raises_rpc_error(-22, "nonce not found",
-            blockNode.submitminingsolution, {'id': candidate['id']})
+                                blockNode.submitminingsolution,
+                                {'id': candidate['id']})
 
         # Bad coinbase
         self.log.info("Submitting with bad coinbase")
         assert_raises_rpc_error(-22, "coinbase decode failed",
-            blockNode.submitminingsolution, {'id': candidate['id'],
-                                             'nonce': block.nNonce,
-                                             'coinbase': 'ALoadOfRubbish'})
+                                blockNode.submitminingsolution,
+                                {'id': candidate['id'],
+                                 'nonce': block.nNonce,
+                                 'coinbase': 'ALoadOfRubbish'})
 
         # Bad POW
         self.log.info("Submitting with bad POW")
@@ -151,37 +158,19 @@ class MiningTest(BitcoinTestFramework):
                                                        'coinbase': '{}'.format(ToHex(coinbase_tx))})
         assert submitResult == 'high-hash'
 
-
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
-        self.relayfee = node.getnetworkinfo()['relayfee']
-        utxos = create_confirmed_utxos(self.relayfee, node, 100)
+        self.relayfee = Decimal("250") / 100000000
+        utxos = create_confirmed_utxos(self.relayfee, node, 100, nodes=self.nodes)
+        self.sync_all()
 
         # Create a lot of transactions from the UTXOs
-        newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos)
+        newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, self.nodes)
         fill_mempool(self.relayfee, node, newutxos)
-
 
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
-        block = CBlock()
-        block.nVersion = candidate["version"]
-        block.hashPrevBlock = int(candidate["prevhash"], 16)
-        block.nTime = candidate["time"]
-        block.nBits = int(candidate["nBits"], 16)
-        block.nNonce = 0
-
-        if(get_coinbase):
-            coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
-        else:
-            coinbase_tx = create_coinbase(height=int(candidate["height"]) + 1)
-        coinbase_tx.rehash()
-        block.vtx = [coinbase_tx]
-
-        # Calculate merkle root & solve
-        block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, candidate["merkleProof"])
-        block.solve()
-        block.rehash()
+        block, coinbase_tx = create_block_from_candidate(candidate, get_coinbase)
         self.log.info("block hash before submit: " + str(block.hash))
 
         if (get_coinbase):
@@ -205,12 +194,14 @@ class MiningTest(BitcoinTestFramework):
         if(get_coinbase):
             assert 'coinbase' in candidate
         else:
-            assert not 'coinbase' in candidate
+            assert 'coinbase' not in candidate
         assert 'coinbaseValue' in candidate
         assert 'version' in candidate
         assert 'nBits' in candidate
         assert 'time' in candidate
         assert 'height' in candidate
+        assert 'sizeWithoutCoinbase' in candidate
+        assert 'num_tx' in candidate
         assert 'merkleProof' in candidate
 
         submitResult = self._create_and_submit_block(blockNode, candidate, get_coinbase)
@@ -218,16 +209,16 @@ class MiningTest(BitcoinTestFramework):
         # submitResult is bool True for success, false if failure
         assert submitResult
 
-
     def test_mine_from_old_mining_candidate(self, blockNode, get_coinbase):
 
+        sync_blocks(self.nodes)
         candidate = blockNode.getminingcandidate(get_coinbase)
 
         # Here we will check multiple block submitions because probability of accepting
         # a block with the random nonce is very high
         for i in range(1, 100):
-            # one more minute to future
-            blockNode.setmocktime(candidate["time"] + 60)
+            # half minute to future. Setting this too high will result in 'time-too-new' errors
+            blockNode.setmocktime(candidate["time"] + 30)
 
             #we are getting new mining candidate to change nTime in the headder of the pblocktemplate
             candidate_new = blockNode.getminingcandidate(get_coinbase)
@@ -239,13 +230,13 @@ class MiningTest(BitcoinTestFramework):
                 assert False, "Submited blocks is rejected because invalid pow, the time has changed."
 
             candidate = candidate_new
-
+            sync_blocks(self.nodes)
 
     def test_optional_validation(self):
         # Start 2 nodes, 1 with validation enabled the other disabled
         self.log.info("Restarting nodes for optional validation")
         self.stop_nodes()
-        self.start_nodes([['-blockcandidatevaliditytest=1','-checkmempool=0'], ['-blockcandidatevaliditytest=0','-checkmempool=0']])
+        self.start_nodes([['-blockcandidatevaliditytest=1','-checkmempool=0', "-disablesafemode=1"], ['-blockcandidatevaliditytest=0','-checkmempool=0', "-disablesafemode=1"]])
         self.sync_all()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -271,6 +262,39 @@ class MiningTest(BitcoinTestFramework):
         # Without validation will be significantly quicker
         assert novalidation_time < validation_time
 
+    def test_additional_fields(self, node):
+        """
+            test rpc call getminingcandidate that correctly returns the number of transactions
+            and size of the current candidate
+        """
+        node.generate(40)
+        num_transactions = 40
+        relay_fee = Decimal("250") / 100000000
+        size_txs = 0
+        for i in range(0, num_transactions):
+            utx = get_any_unspent(node.listunspent(), threshold_amount=1.0)
+            inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
+            outputs = {node.getnewaddress(): utx['amount']-relay_fee}
+            rawtx = node.createrawtransaction(inputs, outputs)
+            signed = node.signrawtransaction(rawtx)
+            node.sendrawtransaction(signed["hex"])
+            size_txs += len(signed["hex"]) / 2
+
+        def wait_for_transactions():
+            candidate = node.getminingcandidate()
+            # check that candidate contains num_transactions + coinbase transaction
+            return int(candidate['num_tx']) == num_transactions + 1
+
+        wait_until(wait_for_transactions, check_interval=0.01)
+
+        candidate = node.getminingcandidate()
+        self.log.info(f"number of transactions that candidate has including coinbase: {candidate['num_tx']}")
+        self.log.info(f"size without coinbase: {candidate['sizeWithoutCoinbase']} bytes")
+
+        # num_transactions + coinbase transaction
+        assert_equal(num_transactions + 1, int(candidate['num_tx']))
+        # size of transactions + 80 bytes for header
+        assert_equal(size_txs + 80, candidate['sizeWithoutCoinbase'])
 
     def run_test(self):
         txnNode = self.nodes[0]
@@ -285,7 +309,12 @@ class MiningTest(BitcoinTestFramework):
         self.test_optional_validation()
 
         self.test_mine_from_old_mining_candidate(blockNode, True)
+
+        self.sync_all()
+
         self.test_mine_from_old_mining_candidate(blockNode, False)
+
+        self.test_additional_fields(txnNode)
 
 
 if __name__ == '__main__':

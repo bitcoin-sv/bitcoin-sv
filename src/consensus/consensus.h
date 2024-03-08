@@ -14,8 +14,18 @@ static const uint64_t ONE_KILOBYTE = 1000;
 static const uint64_t ONE_MEGABYTE = ONE_KILOBYTE * 1000;
 /** 1GB */
 static const uint64_t ONE_GIGABYTE = ONE_MEGABYTE * 1000;
-/** The maximum allowed size for a transaction, in bytes */
-static const uint64_t MAX_TX_SIZE = ONE_MEGABYTE;
+/** 1KiB = 1024 */
+static const uint64_t ONE_KIBIBYTE = 1024;
+/** 1MiB = 1024 * 1024 */
+static const uint64_t ONE_MEBIBYTE = ONE_KIBIBYTE * 1024;
+/** 1GiB = 1024 * 1024 * 1024 */
+static const uint64_t ONE_GIBIBYTE = ONE_MEBIBYTE * 1024;
+/** 1 hour in seconds */
+static constexpr unsigned SECONDS_IN_ONE_HOUR { 60 * 60 };
+/** The maximum allowed size for a transaction before Genesis, in bytes*/
+static const uint64_t MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = ONE_MEGABYTE;
+/** The maximum allowed size for a transaction after Genesis (max value of uint32), in bytes */
+static const uint64_t MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = ONE_GIGABYTE;
 /** The maximum allowed size for a block, before the UAHF */
 static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
 
@@ -23,16 +33,53 @@ static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
  * The maximum allowed number of signature check operations per MB in a block
  * (network rule).
  */
-static const int64_t MAX_BLOCK_SIGOPS_PER_MB = 20000;
-/** allowed number of signature check operations per transaction. */
-static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
+static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS = 20000;
+
+// Maximum number of non-push operations per script before GENESIS
+static const uint64_t MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = 500;
+
+// Maximum number of non-push operations per script after GENESIS
+static const uint64_t MAX_OPS_PER_SCRIPT_AFTER_GENESIS = UINT32_MAX;
+
+
+/** Allowed number of signature check operations per transaction before Genesis */
+static const uint64_t MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = 20000;
+
+// Maximum number of public keys per multisig before GENESIS
+static const uint64_t MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS = 20;
+
+// Maximum number of public keys per multisig after GENESIS
+// Actual maximum number of public keys that can be stored in script of
+// maximum length is actually smaller (since each compressed pub key takes up 33 bytes).
+static const uint64_t MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS = UINT32_MAX;
+
+// Maximum script length in bytes before Genesis
+static const uint64_t MAX_SCRIPT_SIZE_BEFORE_GENESIS = 10000;
+// Maximum script length in bytes after Genesis
+static const uint64_t MAX_SCRIPT_SIZE_AFTER_GENESIS = UINT32_MAX; // 4GB - limited by maximum P2P message size  
+// Maximum script number length before Genesis (equal to CScriptNum::MAXIMUM_ELEMENT_SIZE)
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = 4; 
+
+// Maximum script number length after Genesis
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = 750 * ONE_KILOBYTE; 
+
+// Maximum coinbase scriptSig size
+static const uint64_t MAX_COINBASE_SCRIPTSIG_SIZE = 100;
+
 /**
  * Coinbase transaction outputs can only be spent after this number of new
  * blocks (network rule).
  */
 static const int COINBASE_MATURITY = 100;
+/**
+ * Confiscation transaction outputs can only be spent after this number of new blocks.
+ */
+static const int CONFISCATION_MATURITY = 1000;
 /** Activation time for P2SH (April 1st 2012) */
 static const int64_t P2SH_ACTIVATION_TIME = 1333234914;
+
+/** Maximum stack memory usage (used instead of MAX_SCRIPT_ELEMENT_SIZE and MAX_STACK_ELEMENTS) after Genesis. **/
+static const uint64_t DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS = INT64_MAX;
 
 /** Flags for nSequence and nLockTime locks */
 enum {
@@ -42,16 +89,5 @@ enum {
     /* Use GetMedianTimePast() instead of nTime for end point timestamp. */
     LOCKTIME_MEDIAN_TIME_PAST = (1 << 1),
 };
-
-/**
- * Compute the maximum number of sigops operation that can contained in a block
- * given the block size as parameter. It is computed by multiplying
- * MAX_BLOCK_SIGOPS_PER_MB by the size of the block in MB rounded up to the
- * closest integer.
- */
-inline uint64_t GetMaxBlockSigOpsCount(uint64_t blockSize) {
-    auto nMbRoundedUp = 1 + ((blockSize - 1) / ONE_MEGABYTE);
-    return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB;
-}
 
 #endif // BITCOIN_CONSENSUS_CONSENSUS_H

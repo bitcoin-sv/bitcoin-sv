@@ -91,6 +91,18 @@ enum {
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
+
+    // Is Genesis enabled - transcations that is being executed is part of block that uses Geneisis rules.
+    //
+    SCRIPT_GENESIS = (1U << 18),
+
+    // UTXO being used in this script was created *after* Genesis upgrade
+    // has been activated. This activates new rules (such as original meaning of OP_RETURN)
+    // This is per (input!) UTXO flag
+    SCRIPT_UTXO_AFTER_GENESIS = (1U << 19),
+
+    // Not actual flag. Used for marking largest flag value.
+    SCRIPT_FLAG_LAST = (1U << 20)
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

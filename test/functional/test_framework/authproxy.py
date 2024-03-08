@@ -118,9 +118,10 @@ class AuthServiceProxy():
                 return self._get_response()
             else:
                 raise
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             # Python 3.5+ raises BrokenPipeError instead of BadStatusLine when the connection was reset
             # ConnectionResetError happens on FreeBSD with Python 3.4
+            # ConnectionAbortedError happens on Windows
             self.__conn.close()
             self.__conn.request(method, path, postdata, headers)
             return self._get_response()
@@ -175,7 +176,7 @@ class AuthServiceProxy():
         content_type = http_response.getheader('Content-Type')
         if content_type != 'application/json':
             raise JSONRPCException({
-                'code': -342, 'message': 'non-JSON HTTP response with \'%i %s\' from server' % (http_response.status, http_response.reason)})
+                'code': -342, 'message': 'non-JSON HTTP response with \'%i %s\' from server "%s"' % (http_response.status, http_response.reason, http_response.read())})
 
         responsedata = http_response.read().decode('utf8')
         response = json.loads(responsedata, parse_float=decimal.Decimal)

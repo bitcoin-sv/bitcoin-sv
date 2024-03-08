@@ -144,6 +144,31 @@ BOOST_AUTO_TEST_CASE(bloom_create_insert_key) {
                                   expected.begin(), expected.end());
 }
 
+BOOST_AUTO_TEST_CASE(bloom_filter_limits)
+{
+    std::vector<uint8_t> data(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0xab);
+
+    CBloomFilter filterWithShortData;
+    // streamWithShortData represents filter with inserted vector std::vector<uint8_t> data(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0xab)
+    // Insert method does not insert data longer than MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS bytes.
+    // We could not test contains method if insert would fail.
+    CDataStream streamWithShortData(
+        ParseHex("2300080000000000000121200004400001020400100200000400000000100000a000000c130000000000000001"),
+        SER_NETWORK, PROTOCOL_VERSION);
+    streamWithShortData >> filterWithShortData;
+    BOOST_CHECK(filterWithShortData.contains(data));
+
+    CBloomFilter filterWithLongData;
+    // streamWithLongData represents filter with inserted vector std::vector<uint8_t> data(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 1, 0xab)
+    CDataStream streamWithLongData(
+        ParseHex("232020000080000100088000800000000008000804000000880002000800820028000080130000000000000001"),
+        SER_NETWORK, PROTOCOL_VERSION);
+    streamWithLongData >> filterWithLongData;
+    data.push_back(0xab);
+    // Contains method returns false if data.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS.
+    BOOST_CHECK(!filterWithLongData.contains(data));
+}
+
 BOOST_AUTO_TEST_CASE(bloom_match) {
     // Random real transaction
     // (b4749f017444b051c44dfd2720e88f314ff94f3dd6d56d40ef65854fcd7fff6b)
@@ -391,7 +416,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_1) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0x74d681e0e03bafa802c8aa084379aa98d9fcd632ddc2ed9782b"
@@ -489,7 +514,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_2) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0xe980fe9f792d014e73b95203dc1335c5f9ce19ac537a419e6df"
@@ -603,7 +628,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_2_with_update_none) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0xe980fe9f792d014e73b95203dc1335c5f9ce19ac537a419e6df"
@@ -806,7 +831,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_4) {
     BOOST_CHECK(merkleBlock.header.GetHash() == block.GetHash());
 
     BOOST_CHECK(merkleBlock.vMatchedTxn.size() == 1);
-    std::pair<unsigned int, uint256> pair = merkleBlock.vMatchedTxn[0];
+    std::pair<size_t, uint256> pair = merkleBlock.vMatchedTxn[0];
 
     BOOST_CHECK(merkleBlock.vMatchedTxn[0].second ==
                 uint256S("0x0a2a92f0bda4727d0a13eaddf4dd9ac6b5c61a1429e6b2b818f"

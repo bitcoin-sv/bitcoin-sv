@@ -7,6 +7,7 @@
 #include "consensus/merkle.h"
 
 #include "policy/policy.h"
+#include "script/script_num.h"
 
 #include "tinyformat.h"
 #include "util.h"
@@ -16,6 +17,10 @@
 
 #include "chainparamsseeds.h"
 
+#define GENESIS_ACTIVATION_MAIN                 620538
+#define GENESIS_ACTIVATION_STN                  100
+#define GENESIS_ACTIVATION_TESTNET              1344302
+#define GENESIS_ACTIVATION_REGTEST              10000
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
@@ -72,12 +77,6 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce,
                               nBits, nVersion, genesisReward);
 }
 
-void CChainParams::UpdateBIP9Parameters(Consensus::DeploymentPos d,
-                                        int64_t nStartTime, int64_t nTimeout) {
-    consensus.vDeployments[d].nStartTime = nStartTime;
-    consensus.vDeployments[d].nTimeout = nTimeout;
-}
-
 /**
  * Main network
  */
@@ -100,6 +99,8 @@ public:
         consensus.BIP65Height = 388381;
         // 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
         consensus.BIP66Height = 363725;
+        // 000000000000000004a1b34462cb8aeebd5799177f7a29cf28f2d1961716b5b5
+        consensus.CSVHeight = 419328;
         consensus.powLimit = uint256S(
             "00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         // two weeks
@@ -107,25 +108,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        // 95% of 2016
-        consensus.nRuleChangeActivationThreshold = 1916;
-        // nPowTargetTimespan / nPowTargetSpacing
-        consensus.nMinerConfirmationWindow = 2016;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        // January 1, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime =
-            1199145601;
-        // December 31, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout =
-            1230767999;
-
-        // Deployment of BIP68, BIP112, and BIP113.
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        // May 1st, 2016
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime =
-            1462060800;
-        // May 1st, 2017
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S(
@@ -141,6 +123,9 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 504031;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_MAIN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -172,10 +157,8 @@ public:
         // subset of possible options.
         // Bitcoin SV seeder
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "seed.bitcoinsv.io", true));
-        // cascharia.com
-        vSeeds.push_back(CDNSSeedData("cascharia.com", "seed.cascharia.com", true));
-        // satoshisvision.network
         vSeeds.push_back(CDNSSeedData("satoshisvision.network", "seed.satoshisvision.network", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory", "seed.bitcoinseed.directory", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 5);
@@ -244,10 +227,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             MAIN_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            MAIN_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -255,6 +236,9 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = false;
+        fIsRegTest = false;
     }
 };
 
@@ -283,10 +267,9 @@ public:
         consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
-        consensus.fPowAllowMinDifficultyBlocks = true;
+        // Do not allow min difficulty blocks after some time has elapsed
+        consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1916; // 95% of 2016
-        consensus.nMinerConfirmationWindow = 144; // fast
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -296,6 +279,9 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 2200;     // must be > 2016 - see assert in pow.cpp:268
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_STN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -316,6 +302,9 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "stn-seed.bitcoinsv.io", true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory",
+                                      "stn-seed.bitcoinseed.directory",
+                                      true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -332,18 +321,22 @@ public:
 
         checkpointData = {  { 
                 {0, uint256S("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")},
-                {1, uint256S("000000008908135d180edfe727f4e5dfaea25ed8d72337358d8362df7609b974")},
-                {2301, uint256S("00000000ff0ccf61bb239deb3998bd1a9c71d14c212c3fd58b32aae5ab6eaefb")},
-                {2951, uint256S("0000000076b49c5857b2daf2b363478a799f95a18852155113bbace94321b0d0")}
+                {1, uint256S("00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4")},
+                {2, uint256S("0000000040f8f40b5111d037b8b7ff69130de676327bcbd76ca0e0498a06c44a")},
+                {4, uint256S("00000000d33661d5a6906f84e3c64ea6101d144ec83760bcb4ba81edcb15e68d")},
+                {5, uint256S("00000000e9222ebe623bf53f6ec774619703c113242327bdc24ac830787873d6")},
+                {6, uint256S("00000000764a4ff15c2645e8ede0d0f2af169f7a517dd94a6778684ed85a51e4")},
+                {7, uint256S("000000001f15fe3dac966c6bb873c63348ca3d877cd606759d26bd9ad41e5545")},
+                {8, uint256S("0000000074230d332b2ed9d87af3ad817b6f2616c154372311c9b2e4f386c24c")},
+                {9, uint256S("00000000ca21de811f04f5ec031aa3a102f8e27f2a436cde588786da1996ec9b")},
+                {10, uint256S("0000000046ceee1b7d771594c6c75f11f14f96822fd520e86ec5c703ec231e87")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             STN_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            STN_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            STN_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -351,9 +344,11 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
+        fIsRegTest = false;
     }
 };
-CStnParams stnParams;
 
 /**
  * Testnet (v3)
@@ -370,6 +365,8 @@ public:
         consensus.BIP65Height = 581885;
         // 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
         consensus.BIP66Height = 330776;
+        // 00000000025e930139bac5c6c31a403776da130831ab85be56578f3fa75369bb
+        consensus.CSVHeight = 770112;
         consensus.powLimit = uint256S(
             "00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         // two weeks
@@ -377,25 +374,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
-        // 75% for testchains
-        consensus.nRuleChangeActivationThreshold = 1512;
-        // nPowTargetTimespan / nPowTargetSpacing
-        consensus.nMinerConfirmationWindow = 2016;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        // January 1, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime =
-            1199145601;
-        // December 31, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout =
-            1230767999;
-
-        // Deployment of BIP68, BIP112, and BIP113.
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        // March 1st, 2016
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime =
-            1456790400;
-        // May 1st, 2017
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S(
@@ -411,6 +389,9 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 1188697;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -438,8 +419,12 @@ public:
         // nodes with support for servicebits filtering should be at the top
         // Bitcoin SV seeder
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "testnet-seed.bitcoinsv.io", true));
-        vSeeds.push_back(CDNSSeedData("cascharia.com", "testnet-seed.cascharia.com", true));
-        vSeeds.push_back(CDNSSeedData("bitcoincloud.net", "testnet-seed.bitcoincloud.net", true));
+        vSeeds.push_back(CDNSSeedData("bitcoincloud.net",
+                                      "testnet-seed.bitcoincloud.net",
+                                      true));
+        vSeeds.push_back(CDNSSeedData("bitcoinseed.directory",
+                                      "testnet-seed.bitcoinseed.directory",
+                                      true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -473,10 +458,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            TESTNET_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -484,6 +467,9 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
+        fIsRegTest = false;
     }
 };
 
@@ -503,6 +489,8 @@ public:
         consensus.BIP65Height = 1351;
         // BIP66 activated on regtest (Used in rpc activation tests)
         consensus.BIP66Height = 1251;
+        // CSV activated on regtest (Used in rpc activation tests)
+        consensus.CSVHeight = 576;
         consensus.powLimit = uint256S(
             "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         // two weeks
@@ -510,18 +498,6 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = true;
-        // 75% for testchains
-        consensus.nRuleChangeActivationThreshold = 108;
-        // Faster than normal for regtest (144 instead of 2016)
-        consensus.nMinerConfirmationWindow = 144;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout =
-            999999999999ULL;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout =
-            999999999999ULL;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -535,6 +511,9 @@ public:
 
         // November 13, 2017 hard fork is always on on regtest.
         consensus.daaHeight = 0;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_REGTEST;
 
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;
@@ -582,10 +561,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            REGTEST_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -593,6 +570,9 @@ public:
         };
 
         fTestBlockCandidateValidity = true;
+        fDisableBIP30Checks = false;
+        fCanDisableBIP30Checks = true;
+        fIsRegTest = true;
     }
 };
 
@@ -656,9 +636,4 @@ void SelectParams(const std::string &network) {
         LogPrintf("Manually set magicbytes [%s].\n",magicbytesStr);
         ResetNetMagic(*globalChainParams,magicbytesStr);
     }
-}
-
-void UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime,
-                          int64_t nTimeout) {
-    globalChainParams->UpdateBIP9Parameters(d, nStartTime, nTimeout);
 }

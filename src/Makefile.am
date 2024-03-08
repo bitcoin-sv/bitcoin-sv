@@ -1,5 +1,5 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
-# Copyright (c) 2018-2019 Bitcoin Association
+# Copyright (c) 2018-2021 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 DIST_SUBDIRS = secp256k1 univalue
@@ -23,9 +23,6 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAG
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += $(UNIVALUE_CFLAGS)
 
-BITCOIN_SEEDER_INCLUDES = -I$(srcdir)/seeder
-BITCOIN_SEEDER_INCLUDES += $(BITCOIN_INCLUDES)
-
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CONSENSUS=libbitcoin_consensus.a
@@ -39,9 +36,6 @@ LIBBITCOIN_ZMQ=libbitcoin_zmq.a
 endif
 if BUILD_BITCOIN_LIBS
 LIBBITCOINCONSENSUS=libbitcoinconsensus.la
-endif
-if BUILD_BITCOIN_SEEDER
-LIBBITCOIN_SEEDER=libbitcoin_seeder.a
 endif
 if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
@@ -59,7 +53,6 @@ EXTRA_LIBRARIES += \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_CLI) \
-  $(LIBBITCOIN_SEEDER) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_ZMQ)
 
@@ -74,10 +67,6 @@ if BUILD_BITCOIND
   bin_PROGRAMS += bitcoind
 endif
 
-if BUILD_BITCOIN_SEEDER
-  bin_PROGRAMS += bitcoin-seeder
-endif
-
 if BUILD_BITCOIN_UTILS
   bin_PROGRAMS += bitcoin-cli bitcoin-tx bitcoin-miner
 endif
@@ -85,69 +74,168 @@ endif
 .PHONY: FORCE check-symbols check-security
 # bitcoin core #
 BITCOIN_CORE_H = \
+  abort_node.h \
   addrdb.h \
   addrman.h \
+  async_file_reader.h \
   base58.h \
   bloom.h \
+  block_hasher.h \
+  block_index.h \
+  block_index_store.h \
+  block_index_store_loader.h \
+  dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
+  block_file_access.h \
+  block_file_info.h \
+  blockindex_with_descendants.h \
+  blockstreams.h \
+  blockvalidation.h \
+  cfile_util.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
   chainparamsseeds.h \
   checkpoints.h \
   checkqueue.h \
+  checkqueuepool.h \
   clientversion.h \
   coins.h \
+  miner_id/coinbase_doc.h \
   compat.h \
   compat/byteswap.h \
   compat/endian.h \
   compat/sanity.h \
+  compiler_warnings.h \
   compressor.h \
   config.h \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  disk_block_index.h \
+  disk_block_pos.h \
+  disk_tx_pos.h \
+  double_spend/dsattempt_handler.h \
+  double_spend/dscallback_msg.h \
+  double_spend/dsdetected_defaults.h \
+  double_spend/dsdetected_message.h \
+  double_spend/dstxn_serialiser.h \
+  double_spend/time_limited_blacklist.h \
   dstencode.h \
+  enum_cast.h \
+  frozentxo.h \
+  frozentxo_db.h \
+  frozentxo_logging.h \
   fs.h \
   httprpc.h \
   httpserver.h \
   indirectmap.h \
   init.h \
+  invalid_txn_publisher.h \
+  invalid_txn_sinks/file_sink.h \
+  invalid_txn_sinks/zmq_sink.h \
   key.h \
   keystore.h \
   dbwrapper.h \
+  leaky_bucket.h \
   limitedmap.h \
+  limited_cache.h \
+  locked_ref.h \
   logging.h \
   memusage.h \
+  mempooltxdb.h \
   merkleblock.h \
+  merkleproof.h \
+  merkletree.h \
+  merkletreedb.h \
+  merkletreestore.h \
+  metrics.h \
+  miner_id/dataref_index.h \
+  miner_id/dataref_index_detail.h \
+  miner_id/datareftx.h \
+  miner_id/miner_id.h \
+  miner_id/miner_id_db.h \
+  miner_id/miner_id_db_defaults.h \
+  miner_id/miner_info.h \
+  miner_id/miner_info_doc.h \
+  miner_id/miner_info_error.h \
+  miner_id/miner_info_ref.h \
+  miner_id/revokemid.h \
+  miner_id/miner_info_tracker.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
-  mining/legacy.h \
-  mod_pri_queue.h \
-  net.h \
-  net_processing.h \
-  netaddress.h \
-  netbase.h \
+  mining/group_builder.h \
+  mining/journal.h \
+  mining/journal_builder.h \
+  mining/journal_change_set.h \
+  mining/journal_entry.h \
+  mining/journaling_block_assembler.h \
+  net/array_parser.h \
+  net/association.h \
+  net/association_id.h \
+  net/authconn.h \
+  net/block_download_tracker.h \
+  net/block_parser.h \
+  net/blocktxn_parser.h \
+  net/cmpct_size.h \
+  net/cmpctblock_parser.h \
+  net/fixed_len_multi_parser.h \
+  net/fixed_len_parser.h \
+  net/msg_buffer.h \
+  net/msg_parser.h \
+  net/msg_parser_buffer.h \
+  net/net.h \
+  net/netaddress.h \
+  net/netbase.h \
+  net/net_message.h \
+  net/net_processing.h \
+  net/net_types.h \
+  net/node_state.h \
+  net/node_stats.h \
+  net/parser_utils.h \
+  net/prefilled_tx_parser.h \
+  net/p2p_msg_lengths.h \
+  net/send_queue_bytes.h \
+  net/single_seg_parser.h \
+  net/stream.h \
+  net/stream_policy.h \
+  net/stream_policy_factory.h \
+  net/tx_parser.h \
+  net/validation_scheduler.h \
   netmessagemaker.h \
   noui.h \
+  orphan_txns.h \
   policy/fees.h \
   policy/policy.h \
   pow.h \
+  processing_block_index.h \
   protocol.h \
   random.h \
+  rawtxvalidator.h \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
+  rpc/client_config.h \
+  rpc/client_utils.h \
+  rpc/http_protocol.h \
+  rpc/http_request.h \
+  rpc/http_response.h \
+  rpc/jsonwriter.h \
   rpc/mining.h \
   rpc/misc.h \
   rpc/protocol.h \
   rpc/server.h \
   rpc/tojson.h \
   rpc/register.h \
+  rpc/text_writer.h \
+  rpc/webhook_client.h \
+  rpc/webhook_client_defaults.h \
+  safe_mode.h \
   scheduler.h \
+  script_config.h \
   script/scriptcache.h \
   script/sigcache.h \
   script/sign.h \
@@ -161,19 +249,36 @@ BITCOIN_CORE_H = \
   support/lockedpool.h \
   sync.h \
   task.h \
+  taskcancellation.h \
   task_helpers.h \
+  thread_safe_queue.h \
   threadpool.h \
   threadpoolT.h \
+  threadpriority.h \
   threadsafety.h \
   threadinterrupt.h \
   timedata.h \
-  torcontrol.h \
+  time_locked_mempool.h \
+  transaction_specific_config.h \
   txdb.h \
+  txhasher.h \
   txmempool.h \
+  txmempoolevictioncandidates.h \
+  tx_mempool_info.h \
+  txn_double_spend_detector.h \
+  txn_grouper.h \
+  txn_handlers.h \
   txn_propagator.h \
+  txn_recent_rejects.h \
   txn_sending_details.h \
+  txn_util.h \
+  txn_validation_config.h \
+  txn_validation_data.h \
+  txn_validation_result.h \
+  txn_validator.h \
   ui_interface.h \
   undo.h \
+  unique_array.h \
   util.h \
   utilmoneystr.h \
   utiltime.h \
@@ -190,6 +295,8 @@ BITCOIN_CORE_H = \
   wallet/wallet.h \
   wallet/walletdb.h \
   warnings.h \
+  write_preferring_upgradable_mutex.h \
+  zmq/zmq_publisher.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -206,49 +313,121 @@ libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
+  abort_node.cpp \
   addrman.cpp \
   addrdb.cpp \
   bloom.cpp \
+  block_index.cpp \
   blockencodings.cpp \
+  block_file_info.cpp \
   blockfileinfostore.cpp \
+  block_file_access.cpp \
+  block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
-  config.cpp \
+  miner_id/coinbase_doc.cpp \
+  frozentxo.cpp \
+  frozentxo_db.cpp \
+  frozentxo_logging.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
+  invalid_txn_publisher.cpp \
+  invalid_txn_sinks/file_sink.cpp \
+  invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
+  double_spend/dsattempt_handler.cpp \
+  double_spend/dscallback_msg.cpp \
+  double_spend/dsdetected_message.cpp \
+  double_spend/dstxn_serialiser.cpp \
+  mempooltxdb.cpp \
   merkleblock.cpp \
+  merkleproof.cpp \
+  merkletree.cpp \
+  merkletreedb.cpp \
+  merkletreestore.cpp \
+  miner_id/dataref_index.cpp \
+  miner_id/datareftx.cpp \
+  miner_id/miner_id.cpp \
+  miner_id/miner_id_db.cpp \
+  miner_id/miner_info.cpp \
+  miner_id/miner_info_doc.cpp \
+  miner_id/miner_info_error.cpp \
+  miner_id/miner_info_ref.cpp \
+  miner_id/revokemid.cpp \
+  miner_id/miner_info_tracker.cpp \
+  mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
-  mining/legacy.cpp \
-  net.cpp \
-  net_processing.cpp \
+  mining/group_builder.cpp \
+  mining/journal.cpp \
+  mining/journal_builder.cpp \
+  mining/journal_change_set.cpp \
+  mining/journal_entry.cpp \
+  mining/journaling_block_assembler.cpp \
+  net/association.cpp \
+  net/association_id.cpp \
+  net/block_download_tracker.cpp \
+  net/block_parser.cpp \
+  net/blocktxn_parser.cpp \
+  net/cmpct_size.cpp \
+  net/cmpctblock_parser.cpp \
+  net/fixed_len_multi_parser.cpp \
+  net/fixed_len_parser.cpp \
+  net/msg_buffer.cpp \
+  net/msg_parser_buffer.cpp \
+  net/net.cpp \
+  net/net_message.cpp \
+  net/net_processing.cpp \
+  net/node_state.cpp \
+  net/prefilled_tx_parser.cpp \
+  net/single_seg_parser.cpp \
+  net/stream.cpp \
+  net/stream_policy.cpp \
+  net/stream_policy_factory.cpp \
+  net/tx_parser.cpp \
+  net/validation_scheduler.cpp \
   noui.cpp \
+  orphan_txns.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
+  processing_block_index.cpp \
+  rawtxvalidator.cpp \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
+  rpc/frozentxo_rpc.cpp \
   rpc/mining.cpp \
+  rpc/miner_info.cpp \
   rpc/mining-fbb.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
+  rpc/safe_mode.cpp \
   rpc/server.cpp \
+  rpc/webhook_client.cpp \
+  safe_mode.cpp \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
+  taskcancellation.cpp \
   timedata.cpp \
-  torcontrol.cpp \
+  time_locked_mempool.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txmempoolevictioncandidates.cpp \
+  tx_mempool_info.cpp \
+  txn_double_spend_detector.cpp \
+  txn_grouper.cpp \
   txn_propagator.cpp \
+  txn_validation_data.cpp \
+  txn_recent_rejects.cpp \
+  txn_validator.cpp \
   ui_interface.cpp \
+  unique_array.cpp \
   validation.cpp \
   validationinterface.cpp \
-  versionbits.cpp \
   vmtouch.cpp \
   $(BITCOIN_CORE_H)
 
@@ -256,6 +435,7 @@ if ENABLE_ZMQ
 libbitcoin_zmq_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(ZMQ_CFLAGS)
 libbitcoin_zmq_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_zmq_a_SOURCES = \
+  zmq/zmq_publisher.cpp \
   zmq/zmqabstractnotifier.cpp \
   zmq/zmqnotificationinterface.cpp \
   zmq/zmqpublishnotifier.cpp
@@ -302,16 +482,21 @@ crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4.cpp
 endif
 
 # consensus: shared between all executables that validate any consensus rules.
-libbitcoin_consensus_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-libbitcoin_consensus_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+libbitcoin_consensus_a_CPPFLAGS = $(AM_CPPFLAGS) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) $(BITCOIN_INCLUDES)
+libbitcoin_consensus_a_CXXFLAGS = $(AM_CXXFLAGS) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) $(PIE_FLAGS)
 libbitcoin_consensus_a_SOURCES = \
   amount.h \
   arith_uint256.cpp \
   arith_uint256.h \
+  big_int.cpp \
+  big_int.h \
+  cfile_util.cpp \
+  cfile_util.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
   consensus/validation.h \
+  ecc_guard.h \
   hash.cpp \
   hash.h \
   prevector.h \
@@ -323,16 +508,26 @@ libbitcoin_consensus_a_SOURCES = \
   pubkey.h \
   script/bitcoinconsensus.cpp \
   script/sighashtype.h \
+  script/instruction.h \
+  script/instruction_iterator.h \
   script/interpreter.cpp \
   script/interpreter.h \
+  script/int_serialization.h \
+  script/limitedstack.cpp \
+  script/limitedstack.h \
+  script/opcodes.cpp \
+  script/opcodes.h \
   script/script_flags.h \
   script/script.cpp \
   script/script.h \
+  script/script_num.cpp \
+  script/script_num.h \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
+  taskcancellation.h \
+  taskcancellation.cpp \
   tinyformat.h \
-  uint256.cpp \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
@@ -353,13 +548,17 @@ libbitcoin_common_a_SOURCES = \
   core_write.cpp \
   key.cpp \
   keystore.cpp \
-  netaddress.cpp \
-  netbase.cpp \
+  net/netaddress.cpp \
+  net/netbase.cpp \
   protocol.cpp \
+  rpc/jsonwriter.cpp \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  transaction_specific_config.cpp \
+  txhasher.cpp \
   warnings.cpp \
+  write_preferring_upgradable_mutex.cpp \
   $(BITCOIN_CORE_H)
 
 # util: shared between all executables.
@@ -378,10 +577,11 @@ libbitcoin_util_a_SOURCES = \
   logging.cpp \
   random.cpp \
   rpc/protocol.cpp \
+  rpc/text_writer.cpp \
   support/cleanse.cpp \
   sync.cpp \
   threadinterrupt.cpp \
-  uint256.cpp \
+  threadpriority.cpp \
   uint256.h \
   util.cpp \
   utilmoneystr.cpp \
@@ -398,25 +598,15 @@ endif
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
+  cfile_util.cpp \
+  net/netaddress.cpp \
+  net/netbase.cpp \
   rpc/client.cpp \
+  rpc/client_config.cpp \
+  rpc/client_utils.cpp \
+  rpc/http_request.cpp \
+  rpc/http_response.cpp \
   $(BITCOIN_CORE_H)
-
-# seeder library
-libbitcoin_seeder_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIE_FLAGS) $(BITCOIN_SEEDER_INCLUDES)
-libbitcoin_seeder_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-libbitcoin_seeder_a_SOURCES = \
-  seeder/bitcoin.cpp \
-  seeder/bitcoin.h \
-  seeder/compat.h \
-  seeder/db.cpp \
-  seeder/db.h \
-  seeder/dns.cpp \
-  seeder/dns.h \
-  seeder/strlcpy.h \
-  seeder/util.h
-
-nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
-#
 
 # bitcoind binary #
 bitcoind_SOURCES = bitcoind.cpp
@@ -430,6 +620,7 @@ endif
 
 bitcoind_LDADD = \
   $(LIBBITCOIN_SERVER) \
+  $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_COMMON) \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_UTIL) \
@@ -438,11 +629,20 @@ bitcoind_LDADD = \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
-  $(LIBLEVELDB_SSE42) \
+  $(LIBCRC32C) \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+bitcoind_LDADD += \
+  $(BOOST_LIBS) \
+  $(BDB_LIBS) \
+  $(OPENSSL_LIBS) \
+  $(MINIUPNPC_LIBS) \
+  $(EVENT_PTHREADS_LIBS) \
+  $(EVENT_LIBS) \
+  $(ZMQ_LIBS) \
+  $(AIO_LIBS) \
+  $(TBB_LIBS)
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp
@@ -460,22 +660,7 @@ bitcoin_cli_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO)
 
-bitcoin_cli_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
-#
-
-# bitcoin-seeder binary #
-bitcoin_seeder_SOURCES = seeder/main.cpp
-bitcoin_seeder_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_SEEDER_INCLUDES)
-bitcoin_seeder_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-bitcoin_seeder_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
-
-bitcoin_seeder_LDADD = \
-  $(LIBBITCOIN_SEEDER) \
-  $(LIBBITCOIN_COMMON) \
-  $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_CRYPTO)
-
-bitcoin_seeder_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+bitcoin_cli_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS) $(EVENT_LIBS)
 #
 
 # bitcoin-tx binary #
@@ -496,14 +681,13 @@ bitcoin_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+bitcoin_tx_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS)
 #
 
 # bitcoin-miner binary #
 bitcoin_miner_SOURCES = bitcoin-miner.cpp \
 arith_uint256.cpp \
 arith_uint256.h \
-uint256.cpp \
 uint256.h \
 crypto/sha512.cpp \
 crypto/sha512.h \
@@ -520,7 +704,7 @@ bitcoin_miner_LDADD = \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_UTIL)
  
-bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
+bitcoin_miner_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS) $(EVENT_LIBS)
 #
 
 # bitcoinconsensus library #
@@ -534,8 +718,8 @@ endif
 
 libbitcoinconsensus_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined $(RELDFLAGS)
 libbitcoinconsensus_la_LIBADD = $(LIBSECP256K1)
-libbitcoinconsensus_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
-libbitcoinconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+libbitcoinconsensus_la_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
+libbitcoinconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(BITCOIN_INCLUDES) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) $(PIE_FLAGS)
 
 endif
 #
@@ -556,7 +740,6 @@ CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
 CLEANFILES += rpc/*.gcda rpc/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
-CLEANFILES += seeder/*.gcda seeder/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno
@@ -585,13 +768,13 @@ clean-local:
 check-symbols: $(bin_PROGRAMS)
 if GLIBC_BACK_COMPAT
 	@echo "Checking glibc back compat..."
-	$(AM_V_at) READELF=$(READELF) CPPFILT=$(CPPFILT) $(top_srcdir)/contrib/devtools/symbol-check.py < $(bin_PROGRAMS)
+	$(AM_V_at) READELF=$(READELF) CPPFILT=$(CPPFILT) $(top_srcdir)/contrib/devtools/symbol-check.py $(bin_PROGRAMS)
 endif
 
 check-security: $(bin_PROGRAMS)
 if HARDEN
 	@echo "Checking binary security..."
-	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
+	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py $(bin_PROGRAMS)
 endif
 
 %.pb.cc %.pb.h: %.proto
@@ -599,6 +782,7 @@ endif
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(<D) $<
 
 if EMBEDDED_LEVELDB
+include Makefile.crc32c.include
 include Makefile.leveldb.include
 endif
 

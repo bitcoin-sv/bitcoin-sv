@@ -11,16 +11,26 @@ from test_framework.util import *
 class TxnMallTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 4
+        # Clean chain is needed, otherwise for block tip older than 24h
+        # node stays in IBD and does not ask for tx that it got inv for it.
+        self.setup_clean_chain = True
 
     def add_options(self, parser):
         parser.add_option("--mineblock", dest="mine_block", default=False, action="store_true",
                           help="Test double-spend of 1-confirmed transaction")
 
     def setup_network(self):
-        # Start with split network:
         super(TxnMallTest, self).setup_network()
-        disconnect_nodes(self.nodes[1], 2)
-        disconnect_nodes(self.nodes[2], 1)
+        # Create a 200-block-long chain. Each of the 4 nodes gets 25 mature blocks with 1250 BTC
+        for i in range(2):
+            for peer in range(4):
+                for j in range(25):
+                    self.nodes[peer].generate(1)
+                # Must sync before next peer starts generating blocks
+                sync_blocks(self.nodes)
+
+        # Start with split network:
+        self.split_network()
 
     def run_test(self):
         # All nodes should start with 1,250 BTC:
@@ -120,8 +130,12 @@ class TxnMallTest(BitcoinTestFramework):
         # ... mine a block...
         self.nodes[2].generate(1)
 
+        # Before connecting node1 and node2, wait for node0 and node1 to relay all previous transactions
+        sync_mempools(self.nodes[0:2])
+        wait_for_txn_propagator(self.nodes[1])
+
         # Reconnect the split network, and sync chain:
-        connect_nodes(self.nodes[1], 2)
+        connect_nodes(self.nodes, 1, 2)
         self.nodes[2].sendrawtransaction(fund_bar_tx["hex"])
         self.nodes[2].sendrawtransaction(tx2["hex"])
         self.nodes[2].generate(1)  # Mine another block to make sure we sync

@@ -5,15 +5,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "pow.h"
-
 #include "arith_uint256.h"
 #include "chain.h"
-#include "chainparams.h"
 #include "config.h"
 #include "consensus/params.h"
 #include "primitives/block.h"
 #include "uint256.h"
-#include "util.h"
 #include "validation.h"
 
 /**
@@ -26,11 +23,11 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
 
     // Only change once per difficulty adjustment interval
-    uint32_t nHeight = pindexPrev->nHeight + 1;
+    int32_t nHeight = pindexPrev->GetHeight() + 1;
     if (nHeight % params.DifficultyAdjustmentInterval() == 0) {
         // Go back by what we want to be 14 days worth of blocks
         assert(nHeight >= params.DifficultyAdjustmentInterval());
-        uint32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
+        int32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
         const CBlockIndex *pindexFirst = pindexPrev->GetAncestor(nHeightFirst);
         assert(pindexFirst);
 
@@ -52,17 +49,17 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
 
         // Return the last non-special-min-difficulty-rules-block
         const CBlockIndex *pindex = pindexPrev;
-        while (pindex->pprev &&
-               pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
-               pindex->nBits == nProofOfWorkLimit) {
-            pindex = pindex->pprev;
+        while (!pindex->IsGenesis() &&
+               pindex->GetHeight() % params.DifficultyAdjustmentInterval() != 0 &&
+               pindex->GetBits() == nProofOfWorkLimit) {
+            pindex = pindex->GetPrev();
         }
 
-        return pindex->nBits;
+        return pindex->GetBits();
     }
 
     // We can't go below the minimum, so bail early.
-    uint32_t nBits = pindexPrev->nBits;
+    uint32_t nBits = pindexPrev->GetBits();
     if (nBits == nProofOfWorkLimit) {
         return nProofOfWorkLimit;
     }
@@ -103,10 +100,10 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
 
     // Special rule for regtest: we never retarget.
     if (params.fPowNoRetargeting) {
-        return pindexPrev->nBits;
+        return pindexPrev->GetBits();
     }
 
-    if (IsDAAEnabled(config, pindexPrev)) {
+    if (IsDAAEnabled(config, pindexPrev->GetHeight())) {
         return GetNextCashWorkRequired(pindexPrev, pblock, config);
     }
 
@@ -119,7 +116,7 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexPrev,
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
 
     if (params.fPowNoRetargeting) {
-        return pindexPrev->nBits;
+        return pindexPrev->GetBits();
     }
 
     // Limit adjustment step
@@ -135,7 +132,7 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexPrev,
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew;
-    bnNew.SetCompact(pindexPrev->nBits);
+    bnNew.SetCompact(pindexPrev->GetBits());
     bnNew *= nActualTimespan;
     bnNew /= params.nPowTargetTimespan;
 
@@ -173,20 +170,20 @@ bool CheckProofOfWork(uint256 hash, uint32_t nBits, const Config &config) {
 static arith_uint256 ComputeTarget(const CBlockIndex *pindexFirst,
                                    const CBlockIndex *pindexLast,
                                    const Consensus::Params &params) {
-    assert(pindexLast->nHeight > pindexFirst->nHeight);
+    assert(pindexLast->GetHeight() > pindexFirst->GetHeight());
 
     /**
      * From the total work done and the time it took to produce that much work,
      * we can deduce how much work we expect to be produced in the targeted time
      * between blocks.
      */
-    arith_uint256 work = pindexLast->nChainWork - pindexFirst->nChainWork;
+    arith_uint256 work = pindexLast->GetChainWork() - pindexFirst->GetChainWork();
     work *= params.nPowTargetSpacing;
 
     // In order to avoid difficulty cliffs, we bound the amplitude of the
     // adjustment we are going to do to a factor in [0.5, 2].
     int64_t nActualTimespan =
-        int64_t(pindexLast->nTime) - int64_t(pindexFirst->nTime);
+        pindexLast->GetBlockTime() - pindexFirst->GetBlockTime();
     if (nActualTimespan > 288 * params.nPowTargetSpacing) {
         nActualTimespan = 288 * params.nPowTargetSpacing;
     } else if (nActualTimespan < 72 * params.nPowTargetSpacing) {
@@ -208,7 +205,7 @@ static arith_uint256 ComputeTarget(const CBlockIndex *pindexFirst,
  * basing our computation on via a median of 3.
  */
 static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
-    assert(pindex->nHeight >= 3);
+    assert(pindex->GetHeight() >= 3);
 
     /**
      * In order to avoid a block with a very skewed timestamp having too much
@@ -217,19 +214,22 @@ static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
      */
     const CBlockIndex *blocks[3];
     blocks[2] = pindex;
-    blocks[1] = pindex->pprev;
-    blocks[0] = blocks[1]->pprev;
+    blocks[1] = pindex->GetPrev();
+    blocks[0] = blocks[1]->GetPrev();
 
     // Sorting network.
-    if (blocks[0]->nTime > blocks[2]->nTime) {
+    if (blocks[0]->GetBlockTime() > blocks[2]->GetBlockTime())
+    {
         std::swap(blocks[0], blocks[2]);
     }
 
-    if (blocks[0]->nTime > blocks[1]->nTime) {
+    if (blocks[0]->GetBlockTime() > blocks[1]->GetBlockTime())
+    {
         std::swap(blocks[0], blocks[1]);
     }
 
-    if (blocks[1]->nTime > blocks[2]->nTime) {
+    if (blocks[1]->GetBlockTime() > blocks[2]->GetBlockTime())
+    {
         std::swap(blocks[1], blocks[2]);
     }
 
@@ -264,7 +264,7 @@ uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
     }
 
     // Compute the difficulty based on the full adjustment interval.
-    const uint32_t nHeight = pindexPrev->nHeight;
+    const int32_t nHeight = pindexPrev->GetHeight();
     assert(nHeight >= params.DifficultyAdjustmentInterval());
 
     // Get the last suitable block of the difficulty interval.
@@ -272,7 +272,7 @@ uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
     assert(pindexLast);
 
     // Get the first suitable block of the difficulty interval.
-    uint32_t nHeightFirst = nHeight - 144;
+    int32_t nHeightFirst = nHeight - 144;
     const CBlockIndex *pindexFirst =
         GetSuitableBlock(pindexPrev->GetAncestor(nHeightFirst));
     assert(pindexFirst);

@@ -5,10 +5,8 @@ src/bitcoin
 src/bitcoind
 src/bitcoin-cli
 src/bitcoin-miner
-src/bitcoin-seeder
 src/bitcoin-tx
 src/test/test_bitcoin
-src/test/test_bitcoin_fuzzy
 # autoreconf
 Makefile.in
 aclocal.m4
@@ -29,12 +27,14 @@ build-aux/test-driver
 config.log
 config.status
 configure
+configure~
 libtool
 src/config/bitcoin-config.h
 src/config/bitcoin-config.h.in
 src/config/stamp-h1
 share/setup.nsi
 src/univalue/gen
+src/univalue/configure~
 .deps
 .dirstamp
 .libs
@@ -99,3 +99,8 @@ contrib/devtools/split-debug.sh
 
 # vagrant
 .vagrant
+
+.vscode
+
+# JetBrains, Clion, PyCharm etc...
+.idea

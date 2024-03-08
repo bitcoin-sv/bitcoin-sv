@@ -12,9 +12,9 @@ include(CheckSymbolExists)
 set(PACKAGE_NAME "Bitcoin SV")
 
 # Version
-set(CLIENT_VERSION_MAJOR 0)
-set(CLIENT_VERSION_MINOR 2)
-set(CLIENT_VERSION_REVISION 1)
+set(CLIENT_VERSION_MAJOR 1)
+set(CLIENT_VERSION_MINOR 1)
+set(CLIENT_VERSION_REVISION 0)
 set(CLIENT_VERSION_BUILD 0)
 
 if(ENABLE_PROD_BUILD)
@@ -25,7 +25,7 @@ endif()
 
 
 # Copyright
-set(COPYRIGHT_YEAR 2019)
+set(COPYRIGHT_YEAR 2023)
 set(COPYRIGHT_HOLDERS "The %s developers")
 set(COPYRIGHT_HOLDERS_SUBSTITUTION Bitcoin)
 string(REPLACE "%s" ${COPYRIGHT_HOLDERS_SUBSTITUTION} COPYRIGHT_HOLDERS_FINAL ${COPYRIGHT_HOLDERS})
@@ -115,11 +115,9 @@ check_builtin_exist(__builtin_clzll HAVE_DECL___BUILTIN_CLZLL)
 
 # Various system libraries
 check_symbol_exists(strnlen "string.h" HAVE_DECL_STRNLEN)
+check_symbol_exists(daemon "unistd.h" HAVE_DECL_DAEMON)
 
 # OpenSSL functionality
-include(BrewHelper)
-find_brew_prefix(OPENSSL_ROOT_DIR openssl)
-find_package(OpenSSL REQUIRED)
 set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_CRYPTO_INCLUDES})
 set(CMAKE_REQUIRED_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY})
 check_symbol_exists(EVP_MD_CTX_new "openssl/evp.h" HAVE_DECL_EVP_MD_CTX_NEW)

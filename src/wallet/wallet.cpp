@@ -5,6 +5,8 @@
 
 #include "wallet/wallet.h"
 
+#include "block_file_access.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "checkpoints.h"
 #include "config.h"
@@ -15,7 +17,8 @@
 #include "init.h"
 #include "key.h"
 #include "keystore.h"
-#include "net.h"
+#include "mining/journal_builder.h"
+#include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
@@ -25,6 +28,7 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -36,12 +40,14 @@
 #include <boost/thread.hpp>
 
 #include <cassert>
+#include <cstdint>
+
+using namespace mining;
 
 std::vector<CWalletRef> vpwallets;
 
 /** Transaction fee set by the user */
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
-unsigned int nTxConfirmTarget = DEFAULT_TX_CONFIRM_TARGET;
 bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
 
 const char *DEFAULT_WALLET_DAT = "wallet.dat";
@@ -55,8 +61,9 @@ const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
 CFeeRate CWallet::minTxFee = CFeeRate(DEFAULT_TRANSACTION_MINFEE);
 
 /**
- * If fee estimation does not have enough data to provide estimates, use this
- * fee instead. Has no effect if not using fee estimation.
+ * If fee estimation does not have enough data to provide estimates and 
+ * -minrelaytxfee is set to 0, use this fee instead. 
+ * Has no effect if not using fee estimation.
  * Override with -fallbackfee
  */
 CFeeRate CWallet::fallbackFee = CFeeRate(DEFAULT_FALLBACK_FEE);
@@ -78,6 +85,11 @@ struct CompareValueOnly {
     }
 };
 
+bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
+    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
+    return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
+}
+
 std::string COutput::ToString() const {
     return strprintf("COutput(%s, %d, %d) [%s]", tx->GetId().ToString(), i,
                      nDepth, FormatMoney(tx->tx->vout[i].nValue));
@@ -97,7 +109,9 @@ public:
         txnouttype type;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        if (ExtractDestinations(script, type, vDest, nRequired)) {
+        // We will treat all scripts as after genesis except P2SH.
+        const bool isGenesisEnabled = !IsP2SH(script);
+        if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
             }
@@ -338,12 +352,12 @@ bool CWallet::LoadCScript(const CScript &redeemScript) {
      * never can be redeemed. However, old wallets may still contain these. Do
      * not add them to the wallet and warn.
      */
-    if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE) {
+    if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS) {
         std::string strAddr = EncodeDestination(CScriptID(redeemScript));
         LogPrintf("%s: Warning: This wallet contains a redeemScript of size %i "
                   "which exceeds maximum size %i thus can never be redeemed. "
                   "Do not use address %s.\n",
-                  __func__, redeemScript.size(), MAX_SCRIPT_ELEMENT_SIZE,
+                  __func__, redeemScript.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS,
                   strAddr);
         return true;
     }
@@ -509,13 +523,15 @@ bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB *pwalletdbIn,
         nWalletMaxVersion = nVersion;
     }
 
-    CWalletDB *pwalletdb = pwalletdbIn ? pwalletdbIn : new CWalletDB(*dbw);
-    if (nWalletVersion > 40000) {
-        pwalletdb->WriteMinVersion(nWalletVersion);
-    }
-
-    if (!pwalletdbIn) {
-        delete pwalletdb;
+    if(nWalletVersion > 40'000)
+    {
+        if(pwalletdbIn)
+            pwalletdbIn->WriteMinVersion(nWalletVersion);
+        else
+        { 
+            CWalletDB wdb{*dbw};
+            wdb.WriteMinVersion(nWalletVersion);
+        }
     }
 
     return true;
@@ -794,6 +810,7 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
         if (!EncryptKeys(vMasterKey)) {
             pwalletdbEncryption->TxnAbort();
             delete pwalletdbEncryption;
+            pwalletdbEncryption = nullptr;
             // We now probably have half of our keys encrypted in memory, and
             // half not... die and let the user reload the unencrypted wallet.
             assert(false);
@@ -804,6 +821,7 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
 
         if (!pwalletdbEncryption->TxnCommit()) {
             delete pwalletdbEncryption;
+            pwalletdbEncryption = nullptr;
             // We now have keys encrypted in memory, but not on disk... die to
             // avoid confusion and let the user reload the unencrypted wallet.
             assert(false);
@@ -1025,7 +1043,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFlushOnClose) {
     wtx.BindWallet(this);
     bool fInsertedNew = ret.second;
     if (fInsertedNew) {
-        wtx.nTimeReceived = GetAdjustedTime();
+        wtx.nTimeReceived = static_cast<unsigned int>(GetAdjustedTime());
         wtx.nOrderPos = IncOrderPosNext(&walletdb);
         wtxOrdered.insert(std::make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
         wtx.nTimeSmart = ComputeTimeSmart(wtx);
@@ -1260,10 +1278,10 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx) {
     LOCK2(cs_main, cs_wallet);
 
     int conflictconfirms = 0;
-    if (mapBlockIndex.count(hashBlock)) {
-        CBlockIndex *pindex = mapBlockIndex[hashBlock];
+    if (auto pindex = mapBlockIndex.Get(hashBlock); pindex)
+    {
         if (chainActive.Contains(pindex)) {
-            conflictconfirms = -(chainActive.Height() - pindex->nHeight + 1);
+            conflictconfirms = -(chainActive.Height() - pindex->GetHeight() + 1);
         }
     }
 
@@ -1359,7 +1377,7 @@ void CWallet::BlockConnected(
         SyncTransaction(ptx);
     }
     for (size_t i = 0; i < pblock->vtx.size(); i++) {
-        SyncTransaction(pblock->vtx[i], pindex, i);
+        SyncTransaction(pblock->vtx[i], pindex, static_cast<int>(i));
     }
 }
 
@@ -1428,7 +1446,7 @@ bool CWallet::IsChange(const CTxOut &txout) const {
     // change).
     if (::IsMine(*this, txout.scriptPubKey)) {
         CTxDestination address;
-        if (!ExtractDestination(txout.scriptPubKey, address)) {
+        if (!CWallet::ExtractDestination(txout.scriptPubKey, address)) {
             return true;
         }
 
@@ -1672,8 +1690,8 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
         // In either case, we need to get the destination address.
         CTxDestination address;
 
-        if (!ExtractDestination(txout.scriptPubKey, address) &&
-            !txout.scriptPubKey.IsUnspendable()) {
+        if (!CWallet::ExtractDestination(txout.scriptPubKey, address) &&
+            !txout.scriptPubKey.IsKnownOpReturn()) {
             LogPrintf("CWalletTx::GetAmounts: Unknown transaction type found, "
                       "txid %s\n",
                       this->GetId().ToString());
@@ -1705,14 +1723,14 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
  * before CWallet::nTimeFirstKey). Returns null if there is no such range, or
  * the range doesn't include chainActive.Tip().
  */
-CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
+const CBlockIndex *CWallet::ScanForWalletTransactions(const CBlockIndex *pindexStart,
                                                 bool fUpdate) {
     LOCK2(cs_main, cs_wallet);
 
     int64_t nNow = GetTime();
 
-    CBlockIndex *pindex = pindexStart;
-    CBlockIndex *ret = pindexStart;
+    const CBlockIndex *pindex = pindexStart;
+    const CBlockIndex *ret = pindexStart;
 
     // No need to read and scan block, if block was created before our wallet
     // birthday (as adjusted for block time variability)
@@ -1722,14 +1740,23 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
     }
 
     while (pindex) {
-        
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindex, GlobalConfig::GetConfig())) {
-            for (size_t posInBlock = 0; posInBlock < block.vtx.size();
-                 ++posInBlock) {
-                AddToWalletIfInvolvingMe(block.vtx[posInBlock], pindex,
-                                         posInBlock, fUpdate);
-            }
+
+        auto stream = pindex->GetDiskBlockStreamReader();
+
+        if (stream)
+        {
+            int posInBlock = 0;
+            do
+            {
+                const CTransaction& transaction = stream->ReadTransaction();
+                AddToWalletIfInvolvingMe(
+                    MakeTransactionRef(transaction),
+                    pindex,
+                    posInBlock,
+                    fUpdate);
+                ++posInBlock;
+            } while(!stream->EndOfStream());
+
             if (!ret) {
                 ret = pindex;
             }
@@ -1737,13 +1764,14 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
             ret = nullptr;
         }
 
-        pindex = chainActive.Next(pindex);
         if (GetTime() >= nNow + 60) {
             nNow = GetTime();
             LogPrintf("Still rescanning. At block %d. Progress=%f\n",
-                      pindex->nHeight,
+                      pindex->GetHeight(),
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
+
+        pindex = chainActive.Next(pindex);
     }
 
     return ret;
@@ -1772,14 +1800,11 @@ void CWallet::ReacceptWalletTransactions() {
             mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
         }
     }
-
     // Try to add wallet transactions to memory pool.
     for (std::pair<const int64_t, CWalletTx *> &item : mapSorted) {
         CWalletTx &wtx = *(item.second);
-
-        LOCK(mempool.cs);
         CValidationState state;
-        wtx.AcceptToMemoryPool(maxTxFee, state);
+        wtx.SubmitTxToMempool(maxTxFee, state);
     }
 }
 
@@ -1791,11 +1816,11 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
 
     CValidationState state;
     // GetDepthInMainChain already catches known conflicts.
-    if (InMempool() || AcceptToMemoryPool(maxTxFee, state)) {
+    if (InMempool() || SubmitTxToMempool(maxTxFee, state)) {
         LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
             CInv inv { MSG_TX, GetId() };
-            TxMempoolInfo txinfo { mempool.info(GetId()) };
+            TxMempoolInfo txinfo { mempool.Info(GetId()) };
             connman->EnqueueTransaction( {inv, txinfo} );
             return true;
         }
@@ -1848,6 +1873,9 @@ Amount CWalletTx::GetCredit(const isminefilter &filter) const {
     if (IsCoinBase() && GetBlocksToMaturity() > 0) {
         return Amount(0);
     }
+
+    // NOTE: Maturity of outputs created by confiscation transactions does not need to be checked
+    //       because these outputs are never sent directly to the final owner.
 
     Amount credit(0);
     if (filter & ISMINE_SPENDABLE) {
@@ -1976,17 +2004,15 @@ Amount CWalletTx::GetChange() const {
 }
 
 bool CWalletTx::InMempool() const {
-    LOCK(mempool.cs);
-    if (mempool.exists(GetId())) {
-        return true;
-    }
-
-    return false;
+    return mempool.Exists(GetId());
 }
 
 bool CWalletTx::IsTrusted() const {
     // Quick answer in most cases
-    if (!CheckFinalTx(*this)) {
+    if (!CheckFinalTx(
+           *this,
+            chainActive.Height(),
+            chainActive.Tip()->GetMedianTimePast())) {
         return false;
     }
 
@@ -2209,7 +2235,11 @@ Amount CWallet::GetLegacyBalance(const isminefilter &filter, int minDepth,
     for (const auto &entry : mapWallet) {
         const CWalletTx &wtx = entry.second;
         const int depth = wtx.GetDepthInMainChain();
-        if (depth < 0 || !CheckFinalTx(*wtx.tx) ||
+        if (depth < 0 ||
+            !CheckFinalTx(
+               *wtx.tx,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast()) ||
             wtx.GetBlocksToMaturity() > 0) {
             continue;
         }
@@ -2252,7 +2282,10 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
         const uint256 &wtxid = it->first;
         const CWalletTx *pcoin = &(*it).second;
 
-        if (!CheckFinalTx(*pcoin)) {
+        if (!CheckFinalTx(
+               *pcoin,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast())) {
             continue;
         }
 
@@ -2303,11 +2336,14 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
             if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
+                !(IsP2SH(pcoin->tx->vout[i].scriptPubKey) &&
+                  pcoin->IsGenesisEnabled()) && // we don't want to select p2sh
+                                                // utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
                 vCoins.push_back(COutput(
-                    pcoin, i, nDepth,
+                    pcoin, static_cast<int>(i), nDepth,
                     ((mine & ISMINE_SPENDABLE) != ISMINE_NO) ||
                         (coinControl && coinControl->fAllowWatchOnly &&
                          (mine & ISMINE_WATCH_SOLVABLE) != ISMINE_NO),
@@ -2363,7 +2399,7 @@ static void ApproximateBestSubset(
 
 bool CWallet::SelectCoinsMinConf(
     const Amount nTargetValue, const int nConfMine, const int nConfTheirs,
-    const uint64_t nMaxAncestors, std::vector<COutput> vCoins,
+    const int64_t nMaxAncestors, const int64_t nMaxSecondaryMempoolAncestors, std::vector<COutput> vCoins,
     std::set<std::pair<const CWalletTx *, unsigned int>> &setCoinsRet,
     Amount &nValueRet) const {
     setCoinsRet.clear();
@@ -2392,12 +2428,14 @@ bool CWallet::SelectCoinsMinConf(
             continue;
         }
 
-        if (!mempool.TransactionWithinChainLimit(pcoin->GetId(),
-                                                 nMaxAncestors)) {
+        // check if we extend the chain we will still be inside limits
+        if (!mempool.TransactionWithinChainLimit(pcoin->GetId(), 
+            nMaxAncestors - 1, nMaxSecondaryMempoolAncestors -1)) 
+        {
             continue;
         }
 
-        int i = output.i;
+        auto i = static_cast<unsigned int>(output.i);
         Amount n = pcoin->tx->vout[i].nValue;
 
         std::pair<Amount, std::pair<const CWalletTx *, unsigned int>> coin =
@@ -2492,8 +2530,9 @@ bool CWallet::SelectCoins(
                 continue;
             }
 
-            nValueRet += out.tx->tx->vout[out.i].nValue;
-            setCoinsRet.insert(std::make_pair(out.tx, out.i));
+            auto i = static_cast<unsigned int>(out.i);
+            nValueRet += out.tx->tx->vout[i].nValue;
+            setCoinsRet.insert(std::make_pair(out.tx, i));
         }
 
         return (nValueRet >= nTargetValue);
@@ -2536,35 +2575,42 @@ bool CWallet::SelectCoins(
         }
     }
 
-    size_t nMaxChainLength = std::min(
-        gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT),
-        gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
+    int64_t nMaxChainLength = gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+    int64_t nMaxSecondaryMempoolChainLength = gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT);
     bool fRejectLongChains = gArgs.GetBoolArg(
         "-walletrejectlongchains", DEFAULT_WALLET_REJECT_LONG_CHAINS);
 
     bool res =
         nTargetValue <= nValueFromPresetInputs ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, 0,
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, 0, 0,
                            vCoins, setCoinsRet, nValueRet) ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, 0,
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, 0, 0,
                            vCoins, setCoinsRet, nValueRet) ||
         (bSpendZeroConfChange &&
-         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, 2,
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, 2, 0,
                             vCoins, setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            std::min((size_t)4, nMaxChainLength / 3), vCoins,
+                            std::min((int64_t)4, nMaxChainLength / 3), 0, vCoins,
                             setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            nMaxChainLength / 2, vCoins, setCoinsRet,
+                            nMaxChainLength / 2, 0, vCoins, setCoinsRet,
                             nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            nMaxChainLength, vCoins, setCoinsRet, nValueRet)) ||
+                            nMaxChainLength, 0, vCoins, setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange && !fRejectLongChains &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            std::numeric_limits<uint64_t>::max(), vCoins,
+                            std::numeric_limits<int64_t>::max(), 0, vCoins,
+                            setCoinsRet, nValueRet)) ||
+        (bSpendZeroConfChange && !fRejectLongChains &&
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
+                            std::numeric_limits<int64_t>::max(), nMaxSecondaryMempoolChainLength, vCoins,
+                            setCoinsRet, nValueRet)) ||
+        (bSpendZeroConfChange && !fRejectLongChains &&
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
+                            std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max(), vCoins,
                             setCoinsRet, nValueRet));
 
     // Because SelectCoinsMinConf clears the setCoinsRet, we now add the
@@ -2590,8 +2636,9 @@ bool CWallet::FundTransaction(CMutableTransaction &tx, Amount &nFeeRet,
     // Turn the txout set into a CRecipient vector.
     for (size_t idx = 0; idx < tx.vout.size(); idx++) {
         const CTxOut &txOut = tx.vout[idx];
+        int i = static_cast<int>(idx);
         CRecipient recipient = {txOut.scriptPubKey, txOut.nValue,
-                                setSubtractFeeFromOutputs.count(idx) == 1};
+                                setSubtractFeeFromOutputs.count(i) == 1};
         vecSend.push_back(recipient);
     }
 
@@ -2609,7 +2656,7 @@ bool CWallet::FundTransaction(CMutableTransaction &tx, Amount &nFeeRet,
     CReserveKey reservekey(this);
     CWalletTx wtx;
     if (!CreateTransaction(vecSend, wtx, reservekey, nFeeRet, nChangePosInOut,
-                           strFailReason, &coinControl, false)) {
+                           strFailReason, coinControl, false)) {
         return false;
     }
 
@@ -2648,7 +2695,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                                 CWalletTx &wtxNew, CReserveKey &reservekey,
                                 Amount &nFeeRet, int &nChangePosInOut,
                                 std::string &strFailReason,
-                                const CCoinControl *coinControl, bool sign) {
+                                const CCoinControl& coinControl, bool sign) {
     Amount nValue(0);
     int nChangePosRequest = nChangePosInOut;
     unsigned int nSubtractFeeFromAmount = 0;
@@ -2694,17 +2741,17 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     // that fee sniping isn't a problem yet, but by implementing a fix now we
     // ensure code won't be written that makes assumptions about nLockTime that
     // preclude a fix later.
-    txNew.nLockTime = chainActive.Height();
+    txNew.nLockTime = static_cast<uint32_t>(chainActive.Height());
 
     // Secondly occasionally randomly pick a nLockTime even further back, so
     // that transactions that are delayed after signing for whatever reason,
     // e.g. high-latency mix networks and some CoinJoin implementations, have
     // better privacy.
     if (GetRandInt(10) == 0) {
-        txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
+        txNew.nLockTime = static_cast<uint32_t>(std::max(0, (int)txNew.nLockTime - GetRandInt(100)));
     }
 
-    assert(txNew.nLockTime <= (unsigned int)chainActive.Height());
+    assert(txNew.nLockTime <= static_cast<uint32_t>(chainActive.Height()));
     assert(txNew.nLockTime < LOCKTIME_THRESHOLD);
 
     {
@@ -2712,7 +2759,9 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         LOCK2(cs_main, cs_wallet);
 
         std::vector<COutput> vAvailableCoins;
-        AvailableCoins(vAvailableCoins, true, coinControl);
+        AvailableCoins(vAvailableCoins, true, &coinControl);
+
+        Config &config = GlobalConfig::GetConfig();
 
         nFeeRet = Amount(0);
         // Start with no fee and loop until there is enough fee.
@@ -2728,7 +2777,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 nValueToSelect += nFeeRet;
             }
 
-            double dPriority = 0;
             // vouts to the payees
             for (const auto &recipient : vecSend) {
                 CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
@@ -2745,7 +2793,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     }
                 }
 
-                if (txout.IsDust(dustRelayFee)) {
+                if (txout.IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     if (recipient.fSubtractFeeFromAmount &&
                         nFeeRet > Amount(0)) {
                         if (txout.nValue < Amount(0)) {
@@ -2770,13 +2818,12 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             Amount nValueIn(0);
             setCoins.clear();
             if (!SelectCoins(vAvailableCoins, nValueToSelect, setCoins,
-                             nValueIn, coinControl)) {
+                             nValueIn, &coinControl)) {
                 strFailReason = _("Insufficient funds");
                 return false;
             }
 
             for (const auto &pcoin : setCoins) {
-                Amount nCredit = pcoin.first->tx->vout[pcoin.second].nValue;
                 // The coin age after the next block (depth+1) is used instead
                 // of the current, reflecting an assumption the user would
                 // accept a bit more delay for a chance at a free transaction.
@@ -2785,7 +2832,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 int age = pcoin.first->GetDepthInMainChain();
                 assert(age >= 0);
                 if (age != 0) age += 1;
-                dPriority += (double)nCredit.GetSatoshis() * age;
             }
 
             const Amount nChange = nValueIn - nValueToSelect;
@@ -2796,10 +2842,9 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 CScript scriptChange;
 
                 // Coin control: send change to custom address.
-                if (coinControl &&
-                    !boost::get<CNoDestination>(&coinControl->destChange)) {
+                if (!boost::get<CNoDestination>(&coinControl.destChange)) {
                     scriptChange =
-                        GetScriptForDestination(coinControl->destChange);
+                        GetScriptForDestination(coinControl.destChange);
 
                     // No coin control: send change to newly generated address.
                 } else {
@@ -2832,8 +2877,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 // purpose of the all-inclusive feature. So instead we raise the
                 // change and deduct from the recipient.
                 if (nSubtractFeeFromAmount > 0 &&
-                    newTxOut.IsDust(dustRelayFee)) {
-                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee) -
+                    newTxOut.IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                    Amount nDust = newTxOut.GetDustThreshold(IsGenesisEnabled(config, chainActive.Height() + 1)) -
                                    newTxOut.nValue;
                     // Raise change until no more dust.
                     newTxOut.nValue += nDust;
@@ -2841,7 +2886,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     for (unsigned int i = 0; i < vecSend.size(); i++) {
                         if (vecSend[i].fSubtractFeeFromAmount) {
                             txNew.vout[i].nValue -= nDust;
-                            if (txNew.vout[i].IsDust(dustRelayFee)) {
+                            if (txNew.vout[i].IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
                                 strFailReason =
                                     _("The transaction amount is too small "
                                       "to send after the fee has been "
@@ -2856,7 +2901,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
                 // Never create dust outputs; if we would, just add the dust to
                 // the fee.
-                if (newTxOut.IsDust(dustRelayFee)) {
+                if (newTxOut.IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     nChangePosInOut = -1;
                     nFeeRet += nChange;
                     reservekey.ReturnKey();
@@ -2875,6 +2920,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     txNew.vout.insert(position, newTxOut);
                 }
             } else {
+                nChangePosInOut = -1;
                 reservekey.ReturnKey();
             }
 
@@ -2889,14 +2935,13 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             }
 
             // Fill in dummy signatures for fee calculation.
-            if (!DummySignTx(txNew, setCoins)) {
+            if (!DummySignTx(config, txNew, setCoins)) {
                 strFailReason = _("Signing transaction failed");
                 return false;
             }
 
             CTransaction txNewConst(txNew);
             unsigned int nBytes = txNewConst.GetTotalSize();
-            dPriority = txNewConst.ComputePriority(dPriority, nBytes);
 
             // Remove scriptSigs to eliminate the fee calculation dummy
             // signatures.
@@ -2904,28 +2949,22 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 vin.scriptSig = CScript();
             }
 
-            // Allow to override the default confirmation target over the
-            // CoinControl instance.
-            int currentConfirmationTarget = nTxConfirmTarget;
-            if (coinControl && coinControl->nConfirmTarget > 0) {
-                currentConfirmationTarget = coinControl->nConfirmTarget;
-            }
-
             Amount nFeeNeeded =
-                GetMinimumFee(nBytes, currentConfirmationTarget, mempool);
-            if (coinControl && nFeeNeeded > Amount(0) &&
-                coinControl->nMinimumTotalFee > nFeeNeeded) {
-                nFeeNeeded = coinControl->nMinimumTotalFee;
+                GetMinimumFee(nBytes, coinControl, mempool);
+
+            if (nFeeNeeded > Amount(0) &&
+                coinControl.nMinimumTotalFee > nFeeNeeded) {
+                nFeeNeeded = coinControl.nMinimumTotalFee;
             }
 
-            if (coinControl && coinControl->fOverrideFeeRate) {
-                nFeeNeeded = coinControl->nFeeRate.GetFee(nBytes);
+            if (coinControl.fOverrideFeeRate) {
+                nFeeNeeded = coinControl.nFeeRate.GetFee(nBytes);
             }
 
             // If we made it here and we aren't even able to meet the relay fee
             // on the next pass, give up because we must be at the maximum
             // allowed fee.
-            Amount minFee = GlobalConfig::GetConfig().GetMinFeePerKB().GetFee(nBytes);
+            Amount minFee = config.GetMinFeePerKB().GetFee(nBytes);
             if (nFeeNeeded < minFee) {
                 strFailReason = _("Transaction too large for fee policy");
                 return false;
@@ -2979,18 +3018,21 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             SigHashType sigHashType = SigHashType().withForkId();
 
             CTransaction txNewConst(txNew);
-            int nIn = 0;
+            unsigned int nIn = 0;
             for (const auto &coin : setCoins) {
                 const CScript &scriptPubKey =
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
-
-                if (!ProduceSignature(
+                
+                if (!ProduceSignature(config, true,
                         TransactionSignatureCreator(
                             this, &txNewConst, nIn,
                             coin.first->tx->vout[coin.second].nValue,
                             sigHashType),
-                        scriptPubKey, sigdata)) {
+                        IsGenesisEnabled(config, chainActive.Height() + 1), // new transaction, assume it will be mined in next block
+                        coin.first->IsGenesisEnabled(),
+                        scriptPubKey, 
+                        sigdata)) {
                     strFailReason = _("Signing transaction failed");
                     return false;
                 } else {
@@ -3005,7 +3047,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         wtxNew.SetTx(MakeTransactionRef(std::move(txNew)));
 
         // Limit size.
-        if (CTransaction(wtxNew).GetTotalSize() >= MAX_STANDARD_TX_SIZE) {
+        if (CTransaction(wtxNew).GetTotalSize() >= config.GetMaxTxSize(IsGenesisEnabled(config, chainActive.Height() + 1), false)) {
             strFailReason = _("Transaction too large");
             return false;
         }
@@ -3014,20 +3056,12 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     if (gArgs.GetBoolArg("-walletrejectlongchains",
                          DEFAULT_WALLET_REJECT_LONG_CHAINS)) {
         // Lastly, ensure this tx will pass the mempool's chain limits.
-        LockPoints lp;
-        CTxMemPoolEntry entry(wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
-                              0, lp);
-        CTxMemPool::setEntries setAncestors;
+        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, false, LockPoints{}};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+        size_t nLimitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
 
-        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
-
-        std::string errString;
-        if (!mempool.CalculateMemPoolAncestors(
-                entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
-                nLimitDescendants, nLimitDescendantSize, errString)) {
+        if (!mempool.CheckAncestorLimits(
+                entry, nLimitAncestors, nLimitSecondaryMempoolAncestors, std::nullopt)) {
             strFailReason = _("Transaction has too long of a mempool chain");
             return false;
         }
@@ -3063,7 +3097,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey,
 
     if (fBroadcastTransactions) {
         // Broadcast
-        if (!wtxNew.AcceptToMemoryPool(maxTxFee, state)) {
+        if (!wtxNew.SubmitTxToMempool(maxTxFee, state)) {
             LogPrintf("CommitTransaction(): Transaction cannot be "
                       "broadcast immediately, %s\n",
                       state.GetRejectReason());
@@ -3101,37 +3135,9 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry,
     return true;
 }
 
-Amount CWallet::GetRequiredFee(unsigned int nTxBytes) {
-    return std::max(minTxFee.GetFee(nTxBytes),
-                    GlobalConfig::GetConfig().GetMinFeePerKB().GetFee(nTxBytes));
-}
-
 Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
-                              unsigned int nConfirmTarget,
-                              const CTxMemPool &pool) {
-    // payTxFee is the user-set global for desired feerate.
-    return GetMinimumFee(nTxBytes, nConfirmTarget, pool,
-                         payTxFee.GetFee(nTxBytes));
-}
-
-Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
-                              unsigned int nConfirmTarget,
-                              const CTxMemPool &pool, Amount targetFee) {
-    Amount nFeeNeeded = targetFee;
-    // User didn't set: use -txconfirmtarget to estimate...
-    if (nFeeNeeded == Amount(0)) {
-        int estimateFoundTarget = nConfirmTarget;
-        nFeeNeeded = pool.estimateSmartFee(nConfirmTarget, &estimateFoundTarget)
-                         .GetFee(nTxBytes);
-        // ... unless we don't have enough mempool data for estimatefee, then
-        // use fallbackFee.
-        if (nFeeNeeded == Amount(0)) {
-            nFeeNeeded = fallbackFee.GetFee(nTxBytes);
-        }
-    }
-
-    // Prevent user from paying a fee below minRelayTxFee or minTxFee.
-    nFeeNeeded = std::max(nFeeNeeded, GetRequiredFee(nTxBytes));
+                     const CCoinControl &coin_control, const CTxMemPool &pool) {
+    Amount nFeeNeeded = GetMinimumFeeRate(coin_control, pool).GetFee(nTxBytes);
 
     // But always obey the maximum.
     if (nFeeNeeded > maxTxFee) {
@@ -3140,6 +3146,31 @@ Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
 
     return nFeeNeeded;
 }
+
+CFeeRate CWallet::GetRequiredFeeRate() {
+    return std::max(minTxFee, GlobalConfig::GetConfig().GetMinFeePerKB());
+}
+
+CFeeRate CWallet::GetMinimumFeeRate(
+                                    const CCoinControl &coin_control,
+                                    const CTxMemPool &pool) {
+    CFeeRate neededFeeRate =
+        (coin_control.fOverrideFeeRate && !(coin_control.nFeeRate == CFeeRate()))
+            ? coin_control.nFeeRate
+            : payTxFee;
+
+    if (neededFeeRate == CFeeRate()) {
+        neededFeeRate = pool.estimateFee();
+        // check if we have enough mempool data for estimatefee, otherwise use fallback fee
+        if (neededFeeRate == CFeeRate()) {
+            neededFeeRate = fallbackFee;
+        }
+    }
+
+    // Prevent user from paying a fee below minRelayTxFee or minTxFee.
+    return std::max(neededFeeRate, GetRequiredFeeRate());
+}
+
 
 DBErrors CWallet::LoadWallet(bool &fFirstRunRet) {
     fFirstRunRet = false;
@@ -3255,7 +3286,7 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
         LOCK(cs_wallet);
 
         // Delete destdata tuples associated with address.
-        for (const std::pair<std::string, std::string> &item :
+        for (const auto& item :
              mapAddressBook[address].destdata) {
             CWalletDB(*dbw).EraseDestData(address, item.first);
         }
@@ -3273,8 +3304,8 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
 
 const std::string &CWallet::GetAccountName(const CScript &scriptPubKey) const {
     CTxDestination address;
-    if (ExtractDestination(scriptPubKey, address) &&
-        !scriptPubKey.IsUnspendable()) {
+    if (CWallet::ExtractDestination(scriptPubKey, address) &&
+        !scriptPubKey.IsKnownOpReturn()) { // we do not know how to spend coins containing OP_RETURN (for both pre and post Genesis OP_RETURNs)
         auto mi = mapAddressBook.find(address);
         if (mi != mapAddressBook.end()) {
             return mi->second.name;
@@ -3346,7 +3377,7 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize) {
     }
 
     // Top up key pool
-    unsigned int nTargetSize;
+    int64_t nTargetSize;
     if (kpSize > 0) {
         nTargetSize = kpSize;
     } else {
@@ -3545,7 +3576,7 @@ std::map<CTxDestination, Amount> CWallet::GetAddressBalances() {
                 continue;
             }
 
-            if (!ExtractDestination(pcoin->tx->vout[i].scriptPubKey, addr)) {
+            if (!CWallet::ExtractDestination(pcoin->tx->vout[i].scriptPubKey, addr)) {
                 continue;
             }
 
@@ -3580,7 +3611,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
                     continue;
                 }
 
-                if (!ExtractDestination(mapWallet[txin.prevout.GetTxId()]
+                if (!CWallet::ExtractDestination(mapWallet[txin.prevout.GetTxId()]
                                             .tx->vout[txin.prevout.GetN()]
                                             .scriptPubKey,
                                         address)) {
@@ -3596,7 +3627,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
                 for (CTxOut txout : pcoin->tx->vout) {
                     if (IsChange(txout)) {
                         CTxDestination txoutAddr;
-                        if (!ExtractDestination(txout.scriptPubKey,
+                        if (!CWallet::ExtractDestination(txout.scriptPubKey,
                                                 txoutAddr)) {
                             continue;
                         }
@@ -3616,7 +3647,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
         for (unsigned int i = 0; i < pcoin->tx->vout.size(); i++)
             if (IsMine(pcoin->tx->vout[i])) {
                 CTxDestination address;
-                if (!ExtractDestination(pcoin->tx->vout[i].scriptPubKey,
+                if (!CWallet::ExtractDestination(pcoin->tx->vout[i].scriptPubKey,
                                         address)) {
                     continue;
                 }
@@ -3669,11 +3700,8 @@ std::set<CTxDestination>
 CWallet::GetAccountAddresses(const std::string &strAccount) const {
     LOCK(cs_wallet);
     std::set<CTxDestination> result;
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
-         mapAddressBook) {
-        const CTxDestination &address = item.first;
-        const std::string &strName = item.second.name;
-        if (strName == strAccount) {
+    for (const auto &[address, account]: mapAddressBook) {
+        if (account.name == strAccount) {
             result.insert(address);
         }
     }
@@ -3834,10 +3862,11 @@ void CWallet::GetKeyBirthTimes(
          it != mapWallet.end(); it++) {
         // Iterate over all wallet transactions...
         const CWalletTx &wtx = (*it).second;
-        BlockMap::const_iterator blit = mapBlockIndex.find(wtx.hashBlock);
-        if (blit != mapBlockIndex.end() && chainActive.Contains(blit->second)) {
+        if (auto bl = mapBlockIndex.Get(wtx.hashBlock);
+            bl && chainActive.Contains(bl))
+        {
             // ... which are already in a block.
-            int nHeight = blit->second->nHeight;
+            int32_t nHeight = bl->GetHeight();
             for (const CTxOut &txout : wtx.tx->vout) {
                 // Iterate over all their outputs...
                 CAffectedKeysVisitor(*this, vAffected)
@@ -3847,8 +3876,8 @@ void CWallet::GetKeyBirthTimes(
                     std::map<CKeyID, CBlockIndex *>::iterator rit =
                         mapKeyFirstBlock.find(keyid);
                     if (rit != mapKeyFirstBlock.end() &&
-                        nHeight < rit->second->nHeight) {
-                        rit->second = blit->second;
+                        nHeight < rit->second->GetHeight()) {
+                        rit->second = bl;
                     }
                 }
                 vAffected.clear();
@@ -3887,9 +3916,10 @@ void CWallet::GetKeyBirthTimes(
  * https://github.com/bitcoin/bitcoin/pull/1393.
  */
 unsigned int CWallet::ComputeTimeSmart(const CWalletTx &wtx) const {
-    unsigned int nTimeSmart = wtx.nTimeReceived;
+    int64_t nTimeSmart = wtx.nTimeReceived;
     if (!wtx.hashUnset()) {
-        if (mapBlockIndex.count(wtx.hashBlock)) {
+        if (auto index = mapBlockIndex.Get(wtx.hashBlock); index)
+        {
             int64_t latestNow = wtx.nTimeReceived;
             int64_t latestEntry = 0;
 
@@ -3921,14 +3951,14 @@ unsigned int CWallet::ComputeTimeSmart(const CWalletTx &wtx) const {
                 }
             }
 
-            int64_t blocktime = mapBlockIndex[wtx.hashBlock]->GetBlockTime();
+            int64_t blocktime = index->GetBlockTime();
             nTimeSmart = std::max(latestEntry, std::min(blocktime, latestNow));
         } else {
             LogPrintf("%s: found %s in block %s not in index\n", __func__,
                       wtx.GetId().ToString(), wtx.hashBlock.ToString());
         }
     }
-    return nTimeSmart;
+    return static_cast<unsigned int>(nTimeSmart);
 }
 
 bool CWallet::AddDestData(const CTxDestination &dest, const std::string &key,
@@ -4010,12 +4040,6 @@ std::string CWallet::GetWalletHelpString(bool showDebug) {
                        strprintf(_("Spend unconfirmed change when sending "
                                    "transactions (default: %d)"),
                                  DEFAULT_SPEND_ZEROCONF_CHANGE));
-    strUsage +=
-        HelpMessageOpt("-txconfirmtarget=<n>",
-                       strprintf(_("If paytxfee is not set, include enough fee "
-                                   "so transactions begin confirmation on "
-                                   "average within n blocks (default: %u)"),
-                                 DEFAULT_TX_CONFIRM_TARGET));
     strUsage += HelpMessageOpt(
         "-usehd",
         _("Use hierarchical deterministic key generation (HD) after BIP32. "
@@ -4047,7 +4071,8 @@ std::string CWallet::GetWalletHelpString(bool showDebug) {
         strUsage += HelpMessageOpt(
             "-dblogsize=<n>",
             strprintf("Flush wallet database activity from memory to disk log "
-                      "every <n> megabytes (default: %u)",
+                      "every <n> megabytes (default: %u). "
+                      "The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_WALLET_DBLOGSIZE));
         strUsage += HelpMessageOpt(
             "-flushwallet",
@@ -4189,12 +4214,14 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
 
     LogPrintf(" wallet      %15dms\n", GetTimeMillis() - nStart);
 
-    RegisterValidationInterface(walletInstance);
+    walletInstance->RegisterValidationInterface();
 
     // Try to top up keypool. No-op if the wallet is locked.
     walletInstance->TopUpKeyPool();
 
-    CBlockIndex *pindexRescan = chainActive.Genesis();
+    LOCK(cs_main);
+
+    const CBlockIndex *pindexRescan = chainActive.Genesis();
     if (!gArgs.GetBoolArg("-rescan", false)) {
         CWalletDB walletdb(*walletInstance->dbw);
         CBlockLocator locator;
@@ -4204,31 +4231,23 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
     }
 
     if (chainActive.Tip() && chainActive.Tip() != pindexRescan) {
-        // We can't rescan beyond non-pruned blocks, stop and throw an error.
-        // This might happen if a user uses a old wallet within a pruned node or
-        // if he ran -disablewallet for a longer time, then decided to
-        // re-enable.
-        if (fPruneMode) {
-            CBlockIndex *block = chainActive.Tip();
-            while (block && block->pprev && block->pprev->nStatus.hasData() &&
-                   block->pprev->nTx > 0 && pindexRescan != block) {
-                block = block->pprev;
-            }
-
-            if (pindexRescan != block) {
-                InitError(_("Prune: last wallet synchronisation goes beyond "
-                            "pruned data. You need to -reindex (download the "
-                            "whole blockchain again in case of pruned node)"));
-                return nullptr;
-            }
-        }
-
         uiInterface.InitMessage(_("Rescanning..."));
         LogPrintf("Rescanning last %i blocks (from block %i)...\n",
-                  chainActive.Height() - pindexRescan->nHeight,
-                  pindexRescan->nHeight);
+                  chainActive.Height() - pindexRescan->GetHeight(),
+                  pindexRescan->GetHeight());
         nStart = GetTimeMillis();
-        walletInstance->ScanForWalletTransactions(pindexRescan, true);
+        if (walletInstance->ScanForWalletTransactions(pindexRescan, true) == nullptr)
+        {
+            // We can't rescan beyond non-pruned blocks, stop and throw an error.
+            // This might happen if a user uses a old wallet within a pruned node or
+            // if he ran -disablewallet for a longer time, then decided to
+            // re-enable.
+            LogPrintf(" failed rescan      %15dms\n", GetTimeMillis() - nStart);
+            InitError(_("Prune: last wallet synchronisation goes beyond "
+                        "pruned data. You need to -reindex (download the "
+                        "whole blockchain again in case of pruned node)"));
+            return nullptr;
+        }
         LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());
         walletInstance->dbw->IncrementUpdateCounter();
@@ -4458,8 +4477,6 @@ bool CWallet::ParameterInteraction() {
         }
     }
 
-    nTxConfirmTarget =
-        gArgs.GetArg("-txconfirmtarget", DEFAULT_TX_CONFIRM_TARGET);
     bSpendZeroConfChange =
         gArgs.GetBoolArg("-spendzeroconfchange", DEFAULT_SPEND_ZEROCONF_CHANGE);
 
@@ -4468,6 +4485,25 @@ bool CWallet::ParameterInteraction() {
 
 bool CWallet::BackupWallet(const std::string &strDest) {
     return dbw->Backup(strDest);
+}
+
+void CWallet::RegisterValidationInterface()
+{   
+    CMainSignals& sigs { GetMainSignals() };
+
+    using namespace boost::placeholders;
+    slotConnections.push_back(sigs.TransactionAddedToMempool.connect(boost::bind(&CWallet::TransactionAddedToMempool, this, _1)));
+    slotConnections.push_back(sigs.BlockConnected.connect(boost::bind(&CWallet::BlockConnected, this, _1, _2, _3)));
+    slotConnections.push_back(sigs.BlockDisconnected.connect(boost::bind(&CWallet::BlockDisconnected, this, _1)));
+    slotConnections.push_back(sigs.Broadcast.connect(boost::bind(&CWallet::ResendWalletTransactions, this, _1, _2)));
+    slotConnections.push_back(sigs.SetBestChain.connect(boost::bind(&CWallet::SetBestChain, this, _1)));
+    slotConnections.push_back(sigs.Inventory.connect(boost::bind(&CWallet::Inventory, this, _1)));
+    slotConnections.push_back(sigs.ScriptForMining.connect(boost::bind(&CWallet::GetScriptForMining, this, _1)));
+}
+
+void CWallet::UnregisterValidationInterface()
+{   
+    slotConnections.clear();
 }
 
 CKeyPool::CKeyPool() {
@@ -4494,27 +4530,40 @@ void CMerkleTx::SetMerkleBranch(const CBlockIndex *pindex, int posInBlock) {
     nIndex = posInBlock;
 }
 
-int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const {
-    if (hashUnset()) {
+int CMerkleTx::GetDepthInMainChain() const {
+    int32_t height = GetHeightInMainChain();
+    if (height == MEMPOOL_HEIGHT) {
         return 0;
+    }
+
+    return ((nIndex == -1) ? (-1) : 1) *
+           (chainActive.Height() - height + 1);
+}
+
+int CMerkleTx::GetHeightInMainChain() const {
+    if (hashUnset()) {
+        return MEMPOOL_HEIGHT;
     }
 
     AssertLockHeld(cs_main);
 
     // Find the block it claims to be in.
-    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
-    if (mi == mapBlockIndex.end()) {
-        return 0;
+    auto pindex = mapBlockIndex.Get(hashBlock);
+    if (!pindex || !chainActive.Contains(pindex))
+    {
+        return MEMPOOL_HEIGHT;
     }
 
-    CBlockIndex *pindex = (*mi).second;
-    if (!pindex || !chainActive.Contains(pindex)) {
-        return 0;
-    }
+    return pindex->GetHeight();
+}
 
-    pindexRet = pindex;
-    return ((nIndex == -1) ? (-1) : 1) *
-           (chainActive.Height() - pindex->nHeight + 1);
+bool CMerkleTx::IsGenesisEnabled() const {
+    int32_t height = GetHeightInMainChain();
+    if (height == MEMPOOL_HEIGHT) {
+        AssertLockHeld(cs_main);
+        return ::IsGenesisEnabled(GlobalConfig::GetConfig(), chainActive.Height() + 1);
+    }
+    return ::IsGenesisEnabled(GlobalConfig::GetConfig(), height);
 }
 
 int CMerkleTx::GetBlocksToMaturity() const {
@@ -4525,8 +4574,30 @@ int CMerkleTx::GetBlocksToMaturity() const {
     return std::max(0, (COINBASE_MATURITY + 1) - GetDepthInMainChain());
 }
 
-bool CMerkleTx::AcceptToMemoryPool(const Amount nAbsurdFee,
+bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
                                    CValidationState &state) {
-    return ::AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state, tx, true, nullptr,
-                                false, nAbsurdFee);
+    // Check if g_connman is accessible
+    if (!g_connman) {
+        throw std::runtime_error("Error: P2P functionality missing or disabled");
+    }
+    // Mempool Journal ChangeSet
+    CJournalChangeSetPtr changeSet {
+        mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
+    };
+    // Forward transaction to the validator and wait for results.
+    // To support backward compatibility (of this interface) we need
+    // to wait until the transaction is processed.
+    const auto& txValidator = g_connman->getTxnValidator();
+    state = txValidator->processValidation(
+        std::make_shared<CTxInputData>(
+            g_connman->GetTxIdTracker(),
+            tx,           // a pointer to the tx
+            TxSource::wallet, // tx source
+            TxValidationPriority::normal, // tx validation priority
+            TxStorage::memory, // tx storage
+            GetTime(),    // nAcceptTime
+            nAbsurdFee),  // nAbsurdFee
+        changeSet, // an instance of the mempool journal
+        true); // fLimitMempoolSize
+    return state.IsValid();
 }

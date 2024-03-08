@@ -1,10 +1,10 @@
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
-define(_CLIENT_VERSION_MAJOR, 0)
-define(_CLIENT_VERSION_MINOR, 2)
-define(_CLIENT_VERSION_REVISION, 1)
+define(_CLIENT_VERSION_MAJOR, 1)
+define(_CLIENT_VERSION_MINOR, 1)
+define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)
-define(_COPYRIGHT_YEAR, 2019)
+define(_COPYRIGHT_YEAR, 2024)
 define(_COPYRIGHT_HOLDERS,[The %s Association])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin]])
 AC_INIT([Bitcoin SV],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[https://github.com/bitcoin-sv/bitcoin-sv/issues],[bitcoin-sv],[https://bitcoinsv.io/])
@@ -16,7 +16,6 @@ AC_CONFIG_MACRO_DIR([build-aux/m4])
 BITCOIN_DAEMON_NAME=bitcoind
 BITCOIN_CLI_NAME=bitcoin-cli
 BITCOIN_TX_NAME=bitcoin-tx
-BITCOIN_SEEDER_NAME=bitcoin-seeder
 
 AC_CANONICAL_HOST
 
@@ -28,7 +27,7 @@ dnl faketime breaks configure and is only needed for make. Disable it here.
 unset FAKETIME
 
 dnl Automake init set-up and checks
-AM_INIT_AUTOMAKE([no-define subdir-objects foreign])
+AM_INIT_AUTOMAKE([no-define subdir-objects foreign tar-ustar])
 
 dnl faketime messes with timestamps and causes configure to be re-run.
 dnl --disable-maintainer-mode can be used to bypass this.
@@ -53,8 +52,8 @@ case $host in
      lt_cv_deplibs_check_method="pass_all"
   ;;
 esac
-dnl Require C++17 compiler (no GNU extensions)
-AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory], [nodefault])
+dnl Require C++20 compiler (no GNU extensions)
+AX_CXX_COMPILE_STDCXX([20], [noext], [mandatory], [nodefault])
 dnl Check if -latomic is required for <std::atomic>
 CHECK_ATOMIC
 
@@ -165,6 +164,18 @@ AC_ARG_ENABLE([asm],
   [use_asm=$enableval],
   [use_asm=yes])
 
+AC_ARG_ENABLE([tcmalloc],
+  [AS_HELP_STRING([--enable-tcmalloc],
+  [Link with Google tcmalloc (default is no)])],
+  [use_tcmalloc=$enableval],
+  [use_tcmalloc=no])
+
+AC_ARG_ENABLE([jemalloc],
+  [AS_HELP_STRING([--enable-jemalloc],
+  [Link with jemalloc (default is no)])],
+  [use_jemalloc=$enableval],
+  [use_jemalloc=no])
+
 dnl setup for production/development build
 AC_MSG_CHECKING([whether production or development build])
 if test x$enable_prod_build != xno; then
@@ -176,10 +187,6 @@ else
   AC_MSG_RESULT(dev)
   AC_DEFINE(CLIENT_VERSION_IS_RELEASE, false, [Version is development])
   AC_SUBST(CLIENT_VERSION_IS_RELEASE, false)
-fi
-
-if test "x$use_asm" = xyes; then
-  AC_DEFINE(USE_ASM, 1, [Define this symbol to build in assembly routines])
 fi
 
 AC_ARG_WITH([system-univalue],
@@ -209,10 +216,17 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
+# Enable metrics
+AC_ARG_ENABLE([metrics],
+     [AS_HELP_STRING([--enable-metrics],
+                     [collect metrics at runtime and log them (default is no)])],
+     [enable_metrics=$enableval],
+     [enable_metrics=no])
+
 # Enable ASAN
 AC_ARG_ENABLE([asan],
     [AS_HELP_STRING([--enable-asan],
-                    [enable address sanitizer compiler flags (implies --enable-debug, default is no)])],
+                    [enable address sanitizer compiler flags (implies --enable-debug, default is no; implies --enable-asm=no, default is yes)])],
     [enable_asan=$enableval],
     [enable_asan=no])
 
@@ -240,8 +254,12 @@ AC_ARG_ENABLE([werror],
 AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-Werror],[CXXFLAG_WERROR="-Werror"],[CXXFLAG_WERROR=""])
 
+# Placeholder for linking with tbb as and when it becomes required
+#AC_CHECK_LIB([tbb], [main],TBB_LIBS=-ltbb, AC_MSG_NOTICE(libtbb not available.))
+
 if test "x$enable_asan" = xyes; then
 	enable_debug=yes
+  use_asm=no
   asan_failed=no
   AX_CHECK_COMPILE_FLAG([-fsanitize=address],
     [CXXFLAGS="$CXXFLAGS -fsanitize=address"],
@@ -258,6 +276,10 @@ if test "x$enable_asan" = xyes; then
   fi
   # fix linkage in MacOs
   [LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -fsanitize=address"],
+fi
+
+if test "x$use_asm" = xyes; then
+  AC_DEFINE(USE_ASM, 1, [Define this symbol to build in assembly routines])
 fi
 
 if test "x$enable_tsan" = xyes; then
@@ -307,6 +329,10 @@ if test "x$enable_debug" = xyes; then
     fi
 fi
 
+if test "x$enable_metrics" = xyes; then
+    CPPFLAGS="$CPPFLAGS -DCOLLECT_METRICS"
+fi
+
 ERROR_CXXFLAGS=
 if test "x$enable_werror" = "xyes"; then
   if test "x$CXXFLAG_WERROR" = "x"; then
@@ -335,7 +361,7 @@ AX_CHECK_COMPILE_FLAG([-msse4.2],[[SSE42_CXXFLAGS="-msse4.2"]],,[[$CXXFLAG_WERRO
 
 TEMP_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS $SSE42_CXXFLAGS"
-AC_MSG_CHECKING(for assembler crc32 support)
+AC_MSG_CHECKING(for SSE4.2 intrinsics)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <stdint.h>
     #if defined(_MSC_VER)
@@ -350,7 +376,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     l = _mm_crc32_u64(l, 0);
     return l;
   ]])],
- [ AC_MSG_RESULT(yes); enable_hwcrc32=yes],
+ [ AC_MSG_RESULT(yes); enable_sse42=yes],
  [ AC_MSG_RESULT(no)]
 )
 CXXFLAGS="$TEMP_CXXFLAGS"
@@ -374,12 +400,6 @@ AC_ARG_WITH([daemon],
   [build bitcoind daemon (default=yes)])],
   [build_bitcoind=$withval],
   [build_bitcoind=yes])
-
-AC_ARG_WITH([seeder],
-  [AS_HELP_STRING([--with-seeder],
-  [build seeder (default=yes)])],
-  [build_bitcoin_seeder=$withval],
-  [build_bitcoin_seeder=yes])
 
 use_pkgconfig=yes
 case $host in
@@ -424,7 +444,6 @@ case $host in
      fi
 
      CPPFLAGS="$CPPFLAGS -D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB"
-     LEVELDB_TARGET_FLAGS="-DOS_WINDOWS"
      if test "x$CXXFLAGS_overridden" = "xno"; then
        CXXFLAGS="$CXXFLAGS -w"
      fi
@@ -446,7 +465,6 @@ case $host in
      ;;
   *darwin*)
      TARGET_OS=darwin
-     LEVELDB_TARGET_FLAGS="-DOS_MACOSX"
      if  test x$cross_compiling != xyes; then
        BUILD_OS=darwin
        AC_CHECK_PROG([PORT],port, port)
@@ -472,11 +490,12 @@ case $host in
          openssl_prefix=`$BREW --prefix openssl 2>/dev/null`
          bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
          if test x$openssl_prefix != x; then
+           CPPFLAGS="$CPPFLAGS -I$openssl_prefix/include"
            PKG_CONFIG_PATH="$openssl_prefix/lib/pkgconfig:$PKG_CONFIG_PATH"
            export PKG_CONFIG_PATH
          fi
          if test x$bdb_prefix != x; then
-           CPPFLAGS="$CPPFLAGS -I$bdb_prefix/include"
+           BDB_CFLAGS="-I$bdb_prefix/include"
            LIBS="$LIBS -L$bdb_prefix/lib"
          fi
        fi
@@ -507,18 +526,11 @@ case $host in
      ;;
    *linux*)
      TARGET_OS=linux
-     LEVELDB_TARGET_FLAGS="-DOS_LINUX"
-     ;;
-   *freebsd*)
-     LEVELDB_TARGET_FLAGS="-DOS_FREEBSD"
-     ;;
-   *openbsd*)
-     LEVELDB_TARGET_FLAGS="-DOS_OPENBSD"
+     AIO_LIBS="-lrt"
      ;;
    *)
      OTHER_OS=`echo ${host_os} | awk '{print toupper($0)}'`
      AC_MSG_WARN([Guessing LevelDB OS as OS_${OTHER_OS}, please check whether this is correct, if not add an entry to configure.ac.])
-     LEVELDB_TARGET_FLAGS="-DOS_${OTHER_OS}"
      ;;
 esac
 
@@ -554,6 +566,18 @@ if test x$use_lcov = xyes; then
     [AC_MSG_ERROR("lcov testing requested but --coverage linker flag does not work")])
   AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"],
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
+fi
+
+if test x$use_tcmalloc = xyes; then
+  AC_MSG_RESULT([Enabling tcmalloc])
+  AC_CHECK_LIB([tcmalloc], [malloc],
+    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc $LIBS"],
+    [AC_MSG_ERROR(tcmalloc not found)])
+else
+  if test x$use_jemalloc = xyes; then
+    AC_MSG_RESULT([Enabling jemalloc])
+    AC_CHECK_LIB([jemalloc], [malloc],, [AC_MSG_ERROR(jemalloc not found)])
+  fi
 fi
 
 dnl Check for endianness
@@ -628,11 +652,15 @@ if test x$use_hardening != xno; then
     HARDENED_CPPFLAGS="$HARDENED_CPPFLAGS -D_FORTIFY_SOURCE=2"
   ])
 
+  AX_CHECK_COMPILE_FLAG([-fwrapv],[HARDENED_CXXFLAGS="$HARDENED_CXXFLAGS -fwrapv"])
+
   AX_CHECK_LINK_FLAG([[-Wl,--dynamicbase]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,--dynamicbase"])
   AX_CHECK_LINK_FLAG([[-Wl,--nxcompat]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,--nxcompat"])
   AX_CHECK_LINK_FLAG([[-Wl,--high-entropy-va]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,--high-entropy-va"])
   AX_CHECK_LINK_FLAG([[-Wl,-z,relro]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,relro"])
   AX_CHECK_LINK_FLAG([[-Wl,-z,now]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,now"])
+  AX_CHECK_LINK_FLAG([[-Wl,-z,noexecstack]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,noexecstack"])
+  AX_CHECK_LINK_FLAG([[-Wl,-z,nodlopen]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,nodlopen"])
 
   if test x$TARGET_OS != xwindows; then
     AX_CHECK_COMPILE_FLAG([-fPIE],[PIE_FLAGS="-fPIE"])
@@ -745,6 +773,70 @@ if test x$use_reduce_exports = xyes; then
   [AC_MSG_ERROR([Cannot set default symbol visibility. Use --disable-reduce-exports.])])
 fi
 
+dnl crc32c platform checks
+AC_MSG_CHECKING(for __builtin_prefetch)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[
+  char data = 0;
+  const char* address = &data;
+  __builtin_prefetch(address, 0, 0);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_BUILTIN_PREFETCH=1 ],
+ [ AC_MSG_RESULT(no); HAVE_BUILTIN_PREFETCH=0 ]
+)
+
+AC_MSG_CHECKING(for _mm_prefetch)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <xmmintrin.h>]], [[
+  char data = 0;
+  const char* address = &data;
+  _mm_prefetch(address, _MM_HINT_NTA);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_MM_PREFETCH=1 ],
+ [ AC_MSG_RESULT(no); HAVE_MM_PREFETCH=0 ]
+)
+
+AC_MSG_CHECKING(for strong getauxval support in the system headers)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    #include <sys/auxv.h>
+  ]], [[
+    getauxval(AT_HWCAP);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_STRONG_GETAUXVAL=1 ],
+ [ AC_MSG_RESULT(no); HAVE_STRONG_GETAUXVAL=0 ]
+)
+
+AC_MSG_CHECKING(for weak getauxval support in the compiler)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    unsigned long getauxval(unsigned long type) __attribute__((weak));
+    #define AT_HWCAP 16
+  ]], [[
+    getauxval(AT_HWCAP);
+  ]])],
+ [ AC_MSG_RESULT(yes); HAVE_WEAK_GETAUXVAL=1 ],
+ [ AC_MSG_RESULT(no); HAVE_WEAK_GETAUXVAL=0 ]
+)
+
+dnl LevelDB platform checks
+AC_MSG_CHECKING(for fdatasync)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>]],
+ [[ fdatasync(0); ]])],
+ [ AC_MSG_RESULT(yes); HAVE_FDATASYNC=1 ],
+ [ AC_MSG_RESULT(no); HAVE_FDATASYNC=0 ]
+)
+
+AC_MSG_CHECKING(for F_FULLFSYNC)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>]],
+ [[ fcntl(0, F_FULLFSYNC, 0); ]])],
+ [ AC_MSG_RESULT(yes); HAVE_FULLFSYNC=1 ],
+ [ AC_MSG_RESULT(no); HAVE_FULLFSYNC=0 ]
+)
+
+AC_MSG_CHECKING(for O_CLOEXEC)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>]],
+ [[ open("", O_CLOEXEC); ]])],
+ [ AC_MSG_RESULT(yes); HAVE_O_CLOEXEC=1 ],
+ [ AC_MSG_RESULT(no); HAVE_O_CLOEXEC=0 ]
+)
+
 LEVELDB_CPPFLAGS=
 LIBLEVELDB=
 LIBMEMENV=
@@ -767,7 +859,7 @@ if test x$use_upnp != xno; then
   )
 fi
 
-if test x$build_bitcoin_utils$build_bitcoind$build_bitcoin_seeder$use_tests$use_bench = xnonononono; then
+if test x$build_bitcoin_utils$build_bitcoind$use_tests$use_bench = xnonononono; then
     use_boost=no
 else
     use_boost=yes
@@ -776,7 +868,7 @@ fi
 if test x$use_boost = xyes; then
 
 dnl Minimum required Boost version
-define(MINIMUM_REQUIRED_BOOST, 1.58.0)
+define(MINIMUM_REQUIRED_BOOST, 1.74.0)
 
 dnl Check for boost libs
 AX_BOOST_BASE([MINIMUM_REQUIRED_BOOST])
@@ -947,8 +1039,10 @@ if test x$use_pkgconfig = xyes; then
   m4_ifdef(
     [PKG_CHECK_MODULES],
     [
-      PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl  not found.)])
+      PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(libssl  not found.)])
       PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto  not found.)])
+      OPENSSL_LIBS="$SSL_LIBS $CRYPTO_LIBS"
+
       if test x$build_bitcoin_utils$build_bitcoind$use_tests != xnonono; then
         PKG_CHECK_MODULES([EVENT], [libevent],, [AC_MSG_ERROR(libevent not found.)])
         if test x$TARGET_OS != xwindows; then
@@ -957,10 +1051,10 @@ if test x$use_pkgconfig = xyes; then
       fi
 
       if test "x$use_zmq" = "xyes"; then
-        PKG_CHECK_MODULES([ZMQ],[libzmq >= 4],
+        PKG_CHECK_MODULES([ZMQ],[libzmq >= 4.3.2],
           [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
           [AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-           AC_MSG_WARN([libzmq version 4.x or greater not found, disabling])
+           AC_MSG_WARN([libzmq version 4.3.2 or greater not found, disabling])
            use_zmq=no])
       else
           AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
@@ -969,10 +1063,11 @@ if test x$use_pkgconfig = xyes; then
   )
 else
   AC_CHECK_HEADER([openssl/crypto.h],,AC_MSG_ERROR(libcrypto headers missing))
-  AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto missing))
+  AC_CHECK_LIB([crypto],      [main],CRYPTO_LIBS=-lcrypto, AC_MSG_ERROR(libcrypto not found.))
 
   AC_CHECK_HEADER([openssl/ssl.h],, AC_MSG_ERROR(libssl headers missing),)
-  AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl missing))
+  AC_CHECK_LIB([ssl],         [main],SSL_LIBS=-lssl, AC_MSG_ERROR(libssl not found.))
+  OPENSSL_LIBS="$SSL_LIBS $CRYPTO_LIBS"
 
   if test x$build_bitcoin_utils$build_bitcoind$use_tests != xnonono; then
     AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
@@ -1065,10 +1160,6 @@ AC_MSG_CHECKING([whether to build bitcoind])
 AM_CONDITIONAL([BUILD_BITCOIND], [test x$build_bitcoind = xyes])
 AC_MSG_RESULT($build_bitcoind)
 
-AC_MSG_CHECKING([whether to build bitcoin-seeder])
-AM_CONDITIONAL([BUILD_BITCOIN_SEEDER], [test x$build_bitcoin_seeder = xyes])
-AC_MSG_RESULT($build_bitcoin_seeder)
-
 AC_MSG_CHECKING([whether to build utils (bitcoin-cli bitcoin-tx)])
 AM_CONDITIONAL([BUILD_BITCOIN_UTILS], [test x$build_bitcoin_utils = xyes])
 AC_MSG_RESULT($build_bitcoin_utils)
@@ -1158,7 +1249,7 @@ else
 fi
 
 if test x$build_bitcoin_utils$build_bitcoin_libs$build_bitcoind$use_bench$use_tests = xnonononono; then
-  AC_MSG_ERROR([No targets! Please specify at least one of: --with-utils --with-libs --with-daemon --with-seeder --enable-bench or --enable-tests])
+  AC_MSG_ERROR([No targets! Please specify at least one of: --with-utils --with-libs --with-daemon --enable-bench or --enable-tests])
 fi
 
 AM_CONDITIONAL([TARGET_DARWIN], [test x$TARGET_OS = xdarwin])
@@ -1170,8 +1261,10 @@ AM_CONDITIONAL([ENABLE_BENCH],[test x$use_bench = xyes])
 AM_CONDITIONAL([USE_LCOV],[test x$use_lcov = xyes])
 AM_CONDITIONAL([GLIBC_BACK_COMPAT],[test x$use_glibc_compat = xyes])
 AM_CONDITIONAL([HARDEN],[test x$use_hardening = xyes])
-AM_CONDITIONAL([ENABLE_HWCRC32],[test x$enable_hwcrc32 = xyes])
+AM_CONDITIONAL([ENABLE_HWCRC32],[test x$enable_sse42 = xyes])
+AM_CONDITIONAL([ENABLE_SSE42],[test x$enable_sse42 = xyes])
 AM_CONDITIONAL([USE_ASM],[test x$use_asm = xyes])
+AM_CONDITIONAL([WORDS_BIGENDIAN],[test x$ac_cv_c_bigendian = xyes])
 
 AC_DEFINE(CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MAJOR, [Major version])
 AC_DEFINE(CLIENT_VERSION_MINOR, _CLIENT_VERSION_MINOR, [Minor version])
@@ -1193,7 +1286,6 @@ AC_SUBST(COPYRIGHT_HOLDERS_FINAL, "_COPYRIGHT_HOLDERS_FINAL")
 AC_SUBST(BITCOIN_DAEMON_NAME)
 AC_SUBST(BITCOIN_CLI_NAME)
 AC_SUBST(BITCOIN_TX_NAME)
-AC_SUBST(BITCOIN_SEEDER_NAME)
 
 AC_SUBST(RELDFLAGS)
 AC_SUBST(ERROR_CXXFLAGS)
@@ -1208,16 +1300,23 @@ AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(USE_UPNP)
 AC_SUBST(BOOST_LIBS)
 AC_SUBST(TESTDEFS)
-AC_SUBST(LEVELDB_TARGET_FLAGS)
 AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
-AC_SUBST(CRYPTO_LIBS)
-AC_SUBST(SSL_LIBS)
+AC_SUBST(OPENSSL_LIBS)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
+AC_SUBST(AIO_LIBS)
+AC_SUBST(TBB_LIBS)
+AC_SUBST(HAVE_BUILTIN_PREFETCH)
+AC_SUBST(HAVE_MM_PREFETCH)
+AC_SUBST(HAVE_STRONG_GETAUXVAL)
+AC_SUBST(HAVE_WEAK_GETAUXVAL)
+AC_SUBST(HAVE_FDATASYNC)
+AC_SUBST(HAVE_FULLFSYNC)
+AC_SUBST(HAVE_O_CLOEXEC)
 AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi test/config.ini])
 AC_CONFIG_FILES([contrib/devtools/split-debug.sh],[chmod +x contrib/devtools/split-debug.sh])
 AC_CONFIG_LINKS([test/functional/test_runner.py:test/functional/test_runner.py])
@@ -1251,6 +1350,7 @@ if test x$need_bundled_univalue = xyes; then
 fi
 
 ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery --enable-module-multiset --disable-jni"
+ac_configure_args="${ac_configure_args} --disable-module-schnorrsig --disable-module-extrakeys --disable-module-ellswift"
 AC_CONFIG_SUBDIRS([src/secp256k1])
 
 AC_OUTPUT
@@ -1276,29 +1376,35 @@ esac
 
 echo
 echo "Options used to compile and link:"
-echo "  prod build    = $enable_prod_build"
-echo "  with wallet   = $enable_wallet"
-echo "  with zmq      = $use_zmq"
-echo "  with test     = $use_tests"
-echo "  with bench    = $use_bench"
-echo "  with upnp     = $use_upnp"
-echo "  use asm       = $use_asm"
-echo "  debug enabled = $enable_debug"
-echo "  werror        = $enable_werror"
+echo "  prod build        = $enable_prod_build"
+echo "  with wallet       = $enable_wallet"
+echo "  with zmq          = $use_zmq"
+echo "  with test         = $use_tests"
+echo "  with bench        = $use_bench"
+echo "  with upnp         = $use_upnp"
+echo "  use asm           = $use_asm"
+echo "  debug enabled     = $enable_debug"
+echo "  werror            = $enable_werror"
 echo
-echo "  sanitizers    "
-echo "          asan  = $enable_asan"
-echo "          tsan  = $enable_tsan"
-echo "          ubsan = $enable_ubsan"
+echo "  sanitizers"
+echo "          asan      = $enable_asan"
+echo "          tsan      = $enable_tsan"
+echo "          ubsan     = $enable_ubsan"
 echo
-echo "  target os     = $TARGET_OS"
-echo "  build os      = $BUILD_OS"
+echo "  memory allocators"
+echo "       tcmalloc     = $use_tcmalloc"
+echo "       jemalloc     = $use_jemalloc"
 echo
-echo "  CC            = $CC"
-echo "  CFLAGS        = $CFLAGS"
-echo "  CPPFLAGS      = $CPPFLAGS"
-echo "  CXX           = $CXX"
-echo "  CXXFLAGS      = $CXXFLAGS"
-echo "  LDFLAGS       = $LDFLAGS"
+echo "  target os         = $TARGET_OS"
+echo "  build os          = $BUILD_OS"
+echo
+echo "  CC                = $CC"
+echo "  CFLAGS            = $CFLAGS"
+echo "  CPPFLAGS          = $CPPFLAGS"
+echo "  CXX               = $CXX"
+echo "  HARDENED_CXXFLAGS = $HARDENED_CXXFLAGS"
+echo "  HARDENED_LDFLAGS  = $HARDENED_LDFLAGS"
+echo "  CXXFLAGS          = $CXXFLAGS"
+echo "  LDFLAGS           = $LDFLAGS"
 
 echo

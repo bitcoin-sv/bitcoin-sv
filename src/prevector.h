@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef _BITCOIN_PREVECTOR_H_
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 #define _BITCOIN_PREVECTOR_H_
 
 #include <cassert>
@@ -12,7 +13,20 @@
 
 #include <iterator>
 
-#pragma pack(push, 1)
+#include "compiler_warnings.h"
+
+#ifndef __clang__
+    // -Wmaybe-uninitialized warning flag is disabled here because it gives false alarms in this class due to _union.indirect variable.
+    // _union.indirect is always used after _size becomes larger than N. When this happens, _union.indirect is set for the first time.
+    GCC_WARNINGS_IGNORE(-Wmaybe-uninitialized);
+    #ifdef __GNUC__
+        #if __GNUC__ >= 12
+        // GCC 12 also includes this warning under -Wuninitialized
+        GCC_WARNINGS_IGNORE(-Wuninitialized)
+        #endif
+    #endif
+#endif
+
 /**
  * Implements a drop-in replacement for std::vector<T> which stores up to N
  * elements directly (without heap allocation). The types Size and Diff are used
@@ -32,8 +46,10 @@
  * The data type T must be movable by memmove/realloc(). Once we switch to C++,
  * move constructors can be used instead.
  */
-template <unsigned int N, typename T, typename Size = uint32_t,
-          typename Diff = int32_t>
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+template <unsigned int N, typename T, typename Size = uint64_t,
+          typename Diff = int64_t>
 class prevector {
 public:
     typedef Size size_type;
@@ -49,16 +65,17 @@ public:
 
     public:
         typedef Diff difference_type;
-        typedef T value_type;
+        using element_type = T;
         typedef T *pointer;
         typedef T &reference;
-        typedef std::random_access_iterator_tag iterator_category;
+        using iterator_category = std::contiguous_iterator_tag;
         iterator() : ptr(nullptr) {}
         iterator(T *ptr_) : ptr(ptr_) {}
         T &operator*() const { return *ptr; }
         T *operator->() const { return ptr; }
-        T &operator[](size_type pos) { return ptr[pos]; }
-        const T &operator[](size_type pos) const { return ptr[pos]; }
+        T &operator[](difference_type pos) { return ptr[pos]; }
+        T& operator[](difference_type pos) const { return ptr[pos]; }
+
         iterator &operator++() {
             ptr++;
             return *this;
@@ -80,13 +97,13 @@ public:
         difference_type friend operator-(iterator a, iterator b) {
             return (&(*a) - &(*b));
         }
-        iterator operator+(size_type n) { return iterator(ptr + n); }
-        iterator &operator+=(size_type n) {
+        iterator operator+(difference_type n) const { return iterator(ptr + n); }
+        iterator& operator+=(difference_type n) {
             ptr += n;
             return *this;
         }
-        iterator operator-(size_type n) { return iterator(ptr - n); }
-        iterator &operator-=(size_type n) {
+        iterator operator-(difference_type n) const { return iterator(ptr - n); }
+        iterator& operator-=(difference_type n) {
             ptr -= n;
             return *this;
         }
@@ -96,7 +113,13 @@ public:
         bool operator<=(iterator x) const { return ptr <= x.ptr; }
         bool operator>(iterator x) const { return ptr > x.ptr; }
         bool operator<(iterator x) const { return ptr < x.ptr; }
-    };
+
+        friend iterator operator+(difference_type n, const iterator& it)
+        {
+            return iterator{it.ptr + n};
+        }
+  };
+  static_assert(std::contiguous_iterator<iterator>);
 
     class reverse_iterator {
         T *ptr;
@@ -140,10 +163,10 @@ public:
 
     public:
         typedef Diff difference_type;
-        typedef const T value_type;
+        using element_type = T;
         typedef const T *pointer;
         typedef const T &reference;
-        typedef std::random_access_iterator_tag iterator_category;
+        using iterator_category = std::contiguous_iterator_tag; 
         const_iterator() : ptr(nullptr) {}
         const_iterator(const T *ptr_) : ptr(ptr_) {}
         const_iterator(iterator x) : ptr(&(*x)) {}
@@ -171,17 +194,17 @@ public:
         difference_type friend operator-(const_iterator a, const_iterator b) {
             return (&(*a) - &(*b));
         }
-        const_iterator operator+(size_type n) {
+        const_iterator operator+(difference_type n) const {
             return const_iterator(ptr + n);
         }
-        const_iterator &operator+=(size_type n) {
+        const_iterator &operator+=(difference_type n) {
             ptr += n;
             return *this;
         }
-        const_iterator operator-(size_type n) {
+        const_iterator operator-(difference_type n) const {
             return const_iterator(ptr - n);
         }
-        const_iterator &operator-=(size_type n) {
+        const_iterator &operator-=(difference_type n) {
             ptr -= n;
             return *this;
         }
@@ -191,7 +214,13 @@ public:
         bool operator<=(const_iterator x) const { return ptr <= x.ptr; }
         bool operator>(const_iterator x) const { return ptr > x.ptr; }
         bool operator<(const_iterator x) const { return ptr < x.ptr; }
+
+        friend const_iterator operator+(difference_type n, const const_iterator& it)
+        {
+            return const_iterator{it.ptr + n};
+        }
     };
+    static_assert(std::contiguous_iterator<const_iterator>);
 
     class const_reverse_iterator {
         const T *ptr;
@@ -232,24 +261,29 @@ public:
 private:
     size_type _size;
     union direct_or_indirect {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         char direct[sizeof(T) * N];
         struct {
             size_type capacity;
             char *indirect;
-        };
+        } other;
     } _union;
 
     T *direct_ptr(difference_type pos) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<T *>(_union.direct) + pos;
     }
     const T *direct_ptr(difference_type pos) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return reinterpret_cast<const T *>(_union.direct) + pos;
     }
     T *indirect_ptr(difference_type pos) {
-        return reinterpret_cast<T *>(_union.indirect) + pos;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        return reinterpret_cast<T *>(_union.other.indirect) + pos;
     }
     const T *indirect_ptr(difference_type pos) const {
-        return reinterpret_cast<const T *>(_union.indirect) + pos;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        return reinterpret_cast<const T *>(_union.other.indirect) + pos;
     }
     bool is_direct() const { return _size <= N; }
 
@@ -260,6 +294,7 @@ private:
                 T *src = indirect;
                 T *dst = direct_ptr(0);
                 memcpy(dst, src, size() * sizeof(T));
+                // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
                 free(indirect);
                 _size -= N + 1;
             }
@@ -270,19 +305,23 @@ private:
                 // allocator or new/delete so that handlers are called as
                 // necessary, but performance would be slightly degraded by
                 // doing so.
-                _union.indirect = static_cast<char *>(realloc(
-                    _union.indirect, ((size_t)sizeof(T)) * new_capacity));
-                assert(_union.indirect);
-                _union.capacity = new_capacity;
+                // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
+                _union.other.indirect = static_cast<char *>(realloc(
+                    _union.other.indirect, ((size_t)sizeof(T)) * new_capacity));
+                assert(_union.other.indirect);
+                _union.other.capacity = new_capacity;
             } else {
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                 char *new_indirect = static_cast<char *>(
+                    // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
                     malloc(((size_t)sizeof(T)) * new_capacity));
                 assert(new_indirect);
                 T *src = direct_ptr(0);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 T *dst = reinterpret_cast<T *>(new_indirect);
                 memcpy(dst, src, size() * sizeof(T));
-                _union.indirect = new_indirect;
-                _union.capacity = new_capacity;
+                _union.other.indirect = new_indirect;
+                _union.other.capacity = new_capacity;
                 _size += N + 1;
             }
         }
@@ -303,7 +342,7 @@ public:
         }
         while (size() < n) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(val);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(val);
         }
     }
 
@@ -316,7 +355,7 @@ public:
         }
         while (first != last) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*first);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*first);
             ++first;
         }
     }
@@ -329,17 +368,17 @@ public:
         change_capacity(n);
         while (size() < n) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(val);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(val);
         }
     }
 
     template <typename InputIterator>
     prevector(InputIterator first, InputIterator last) : _size(0) {
-        size_type n = last - first;
+        size_type n = static_cast<size_type>(last - first);
         change_capacity(n);
         while (first != last) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*first);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*first);
             ++first;
         }
     }
@@ -349,11 +388,12 @@ public:
         const_iterator it = other.begin();
         while (it != other.end()) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*it);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
             ++it;
         }
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
 
     prevector &operator=(const prevector<N, T, Size, Diff> &other) {
@@ -365,12 +405,13 @@ public:
         const_iterator it = other.begin();
         while (it != other.end()) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*it);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
             ++it;
         }
         return *this;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector &operator=(prevector<N, T, Size, Diff> &&other) {
         swap(other);
         return *this;
@@ -382,40 +423,40 @@ public:
 
     iterator begin() { return iterator(item_ptr(0)); }
     const_iterator begin() const { return const_iterator(item_ptr(0)); }
-    iterator end() { return iterator(item_ptr(size())); }
-    const_iterator end() const { return const_iterator(item_ptr(size())); }
+    iterator end() { return iterator(item_ptr(static_cast<difference_type>(size()))); }
+    const_iterator end() const { return const_iterator(item_ptr(static_cast<difference_type>(size()))); }
 
-    reverse_iterator rbegin() { return reverse_iterator(item_ptr(size() - 1)); }
+    reverse_iterator rbegin() { return reverse_iterator(item_ptr(static_cast<difference_type>(size() - 1))); }
     const_reverse_iterator rbegin() const {
-        return const_reverse_iterator(item_ptr(size() - 1));
+        return const_reverse_iterator(item_ptr(static_cast<difference_type>(size() - 1)));
     }
-    reverse_iterator rend() { return reverse_iterator(item_ptr(-1)); }
+    reverse_iterator rend() { return reverse_iterator(item_ptr(static_cast<difference_type>(-1))); }
     const_reverse_iterator rend() const {
-        return const_reverse_iterator(item_ptr(-1));
+        return const_reverse_iterator(item_ptr(static_cast<difference_type>(-1)));
     }
 
     size_t capacity() const {
         if (is_direct()) {
             return N;
         } else {
-            return _union.capacity;
+            return _union.other.capacity;
         }
     }
 
-    T &operator[](size_type pos) { return *item_ptr(pos); }
+    T &operator[](size_type pos) { return *item_ptr(static_cast<difference_type>(pos)); }
 
-    const T &operator[](size_type pos) const { return *item_ptr(pos); }
+    const T &operator[](size_type pos) const { return *item_ptr(static_cast<difference_type>(pos)); }
 
     void resize(size_type new_size) {
         if (size() > new_size) {
-            erase(item_ptr(new_size), end());
+            erase(item_ptr(static_cast<difference_type>(new_size)), end());
         }
         if (new_size > capacity()) {
             change_capacity(new_size);
         }
         while (size() < new_size) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T();
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T();
         }
     }
 
@@ -430,42 +471,42 @@ public:
     void clear() { resize(0); }
 
     iterator insert(iterator pos, const T &value) {
-        size_type p = pos - begin();
+        size_type p = static_cast<size_type>(pos - begin());
         size_type new_size = size() + 1;
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        memmove(item_ptr(p + 1), item_ptr(p), (size() - p) * sizeof(T));
+        memmove(item_ptr(static_cast<difference_type>(p + 1)), item_ptr(static_cast<difference_type>(p)), (size() - p) * sizeof(T));
         _size++;
-        new (static_cast<void *>(item_ptr(p))) T(value);
-        return iterator(item_ptr(p));
+        new (static_cast<void *>(item_ptr(static_cast<difference_type>(p)))) T(value);
+        return iterator(item_ptr(static_cast<difference_type>(p)));
     }
 
     void insert(iterator pos, size_type count, const T &value) {
-        size_type p = pos - begin();
+        size_type p = static_cast<size_type>(pos - begin());
         size_type new_size = size() + count;
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        memmove(item_ptr(p + count), item_ptr(p), (size() - p) * sizeof(T));
+        memmove(item_ptr(static_cast<difference_type>(p + count)), item_ptr(static_cast<difference_type>(p)), (size() - p) * sizeof(T));
         _size += count;
         for (size_type i = 0; i < count; i++) {
-            new (static_cast<void *>(item_ptr(p + i))) T(value);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(p + i)))) T(value);
         }
     }
 
     template <typename InputIterator>
     void insert(iterator pos, InputIterator first, InputIterator last) {
-        size_type p = pos - begin();
-        difference_type count = last - first;
+        size_type p = static_cast<size_type>(pos - begin());
+        size_type count = static_cast<size_type>(last - first);
         size_type new_size = size() + count;
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        memmove(item_ptr(p + count), item_ptr(p), (size() - p) * sizeof(T));
+        memmove(item_ptr(static_cast<difference_type>(p + count)), item_ptr(static_cast<difference_type>(p)), (size() - p) * sizeof(T));
         _size += count;
         while (first != last) {
-            new (static_cast<void *>(item_ptr(p))) T(*first);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(p)))) T(*first);
             ++p;
             ++first;
         }
@@ -481,7 +522,7 @@ public:
             _size--;
             ++p;
         }
-        memmove(&(*first), &(*last), endp - ((char *)(&(*last))));
+        memmove(&(*first), &(*last), static_cast<size_t>(endp - ((char *)(&(*last)))));
         return first;
     }
 
@@ -490,7 +531,7 @@ public:
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        new (item_ptr(size())) T(value);
+        new (item_ptr(static_cast<difference_type>(size()))) T(value);
         _size++;
     }
 
@@ -504,6 +545,7 @@ public:
 
     const T &back() const { return *item_ptr(size() - 1); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap, performance-noexcept-swap)
     void swap(prevector<N, T, Size, Diff> &other) {
         std::swap(_union, other._union);
         std::swap(_size, other._size);
@@ -512,8 +554,9 @@ public:
     ~prevector() {
         clear();
         if (!is_direct()) {
-            free(_union.indirect);
-            _union.indirect = nullptr;
+            // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
+            free(_union.other.indirect);
+            _union.other.indirect = nullptr;
         }
     }
 
@@ -565,7 +608,7 @@ public:
         if (is_direct()) {
             return 0;
         } else {
-            return ((size_t)(sizeof(T))) * _union.capacity;
+            return ((size_t)(sizeof(T))) * _union.other.capacity;
         }
     }
 
@@ -573,6 +616,7 @@ public:
 
     const value_type *data() const { return item_ptr(0); }
 };
-#pragma pack(pop)
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)
 
 #endif

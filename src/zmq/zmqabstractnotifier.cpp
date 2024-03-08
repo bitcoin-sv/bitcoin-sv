@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "zmqabstractnotifier.h"
+
+#include "txmempool.h"
 #include "util.h"
 
 CZMQAbstractNotifier::~CZMQAbstractNotifier() {
@@ -15,5 +17,30 @@ bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex * /*CBlockIndex*/) {
 
 bool CZMQAbstractNotifier::NotifyTransaction(
     const CTransaction & /*transaction*/) {
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyTextMessage(const std::string& topic, std::string_view message)
+{
+    return true;
+}
+bool CZMQAbstractNotifier::NotifyRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason,
+                                                    const CTransactionConflict& conflictedWith)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyBlock2(const CBlockIndex*)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyTransaction2(const CTransaction&)
+{
     return true;
 }

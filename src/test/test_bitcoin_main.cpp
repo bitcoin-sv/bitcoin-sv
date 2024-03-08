@@ -4,20 +4,29 @@
 
 #define BOOST_TEST_MODULE Bitcoin Test Suite
 
-#include "net.h"
-
 #include <boost/test/unit_test.hpp>
+#include "logging.h"
+#include <algorithm>
 
-std::unique_ptr<CConnman> g_connman;
-
-[[noreturn]] void Shutdown(void *parg) {
-    std::exit(EXIT_SUCCESS);
+bool HasCustomOption(std::string option)
+{
+    const auto& argc = boost::unit_test::framework::master_test_suite().argc;
+    const auto& argv = boost::unit_test::framework::master_test_suite().argv;
+    return std::any_of(argv, argv+argc, [&option](auto& arg) {return option == arg;});
 }
 
-[[noreturn]] void StartShutdown() {
-    std::exit(EXIT_SUCCESS);
-}
+struct EnableLoggingFixture {
+    EnableLoggingFixture() {
+        std::string option {"--enable-logging"};
+        if (HasCustomOption(option)) {
+            GetLogger().EnableCategory(BCLog::ALL);
+            GetLogger().fPrintToConsole = true;
+            GetLogger().fLogTimeMicros = true;
+            GetLogger().fLogTimestamps = true;
+        } else {
+            BOOST_TEST_MESSAGE("To enable logging, run the unit tests with   -- " << option);
+        }
+    }
+};
 
-bool ShutdownRequested() {
-    return false;
-}
+BOOST_TEST_GLOBAL_FIXTURE(EnableLoggingFixture);

@@ -6,17 +6,27 @@
 #include "chainparams.h"
 #include "config.h"
 #include "consensus/merkle.h"
+#include "pow.h"
 #include "random.h"
+#include "merkletree.h"
+
+#include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
 
-std::vector<std::pair<uint256, CTransactionRef>> extra_txn;
+namespace
+{
 
-struct RegtestingSetup : public TestingSetup {
-    RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
-};
+    std::vector<std::pair<uint256, CTransactionRef>> extra_txn;
+
+    struct RegtestingSetup : public TestingSetup {
+        RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
+    };
+
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+}
 
 BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
 
@@ -61,12 +71,13 @@ static CBlock BuildBlockTestCase() {
 
 BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
     CTxMemPool pool;
-    TestMemPoolEntryHelper entry;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
-    pool.addUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]));
+    pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
-        pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+        testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
 
     // Do a simple ShortTxIDs RT
@@ -87,18 +98,18 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
         BOOST_CHECK(partialBlock.IsTxAvailable(2));
 
         BOOST_CHECK_EQUAL(
-            pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+            testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
             SHARED_TX_OFFSET + 1);
 
-        size_t poolSize = pool.size();
-        pool.removeRecursive(*block.vtx[2]);
-        BOOST_CHECK_EQUAL(pool.size(), poolSize - 1);
+        size_t poolSize = pool.Size();
+        testPoolAccess.RemoveRecursive(*block.vtx[2], nullChangeSet);
+        BOOST_CHECK_EQUAL(pool.Size(), poolSize - 1);
 
         CBlock block2;
         {
             // No transactions.
             PartiallyDownloadedBlock tmp = partialBlock;
-            BOOST_CHECK(partialBlock.FillBlock(block2, {}) ==
+            BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) ==
                         READ_STATUS_INVALID);
             partialBlock = tmp;
         }
@@ -108,20 +119,29 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
             // Current implementation doesn't check txn here, but don't require
             // that.
             PartiallyDownloadedBlock tmp = partialBlock;
-            partialBlock.FillBlock(block2, {block.vtx[2]});
+            partialBlock.FillBlock(block2, {block.vtx[2]}, 0);
             partialBlock = tmp;
         }
         bool mutated;
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
+        {
+            CMerkleTree merkleTree(block2.vtx, uint256(), 0);
+            BOOST_CHECK(block.hashMerkleRoot != merkleTree.GetMerkleRoot());
+        }
 
         CBlock block3;
-        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[1]}) ==
+        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[1]}, 0) ==
                     READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block3.GetHash().ToString());
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block3, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block3.vtx, uint256(), 0);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
     }
 }
 
@@ -149,7 +169,7 @@ public:
         return base.GetShortID(txhash);
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -171,12 +191,13 @@ public:
 
 BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
     CTxMemPool pool;
-    TestMemPoolEntryHelper entry;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
-    pool.addUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]));
+    pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
-        pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+        testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
 
     uint256 txhash;
@@ -204,14 +225,14 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         BOOST_CHECK(partialBlock.IsTxAvailable(2));
 
         BOOST_CHECK_EQUAL(
-            pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
+            testPoolAccess.mapTx().find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
             SHARED_TX_OFFSET + 1);
 
         CBlock block2;
         {
             // No transactions.
             PartiallyDownloadedBlock tmp = partialBlock;
-            BOOST_CHECK(partialBlock.FillBlock(block2, {}) ==
+            BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) ==
                         READ_STATUS_INVALID);
             partialBlock = tmp;
         }
@@ -221,21 +242,31 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
             // Current implementation doesn't check txn here, but don't require
             // that.
             PartiallyDownloadedBlock tmp = partialBlock;
-            partialBlock.FillBlock(block2, {block.vtx[1]});
+            partialBlock.FillBlock(block2, {block.vtx[1]}, 0);
             partialBlock = tmp;
         }
         bool mutated;
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
+        {
+            CMerkleTree merkleTree(block2.vtx, uint256(), 0);
+            BOOST_CHECK(block.hashMerkleRoot != merkleTree.GetMerkleRoot());
+
+        }
 
         CBlock block3;
         PartiallyDownloadedBlock partialBlockCopy = partialBlock;
-        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[0]}) ==
+        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[0]}, 0) ==
                     READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block3.GetHash().ToString());
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block3, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block3.vtx, uint256(), 0);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
 
         txhash = block.vtx[2]->GetId();
         block.vtx.clear();
@@ -243,21 +274,22 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         block3.vtx.clear();
 
         // + 1 because of partialBlockCopy.
-        BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+        BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                           SHARED_TX_OFFSET + 1);
     }
-    BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+    BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                       SHARED_TX_OFFSET + 0);
 }
 
 BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
     CTxMemPool pool;
-    TestMemPoolEntryHelper entry;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
-    pool.addUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]));
+    pool.AddUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
-        pool.mapTx.find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
+        testPoolAccess.mapTx().find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
 
     uint256 txhash;
@@ -286,33 +318,39 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
         BOOST_CHECK(partialBlock.IsTxAvailable(2));
 
         BOOST_CHECK_EQUAL(
-            pool.mapTx.find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
+            testPoolAccess.mapTx().find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
             SHARED_TX_OFFSET + 1);
 
         CBlock block2;
         PartiallyDownloadedBlock partialBlockCopy = partialBlock;
-        BOOST_CHECK(partialBlock.FillBlock(block2, {}) == READ_STATUS_OK);
+        BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) == READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block2.GetHash().ToString());
         bool mutated;
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block2, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block2.vtx, uint256(), 0);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
 
         txhash = block.vtx[1]->GetId();
         block.vtx.clear();
         block2.vtx.clear();
 
         // + 1 because of partialBlockCopy.
-        BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+        BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                           SHARED_TX_OFFSET + 1);
     }
-    BOOST_CHECK_EQUAL(pool.mapTx.find(txhash)->GetSharedTx().use_count(),
+    BOOST_CHECK_EQUAL(testPoolAccess.mapTx().find(txhash)->GetSharedTx().use_count(),
                       SHARED_TX_OFFSET + 0);
 }
 
 BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
     CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
     CMutableTransaction coinbase;
     coinbase.vin.resize(1);
     coinbase.vin[0].scriptSig.resize(10);
@@ -352,13 +390,18 @@ BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
 
         CBlock block2;
         std::vector<CTransactionRef> vtx_missing;
-        BOOST_CHECK(partialBlock.FillBlock(block2, vtx_missing) ==
+        BOOST_CHECK(partialBlock.FillBlock(block2, vtx_missing, 0) ==
                     READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block2.GetHash().ToString());
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block2, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block2.vtx, uint256(), 0);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
     }
 }
 

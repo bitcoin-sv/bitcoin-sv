@@ -18,6 +18,7 @@ from test_framework.blocktools import *
 import time
 from test_framework.script import *
 
+
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 class TestNode(NodeConnCB):
 
@@ -60,13 +61,11 @@ class FullBlockTest(ComparisonTestFramework):
         self.setup_clean_chain = True
         # excessive_block_size needs to be > generated block size
         self.excessive_block_size = 64 * ONE_MEGABYTE
-        self.extra_args = [['-norelaypriority',
+        self.extra_args = [['-minrelaytxfee=0',
                             '-whitelist=127.0.0.1',
                             '-limitancestorcount=999999',
-                            '-limitancestorsize=999999',
-                            '-limitdescendantcount=999999',
-                            '-limitdescendantsize=999999',
                             '-maxmempool=99999',
+                            '-maxmempoolsizedisk=0',
                             "-excessiveblocksize=%d"
                             % self.excessive_block_size]]
 
@@ -75,35 +74,27 @@ class FullBlockTest(ComparisonTestFramework):
         parser.add_option(
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        # RPC timeout needs to be high because in debug build invalidateblock can take >90s to complete
+        timewait=150
+        return super().add_node(i, extra_args, rpchost, timewait, binary, init_data_dir)
+
     def run_test(self):
         self.nodes[0].setexcessiveblock(self.excessive_block_size)
         self.test.run()
 
     def get_tests(self):
-        self.chain.set_genesis_hash( int(self.nodes[0].getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out, _ = prepare_init_chain(self.chain, 99, 100)
 
-        # Send it all to the node at once.
         yield test
-
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
 
         # Check that compact block also work for big blocks
         node = self.nodes[0]

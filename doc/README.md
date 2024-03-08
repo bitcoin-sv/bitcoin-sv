@@ -12,17 +12,24 @@ To download Bitcoin SV, visit [bitcoinsv.io](https://bitcoinsv.io/).
 
 Running
 ---------------------
-Bitcoin SV is only supported on the Unix platform at this time.
+Bitcoin SV is only supported on the Linux and docker platforms at this time.
 
-To run Bitcoin SV, unpack the files into a directory and run:
+To run Bitcoin SV on Linux:
 
-- `bin/bitcoind`
+* ensure that your system meets the minimum recommended [system requirements](system-requirements.md)
+* unpack the files into a directory
+* run `bin/bitcoind`
 
+A docker image is available from https://hub.docker.com/r/bitcoinsv/bitcoin-sv. Images are tagged with 
+the release version number. The `latest` tag is updated as new versions are released. The source for this image 
+(Dockerfiles etc) is maintained in a GitHub repository: https://github.com/bitcoin-sv/docker-sv. 
+ 
 ### Need Help?
 
 * Log an issue on [GitHub] (https://github.com/bitcoin-sv/bitcoin-sv/issues)
 * Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/bitcoinSV/) or
 [Bictoin Cash SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).
+* Consult [Bitcoin SV Wiki](https://wiki.bitcoinsv.io/) for information about Bitcoin protocol.
 
 Building
 ---------------------

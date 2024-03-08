@@ -1,13 +1,14 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "addrman.h"
 #include "test/test_bitcoin.h"
 #include <boost/test/unit_test.hpp>
 #include <string>
 
 #include "hash.h"
-#include "netbase.h"
+#include "net/netbase.h"
 #include "random.h"
 
 class CAddrManTest : public CAddrMan {
@@ -189,7 +190,7 @@ BOOST_AUTO_TEST_CASE(addrman_select) {
     for (int i = 0; i < 20; ++i) {
         ports.insert(addrman.Select().GetPort());
     }
-    BOOST_CHECK_EQUAL(ports.size(), 3);
+    BOOST_CHECK_EQUAL(ports.size(), 3U);
 }
 
 BOOST_AUTO_TEST_CASE(addrman_new_collisions) {
@@ -389,6 +390,14 @@ BOOST_AUTO_TEST_CASE(addrman_getaddr) {
     BOOST_CHECK(vAddr.size() == 461);
     // (Addrman.size() < number of addresses added) due to address collisons.
     BOOST_CHECK(addrman.size() == 2007);
+
+    // Test 26: IsTerrible() is true for stale address > ADDRMAN_HORIZON_DAYS
+    CAddress addr6 = CAddress(ResolveService("252.254.5.6", 8333), NODE_NONE);
+    int64_t nNow = GetAdjustedTime();
+    addr6.nTime = nNow - (ADDRMAN_HORIZON_DAYS * 24 * 60 * 60) - 1;
+    addrman.Add(addr6, source1);
+    CAddrInfo *info6 = addrman.Find(addr6);
+    BOOST_ASSERT(info6->IsTerrible(nNow));
 }
 
 BOOST_AUTO_TEST_CASE(caddrinfo_get_tried_bucket) {

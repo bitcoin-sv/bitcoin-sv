@@ -12,6 +12,7 @@ import logging
 import os
 import subprocess
 import time
+import atexit
 
 from .mininode import COIN, ToHex
 from .util import (
@@ -22,7 +23,11 @@ from .util import (
 )
 from .authproxy import JSONRPCException
 
-BITCOIND_PROC_WAIT_TIMEOUT = 60
+BITCOIND_PROC_WAIT_TIMEOUT = 120
+
+# Keep a global list of started external processes so that they can be killed
+# before Python exits if they are still running.
+TestNode_process_list = []
 
 
 class TestNode():
@@ -54,8 +59,17 @@ class TestNode():
         self.coverage_dir = coverage_dir
         # Most callers will just need to add extra args to the standard list below. For those callers that need more flexibity, they can just set the args property directly.
         self.extra_args = extra_args
-        self.args = self.binary + ["-datadir=" + self.datadir, "-server", "-keypool=1", "-discover=0", "-rest", "-logtimemicros",
-                     "-debug", "-debugexclude=libevent", "-debugexclude=leveldb", "-mocktime=" + str(mocktime), "-uacomment=testnode%d" % i]
+        self.args = self.binary + ["-datadir=" + self.datadir,
+                                   "-server",
+                                   "-keypool=1",
+                                   "-discover=0",
+                                   "-rest",
+                                   "-logtimemicros",
+                                   "-debug",
+                                   "-debugexclude=libevent",
+                                   "-debugexclude=leveldb",
+                                   "-mocktime=" + str(mocktime),
+                                   "-uacomment=testnode%d" % i]
 
         self.cli = TestNodeCLI(
             os.getenv("BITCOINCLI", "bitcoin-cli"), self.datadir)
@@ -73,13 +87,53 @@ class TestNode():
         assert self.rpc_connected and self.rpc is not None, "Error: no RPC connection"
         return self.rpc.__getattr__(*args, **kwargs)
 
-    def start(self, extra_args=None, stderr=None):
+    def setRequiredArgs(self, inputArgs, runNodesWithRequiredParams):
+        """Sets the following required bitcoind arguments with default values if they are not already set.
+           This prevents node from failing in functional tests
+        """
+        if not runNodesWithRequiredParams:
+            return inputArgs
+
+        requiredArgs = ["-maxstackmemoryusageconsensus=0",
+                        "-minminingtxfee=0.000005",
+                        "-excessiveblocksize=0"]
+
+        allSetArgs = []
+        #Config file parameters should be checked as well
+        configFilename = os.path.join(self.datadir, "bitcoin.conf")
+        with open(configFilename, 'r', encoding='utf8') as configFile:
+            configFileArg = configFile.readline()
+            while configFileArg:
+                allSetArgs += ["-" + configFileArg.rstrip()]
+                configFileArg = configFile.readline()
+
+        allSetArgs += inputArgs
+
+        for currentArg in allSetArgs:
+            checkCurentAt = currentArg.find("=")
+            if checkCurentAt == -1:
+                checkCurentAt = len(currentArg)
+            for requiredArg in requiredArgs:
+                checkRequiredAt = requiredArg.find("=")
+                if checkRequiredAt == -1:
+                    checkRequiredAt = len(requiredArg)
+                if requiredArg[:checkRequiredAt] == currentArg[:checkCurentAt]:
+                    requiredArgs.remove(requiredArg)
+                    break
+
+        return inputArgs + requiredArgs
+
+    def start(self, runNodesWithRequiredParams, extra_args=None, stderr=None):
         """Start the node."""
+        if os.path.isfile(os.path.join(self.datadir, "regtest", ".cookie")):
+            # remove old .cookie file so that it is not accidentally used in wait_for_rpc_connection before new one is created by node during startup
+            os.remove(os.path.join(self.datadir, "regtest", ".cookie"))
         if extra_args is None:
             extra_args = self.extra_args
         if stderr is None:
             stderr = self.stderr
-        self.process = subprocess.Popen(self.args + extra_args, stderr=stderr)
+        self.process = subprocess.Popen(self.setRequiredArgs(self.args + extra_args, runNodesWithRequiredParams), stderr=stderr)
+        TestNode_process_list.append(self.process) # Add node process to list of running external processes
         self.running = True
         self.log.debug("bitcoind started, waiting for RPC to come up")
 
@@ -127,7 +181,7 @@ class TestNode():
         except http.client.CannotSendRequest:
             self.log.exception("Unable to stop node.")
 
-    def is_node_stopped(self):
+    def is_node_stopped(self, assert_zero_exit_code=True):
         """Checks whether the node has stopped.
 
         Returns True if the node has stopped. False otherwise.
@@ -138,8 +192,11 @@ class TestNode():
         if return_code is None:
             return False
 
-        # process has stopped. Assert that it didn't return an error code.
-        assert_equal(return_code, 0)
+        TestNode_process_list.remove(self.process) # Remove node process from list of running external processes
+
+        if assert_zero_exit_code:
+            # process has stopped. Assert that it didn't return an error code.
+            assert_equal(return_code, 0)
         self.running = False
         self.process = None
         self.rpc_connected = False
@@ -149,6 +206,10 @@ class TestNode():
 
     def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
         wait_until(self.is_node_stopped, timeout=timeout)
+
+    def wait_for_exit(self, timeout):
+        self.process.wait(timeout)
+        assert self.is_node_stopped(assert_zero_exit_code=False) # Check that process has quit and cleanup resources
 
     def node_encrypt_wallet(self, passphrase):
         """"Encrypts the wallet.
@@ -210,3 +271,16 @@ class TestNodeCLI():
             raise subprocess.CalledProcessError(
                 returncode, self.binary, output=cli_stderr)
         return json.loads(cli_stdout, parse_float=decimal.Decimal)
+
+
+def TestNode_kill_running_processes():
+    """ Kill all started external processes that are still running in reverse order they were added to array """
+    for p in reversed(TestNode_process_list):
+        if(p.poll() is None):
+            print("Killing sub-process " + str(p.pid))
+            p.kill()
+            p.wait(timeout=1)
+    TestNode_process_list.clear()
+
+
+atexit.register(TestNode_kill_running_processes)

@@ -16,7 +16,7 @@ static const int DEFAULT_HTTP_SERVER_TIMEOUT = 30;
 struct evhttp_request;
 struct event_base;
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CService;
 class HTTPRequest;
 
@@ -61,7 +61,11 @@ private:
     bool replySent;
 
 public:
-    HTTPRequest(struct evhttp_request *req);
+    HTTPRequest(const HTTPRequest&) = delete;
+    HTTPRequest& operator=(const HTTPRequest&) = delete;
+    HTTPRequest(HTTPRequest&&) = delete;
+    HTTPRequest& operator=(HTTPRequest&&) = delete;
+    explicit HTTPRequest(struct evhttp_request *req);
     ~HTTPRequest();
 
     enum RequestMethod { UNKNOWN, GET, POST, HEAD, PUT, OPTIONS };
@@ -110,10 +114,17 @@ public:
      * this.
      */
     void WriteReply(int nStatus, const std::string &strReply = "");
+
+    void StartWritingChunks(int nStatus);
+
+    void WriteReplyChunk(std::string_view strReply);
+
+    void StopWritingChunks();
 };
 
 /** Event handler closure.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class HTTPClosure {
 public:
     virtual void operator()() = 0;
@@ -130,6 +141,10 @@ public:
      * triggered (and the handler called)
      * handler is the handler to call when the event is triggered.
      */
+    HTTPEvent(const HTTPEvent&) = delete;
+    HTTPEvent& operator=(const HTTPEvent&) = delete;
+    HTTPEvent(HTTPEvent&&) = delete;
+    HTTPEvent& operator=(HTTPEvent&&) = delete;
     HTTPEvent(struct event_base *base, bool deleteWhenTriggered,
               const std::function<void(void)> &handler);
     ~HTTPEvent();

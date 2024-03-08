@@ -27,7 +27,7 @@ class CTxnSendingDetails
         if(mForcedTx)
             return mForcedTx;
         else
-            return mTxInfo.tx;
+            return mTxInfo.GetTx();
     }
 
   private:
@@ -36,18 +36,3 @@ class CTxnSendingDetails
     TxMempoolInfo mTxInfo {};
     CTransactionRef mForcedTx {};
 };
-
-/**
-* Comparator for transaction priority.
-*/
-struct CompareTxnSendingDetails
-{   
-    CTxMemPool* mMempool {nullptr};
-    CompareTxnSendingDetails(CTxMemPool* mp) : mMempool{mp} {}
-
-    bool operator()(const CTxnSendingDetails& a, const CTxnSendingDetails& b)
-    {   
-        return mMempool->CompareDepthAndScoreUnlocked(b.getInv().hash, a.getInv().hash);
-    }
-};
-

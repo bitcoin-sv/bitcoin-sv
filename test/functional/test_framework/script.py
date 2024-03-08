@@ -7,11 +7,14 @@
 This file is modified from python-bitcoinlib.
 """
 
-from .mininode import CTransaction, CTxOut, sha256, hash256, uint256_from_str, ser_uint256, ser_string
 from binascii import hexlify
-import hashlib
+from .bignum import bn2vch
+from .mininode import CTransaction, CTxOut, sha256, hash256, uint256_from_str, ser_uint256, ser_string
+from .ripemd160 import ripemd160
 
 import sys
+import struct
+
 bchr = chr
 bord = ord
 if sys.version > '3':
@@ -21,19 +24,15 @@ if sys.version > '3':
 
     def bord(x): return x
 
-import struct
-
-from .bignum import bn2vch
-
 MAX_SCRIPT_SIZE = 10000
-MAX_SCRIPT_ELEMENT_SIZE = 520
+MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520
 MAX_SCRIPT_OPCODES = 201
 
 OPCODE_NAMES = {}
 
 
 def hash160(s):
-    return hashlib.new('ripemd160', sha256(s)).digest()
+    return ripemd160(sha256(s))
 
 
 _opcode_instances = []

@@ -6,26 +6,39 @@
 #ifndef BITCOIN_NETMESSAGEMAKER_H
 #define BITCOIN_NETMESSAGEMAKER_H
 
-#include "net.h"
+#include "net/net.h"
 #include "serialize.h"
+
+#include <vector>
 
 class CNetMsgMaker {
 public:
     CNetMsgMaker(int nVersionIn) : nVersion(nVersionIn) {}
 
     template <typename... Args>
-    CSerializedNetMsg Make(int nFlags, std::string sCommand,
+    CSerializedNetMsg Make(int nFlags, CSerializedNetMsg::PayloadType payloadType, std::string sCommand,
                            Args &&... args) const {
-        CSerializedNetMsg msg;
-        msg.command = std::move(sCommand);
-        CVectorWriter{SER_NETWORK, nFlags | nVersion, msg.data, 0,
+        std::vector<uint8_t> data;
+        data.reserve(ser_size(args...));
+        CVectorWriter{SER_NETWORK, nFlags | nVersion, data, 0,
                       std::forward<Args>(args)...};
-        return msg;
+        return {std::move(sCommand), payloadType, std::move(data)};
     }
 
     template <typename... Args>
     CSerializedNetMsg Make(std::string sCommand, Args &&... args) const {
-        return Make(0, std::move(sCommand), std::forward<Args>(args)...);
+        return Make(0, CSerializedNetMsg::PayloadType::UNKNOWN, std::move(sCommand), std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    CSerializedNetMsg Make(CSerializedNetMsg::PayloadType payloadType, std::string sCommand,
+                           Args &&... args) const {
+        return Make(0, payloadType, std::move(sCommand), std::forward<Args>(args)...);
+    }
+
+    int GetVersion() const
+    {
+        return nVersion;
     }
 
 private:

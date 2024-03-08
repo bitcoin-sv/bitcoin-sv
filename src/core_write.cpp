@@ -7,13 +7,12 @@
 #include "dstencode.h"
 #include "primitives/transaction.h"
 #include "script/script.h"
+#include "script/script_num.h"
 #include "script/standard.h"
 #include "serialize.h"
-#include "streams.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-
 #include <univalue.h>
 
 std::string FormatScript(const CScript &script) {
@@ -86,29 +85,46 @@ const std::map<uint8_t, std::string> mapSigHashTypes = {
  * pass true for scripts you believe could contain signatures. For example, pass
  * false, or omit the this argument (defaults to false), for scriptPubKeys.
  */
-std::string ScriptToAsmStr(const CScript &script,
-                           const bool fAttemptSighashDecode) {
-    std::string str;
+std::string ScriptToAsmStr(const CScript& script,
+                           const bool fAttemptSighashDecode)
+{
+    CStringWriter stringWriter;
+    ScriptToAsmStr(script, stringWriter, fAttemptSighashDecode);
+    return stringWriter.MoveOutString();
+}
+
+void ScriptToAsmStr(const CScript& script,
+                    CTextWriter& textWriter,
+                    const bool fAttemptSighashDecode)
+{
     opcodetype opcode;
     std::vector<uint8_t> vch;
     CScript::const_iterator pc = script.begin();
-    while (pc < script.end()) {
-        if (!str.empty()) {
-            str += " ";
+    while (pc < script.end()) 
+    {
+        if (pc != script.begin()) 
+        {
+            textWriter.Write(' ');
         }
 
-        if (!script.GetOp(pc, opcode, vch)) {
-            str += "[error]";
-            return str;
+        if (!script.GetOp(pc, opcode, vch))
+        {
+            textWriter.Write("[error]");
+            return;
         }
 
-        if (0 <= opcode && opcode <= OP_PUSHDATA4) {
-            if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4)) {
-                str += strprintf("%d", CScriptNum(vch, false).getint());
-            } else {
-                // the IsUnspendable check makes sure not to try to decode
+        if (0 <= opcode && opcode <= OP_PUSHDATA4)
+        {
+            if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4))
+            {
+                textWriter.Write(strprintf("%d", CScriptNum(vch, false).getint()));
+            }
+            else
+            {
+                // the IsKnownOpReturn check makes sure not to try to decode
                 // OP_RETURN data that may match the format of a signature
-                if (fAttemptSighashDecode && !script.IsUnspendable()) {
+                if (fAttemptSighashDecode && !script.IsKnownOpReturn())
+                {
                     std::string strSigHashDecode;
                     // goal: only attempt to decode a defined sighash type from
                     // data that looks like a signature within a scriptSig. This
@@ -117,15 +133,18 @@ std::string ScriptToAsmStr(const CScript &script,
                     // formats (see IsCompressedOrUncompressedPubKey) being
                     // incongruous with the checks in CheckSignatureEncoding.
                     uint32_t flags = SCRIPT_VERIFY_STRICTENC;
-                    if (vch.back() & SIGHASH_FORKID) {
+                    if (vch.back() & SIGHASH_FORKID)
+                    {
                         // If the transaction is using SIGHASH_FORKID, we need
                         // to set the apropriate flag.
                         // TODO: Remove after the Hard Fork.
                         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
                     }
-                    if (CheckSignatureEncoding(vch, flags, nullptr)) {
+                    if (CheckSignatureEncoding(vch, flags, nullptr))
+                    {
                         const uint8_t chSigHashType = vch.back();
-                        if (mapSigHashTypes.count(chSigHashType)) {
+                        if (mapSigHashTypes.count(chSigHashType))
+                        {
                             strSigHashDecode =
                                 "[" +
                                 mapSigHashTypes.find(chSigHashType)->second +
@@ -135,28 +154,56 @@ std::string ScriptToAsmStr(const CScript &script,
                             vch.pop_back();
                         }
                     }
-
-                    str += HexStr(vch) + strSigHashDecode;
-                } else {
-                    str += HexStr(vch);
+                    HexStr(vch, textWriter);
+                    textWriter.Write(strSigHashDecode);
+                }
+                else
+                {
+                    HexStr(vch, textWriter);
                 }
             }
-        } else {
-            str += GetOpName(opcode);
+        }
+        else
+        {
+            textWriter.Write(GetOpName(opcode));
         }
     }
-
-    return str;
 }
 
-std::string EncodeHexTx(const CTransaction &tx, const int serialFlags) {
-    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION | serialFlags);
+std::string EncodeHexTx(const CTransaction& tx, const int serialFlags)
+{
+    CStringWriter stringWriter;
+    stringWriter.ReserveAdditional(tx.GetTotalSize() * 2);
+    EncodeHexTx(tx, stringWriter, serialFlags);
+    return stringWriter.MoveOutString();
+}
+
+class CHexWriter
+{
+    CTextWriter& tw;
+public:
+    CHexWriter(CTextWriter& twIn) : tw(twIn) {}
+
+    void write(const char* pch, size_t nSize)
+    {
+        HexStr(pch, pch + nSize, tw);
+    }
+
+    template <typename T> CHexWriter& operator<<(const T& obj)
+    {
+        // Serialize to this stream
+        ::Serialize(*this, obj);
+        return (*this);
+    }
+};
+
+void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serialFlags)
+{
+    CHexWriter ssTx(writer);
     ssTx << tx;
-    return HexStr(ssTx.begin(), ssTx.end());
 }
 
-void ScriptPubKeyToUniv(const CScript &scriptPubKey, UniValue &out,
-                        bool fIncludeHex) {
+void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out) {
     txnouttype type;
     std::vector<CTxDestination> addresses;
     int nRequired;
@@ -166,7 +213,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, UniValue &out,
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
     }
 
-    if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired)) {
+    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired)) {
         out.pushKV("type", GetTxnOutputType(type));
         return;
     }
@@ -181,60 +228,134 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, UniValue &out,
     out.pushKV("addresses", a);
 }
 
-void TxToUniv(const CTransaction &tx, const uint256 &hashBlock,
-              UniValue &entry) {
+void TxToJSON(const CTransaction& tx,
+              const uint256& hashBlock,
+              bool utxoAfterGenesis,
+              const int serializeFlags,
+              CJSONWriter& entry,
+              const std::optional<CBlockDetailsData>&  blockData)
+{
+    entry.writeBeginObject();
+
     entry.pushKV("txid", tx.GetId().GetHex());
     entry.pushKV("hash", tx.GetHash().GetHex());
     entry.pushKV("version", tx.nVersion);
     entry.pushKV("size", (int)::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
     entry.pushKV("locktime", (int64_t)tx.nLockTime);
 
-    UniValue vin(UniValue::VARR);
-    for (unsigned int i = 0; i < tx.vin.size(); i++) {
-        const CTxIn &txin = tx.vin[i];
-        UniValue in(UniValue::VOBJ);
-        if (tx.IsCoinBase()) {
-            in.pushKV("coinbase",
-                      HexStr(txin.scriptSig.begin(), txin.scriptSig.end()));
-        } else {
-            in.pushKV("txid", txin.prevout.GetTxId().GetHex());
-            in.pushKV("vout", int64_t(txin.prevout.GetN()));
-            UniValue o(UniValue::VOBJ);
-            o.pushKV("asm", ScriptToAsmStr(txin.scriptSig, true));
-            o.pushKV("hex",
-                     HexStr(txin.scriptSig.begin(), txin.scriptSig.end()));
-            in.pushKV("scriptSig", o);
+    entry.writeBeginArray("vin");
+    for (const CTxIn& txin : tx.vin)
+    {
+        entry.writeBeginObject();
+        if (tx.IsCoinBase())
+        {
+            entry.pushK("coinbase");
+            entry.pushQuote();
+            HexStr(txin.scriptSig.begin(), txin.scriptSig.end(), entry.getWriter());
+            entry.pushQuote();
         }
+        else
+        {
+            entry.pushKV("txid", txin.prevout.GetTxId().GetHex());
+            entry.pushKV("vout", int64_t(txin.prevout.GetN()));
+            entry.writeBeginObject("scriptSig");
 
-        in.pushKV("sequence", (int64_t)txin.nSequence);
-        vin.push_back(in);
+            entry.pushK("asm");
+            entry.pushQuote();
+            ScriptToAsmStr(txin.scriptSig, entry.getWriter(), true);
+            entry.pushQuote();
+
+            entry.pushK("hex");
+            entry.pushQuote();
+            HexStr(txin.scriptSig.begin(), txin.scriptSig.end(), entry.getWriter());
+            entry.pushQuote();
+
+            entry.writeEndObject();
+        }
+        entry.pushKV("sequence", (int64_t)txin.nSequence);
+
+        entry.writeEndObject();
+    }
+    entry.writeEndArray();
+
+    entry.writeBeginArray("vout");
+    for (size_t i = 0; i < tx.vout.size(); i++)
+    {
+        const CTxOut& txout = tx.vout[i];
+        entry.writeBeginObject();
+
+        entry.pushKVJSONFormatted("value", FormatMoney(txout.nValue));
+        entry.pushKV("n", static_cast<int64_t>(i));
+
+        entry.writeBeginObject("scriptPubKey");
+        ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
+        entry.writeEndObject();
+
+        entry.writeEndObject();
     }
 
-    entry.pushKV("vin", vin);
+    entry.writeEndArray();
 
-    UniValue vout(UniValue::VARR);
-    for (unsigned int i = 0; i < tx.vout.size(); i++) {
-        const CTxOut &txout = tx.vout[i];
-
-        UniValue out(UniValue::VOBJ);
-
-        UniValue outValue(UniValue::VNUM, FormatMoney(txout.nValue));
-        out.pushKV("value", outValue);
-        out.pushKV("n", (int64_t)i);
-
-        UniValue o(UniValue::VOBJ);
-        ScriptPubKeyToUniv(txout.scriptPubKey, o, true);
-        out.pushKV("scriptPubKey", o);
-        vout.push_back(out);
-    }
-
-    entry.pushKV("vout", vout);
-
-    if (!hashBlock.IsNull()) {
+    if (!hashBlock.IsNull())
+    {
         entry.pushKV("blockhash", hashBlock.GetHex());
+    }
+
+    if (blockData.has_value())
+    {
+        auto& blockDataVal = blockData.value();
+        entry.pushKV("confirmations", blockDataVal.confirmations);
+        if (blockDataVal.time.has_value())
+        {
+            entry.pushKV("time", blockDataVal.time.value());
+            entry.pushKV("blocktime", blockDataVal.blockTime.value());
+            entry.pushKV("blockheight", blockDataVal.blockHeight.value());
+        }
     }
 
     // the hex-encoded transaction. used the name "hex" to be consistent with
     // the verbose output of "getrawtransaction".
-    entry.pushKV("hex", EncodeHexTx(tx));
+    entry.pushK("hex");
+    entry.pushQuote();
+    EncodeHexTx(tx, entry.getWriter(), serializeFlags);
+    entry.pushQuote();
+
+    entry.writeEndObject();
+}
+
+void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
+                           bool fIncludeHex,
+                           bool isGenesisEnabled,
+                           CJSONWriter& entry) {
+    txnouttype type;
+    std::vector<CTxDestination> addresses;
+    int nRequired;
+
+    entry.pushK("asm");
+    entry.pushQuote();
+    ScriptToAsmStr(scriptPubKey, entry.getWriter());
+    entry.pushQuote();
+    if (fIncludeHex)
+    {
+        entry.pushK("hex");
+        entry.pushQuote();
+        HexStr(scriptPubKey.begin(), scriptPubKey.end(), entry.getWriter());
+        entry.pushQuote();
+    }
+
+    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired))
+    {
+        entry.pushKV("type", GetTxnOutputType(type));
+        return;
+    }
+
+    entry.pushKV("reqSigs", nRequired);
+    entry.pushKV("type", GetTxnOutputType(type));
+
+    entry.writeBeginArray("addresses");
+    for (const CTxDestination& addr : addresses )
+    {
+        entry.pushV(EncodeDestination(addr));
+    }
+    entry.writeEndArray();
 }

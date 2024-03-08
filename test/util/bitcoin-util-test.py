@@ -27,6 +27,9 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-b', '--buildconfig',
+                        default="", help="Optional name of directory that contains binary and its location inside the build directory. Used on Windows where "
+                        "the build directory can contain outputs for multiple configurations. Example: -b RelWithDebInfo.")
     args = parser.parse_args()
     verbose = args.verbose
 
@@ -39,12 +42,12 @@ def main():
     logging.basicConfig(format=formatter, level=level)
 
     bctester(os.path.join(config["environment"]["SRCDIR"], "test", "util", "data"),
-             "bitcoin-util-test.json", config["environment"])
+             "bitcoin-util-test.json", config["environment"], args.buildconfig)
 
 
-def bctester(testDir, input_basename, buildenv):
+def bctester(testDir, input_basename, buildenv, buildconfig):
     """ Loads and parses the input file, runs all tests and reports results"""
-    input_filename = testDir + "/" + input_basename
+    input_filename = os.path.join(testDir, input_basename)
     raw_data = open(input_filename).read()
     input_data = json.loads(raw_data)
 
@@ -52,7 +55,7 @@ def bctester(testDir, input_basename, buildenv):
 
     for testObj in input_data:
         try:
-            bctest(testDir, testObj, buildenv)
+            bctest(testDir, testObj, buildenv, buildconfig)
             logging.info("PASSED: " + testObj["description"])
         except:
             logging.info("FAILED: " + testObj["description"])
@@ -67,15 +70,16 @@ def bctester(testDir, input_basename, buildenv):
         sys.exit(0)
 
 
-def bctest(testDir, testObj, buildenv):
+def bctest(testDir, testObj, buildenv, buildconfig):
     """Runs a single test, comparing output and RC to expected output and RC.
 
     Raises an error if input can't be read, executable fails, or output/RC
     are not as expected. Error is caught by bctester() and reported.
     """
+
     # Get the exec names and arguments
-    execprog = buildenv["BUILDDIR"] + "/src/" + \
-        testObj['exec'] + buildenv["EXEEXT"]
+    execprog = os.path.join(buildenv["BUILDDIR"], "src", buildconfig, 
+                            testObj["exec"] + buildenv["EXEEXT"])
     execargs = testObj['args']
     execrun = [execprog] + execargs
 

@@ -4,17 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "db.h"
-
-#include "addrman.h"
 #include "fs.h"
 #include "hash.h"
 #include "protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
-#include <boost/thread.hpp>
-#include <boost/version.hpp>
-
 #include <cstdint>
 
 #ifndef WIN32
@@ -24,7 +18,7 @@
 //
 // CDB
 //
-
+#include <boost/thread/thread.hpp>
 CDBEnv bitdb;
 
 void CDBEnv::EnvShutdown() {
@@ -233,7 +227,8 @@ bool CDB::VerifyEnvironment(const std::string &walletFile,
     LogPrintf("Using wallet %s\n", walletFile);
 
     // Wallet file must be a plain filename without a directory
-    if (walletFile != fs::basename(walletFile) + fs::extension(walletFile)) {
+    const fs::path walletFilePath { walletFile };
+    if (walletFile != walletFilePath.stem().string() + walletFilePath.extension().string()) {
         errorStr = strprintf(_("Wallet %s resides outside data directory %s"),
                              walletFile, dataDir.string());
         return false;
@@ -457,7 +452,7 @@ void CDB::Flush() {
     }
 
     env->dbenv->txn_checkpoint(
-        nMinutes ? gArgs.GetArg("-dblogsize", DEFAULT_WALLET_DBLOGSIZE) * 1024
+        nMinutes ? gArgs.GetArgAsBytes("-dblogsize", DEFAULT_WALLET_DBLOGSIZE, ONE_MEBIBYTE) / ONE_KIBIBYTE
                  : 0,
         nMinutes, 0);
 }
@@ -721,8 +716,7 @@ bool CWalletDBWrapper::Backup(const std::string &strDest) {
                         return false;
                     }
 
-                    fs::copy_file(pathSrc, pathDest,
-                                  fs::copy_option::overwrite_if_exists);
+                    fs::copy_file(pathSrc, pathDest, fs::copy_options::overwrite_existing);
                     LogPrintf("copied %s to %s\n", strFile, pathDest.string());
                     return true;
                 } catch (const fs::filesystem_error &e) {

@@ -17,21 +17,30 @@ void RegisterNetRPCCommands(CRPCTable &tableRPC);
 void RegisterMiscRPCCommands(CRPCTable &tableRPC);
 /** Register mining RPC commands */
 void RegisterMiningRPCCommands(CRPCTable &tableRPC);
+/** Register minier id RPC commands */
+void RegisterMinerIdRPCCommands(CRPCTable &tableRPC);
 /** Register mining-fbb RPC commands */
 void RegisterMiningFBBRPCCommands(CRPCTable &tableRPC);
 /** Register raw transaction RPC commands */
 void RegisterRawTransactionRPCCommands(CRPCTable &tableRPC);
 /** Register ABC RPC commands */
 void RegisterABCRPCCommands(CRPCTable &tableRPC);
+/** Register Frozen transactions RPC command */
+void RegisterFrozenTransactionRPCCommands(CRPCTable& tableRPC);
+/** Register safe mode RPC commands */
+void RegisterSafeModeRPCCommands(CRPCTable &tableRPC);
 
 static inline void RegisterAllRPCCommands(CRPCTable &t) {
     RegisterBlockchainRPCCommands(t);
     RegisterNetRPCCommands(t);
     RegisterMiscRPCCommands(t);
     RegisterMiningRPCCommands(t);
+    RegisterMinerIdRPCCommands(t);
     RegisterMiningFBBRPCCommands(t);
     RegisterRawTransactionRPCCommands(t);
     RegisterABCRPCCommands(t);
+    RegisterFrozenTransactionRPCCommands(t);
+    RegisterSafeModeRPCCommands(t);
 }
 
 #endif

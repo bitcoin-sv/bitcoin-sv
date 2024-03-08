@@ -17,7 +17,7 @@ from test_framework.util import *
 class AbandonConflictTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
-        self.extra_args = [["-minrelaytxfee=0.00001"], []]
+        self.extra_args = [["-mindebugrejectionfee=0.00001"], []]
 
     def run_test(self):
         self.nodes[1].generate(100)
@@ -39,7 +39,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         balance = newbalance
 
         # Disconnect nodes so node0's transactions don't get into node1's mempool
-        disconnect_nodes(self.nodes[0], 1)
+        disconnect_nodes_bi(self.nodes, 0, 1)
 
         # Identify the 10btc outputs
         nA = next(i for i, vout in enumerate(self.nodes[0].getrawtransaction(
@@ -83,7 +83,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         # Restart the node with a higher min relay fee so the parent tx is no longer in mempool
         # TODO: redo with eviction
         self.stop_node(0)
-        self.start_node(0, extra_args=["-minrelaytxfee=0.0001"])
+        self.start_node(0, extra_args=["-mindebugrejectionfee=0.0001"])
 
         # Verify txs no longer in either node's mempool
         assert_equal(len(self.nodes[0].getrawmempool()), 0)
@@ -99,7 +99,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         ) + self.nodes[0].getbalance()
         assert_equal(unconfbalance, newbalance)
         # Also shouldn't show up in listunspent
-        assert(not txABC2 in [utxo["txid"]
+        assert(txABC2 not in [utxo["txid"]
                               for utxo in self.nodes[0].listunspent(0)])
         balance = newbalance
 
@@ -112,7 +112,7 @@ class AbandonConflictTest(BitcoinTestFramework):
 
         # Verify that even with a low min relay fee, the tx is not reaccepted from wallet on startup once abandoned
         self.stop_node(0)
-        self.start_node(0, extra_args=["-minrelaytxfee=0.00001"])
+        self.start_node(0, extra_args=["-mindebugrejectionfee=0.00001"])
         assert_equal(len(self.nodes[0].getrawmempool()), 0)
         assert_equal(self.nodes[0].getbalance(), balance)
 
@@ -133,7 +133,7 @@ class AbandonConflictTest(BitcoinTestFramework):
 
         # Remove using high relay fee again
         self.stop_node(0)
-        self.start_node(0, extra_args=["-minrelaytxfee=0.0001"])
+        self.start_node(0, extra_args=["-mindebugrejectionfee=0.0001"])
         assert_equal(len(self.nodes[0].getrawmempool()), 0)
         newbalance = self.nodes[0].getbalance()
         assert_equal(newbalance, balance - Decimal("24.9996"))
@@ -150,7 +150,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         self.nodes[1].sendrawtransaction(signed["hex"])
         self.nodes[1].generate(1)
 
-        connect_nodes(self.nodes[0], 1)
+        connect_nodes(self.nodes, 0, 1)
         sync_blocks(self.nodes)
 
         # Verify that B and C's 10 BTC outputs are available for spending again because AB1 is now conflicted

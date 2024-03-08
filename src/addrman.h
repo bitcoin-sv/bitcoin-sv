@@ -6,7 +6,7 @@
 #ifndef BITCOIN_ADDRMAN_H
 #define BITCOIN_ADDRMAN_H
 
-#include "netaddress.h"
+#include "net/netaddress.h"
 #include "protocol.h"
 #include "random.h"
 #include "sync.h"
@@ -25,34 +25,34 @@ class CAddrInfo : public CAddress {
 
 public:
     //! last try whatsoever by us (memory only)
-    int64_t nLastTry;
+    int64_t nLastTry{0};
 
     //! last counted attempt (memory only)
-    int64_t nLastCountAttempt;
+    int64_t nLastCountAttempt{0};
 
 private:
     //! where knowledge about this address first came from
     CNetAddr source;
 
     //! last successful connection by us
-    int64_t nLastSuccess;
+    int64_t nLastSuccess{0};
 
     //! connection attempts since last successful attempt
-    int nAttempts;
+    int nAttempts{0};
 
     //! reference count in new sets (memory only)
-    int nRefCount;
+    int nRefCount{0};
 
     //! in tried set? (memory only)
-    bool fInTried;
+    bool fInTried{false};
 
     //! position in vRandom
-    int nRandomPos;
+    int nRandomPos{-1};
 
     friend class CAddrMan;
 
 public:
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -62,22 +62,11 @@ public:
         READWRITE(nAttempts);
     }
 
-    void Init() {
-        nLastSuccess = 0;
-        nLastTry = 0;
-        nLastCountAttempt = 0;
-        nAttempts = 0;
-        nRefCount = 0;
-        fInTried = false;
-        nRandomPos = -1;
-    }
-
     CAddrInfo(const CAddress &addrIn, const CNetAddr &addrSource)
         : CAddress(addrIn), source(addrSource) {
-        Init();
     }
 
-    CAddrInfo() : CAddress(), source() { Init(); }
+    CAddrInfo() = default;
 
     //! Calculate in which "tried" bucket this entry belongs
     int GetTriedBucket(const uint256 &nKey) const;
@@ -164,7 +153,7 @@ public:
 #define ADDRMAN_NEW_BUCKETS_PER_ADDRESS 8
 
 //! how old addresses can maximally be
-#define ADDRMAN_HORIZON_DAYS 30
+#define ADDRMAN_HORIZON_DAYS 7
 
 //! after how many failed attempts we give up on a new node
 #define ADDRMAN_RETRIES 3
@@ -173,7 +162,7 @@ public:
 #define ADDRMAN_MAX_FAILURES 10
 
 //! ... in at least this many days
-#define ADDRMAN_MIN_FAIL_DAYS 7
+#define ADDRMAN_MIN_FAIL_DAYS 2
 
 //! the maximum percentage of nodes to return in a getaddr call
 #define ADDRMAN_GETADDR_MAX_PCT 23
@@ -189,7 +178,8 @@ public:
 /**
  * Stochastical (IP) address manager
  */
-class CAddrMan {
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
+class CAddrMan { // NOLINT(cppcoreguidelines-special-member-functions)
 private:
     //! critical section to protect the inner data structures
     mutable CCriticalSection cs;
@@ -210,12 +200,14 @@ private:
     int nTried;
 
     //! list of "tried" buckets
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     int vvTried[ADDRMAN_TRIED_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
     //! number of (unique) "new" entries
     int nNew;
 
     //! list of "new" buckets
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     int vvNew[ADDRMAN_NEW_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
     //! last time Good was called (memory only)
@@ -351,6 +343,7 @@ public:
         }
         for (int bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
             int nSize = 0;
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             for (int i = 0; i < ADDRMAN_BUCKET_SIZE; i++) {
                 if (vvNew[bucket][i] != -1) nSize++;
             }
@@ -361,6 +354,7 @@ public:
                     s << nIndex;
                 }
             }
+            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 
@@ -369,9 +363,9 @@ public:
 
         Clear();
 
-        uint8_t nVersion;
+        uint8_t nVersion; // NOLINT(cppcoreguidelines-init-variables)
         s >> nVersion;
-        uint8_t nKeySize;
+        uint8_t nKeySize; // NOLINT(cppcoreguidelines-init-variables)
         s >> nKeySize;
         if (nKeySize != 32)
             throw std::ios_base::failure(
@@ -400,6 +394,7 @@ public:
             CAddrInfo &info = mapInfo[n];
             s >> info;
             mapAddr[info] = n;
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             info.nRandomPos = vRandom.size();
             vRandom.push_back(n);
             if (nVersion != 1 || nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
@@ -408,7 +403,9 @@ public:
                 // reference based on their primary source address.
                 int nUBucket = info.GetNewBucket(nKey);
                 int nUBucketPos = info.GetBucketPosition(nKey, true, nUBucket);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 if (vvNew[nUBucket][nUBucketPos] == -1) {
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                     vvNew[nUBucket][nUBucketPos] = n;
                     info.nRefCount++;
                 }
@@ -423,12 +420,15 @@ public:
             s >> info;
             int nKBucket = info.GetTriedBucket(nKey);
             int nKBucketPos = info.GetBucketPosition(nKey, false, nKBucket);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             if (vvTried[nKBucket][nKBucketPos] == -1) {
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 info.nRandomPos = vRandom.size();
                 info.fInTried = true;
                 vRandom.push_back(nIdCount);
                 mapInfo[nIdCount] = info;
                 mapAddr[info] = nIdCount;
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 vvTried[nKBucket][nKBucketPos] = nIdCount;
                 nIdCount++;
             } else {
@@ -450,9 +450,11 @@ public:
                         info.GetBucketPosition(nKey, true, bucket);
                     if (nVersion == 1 &&
                         nUBuckets == ADDRMAN_NEW_BUCKET_COUNT &&
+                        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                         vvNew[bucket][nUBucketPos] == -1 &&
                         info.nRefCount < ADDRMAN_NEW_BUCKETS_PER_ADDRESS) {
                         info.nRefCount++;
+                        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                         vvNew[bucket][nUBucketPos] = nIndex;
                     }
                 }
@@ -485,11 +487,13 @@ public:
         nKey = GetRandHash();
         for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
             for (size_t entry = 0; entry < ADDRMAN_BUCKET_SIZE; entry++) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 vvNew[bucket][entry] = -1;
             }
         }
         for (size_t bucket = 0; bucket < ADDRMAN_TRIED_BUCKET_COUNT; bucket++) {
             for (size_t entry = 0; entry < ADDRMAN_BUCKET_SIZE; entry++) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
                 vvTried[bucket][entry] = -1;
             }
         }
@@ -501,6 +505,7 @@ public:
         nLastGood = 1;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CAddrMan() { Clear(); }
 
     ~CAddrMan() { nKey.SetNull(); }

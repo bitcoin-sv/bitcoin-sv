@@ -1,0 +1,23 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Install build tools'
+description:  'Install build tools'
+
+inputs:
+  toolset:
+    description: toolset (clang/gcc)
+    required: true
+  
+  version:
+    description: toolset version 
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        .github/workflows/select_toolset_version/update-alternatives-cpp.sh -r \
+            ${{ inputs.toolset }} \
+            ${{ inputs.version }}
+      shell: bash

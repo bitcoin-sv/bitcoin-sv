@@ -11,6 +11,9 @@
 
 class Config;
 class CTxMemPool;
+class CFileReader;
+template<typename Reader>
+class CBlockStreamReader;
 
 // Dumb helper to handle CTransaction compression at serialize-time
 struct TransactionCompressor {
@@ -20,7 +23,7 @@ private:
 public:
     TransactionCompressor(CTransactionRef &txIn) : tx(txIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -35,7 +38,7 @@ public:
     uint256 blockhash;
     std::vector<uint32_t> indices;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -87,7 +90,7 @@ public:
     BlockTransactions(const BlockTransactionsRequest &req)
         : blockhash(req.blockhash), txn(req.indices.size()) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -110,6 +113,8 @@ public:
     }
 };
 
+size_t ser_size(const BlockTransactions&); 
+
 // Dumb serialization/storage-helper for CBlockHeaderAndShortTxIDs and
 // PartiallyDownloadedBlock
 struct PrefilledTransaction {
@@ -118,7 +123,7 @@ struct PrefilledTransaction {
     uint32_t index;
     CTransactionRef tx;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -165,6 +170,7 @@ public:
     CBlockHeaderAndShortTxIDs() {}
 
     CBlockHeaderAndShortTxIDs(const CBlock &block);
+    CBlockHeaderAndShortTxIDs(CBlockStreamReader<CFileReader>& stream);
 
     uint64_t GetShortID(const uint256 &txhash) const;
 
@@ -172,7 +178,7 @@ public:
         return shorttxids.size() + prefilledtxn.size();
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -233,7 +239,8 @@ public:
              const std::vector<std::pair<uint256, CTransactionRef>> &extra_txn);
     bool IsTxAvailable(size_t index) const;
     ReadStatus FillBlock(CBlock &block,
-                         const std::vector<CTransactionRef> &vtx_missing);
+                         const std::vector<CTransactionRef> &vtx_missing,
+                         int32_t blockHeight);
 };
 
 #endif

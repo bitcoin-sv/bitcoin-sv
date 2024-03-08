@@ -4,6 +4,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "script_error.h"
+#include <iostream>
 
 const char *ScriptErrorString(const ScriptError serror) {
     switch (serror) {
@@ -96,6 +97,8 @@ const char *ScriptErrorString(const ScriptError serror) {
             return "Illegal use of SIGHASH_FORKID";
         case SCRIPT_ERR_MUST_USE_FORKID:
             return "Signature must use SIGHASH_FORKID";
+        case SCRIPT_ERR_BIG_INT:
+            return "Big integer OpenSSL error";
         case SCRIPT_ERR_UNKNOWN_ERROR:
         case SCRIPT_ERR_ERROR_COUNT:
         default:
@@ -103,3 +106,10 @@ const char *ScriptErrorString(const ScriptError serror) {
     }
     return "unknown error";
 }
+
+std::ostream& operator<<(std::ostream& os, const ScriptError e)
+{
+    os << ScriptErrorString(e);
+    return os;
+}
+

@@ -9,7 +9,6 @@
 //
 
 #include <stdio.h>
-#include <string.h>
 #include "univalue.h"
 
 static bool initEscapes;

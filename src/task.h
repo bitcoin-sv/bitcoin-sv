@@ -25,13 +25,24 @@ class CTask
         High = 2
     };
 
+    // Some pre-defined status levels.
+    enum class Status : int
+    {
+        Canceled = 0,
+        Created = 1,
+        Faulted = 2,
+        RanToCompletion = 3,
+        Running = 4,
+        WaitingToRun = 5
+    };
+
   private:
 
     // Helper method for converting a pre-defined priority level to the underlying
     // integer type.
     static typename std::underlying_type<Priority>::type convertPriority(Priority priority)
     {
-        return { static_cast<typename std::underlying_type<Priority>::type>(priority) };
+        return static_cast<typename std::underlying_type<Priority>::type>(priority);
     }
 
   public:
@@ -59,13 +70,13 @@ class CTask
     */
     template<typename Callable, typename... Args>
     auto injectTask(Callable&& call, Args&&... args)
-        -> std::future<typename std::result_of<Callable(Args...)>::type>
+        -> std::future<std::invoke_result_t<Callable, Args...>>
     {
         // Use packaged_task with bind to get us a task we can easily call
         // without needing to remember all its args.
         // FIXME: Once we get generalised lambda capture & C++14 we could use
         // make_unique here instead of make_shared.
-        using returnType = typename std::result_of<Callable(Args...)>::type;
+        using returnType = std::invoke_result_t<Callable, Args...>;
         auto task { std::make_shared<std::packaged_task<returnType()>>(
             std::bind(std::forward<Callable>(call), std::forward<Args>(args)...))
         };
@@ -97,7 +108,7 @@ namespace std
     {
         bool operator()(const CTask& a, const CTask& b) const
         {
-            return { a.getPriority() < b.getPriority() };
+            return ( a.getPriority() < b.getPriority() );
         }
     };
 }

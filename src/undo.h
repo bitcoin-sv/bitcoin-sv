@@ -10,8 +10,8 @@
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/consensus.h"
-#include "primitives/transaction.h"
 #include "serialize.h"
+#include "taskcancellation.h"
 
 class CBlock;
 class CBlockIndex;
@@ -27,14 +27,15 @@ class CValidationState;
  * there.
  */
 class TxInUndoSerializer {
-    const Coin *pcoin;
+    const CoinWithScript* pcoin;
 
 public:
-    TxInUndoSerializer(const Coin *pcoinIn) : pcoin(pcoinIn) {}
+    TxInUndoSerializer(const CoinWithScript* pcoinIn) : pcoin(pcoinIn) {}
 
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(
-            s, VARINT(pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0)));
+            // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
+            s, VARINT( (pcoin->IsConfiscation() ? 0x100000000ll : 0ll) + pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0) ));
         if (pcoin->GetHeight() > 0) {
             // Required to maintain compatibility with older undo format.
             ::Serialize(s, uint8_t(0));
@@ -44,39 +45,42 @@ public:
 };
 
 class TxInUndoDeserializer {
-    Coin *pcoin;
+    CoinWithScript* pcoin;
 
 public:
-    TxInUndoDeserializer(Coin *pcoinIn) : pcoin(pcoinIn) {}
+    TxInUndoDeserializer(CoinWithScript* pcoinIn) : pcoin(pcoinIn) {}
 
     template <typename Stream> void Unserialize(Stream &s) {
-        uint32_t nCode = 0;
+        uint64_t nCode = 0;
         ::Unserialize(s, VARINT(nCode));
-        uint32_t nHeight = nCode / 2;
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        int32_t nHeight = static_cast<uint32_t>(nCode & 0xffffffff) / 2;
         bool fCoinBase = nCode & 1;
+        bool fConfiscation = nCode & 0x100000000ull;
         if (nHeight > 0) {
             // Old versions stored the version number for the last spend of a
             // transaction's outputs. Non-final spends were indicated with
             // height = 0.
-            int nVersionDummy;
+            [[maybe_unused]] int nVersionDummy = 0;
             ::Unserialize(s, VARINT(nVersionDummy));
         }
 
         CTxOut txout;
         ::Unserialize(s, REF(CTxOutCompressor(REF(txout))));
 
-        *pcoin = Coin(std::move(txout), nHeight, fCoinBase);
+        *pcoin = CoinWithScript::MakeOwning(std::move(txout), nHeight, fCoinBase, fConfiscation);
     }
 };
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const size_t MAX_INPUTS_PER_TX =
-    MAX_TX_SIZE / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
+    MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
 
 /** Restore the UTXO in a Coin at a given COutPoint */
 class CTxUndo {
 public:
     // Undo information for all txins
-    std::vector<Coin> vprevout;
+    std::vector<CoinWithScript> vprevout;
 
     template <typename Stream> void Serialize(Stream &s) const {
         // TODO: avoid reimplementing vector serializer.
@@ -107,7 +111,7 @@ public:
     // For all but the coinbase
     std::vector<CTxUndo> vtxundo;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -131,15 +135,8 @@ enum DisconnectResult {
  * @param out The out point that corresponds to the tx input.
  * @return A DisconnectResult
  */
-DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
-                               const COutPoint &out);
+DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view,
+                               const COutPoint &out, const Config &config);
 
-/**
- * Undo a block from the block and the undoblock data.
- * See DisconnectBlock for more details.
- */
-DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
-                                const CBlock &block, const CBlockIndex *pindex,
-                                CCoinsViewCache &coins);
 
 #endif // BITCOIN_UNDO_H

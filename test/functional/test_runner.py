@@ -30,16 +30,10 @@ import json
 
 # Formatting. Default colors to empty strings.
 BOLD, BLUE, RED, GREY = ("", ""), ("", ""), ("", ""), ("", "")
-try:
-    # Make sure python thinks it can write unicode to its stdout
-    "\u2713".encode("utf_8").decode(sys.stdout.encoding)
-    TICK = "✓ "
-    CROSS = "✖ "
-    CIRCLE = "○ "
-except UnicodeDecodeError:
-    TICK = "P "
-    CROSS = "x "
-    CIRCLE = "o "
+
+TICK = "P "
+CROSS = "x "
+CIRCLE = "o "
 
 if os.name == 'posix':
     # primitive formatting on supported
@@ -57,7 +51,66 @@ NON_SCRIPTS = [
     "combine_logs.py",
     "create_cache.py",
     "test_runner.py",
+    "bsv_pbv_common.py"
 ]
+
+LARGE_BLOCK_TESTS = [
+    # Tests for block files larger than 4GB.
+    # This tests take really long time to execute or require a great deal of memory so they
+    # are excluded by default.
+    # Use --large-block-tests command line parameter to run them.
+    "bsv-genesis-large-blockfile-io.py",
+    "bsv-genesis-large-blockfile-reindex.py",
+    "bsv-genesis-large-blockfile-max-32-bit.py",
+    "bsv-large-blocks-txindex-data.py",
+    "bsv-4gb-plus-block.py"
+]
+
+# This is a list of tests that should not run in parallel.
+# These tests are executed one by one when all others have finished
+# Such tests may fall in one of the following categories:
+# - Test is resource intensive and utilizes many CPU cores and use a lot o RAM
+#   (these tests may cause others to fail)
+# - Test relies on time measurements and/or compares times of multiple operations
+# - A test is vulnerable to CPU/RAM availability fluctuations
+
+SOLO_TESTS = {
+    "bsv-rpc-verifyscript.py",
+    "wallet-encryption.py",
+    "bsv-ptv-txn-chains.py",
+    "mining_api.py",
+    "bsv-pbv-withsigops.py",
+    "bsv-broadcast_delay.py",
+    "bsv-dsreport.py",
+    "bsv-callback-service.py",
+    "bsv-dsattack-with-mocked-dsdetector.py",
+    "bsv-p2p-dsdetected.py",
+    "bsv-safe-mode.py",
+    "bsv-safe-mode-reorg-notification.py"
+}
+
+ENVIRONMENT_TYPE = {
+    1 : "Release build",
+    2 : "Release build with sanitizers enabled",
+    3 : "Debug build",
+    4 : "Debug build with sanitizers enabled"
+}
+
+# collection of timeout factors for time-sensitive tests:
+# test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
+# factor for release build is always 1; it is still present in this map for consistency
+TIMEOUT_FACTOR_FOR_TESTS = {
+    "bsv-block-propagation-priority.py" : [1,2,2,3],
+    "bsv-consolidation-feefilter.py" : [1,4,4,5],
+    "bsv-genesis-general.py" : [1,2,2,3],
+    "bsv-mempool-eviction.py" : [1,1,3,5],
+    "bsv-4gb-plus-block.py" : [1,2,2,3],
+    "bsv-block-stalling-test.py" : [1,2,2,3]
+}
+
+# This tests can be only run by explicitly specifying them on command line.
+# This is usefull for tests that take really long time to execute.
+EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
@@ -75,14 +128,18 @@ TEST_PARAMS = {
     "bsv-128Mb-blocks.py": [["--excessiveblocksize=130000000"]],
 
     # Run  automatic block size validation size with default activation time as well as overriden time
-    "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime=1563197777"]],
-    "bsv-block-size-activation-default.py": [["--blocksizeactivationtime=1563197777"]]
+    "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]],
+    "bsv-block-size-activation-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]]
 }
+
+TESTS_WITH_DISABLED_STDERROR_CHECK = ["bsv-callback-service.py", "bsv-dsreport.py", "bsv-ds-bad-callback-service.py"]
 
 # Used to limit the number of tests, when list of tests is not provided on command line
 # When --extended is specified, we run all tests, otherwise
 # we only run a test if its execution time in seconds does not exceed EXTENDED_CUTOFF
 EXTENDED_CUTOFF = 40
+
+running_jobs = []
 
 
 def on_ci():
@@ -109,10 +166,14 @@ def main():
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--coverage', action='store_true',
                         help='generate a basic coverage report for the RPC interface')
-    parser.add_argument(
-        '--exclude', '-x', help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
+    parser.add_argument('--exclude', '-x',
+                        help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
+    parser.add_argument('--run-solo',
+                        help='specify a comma-seperated-list of scripts to execute non-parallel. Do not include the .py extension in the name.')
     parser.add_argument('--extended', action='store_true',
                         help='run the extended test suite in addition to the basic tests')
+    parser.add_argument('--list-tests', action='store_true',
+                        help='just show the tests that would be run')
     parser.add_argument('--help', '-h', '-?',
                         action='store_true', help='print help text and exit')
     parser.add_argument('--jobs', '-j', type=int, default=4,
@@ -121,6 +182,8 @@ def main():
                         help='the default behavior is to flush the cache directory on startup. --keepcache retains the cache from the previous testrun.')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='only print results summary and failure logs')
+    parser.add_argument('--failfast', '-f', action='store_true',
+                        help='Exit on first failing test')
     parser.add_argument('--tmpdirprefix', '-t',
                         default=tempfile.gettempdir(), help="Root directory for datadirs")
     parser.add_argument('--junitouput', '-ju',
@@ -128,8 +191,29 @@ def main():
     parser.add_argument('--buildconfig', '-b',
                         default="", help="Optional name of directory that contains binary and is located inside build directory. Used on Windows where "
                         "the build directory can contain outputs for multiple configurations. Example: -b RelWithDebInfo.")
-
+    parser.add_argument('--watch', type=str,
+                        default=None, help="Showing specified file in the console and monitoring its changes, usefull "
+                                           "for live viewing of the log files. If it is of the form 'nodeX' where X is integer, "
+                                           "it will show bitcoind.log file of the specified node")
+    parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
+    parser.add_argument('--output-type', type=int, default=2, help="Output type: 2 - Automatic detection. 0 - Primitive output suited for CI. 1 - Advanced suited for console.")
+    parser.add_argument('--timeout-factors', type=str, default="1", help="Purpose of this flag is to adjust timeouts in specific tests as needed by test environment (e.g. debug builds need longer timeouts)."
+                                                                         " There are two possible inputs for this argument: You can choose environment type and default timeout factors will be set:"
+                                                                         " 1: Release build. (default) 2: Debug build. 3: Release build with sanitizers. 4: Debug build with sanitizers.\n"
+                                                                         "If these factors do not work for you, you can pass them directly (in JSON): "
+                                                                         " Example: --timeout-factors={{\"bsv-genesis-general.py\" : 2, \"bsv-mempool-eviction.py\" : 3 , ...}}."
+                                                                         " You must pass timeout factors for all the following tests (if you are running them): {}."
+                                                                         .format([test for test in TIMEOUT_FACTOR_FOR_TESTS.keys()]))
     args, unknown_args = parser.parse_known_args()
+
+    # Output type. Default is 2: automatic detection
+    if args.output_type == 2:
+        if os.name == 'nt':
+            console = False
+        else:
+            console = sys.stdout.isatty()
+    else:
+        console = args.output_type==1
 
     # Create a set to store arguments and create the passon string
     tests = set(arg for arg in unknown_args if arg[:2] != "--")
@@ -158,8 +242,22 @@ def main():
             "Rerun `configure` with -enable-wallet, -with-utils and -with-daemon and rerun make")
         sys.exit(0)
 
+    # Parse '--run-solo'. Add specified tests to the SOLO_TESTS list
+    if args.run_solo:
+        for test_name in args.run_solo.split(','):
+            test_name = test_name + ".py"
+            if test_name not in SOLO_TESTS:
+                SOLO_TESTS.add(test_name)
+            else:
+                print("Warning: %s already a part of SOLO_TESTS" % test_name)
+
     # Build list of tests
     all_scripts = get_all_scripts_from_disk(tests_dir, NON_SCRIPTS)
+
+    # Check for large block tests parameter 
+    if args.large_block_tests:
+        tests = LARGE_BLOCK_TESTS
+        args.jobs = 1
 
     if tests:
         # Individual tests have been specified. Run specified tests that exist
@@ -176,6 +274,12 @@ def main():
         cutoff = EXTENDED_CUTOFF
         if args.extended:
             cutoff = sys.maxsize
+        # Exclude tests specified in EXCLUDED_TESTS.
+        # These tests should be specified in command line to execute
+        test_list = [test for test in test_list if test not in EXCLUDED_TESTS]
+        # Exclude large block tests unless explicitly told to run them
+        if not args.large_block_tests:
+            test_list = [test for test in test_list if test not in LARGE_BLOCK_TESTS]
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:
@@ -194,8 +298,27 @@ def main():
         src_dir, "test", "functional", 'timing.json'))
 
     # Add test parameters and remove long running tests if needed
-    test_list = get_tests_to_run(
+    test_list, solo_position_start = get_tests_to_run(
         test_list, TEST_PARAMS, cutoff, src_timings, build_timings)
+
+    if (args.timeout_factors.isdigit()):
+        for timeout_test in TIMEOUT_FACTOR_FOR_TESTS.keys():
+            if timeout_test in test_list:
+                test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}"
+                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1])) # noqa
+
+    else:
+        try:
+            timeout_factors_json = json.loads(args.timeout_factors)
+            if (set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys()) - set(timeout_factors_json.keys()) != set()):
+                print("Timeout factor tests should include timeout factor for tests: {}"
+                    .format([test for test in set(test_list).intersection(TIMEOUT_FACTOR_FOR_TESTS.keys())])) # noqa
+                sys.exit(0)
+            for timeout_test in timeout_factors_json.keys():
+                if timeout_test in test_list:
+                    test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}".format(timeout_factors_json[timeout_test]))
+        except ValueError as e:
+            print ("Error parsing input json: ", e)
 
     if not test_list:
         print("No valid test scripts specified. Check that your test is in one "
@@ -210,15 +333,19 @@ def main():
             [sys.executable, os.path.join(tests_dir, test_list[0]), '-h'])
         sys.exit(0)
 
+    if args.list_tests:
+        print("\n".join(test_list))
+        sys.exit(0)
+
     if not args.keepcache:
         shutil.rmtree(os.path.join(build_dir, "test",
                                    "cache"), ignore_errors=True)
 
-    run_tests(test_list, build_dir, tests_dir, args.junitouput,
-              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig)
+    run_tests(test_list, build_dir, tests_dir, args.junitouput, args.failfast,
+              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console, solo_position_start)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig=""):
+def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -251,7 +378,6 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
             BOLD[1], BOLD[0], os.environ["BITCOINCLI"]))
         sys.exit(0)
 
-
     flags = [os.path.join("--srcdir={}".format(build_dir), "src")] + args
     flags.append("--cachedir=%s" % cache_dir)
 
@@ -271,7 +397,7 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
             raise
 
     # Run Tests
-    job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags)
+    job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags, file_for_monitoring, console, solo_position_start)
     time0 = time.time()
     test_results = []
 
@@ -282,16 +408,19 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
         test_results.append(test_result)
 
         if test_result.status == "Passed":
-            logging.debug("\n%s%s%s passed, Duration: %s s" % (
-                BOLD[1], test_result.name, BOLD[0], test_result.time))
+            print_log("\n%s%s%s passed, Duration: %s s" % (
+                BOLD[1], test_result.name, BOLD[0], test_result.time), console=console)
         elif test_result.status == "Skipped":
-            logging.debug("\n%s%s%s skipped" %
-                          (BOLD[1], test_result.name, BOLD[0]))
+            print_log("\n%s%s%s skipped" %
+                      (BOLD[1], test_result.name, BOLD[0]), console=console)
         else:
-            print("\n%s%s%s failed, Duration: %s s\n" %
-                  (BOLD[1], test_result.name, BOLD[0], test_result.time))
+            print_log("\n%s%s%s failed, Duration: %s s\n" %
+                      (BOLD[1], test_result.name, BOLD[0], test_result.time))
             print(BOLD[1] + 'stdout:\n' + BOLD[0] + test_result.stdout + '\n')
             print(BOLD[1] + 'stderr:\n' + BOLD[0] + test_result.stderr + '\n')
+
+            if(fail_fast):
+                break
 
     runtime = int(time.time() - time0)
     print_results(test_results, max_len_name, runtime)
@@ -310,10 +439,10 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
     if not os.listdir(tmpdir):
         os.rmdir(tmpdir)
 
-    all_passed = all(
-        map(lambda test_result: test_result.status == "Passed", test_results))
+    all_passed_or_skipped = all(
+        map(lambda test_result: test_result.status == "Passed" or test_result.status == "Skipped", test_results))
 
-    sys.exit(not all_passed)
+    sys.exit(not all_passed_or_skipped)
 
 
 def print_results(test_results, max_len_name, runtime):
@@ -338,72 +467,135 @@ def print_results(test_results, max_len_name, runtime):
 
 
 class TestHandler:
-
     """
     Trigger the testscrips passed in via the list.
     """
 
-    def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None):
-        assert(num_tests_parallel >= 1)
+    def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None, file_for_monitoring=None, console=False, solo_position_start=-1):
+        assert (num_tests_parallel >= 1)
         self.num_jobs = num_tests_parallel
         self.tests_dir = tests_dir
         self.tmpdir = tmpdir
         self.test_list = test_list
         self.flags = flags
         self.num_running = 0
+        self.ts = time.time()
+        self.console = console
+        self.test_count = 0
+        self.solo_position_start=solo_position_start
         # In case there is a graveyard of zombie bitcoinds, we can apply a
         # pseudorandom offset to hopefully jump over them.
         # (625 is PORT_RANGE/MAX_NODES)
         self.portseed_offset = int(time.time() * 1000) % 625
-        self.jobs = []
+        if (file_for_monitoring is not None):
+            if file_for_monitoring[:4] == "node" and file_for_monitoring[4:].isnumeric():
+                file_for_monitoring = os.path.join(file_for_monitoring, "regtest", "bitcoind.log")
+            if file_for_monitoring == "test":
+                file_for_monitoring = "test_framework.log"
+        self.file_for_monitoring = file_for_monitoring
 
     def get_next(self):
-        while self.num_running < self.num_jobs and self.test_list:
-            # Add tests
-            self.num_running += 1
-            t = self.test_list.pop(0)
-            portseed = len(self.test_list) + self.portseed_offset
-            portseed_arg = ["--portseed={}".format(portseed)]
-            log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16)
-            log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
-            test_argv = t.split()
-            tmpdir = [os.path.join("--tmpdir=%s", "%s_%s") %
-                      (self.tmpdir, re.sub(".py$", "", t), portseed)]
-            self.jobs.append((t,
-                              time.time(),
-                              subprocess.Popen([sys.executable, os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,
-                                               universal_newlines=True,
-                                               stdout=log_stdout,
-                                               stderr=log_stderr),
-                              log_stdout,
-                              log_stderr))
-        if not self.jobs:
-            raise IndexError('pop from empty list')
-        while True:
-            # Return first proc that finishes
-            time.sleep(.5)
-            for j in self.jobs:
-                (name, time0, proc, log_out, log_err) = j
-                if on_ci() and int(time.time() - time0) > 40 * 60:
-                    # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
-                    # providing useful output.
-                    proc.send_signal(signal.SIGINT)
-                if proc.poll() is not None:
-                    log_out.seek(0), log_err.seek(0)
-                    [stdout, stderr] = [l.read().decode('utf-8')
-                                        for l in (log_out, log_err)]
-                    log_out.close(), log_err.close()
-                    if proc.returncode == TEST_EXIT_PASSED and stderr == "":
-                        status = "Passed"
-                    elif proc.returncode == TEST_EXIT_SKIPPED:
-                        status = "Skipped"
-                    else:
-                        status = "Failed"
-                    self.num_running -= 1
-                    self.jobs.remove(j)
+        log_job = None
+        try:
+            while self.num_running < self.num_jobs and self.test_list:
 
-                    return TestResult(name, status, int(time.time() - time0), stdout, stderr)
-            print('.', end='', flush=True)
+                # Run parallel tests first, then solo
+                if self.solo_position_start >= 0 and self.test_count >= self.solo_position_start:
+                    if self.num_running > 0:
+                        # All tests that may still be running must finish before solo tests can be started
+                        break
+                    if self.num_jobs > 1:
+                        # From this point on the tests are not run in parallel anymore
+                        self.num_jobs = 1
+                        print_log("*\n*** Finished running tests in parallel, now running solo tests ***\n*", console=self.console)
+                self.test_count += 1
+
+                # Add tests
+                self.num_running += 1
+                t = self.test_list.pop(0)
+                print_log("  %s%s%s: started" % (BOLD[1], t, BOLD[0]), console=self.console)
+                portseed = len(self.test_list) + self.portseed_offset
+                portseed_arg = ["--portseed={}".format(portseed)]
+                log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16)
+                log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
+                test_argv = t.split()
+                tmpdir = [os.path.join("--tmpdir=%s", "%s_%s") %
+                          (self.tmpdir, re.sub(".py.*$", "", t), portseed)]
+                running_jobs.append((t,
+                                    time.time(),
+                                    subprocess.Popen([sys.executable,
+                                                      os.path.join(self.tests_dir, test_argv[0])]
+                                                     + test_argv[1:]
+                                                     + self.flags
+                                                     + portseed_arg
+                                                     + tmpdir,
+                                                     universal_newlines=True,
+                                                     stdout=log_stdout,
+                                                     stderr=log_stderr),
+                                    log_stdout,
+                                    log_stderr))
+
+                if self.file_for_monitoring is not None:
+                    logfile = os.path.join(self.tmpdir, f"{t[:-3]}_{portseed}", self.file_for_monitoring)
+                    print("\nWatching file: ", logfile, "\n\n\n")
+                    for _ in range(15):
+                        if os.path.isfile(logfile):
+                            if os.name == 'nt':
+                                log_job = subprocess.Popen(["powershell", "Get-Content", logfile, "-Wait"],
+                                                           universal_newlines=True)
+                            elif os.name == 'posix':
+                                log_job = subprocess.Popen(["tail", "-F", logfile],
+                                                           universal_newlines=True)
+                            break
+                        time.sleep(1)
+
+            if not running_jobs:
+                raise IndexError('pop from empty list')
+            while True:
+                # Return first proc that finishes
+                for j in running_jobs:
+                    (name, time0, proc, log_out, log_err) = j
+                    if on_ci() and int(time.time() - time0) > 40 * 60:
+                        # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
+                        # providing useful output.
+                        proc.send_signal(signal.SIGINT)
+                    if proc.poll() is not None:
+                        if log_job:
+                            log_job.terminate()
+                            log_job = None
+                        log_out.seek(0), log_err.seek(0)
+                        [stdout, stderr] = [l.read().decode('utf-8')
+                                            for l in (log_out, log_err)]
+                        log_out.close(), log_err.close()
+                        if proc.returncode == TEST_EXIT_PASSED and (stderr == "" or name in TESTS_WITH_DISABLED_STDERROR_CHECK):
+                            status = "Passed"
+                        elif proc.returncode == TEST_EXIT_SKIPPED:
+                            status = "Skipped"
+                        else:
+                            status = "Failed"
+                        self.num_running -= 1
+                        running_jobs.remove(j)
+
+                        return TestResult(name, status, int(time.time() - time0), stdout, stderr)
+
+                # In a console mode (interactive shell) the output can be more  user friendly
+                # and status of running tests will be constantly refreshed on the bottom.
+                # When output is to stdout, such as on CI, a more simple output is required.
+                # In this case we check every minute for jobs that are running for a long time and print them.
+                # This helps identify the jobs that gave up on life.
+                if not log_job:
+                    if self.console:
+                        # This will refresh job statuses
+                        print_log(jobs=running_jobs, console=self.console)
+                    else:
+                        # Check jobs every minute
+                        if time.time() - self.ts > 60:
+                            self.ts = time.time()
+                            check_jobs(running_jobs)
+                    time.sleep(0.5)
+        finally:
+            if log_job:
+                log_job.terminate()
 
 
 class TestResult():
@@ -439,7 +631,7 @@ def get_all_scripts_from_disk(test_dir, non_scripts):
 
 def get_tests_to_run(test_list, test_params, cutoff, src_timings, build_timings=None):
     """
-    Returns only test that will not run longer that cutoff.
+    Returns only test that will not run longer then cutoff (see --extended option).
     Long running tests are returned first to favor running tests in parallel
     Timings from build directory override those from src directory
     """
@@ -456,18 +648,34 @@ def get_tests_to_run(test_list, test_params, cutoff, src_timings, build_timings=
             (x['time'] for x in src_timings.existing_timings if x['name'] == test), 0)
 
     # Some tests must also be run with additional parameters. Add them to the list.
+    # Separate the list in two parts: parallel first, solo last
     tests_with_params = []
+    solo_tests = []
     for test_name in test_list:
         # always execute a test without parameters
-        tests_with_params.append(test_name)
+        if test_name in SOLO_TESTS:
+            solo_tests.append(test_name)
+        else:
+            tests_with_params.append(test_name)
+
+        # Add predefined parameters to tests
         params = test_params.get(test_name)
         if params is not None:
-            tests_with_params.extend(
-                [test_name + " " + " ".join(p) for p in params])
+            if test_name in SOLO_TESTS:
+                solo_tests.extend([test_name + " " + " ".join(p) for p in params])
+            else:
+                tests_with_params.extend([test_name + " " + " ".join(p) for p in params])
 
+    # Remove extended tests (tests, whose expected running time is longer than cutoff, see '--extended') and sort
     result = [t for t in tests_with_params if get_test_time(t) <= cutoff]
-    result.sort(key=lambda x:  (-get_test_time(x), x))
-    return result
+    result.sort(key=lambda x: (-get_test_time(x), x))
+
+    result_solo = [t for t in solo_tests if get_test_time(t) <= cutoff]
+    result_solo.sort(key=lambda x: (-get_test_time(x), x))
+
+    solo_position_start = len(result)
+    result = result + result_solo
+    return result, solo_position_start
 
 
 class RPCCoverage():
@@ -614,12 +822,58 @@ class Timings():
         # we only save test that have passed - timings for failed test might be
         # wrong (timeouts or early fails)
         passed_results = [t for t in test_results if t.status == 'Passed']
-        new_timings = list(map(lambda t: {'name':  t.name, 'time': t.time},
+        new_timings = list(map(lambda t: {'name': t.name, 'time': t.time},
                                passed_results))
         merged_timings = self.get_merged_timings(new_timings)
 
         with open(self.timing_file, 'w') as f:
             json.dump(merged_timings, f, indent=True)
+
+# Prints a user friendly report of currently running jobs
+
+
+printed_lines = 0
+
+
+def print_log(data="", jobs=None, console=False):
+    global printed_lines
+    if not console:
+        if data:
+            print(data)
+    else:
+        # Clear * Running jobs *
+        for i in range(printed_lines):
+            sys.stdout.write("\033[F")  # back to previous line
+            printed_lines = 0
+
+        # Print data
+        for line in data.splitlines():
+            sys.stdout.write("\033[K")  # clear line
+            print(line)
+
+        # Print * Running jobs *
+        sys.stdout.write("\033[K")  # clear line
+        print("******* Running jobs *******")
+        printed_lines += 1
+        for job in running_jobs:
+            sys.stdout.write("\033[K")  # clear line
+            print("%s %ss" % (job[0], f"{time.time() - job[1]:.0f}"))
+            printed_lines += 1
+
+
+# Prints running jobs if they take a long time
+def check_jobs(jobs=None):
+    printed_header = False
+    for job in jobs:
+        if time.time() - job[1] > 90:
+            if not printed_header:
+                print("\n  ******* Long running jobs *******")
+                printed_header = True
+
+            print_log(data="  * %s is running for %s" % (job[0], f"{time.time() - job[1]:.0f}"), jobs=jobs)
+
+    if printed_header:
+        print("  *********************************")
 
 
 if __name__ == '__main__':

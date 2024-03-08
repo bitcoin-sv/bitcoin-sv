@@ -5,8 +5,6 @@
 #ifndef BITCOIN_WALLET_COINCONTROL_H
 #define BITCOIN_WALLET_COINCONTROL_H
 
-#include "primitives/transaction.h"
-
 /** Coin Control Features. */
 class CCoinControl {
 public:
@@ -23,8 +21,6 @@ public:
     bool fOverrideFeeRate;
     //! Feerate to use if overrideFeeRate is true
     CFeeRate nFeeRate;
-    //! Override the default confirmation target, 0 = use default
-    int nConfirmTarget;
 
     CCoinControl() { SetNull(); }
 
@@ -36,7 +32,6 @@ public:
         nMinimumTotalFee = Amount(0);
         nFeeRate = CFeeRate(Amount(0));
         fOverrideFeeRate = false;
-        nConfirmTarget = 0;
     }
 
     bool HasSelected() const { return (setSelected.size() > 0); }
@@ -46,10 +41,6 @@ public:
     }
 
     void Select(const COutPoint &output) { setSelected.insert(output); }
-
-    void UnSelect(const COutPoint &output) { setSelected.erase(output); }
-
-    void UnSelectAll() { setSelected.clear(); }
 
     void ListSelected(std::vector<COutPoint> &vOutpoints) const {
         vOutpoints.assign(setSelected.begin(), setSelected.end());

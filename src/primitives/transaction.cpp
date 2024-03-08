@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
+#include "streams.h"
 
 std::string COutPoint::ToString() const {
     return strprintf("COutPoint(%s, %u)", txid.ToString().substr(0, 10), n);
@@ -34,6 +35,27 @@ std::string CTxOut::ToString() const {
                      nValue.GetSatoshis() / COIN.GetSatoshis(),
                      nValue.GetSatoshis() % COIN.GetSatoshis(),
                      HexStr(scriptPubKey).substr(0, 30));
+}
+
+std::istream & operator>>(std::istream & stream, TxId& txid)
+{
+    uint256 hash;
+    stream >> hash;
+    txid = TxId(hash);
+    return stream;
+}
+
+std::istream& operator>>(std::istream& is, COutPoint& op)
+{
+    is >> op.txid;
+    is >> op.n;
+    return is;
+}
+
+std::ostream& operator<<(std::ostream& os, const COutPoint& op)
+{
+    os << "txid: " << op.txid.ToString() << "\nn: " << op.n;
+    return os;
 }
 
 CMutableTransaction::CMutableTransaction()
@@ -84,33 +106,16 @@ Amount CTransaction::GetValueOut() const {
     return nValueOut;
 }
 
-double CTransaction::ComputePriority(double dPriorityInputs,
-                                     unsigned int nTxSize) const {
-    nTxSize = CalculateModifiedSize(nTxSize);
-    if (nTxSize == 0) return 0.0;
-
-    return dPriorityInputs / nTxSize;
-}
-
-unsigned int CTransaction::CalculateModifiedSize(unsigned int nTxSize) const {
-    // In order to avoid disincentivizing cleaning up the UTXO set we don't
-    // count the constant overhead for each txin and up to 110 bytes of
-    // scriptSig (which is enough to cover a compressed pubkey p2sh redemption)
-    // for priority. Providing any more cleanup incentive than making additional
-    // inputs free would risk encouraging people to create junk outputs to
-    // redeem later.
-    if (nTxSize == 0) nTxSize = GetTotalSize();
-    for (std::vector<CTxIn>::const_iterator it(vin.begin()); it != vin.end();
-         ++it) {
-        unsigned int offset =
-            41U + std::min(110U, (unsigned int)it->scriptSig.size());
-        if (nTxSize > offset) nTxSize -= offset;
-    }
-    return nTxSize;
-}
-
 unsigned int CTransaction::GetTotalSize() const {
     return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+bool CTransaction::HasP2SHOutput() const {
+     return std::any_of(vout.begin(), vout.end(), 
+            [](const CTxOut& o){ 
+                return IsP2SH(o.scriptPubKey); 
+            }
+        );
 }
 
 std::string CTransaction::ToString() const {
@@ -125,3 +130,44 @@ std::string CTransaction::ToString() const {
         str += "    " + vout[i].ToString() + "\n";
     return str;
 }
+
+// Test for double-spend notification enabled output on a transaction
+std::pair<bool, size_t> TxnHasDSNotificationOutput(const CTransaction& txn)
+{
+    // Look for the first double-spend notification enabled output, there should only be 1
+    for(size_t output = 0; output < txn.vout.size(); ++output)
+    {
+        if(IsDSNotification(txn.vout[output].scriptPubKey))
+        {
+            return { true, output };
+        }
+    }
+
+    return { false, 0 };
+}
+
+size_t ser_size(const CTransaction& tx) 
+{
+    auto total{sizeof(tx.nVersion) + 
+               cmpt_ser_size(tx.vin.size()) +
+               cmpt_ser_size(tx.vout.size()) +
+               sizeof(tx.nLockTime)};
+    total = ser_size(tx.vin.cbegin(), tx.vin.cend(), total);
+    return ser_size(tx.vout.cbegin(), tx.vout.cend(), total);
+}
+
+size_t ser_size(const CTxIn& input)
+{
+    return sizeof(COutPoint) +
+           cmpt_ser_size(input.scriptSig.size()) +
+           input.scriptSig.size() +
+           sizeof(input.nSequence);
+}
+
+size_t ser_size(const CTxOut& op)
+{
+    return sizeof(op.nValue) +
+           cmpt_ser_size(op.scriptPubKey.size()) +
+           op.scriptPubKey.size();
+}
+

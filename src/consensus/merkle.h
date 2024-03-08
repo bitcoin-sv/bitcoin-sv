@@ -1,6 +1,6 @@
 // Copyright (c) 2015 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_MERKLE
 #define BITCOIN_MERKLE
@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "primitives/block.h"
-#include "primitives/transaction.h"
 #include "uint256.h"
 
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves,

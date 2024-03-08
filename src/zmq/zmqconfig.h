@@ -16,7 +16,6 @@
 #endif
 
 #include "primitives/block.h"
-#include "primitives/transaction.h"
 
 void zmqError(const char *str);
 

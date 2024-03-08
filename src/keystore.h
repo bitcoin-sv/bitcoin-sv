@@ -8,7 +8,6 @@
 
 #include "key.h"
 #include "pubkey.h"
-#include "script/script.h"
 #include "script/standard.h"
 #include "sync.h"
 

@@ -1,35 +1,22 @@
 ---
-name: "bitcoin-sv-0.2.1-linux"
+name: "bitcoin-sv-1.1.0-linux"
 enable_cache: true
 suites:
-- "bionic"
+- "focal"
 architectures:
 - "amd64"
 packages:
-- "curl"
-- "g++-aarch64-linux-gnu"
-- "g++-8-aarch64-linux-gnu"
-- "gcc-8-aarch64-linux-gnu"
-- "binutils-aarch64-linux-gnu"
-- "g++-arm-linux-gnueabihf"
-- "g++-8-arm-linux-gnueabihf"
-- "gcc-8-arm-linux-gnueabihf"
-- "binutils-arm-linux-gnueabihf"
-- "g++-riscv64-linux-gnu"
-- "g++-8-riscv64-linux-gnu"
-- "gcc-8-riscv64-linux-gnu"
-- "binutils-riscv64-linux-gnu"
-- "g++-8-multilib"
-- "gcc-8-multilib"
-- "binutils-gold"
-- "git"
-- "pkg-config"
 - "autoconf"
-- "libtool"
 - "automake"
-- "faketime"
+- "binutils"
 - "bsdmainutils"
 - "ca-certificates"
+- "curl"
+- "faketime"
+- "g++-10"
+- "git"
+- "libtool"
+- "pkg-config"
 - "python"
 remotes:
 - "url": "https://github.com/bitcoin-sv/bitcoin-sv.git"
@@ -63,7 +50,7 @@ script: |
     echo "REAL=\`which -a ${prog} | grep -v ${WRAP_DIR}/${prog} | head -1\`" >> ${WRAP_DIR}/${prog}
     echo 'export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1' >> ${WRAP_DIR}/${prog}
     echo "export FAKETIME=\"$1\"" >> ${WRAP_DIR}/${prog}
-    echo "\$REAL \$@" >> $WRAP_DIR/${prog}
+    echo "\$REAL \$@" >> ${WRAP_DIR}/${prog}
     chmod +x ${WRAP_DIR}/${prog}
   done
   }
@@ -71,13 +58,13 @@ script: |
   function create_per-host_faketime_wrappers {
   for i in $HOSTS; do
     for prog in ${FAKETIME_HOST_PROGS}; do
-        if which ${i}-${prog}-8
+        if which ${i}-${prog}-10
         then
             echo '#!/usr/bin/env bash' > ${WRAP_DIR}/${i}-${prog}
-            echo "REAL=\`which -a ${i}-${prog}-8 | grep -v ${WRAP_DIR}/${i}-${prog} | head -1\`" >> ${WRAP_DIR}/${i}-${prog}
+            echo "REAL=\`which -a ${i}-${prog}-10 | grep -v ${WRAP_DIR}/${i}-${prog} | head -1\`" >> ${WRAP_DIR}/${i}-${prog}
             echo 'export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1' >> ${WRAP_DIR}/${i}-${prog}
             echo "export FAKETIME=\"$1\"" >> ${WRAP_DIR}/${i}-${prog}
-            echo "\$REAL \$@" >> $WRAP_DIR/${i}-${prog}
+            echo "\$REAL \$@" >> ${WRAP_DIR}/${i}-${prog}
             chmod +x ${WRAP_DIR}/${i}-${prog}
         fi
     done
@@ -90,7 +77,7 @@ script: |
   create_per-host_faketime_wrappers "2000-01-01 12:00:00"
   export PATH=${WRAP_DIR}:${PATH}
 
-  EXTRA_INCLUDES_BASE=$WRAP_DIR/extra_includes
+  EXTRA_INCLUDES_BASE=${WRAP_DIR}/extra_includes
   mkdir -p $EXTRA_INCLUDES_BASE
 
   # x86 needs /usr/include/i386-linux-gnu/asm pointed to /usr/include/x86_64-linux-gnu/asm,
@@ -98,14 +85,14 @@ script: |
   # search paths by wrapping gcc/g++.
 
   mkdir -p $EXTRA_INCLUDES_BASE/i686-pc-linux-gnu
-  rm -f $WRAP_DIR/extra_includes/i686-pc-linux-gnu/asm
+  rm -f ${WRAP_DIR}/extra_includes/i686-pc-linux-gnu/asm
   ln -s /usr/include/x86_64-linux-gnu/asm $EXTRA_INCLUDES_BASE/i686-pc-linux-gnu/asm
 
   for prog in gcc g++; do
   rm -f ${WRAP_DIR}/${prog}
   cat << EOF > ${WRAP_DIR}/${prog}
   #!/usr/bin/env bash
-  REAL="`which -a ${prog}-8 | grep -v ${WRAP_DIR}/${prog} | head -1`"
+  REAL="`which -a ${prog}-10 | grep -v ${WRAP_DIR}/${prog} | head -1`"
   for var in "\$@"
   do
     if [ "\$var" = "-m32" ]; then
@@ -137,9 +124,14 @@ script: |
   create_per-host_faketime_wrappers "${REFERENCE_DATETIME}"
   export PATH=${WRAP_DIR}:${PATH}
 
+  # Is this a prod build?
+  if ./share/on_prod_tag.sh; then
+    ENABLE_PROD="--enable-prod-build"
+  fi
+
   # Create the release tarball using (arbitrarily) the first host
   ./autogen.sh
-  CONFIG_SITE=${BASEPREFIX}/`echo "${HOSTS}" | awk '{print $1;}'`/share/config.site ./configure --enable-prod-build --prefix=/
+  CONFIG_SITE=${BASEPREFIX}/`echo "${HOSTS}" | awk '{print $1;}'`/share/config.site ./configure $ENABLE_PROD --prefix=/
   make dist
   SOURCEDIST=`echo bitcoin-sv-*.tar.gz`
   DISTNAME=`echo ${SOURCEDIST} | sed 's/.tar.*//'`
@@ -168,7 +160,7 @@ script: |
     mkdir src/obj
     cp ../src/obj/build.h src/obj/
 
-    CONFIG_SITE=${BASEPREFIX}/${i}/share/config.site ./configure --enable-prod-build --prefix=/ --disable-ccache --disable-maintainer-mode --disable-dependency-tracking ${CONFIGFLAGS} CFLAGS="${HOST_CFLAGS}" CXXFLAGS="${HOST_CXXFLAGS}" LDFLAGS="${HOST_LDFLAGS}"
+    CONFIG_SITE=${BASEPREFIX}/${i}/share/config.site ./configure $ENABLE_PROD --prefix=/ --disable-ccache --disable-maintainer-mode --disable-dependency-tracking ${CONFIGFLAGS} CFLAGS="${HOST_CFLAGS}" CXXFLAGS="${HOST_CXXFLAGS}" LDFLAGS="${HOST_LDFLAGS}"
     make ${MAKEOPTS}
     make ${MAKEOPTS} -C src check-security
     make ${MAKEOPTS} -C src check-symbols

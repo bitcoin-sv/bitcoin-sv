@@ -20,6 +20,7 @@ from test_framework.key import CECKey
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 
+
 class FullBlockTest(ComparisonTestFramework):
 
     # Can either run this test as 1 node with expected answers, or two and compare them.
@@ -45,28 +46,17 @@ class FullBlockTest(ComparisonTestFramework):
 
     def get_tests(self):
         node = self.nodes[0]
-        self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
         # shorthand for functions
         block = self.chain.next_block
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 99, 100)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         # Let's build some blocks and test them.
         for i in range(16):

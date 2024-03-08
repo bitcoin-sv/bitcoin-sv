@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "sync.h"
+#include "block_file_info.h"
 #include "chain.h"
 #include "validation.h"
 
@@ -21,22 +22,24 @@ class CBlockFileInfoStore
     std::set<int> setDirtyFileInfo;
 
     void FindNextFileWithEnoughEmptySpace(const Config &config,
-        unsigned int nAddSize, unsigned int& nFile);
+        uint64_t nAddSize, unsigned int& nFile);
 public:
     uint64_t CalculateCurrentUsage();
 
     bool FindBlockPos(const Config &config, CValidationState &state,
-        CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight,
+        CDiskBlockPos &pos, uint64_t nAddSize, int32_t nHeight,
         uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
 
-    void FindFilesToPrune(std::set<int> &setFilesToPrune,
-        uint64_t nPruneAfterHeight);
+    void FindFilesToPrune(const Config& config,
+        std::set<int> &setFilesToPrune,
+        int32_t nPruneAfterHeight);
 
-    void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
-        int nManualPruneHeight);
+    void FindFilesToPruneManual(const Config& config,
+        std::set<int> &setFilesToPrune,
+        int32_t nManualPruneHeight);
 
     bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
-        unsigned int nAddSize, bool& fCheckForPruning);
+        uint64_t nAddSize, bool& fCheckForPruning);
 
     void FlushBlockFile(bool fFinalize = false);
 
@@ -62,20 +65,6 @@ public:
     {
         return cs_LastBlockFile;
     }
-};
-
-
-/** Utility functions for opening disk and block files */
-class CDiskFiles
-{
-    static FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix,
-        bool fReadOnly);
-public:
-    /** Open a block file (blk?????.dat). */
-    static FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-
-    /** Open an undo file (rev?????.dat) */
-    static FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 };
 
 

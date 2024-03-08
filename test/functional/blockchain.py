@@ -10,6 +10,7 @@ Test the following RPCs:
     - getdifficulty
     - getbestblockhash
     - getblock
+    - getblocbyheight
     - getblockhash
     - getblockheader
     - getchaintxstats
@@ -43,8 +44,10 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
         self._test_getblock()
+        self._test_getblockbyheight()
         self._test_getdifficulty()
         self._test_getnetworkhashps()
+        self._test_getblock_num_tx()
         self._test_stopatheight()
         assert self.nodes[0].verifychain(4, 0)
 
@@ -192,10 +195,142 @@ class BlockchainTest(BitcoinTestFramework):
         for tx in blockjson['tx']:
             assert isinstance(tx, dict)
 
+        self.log.info("Test getblock with verbosity=3")
+        blockjson = node.getblock(besthash, 3)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        #only coinbase tx should be in block
+        assert_equal(len(blockjson['tx']), 1)
+        tx = blockjson['tx'][0]
+        assert isinstance(tx, dict)
+        assert_is_hash_string(tx['vin'][0]['coinbase'], length=None)
+
         self.log.info("Test getblock with invalid verbosity fails")
-        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, 3)
+        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, 4)
         assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, -1)
         assert_raises_rpc_error(-8, "Verbosity value not recognized", node.getblock, besthash, "ASDFG")
+
+    def _test_getblockbyheight(self):
+        node = self.nodes[0]
+        assert_raises_rpc_error(-5, "Block not found", node.getblockheader, "nonsense")
+
+        besthash = node.getbestblockhash()
+        secondbesthash = node.getblockhash(199)
+
+        self.log.info("Test getblockbyheight with verbosity=0")
+        blockhex = node.getblockbyheight(1, 0)
+        assert_is_hex_string(blockhex)
+        self.log.info("Test getblockbyheight with verbosity=RAW_BLOCK")
+        blockhex = node.getblockbyheight(1, "RAW_BLOCK")
+        assert_is_hex_string(blockhex)
+        self.log.info("Test getblockbyheight with verbosity=RaW_BlocK")
+        blockhex = node.getblockbyheight(1, "RaW_BlocK")
+        assert_is_hex_string(blockhex)
+
+        self.log.info("Test getblockbyheight with verbosity=1")
+        blockjson = node.getblockbyheight(200, 1)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        assert isinstance(blockjson['tx'], list)
+        for tx in blockjson['tx']:
+            assert_is_hash_string(tx)
+
+        self.log.info("Test getblockbyheight with verbosity=DECODE_HEADER")
+        blockjson = node.getblockbyheight(200, "DECODE_HEADER")
+        assert_equal(blockjson['hash'], besthash)
+        for tx in blockjson['tx']:
+            assert_is_hash_string(tx)
+
+        self.log.info("Test getblockbyheight with verbosity=2")
+        blockjson = node.getblockbyheight(200, 2)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        for tx in blockjson['tx']:
+            assert isinstance(tx, dict)
+
+        self.log.info("Test getblockbyheight with verbosity=DECODE_TRANSACTIONS")
+        blockjson = node.getblockbyheight(200, "DECODE_TRANSACTIONS")
+        assert_equal(blockjson['hash'], besthash)
+        for tx in blockjson['tx']:
+            assert isinstance(tx, dict)
+
+        self.log.info("Test getblockbyheight with verbosity=3")
+        blockjson = node.getblockbyheight(200, 3)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        #only coinbase tx should be in block
+        assert_equal(len(blockjson['tx']), 1)
+        tx = blockjson['tx'][0]
+        assert isinstance(tx, dict)
+        assert_is_hash_string(tx['vin'][0]['coinbase'], length=None)
+
+        self.log.info("Test getblockbyheight with verbosity=DECODE_HEADER_AND_COINBASE")
+        blockjson = node.getblockbyheight(200, "DECODE_HEADER_AND_COINBASE")
+        assert_equal(blockjson['hash'], besthash)
+        #only coinbase tx should be in block
+        assert_equal(len(blockjson['tx']), 1)
+        tx = blockjson['tx'][0]
+        assert isinstance(tx, dict)
+        assert_is_hash_string(tx['vin'][0]['coinbase'], length=None)
+
+        self.log.info("Test getblock with invalid verbosity fails")
+        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblockbyheight, 200, 4)
+        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblockbyheight, 200, -1)
+        assert_raises_rpc_error(-8, "Verbosity value not recognized", node.getblockbyheight, 200, "ASDFG")
+        assert_raises_rpc_error(-8, "Block height out of range", node.getblockbyheight, -1)
+        assert_raises_rpc_error(-8, "Block height out of range", node.getblockbyheight, 300)
 
     def _test_getblockheader(self):
         self.log.info("Test getblockheader")
@@ -239,8 +374,8 @@ class BlockchainTest(BitcoinTestFramework):
 
     def _test_stopatheight(self):
         self.log.info("Test stopatheight")
-        assert_equal(self.nodes[0].getblockcount(), 200)
-        self.nodes[0].generate(6)
+        assert_equal(self.nodes[0].getblockcount(), 201)
+        self.nodes[0].generate(5)
         assert_equal(self.nodes[0].getblockcount(), 206)
         self.log.debug('Node should not stop at this height')
         assert_raises(subprocess.TimeoutExpired,
@@ -253,6 +388,35 @@ class BlockchainTest(BitcoinTestFramework):
         self.nodes[0].wait_until_stopped()
         self.start_node(0)
         assert_equal(self.nodes[0].getblockcount(), 207)
+
+    def _test_getblock_num_tx(self):
+        self.log.info("Test num_tx is valid for getblock, getblockbyheight, getblockheader")
+        num_tx_to_create = 10
+        addr = self.nodes[0].getnewaddress()
+        for _ in range(num_tx_to_create):
+            self.nodes[0].sendtoaddress(addr, 0.1)
+        self.sync_all()
+        blockhash = self.nodes[0].generate(1)[0]
+        blockheight = self.nodes[0].getblockcount()
+        # getblock
+        blockjson = self.nodes[0].getblock(blockhash, 1)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblock(blockhash, 2)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblock(blockhash, 3)
+        assert_equal(len(blockjson['tx']), 1)
+        assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
+        # getblockbyheight
+        blockjson = self.nodes[0].getblockbyheight(blockheight, 1)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblockbyheight(blockheight, 2)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblockbyheight(blockheight, 3)
+        assert_equal(len(blockjson['tx']), 1)
+        assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
+        # getblockhash
+        blockjson = self.nodes[0].getblockheader(blockhash)
+        assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
 
 
 if __name__ == '__main__':

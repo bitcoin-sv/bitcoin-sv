@@ -1,0 +1,58 @@
+# Copyright (c) 2019 The Bitcoin Core developers
+# Copyright (c) 2021 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
+
+LIBCRC32C_INT = leveldb/crc32c/libcrc32c.a
+
+EXTRA_LIBRARIES += $(LIBCRC32C_INT)
+
+LIBCRC32C = $(LIBCRC32C_INT)
+
+CRC32C_CPPFLAGS_INT =
+CRC32C_CPPFLAGS_INT += -I$(srcdir)/leveldb/crc32c/include
+CRC32C_CPPFLAGS_INT += -DHAVE_BUILTIN_PREFETCH=@HAVE_BUILTIN_PREFETCH@
+CRC32C_CPPFLAGS_INT += -DHAVE_MM_PREFETCH=@HAVE_MM_PREFETCH@
+CRC32C_CPPFLAGS_INT += -DHAVE_STRONG_GETAUXVAL=@HAVE_STRONG_GETAUXVAL@
+CRC32C_CPPFLAGS_INT += -DHAVE_WEAK_GETAUXVAL=@HAVE_WEAK_GETAUXVAL@
+CRC32C_CPPFLAGS_INT += -DCRC32C_TESTS_BUILT_WITH_GLOG=0
+
+if ENABLE_SSE42
+CRC32C_CPPFLAGS_INT += -DHAVE_SSE42=1
+else
+CRC32C_CPPFLAGS_INT += -DHAVE_SSE42=0
+endif
+
+if WORDS_BIGENDIAN
+CRC32C_CPPFLAGS_INT += -DBYTE_ORDER_BIG_ENDIAN=1
+else
+CRC32C_CPPFLAGS_INT += -DBYTE_ORDER_BIG_ENDIAN=0
+endif
+
+leveldb_crc32c_libcrc32c_a_CPPFLAGS = $(AM_CPPFLAGS) $(CRC32C_CPPFLAGS_INT) $(CRC32C_CPPFLAGS)
+leveldb_crc32c_libcrc32c_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+
+leveldb_crc32c_libcrc32c_a_SOURCES =
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/include/crc32c/crc32c.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_arm64.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_arm64_check.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_internal.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_prefetch.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_read_le.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_round_up.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_sse42_check.h
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_sse42.h
+
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c.cc
+leveldb_crc32c_libcrc32c_a_SOURCES += leveldb/crc32c/src/crc32c_portable.cc
+
+if ENABLE_SSE42
+LIBCRC32C_SSE42_INT = leveldb/crc32c/libcrc32c_sse42.a
+EXTRA_LIBRARIES += $(LIBCRC32C_SSE42_INT)
+LIBCRC32C += $(LIBCRC32C_SSE42_INT)
+
+leveldb_crc32c_libcrc32c_sse42_a_CPPFLAGS = $(leveldb_crc32c_libcrc32c_a_CPPFLAGS)
+leveldb_crc32c_libcrc32c_sse42_a_CXXFLAGS = $(leveldb_crc32c_libcrc32c_a_CXXFLAGS) $(SSE42_CXXFLAGS)
+
+leveldb_crc32c_libcrc32c_sse42_a_SOURCES = leveldb/crc32c/src/crc32c_sse42.cc
+endif
+

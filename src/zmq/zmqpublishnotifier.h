@@ -12,7 +12,9 @@ class CBlockIndex;
 class CZMQAbstractPublishNotifier : public CZMQAbstractNotifier {
 private:
     //!< upcounting per message sequence number
-    uint32_t nSequence;
+    std::atomic<uint32_t> nSequence{0};
+
+    std::shared_ptr<CZMQPublisher> zmqPublisher;
 
 public:
     /* send zmq multipart message
@@ -21,9 +23,13 @@ public:
           * data
           * message sequence number
     */
-    bool SendMessage(const char *command, const void *data, size_t size);
+    bool SendZMQMessage(const char *command, const void *data, size_t size);
+    
+    bool SendZMQMessage(const char* command, const uint256& hash);
+    bool SendZMQMessage(const char* command, const CBlockIndex* pindex);
+    bool SendZMQMessage(const char* command, const CTransaction& transaction);
 
-    bool Initialize(void *pcontext) override;
+    bool Initialize(void *pcontext, std::shared_ptr<CZMQPublisher>) override;
     void Shutdown() override;
 };
 
@@ -37,6 +43,19 @@ public:
     bool NotifyTransaction(const CTransaction &transaction) override;
 };
 
+class CZMQPublishRemovedFromMempoolNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
+                                  const CTransactionConflict& conflictedWith) override;
+};
+
+class CZMQPublishRemovedFromMempoolBlockNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyRemovedFromMempoolBlock(const uint256& txid, const MemPoolRemovalReason reason) override;
+};
+
 class CZMQPublishRawBlockNotifier : public CZMQAbstractPublishNotifier {
 public:
     bool NotifyBlock(const CBlockIndex *pindex) override;
@@ -45,6 +64,31 @@ public:
 class CZMQPublishRawTransactionNotifier : public CZMQAbstractPublishNotifier {
 public:
     bool NotifyTransaction(const CTransaction &transaction) override;
+};
+
+class CZMQPublishTextNotifier : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyTextMessage(const std::string& topic, std::string_view message) override;
+};
+
+class CZMQPublishHashBlockNotifier2 : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyBlock2(const CBlockIndex* pindex) override;
+};
+
+class CZMQPublishRawBlockNotifier2 : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyBlock2(const CBlockIndex* pindex) override;
+};
+
+class CZMQPublishHashTransactionNotifier2 : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyTransaction2(const CTransaction& transaction) override;
+};
+
+class CZMQPublishRawTransactionNotifier2 : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyTransaction2(const CTransaction& transaction) override;
 };
 
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

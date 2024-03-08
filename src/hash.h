@@ -25,9 +25,13 @@ private:
 public:
     static const size_t OUTPUT_SIZE = CSHA256::OUTPUT_SIZE;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]) {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t buf[CSHA256::OUTPUT_SIZE];
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         sha.Finalize(buf);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         sha.Reset().Write(buf, CSHA256::OUTPUT_SIZE).Finalize(hash);
     }
 
@@ -50,9 +54,15 @@ private:
 public:
     static const size_t OUTPUT_SIZE = CRIPEMD160::OUTPUT_SIZE;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]) {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t buf[CSHA256::OUTPUT_SIZE];
+
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         sha.Finalize(buf);
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         CRIPEMD160().Write(buf, CSHA256::OUTPUT_SIZE).Finalize(hash);
     }
 
@@ -69,11 +79,15 @@ public:
 
 /** Compute the 256-bit hash of an object. */
 template <typename T1> inline uint256 Hash(const T1 pbegin, const T1 pend) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     static const uint8_t pblank[1] = {};
     uint256 result;
     CHash256()
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
-               (pend - pbegin) * sizeof(pbegin[0]))
+               static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -82,13 +96,15 @@ template <typename T1> inline uint256 Hash(const T1 pbegin, const T1 pend) {
 template <typename T1, typename T2>
 inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
                     const T2 p2end) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     static const uint8_t pblank[1] = {};
     uint256 result;
     CHash256()
         .Write(p1begin == p1end ? pblank : (const uint8_t *)&p1begin[0],
-               (p1end - p1begin) * sizeof(p1begin[0]))
+               static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
         .Write(p2begin == p2end ? pblank : (const uint8_t *)&p2begin[0],
-               (p2end - p2begin) * sizeof(p2begin[0]))
+               static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -97,26 +113,32 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
 template <typename T1, typename T2, typename T3>
 inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin,
                     const T2 p2end, const T3 p3begin, const T3 p3end) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     static const uint8_t pblank[1] = {};
     uint256 result;
     CHash256()
         .Write(p1begin == p1end ? pblank : (const uint8_t *)&p1begin[0],
-               (p1end - p1begin) * sizeof(p1begin[0]))
+               static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
         .Write(p2begin == p2end ? pblank : (const uint8_t *)&p2begin[0],
-               (p2end - p2begin) * sizeof(p2begin[0]))
+               static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
         .Write(p3begin == p3end ? pblank : (const uint8_t *)&p3begin[0],
-               (p3end - p3begin) * sizeof(p3begin[0]))
+               static_cast<size_t>(p3end - p3begin) * sizeof(p3begin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
 
 /** Compute the 160-bit hash an object. */
 template <typename T1> inline uint160 Hash160(const T1 pbegin, const T1 pend) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     static uint8_t pblank[1] = {};
     uint160 result;
     CHash160()
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
-               (pend - pbegin) * sizeof(pbegin[0]))
+               static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Finalize((uint8_t *)&result);
     return result;
 }
@@ -136,8 +158,10 @@ inline uint160 Hash160(const prevector<N, uint8_t> &vch) {
 class CHashWriter {
 private:
     CHash256 ctx;
-
+ 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 
 public:
@@ -148,12 +172,14 @@ public:
     int GetVersion() const { return nVersion; }
 
     void write(const char *pch, size_t size) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ctx.Write((const uint8_t *)pch, size);
     }
 
     // invalidates the object
     uint256 GetHash() {
         uint256 result;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ctx.Finalize((uint8_t *)&result);
         return result;
     }
@@ -183,6 +209,7 @@ public:
     }
 
     void ignore(size_t nSize) {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         char data[1024];
         while (nSize > 0) {
             size_t now = std::min<size_t>(nSize, 1024);
@@ -211,11 +238,13 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
                          const std::vector<uint8_t> &vDataToHash);
 
 void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, uint8_t header,
+               // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
                const uint8_t data[32], uint8_t output[64]);
 
 /** SipHash-2-4 */
 class CSipHasher {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint64_t v[4];
     uint64_t tmp;
     int count;

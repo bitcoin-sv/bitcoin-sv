@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
+#include "taskcancellation.h"
 #include "version.h"
 
 namespace {
@@ -59,11 +60,6 @@ inline int set_error(bitcoinconsensus_error *ret,
     return 0;
 }
 
-struct ECCryptoClosure {
-    ECCVerifyHandle handle;
-};
-
-ECCryptoClosure instance_of_eccryptoclosure;
 } // namespace
 
 /** Check that all specified flags are part of the libconsensus interface. */
@@ -71,11 +67,11 @@ static bool verify_flags(unsigned int flags) {
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
-static int verify_script(const uint8_t *scriptPubKey,
+static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKey,
                          unsigned int scriptPubKeyLen, Amount amount,
-                         const uint8_t *txTo, unsigned int txToLen,
+                         const uint8_t* txTo, unsigned int txToLen,
                          unsigned int nIn, unsigned int flags,
-                         bitcoinconsensus_error *err) {
+                         bitcoinconsensus_error* err) {
     if (!verify_flags(flags)) {
         return bitcoinconsensus_ERR_INVALID_FLAGS;
     }
@@ -91,10 +87,17 @@ static int verify_script(const uint8_t *scriptPubKey,
         set_error(err, bitcoinconsensus_ERR_OK);
 
         PrecomputedTransactionData txdata(tx);
-        return VerifyScript(
-            tx.vin[nIn].scriptSig,
-            CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
-            TransactionSignatureChecker(&tx, nIn, amount, txdata), nullptr);
+        auto source = task::CCancellationSource::Make();
+
+        auto res =
+          VerifyScript(
+              config, true,
+              source->GetToken(),
+              tx.vin[nIn].scriptSig,
+              CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
+              TransactionSignatureChecker(&tx, nIn, amount, txdata), nullptr);
+
+        return res.value();
     } catch (const std::exception &) {
         // Error deserializing
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE);
@@ -102,15 +105,17 @@ static int verify_script(const uint8_t *scriptPubKey,
 }
 
 int bitcoinconsensus_verify_script_with_amount(
+    const CScriptConfig& config,
     const uint8_t *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
     const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
     unsigned int flags, bitcoinconsensus_error *err) {
     Amount am(amount);
-    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
+    return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 
-int bitcoinconsensus_verify_script(const uint8_t *scriptPubKey,
+int bitcoinconsensus_verify_script(const CScriptConfig& config,
+                                   const uint8_t *scriptPubKey,
                                    unsigned int scriptPubKeyLen,
                                    const uint8_t *txTo, unsigned int txToLen,
                                    unsigned int nIn, unsigned int flags,
@@ -121,7 +126,7 @@ int bitcoinconsensus_verify_script(const uint8_t *scriptPubKey,
     }
 
     Amount am(0);
-    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
+    return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 

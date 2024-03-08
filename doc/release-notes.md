@@ -1,24 +1,53 @@
-# Bitcoin SV version 0.2.1 Release Notes
+# Bitcoin SV Node Software – v1.1.0 Release
 
-## List of Changes
-    getblock optionally returns rpc transaction details
-    fix to univalue read to mitigate memory issues. 
-    New parameter (-factorMaxSendQueuesBytes) which limits total size of blocks currently in queue for sending to peers.
-    Help message for "-preload" options moved to another section.
-    libgen.h included unconditionally in vmtouch.cpp.
-    Fixes for Mac and Windows builds.
-    Minor refactoring and potential bug fixes.
-    Remove Bitcoin ABC cashaddr address format.
-    Increase UTXO cache default to hold the entire UTXO set in cache.
-    Calls to TestBlockValidity() call are now configurable using -blockcandidatevaliditytest option.
-    Support for OP_FALSE OP_RETURN as a standard transactions
-    Pyhton code: Fix for array.tostring deprecated warning
-    Update the OpenBSV license for Testnet/Regnet/STN
+## Overview
 
-## Scaling Test Network Reset
-NA
+Security enhancements and peer management features for node operators are the main features included in this release.
 
-# Previous Releases
-* [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
-* [Version 0.1.1](release-notes-v0.1.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.1) - 2019-02-11
-* [Version 0.2.0](release-notes-v0.2.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.0) - 2019-06-05
+The 1.1.0 node release is a recommended upgrade from version 1.0.16.
+
+## Security Enhancements
+
+*   Network peer connection management.
+    *   Configurable numbers of:
+        *   pending p2p message response queue management.
+        *   connections from the same IP address.
+        *   connections to both inbound and outbound peers.
+*   General code security enhancements.
+
+## Security Dependency Updates
+
+*   Updated secp256k1 library version.
+*   Updated OpenSSL library version in build system.
+
+## Alert System
+Version 1.1.0 reintroduces the Alert System. The Alert System, originally implemented in the v0.3.10 Bitcoin release, enables the BSV Association to send signed messages to the network. Messages can be of an informational or directive nature. This release also contains native support for Digital Asset Recovery alerts.
+
+Node operators are required to run the Alert System in conjunction with the BSV Node. Node operators who do not interact with the Alert System risk being banned and/or having their blocks rejected by node operators who do.
+
+Detailed instructions on how to run the Alert System are available here: [node.bitcoinsv.io/sv-node/alert-system](https://node.bitcoinsv.io/sv-node/alert-system).
+
+## Network Access Rules
+The BSV Association is also releasing the BSV Blockchain Network Access Rules. The Network Access Rules formalize the terms and conditions for operating a node on the BSV Blockchain. Read more about the Network access rules here: [bsvblockchain.org/network-access-rules](https://bsvblockchain.org/network-access-rules).
+
+## Updated Open BSV License
+The Open BSV License has been updated to version 5 and is available here: [github.com/bitcoin-sv/bitcoin-sv/blob/v1.1.0/LICENSE](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.1.0/LICENSE).
+
+## Other items
+
+*   STN Reset - includes an updated chain height block hash.
+*   Include GitHub workflows configuration file structure.
+
+## Specific Configuration Details
+
+### Inbound and Outbound Connection Management
+
+Max Connections gives node operators flexibility in how to manage peers they interact with on the network.
+
+| **Configuration parameter** | **Default value** | **Description** |
+| -------------- | ---------------  | --------------- |
+| `maxconnections`                 | 125    |    Maintain at most *n* connections to peers |
+| `maxconnectionsfromaddr`         | 0     | Maximum number of inbound connections from a single address. Not applicable to whitelisted peers.<br/><br/>A value of 0 = unrestricted |
+| `maxpendingresponses_getheaders` | 0     | Maximum allowed number of pending responses in the sending queue for received GETHEADERS P2P requests before the connection is closed. Not applicable to whitelisted peers. The main purpose of this setting is to limit memory usage. The specified value should be small (e.g. ~50) since in practice connected peers do not need to send many GETHEADERS requests in parallel. <br/><br/>A value of 0 = unrestricted. |
+| `maxpendingresponses_gethdrsen`  | 0     | Maximum allowed number of pending responses in the sending queue for received GETHDRSEN P2P requests before the connection is closed. Not applicable to whitelisted peers. The main purpose of this setting is to limit memory usage. The specified value should be small (e.g. ~10) since in practice connected peers do not need to send many GETHDRSEN requests in parallel. <br/><br/>A value of 0 = unrestricted. |
+|       |       |       |

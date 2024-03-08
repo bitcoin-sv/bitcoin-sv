@@ -6,8 +6,8 @@
 #ifndef BITCOIN_COMPRESSOR_H
 #define BITCOIN_COMPRESSOR_H
 
+#include "consensus/consensus.h"
 #include "primitives/transaction.h"
-#include "script/script.h"
 #include "serialize.h"
 
 class CKeyID;
@@ -36,7 +36,7 @@ private:
      */
     static const unsigned int nSpecialScripts = 6;
 
-    CScript &script;
+    CScript &script; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 protected:
     /**
@@ -78,21 +78,39 @@ public:
             return;
         }
         nSize -= nSpecialScripts;
-        if (nSize > MAX_SCRIPT_SIZE) {
+        if (nSize > MAX_SCRIPT_SIZE_AFTER_GENESIS) {
             // Overly long script, replace with a short invalid one
-            script << OP_RETURN;
+            script << OP_FALSE << OP_RETURN;
             s.ignore(nSize);
         } else {
-            script.resize(nSize);
-            s >> REF(CFlatData(script));
+            NonSpecialScriptUnserializer<Stream>::Unserialize(this, s, nSize);
         }
     }
+
+private:
+    /**
+    * Helper class that provides a static method used to unserialize non-special script
+    *
+    * @note This is a separate class, so that it can be specialized for a custom Stream class, which
+    *       allows customization for special cases (e.g. not loading script if it is too large).
+    *       See an example in txdb.cpp.
+    */
+    template<typename Stream>
+    class NonSpecialScriptUnserializer
+    {
+    public:
+        static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
+        {
+            self->script.resize(nSize);
+            s >> REF(CFlatData(self->script));
+        }
+    };
 };
 
 /** wrapper for CTxOut that provides a more compact serialization */
 class CTxOutCompressor {
 private:
-    CTxOut &txout;
+    CTxOut &txout;// NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 public:
     static uint64_t CompressAmount(Amount nAmount);
@@ -100,7 +118,7 @@ public:
 
     CTxOutCompressor(CTxOut &txoutIn) : txout(txoutIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

@@ -1,0 +1,108 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: Main
+run-name:
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'doc/**'
+  workflow_dispatch:
+    paths-ignore:
+      - 'doc/**'
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pycodestyle:
+    strategy:
+      matrix:
+        org_repo: [nchain/svn_dev]
+        tag : [ubuntu_22.04]
+    runs-on: [ self-hosted ]
+    container:
+      image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
+    timeout-minutes: 1 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: ''
+      - run: |
+          ./pycodestyle.sh 
+        shell: bash
+  
+  autotools:
+    needs: pycodestyle
+    strategy:
+      matrix:
+        org_repo: [nchain/svn_dev]
+        tag: [ubuntu_22.04, debian_11, centos_9]
+        toolset: [gcc]
+    runs-on: [ self-hosted ]
+    container:
+      image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: ''
+      - name: Build
+        uses: ./.github/workflows/build_bitcoin_autotools
+      - name: Unit test
+        uses: ./.github/workflows/unit_test_bitcoin_autotools
+      - name: Functional test
+        uses: ./.github/workflows/functional_test
+        with: 
+          tag: ${{ matrix.tag }}
+          toolset: ${{ matrix.toolset }}
+
+  cmake:
+    needs: pycodestyle
+    strategy:
+      matrix:
+        org_repo: [nchain/svn_dev]
+        tag : [ubuntu_22.04]
+        toolset: [clang]
+        version: [ 17 ]
+        build_type: [ Release, Debug ]
+        include:
+          - version: 17
+            build_type: Release
+            sanitizers: asan usan
+    runs-on: [ self-hosted ]
+    container:
+      image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: ''
+      - name: Select toolset version
+        uses: ./.github/workflows/select_toolset_version
+        with: 
+          toolset: ${{ matrix.toolset }}
+          version: ${{ matrix.version }}
+      - name: Build Bitcoin
+        uses: ./.github/workflows/build_bitcoin_cmake
+        with: 
+          build_type: ${{ matrix.build_type }}
+          sanitizers: ${{ matrix.sanitizers }}
+      - name: Unit test secp256k1
+        uses: ./.github/workflows/unit_test_secp256k1_cmake
+      - name: Unit test Bitcoin
+        uses: ./.github/workflows/unit_test_bitcoin_cmake
+      - name: Bench test Bitcoin
+        uses: ./.github/workflows/bench_test_bitcoin_cmake
+      - name: Functional test
+        if: ${{ matrix.build_type != 'Debug' }}
+        uses: ./.github/workflows/functional_test
+        with: 
+          tag: ${{ matrix.tag }}
+          toolset: ${{ matrix.toolset }}
+

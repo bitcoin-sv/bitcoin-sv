@@ -10,7 +10,6 @@
 #include "clientversion.h"
 #include "fs.h"
 #include "hash.h"
-#include "random.h"
 #include "streams.h"
 #include "tinyformat.h"
 #include "util.h"
@@ -46,7 +45,7 @@ bool CBanDB::Write(const banmap_t &banSet) {
         return error("%s: Serialize or I/O error - %s", __func__, e.what());
     }
     FileCommit(fileout.Get());
-    fileout.fclose();
+    fileout.reset();
 
     // replace existing banlist.dat, if any, with new banlist.dat.XXXX
     if (!RenameOver(pathTmp, pathBanlist))
@@ -79,7 +78,7 @@ bool CBanDB::Read(banmap_t &banSet) {
     } catch (const std::exception &e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
-    filein.fclose();
+    filein.reset();
 
     CDataStream ssBanlist(vchData, SER_DISK, CLIENT_VERSION);
 
@@ -139,7 +138,7 @@ bool CAddrDB::Write(const CAddrMan &addr) {
         return error("%s: Serialize or I/O error - %s", __func__, e.what());
     }
     FileCommit(fileout.Get());
-    fileout.fclose();
+    fileout.reset();
 
     // replace existing peers.dat, if any, with new peers.dat.XXXX
     if (!RenameOver(pathTmp, pathAddr))
@@ -171,7 +170,7 @@ bool CAddrDB::Read(CAddrMan &addr) {
     } catch (const std::exception &e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
-    filein.fclose();
+    filein.reset();
 
     CDataStream ssPeers(vchData, SER_DISK, CLIENT_VERSION);
 

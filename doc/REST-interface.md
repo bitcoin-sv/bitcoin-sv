@@ -8,29 +8,38 @@ The interface runs on the same port as the JSON-RPC interface, by default port 8
 Supported API
 -------------
 
-####Transactions
+#### Transactions
+
 `GET /rest/tx/<TX-HASH>.<bin|hex|json>`
 
 Given a transaction hash: returns a transaction in binary, hex-encoded binary, or JSON formats.
 
 For full TX query capability, one must enable the transaction index via "txindex=1" command line / configuration option.
 
-####Blocks
+#### Blocks
+
 `GET /rest/block/<BLOCK-HASH>.<bin|hex|json>`
+
 `GET /rest/block/notxdetails/<BLOCK-HASH>.<bin|hex|json>`
 
 Given a block hash: returns a block, in binary, hex-encoded binary or JSON formats.
 
-The HTTP request and response are both handled entirely in-memory, thus making maximum memory usage at least 2.66MB (1 MB max block, plus hex encoding) per request.
+When requesting a binary format block there is also basic support for the HTTP Range header, for example: `Range: bytes=1024-2048`
 
 With the /notxdetails/ option JSON response will only contain the transaction hash instead of the complete transaction details. The option only affects the JSON response.
 
-####Blockheaders
+#### Blockheaders
+
 `GET /rest/headers/<COUNT>/<BLOCK-HASH>.<bin|hex|json>`
 
 Given a block hash: returns <COUNT> amount of blockheaders in upward direction.
 
-####Chaininfos
+`GET /rest/headers/extended/<COUNT>/<BLOCK-HASH>.<bin|hex|json>`
+
+Returns same as headers rest method with additional data for coinbase transaction and proof of inclusion for coinbase transaction
+
+#### Chaininfos
+
 `GET /rest/chaininfo.json`
 
 Returns various state info regarding block chain processing.
@@ -46,7 +55,8 @@ Only supports JSON as output format.
 * pruneheight : (numeric) heighest block available
 * softforks : (array) status of softforks in progress
 
-####Query UTXO set
+#### Query UTXO set
+
 `GET /rest/getutxos/<checkmempool>/<txid>-<n>/<txid>-<n>/.../<txid>-<n>.<bin|hex|json>`
 
 The getutxo command allows querying of the UTXO set given a set of outpoints.
@@ -54,6 +64,7 @@ See BIP64 for input and output serialisation:
 https://github.com/bitcoin/bips/blob/master/bip-0064.mediawiki
 
 Example:
+
 ```
 $ curl localhost:18332/rest/getutxos/checkmempool/b2cdfd7b89def827ff8af7cd9bff7627ff72e5e8b0f71210f92ea7a4000c5d75-0.json 2>/dev/null | json_pp
 {
@@ -79,7 +90,8 @@ $ curl localhost:18332/rest/getutxos/checkmempool/b2cdfd7b89def827ff8af7cd9bff76
 }
 ```
 
-####Memory pool
+#### Memory pool
+
 `GET /rest/mempool/info.json`
 
 Returns various information about the TX mempool.

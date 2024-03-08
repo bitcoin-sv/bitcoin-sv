@@ -7,7 +7,7 @@
 
 #include "test/test_bitcoin.h"
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/test/unit_test.hpp>
@@ -51,7 +51,8 @@ BOOST_AUTO_TEST_CASE(manythreads) {
 
     boost::mutex counterMutex[10];
     int counter[10] = {0};
-    boost::random::mt19937 rng(42);
+    ResetGlobalRandomContext();
+    boost::random::mt19937 rng(insecure_rand());
     boost::random::uniform_int_distribution<> zeroToNine(0, 9);
     boost::random::uniform_int_distribution<> randomMsec(-11, 1000);
     boost::random::uniform_int_distribution<> randomDelta(-1000, 1000);
@@ -84,16 +85,19 @@ BOOST_AUTO_TEST_CASE(manythreads) {
     // queue
     boost::thread_group microThreads;
     for (int i = 0; i < 5; i++)
-        microThreads.create_thread(
-            boost::bind(&CScheduler::serviceQueue, &microTasks));
+    {
+        microTasks.startServiceThread(microThreads);
+    }
 
     MicroSleep(600);
     now = boost::chrono::system_clock::now();
 
     // More threads and more tasks:
     for (int i = 0; i < 5; i++)
-        microThreads.create_thread(
-            boost::bind(&CScheduler::serviceQueue, &microTasks));
+    {
+        microTasks.startServiceThread(microThreads);
+    }
+
     for (int i = 0; i < 100; i++) {
         boost::chrono::system_clock::time_point t =
             now + boost::chrono::microseconds(randomMsec(rng));

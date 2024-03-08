@@ -4,6 +4,8 @@
 
 project(crypto)
 
+option(CRYPTO_USE_ASM "Use assembly version of crypto primitives" ON)
+
 # The library
 add_library(crypto
 	aes.cpp
@@ -13,7 +15,7 @@ add_library(crypto
 	ripemd160.cpp
 	sha1.cpp
 	sha256.cpp
-	sha256_sse4.cpp
+	$<$<BOOL:${CRYPTO_USE_ASM}>:sha256_sse4.cpp>
 	sha512.cpp
 )
 
@@ -28,15 +30,15 @@ target_include_directories(crypto
 target_compile_definitions(crypto PUBLIC HAVE_CONFIG_H)
 
 # Use assembly is specified
-option(CRYPTO_USE_ASM "Use assembly version of crypto primitives" ON)
 if(CRYPTO_USE_ASM)
+	if(enable_asan)
+		message(FATAL_ERROR "enable_asan can not be used with"
+			" CRYPTO_USE_ASM enabled!")
+	endif()
 	target_compile_definitions(crypto PRIVATE USE_ASM)
 endif()
 
 # Dependencies
-include(BrewHelper)
-find_brew_prefix(OPENSSL_ROOT_DIR openssl)
-find_package(OpenSSL REQUIRED)
 target_link_libraries(crypto ${OPENSSL_CRYPTO_LIBRARY})
 
 if(MSVC)

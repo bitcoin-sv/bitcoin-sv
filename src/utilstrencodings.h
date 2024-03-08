@@ -9,9 +9,17 @@
 #ifndef BITCOIN_UTILSTRENCODINGS_H
 #define BITCOIN_UTILSTRENCODINGS_H
 
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cctype>
 #include <cstdint>
+#include <iterator>
 #include <string>
+#include <string_view>
 #include <vector>
+
+#include "rpc/text_writer.h"
 
 #define BEGIN(a) ((char *)&(a))
 #define END(a) ((char *)&((&(a))[1]))
@@ -61,6 +69,7 @@ std::string EncodeBase32(const uint8_t *pch, size_t len);
 std::string EncodeBase32(const std::string &str);
 
 void SplitHostPort(std::string in, int &portOut, std::string &hostOut);
+void SplitURL(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& endpoint);
 std::string i64tostr(int64_t n);
 std::string itostr(int n);
 int64_t atoi64(const char *psz);
@@ -104,25 +113,122 @@ bool ParseUInt64(const std::string &str, uint64_t *out);
  */
 bool ParseDouble(const std::string &str, double *out);
 
-template <typename T>
-std::string HexStr(const T itbegin, const T itend, bool fSpaces = false) {
-    std::string rv;
-    static const char hexmap[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
-                                    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-    rv.reserve((itend - itbegin) * 3);
-    for (T it = itbegin; it < itend; ++it) {
-        uint8_t val = uint8_t(*it);
-        if (fSpaces && it != itbegin) rv.push_back(' ');
-        rv.push_back(hexmap[val >> 4]);
-        rv.push_back(hexmap[val & 15]);
-    }
 
-    return rv;
+inline constexpr std::array<char, 16> hexmap = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+template <typename T>
+void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
+{
+    std::string rv;
+    writer.ReserveAdditional((itend - itbegin) * (fSpaces ? 3 : 2));
+    for (T it = itbegin; it < itend; ++it)
+    {
+        uint8_t val = uint8_t(*it);
+        if (fSpaces && it != itbegin)
+        {
+            writer.Write(' ');
+        }
+
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        writer.Write(hexmap[val >> 4]);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        writer.Write(hexmap[val & 15]);
+    }
 }
 
 template <typename T>
-inline std::string HexStr(const T &vch, bool fSpaces = false) {
-    return HexStr(vch.begin(), vch.end(), fSpaces);
+std::string HexStr(const T itbegin, const T itend, bool fSpaces = false)
+{
+    CStringWriter stringWriter;
+    HexStr(itbegin, itend, stringWriter, fSpaces);
+    return stringWriter.MoveOutString();
+}
+
+template <typename T>
+inline std::string HexStr(const T &vch, bool fSpaces = false)
+{
+    CStringWriter stringWriter;
+    HexStr(vch.begin(), vch.end(), stringWriter, fSpaces);
+    return stringWriter.MoveOutString();
+}
+
+template <typename T>
+inline void HexStr(const T& vch, CTextWriter& writer, bool fSpaces = false)
+{
+    HexStr(vch.begin(), vch.end(), writer, fSpaces);
+}
+
+template <typename I, typename O, typename F>
+I transform_pairs(I f, I l, O o, F func)
+{
+    while(f != l)
+    {
+        I n = std::next(f);
+        if(n == l)
+            return f;
+
+        *o = func(*f, *n);
+        ++n;
+        if(n == l)
+            return l;
+
+        std::advance(f, 2);
+        ++n;
+        if(n == l)
+            return f;
+    }
+
+    return l;
+}
+
+// Precondition
+// I::value_type [0-9a-f]
+// Return Value: Input iterator set to one-past the end of the range
+// transformed.
+//
+// Converts a closed range of hexadecimal characters (lowercase a-f) to an
+// output iterator of bytes. Each character is transformed into the nibble of a
+// byte. e.g.
+//    "1289abef" -> {0x12, 0x89, 0xab, 0xef}
+//
+// A nibble can hold 16 values (0x0->0xf) which represent the characters
+// '0' -> 'f' respectively.
+// The characters are transformed pair-wise. If an odd number of characters
+// is supplied then the last character is not transformed.
+//
+template <typename I, typename O>
+I transform_hex(I f, I l, O o)
+{
+    return transform_pairs(f, l, o, [](const auto a, const auto b) {
+        constexpr auto l = [](const char c) {
+            if(isdigit(c))
+                return c - '0';
+            else if(c >= 'a' && c <= 'f')
+                return c - 'W';
+            else
+                assert(false);
+        };
+        return (0xf0 & (l(a) << 4)) | (0xf & l(b));
+    });
+}
+
+// Converts a string_view of hexadecimal characters (lowercase a-f) to an output
+// iterator of bytes. See overload for more details.
+// The input is checked to ensure that it only contains characters '0'->'9' or
+// 'a' -> 'f'.
+// Return Value: Input iterator set to the first invalid character or one-past
+// the end of the range transformed.
+template <typename O>
+auto transform_hex(const std::string_view s, O o)
+{
+    const auto it = std::find_if_not(s.begin(), s.end(), [](const auto& c) {
+        return isdigit(c) || (c >= 'a' && c <= 'f');
+    });
+    if(it != s.end())
+        return it;
+
+    return transform_hex(s.begin(), s.end(), o);
 }
 
 /**

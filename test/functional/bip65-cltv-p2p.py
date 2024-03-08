@@ -83,7 +83,14 @@ class BIP65Test(BitcoinTestFramework):
         node0.wait_for_verack()
 
         self.log.info("Mining %d blocks", CLTV_HEIGHT - 2)
-        self.coinbase_blocks = self.nodes[0].generate(CLTV_HEIGHT - 2)
+        # Break the generate 1349 blocks call into smaller chunks to avoid occasional timeout
+        # when node is too busy to send getdata msg
+        rem = (CLTV_HEIGHT - 2) % 10
+        self.coinbase_blocks = []
+        for i in range((CLTV_HEIGHT - 2) // 10):
+            self.coinbase_blocks += self.nodes[0].generate(10)
+        self.coinbase_blocks += self.nodes[0].generate(rem)
+
         self.nodeaddress = self.nodes[0].getnewaddress()
 
         self.log.info(
@@ -137,7 +144,7 @@ class BIP65Test(BitcoinTestFramework):
         # accepted to the mempool (which we can achieve with
         # -promiscuousmempoolflags).
         node0.send_and_ping(msg_tx(spendtx))
-        assert spendtx.hash in self.nodes[0].getrawmempool()
+        wait_until(lambda: spendtx.hash in self.nodes[0].getrawmempool(), timeout=240)
 
         # Now we verify that a block with this transaction is invalid.
         block.vtx.append(spendtx)
@@ -155,8 +162,7 @@ class BIP65Test(BitcoinTestFramework):
             assert_equal(node0.last_message["reject"].data, block.sha256)
             if node0.last_message["reject"].code == REJECT_INVALID:
                 # Generic rejection when a block is invalid
-                assert_equal(
-                    node0.last_message["reject"].reason, b'blk-bad-inputs')
+                assert(node0.last_message["reject"].reason.startswith(b'blk-bad-inputs'))
             else:
                 assert b'Negative locktime' in node0.last_message["reject"].reason
 

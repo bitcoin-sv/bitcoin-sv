@@ -6,7 +6,9 @@
 
 from base64 import b64encode
 from binascii import hexlify, unhexlify
+import configparser
 from decimal import Decimal, ROUND_DOWN
+import glob
 import hashlib
 import json
 import logging
@@ -18,6 +20,7 @@ import time
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+from .streams import BlockPriorityStreamPolicy, DefaultStreamPolicy
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -230,13 +233,13 @@ def satoshi_round(amount):
     return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
 
-def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None):
+def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None, check_interval=0.05, label="wait_until"):
     if attempts == float('inf') and timeout == float('inf'):
         timeout = 60
     attempt = 0
-    timeout += time.time()
+    timestamp = timeout + time.time()
 
-    while attempt < attempts and time.time() < timeout:
+    while attempt < attempts and time.time() < timestamp:
         if lock:
             with lock:
                 if predicate():
@@ -245,11 +248,11 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
             if predicate():
                 return
         attempt += 1
-        time.sleep(0.05)
+        time.sleep(check_interval)
 
     # Print the cause of the timeout
-    assert_greater_than(attempts, attempt)
-    assert_greater_than(timeout, time.time())
+    assert attempts > attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
+    assert timestamp >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
 # RPC/P2P connection constants and functions
@@ -258,9 +261,9 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
 
 # The maximum number of nodes a single test can spawn
 MAX_NODES = 8
-# Don't assign rpc or p2p ports lower than this
+# Don't assign rpc, p2p or zmq ports lower than this
 PORT_MIN = 11000
-# The number of ports to "reserve" for p2p and rpc, each
+# The number of ports to "reserve" for p2p, rpc and zmq, each
 PORT_RANGE = 5000
 
 
@@ -304,6 +307,11 @@ def rpc_port(n):
     return PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 
+def zmq_port(n):
+    assert(n <= MAX_NODES)
+    return PORT_MIN + 2*PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+
+
 def rpc_url(datadir, i, rpchost=None):
     rpc_u, rpc_p = get_auth_cookie(datadir)
     host = '127.0.0.1'
@@ -328,9 +336,9 @@ def initialize_datadir(dirname, n):
         f.write("regtest=1\n")
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
-        f.write("listenonion=0\n")
         f.write("shrinkdebugfile=0\n")
     return datadir
+
 
 def get_datadir_path(dirname, n):
     return os.path.join(dirname, "node" + str(n))
@@ -349,11 +357,13 @@ def get_auth_cookie(datadir):
                     assert password is None  # Ensure that there is only one rpcpassword line
                     password = line.split("=")[1].strip("\n")
     if os.path.isfile(os.path.join(datadir, "regtest", ".cookie")):
-        with open(os.path.join(datadir, "regtest", ".cookie"), 'r') as f:
-            userpass = f.read()
-            split_userpass = userpass.split(':')
-            user = split_userpass[0]
-            password = split_userpass[1]
+        try:
+            with open(os.path.join(datadir, "regtest", ".cookie"), 'r') as f:
+                userpass = f.read()
+                split_userpass = userpass.split(':')
+                user = split_userpass[0]
+                password = split_userpass[1]
+        except: pass # any failures while reading the cookie file are treated as if the file was not there
     if user is None or password is None:
         raise ValueError("No RPC credentials")
     return user, password
@@ -363,40 +373,85 @@ def log_filename(dirname, n_node, logname):
     return os.path.join(dirname, "node" + str(n_node), "regtest", logname)
 
 
-def get_bip9_status(node, key):
-    info = node.getblockchaininfo()
-    return info['bip9_softforks'][key]
-
-
 def set_node_times(nodes, t):
     for node in nodes:
         node.setmocktime(t)
 
 
+# Disconnects only the outbound connection "from_connection -> node_num"
+# If nodes were connected with connect_nodes_bi (default setup_network) use disconnect_nodes_bi to completely split the nodes if needed
 def disconnect_nodes(from_connection, node_num):
-    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']]:
+    subver = "testnode%d" % node_num
+    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if subver in peer['subver'] and not peer['inbound']]:
         from_connection.disconnectnode(nodeid=peer_id)
 
     for _ in range(50):
-        if [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']] == []:
+        if [peer['id'] for peer in from_connection.getpeerinfo() if subver in peer['subver'] and not peer['inbound']] == []:
             break
         time.sleep(0.1)
     else:
         raise AssertionError("timed out waiting for disconnect")
 
 
-def connect_nodes(from_connection, node_num):
-    ip_port = "127.0.0.1:" + str(p2p_port(node_num))
-    from_connection.addnode(ip_port, "onetry")
-    # poll until version handshake complete to avoid race conditions
-    # with transaction relaying
-    while any(peer['version'] == 0 for peer in from_connection.getpeerinfo()):
-        time.sleep(0.1)
+# Disconnects both outbound and inbound connections between nodes[node_a_index] and nodes[node_b_index]
+# Inbound connection on one node is implicitly closed as a result of closing the outbound connection on the other node
+def disconnect_nodes_bi(nodes, node_a_index, node_b_index):
+    disconnect_nodes(nodes[node_a_index], node_b_index)
+    disconnect_nodes(nodes[node_b_index], node_a_index)
+
+
+# Returns False if node has -multistreams=0 set
+def is_multistreams_enabled(node):
+    for extra_arg in node.extra_args:
+        if '-multistreams' in extra_arg:
+            checkValueAt = extra_arg.find("=") + 1
+            return int(extra_arg[checkValueAt:])
+    return True
+
+
+# Returns the number of additional stream policies used by connecting nodes.
+def number_of_additional_streams(from_node, to_node):
+    streampolicies_from_node = from_node.getnetworkinfo()["streampolicies"].split(",")
+    streampolicies_to_node = to_node.getnetworkinfo()["streampolicies"].split(",")
+    # Find the first policy both nodes have in common and return the number of additional streams used by the matched policy
+    for policy_from_node in streampolicies_from_node:
+        for policy_to_node in streampolicies_to_node:
+            if policy_from_node == policy_to_node:
+                additional_streams = []
+                if policy_from_node == "BlockPriority":
+                    additional_streams = BlockPriorityStreamPolicy().additional_streams
+                elif policy_from_node == "Default":
+                    additional_streams = DefaultStreamPolicy().additional_streams
+                else:
+                    raise AssertionError("Connecting test nodes are using an unexpected stream policy %s" % (policy_from_node))
+                return len(additional_streams)
+    return 0
+
+
+# Connects two nodes and waits for connection to be established
+# Set wait_multistreams to False to skip waiting for multistreams connection establishment
+def connect_nodes(nodes, from_node_num, to_node_num, wait_multistreams=True):
+    ip_port = "127.0.0.1:" + str(p2p_port(to_node_num))
+    nodes[from_node_num].addnode(ip_port, "onetry")
+
+    # check if both nodes use multistreams (True by default)
+    multiStreamsEnabled = wait_multistreams and is_multistreams_enabled(nodes[from_node_num]) and is_multistreams_enabled(nodes[to_node_num])
+
+    # Poll until version handshake complete to avoid race conditions with transaction relaying
+    # Wait for fully established associations if multistreams is set on both nodes:
+    # - only connections with 'testnode<to_node_num>' 'subver' are waited here
+    # - 'associd' must not be 'Not-Set'
+    # - 'streams' must contain predefined number of streams, depending on -multistreampolicies configuration parameter
+    subver = "testnode%d" % to_node_num
+    # Number of streams between nodes that will be established
+    number_of_streams = number_of_additional_streams(nodes[from_node_num], nodes[to_node_num]) + 1
+    wait_until(lambda: all(peer['version'] != 0 and (not multiStreamsEnabled or subver not in peer['subver'] or (peer['associd'] != 'Not-Set' and len(peer['streams']) == number_of_streams)) for peer in nodes[from_node_num].getpeerinfo()))
 
 
 def connect_nodes_bi(nodes, a, b):
-    connect_nodes(nodes[a], b)
-    connect_nodes(nodes[b], a)
+    connect_nodes(nodes, a, b)
+    connect_nodes(nodes, b, a)
+
 
 def connect_nodes_mesh(nodes, bi=False):
     for i in range(len(nodes)):
@@ -404,7 +459,8 @@ def connect_nodes_mesh(nodes, bi=False):
             if bi:
                 connect_nodes_bi(nodes, i, j)
             else:
-                connect_nodes(nodes[i], j)
+                connect_nodes(nodes, i, j)
+
 
 def sync_blocks(rpc_connections, *, wait=1, timeout=60):
     """
@@ -453,15 +509,58 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
     """
     while timeout > 0:
         pool = set(rpc_connections[0].getrawmempool())
+        non_final_pool = set(rpc_connections[0].getrawnonfinalmempool())
         num_match = 1
         for i in range(1, len(rpc_connections)):
-            if set(rpc_connections[i].getrawmempool()) == pool:
+            pool_match = set(rpc_connections[i].getrawmempool()) == pool
+            non_final_pool_match = set(rpc_connections[i].getrawnonfinalmempool()) == non_final_pool
+            if pool_match and non_final_pool_match:
                 num_match = num_match + 1
         if num_match == len(rpc_connections):
             return
         time.sleep(wait)
         timeout -= wait
     raise AssertionError("Mempool sync failed")
+
+
+def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0.1):
+    try:
+        wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool},
+                   timeout=timeout, check_interval=check_interval)
+    except:
+        mempool = set(rpc.getrawmempool())
+        expected = {t.hash for t in should_be_in_mempool}
+        missing = expected - mempool
+        unexpected = mempool - expected
+        if missing:
+            rpc.log.info("Transactions missing from the mempool: " + str(list(missing)))
+        if unexpected:
+            rpc.log.info("Transactions that should not be in the mempool: " + str(list(unexpected)))
+        raise
+
+
+# The function checks if transaction/block was rejected
+# The actual reject reason is checked if specified
+def wait_for_reject_message(conn, reject_reason=None, timeout=5):
+    wait_until(lambda: ('reject' in list(conn.cb.last_message.keys())
+                        and (reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)),
+               timeout=timeout)
+    if conn.cb.last_message['reject'].message == b'tx':
+        conn.rpc.log.info('Transaction rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
+    else:
+        conn.rpc.log.info('Block rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
+
+    conn.cb.last_message.pop('reject', None)
+
+
+# The function checks that transaction/block was not rejected
+def ensure_no_rejection(conn):
+    # wait 2 seconds for transaction/block before checking for reject message
+    time.sleep(2)
+    wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message[
+        'reject'].reason == None, timeout=5)
+    conn.rpc.log.info('Not rejected -- OK')
+
 
 # Transaction/Block functions
 #############################
@@ -581,15 +680,19 @@ def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
 
     return (txid, signresult["hex"], fee)
 
+
 # Helper to create at least "count" utxos
 # Pass in a fee that is sufficient for relay and mining new transactions.
+def create_confirmed_utxos(fee, node, count, age=101, nodes=None):
 
-
-def create_confirmed_utxos(fee, node, count, age=101):
     to_generate = int(0.5 * count) + age
     while to_generate > 0:
         node.generate(min(25, to_generate))
         to_generate -= 25
+
+    if nodes is not None:
+        sync_blocks(nodes)
+
     utxos = node.listunspent()
     iterations = count - len(utxos)
     addr1 = node.getnewaddress()
@@ -611,14 +714,17 @@ def create_confirmed_utxos(fee, node, count, age=101):
     while (node.getmempoolinfo()['size'] > 0):
         node.generate(1)
 
+    # If running multiple nodes they have to be synced regularly to prevent simultaneous syncing of blocks and txs
+    if nodes is not None:
+        sync_blocks(nodes)
+
     utxos = node.listunspent()
     assert(len(utxos) >= count)
     return utxos
 
+
 # Create large OP_RETURN txouts that can be appended to a transaction
 # to make it large (helper for constructing large transactions).
-
-
 def gen_return_txouts():
     # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
     # So we have big transactions (and therefore can't fit very many into each block)
@@ -647,10 +753,9 @@ def create_tx(node, coinbase, to_address, amount):
     assert_equal(signresult["complete"], True)
     return signresult["hex"]
 
+
 # Create a spend of each passed-in utxo, splicing in "txouts" to each raw
 # transaction to make it large.  See gen_return_txouts() above.
-
-
 def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
     addr = node.getnewaddress()
     txids = []
@@ -679,7 +784,11 @@ def mine_large_block(node, utxos=None):
     if len(utxos) < num:
         utxos.clear()
         utxos.extend(node.listunspent())
-    fee = 100 * node.getnetworkinfo()["relayfee"]
+
+    # we pay a fee so we are not rejected by mempool rejection fee
+    # Before we used the relayfee which does not exist any more
+    # fee = 200 * node.getnetworkinfo()["relayfee"]
+    fee = 200 * Decimal("0.00000250")
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
 
@@ -727,3 +836,103 @@ def get_srcdir(calling_script=None):
 
     # No luck, give up.
     return None
+
+
+def loghash(inhash=None):
+    if inhash:
+        if len(inhash) > 12:
+            return "{" + inhash[:6] + "...." + inhash[-6:] + "}"
+        else:
+            return inhash
+    else:
+        return inhash
+
+
+def check_for_log_msg(rpc, log_msg, node_dir=None):
+    """
+    Checks for occurrence of the log_msg in the bitcoind.log
+    rpc can be any object which has .log member (logger)
+    If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
+    """
+    assert hasattr(rpc, "log")
+
+    if node_dir is None:
+        assert hasattr(rpc, "datadir")
+        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
+    else:
+        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
+
+    with open(logfile_path) as f:
+        for line in f:
+            if log_msg in line:
+                rpc.log.info("Found line: %s", line.strip())
+                return True
+    return False
+
+
+def count_log_msg(rpc, log_msg, node_dir=None):
+    """
+    Checks for number of occurrences of the log_msg in the bitcoind.log
+    rpc can be any object which has .log member (logger)
+    If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
+    """
+    assert hasattr(rpc, "log")
+
+    if node_dir is None:
+        assert hasattr(rpc, "datadir")
+        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
+    else:
+        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
+
+    count = 0
+    with open(logfile_path) as f:
+        for line in f:
+            if log_msg in line:
+                count += 1
+    rpc.log.info(f'String "{log_msg}"" found in {count} lines')
+    return count
+
+
+def hashToHex(hash):
+    return format(hash, '064x')
+
+
+def check_zmq_test_requirements(configfile, skip_test_exception):
+    # Check that bitcoin has been built with ZMQ enabled
+    config = configparser.ConfigParser()
+    if not configfile:
+        if os.path.exists(os.path.dirname(__file__) + "/../../../build/test/config.ini"):
+            configfile = os.path.dirname(__file__) + "/../../../build/test/config.ini"
+        elif os.path.exists(os.path.dirname(__file__) + "/../../config.ini"):
+            configfile = os.path.dirname(__file__) + "/../../config.ini"
+        else:
+            raise Exception("config.ini not found please provide path with --configfile <path to>/config.ini")
+    config.read_file(open(configfile))
+
+    if not config["components"].getboolean("ENABLE_ZMQ"):
+        raise skip_test_exception
+
+    # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
+    try:
+        import zmq
+    except ImportError:
+        raise Exception("pyzmq module not available.")
+
+
+def wait_for_ptv_completion(conn, exp_mempool_size, check_interval=0.1, timeout=60):
+    """
+    The invocation of this function waits until the following conditions are met:
+    a) there is an expected amount of transactions in the mempool
+    b) there are no transactions in the ptv's queues, including: pending, being processed, detected orphans
+    Both conditions ensure that the call won't finish too early, because of race conditions such as:
+    - not sending all txs to the node through the connection
+    """
+    wait_until(lambda: conn.rpc.getmempoolinfo()['size'] >= exp_mempool_size,
+               check_interval=check_interval, timeout=timeout)
+    conn.rpc.waitforptvcompletion()
+
+
+def wait_for_txn_propagator(node):
+    # Wait for this node's transactions propagator to finish relaying transactions to other nodes.
+    # Can be used to make sure current transactions are not relayed to nodes being reconnected later.
+    wait_until(lambda: (node.getnetworkinfo()['txnpropagationqlen'] == 0))

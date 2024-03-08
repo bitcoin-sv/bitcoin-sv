@@ -9,6 +9,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import random
 
+
 class P2PConnections(BitcoinTestFramework):
 
     def clear_disconnections(self):
@@ -54,14 +55,14 @@ class P2PConnections(BitcoinTestFramework):
                     self.disconnections[node1].append(node2)
                     self.disconnections[node2].append(node1)
                     self.log.info("Disconnecting node {} and {}".format(node1, node2))
-                    disconnect_nodes(self.nodes[node1], node2)
+                    disconnect_nodes_bi(self.nodes, node1, node2)
                     break
 
     def do_reconnection(self):
         # Remake disconnected connections
         for node1, disconnects in self.disconnections.items():
             for node2 in disconnects:
-                connect_nodes(self.nodes[node1], node2)
+                connect_nodes(self.nodes, node1, node2)
 
         # Reset map of disconnections to empty
         self.clear_disconnections()
@@ -91,6 +92,7 @@ class P2PConnections(BitcoinTestFramework):
 
     def run_test(self):
         self.test_connections()
+
 
 if __name__ == '__main__':
     P2PConnections().main()

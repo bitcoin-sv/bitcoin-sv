@@ -10,6 +10,7 @@
 #include "script/script.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "config.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -43,7 +44,10 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
                   bool &isInvalid) {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    // We will assume that the utxo is before genesis if it is P2SH because we still want to recognize 
+    // P2SH scripts as ours and we don't have utxo height here.
+    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
+    if (!Solver(scriptPubKey, isGenesisEnabled, whichType, vSolutions)) {
         if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_UNSOLVABLE;
         return ISMINE_NO;
@@ -92,8 +96,10 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
         // TODO: This could be optimized some by doing some work after the above
         // solver
         SignatureData sigs;
-        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey,
-                                sigs)
+        
+        const Config &config = GlobalConfig::GetConfig();
+        return ProduceSignature(config, true, DummySignatureCreator(&keystore), true, isGenesisEnabled,
+                                scriptPubKey, sigs)
                    ? ISMINE_WATCH_SOLVABLE
                    : ISMINE_WATCH_UNSOLVABLE;
     }

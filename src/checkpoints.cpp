@@ -4,16 +4,14 @@
 
 #include "checkpoints.h"
 
+#include "block_index_store.h"
 #include "chain.h"
 #include "chainparams.h"
-
-#include <cstdint>
-
 #include <boost/range/adaptor/reversed.hpp>
 
 namespace Checkpoints {
 
-bool CheckBlock(const CCheckpointData &data, int nHeight, const uint256 &hash) {
+bool CheckBlock(const CCheckpointData &data, int32_t nHeight, const uint256 &hash) {
     const MapCheckpoints &checkpoints = data.mapCheckpoints;
 
     MapCheckpoints::const_iterator i = checkpoints.find(nHeight);
@@ -29,9 +27,8 @@ CBlockIndex *GetLastCheckpoint(const CCheckpointData &data) {
     for (const MapCheckpoints::value_type &i :
          boost::adaptors::reverse(checkpoints)) {
         const uint256 &hash = i.second;
-        BlockMap::const_iterator t = mapBlockIndex.find(hash);
-        if (t != mapBlockIndex.end()) {
-            return t->second;
+        if (auto index = mapBlockIndex.Get(hash); index != nullptr) {
+            return index;
         }
     }
 

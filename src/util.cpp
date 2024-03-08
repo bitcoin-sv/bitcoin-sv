@@ -17,6 +17,7 @@
 #include "utiltime.h"
 
 #include <cstdarg>
+#include <regex>
 
 #if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include <pthread.h>
@@ -35,10 +36,9 @@
 
 #endif // __linux__
 
-#include <algorithm>
 #include <fcntl.h>
 #include <sys/resource.h>
-#include <sys/stat.h>
+#include <thread>
 
 #else
 
@@ -73,15 +73,13 @@
 #endif
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 #include <boost/filesystem/fstream.hpp>
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/thread.hpp>
-
 #include <openssl/conf.h>
 #include <openssl/rand.h>
+#include <boost/algorithm/string/predicate.hpp>
 
 // Application startup time (used for uptime calculation)
 const int64_t nStartupTime = GetTime();
@@ -125,8 +123,8 @@ public:
         OPENSSL_no_config();
 
 #ifdef WIN32
-        // Seed OpenSSL PRNG with current contents of the screen.
-        RAND_screen();
+        // Seed OpenSSL PRNG using random input obtained from polling various trusted entropy sources
+        RAND_poll();
 #endif
 
         // Seed OpenSSL PRNG with performance counter.
@@ -189,6 +187,48 @@ void ArgsManager::ParseParameters(int argc, const char *const argv[]) {
     }
 }
 
+bool ArgsManager::IsSensitiveArg(const std::string& argName)
+{
+    return std::find(sensitiveArgs.begin(), sensitiveArgs.end(), argName) != sensitiveArgs.end();
+}
+
+std::vector<std::string> ArgsManager::GetNonSensitiveParameters()
+{
+    std::vector<std::string> nonSensitiveParameters;
+
+    // Parameter names (keys of mapMultiArgs) are in form of -name. They also need to be specified like that
+    // when starting bitcoind (e.g. bitcoin -name) or they will not be added to mapMultiArgs.
+    // Filter out sensitive parameters and remove first character (-)
+    for(const auto& arg : mapMultiArgs)
+    {
+        if (IsSensitiveArg(arg.first))
+        {
+            continue;
+        }
+        for(const auto& value : arg.second)
+        {
+            if (value.empty())
+            {
+                nonSensitiveParameters.push_back(arg.first.substr(1));
+            }
+            else
+            {
+                nonSensitiveParameters.push_back(arg.first.substr(1) + "=" + value);
+            }
+        }
+    }
+    return nonSensitiveParameters;
+}
+
+void ArgsManager::LogSetParameters()
+{
+    LogPrint(BCLog::ALL, "Printing non-sensitive parameters that are force set and set by switches and config file...\n");
+    for(const auto& arg : gArgs.GetNonSensitiveParameters())
+    {
+        LogPrintf("%s\n", arg);
+    }
+}
+
 std::vector<std::string> ArgsManager::GetArgs(const std::string &strArg) {
     LOCK(cs_args);
     return mapMultiArgs.at(strArg);
@@ -206,27 +246,125 @@ std::string ArgsManager::GetArg(const std::string &strArg,
     return strDefault;
 }
 
-int64_t ArgsManager::GetArg(const std::string &strArg, int64_t nDefault) {
+int64_t ArgsManager::GetArg(const std::string& strArg, int64_t nDefault) {
     LOCK(cs_args);
     int64_t returnValue(nDefault);
-	if (mapArgs.count(strArg)) 
+    if (mapArgs.count(strArg))
     {
-        const std::string& argValue (mapArgs[strArg]);
-        if ( argValue.find_first_not_of ( "\t\r\n\f ") != std::string::npos)
+        const std::string& argValue(mapArgs[strArg]);
+        if (argValue.find_first_not_of("\t\r\n\f ") != std::string::npos)
         {
             try
-            {   
+            {
                 returnValue = stoll(argValue);
             }
             catch (std::exception& e)
-            {   
-                PrintExceptionContinue(&e, "ArgsManager::GetArg" );
+            {
+                std::string argError = "\nArgsManager::GetArg '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
+                PrintExceptionContinue(&e, argError.c_str());
             }
         }
     }
     return returnValue;
 }
 
+double ArgsManager::GetDoubleArg(const std::string& strArg, double dDefault)
+{
+    LOCK(cs_args);
+    double retValue { dDefault };
+    if (mapArgs.count(strArg))
+    {
+        const std::string& argValue { mapArgs[strArg] };
+        if(argValue.find_first_not_of("\t\r\n\f ") != std::string::npos)
+        {
+            try
+            {
+                retValue = std::stod(argValue);
+            }
+            catch (std::exception& e)
+            {
+                std::string argError = "\nArgsManager::GetArg '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
+                PrintExceptionContinue(&e, argError.c_str());
+            }
+        }
+    }
+
+    return retValue;
+}
+
+int64_t ArgsManager::GetArgAsBytes(const std::string& strArg, int64_t nDefault, int64_t nMultiples) {
+    LOCK(cs_args);
+    int64_t returnValue(nDefault * nMultiples);
+    if (mapArgs.count(strArg))
+    {
+        const std::string& argValue(mapArgs[strArg]);
+        if (argValue.find_first_not_of("\t\r\n\f ") != std::string::npos)
+        {
+            try
+            {
+                returnValue = parseUnit(argValue, nMultiples);
+            }
+            catch (std::exception & e)
+            {
+                std::string argError = "\nArgsManager::GetArgAsBytes '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
+                PrintExceptionContinue(&e, argError.c_str());
+            }
+        }
+    }
+    return returnValue;
+}
+
+int64_t ArgsManager::parseUnit(std::string argValue, int64_t nMultiples)
+{
+    long double argNum;
+
+    static const std::regex txt_regex("^\\s*((?:-|\\+)?[0-9]+(?:\\.[0-9]+)?)\\s?((?:KI|K|MI|M|GI|G)?B)?\\s*$", std::regex::icase);
+    std::smatch match;
+    if (std::regex_search(argValue, match, txt_regex))
+    {
+        std::string matchNumber = match[1].str();
+        std::string matchUnit = match[2].str();
+        boost::to_upper(matchUnit);
+
+        if (matchUnit == "KB")
+        {
+            argNum = std::stold(matchNumber) * ONE_KILOBYTE;
+        }
+        else if (matchUnit == "KIB")
+        {
+            argNum = std::stold(matchNumber) * ONE_KIBIBYTE;
+        }
+        else if (matchUnit == "MB")
+        {
+            argNum = std::stold(matchNumber) * ONE_MEGABYTE;
+        }
+        else if (matchUnit == "MIB")
+        {
+            argNum = std::stold(matchNumber) * ONE_MEBIBYTE;
+        }
+        else if (matchUnit == "GB")
+        {
+            argNum = std::stold(matchNumber) * ONE_GIGABYTE;
+        }
+        else if (matchUnit == "GIB")
+        {
+            argNum = std::stold(matchNumber) * ONE_GIBIBYTE;
+        }
+        else if (matchUnit == "B")
+        {
+            return std::stoll(matchNumber);
+        }
+        else
+        {
+            return std::stoll(matchNumber) * nMultiples;
+        }
+    }
+    else
+    {
+        throw std::runtime_error(argValue + " is invalid value.");
+    }
+    return std::llround(argNum);
+}
 
 bool ArgsManager::GetBoolArg(const std::string &strArg, bool fDefault) {
     LOCK(cs_args);
@@ -256,6 +394,13 @@ void ArgsManager::ForceSetArg(const std::string &strArg,
     LOCK(cs_args);
     mapArgs[strArg] = strValue;
     mapMultiArgs[strArg].push_back(strValue);
+}
+
+void ArgsManager::ForceSetBoolArg(const std::string &strArg, bool fValue) {
+    if (fValue)
+        return ForceSetArg(strArg, std::string("1"));
+    else
+        return ForceSetArg(strArg, std::string("0"));
 }
 
 /**
@@ -379,7 +524,7 @@ void ClearDatadirCache() {
 
 fs::path GetConfigFile(const std::string &confPath) {
     fs::path pathConfigFile(confPath);
-    if (!pathConfigFile.is_complete())
+    if (!pathConfigFile.is_absolute())
         pathConfigFile = GetDataDir(false) / pathConfigFile;
 
     return pathConfigFile;
@@ -418,7 +563,7 @@ void ArgsManager::ReadConfigFile(const std::string &confPath) {
 #ifndef WIN32
 fs::path GetPidFile() {
     fs::path pathPidFile(gArgs.GetArg("-pid", BITCOIN_PID_FILENAME));
-    if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
+    if (!pathPidFile.is_absolute()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }
 
@@ -477,10 +622,11 @@ void FileCommit(FILE *file) {
 #endif
 }
 
-bool TruncateFile(FILE *file, unsigned int length) {
+bool TruncateFile(FILE *file, uint64_t length) {
 #if defined(WIN32)
-    return _chsize(_fileno(file), length) == 0;
+    return _chsize_s(_fileno(file), length) == 0;
 #else
+    static_assert(std::is_same_v<off_t, int64_t>, "Type off_t must be 64-bit.");
     return ftruncate(fileno(file), length) == 0;
 #endif
 }
@@ -515,7 +661,7 @@ int RaiseFileDescriptorLimit(int nMinFD) {
  * (corresponding to disk space) it is advisory, and the range specified in the
  * arguments will never contain live data.
  */
-void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
+void AllocateFileRange(FILE *file, unsigned int offset, uint64_t length) {
 #if defined(WIN32)
     // Windows-specific version.
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
@@ -578,7 +724,36 @@ void runCommand(const std::string &strCommand) {
                   nErr);
 }
 
-void RenameThread(const char *name) {
+#ifdef __MINGW32__
+// MinGW with POSIX threads has a bug where destructors for thread_local
+// objects are called after the memory has been already released.
+// As a workaround, Boost thread specific storage is used instead.
+#include <boost/thread/tss.hpp>
+static std::string& ThreadName()
+{
+    static boost::thread_specific_ptr<std::string> threadName_tsp;
+    auto* threadName = threadName_tsp.get();
+    if(threadName==nullptr)
+    {
+        threadName_tsp.reset(new std::string);
+        threadName = threadName_tsp.get();
+    }
+    return *threadName;
+}
+#else
+static std::string& ThreadName()
+{
+    // Declare the thread-local variable inside this function so that it's
+    // predictably initialized the first time control enters the function
+    // in any thread.
+    static thread_local std::string threadName {};
+    return threadName;
+}
+#endif
+
+void RenameThread(const char *name)
+{
+    ThreadName() = name;
 #if defined(PR_SET_NAME)
     // Only the first 15 characters are used (16 - NUL terminator)
     ::prctl(PR_SET_NAME, name, 0, 0, 0);
@@ -592,6 +767,20 @@ void RenameThread(const char *name) {
     (void)name;
 #endif
 }
+
+std::string GetThreadName()
+{
+    auto& threadName = ThreadName();
+    if (threadName.empty()) {
+#ifdef WIN32
+        return strprintf("thread-%d", GetCurrentThreadId());
+#else
+        return strprintf("thread-%d", std::this_thread::get_id());
+#endif
+    }
+    return threadName;
+}
+
 
 void SetupEnvironment() {
 // On most POSIX systems (e.g. Linux, but not BSD) the environment's locale may

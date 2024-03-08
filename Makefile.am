@@ -21,7 +21,6 @@ endif
 
 BITCOIND_BIN=$(top_builddir)/src/$(BITCOIN_DAEMON_NAME)$(EXEEXT)
 BITCOIN_CLI_BIN=$(top_builddir)/src/$(BITCOIN_CLI_NAME)$(EXEEXT)
-BITCOIN_SEEDER_BIN=$(top_builddir)/src/$(BITCOIN_SEEDER_NAME)$(EXEEXT)
 BITCOIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EXEEXT)
 
 empty :=
@@ -31,11 +30,13 @@ DIST_DOCS = $(wildcard doc/*.md) $(wildcard doc/release-notes/*.md)
 DIST_CONTRIB = $(top_srcdir)/contrib/bitcoin-cli.bash-completion \
 	       $(top_srcdir)/contrib/bitcoin-tx.bash-completion \
 	       $(top_srcdir)/contrib/bitcoind.bash-completion \
-	       $(top_srcdir)/contrib/init \
-	       $(top_srcdir)/contrib/rpm
+	       $(top_srcdir)/contrib/init
 
 BIN_CHECKS=$(top_srcdir)/contrib/devtools/symbol-check.py \
            $(top_srcdir)/contrib/devtools/security-check.py
+
+BUILD_FILES=$(top_srcdir)/share/genbuild.sh \
+            $(top_srcdir)/share/on_prod_tag.sh
 
 WINDOWS_PACKAGING = $(top_srcdir)/share/pixmaps/bitcoin.ico \
   $(top_srcdir)/share/pixmaps/nsis-header.bmp \
@@ -69,9 +70,6 @@ $(BITCOIND_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
 $(BITCOIN_CLI_BIN): FORCE
-	$(MAKE) -C src $(@F)
-
-$(BITCOIN_SEEDER_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
 if USE_LCOV
@@ -130,7 +128,7 @@ endif
 
 dist_noinst_SCRIPTS = autogen.sh
 
-EXTRA_DIST = $(top_srcdir)/share/genbuild.sh test/functional/test_runner.py test/functional $(DIST_CONTRIB) $(DIST_DOCS) $(WINDOWS_PACKAGING) $(BIN_CHECKS)
+EXTRA_DIST = $(BUILD_FILES) test/functional/test_runner.py test/functional $(DIST_CONTRIB) $(DIST_DOCS) $(WINDOWS_PACKAGING) $(BIN_CHECKS)
 
 EXTRA_DIST += \
 	test/util/bitcoin-util-test.py \
@@ -160,14 +158,10 @@ EXTRA_DIST += \
 	test/util/data/txcreatedata_seq1.json \
 	test/util/data/txcreatemultisig1.hex \
 	test/util/data/txcreatemultisig1.json \
-	test/util/data/txcreatemultisig2.hex \
-	test/util/data/txcreatemultisig2.json \
 	test/util/data/txcreateoutpubkey1.hex \
 	test/util/data/txcreateoutpubkey1.json \
 	test/util/data/txcreatescript1.hex \
 	test/util/data/txcreatescript1.json \
-	test/util/data/txcreatescript2.hex \
-	test/util/data/txcreatescript2.json \
 	test/util/data/txcreatesignv1.hex \
 	test/util/data/txcreatesignv1.json \
 	test/util/data/txcreatesignv2.hex

@@ -26,7 +26,7 @@ bool fLogIPs = DEFAULT_LOGIPS;
  * ee3374234c60aba2cc4c5cd5cac1c0aefc2d817c.
  */
 BCLog::Logger &GetLogger() {
-    static BCLog::Logger *const logger = new BCLog::Logger();
+    static BCLog::Logger *const logger = new BCLog::Logger(LOGFILE);
     return *logger;
 }
 
@@ -34,11 +34,11 @@ static int FileWriteStr(const std::string &str, FILE *fp) {
     return fwrite(str.data(), 1, str.size(), fp);
 }
 
-void BCLog::Logger::OpenDebugLog() {
+bool BCLog::Logger::OpenDebugLog() {
     std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
     assert(fileout == nullptr);
-    fs::path pathDebug = GetDataDir() / LOGFILE;
+    fs::path pathDebug = GetDataDir() / this->fileName;
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
         // Unbuffered.
@@ -48,6 +48,10 @@ void BCLog::Logger::OpenDebugLog() {
             FileWriteStr(vMsgsBeforeOpenLog.front(), fileout);
             vMsgsBeforeOpenLog.pop_front();
         }
+        return false;
+    }
+    else {
+        return true;
     }
 }
 
@@ -58,15 +62,12 @@ struct CLogCategoryDesc {
 
 const CLogCategoryDesc LogCategories[] = {
     {BCLog::NONE, "0"},
-    {BCLog::NET, "net"},
-    {BCLog::TOR, "tor"},
     {BCLog::MEMPOOL, "mempool"},
     {BCLog::HTTP, "http"},
     {BCLog::BENCH, "bench"},
     {BCLog::ZMQ, "zmq"},
     {BCLog::DB, "db"},
     {BCLog::RPC, "rpc"},
-    {BCLog::ESTIMATEFEE, "estimatefee"},
     {BCLog::ADDRMAN, "addrman"},
     {BCLog::SELECTCOINS, "selectcoins"},
     {BCLog::REINDEX, "reindex"},
@@ -80,6 +81,15 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::LEVELDB, "leveldb"},
     {BCLog::TXNPROP, "txnprop"},
     {BCLog::TXNSRC, "txnsrc"},
+    {BCLog::JOURNAL, "journal"},
+    {BCLog::TXNVAL, "txnval"},
+    {BCLog::NETCONN, "netconn"},
+    {BCLog::NETMSG, "netmsg"},
+    {BCLog::NETMSGVERB, "netmsgverb"},
+    {BCLog::NETMSGALL, "netmsgall"},
+    {BCLog::NET, "net"},
+    {BCLog::DOUBLESPEND, "doublespend"},
+    {BCLog::MINERID, "minerid"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };
@@ -113,36 +123,80 @@ std::string ListLogCategories() {
     return ret;
 }
 
+BCLog::Logger::Logger(const char* fileName)
+: fileName(fileName)
+{
+}
+
 BCLog::Logger::~Logger() {
     if (fileout) {
         fclose(fileout);
     }
 }
 
-std::string BCLog::Logger::LogTimestampStr(const std::string &str) {
-    std::string strStamped;
+#ifdef __MINGW32__
+// MinGW with POSIX threads has a bug where destructors for thread_local
+// objects are called after the memory has been already released.
+// As a workaround, Boost thread specific storage is used instead.
+#include <boost/thread/tss.hpp>
+namespace {
+const DateTimeFormatter& thread_local_log_DateTimeFormatter()
+{
+    static boost::thread_specific_ptr<DateTimeFormatter> dtf_tsp;
+    auto* dtf = dtf_tsp.get();
+    if(dtf==nullptr)
+    {
+        dtf_tsp.reset(new DateTimeFormatter{"%Y-%m-%d %H:%M:%S"});
+        dtf = dtf_tsp.get();
+    }
+    return *dtf;
+}
+}
+#endif
 
-    if (!fLogTimestamps) return str;
+std::string BCLog::Logger::LogTimestampStr(const std::string& str)
+{
+    if(!fLogTimestamps)
+        return str;
 
-    if (fStartedNewLine) {
-        int64_t nTimeMicros = GetLogTimeMicros();
-        strStamped =
-            DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
-        if (fLogTimeMicros)
-            strStamped += strprintf(".%06d", nTimeMicros % 1000000);
-        strStamped += ' ' + str;
-    } else
-        strStamped = str;
+    std::ostringstream ss;
 
-    if (!str.empty() && str[str.size() - 1] == '\n')
+    if(fStartedNewLine)
+    {
+#ifdef __MINGW32__
+        const DateTimeFormatter& dtf = thread_local_log_DateTimeFormatter();
+#else
+        thread_local const DateTimeFormatter dtf{"%Y-%m-%d %H:%M:%S"};
+#endif
+
+        const int64_t nTimeMicros{GetLogTimeMicros()};
+        ss = dtf(nTimeMicros / 1000000);
+        if(fLogTimeMicros)
+            ss << strprintf(".%06d", nTimeMicros % 1000000);
+
+        ss << " [" << GetThreadName() << "] " << str;
+    }
+    else
+        ss << str;
+
+    if(!str.empty() && str[str.size() - 1] == '\n')
         fStartedNewLine = true;
     else
         fStartedNewLine = false;
 
-    return strStamped;
+    return ss.str();
 }
 
-int BCLog::Logger::LogPrintStr(const std::string &str) {
+int BCLog::Logger::LogPrintStr(const std::string &str) 
+{
+    return log(str.c_str());
+}
+
+// Uses const char* as str type so that log entries from all nodes can be traced during 
+// functional tests. e.g.
+// bpftrace -e 'u:/root/sv/src/bitcoind:*Logger*log* { printf("%d %s\n", pid, str(arg1)) }'
+int BCLog::Logger::log(const char* str) {
+
     // Returns total number of characters written.
     int ret = 0;
 
@@ -157,13 +211,19 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
 
         // Buffer if we haven't opened the log yet.
         if (fileout == nullptr) {
-            ret = strTimestamped.length();
-            vMsgsBeforeOpenLog.push_back(strTimestamped);
+            // Stop logging if buffer gets too big
+            if (vMsgsBeforeOpenLog.size() > 1000) {
+                ret = 0;
+            }
+            else {
+                vMsgsBeforeOpenLog.push_back(strTimestamped);
+                ret = strTimestamped.length();
+            }
         } else {
             // Reopen the log file, if requested.
             if (fReopenDebugLog) {
                 fReopenDebugLog = false;
-                fs::path pathDebug = GetDataDir() / LOGFILE;
+                fs::path pathDebug = GetDataDir() / this->fileName;
                 if (fsbridge::freopen(pathDebug, "a", fileout) != nullptr) {
                     // unbuffered.
                     setbuf(fileout, nullptr);
@@ -180,7 +240,7 @@ void BCLog::Logger::ShrinkDebugFile() {
     // Amount of LOGFILE to save at end when shrinking (must fit in memory)
     constexpr size_t RECENT_DEBUG_HISTORY_SIZE = 10 * 1000000;
     // Scroll LOGFILE if it's getting too big.
-    fs::path pathLog = GetDataDir() / LOGFILE;
+    fs::path pathLog = GetDataDir() / this->fileName;
     FILE *file = fsbridge::fopen(pathLog, "r");
     // If LOGFILE is more than 10% bigger the RECENT_DEBUG_HISTORY_SIZE
     // trim it down by saving only the last RECENT_DEBUG_HISTORY_SIZE bytes.

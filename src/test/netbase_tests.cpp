@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "netbase.h"
+#include "net/netbase.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 
@@ -29,9 +29,6 @@ BOOST_AUTO_TEST_CASE(netbase_networks) {
     BOOST_CHECK(ResolveIP("::1").GetNetwork() == NET_UNROUTABLE);
     BOOST_CHECK(ResolveIP("8.8.8.8").GetNetwork() == NET_IPV4);
     BOOST_CHECK(ResolveIP("2001::8888").GetNetwork() == NET_IPV6);
-    BOOST_CHECK(
-        ResolveIP("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca").GetNetwork() ==
-        NET_TOR);
 }
 
 BOOST_AUTO_TEST_CASE(netbase_properties) {
@@ -50,7 +47,6 @@ BOOST_AUTO_TEST_CASE(netbase_properties) {
     BOOST_CHECK(ResolveIP("2001:10::").IsRFC4843());
     BOOST_CHECK(ResolveIP("FE80::").IsRFC4862());
     BOOST_CHECK(ResolveIP("64:FF9B::").IsRFC6052());
-    BOOST_CHECK(ResolveIP("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca").IsTor());
     BOOST_CHECK(ResolveIP("127.0.0.1").IsLocal());
     BOOST_CHECK(ResolveIP("::1").IsLocal());
     BOOST_CHECK(ResolveIP("8.8.8.8").IsRoutable());
@@ -97,18 +93,6 @@ BOOST_AUTO_TEST_CASE(netbase_lookupnumeric) {
     BOOST_CHECK(TestParse("[::]:8333", "[::]:8333"));
     BOOST_CHECK(TestParse("[127.0.0.1]", "127.0.0.1:65535"));
     BOOST_CHECK(TestParse(":::", "[::]:0"));
-}
-
-BOOST_AUTO_TEST_CASE(onioncat_test) {
-
-    // values from
-    // https://web.archive.org/web/20121122003543/http://www.cypherpunk.at/onioncat/wiki/OnionCat
-    CNetAddr addr1(ResolveIP("5wyqrzbvrdsumnok.onion"));
-    CNetAddr addr2(ResolveIP("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca"));
-    BOOST_CHECK(addr1 == addr2);
-    BOOST_CHECK(addr1.IsTor());
-    BOOST_CHECK(addr1.ToStringIP() == "5wyqrzbvrdsumnok.onion");
-    BOOST_CHECK(addr1.IsRoutable());
 }
 
 BOOST_AUTO_TEST_CASE(subnet_test) {
@@ -298,10 +282,6 @@ BOOST_AUTO_TEST_CASE(netbase_getgroup) {
     // RFC4380
     BOOST_CHECK(ResolveIP("2001:0:9999:9999:9999:9999:FEFD:FCFB").GetGroup() ==
                 Vec8({NET_IPV4, 1, 2}));
-    // Tor
-    BOOST_CHECK(
-        ResolveIP("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca").GetGroup() ==
-        Vec8({NET_TOR, 239}));
     // he.net
     BOOST_CHECK(
         ResolveIP("2001:470:abcd:9999:9999:9999:9999:9999").GetGroup() ==

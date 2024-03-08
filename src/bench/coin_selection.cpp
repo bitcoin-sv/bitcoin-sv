@@ -4,6 +4,7 @@
 
 #include "bench.h"
 #include "chainparams.h"
+#include "config.h"
 #include "wallet/wallet.h"
 
 #include <set>
@@ -35,17 +36,21 @@ static void addCoin(const Amount nValue, const CWallet &wallet,
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
 static void CoinSelection(benchmark::State &state) {
     SelectParams(CBaseChainParams::TESTNET);
+    GlobalConfig::GetModifiableGlobalConfig().SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     const CWallet wallet(Params());
     std::vector<COutput> vCoins;
     LOCK(wallet.cs_wallet);
 
-    while (state.KeepRunning()) {
-        // Empty wallet.
-        for (COutput output : vCoins) {
+    auto ClearCoins = [&vCoins]() {
+        for (auto& output : vCoins) {
             delete output.tx;
         }
-
         vCoins.clear();
+    };
+
+    while (state.KeepRunning()) {
+        // Empty wallet.
+        ClearCoins();
 
         // Add coins.
         for (int i = 0; i < 1000; i++)
@@ -54,12 +59,14 @@ static void CoinSelection(benchmark::State &state) {
 
         std::set<std::pair<const CWalletTx *, unsigned int>> setCoinsRet;
         Amount nValueRet;
-        bool success = wallet.SelectCoinsMinConf(1003 * COIN, 1, 6, 0, vCoins,
+        bool success = wallet.SelectCoinsMinConf(1003 * COIN, 1, 6, 0, 0, vCoins,
                                                  setCoinsRet, nValueRet);
         assert(success);
         assert(nValueRet == 1003 * COIN);
         assert(setCoinsRet.size() == 2);
     }
+
+    ClearCoins();
 }
 
-BENCHMARK(CoinSelection);
+BENCHMARK(CoinSelection)

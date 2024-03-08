@@ -37,6 +37,16 @@ def http_get_call(host, port, path, response_object=0):
 
     return conn.getresponse().read().decode('utf-8')
 
+
+def http_get_call_with_headers(host, port, path, headers, response_object=0):
+    conn = http.client.HTTPConnection(host, port)
+    conn.request('GET', path, None, headers)
+
+    if response_object:
+        return conn.getresponse()
+
+    return conn.getresponse().read().decode('utf-8')
+
 # allows simple http post calls with a request body
 
 
@@ -129,13 +139,22 @@ class RESTTest (BitcoinTestFramework):
         #
         # GETUTXOS: now check both with the same request #
         #
+        # request data of one known transaction twice at two different positions
+        # to make sure that utxo position index works as expected
         json_request = '/checkmempool/' + \
-            txid + '-' + str(n) + '/' + vintx + '-0'
+            txid + '-' + str(n) + '/' + vintx + '-0/' + txid + '-' + str(n)
         json_string = http_get_call(
             url.hostname, url.port, '/rest/getutxos' + json_request + self.FORMAT_SEPARATOR + 'json')
         json_obj = json.loads(json_string)
-        assert_equal(len(json_obj['utxos']), 1)
-        assert_equal(json_obj['bitmap'], "10")
+        assert_equal(len(json_obj['utxos']), 2)
+        assert_equal(json_obj['bitmap'], "101")
+        # now check the same thing without also querying mempool
+        json_request = '/' + txid + '-' + str(n) + '/' + vintx + '-0/' + txid + '-' + str(n)
+        json_string = http_get_call(
+            url.hostname, url.port, '/rest/getutxos' + json_request + self.FORMAT_SEPARATOR + 'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 2)
+        assert_equal(json_obj['bitmap'], "101")
 
         # test binary response
         bb_hash = self.nodes[0].getbestblockhash()
@@ -242,6 +261,28 @@ class RESTTest (BitcoinTestFramework):
         assert_equal(response.status, 200)
         assert_greater_than(int(response.getheader('content-length')), 80)
         response_str = response.read()
+
+        # get binary block with range
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10-29'}, True)
+        assert_equal(response_str[10:30], response.read())
+        assert_equal(response.status, 206)
+        assert_equal(int(response.getheader('content-length')), 20)
+
+        # get binary block with invalid range parameters
+
+        # range overlapping
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=29-10'}, True)
+        assert_equal(response.status, 404)
+
+        # invalid format
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': '10-29'}, True)
+        assert_equal(response.status, 404)
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10'}, True)
+        assert_equal(response.status, 404)
 
         # compare with block header
         response_header = http_get_call(
@@ -369,7 +410,7 @@ class RESTTest (BitcoinTestFramework):
             url.hostname, url.port, '/rest/block/' + newblockhash[0] + self.FORMAT_SEPARATOR + 'json')
         json_obj = json.loads(json_string)
         for tx in json_obj['tx']:
-            if not 'coinbase' in tx['vin'][0]:  # exclude coinbase
+            if 'coinbase' not in tx['vin'][0]:  # exclude coinbase
                 assert_equal(tx['txid'] in txs, True)
 
         # check the same but without tx details

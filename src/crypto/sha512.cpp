@@ -6,6 +6,7 @@
 
 #include "crypto/common.h"
 
+#include <cassert>
 #include <cstring>
 
 // Internal implementation code.
@@ -246,6 +247,10 @@ CSHA512::CSHA512() : bytes(0) {
 }
 
 CSHA512 &CSHA512::Write(const uint8_t *data, size_t len) {
+    if (len == 0) {
+        return *this;    
+    }
+    assert(data);
     const uint8_t *end = data + len;
     size_t bufsize = bytes % 128;
     if (bufsize && bufsize + len >= 128) {

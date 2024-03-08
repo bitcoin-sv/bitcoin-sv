@@ -19,8 +19,7 @@ class TxnMallTest(BitcoinTestFramework):
     def setup_network(self):
         # Start with split network:
         super().setup_network()
-        disconnect_nodes(self.nodes[1], 2)
-        disconnect_nodes(self.nodes[2], 1)
+        self.split_network()
 
     def run_test(self):
         # All nodes should start with 1,250 BTC:
@@ -108,7 +107,7 @@ class TxnMallTest(BitcoinTestFramework):
         self.nodes[2].generate(1)
 
         # Reconnect the split network, and sync chain:
-        connect_nodes(self.nodes[1], 2)
+        connect_nodes(self.nodes, 1, 2)
         self.nodes[2].generate(1)  # Mine another block to make sure we sync
         sync_blocks(self.nodes)
         assert_equal(self.nodes[0].gettransaction(

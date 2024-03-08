@@ -115,6 +115,8 @@
 #ifndef TINYFORMAT_H_INCLUDED
 #define TINYFORMAT_H_INCLUDED
 
+// NOLINTBEGIN(*)
+
 namespace tinyformat {}
 //------------------------------------------------------------------------------
 // Config section.  Customize to your liking!
@@ -133,6 +135,7 @@ namespace tfm = tinyformat;
 // Implementation details.
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -206,8 +209,8 @@ namespace detail {
     };
     template <> struct is_wchar<wchar_t *> {};
     template <> struct is_wchar<const wchar_t *> {};
-    template <int n> struct is_wchar<const wchar_t[n]> {};
-    template <int n> struct is_wchar<wchar_t[n]> {};
+    template <size_t n> struct is_wchar<const wchar_t[n]> {};
+    template <size_t n> struct is_wchar<wchar_t[n]> {};
 
     // Format the value by casting to type fmtT. This default implementation
     // should never be called.
@@ -901,13 +904,13 @@ typedef const FormatList &FormatListRef;
 namespace detail {
 
     // Format list subclass with fixed storage to avoid dynamic allocation
-    template <int N> class FormatListN : public FormatList {
+    template <size_t N> class FormatListN : public FormatList {
     public:
 #ifdef TINYFORMAT_USE_VARIADIC_TEMPLATES
         template <typename... Args>
         FormatListN(const Args &... args)
-            : FormatList(&m_formatterStore[0], N), m_formatterStore{
-                                                       FormatArg(args)...} {
+            : FormatList(&m_formatterStore[0], static_cast<int>(N))
+            , m_formatterStore{FormatArg(args)...} {
             static_assert(sizeof...(args) == N, "Number of args must be N");
         }
 #else // C++98 version
@@ -1072,5 +1075,7 @@ std::string format(const std::string &fmt, const Args &... args) {
 } // namespace tinyformat
 
 #define strprintf tfm::format
+
+// NOLINTEND(*)
 
 #endif // TINYFORMAT_H_INCLUDED

@@ -12,43 +12,66 @@
 #include "fs.h"
 #include "key.h"
 #include "logging.h"
+#include "miner_id/miner_info_tracker.h"
 #include "mining/factory.h"
-#include "net_processing.h"
+#include "mining/journal_builder.h"
+#include "net/net_processing.h"
+#include "pow.h"
 #include "pubkey.h"
 #include "random.h"
+#include "rpc/mining.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
+#include "taskcancellation.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-#include "validation.h"
 
 #include "test/testutil.h"
+#include "test/mempool_test_access.h"
 
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <list>
 #include <memory>
 #include <thread>
 
-uint256 insecure_rand_seed = GetRandHash();
+using mining::CBlockTemplate;
+
+constexpr auto env_var_name = "TEST_BITCOIN_RANDOM_SEED";
+
+const uint256 insecure_rand_seed = []() {
+    auto env = std::getenv(env_var_name);
+    auto hash = env ? uint256S(env) : GetRandHash();
+    if (env) {
+        printf("Global random seed is set by environment: %s\n", hash.GetHex().c_str());
+    } else {
+        printf("To re-run tests using the same seed, set the following environment variable:\n export %s=%s\n", env_var_name, hash.GetHex().c_str());
+    }
+    return hash;
+}();
 FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern void noui_connect();
 
-BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
-    SHA256AutoDetect();
+void ResetGlobalRandomContext() {
     RandomInit();
-    ECC_Start();
+    insecure_rand_ctx = FastRandomContext{insecure_rand_seed};
+}
+
+BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetModifiableGlobalConfig()) {
+    SHA256AutoDetect();
     SetupEnvironment();
     SetupNetworking();
     InitSignatureCache();
     InitScriptExecutionCache();
+    ResetGlobalRandomContext();
 
     // Don't want to write to bitcoind.log file.
     GetLogger().fPrintToDebugLog = false;
@@ -56,62 +79,102 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
     fCheckBlockIndex = true;
     SelectParams(chainName);
     noui_connect();
+    testConfig.Reset(); // make sure that we start every test with a clean config
+    testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    testConfig.SetBlockScriptValidatorsParams(
+        DEFAULT_SCRIPT_CHECK_POOL_SIZE,
+        DEFAULT_SCRIPTCHECK_THREADS,
+        DEFAULT_TXNCHECK_THREADS,
+        DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE);
+
+    // Use a temporary datadir that we don't inadvertently create the default one.
+    ClearDatadirCache();
+    static FastRandomContext local_rand_ctx{GetRandHash()};
+    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
+                                         (unsigned long)GetTime(),
+                                         (int)(local_rand_ctx.randrange(100000)));
+    fs::create_directories(pathTemp);
+    gArgs.ForceSetArg("-datadir", pathTemp.string());
+
+    mempool.SuspendSanityCheck();
+    mempool.getNonFinalPool().loadConfig();
+    CTxMemPoolTestAccess{mempool}.InitInMemoryMempoolTxDB();
+    mempool.ResumeSanityCheck();
+    if (!g_MempoolDatarefTracker)
+        g_MempoolDatarefTracker = std::make_unique<mining::MempoolDatarefTracker>();
+    if (!g_BlockDatarefTracker)
+        g_BlockDatarefTracker = std::make_unique<mining::BlockDatarefTracker>();
 
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
-    ECC_Stop();
-    g_connman.reset();
+    fs::remove_all(pathTemp);
 }
 
-TestingSetup::TestingSetup(const std::string &chainName)
+TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory::BlockAssemblerType assemblerType)
     : BasicTestingSetup(chainName) {
-
+    
+    testConfig.SetMiningCandidateBuilder(assemblerType);
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
-    GlobalConfig &config = GlobalConfig::GetConfig();
-    config.Reset(); // make sure that we start every test with a clean config
-    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     RegisterAllRPCCommands(tableRPC);
-    ClearDatadirCache();
-    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
-                                         (unsigned long)GetTime(),
-                                         (int)(InsecureRandRange(100000)));
-    fs::create_directories(pathTemp);
-    gArgs.ForceSetArg("-datadir", pathTemp.string());
-    mempool.setSanityCheck(1.0);
+    mempool.SetSanityCheck(1.0);
+    InitFrozenTXO(DEFAULT_FROZEN_TXO_DB_CACHE);
     pblocktree = new CBlockTreeDB(1 << 20, true);
-    pcoinsdbview = new CCoinsViewDB(1 << 23, true);
-    pcoinsTip = new CCoinsViewCache(pcoinsdbview);
-    if (!InitBlockIndex(config)) {
+    pcoinsTip =
+        std::make_unique<CoinsDB>(
+            std::numeric_limits<size_t>::max(),
+            1 << 23,
+            CoinsDB::MaxFiles::Default(),
+            true);
+    if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
     }
     {
-        CValidationState state;
-        if (!ActivateBestChain(config, state)) {
+        // dummyState is used to report errors, not block related invalidity - ignore it
+        // (see description of ActivateBestChain)
+        CValidationState dummyState;
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        auto source = task::CCancellationSource::Make();
+        if (!ActivateBestChain(source->GetToken(), testConfig, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
-    nScriptCheckThreads = 3;
-    for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-        threadGroup.create_thread(&ThreadScriptCheck);
-    }
+    InitScriptCheckQueues(testConfig, threadGroup);
 
     // Deterministic randomness for tests.
-    g_connman = std::unique_ptr<CConnman>(new CConnman(config, 0x1337, 0x1337));
+    g_connman =
+        std::make_unique<CConnman>(
+          testConfig, 0x1337, 0x1337, std::chrono::milliseconds{0});
     connman = g_connman.get();
     RegisterNodeSignals(GetNodeSignals());
+
+    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testConfig);
 }
 
 TestingSetup::~TestingSetup() {
-    UnregisterNodeSignals(GetNodeSignals());
+    mining::g_miningFactory.reset();
     threadGroup.interrupt_all();
     threadGroup.join_all();
     UnloadBlockIndex();
-    delete pcoinsTip;
-    delete pcoinsdbview;
+    pcoinsTip.reset();
+
+    if (g_connman)
+    {
+        g_connman->Interrupt();
+        // call Stop first as CConnman members are using g_connman global
+        // variable and they must be shut down before the variable is reset to
+        // nullptr
+        g_connman->Stop();
+        g_connman.reset();
+        connman = nullptr;
+    }
+
+    ShutdownScriptCheckQueues();
+    UnregisterNodeSignals(GetNodeSignals());
     delete pblocktree;
-    fs::remove_all(pathTemp);
+    pblocktree = nullptr;
+    ShutdownFrozenTXO();
 }
 
 TestChain100Setup::TestChain100Setup()
@@ -136,7 +199,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+            mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 
@@ -147,7 +210,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     }
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
-    IncrementExtraNonce(config, &block, pindexPrev, extraNonce);
+    IncrementExtraNonce(&block, pindexPrev, extraNonce);
 
     while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;
@@ -155,7 +218,8 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
 
     std::shared_ptr<const CBlock> shared_pblock =
         std::make_shared<const CBlock>(block);
-    ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr);
+    ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr,
+        CBlockSource::MakeLocal("test"));
 
     CBlock result = block;
     return result;
@@ -171,14 +235,8 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx,
 
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
                                                CTxMemPool *pool) {
-    // Hack to assume either it's completely dependent on other mempool txs or
-    // not at all.
-    Amount inChainValue =
-        pool && pool->HasNoInputsOf(txn) ? txn.GetValueOut() : Amount(0);
-
-    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, dPriority,
-                           nHeight, inChainValue, spendsCoinbase, sigOpCost,
-                           lp);
+    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, 
+                           nHeight, spendsCoinbase, lp);
 }
 
 namespace {

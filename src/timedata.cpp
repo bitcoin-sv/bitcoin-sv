@@ -8,11 +8,10 @@
 
 #include "timedata.h"
 
-#include "netaddress.h"
+#include "net/netaddress.h"
 #include "sync.h"
 #include "ui_interface.h"
 #include "util.h"
-#include "utilstrencodings.h"
 #include "warnings.h"
 
 static CCriticalSection cs_nTimeOffset;
@@ -51,7 +50,7 @@ void AddTimeData(const CNetAddr &ip, int64_t nOffsetSample) {
     // Add data
     static CMedianFilter<int64_t> vTimeOffsets(BITCOIN_TIMEDATA_MAX_SAMPLES, 0);
     vTimeOffsets.input(nOffsetSample);
-    LogPrint(BCLog::NET,
+    LogPrint(BCLog::NETMSG,
              "added time data, samples %d, offset %+d (%+d minutes)\n",
              vTimeOffsets.size(), nOffsetSample, nOffsetSample / 60);
 
@@ -107,13 +106,13 @@ void AddTimeData(const CNetAddr &ip, int64_t nOffsetSample) {
             }
         }
 
-        if (LogAcceptCategory(BCLog::NET)) {
+        if (LogAcceptCategory(BCLog::NETMSG)) {
             for (int64_t n : vSorted) {
-                LogPrint(BCLog::NET, "%+d  ", n);
+                LogPrint(BCLog::NETMSG, "%+d  ", n);
             }
 
-            LogPrint(BCLog::NET, "|  ");
-            LogPrint(BCLog::NET, "nTimeOffset = %+d  (%+d minutes)\n",
+            LogPrint(BCLog::NETMSG, "|  ");
+            LogPrint(BCLog::NETMSG, "nTimeOffset = %+d  (%+d minutes)\n",
                      nTimeOffset, nTimeOffset / 60);
         }
     }

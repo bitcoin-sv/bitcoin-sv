@@ -3,10 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
-
 #include "base58.h"
-#include "validation.h"
-
 #include <string>
 #include <vector>
 
@@ -40,6 +37,6 @@ static void Base58Decode(benchmark::State &state) {
     }
 }
 
-BENCHMARK(Base58Encode);
-BENCHMARK(Base58CheckEncode);
-BENCHMARK(Base58Decode);
+BENCHMARK(Base58Encode)
+BENCHMARK(Base58CheckEncode)
+BENCHMARK(Base58Decode)

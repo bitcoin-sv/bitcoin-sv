@@ -5,19 +5,21 @@
 
 #include "txdb.h"
 
+#include "block_file_info.h"
 #include "chainparams.h"
 #include "config.h"
+#include "disk_block_index.h"
+#include "disk_tx_pos.h"
 #include "hash.h"
 #include "init.h"
 #include "pow.h"
 #include "random.h"
-#include "ui_interface.h"
 #include "uint256.h"
 #include "util.h"
-
+#include "ui_interface.h"
 #include <boost/thread.hpp>
-
-#include <cstdint>
+#include <string>
+#include <vector>
 
 static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';
@@ -56,24 +58,133 @@ struct CoinEntry {
 };
 } // namespace
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
-    : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true) {}
+namespace {
 
-bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    return db.Read(CoinEntry(&outpoint), coin);
+/**
+ * Custom stream class that only unserializes the script if it is not larger than maxScriptSize.
+ *
+ * If the script is larger, it is not unserialized and the actualScriptSize is set to the actual size of script.
+ * Otherwise value of actualScriptSize is left as is (i.e. empty).
+ *
+ * After unserialization, caller can use member actualScriptSIze to check if script was actually unserialized
+ * and determine actual length of the script.
+ *
+ * This roundabout way of unserializing script and template trickery is needed to preserve compatibility with other
+ * Unserialize() functions that unconditionally unserialize everything.
+ *
+ * @note This only works correctly when unserializing classes with at most one script because actual size of only
+ *       one script can be provided. It is enforced (assert) within implementation of Unserialize() method.
+ *
+ * @see CScriptCompressor::NonSpecialScriptUnserializer<CDataStreamInput_NoScr> that provides actual Unserialize() method.
+ */
+template<class TBase>
+struct CDataStreamInput_NoScr : TBase
+{
+    using Base = TBase;
+
+    CDataStreamInput_NoScr(std::string_view buf, const std::vector<uint8_t>& key, std::size_t maxScriptSize, std::optional<std::size_t>& actualScriptSize)
+    : Base(buf, key)
+    , maxScriptSize(maxScriptSize)
+    , actualScriptSize(actualScriptSize)
+    , wasUnserializeScriptCalled(false)
+    {}
+
+    template<typename T>
+    CDataStreamInput_NoScr& operator>>(T& obj)
+    {
+        ::Unserialize(*this, obj);
+        return *this;
+    }
+
+    const std::size_t maxScriptSize;
+    std::optional<std::size_t>& actualScriptSize;
+    bool wasUnserializeScriptCalled;
+};
+
+} // anonymous namespace
+
+/**
+ * Implements unserialization of locking script only if it is not larger than maximum size specified
+ * in CDataStreamInput_NoScr object.
+ */
+template<class TBase>
+class CScriptCompressor::NonSpecialScriptUnserializer< CDataStreamInput_NoScr<TBase> >
+{
+public:
+    using Stream = CDataStreamInput_NoScr<TBase>;
+
+    static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
+    {
+        assert([](auto& s){
+            bool result = !s.wasUnserializeScriptCalled;
+            s.wasUnserializeScriptCalled = true;
+            return result;
+        }(s)); // Cannot unserialize more than one script using only one CDataStreamInput_NoScr object!
+               // NOTE: Lambda is used because we want to remember within assert expression that Unserialize was called since
+               //       this flag is only needed by assert expression. I.e.: No assert, no need to change the flag.
+        if(nSize > s.maxScriptSize)
+        {
+            // Default initialize script if it is too large
+            self->script = CScript();
+
+            // Provide actual script size to the caller
+            s.actualScriptSize = nSize;
+
+            return;
+        }
+
+        // Unserialize script using Base of our custom stream class
+        NonSpecialScriptUnserializer<typename Stream::Base>::Unserialize(self, s, nSize);
+    }
+};
+
+std::optional<CoinImpl> CoinsDB::DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
+    try
+    {
+        std::optional<CoinImpl> coin{CoinImpl{}};
+        // If script is not unserialized, this will be set to the actual size of the script.
+        // Otherwise (i.e. if script is unserialized), value will remain unset.
+        std::optional<std::size_t> actualScriptSize;
+        bool res = db.Read<CDataStreamInput_NoScr>(CoinEntry(&outpoint), coin.value(), maxScriptSize, actualScriptSize);
+        if( res )
+        {
+            if(actualScriptSize.has_value())
+            {
+                // Script was not unserialized
+                return {
+                    CoinImpl{
+                        coin->GetTxOut().nValue,
+                        *actualScriptSize,
+                        coin->GetHeight(),
+                        coin->IsCoinBase(),
+                        coin->IsConfiscation()}};
+            }
+
+            return coin;
+        }
+
+        return {};
+    } catch (const std::runtime_error &e) {
+        uiInterface.ThreadSafeMessageBox(
+            _("Error reading from database, shutting down."), "",
+            CClientUIInterface::MSG_ERROR);
+        LogPrintf("Error reading from database: %s\n", e.what());
+        // Starting the shutdown sequence and returning false to the caller
+        // would be interpreted as 'entry not found' (as opposed to unable
+        // to read data), and could lead to invalid interpretation. Just
+        // exit immediately, as we can't continue anyway, and all writes
+        // should be atomic.
+        abort();
+    }
 }
 
-bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {
-    return db.Exists(CoinEntry(&outpoint));
-}
-
-uint256 CCoinsViewDB::GetBestBlock() const {
+uint256 CoinsDB::DBGetBestBlock() const {
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain)) return uint256();
     return hashBestChain;
 }
 
-std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
+std::vector<uint256> CoinsDB::GetHeadBlocks() const {
     std::vector<uint256> vhashHeadBlocks;
     if (!db.Read(DB_HEAD_BLOCKS, vhashHeadBlocks)) {
         return std::vector<uint256>();
@@ -81,16 +192,16 @@ std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
     return vhashHeadBlocks;
 }
 
-bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
+bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
     size_t batch_size =
-        (size_t)gArgs.GetArg("-dbbatchsize", nDefaultDbBatchSize);
+        (size_t)gArgs.GetArgAsBytes("-dbbatchsize", nDefaultDbBatchSize);
     int crash_simulate = gArgs.GetArg("-dbcrashratio", 0);
     assert(!hashBlock.IsNull());
 
-    uint256 old_tip = GetBestBlock();
+    uint256 old_tip = DBGetBestBlock();
     if (old_tip.IsNull()) {
         // We may be in the middle of replaying.
         std::vector<uint256> old_heads = GetHeadBlocks();
@@ -110,10 +221,16 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
             CoinEntry entry(&it->first);
-            if (it->second.coin.IsSpent()) {
+            if (it->second.GetCoin().IsSpent()) {
                 batch.Erase(entry);
             } else {
-                batch.Write(entry, it->second.coin);
+                auto coinWithScript = it->second.GetCoinWithScript();
+
+                // coin entries that have DIRTY flag set and are not spent must
+                // always contain the script
+                assert(coinWithScript.has_value());
+
+                batch.Write(entry, coinWithScript.value());
             }
             changed++;
         }
@@ -127,7 +244,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
             batch.Clear();
             if (crash_simulate) {
                 static FastRandomContext rng;
-                if (rng.randrange(crash_simulate) == 0) {
+                static int64_t crash_notbefore = gArgs.GetArg("-dbcrashnotbefore", 0);
+                if (rng.randrange(crash_simulate) == 0 && GetSystemTimeInSeconds() > crash_notbefore) {
                     LogPrintf("Simulating a crash. Goodbye.\n");
                     _Exit(0);
                 }
@@ -148,7 +266,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     return ret;
 }
 
-size_t CCoinsViewDB::EstimateSize() const {
+size_t CoinsDB::EstimateSize() const {
     return db.EstimateSize(DB_COIN, char(DB_COIN + 1));
 }
 
@@ -176,7 +294,7 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
     return Read(DB_LAST_BLOCK, nFile);
 }
 
-CCoinsViewCursor *CCoinsViewDB::Cursor() const {
+CCoinsViewDBCursor *CoinsDB::Cursor() const {
     CCoinsViewDBCursor *i = new CCoinsViewDBCursor(
         const_cast<CDBWrapper &>(db).NewIterator(), GetBestBlock());
     /**
@@ -197,6 +315,29 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const {
     return i;
 }
 
+// Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
+CCoinsViewDBCursor* CoinsDB::Cursor(const TxId &txId) const {
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
+        const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
+    
+    COutPoint op = COutPoint(txId, 0);
+    CoinEntry key = CoinEntry(&op);
+
+    i->pcursor->Seek(key);
+
+    // Cache key of first record
+    if (i->pcursor->Valid()) {
+        CoinEntry entry(&i->keyTmp.second);
+        i->pcursor->GetKey(entry);
+        i->keyTmp.first = entry.key;
+    }
+    else {
+        // Make sure Valid() and GetKey() return false
+        i->keyTmp.first = 0;
+    }
+    return i;
+}
+
 bool CCoinsViewDBCursor::GetKey(COutPoint &key) const {
     // Return cached key
     if (keyTmp.first == DB_COIN) {
@@ -206,12 +347,52 @@ bool CCoinsViewDBCursor::GetKey(COutPoint &key) const {
     return false;
 }
 
-bool CCoinsViewDBCursor::GetValue(Coin &coin) const {
-    return pcursor->GetValue(coin);
+std::optional<CoinImpl> CCoinsViewDBCursor::GetCoin(uint64_t maxScriptSize) const {
+    std::optional<CoinImpl> coin{ CoinImpl{} };
+    // If script is not unserialized, this will be set to the actual size of the script.
+    // Otherwise (i.e. if script is unserialized), value will remain unset.
+    std::optional<std::size_t> actualScriptSize;
+    bool res = pcursor->GetValue<CDataStreamInput_NoScr>(coin.value(), maxScriptSize, actualScriptSize);
+    if( res )
+    {
+        if(actualScriptSize.has_value())
+        {
+            // Script was not unserialized
+            return {
+                CoinImpl{
+                    coin->GetTxOut().nValue,
+                    *actualScriptSize,
+                    coin->GetHeight(),
+                    coin->IsCoinBase(),
+                    coin->IsConfiscation()}};
+        }
+
+        return coin;
+    }
+
+    return {};
 }
 
-unsigned int CCoinsViewDBCursor::GetValueSize() const {
-    return pcursor->GetValueSize();
+bool CCoinsViewDBCursor::GetValue(Coin &coin) const {
+    if(auto tmp = GetCoin(0); tmp.has_value())
+    {
+        coin = Coin{tmp.value()};
+
+        return true;
+    }
+
+    return false;
+}
+
+bool CCoinsViewDBCursor::GetValue(CoinWithScript &coin) const {
+    if(auto tmp = GetCoin(std::numeric_limits<uint64_t>::max()); tmp.has_value())
+    {
+        coin = std::move(tmp.value());
+
+        return true;
+    }
+
+    return false;
 }
 
 bool CCoinsViewDBCursor::Valid() const {
@@ -244,7 +425,7 @@ bool CBlockTreeDB::WriteBatchSync(
              blockinfo.begin();
          it != blockinfo.end(); it++) {
         batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()),
-                    CDiskBlockIndex(*it));
+                    CDiskBlockIndex(const_cast<CBlockIndex&>(**it)));
     }
     return WriteBatch(batch, true);
 }
@@ -274,185 +455,320 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
-bool CBlockTreeDB::LoadBlockIndexGuts(
-    std::function<CBlockIndex *(const uint256 &)> insertBlockIndex) {
-    const Config &config = GlobalConfig::GetConfig();
+std::unique_ptr<CDBIterator> CBlockTreeDB::GetIterator()
+{
+    return std::unique_ptr<CDBIterator>{ NewIterator() };
+}
 
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
-
-    pcursor->Seek(std::make_pair(DB_BLOCK_INDEX, uint256()));
-
-    // Load mapBlockIndex
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
-        if (!pcursor->GetKey(key) || key.first != DB_BLOCK_INDEX) {
-            break;
-        }
-
-        CDiskBlockIndex diskindex;
-        if (!pcursor->GetValue(diskindex)) {
-            return error("LoadBlockIndex() : failed to read value");
-        }
-
-        // Construct block index object
-        CBlockIndex *pindexNew = insertBlockIndex(diskindex.GetBlockHash());
-        pindexNew->pprev = insertBlockIndex(diskindex.hashPrev);
-        pindexNew->nHeight = diskindex.nHeight;
-        pindexNew->nFile = diskindex.nFile;
-        pindexNew->nDataPos = diskindex.nDataPos;
-        pindexNew->nUndoPos = diskindex.nUndoPos;
-        pindexNew->nVersion = diskindex.nVersion;
-        pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-        pindexNew->nTime = diskindex.nTime;
-        pindexNew->nBits = diskindex.nBits;
-        pindexNew->nNonce = diskindex.nNonce;
-        pindexNew->nStatus = diskindex.nStatus;
-        pindexNew->nTx = diskindex.nTx;
-
-        if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits,
-                              config)) {
-            return error("LoadBlockIndex(): CheckProofOfWork failed: %s",
-                         pindexNew->ToString());
-        }
-
-        pcursor->Next();
+bool CoinsDB::IsOldDBFormat()
+{
+    std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
+    pcursor->Seek(std::make_pair(DB_COINS, uint256()));
+    if (!pcursor->Valid())
+    {
+        return false;
     }
-
     return true;
 }
 
-namespace {
-//! Legacy class to deserialize pre-pertxout database entries without reindex.
-class CCoins {
-public:
-    //! whether transaction is a coinbase
-    bool fCoinBase;
+CoinsDB::CoinsDB(
+        uint64_t cacheSizeThreshold,
+        size_t nCacheSize,
+        CDBWrapper::MaxFiles maxFiles,
+        bool fMemory,
+        bool fWipe)
+    : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true, maxFiles }
+    , mCacheSizeThreshold{cacheSizeThreshold}
+{}
 
-    //! unspent transaction outputs; spent outputs are .IsNull(); spent outputs
-    //! at the end of the array are dropped
-    std::vector<CTxOut> vout;
+size_t CoinsDB::DynamicMemoryUsage() const {
+    std::shared_lock lock { mCoinsViewCacheMtx };
+    return mCache.DynamicMemoryUsage();
+}
 
-    //! at which height this transaction was included in the active block chain
-    int nHeight;
-
-    //! empty constructor
-    CCoins() : fCoinBase(false), vout(0), nHeight(0) {}
-
-    template <typename Stream> void Unserialize(Stream &s) {
-        uint32_t nCode = 0;
-        // version
-        int nVersionDummy;
-        ::Unserialize(s, VARINT(nVersionDummy));
-        // header code
-        ::Unserialize(s, VARINT(nCode));
-        fCoinBase = nCode & 1;
-        std::vector<bool> vAvail(2, false);
-        vAvail[0] = (nCode & 2) != 0;
-        vAvail[1] = (nCode & 4) != 0;
-        uint32_t nMaskCode = (nCode / 8) + ((nCode & 6) != 0 ? 0 : 1);
-        // spentness bitmask
-        while (nMaskCode > 0) {
-            uint8_t chAvail = 0;
-            ::Unserialize(s, chAvail);
-            for (unsigned int p = 0; p < 8; p++) {
-                bool f = (chAvail & (1 << p)) != 0;
-                vAvail.push_back(f);
-            }
-            if (chAvail != 0) {
-                nMaskCode--;
-            }
+void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
+{
+    // Sort inputs; leveldb seems to prefer it that way
+    auto Sort = [](const COutPoint& out1, const COutPoint& out2)
+    {
+        if(out1.GetTxId() == out2.GetTxId())
+        {
+            return out1.GetN() < out2.GetN();
         }
-        // txouts themself
-        vout.assign(vAvail.size(), CTxOut());
-        for (size_t i = 0; i < vAvail.size(); i++) {
-            if (vAvail[i]) {
-                ::Unserialize(s, REF(CTxOutCompressor(vout[i])));
-            }
+        return out1.GetTxId() < out2.GetTxId();
+    };
+
+    std::vector<COutPoint> allInputs {};
+    for(size_t i = 1; i < txns.size(); ++i)
+    {
+        for(const auto& in: txns[i]->vin)
+        {
+            allInputs.push_back(in.prevout);
         }
-        // coinbase height
-        ::Unserialize(s, VARINT(nHeight));
     }
-};
-} // namespace
+    // FIXME: Consider using parallel sort when it beconmes available
+    // NOTE: parallel sorting requires -ltbb in few GCC versions
+    std::sort(allInputs.begin(), allInputs.end(), Sort);
 
-/**
- * Upgrade the database from older formats.
- *
- * Currently implemented: from the per-tx utxo model (0.8..0.14.x) to per-txout.
- */
-bool CCoinsViewDB::Upgrade() {
-    std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
-    pcursor->Seek(std::make_pair(DB_COINS, uint256()));
-    if (!pcursor->Valid()) {
+    for(const auto& outpoint : allInputs)
+    {
+        GetCoin(outpoint, std::numeric_limits<uint64_t>::max());
+    }
+}
+
+std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
+    std::optional<CoinImpl> coinFromCache;
+    size_t maxScriptLoadingSize = 0;
+
+    // Scope guard must protect the scope until the end of the cache insertion
+    // below the infinite while loop if it is instantiated inside that loop!
+    std::optional<FetchingCoins::ScopeGuard> fetchCoinsGuard;
+
+    while(true)
+    {
+        {
+            std::shared_lock lock { mCoinsViewCacheMtx };
+
+            coinFromCache = mCache.FetchCoin(outpoint);
+
+            if (coinFromCache.has_value())
+            {
+                if (coinFromCache->IsSpent())
+                {
+                    return {};
+                }
+                else if (coinFromCache->HasScript())
+                {
+                    return coinFromCache;
+                }
+                else if(maxScriptSize < coinFromCache->GetScriptSize())
+                {
+                    // make a copy since we will swap the cached value on script load
+                    // and we want the child view to re-request the coin from us
+                    // at that point to preserve thread safety
+                    return
+                        CoinImpl{
+                            coinFromCache->GetTxOut().nValue,
+                            coinFromCache->GetScriptSize(),
+                            coinFromCache->GetHeight(),
+                            coinFromCache->IsCoinBase(),
+                            coinFromCache->IsConfiscation()};
+                }
+            }
+
+            // Scoped guard prevents race to mCoinsViewCacheMtx unique lock as reader threads
+            // shouldn't get to it before the writer thread has the chance to write it into
+            // the cache (the first thread that manages the insert)
+            // We have to grab it under mCoinsViewCacheMtx being locked since
+            // we need the guarantee that TryInsert won't accidentally cause
+            // a race condition that would go to the database more than once
+            // so the flow is:
+            // T1: shared locks mCoinsViewCacheMtx
+            // T1: doesn't find the coin and grabs the fetch guard
+            // T2: shared locks mCoinsViewCacheMtx
+            // T2: doesn't find the coin and can't obtain fetch guard
+            // T1: releases shared lock of mCoinsViewCacheMtx
+            // T2: still can't obtain fetch guard
+            // T1: obtains exclusive lock of mCoinsViewCacheMtx after all
+            //     other threads left this shared lock scope
+            // T1: writes to cache or fails to fetch coin
+            // T1: releases exclusive lock of mCoinsViewCacheMtx
+            // T2: shared locks mCoinsViewCacheMtx
+            // T2: is guaranteed to either get the coin (if it exists) from the
+            //     cache above or obtain fetch coins guard and re-try DB fetch
+            //     of coin that is guaranteed not to be in the cache
+            fetchCoinsGuard = mFetchingCoins.TryInsert(outpoint);
+            if (fetchCoinsGuard.has_value())
+            {
+                // it can happen that we'll get multiple requests and unnecessarily
+                // load more scripts than needed but that should be rare enough
+                maxScriptLoadingSize = getMaxScriptLoadingSize(maxScriptSize);
+                break;
+            }
+        }
+
+        // All but the first reader will end up here. Give the initial thread a
+        // chance to load the coin before re-attempting to access it.
+        //
+        // The code would get here extremely rarely during parallel block
+        // validation and almost simultaneous request of the same coin.
+        //
+        // The other, more likely scenario is chain validation when we validate
+        // dependant transactions in parallel. Validation will look for the
+        // transaction outputs of the ancestor transaction, that we will
+        // normally not find, and in parallel in a separate task validation of
+        // the dependant transaction will load inputs that we will _also_ not
+        // find.
+        //
+        // Sleeping as little time as possible speeds up the more common
+        // not-found case.
+        //
+        std::this_thread::yield();
+    }
+
+    // Only one thread can reach this point for each distinct outpoint – this
+    // will perform a read from the backing view and remove the outpoint from
+    // mFetchcingCoins when local variable “guard” goes out of scope so that
+    // the rare potential other threads that are waiting for the same outpoint
+    // may continue.
+
+    auto coinFromView = DBGetCoin(outpoint, maxScriptLoadingSize);
+    if (!coinFromView.has_value())
+    {
+        return {};
+    }
+
+    std::unique_lock lock { mCoinsViewCacheMtx };
+
+    if (coinFromCache.has_value())
+    {
+        assert(coinFromView->HasScript());
+
+        if (hasSpaceForScript(coinFromView.value().GetScriptSize()))
+        {
+            return mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value())).MakeNonOwning();
+        }
+
+        return coinFromView;
+    }
+
+    if (!hasSpaceForScript(coinFromView->GetScriptSize()))
+    {
+        mCache.AddCoin(
+            outpoint,
+            CoinImpl{
+                coinFromView->GetTxOut().nValue,
+                coinFromView->GetScriptSize(),
+                coinFromView->GetHeight(),
+                coinFromView->IsCoinBase(),
+                coinFromView->IsConfiscation()});
+
+        return coinFromView;
+    }
+
+    auto& cws = mCache.AddCoin(outpoint, std::move(coinFromView.value()));
+    assert(cws.IsStorageOwner());
+
+    return cws.MakeNonOwning();
+}
+
+bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
+    std::shared_lock lock { mCoinsViewCacheMtx };
+    return mCache.FetchCoin(outpoint).has_value();
+}
+
+uint256 CoinsDB::GetBestBlock() const {
+    std::shared_lock lock { mCoinsViewCacheMtx };
+    if (hashBlock.IsNull()) {
+        hashBlock = DBGetBestBlock();
+    }
+    return hashBlock;
+}
+
+bool CoinsDB::BatchWrite(
+    const WPUSMutex::Lock& writeLock,
+    const uint256& hashBlockIn,
+    CCoinsMap&& mapCoins)
+{
+    assert( writeLock.GetLockType() == WPUSMutex::Lock::Type::write );
+    std::unique_lock lock { mCoinsViewCacheMtx };
+
+    if(hashBlockIn.IsNull())
+    {
+        assert(mapCoins.empty());
+    }
+    else
+    {
+        mCache.BatchWrite(mapCoins);
+        hashBlock = hashBlockIn;
+    }
+    return true;
+}
+
+bool CoinsDB::Flush()
+{
+    WPUSMutex::Lock writeLock = mMutex.WriteLock();
+    std::unique_lock lock { mCoinsViewCacheMtx };
+
+    if(hashBlock.IsNull())
+    {
+        // nothing new was added
         return true;
     }
 
-    int64_t count = 0;
-    LogPrintf("Upgrading utxo-set database...\n");
-    LogPrintf("[0%%]...");
-    size_t batch_size = 1 << 24;
-    CDBBatch batch(db);
-    uiInterface.SetProgressBreakAction(StartShutdown);
-    int reportDone = 0;
-    std::pair<uint8_t, uint256> key;
-    std::pair<uint8_t, uint256> prev_key = {DB_COINS, uint256()};
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-        if (ShutdownRequested()) {
-            break;
-        }
+    auto coins = mCache.MoveOutCoins();
 
-        if (!pcursor->GetKey(key) || key.first != DB_COINS) {
-            break;
-        }
+    return DBBatchWrite(coins, hashBlock);
+}
 
-        if (count++ % 256 == 0) {
-            uint32_t high =
-                0x100 * *key.second.begin() + *(key.second.begin() + 1);
-            int percentageDone = (int)(high * 100.0 / 65536.0 + 0.5);
-            uiInterface.ShowProgress(
-                _("Upgrading UTXO database") + "\n" +
-                    _("(press q to shutdown and continue later)") + "\n",
-                percentageDone);
-            if (reportDone < percentageDone / 10) {
-                // report max. every 10% step
-                LogPrintf("[%d%%]...", percentageDone);
-                reportDone = percentageDone / 10;
-            }
-        }
+void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)
+{
+    WPUSMutex::Lock writeLock = mMutex.WriteLock();
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    mCache.Uncache(vOutpoints);
+}
 
-        CCoins old_coins;
-        if (!pcursor->GetValue(old_coins)) {
-            return error("%s: cannot parse CCoins record", __func__);
-        }
+unsigned int CoinsDB::GetCacheSize() const {
+    std::shared_lock lock { mCoinsViewCacheMtx };
+    return mCache.CachedCoinsCount();
+}
 
-        TxId id(key.second);
-        for (size_t i = 0; i < old_coins.vout.size(); ++i) {
-            if (!old_coins.vout[i].IsNull() &&
-                !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
-                Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight,
-                             old_coins.fCoinBase);
-                COutPoint outpoint(id, i);
-                CoinEntry entry(&outpoint);
-                batch.Write(entry, newcoin);
-            }
-        }
+std::optional<Coin> CoinsDB::GetCoinByTxId(const TxId& txid) const
+{
+    constexpr int MAX_VIEW_ITERATIONS = 100;
 
-        batch.Erase(key);
-        if (batch.SizeEstimate() > batch_size) {
-            db.WriteBatch(batch);
-            batch.Clear();
-            db.CompactRange(prev_key, key);
-            prev_key = key;
-        }
+    // wtih MAX_VIEW_ITERATIONS we are avoiding for loop to MAX_OUTPUTS_PER_TX (in millions after genesis)
+    // performance testing indicates that after 100 look up by cursor becomes faster
 
-        pcursor->Next();
+    for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
+        auto alternate = GetCoin(COutPoint(txid, n), 0);
+        if (alternate.has_value()) {
+            return Coin{alternate.value()};
+        }
     }
 
-    db.WriteBatch(batch);
-    db.CompactRange({DB_COINS, uint256()}, key);
-    uiInterface.SetProgressBreakAction(std::function<void(void)>());
-    LogPrintf("[%s].\n", ShutdownRequested() ? "CANCELLED" : "DONE");
-    return !ShutdownRequested();
+    // for large output indexes delegate search to db cursor/iterator by key prefix (txId)
+
+    COutPoint key;
+    std::optional<Coin> coin{ Coin{} };
+
+    std::unique_ptr<CCoinsViewDBCursor> cursor{ Cursor(txid) };
+
+    if (cursor->Valid())
+    {
+        cursor->GetKey(key);
+    }
+    while (cursor->Valid() && key.GetTxId() == txid)
+    {
+        if (!cursor->GetValue(coin.value()))
+        {
+            return {};
+        }
+        assert(!coin->IsSpent());
+        return coin;
+    }
+    return {};
+}
+
+auto CoinsDBSpan::TryFlush() -> WriteState
+{
+    assert(mThreadId == std::this_thread::get_id());
+    assert(mShards.size() == 1);
+
+    if (!mDB.TryWriteLock( mView.mLock ))
+    {
+        return WriteState::invalidated;
+    }
+
+    auto revertToReadLock =
+        [this](void*)
+        {
+             mDB.ReadLock( mView.mLock );
+        };
+    std::unique_ptr<WPUSMutex::Lock, decltype(revertToReadLock)> guard{&mView.mLock, revertToReadLock};
+
+    return
+        mDB.BatchWrite(mView.mLock, GetBestBlock(), mShards[0].GetCache().MoveOutCoins())
+        ? WriteState::ok
+        : WriteState::error;
 }

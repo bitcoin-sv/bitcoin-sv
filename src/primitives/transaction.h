@@ -10,17 +10,31 @@
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
+#include <optional>
+#include <ostream>
 
-static const int SERIALIZE_TRANSACTION = 0x00;
+struct TxId;
+/**
+ * Specialise std::hash for TxId.
+ */
+namespace std
+{
+    template<> class hash<TxId> : public hash<uint256> {};
+}
 
 /**
  * A TxId is the identifier of a transaction. Currently identical to TxHash but
  * differentiated for type safety.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct TxId : public uint256 {
-    TxId() {}
-    explicit TxId(const uint256 &b) : uint256(b) {}
+    TxId() = default;
+    explicit TxId(const uint256 &b) : uint256{b} {}
+    TxId(const TxId& b) = default;
+    TxId& operator=(const TxId& b) = default;
 };
+
+std::istream & operator>>(std::istream&, TxId&);
 
 /**
  * A TxHash is the double sha256 hash of the full transaction data.
@@ -42,7 +56,7 @@ public:
     COutPoint() : txid(), n(-1) {}
     COutPoint(uint256 txidIn, uint32_t nIn) : txid(TxId(txidIn)), n(nIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -69,7 +83,13 @@ public:
     }
 
     std::string ToString() const;
+
+    friend std::istream& operator>>(std::istream&, COutPoint&);
+    friend std::ostream& operator<<(std::ostream&, const COutPoint&);
 };
+
+std::istream& operator>>(std::istream&, COutPoint&);
+std::ostream& operator<<(std::ostream&, const COutPoint&);
 
 /**
  * An input of a transaction. It contains the location of the previous
@@ -86,27 +106,27 @@ public:
      * Setting nSequence to this value for every input in a transaction disables
      * nLockTime.
      */
-    static const uint32_t SEQUENCE_FINAL = 0xffffffff;
+    static inline constexpr uint32_t SEQUENCE_FINAL = 0xffffffff;
 
     /* Below flags apply in the context of BIP 68*/
     /**
      * If this flag set, CTxIn::nSequence is NOT interpreted as a relative
      * lock-time.
      */
-    static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
+    static inline constexpr uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
 
     /**
      * If CTxIn::nSequence encodes a relative lock-time and this flag is set,
      * the relative lock-time has units of 512 seconds, otherwise it specifies
      * blocks with a granularity of 1.
      */
-    static const uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22);
+    static inline constexpr uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 22);
 
     /**
      * If CTxIn::nSequence encodes a relative lock-time, this mask is applied to
      * extract that lock-time from the sequence field.
      */
-    static const uint32_t SEQUENCE_LOCKTIME_MASK = 0x0000ffff;
+    static inline constexpr uint32_t SEQUENCE_LOCKTIME_MASK = 0x0000ffff;
 
     /**
      * In order to use the same number of bits to encode roughly the same
@@ -116,18 +136,21 @@ public:
      * seconds is performed by multiplying by 512 = 2^9, or equivalently
      * shifting up by 9 bits.
      */
-    static const int SEQUENCE_LOCKTIME_GRANULARITY = 9;
+    static inline constexpr int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     CTxIn() { nSequence = SEQUENCE_FINAL; }
 
     explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(),
                    uint32_t nSequenceIn = SEQUENCE_FINAL)
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : prevout(prevoutIn), scriptSig(scriptSigIn), nSequence(nSequenceIn) {}
     CTxIn(TxId prevTxId, uint32_t nOut, CScript scriptSigIn = CScript(),
           uint32_t nSequenceIn = SEQUENCE_FINAL)
+        // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : CTxIn(COutPoint(prevTxId, nOut), scriptSigIn, nSequenceIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -146,6 +169,10 @@ public:
     std::string ToString() const;
 };
 
+size_t ser_size(const CTxIn&);
+
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
+class Config; // declared in config.h, but including the header file here brings in additional problem
 /**
  * An output of a transaction.  It contains the public key that the next input
  * must be able to sign with to claim it.
@@ -157,10 +184,12 @@ public:
 
     CTxOut() { SetNull(); }
 
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CTxOut(Amount nValueIn, CScript scriptPubKeyIn)
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : nValue(nValueIn), scriptPubKey(scriptPubKeyIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -175,30 +204,16 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(const CFeeRate &minRelayTxFee) const {
-        /**
-         * "Dust" is defined in terms of CTransaction::minRelayTxFee, which has
-         * units satoshis-per-kilobyte. If you'd pay more than 1/3 in fees to
-         * spend something, then we consider it dust. A typical spendable
-         * non-segwit txout is 34 bytes big, and will need a CTxIn of at least
-         * 148 bytes to spend: so dust is a spendable txout less than
-         * 546*minRelayTxFee/1000 (in satoshis). A typical spendable segwit
-         * txout is 31 bytes big, and will need a CTxIn of at least 67 bytes to
-         * spend: so dust is a spendable txout less than 294*minRelayTxFee/1000
-         * (in satoshis).
-         */
-        if (scriptPubKey.IsUnspendable()) return Amount(0);
+    Amount GetDustThreshold(bool isGenesisEnabled) const {
+        // dust threshold is now hardcoded to 1 satoshi per output
+        if (scriptPubKey.IsUnspendable(isGenesisEnabled))
+            return Amount{0};
 
-        size_t nSize = GetSerializeSize(*this, SER_DISK, 0);
-
-        // the 148 mentioned above
-        nSize += (32 + 4 + 1 + 107 + 4);
-
-        return 3 * minRelayTxFee.GetFee(nSize);
+        return Amount{1};
     }
 
-    bool IsDust(const CFeeRate &minRelayTxFee) const {
-        return (nValue < GetDustThreshold(minRelayTxFee));
+    bool IsDust(bool isGenesisEnabled) const {
+        return (nValue < GetDustThreshold(isGenesisEnabled));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {
@@ -211,6 +226,8 @@ public:
 
     std::string ToString() const;
 };
+
+size_t ser_size(const CTxOut&); 
 
 class CMutableTransaction;
 
@@ -262,13 +279,16 @@ public:
     // actually immutable; deserialization and assignment are implemented,
     // and bypass the constness. This is safe, as they update the entire
     // structure, including the hash.
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int32_t nVersion;
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const uint32_t nLockTime;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 private:
     /** Memory only. */
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const uint256 hash;
 
     uint256 ComputeHash() const;
@@ -304,14 +324,6 @@ public:
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
-    // Compute priority, given priority of inputs and (optionally) tx size
-    double ComputePriority(double dPriorityInputs,
-                           unsigned int nTxSize = 0) const;
-
-    // Compute modified tx size for priority calculation (optionally given tx
-    // size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
-
     /**
      * Get the total transaction size in bytes.
      * @return Total transaction size in bytes
@@ -330,8 +342,12 @@ public:
         return a.hash != b.hash;
     }
 
+    bool HasP2SHOutput() const;
+
     std::string ToString() const;
 };
+
+size_t ser_size(const CTransaction&);
 
 /**
  * A mutable version of CTransaction.
@@ -355,6 +371,7 @@ public:
     }
 
     template <typename Stream>
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CMutableTransaction(deserialize_type, Stream &s) {
         Unserialize(s);
     }
@@ -373,7 +390,8 @@ public:
     }
 };
 
-typedef std::shared_ptr<const CTransaction> CTransactionRef;
+using CTransactionRef = std::shared_ptr<const CTransaction>;
+using CWeakTransactionRef = std::weak_ptr<const CTransaction>;
 static inline CTransactionRef MakeTransactionRef() {
     return std::make_shared<const CTransaction>();
 }
@@ -383,17 +401,18 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn) {
 }
 
 /** Precompute sighash midstate to avoid quadratic hashing */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct PrecomputedTransactionData {
     uint256 hashPrevouts, hashSequence, hashOutputs;
 
-    PrecomputedTransactionData()
-        : hashPrevouts(), hashSequence(), hashOutputs() {}
-
-    PrecomputedTransactionData(const PrecomputedTransactionData &txdata)
-        : hashPrevouts(txdata.hashPrevouts), hashSequence(txdata.hashSequence),
-          hashOutputs(txdata.hashOutputs) {}
+    PrecomputedTransactionData() = default;
+    PrecomputedTransactionData(const PrecomputedTransactionData&) = default;
+    PrecomputedTransactionData& operator=(const PrecomputedTransactionData&) = default;
 
     PrecomputedTransactionData(const CTransaction &tx);
 };
+
+// Test for double-spend notification enabled output on a transaction
+[[nodiscard]] std::pair<bool, size_t> TxnHasDSNotificationOutput(const CTransaction& txn);
 
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H

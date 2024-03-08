@@ -1,0 +1,11 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Unit test Bitcoin'
+description:  'Unit test Bitcoin'
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        ./src/test/test_bitcoin --catch_system_error=yes --log_level=test_suite
+      shell: bash

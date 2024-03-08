@@ -3,13 +3,106 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "core_io.h"
-#include "test/test_bitcoin.h"
+#include "script/script.h"
 
 #include <boost/test/unit_test.hpp>
 
+#include <array>
+#include <future>
 #include <string>
 
-BOOST_FIXTURE_TEST_SUITE(core_io_tests, BasicTestingSetup)
+using namespace std;
+
+BOOST_AUTO_TEST_SUITE(core_io_tests)
+
+BOOST_AUTO_TEST_CASE(mt_parse_script_of_opcodes)
+{
+    // Create n tasks to call ParseScript at the same time
+    // via a promise (go) and shared_future (sf).
+    promise<void> go;
+    shared_future sf{go.get_future()};
+
+    constexpr size_t n{8};
+    array<promise<void>, n> promises;
+    array<future<CScript>, n> futures;
+    for(size_t i{}; i < n; ++i)
+    {
+        futures[i] = async(
+            std::launch::async,
+            [&sf](auto* ready) {
+                ready->set_value();
+                sf.wait();
+                return ParseScript("OP_ADD");
+            },
+            &promises[i]);
+    }
+
+    // wait until all tasks are ready
+    for(auto& p : promises)
+        p.get_future().wait();
+
+    // All tasks are ready, go...
+    go.set_value();
+
+    // Wait until all tasks have finished
+    for(auto& f : futures)
+        f.get();
+}
+
+BOOST_AUTO_TEST_CASE(test_for_exposition)
+{
+    BOOST_CHECK_NO_THROW(ParseScript("0x00"));
+    BOOST_CHECK_NO_THROW(ParseScript("0x0000"));
+    BOOST_CHECK_NO_THROW(ParseScript("0x000000"));
+
+    BOOST_CHECK_THROW(ParseScript("0x"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("0x0"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("0x000"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("0x00000"), std::runtime_error);
+
+    BOOST_CHECK_NO_THROW(ParseScript("0"));
+    BOOST_CHECK_NO_THROW(ParseScript("1"));
+    BOOST_CHECK_NO_THROW(ParseScript("2"));
+    BOOST_CHECK_NO_THROW(ParseScript("3"));
+    BOOST_CHECK_NO_THROW(ParseScript("4"));
+    BOOST_CHECK_NO_THROW(ParseScript("5"));
+    BOOST_CHECK_NO_THROW(ParseScript("6"));
+    BOOST_CHECK_NO_THROW(ParseScript("7"));
+    BOOST_CHECK_NO_THROW(ParseScript("8"));
+    BOOST_CHECK_NO_THROW(ParseScript("9"));
+    BOOST_CHECK_NO_THROW(ParseScript("10"));
+    BOOST_CHECK_NO_THROW(ParseScript("11"));
+    BOOST_CHECK_NO_THROW(ParseScript("12"));
+    BOOST_CHECK_NO_THROW(ParseScript("13"));
+    BOOST_CHECK_NO_THROW(ParseScript("14"));
+    BOOST_CHECK_NO_THROW(ParseScript("15"));
+    BOOST_CHECK_NO_THROW(ParseScript("16"));
+
+    BOOST_CHECK_THROW(ParseScript("OP_0"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_1"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_2"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_3"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_4"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_5"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_6"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_7"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_8"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_9"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_10"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_11"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_12"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_13"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_14"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_15"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_16"), std::runtime_error);
+    const CScript delimiters{ParseScript("1 2\t3\n4")};
+    BOOST_CHECK_EQUAL(4U, delimiters.size());
+    const CScript add{ParseScript("OP_ADD ADD")};
+    BOOST_CHECK_EQUAL(2U, add.size());
+
+    BOOST_CHECK_THROW(ParseScript("OP_ADDx"), std::runtime_error);
+    BOOST_CHECK_THROW(ParseScript("OP_2OP_ADD"), std::runtime_error);
+}
 
 BOOST_AUTO_TEST_CASE(parse_hex_test) {
     std::string s = "0x";

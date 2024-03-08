@@ -44,7 +44,7 @@ CMiningCandidateRef CMiningCandidateManager::Create(const CBlockRef& block)
     std::lock_guard<std::mutex> lock {mMutex};
     mCandidates[nextId] = candidate;
     return candidate;
-};
+}
 
 /**
  * Lookup and return a reference to the requested MiningCandidate.
@@ -74,7 +74,7 @@ CMiningCandidateRef CMiningCandidateManager::Get(const MiningCandidateId& candid
  */
 void CMiningCandidateManager::RemoveOldCandidates()
 {
-    unsigned int height {0};
+    int32_t height {0};
     int64_t tdiff {0};
 
     {
@@ -82,11 +82,11 @@ void CMiningCandidateManager::RemoveOldCandidates()
         if(chainActive.Height() < 0)
             return;
 
-        height = static_cast<unsigned int>(chainActive.Height());
+        height = chainActive.Height();
         if(height <= mPrevHeight)
             return;
 
-        tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
+        tdiff = GetTime() - (chainActive.Tip()->GetBlockTime() + NEW_CANDIDATE_INTERVAL);
     }
 
     if(tdiff >= 0)

@@ -24,11 +24,11 @@ struct CDNSSeedData {
 };
 
 struct SeedSpec6 {
-    uint8_t addr[16];
+    uint8_t addr[16]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     uint16_t port;
 };
 
-typedef std::map<int, uint256> MapCheckpoints;
+typedef std::map<int32_t, uint256> MapCheckpoints;
 
 struct CCheckpointData {
     MapCheckpoints mapCheckpoints;
@@ -45,8 +45,7 @@ struct ChainTxData {
 
 struct DefaultBlockSizeParams {
     int64_t blockSizeActivationTime;
-    uint64_t maxBlockSizeBefore;
-    uint64_t maxBlockSizeAfter;
+    uint64_t maxBlockSize;
     uint64_t maxGeneratedBlockSizeBefore;
     uint64_t maxGeneratedBlockSizeAfter;
 };
@@ -76,13 +75,11 @@ public:
     int GetDefaultPort() const { return nDefaultPort; }
 
     const CBlock &GenesisBlock() const { return genesis; }
-    /** Make miner wait to have peers to avoid wasting work */
-    bool MiningRequiresPeers() const { return fMiningRequiresPeers; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
-    uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
+    int32_t PruneAfterHeight() const { return nPruneAfterHeight; }
     /**
      * Make miner stop after a block is found. In RPC, don't return until
      * nGenProcLimit blocks are generated.
@@ -92,27 +89,33 @@ public:
     std::string NetworkIDString() const { return strNetworkID; }
     const std::vector<CDNSSeedData> &DNSSeeds() const { return vSeeds; }
     const std::vector<uint8_t> &Base58Prefix(Base58Type type) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         return base58Prefixes[type];
     }
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData &Checkpoints() const { return checkpointData; }
     const ChainTxData &TxData() const { return chainTxData; }
-    void UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime,
-                              int64_t nTimeout);
     const DefaultBlockSizeParams &GetDefaultBlockSizeParams() const { return defaultBlockSizeParams; }
 
     bool TestBlockCandidateValidity() const { return fTestBlockCandidateValidity; }
 
+    bool DisableBIP30Checks() const { return fDisableBIP30Checks; }
+    bool CanDisableBIP30Checks() const { return fCanDisableBIP30Checks; }
+
+    bool IsRegTest() const { return fIsRegTest; }
+
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CChainParams() {}
 
     Consensus::Params consensus;
     CMessageHeader::MessageMagic diskMagic;
     CMessageHeader::MessageMagic netMagic;
     int nDefaultPort;
-    uint64_t nPruneAfterHeight;
+    int32_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
     CBlock genesis;
@@ -122,6 +125,9 @@ protected:
     bool fRequireStandard;
     bool fMineBlocksOnDemand;
     bool fTestBlockCandidateValidity;
+    bool fDisableBIP30Checks;
+    bool fCanDisableBIP30Checks;
+    bool fIsRegTest;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
     DefaultBlockSizeParams defaultBlockSizeParams;
@@ -150,11 +156,5 @@ const CChainParams &Params();
  * @throws std::runtime_error when the chain is not supported.
  */
 void SelectParams(const std::string &chain);
-
-/**
- * Allows modifying the BIP9 regtest parameters.
- */
-void UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime,
-                          int64_t nTimeout);
 
 #endif // BITCOIN_CHAINPARAMS_H

@@ -17,21 +17,25 @@ add_executable(bench_bitcoin
         ccoins_caching.cpp
         checkblock.cpp
         checkqueue.cpp
-        coin_selection.cpp
+        $<$<BOOL:${BUILD_BITCOIN_WALLET}>:coin_selection.cpp>
         crypto_hash.cpp
+        interpreter.cpp
         lockedpool.cpp
         mempool_eviction.cpp
+        mempooltxdb.cpp
         perf.cpp
         rollingbloom.cpp
+        serialisation.cpp
+        thread_safe_queue.cpp
         data/block413567.raw.h)
 
 target_link_libraries(bench_bitcoin
         server
+        rpcclient
         common
         util
         bitcoinconsensus
         crypto
         leveldb
-        memenv
-        secp256k1
-        univalue)
+        univalue
+        $<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux

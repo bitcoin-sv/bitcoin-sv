@@ -3,29 +3,23 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "mining.h"
-
-#include "amount.h"
 #include "config.h"
 #include "chain.h"
-#include "chainparams.h"
-#include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/params.h"
-#include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
 #include "mining/candidates.h"
 #include "mining/factory.h"
-#include "net.h"
-#include "policy/policy.h"
+#include "net/net.h"
+#include "primitives/transaction.h"
 #include "rpc/server.h"
 #include "tinyformat.h"
 #include "util.h"
 #include "validationinterface.h"
 #include "validation.h"
-#include "version.h"
 #include "versionbits.h"
-#include "utilstrencodings.h"
+#include "invalid_txn_publisher.h"
 #include <iomanip>
 #include <limits>
 #include <queue>
@@ -33,6 +27,7 @@
 #include <boost/uuid/uuid_io.hpp>
 
 using namespace std;
+using mining::CBlockTemplate;
 
 namespace
 {
@@ -59,13 +54,19 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
     }
 
-    static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
+    if(!mining::g_miningFactory)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+    }
+
+    auto assembler { mining::g_miningFactory->GetAssembler() };
 
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
+    static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
     static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
-    if (pindexPrev != chainActive.Tip() ||
+    if (pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -92,7 +93,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
             coinbaseScriptPubKey = coinbaseScript->reserveScript;
         }
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
+        pblocktemplate = assembler->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
@@ -102,11 +103,11 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     CBlock *pblock = blockref.get();
 
     // Update nTime
-    UpdateTime(pblock, config, pindexPrev);
+    mining::UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
     // Create candidate and return it
-    CMiningCandidateRef candidate  { CMiningFactory::GetCandidateManager().Create(blockref) };
+    CMiningCandidateRef candidate  { mining::CMiningFactory::GetCandidateManager().Create(blockref) };
     return candidate;
 }
 
@@ -152,7 +153,7 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     UniValue ret(UniValue::VOBJ);
     CBlockRef block = candidate->GetBlock();
 
-    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+    mining::CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
     std::stringstream idstr {};
     idstr << candidate->GetId();
@@ -171,6 +172,10 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     ret.push_back(Pair("nBits", strprintf("%08x", block->nBits)));
     ret.push_back(Pair("time", block->GetBlockTime()));
     ret.push_back(Pair("height", block->GetHeightFromCoinbase()));
+
+    // number of transactions including coinbase transaction
+    ret.push_back(Pair("num_tx", static_cast<uint64_t>(block->GetTransactionCount())));
+    ret.push_back(Pair("sizeWithoutCoinbase", static_cast<uint64_t>(block->GetSizeWithoutCoinbase())));
 
     // merkleProof:
     std::vector<uint256> brancharr = GetMerkleProofBranches(block);
@@ -201,14 +206,17 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
                     "1. \"coinbase\"        (boolean, optional) True if a coinbase transaction is required in result"
                     "\nResult: (json string)\n"
                     "    {\n                         \n"
-                    "        \"id\": n,              (string) Candidate identifier for submitminingsolution\n"
-                    "        \"prevhash\": \"xxxx\", (hex string) Hash of the previous block\n"
-                    "        \"coinbase\": \"xxxx\", (optional hex string encoded binary transaction) Coinbase transaction\n"
-                    "        \"version\": n,         (integer) Block version\n"
-                    "        \"nBits\": \"xxxx\",    (hex string) Difficulty\n"
-                    "        \"time\": n,            (integer) Block time\n"
-                    "        \"height\": n,          (integer) Current Block Height\n"
-                    "        \"merkleProof\": [      (list of hex strings) Merkle branch for the block\n"
+                    "        \"id\": n,                  (string) Candidate identifier for submitminingsolution\n"
+                    "        \"prevhash\": \"xxxx\",     (hex string) Hash of the previous block\n"
+                    "        \"coinbase\": \"xxxx\",     (optional hex string encoded binary transaction) Coinbase transaction\n"
+                    "        \"coinbaseValue\": n,       (integer) Total funds available for the coinbase transaction (in Satoshis)\n"
+                    "        \"version\": n,             (integer) Block version\n"
+                    "        \"nBits\": \"xxxx\",        (hex string) Difficulty\n"
+                    "        \"time\": n,                (integer) Block time\n"
+                    "        \"height\": n,              (integer) Current Block Height\n"
+                    "        \"num_tx\": n,              (integer) Number of transactions the current candidate has including coinbase transaction\n"
+                    "        \"sizeWithoutCoinbase\": n, (integer) Size of current block candidate in bytes without coinbase transaction\n"
+                    "        \"merkleProof\": [          (list of hex strings) Merkle branch for the block\n"
                     "                          xxxx,\n"
                     "                          yyyy,\n"
                     "                         ]\n"
@@ -235,7 +243,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     if (request.fHelp || request.params.size() != 1)
     {
         throw std::runtime_error(
-                "submitminingsolution \"<json string>\" \n"
+                "submitminingsolution \"<json string>\"\n"
                 "\nAttempts to submit a new block to the network.\n"
                 "\nJson Object should comprise of the following and must be escaped\n"
                 "    {\n"
@@ -257,7 +265,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     std::string idstr { rcvd["id"].get_str() };
     MiningCandidateId id { boost::lexical_cast<MiningCandidateId>(idstr) };
 
-    CMiningCandidateRef result { CMiningFactory::GetCandidateManager().Get(id) };
+    CMiningCandidateRef result { mining::CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
@@ -337,8 +345,12 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         // Ensure we run full checks on submitted block
         block->fChecked = false;
 
-        LOCK(cs_main);
-        submitted = SubmitBlock(config, block); // returns string on failure
+        auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
+        {
+            CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitminingsolution");
+            return ProcessNewBlock(config, blockptr, true, nullptr, CBlockSource::MakeRPC());
+        };
+        submitted = processBlock(config, block, submitBlock); // returns string on failure
     }
     if(submitted.isNull())
     {
@@ -349,7 +361,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     }
 
     // Clear out old candidates
-    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+    mining::CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
     return submitted;
 }

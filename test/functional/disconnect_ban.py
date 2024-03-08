@@ -22,7 +22,7 @@ class DisconnectBanTest(BitcoinTestFramework):
 
         self.log.info("setban: successfully ban single IP address")
         # node1 should have 2 connections to node0 at this point
-        assert_equal(len(self.nodes[1].getpeerinfo()), 2)
+        wait_until(lambda: len(self.nodes[1].getpeerinfo()) == 2, timeout=10)
         self.nodes[1].setban("127.0.0.1", "add")
         wait_until(lambda: len(self.nodes[1].getpeerinfo()) == 0, timeout=10)
         # all nodes must be disconnected at this point
@@ -60,8 +60,10 @@ class DisconnectBanTest(BitcoinTestFramework):
         self.log.info("setban: test persistence across node restart")
         self.nodes[1].setban("127.0.0.0/32", "add")
         self.nodes[1].setban("127.0.0.0/24", "add")
-        # ban for 1 seconds
-        self.nodes[1].setban("192.168.0.1", "add", 1)
+        # When running tests in parallel the machine and network can get clogged
+        # and by the time the test gets to the listbanned() command the timeout should not expire.
+        # Timeout of 1s caused the test to fail (very rarely). 2s should be enough.
+        self.nodes[1].setban("192.168.0.1", "add", 2)
         # ban for 1000 seconds
         self.nodes[1].setban(
             "2001:4d48:ac57:400:cacf:e9ff:fe1d:9c63/19", "add", 1000)

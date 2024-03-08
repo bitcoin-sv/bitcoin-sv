@@ -21,32 +21,42 @@ public:
 };
 
 /** Template base class for unsigned big integers. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 template <unsigned int BITS> class base_uint {
 protected:
     enum { WIDTH = BITS / 32 };
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint32_t pn[WIDTH];
 
 public:
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint() {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint(const base_uint &b) {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
     }
 
+    // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
     base_uint &operator=(const base_uint &b) {
         for (int i = 0; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
         return *this;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint(uint64_t b) {
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);
         for (int i = 2; i < WIDTH; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
     }
 
@@ -119,7 +129,9 @@ public:
     base_uint &operator+=(const base_uint &b) {
         uint64_t carry = 0;
         for (int i = 0; i < WIDTH; i++) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             uint64_t n = carry + pn[i] + b.pn[i];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = n & 0xffffffff;
             carry = n >> 32;
         }
@@ -293,6 +305,7 @@ public:
                               bool *pfOverflow = nullptr);
     uint32_t GetCompact(bool fNegative = false) const;
 
+    friend std::ostream& operator<<(std::ostream&, const arith_uint256&);
     friend uint256 ArithToUint256(const arith_uint256 &);
     friend arith_uint256 UintToArith256(const uint256 &);
 };

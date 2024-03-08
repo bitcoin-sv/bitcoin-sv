@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
         pathTemp / strprintf("vlebf_test_%lu_%i", (unsigned long)GetTime(),
                              (int)(InsecureRandRange(100000)));
 
-    FILE *fp = fopen(tmpfile_name.string().c_str(), "wb+");
+    UniqueCFile fp{ fopen(tmpfile_name.string().c_str(), "wb+") };
 
     BOOST_CHECK(fp != nullptr);
 
@@ -50,30 +50,30 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
     // message start magic, size of block, block
 
     size_t nwritten = fwrite(chainparams.DiskMagic().data(),
-                             CMessageHeader::MESSAGE_START_SIZE, 1, fp);
+                             CMessageFields::MESSAGE_START_SIZE, 1, fp.get());
 
     BOOST_CHECK_EQUAL(nwritten, 1UL);
 
     CTransaction empty_tx;
     size_t empty_tx_size = GetSerializeSize(empty_tx, SER_DISK, CLIENT_VERSION);
 
-    size_t num_tx = (10 * MAX_TX_SIZE) / empty_tx_size;
+    size_t num_tx = (10 * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS) / empty_tx_size;
 
     CBlock block = makeLargeDummyBlock(num_tx);
 
     BOOST_CHECK(GetSerializeSize(block, SER_DISK, CLIENT_VERSION) >
-                2 * MAX_TX_SIZE);
+                2 * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     unsigned int size = GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
     {
-        CAutoFile outs(fp, SER_DISK, CLIENT_VERSION);
+        CAutoFile outs(std::move(fp), SER_DISK, CLIENT_VERSION);
         outs << size;
         outs << block;
-        outs.release();
+        fp = outs.release();
     }
 
-    fseek(fp, 0, SEEK_SET);
-    BOOST_CHECK_NO_THROW({ LoadExternalBlockFile(config, fp, 0); });
+    fseek(fp.get(), 0, SEEK_SET);
+    BOOST_CHECK_NO_THROW({ LoadExternalBlockFile(config, std::move(fp), 0); });
 }
 
 BOOST_AUTO_TEST_SUITE_END()

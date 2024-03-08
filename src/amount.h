@@ -13,6 +13,8 @@
 #include <string>
 #include <type_traits>
 
+// NOLINTBEGIN(performance-unnecessary-value-param)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Amount {
 private:
     int64_t amount;
@@ -27,6 +29,7 @@ public:
     }
 
     constexpr Amount(const Amount &_camount) : amount(_camount.amount) {}
+    constexpr Amount& operator=(const Amount&) = default;
 
     // Allow access to underlying value for non-monetary operations
     int64_t GetSatoshis() const { return amount; }
@@ -132,7 +135,7 @@ public:
     std::string ToString() const;
 
     // serialization support
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -140,8 +143,8 @@ public:
     }
 };
 
-static const Amount COIN(100000000);
-static const Amount CENT(1000000);
+static const Amount COIN(100000000); // NOLINT(cert-err58-cpp)
+static const Amount CENT(1000000);   // NOLINT(cert-err58-cpp)
 
 extern const std::string CURRENCY_UNIT;
 
@@ -155,7 +158,7 @@ extern const std::string CURRENCY_UNIT;
  * critical; in unusual circumstances like a(nother) overflow bug that allowed
  * for the creation of coins out of thin air modification could lead to a fork.
  */
-static const Amount MAX_MONEY = 21000000 * COIN;
+static const Amount MAX_MONEY = 21000000 * COIN; // NOLINT(cert-err58-cpp)
 inline bool MoneyRange(const Amount nValue) {
     return (nValue >= Amount(0) && nValue <= MAX_MONEY);
 }
@@ -166,11 +169,10 @@ inline bool MoneyRange(const Amount nValue) {
 class CFeeRate {
 private:
     // unit is satoshis-per-1,000-bytes
-    Amount nSatoshisPerK;
+    Amount nSatoshisPerK {0};
 
 public:
-    /** Fee rate of 0 satoshis per kB */
-    CFeeRate() : nSatoshisPerK(0) {}
+    CFeeRate () = default;
     explicit CFeeRate(const Amount _nSatoshisPerK)
         : nSatoshisPerK(_nSatoshisPerK) {}
     /**
@@ -178,7 +180,6 @@ public:
      * exceed (2^63 - 1)
      */
     CFeeRate(const Amount nFeePaid, size_t nBytes);
-    CFeeRate(const CFeeRate &other) { nSatoshisPerK = other.nSatoshisPerK; }
     /**
      * Return the fee in satoshis for the given size in bytes.
      */
@@ -186,7 +187,7 @@ public:
     /**
      * Return the fee in satoshis for a size of 1000 bytes
      */
-    Amount GetFeePerK() const { return GetFee(1000); }
+    Amount GetFeePerK() const { return nSatoshisPerK; }
     friend bool operator<(const CFeeRate &a, const CFeeRate &b) {
         return a.nSatoshisPerK < b.nSatoshisPerK;
     }
@@ -208,12 +209,13 @@ public:
     }
     std::string ToString() const;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(nSatoshisPerK);
     }
 };
+// NOLINTEND(performance-unnecessary-value-param)
 
 #endif //  BITCOIN_AMOUNT_H

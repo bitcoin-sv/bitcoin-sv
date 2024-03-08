@@ -3,11 +3,11 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "base58.h"
+#include "block_index_store.h"
 #include "chain.h"
 #include "config.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "merkleblock.h"
 #include "rpc/server.h"
 #include "rpcwallet.h"
@@ -18,14 +18,10 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "wallet.h"
-
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
 #include <univalue.h>
-
-#include <cstdint>
-#include <fstream>
+#include <string>
 #include <iostream>
 
 static std::string EncodeDumpTime(int64_t nTime) {
@@ -193,7 +189,7 @@ void ImportScript(CWallet *const pwallet, const CScript &script,
         ImportAddress(pwallet, CScriptID(script), strLabel);
     } else {
         CTxDestination destination;
-        if (ExtractDestination(script, destination)) {
+        if (CWallet::ExtractDestination(script, destination)) {
             pwallet->SetAddressBook(destination, strLabel, "receive");
         }
     }
@@ -342,9 +338,9 @@ UniValue importprunedfunds(const Config &config,
 
         LOCK(cs_main);
 
-        if (!mapBlockIndex.count(merkleBlock.header.GetHash()) ||
-            !chainActive.Contains(
-                mapBlockIndex[merkleBlock.header.GetHash()])) {
+        if (auto index = mapBlockIndex.Get(merkleBlock.header.GetHash());
+            !index || !chainActive.Contains(index))
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                "Block not found in chain");
         }
@@ -398,7 +394,7 @@ UniValue removeprunedfunds(const Config &config,
                                                 "ce581bebf46446a512166eae762873"
                                                 "4ea0a5\"") +
             "\nAs a JSON-RPC call\n" +
-            HelpExampleRpc("removprunedfunds", "\"a8d0c0184dde994a09ec054286f1c"
+            HelpExampleRpc("removeprunedfunds", "\"a8d0c0184dde994a09ec054286f1c"
                                                "e581bebf46446a512166eae7628734e"
                                                "a0a5\""));
     }
@@ -600,7 +596,7 @@ UniValue importwallet(const Config &config, const JSONRPCRequest &request) {
         chainActive.FindEarliestAtLeast(nTimeBegin - TIMESTAMP_WINDOW);
 
     LogPrintf("Rescanning last %i blocks\n",
-              chainActive.Height() - pindex->nHeight + 1);
+              chainActive.Height() - pindex->GetHeight() + 1);
     pwallet->ScanForWalletTransactions(pindex);
     pwallet->MarkDirty();
 
@@ -887,7 +883,7 @@ UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
             CScript redeemScript = CScript(vData.begin(), vData.end());
 
             // Invalid P2SH address
-            if (!script.IsPayToScriptHash()) {
+            if (!IsP2SH(script)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                    "Invalid P2SH address / script");
             }
@@ -1000,7 +996,7 @@ UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
                 if (isScript) {
                     CTxDestination destination;
 
-                    if (ExtractDestination(script, destination)) {
+                    if (CWallet::ExtractDestination(script, destination)) {
                         if (!(destination == pubkey_dest)) {
                             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                                "Consistency check failed");
@@ -1083,7 +1079,7 @@ UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
                 if (isScript) {
                     CTxDestination destination;
 
-                    if (ExtractDestination(script, destination)) {
+                    if (CWallet::ExtractDestination(script, destination)) {
                         if (!(destination == pubkey_dest)) {
                             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                                "Consistency check failed");
@@ -1211,10 +1207,11 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
             "     \"rescan\": <false>,         (boolean, optional, default: true) Stating if should rescan the blockchain after all imports\n"
             "  }\n"
             "\nExamples:\n" +
-            HelpExampleCli("importmulti", "'[{ \"scriptPubKey\": { \"address\": \"<my address>\" }, \"timestamp\":1455191478 }, "
-                                          "{ \"scriptPubKey\": { \"address\": \"<my 2nd address>\" }, \"label\": \"example 2\", \"timestamp\": 1455191480 }]'") +
-            HelpExampleCli("importmulti", "'[{ \"scriptPubKey\": { \"address\": \"<my address>\" }, \"timestamp\":1455191478 }]' '{ \"rescan\": false}'") +
-
+            HelpExampleCli("importmulti", "\"[{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my address\\\"}, \\\"timestamp\\\":1455191478}, "
+                                          "{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my 2nd address\\\"}, \\\"label\\\":\\\"example 2\\\", \\\"timestamp\\\":1455191480}]\"") +
+            HelpExampleCli("importmulti", "\"[{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my address\\\"}, \\\"timestamp\\\":1455191478}]\" \"{\\\"rescan\\\":false}\"") +
+            HelpExampleRpc("importmulti", "[{\"scriptPubKey\": {\"address\":\"my address\"}, \"timestamp\":1455191478}], {\"rescan\":false}") +
+            
             "\nResponse is an array with the same size as the input that has the execution result :\n"
             "  [{ \"success\": true } , { \"success\": false, \"error\": { \"code\": -1, \"message\": \"Internal Server Error\"} }, ... ]\n");
     }
@@ -1280,18 +1277,18 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
     }
 
     if (fRescan && fRunScan && requests.size()) {
-        CBlockIndex *pindex =
+        const CBlockIndex *pindex =
             nLowestTimestamp > minimumTimestamp
                 ? chainActive.FindEarliestAtLeast(
                       std::max<int64_t>(nLowestTimestamp - TIMESTAMP_WINDOW, 0))
                 : chainActive.Genesis();
-        CBlockIndex *scannedRange = nullptr;
+        const CBlockIndex *scannedRange = nullptr;
         if (pindex) {
             scannedRange = pwallet->ScanForWalletTransactions(pindex, true);
             pwallet->ReacceptWalletTransactions();
         }
 
-        if (!scannedRange || scannedRange->nHeight > pindex->nHeight) {
+        if (!scannedRange || scannedRange->GetHeight() > pindex->GetHeight()) {
             std::vector<UniValue> results = response.getValues();
             response.clear();
             response.setArray();

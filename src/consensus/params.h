@@ -8,59 +8,33 @@
 
 #include "uint256.h"
 
-#include <map>
-#include <string>
-
 namespace Consensus {
-
-enum DeploymentPos {
-    DEPLOYMENT_TESTDUMMY,
-    // Deployment of BIP68, BIP112, and BIP113.
-    DEPLOYMENT_CSV,
-    // NOTE: Also add new deployments to VersionBitsDeploymentInfo in
-    // versionbits.cpp
-    MAX_VERSION_BITS_DEPLOYMENTS
-};
-
-/**
- * Struct for each individual consensus rule change using BIP9.
- */
-struct BIP9Deployment {
-    /** Bit position to select the particular bit in nVersion. */
-    int bit;
-    /** Start MedianTime for version bits miner confirmation. Can be a date in
-     * the past */
-    int64_t nStartTime;
-    /** Timeout/expiry MedianTime for the deployment attempt. */
-    int64_t nTimeout;
-};
 
 /**
  * Parameters that influence chain consensus.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct Params {
     uint256 hashGenesisBlock;
     int nSubsidyHalvingInterval;
     /** Block height and hash at which BIP34 becomes active */
-    int BIP34Height;
+    int32_t BIP34Height;
     uint256 BIP34Hash;
     /** Block height at which BIP65 becomes active */
-    int BIP65Height;
+    int32_t BIP65Height;
     /** Block height at which BIP66 becomes active */
-    int BIP66Height;
+    int32_t BIP66Height;
+    /** Block height at which CSV (BIP68, BIP112 and BIP113) becomes active */
+    int32_t CSVHeight;
     /** Block height at which UAHF kicks in */
-    int uahfHeight;
+    int32_t uahfHeight;
     /** Block height at which the new DAA becomes active */
-    int daaHeight;
-    /**
-     * Minimum blocks including miner confirmation of the total of 2016 blocks
-     * in a retargeting period, (nPowTargetTimespan / nPowTargetSpacing) which
-     * is also used for BIP9 deployments.
-     * Examples: 1916 for 95%, 1512 for testchains.
-     */
-    uint32_t nRuleChangeActivationThreshold;
-    uint32_t nMinerConfirmationWindow;
-    BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS];
+    int32_t daaHeight;
+    /** Block height at which the Genesis becomes active.
+      * The specified block height is the height of the block where the new rules are active.
+      * It is not the height of the last block with the old rules.
+      */
+    int32_t genesisHeight;
     /** Proof of work parameters */
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;

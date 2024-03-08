@@ -9,16 +9,17 @@ from test_framework.util import *
 import time
 import os
 
+
 class TestNode(NodeConnCB):
     def __init__(self):
         super().__init__()
+
 
 class msg_garbage():
     command = b"inv"
 
     def __init__(self):
         pass
-
 
     def serialize(self):
         r = b""
@@ -27,6 +28,7 @@ class msg_garbage():
 
     def __repr__(self):
         return "garbage"#(announce=%s, version=%lu)" % (self.announce, self.version)
+
 
 class SpamLog(BitcoinTestFramework):
     def set_test_params(self):
@@ -56,6 +58,7 @@ class SpamLog(BitcoinTestFramework):
         size = os.path.getsize(logfile)
         self.log.info("Logile size = {}".format(size))
         assert(size < 1000000)
+
 
 if __name__ == '__main__':
     SpamLog().main()

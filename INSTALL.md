@@ -1,5 +1,4 @@
 Building Bitcoin
 ================
 
-See doc/build-*.md for instructions on building the various
-elements of the Bitcoin SV implementation of Bitcoin SV.
+See [doc/build-unix.md](./doc/build-unix.md) for instructions on building Bitcoin.

@@ -33,7 +33,7 @@ buffering or reassembly.
 
 ## Prerequisites
 
-The ZeroMQ feature in Bitcoin SV requires ZeroMQ API version 4.x or
+The ZeroMQ feature in Bitcoin SV requires ZeroMQ API version 4.3.2 or
 newer. Typically, it is packaged by distributions as something like
 *libzmq3-dev*. The C++ wrapper for ZeroMQ is *not* needed.
 
@@ -60,6 +60,15 @@ Currently, the following notifications are supported:
     -zmqpubhashblock=address
     -zmqpubrawblock=address
     -zmqpubrawtx=address
+    -zmqpubinvalidtx=address
+    -zmqpubdiscardedfrommempool=address
+    -zmqpubremovedfrommempoolblock=address
+
+    -zmqpubhashtx2=address
+    -zmqpubhashblock2=address
+    -zmqpubrawblock2=address
+    -zmqpubrawtx2=address
+
 
 The socket type is PUB and the address must be a valid ZeroMQ socket
 address. The same address can be used in more than one notification.
@@ -69,16 +78,44 @@ For instance:
     $ bitcoind -zmqpubhashtx=tcp://127.0.0.1:28332 \
                -zmqpubrawtx=ipc:///tmp/bitcoind.tx.raw
 
+These options can also be provided in bitcoin.conf.
+
 Each PUB notification has a topic and body, where the header
 corresponds to the notification type. For instance, for the
 notification `-zmqpubhashtx` the topic is `hashtx` (no null
 terminator) and the body is the hexadecimal transaction hash (32
 bytes).
 
+`-zmqpubdiscardedfrommempool` and `-zmqpubremovedfrommempoolblock` notification body
+is in json format:
+
+`{"txid": hexstring, "reason": string, "collidedWith": {txid: hexstring, size: integer, hex: hexstring}, "blockhash": hexstring}`.
+
+The collidedWith field gives information about transaction which uses same inputs as removed transaction, and field blockhash
+gives information in which block transaction we "collided with" arrived.
+The fields collidedWith and blockhash are only present when the reason for removal is `collision-in-block-tx`.
+
+`-zmqpubdiscardedfrommempool` notification will contain one of the following reasons:
+- expired, mempool-sizelimit-exceeded, collision-in-block-tx
+
+we get `collision-in-block-tx` when we switch to longer chain and there is a
+transaction in active block after reorg, which uses the same input as the transaction we had
+in mempool or one of the blocks we had.
+
+`-zmqpubremovedfrommempoolblock` notification will contain one of the following reasons:
+- reorg, included-in-block
+
+The behaviour of PUB notifications of form zmqpub<body>2 is similar to
+the one of the respective original ones. The differences are:
+	- duplicate notifications for transaction that was already in 
+	our mempool, when it is included in the receiving block, are removed
+	- on reorg all blocks are notified, not only the tip (see 
+	remarks)
+
 These options can also be provided in bitcoin.conf.
 
 ZeroMQ endpoint specifiers for TCP (and others) are documented in the
-[ZeroMQ API](http://api.zeromq.org/4-0:_start).
+[ZeroMQ API](http://api.zeromq.org/master:_start).
 
 Client side, then, the ZeroMQ subscriber socket must have the
 ZMQ_SUBSCRIBE option set to one or either of these prefixes (for

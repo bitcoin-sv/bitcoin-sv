@@ -3,7 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockencodings.h"
-#include "chainparams.h"
+#include "blockstreams.h"
+#include "clientversion.h"
 #include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
@@ -11,7 +12,6 @@
 #include "random.h"
 #include "streams.h"
 #include "txmempool.h"
-#include "util.h"
 #include "validation.h"
 
 #include <unordered_map>
@@ -27,6 +27,37 @@ CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(const CBlock &block)
         const CTransaction &tx = *block.vtx[i];
         shorttxids[i - 1] = GetShortID(tx.GetHash());
     }
+}
+
+CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(
+    CBlockStreamReader<CFileReader>& stream)
+    : nonce{GetRand(std::numeric_limits<uint64_t>::max())}
+    , prefilledtxn{1}
+{
+    assert(stream.GetRemainingTransactionsCount() > 0);
+
+    shorttxids.reserve(stream.GetRemainingTransactionsCount() - 1);
+    header = stream.GetBlockHeader();
+    FillShortTxIDSelector();
+
+    bool firstTransaction = true;
+    do
+    {
+        const CTransaction& transaction = stream.ReadTransaction();
+        if (firstTransaction)
+        {
+            // TODO: Use our mempool prior to block acceptance
+            // to predictively fill more than just the coinbase.
+            prefilledtxn[0] =
+                {0, MakeTransactionRef(transaction)};
+            firstTransaction = false;
+        }
+        else
+        {
+            shorttxids.push_back(
+                GetShortID(transaction.GetHash()));
+        }
+    } while(!stream.EndOfStream());
 }
 
 void CBlockHeaderAndShortTxIDs::FillShortTxIDSelector() const {
@@ -128,16 +159,12 @@ ReadStatus PartiallyDownloadedBlock::InitData(
 
     std::vector<bool> have_txn(txns_available.size());
     {
-        LOCK(pool->cs);
-        const std::vector<std::pair<uint256, CTxMemPool::txiter>> &vTxHashes =
-            pool->vTxHashes;
-        for (auto txHash : vTxHashes) {
-            uint64_t shortid = cmpctblock.GetShortID(txHash.first);
-            std::unordered_map<uint64_t, uint32_t>::iterator idit =
-                shorttxids.find(shortid);
+        for (const auto& tx : pool->GetTransactions()) {
+            const auto shortid = cmpctblock.GetShortID(tx->GetHash());
+            const auto idit = shorttxids.find(shortid);
             if (idit != shorttxids.end()) {
                 if (!have_txn[idit->second]) {
-                    txns_available[idit->second] = txHash.second->GetSharedTx();
+                    txns_available[idit->second] = tx;
                     have_txn[idit->second] = true;
                     mempool_count++;
                 } else {
@@ -210,7 +237,7 @@ bool PartiallyDownloadedBlock::IsTxAvailable(size_t index) const {
 }
 
 ReadStatus PartiallyDownloadedBlock::FillBlock(
-    CBlock &block, const std::vector<CTransactionRef> &vtx_missing) {
+    CBlock &block, const std::vector<CTransactionRef> &vtx_missing, int32_t blockHeight) {
     assert(!header.IsNull());
     uint256 hash = header.GetHash();
     block = header;
@@ -238,7 +265,7 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(
     }
 
     CValidationState state;
-    if (!CheckBlock(*config, block, state)) {
+    if (!CheckBlock(*config, block, state, blockHeight)) {
         // TODO: We really want to just check merkle tree manually here, but
         // that is expensive, and CheckBlock caches a block's "checked-status"
         // (in the CBlock?). CBlock should be able to check its own merkle root
@@ -265,4 +292,17 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(
     }
 
     return READ_STATUS_OK;
+}
+
+size_t ser_size(const BlockTransactions& txns) 
+{ 
+    size_t total{sizeof(txns.blockhash)};
+    total += cmpt_ser_size(txns.txn.size());
+    return std::accumulate(txns.txn.cbegin(),
+                           txns.txn.cend(),
+                           total,
+                           [](auto total, const auto& sp_tx) {
+                               total += ser_size(*sp_tx);
+                               return total;
+                           });
 }

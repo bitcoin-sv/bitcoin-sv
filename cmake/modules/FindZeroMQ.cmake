@@ -11,7 +11,7 @@ endif()
 find_path(ZMQ_INCLUDE_DIR NAMES zmq.h)
 
 if (MSVC)
-  find_library(ZMQ_LIBRARY NAMES libzmq-mt-s-4_3_0 libzmq-mt-s-4_3_1 libzmq-mt-s-4_3_2)
+  find_library(ZMQ_LIBRARY NAMES libzmq-mt-s-4_3_2 libzmq-mt-s-4_3_3)
 else()
   find_library(ZMQ_LIBRARY NAMES zmq libzmq)
 endif()

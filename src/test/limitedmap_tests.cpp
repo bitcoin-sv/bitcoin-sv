@@ -28,6 +28,7 @@ BOOST_AUTO_TEST_CASE(limitedmap_test) {
 
     // make sure that the new item is in the map
     BOOST_CHECK(map.count(-1) == 1);
+    BOOST_CHECK(map.contains(-1));
 
     // insert 10 new items
     for (int i = 0; i < 10; i++) {
@@ -39,12 +40,14 @@ BOOST_AUTO_TEST_CASE(limitedmap_test) {
 
     // ...and that the first item has been discarded
     BOOST_CHECK(map.count(-1) == 0);
+    BOOST_CHECK(! map.contains(-1));
 
     // iterate over the map, both with an index and an iterator
     limitedmap<int, int>::const_iterator it = map.begin();
     for (int i = 0; i < 10; i++) {
         // make sure the item is present
         BOOST_CHECK(map.count(i) == 1);
+        BOOST_CHECK(map.contains(i));
 
         // use the iterator to check for the expected key and value
         BOOST_CHECK(it->first == i);
@@ -75,8 +78,10 @@ BOOST_AUTO_TEST_CASE(limitedmap_test) {
     for (int i = 0; i < 10; i++) {
         if (i < 5) {
             BOOST_CHECK(map.count(i) == 0);
+            BOOST_CHECK(! map.contains(i));
         } else {
             BOOST_CHECK(map.count(i) == 1);
+            BOOST_CHECK(map.contains(i));
         }
     }
 

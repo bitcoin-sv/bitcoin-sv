@@ -19,6 +19,6 @@ namespace fs = boost::filesystem;
 namespace fsbridge {
 FILE *fopen(const fs::path &p, const char *mode);
 FILE *freopen(const fs::path &p, const char *mode, FILE *stream);
-};
+}
 
 #endif

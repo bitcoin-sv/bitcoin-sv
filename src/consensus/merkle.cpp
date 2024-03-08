@@ -1,6 +1,6 @@
 // Copyright (c) 2015-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "merkle.h"
 #include "hash.h"
@@ -162,7 +162,12 @@ uint256 ComputeMerkleRootFromBranch(const uint256 &leaf,
     uint256 hash = leaf;
     for (std::vector<uint256>::const_iterator it = vMerkleBranch.begin();
          it != vMerkleBranch.end(); ++it) {
-        if (nIndex & 1) {
+        if ((*it).IsNull())
+        {
+            // Duplicated node
+            hash = Hash(BEGIN(hash), END(hash), BEGIN(hash), END(hash));
+        }
+        else if (nIndex & 1) {
             hash = Hash(BEGIN(*it), END(*it), BEGIN(hash), END(hash));
         } else {
             hash = Hash(BEGIN(hash), END(hash), BEGIN(*it), END(*it));

@@ -21,10 +21,17 @@ bench_bench_bitcoin_SOURCES = \
   bench/crypto_hash.cpp \
   bench/ccoins_caching.cpp \
   bench/mempool_eviction.cpp \
+  bench/mempooltxdb.cpp \
   bench/base58.cpp \
   bench/lockedpool.cpp \
   bench/perf.cpp \
-  bench/perf.h
+  bench/perf.h \
+  bench/cscript.cpp \
+  bench/interpreter.cpp \
+  bench/serialisation.cpp \
+  bench/thread_safe_queue.cpp
+
+bench_bench_bitcoin_SOURCES += bench/data/hexhdr.py
 
 nodist_bench_bench_bitcoin_SOURCES = $(GENERATED_TEST_FILES)
 
@@ -32,12 +39,13 @@ bench_bench_bitcoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CLFAGS
 bench_bench_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 bench_bench_bitcoin_LDADD = \
   $(LIBBITCOIN_SERVER) \
+  $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBLEVELDB) \
-  $(LIBLEVELDB_SSE42) \
+  $(LIBCRC32C) \
   $(LIBMEMENV) \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE)
@@ -51,7 +59,7 @@ bench_bench_bitcoin_SOURCES += bench/coin_selection.cpp
 bench_bench_bitcoin_LDADD += $(LIBBITCOIN_WALLET) $(LIBBITCOIN_CRYPTO)
 endif
 
-bench_bench_bitcoin_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+bench_bench_bitcoin_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(OPENSSL_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(AIO_LIBS) $(TBB_LIBS)
 bench_bench_bitcoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 CLEAN_BITCOIN_BENCH = bench/*.gcda bench/*.gcno $(GENERATED_TEST_FILES)

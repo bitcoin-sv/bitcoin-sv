@@ -12,15 +12,11 @@
 #include "compat.h"
 #include "config.h"
 #include "fs.h"
-#include "httprpc.h"
-#include "httpserver.h"
 #include "init.h"
 #include "noui.h"
-#include "rpc/server.h"
 #include "scheduler.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/thread.hpp>
 
@@ -48,12 +44,11 @@
  * <code>Files</code> at the top of the page to start navigating the code.
  */
 
-void WaitForShutdown(boost::thread_group *threadGroup) {
-    bool fShutdown = ShutdownRequested();
+void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellationToken& shutdownToken) {
+
     // Tell the main threads to shutdown.
-    while (!fShutdown) {
-        MilliSleep(200);
-        fShutdown = ShutdownRequested();
+    while (!shutdownToken.IsCanceled()) {
+        MilliSleep(200); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
     }
     if (threadGroup) {
         Interrupt(*threadGroup);
@@ -65,14 +60,18 @@ void WaitForShutdown(boost::thread_group *threadGroup) {
 //
 // Start
 //
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 bool AppInit(int argc, char *argv[]) {
+    RenameThread("main");
     boost::thread_group threadGroup;
     CScheduler scheduler;
 
     // FIXME: Ideally, we'd like to build the config here, but that's currently
     // not possible as the whole application has too many global state. However,
     // this is a first step.
-    auto& config = GlobalConfig::GetConfig();
+    auto& config = GlobalConfig::GetModifiableGlobalConfig();
 
     bool fRet = false;
 
@@ -96,15 +95,16 @@ bool AppInit(int argc, char *argv[]) {
                         "  bitcoind [options]                     " +
                         strprintf(_("Start %s Daemon"), _(PACKAGE_NAME)) + "\n";
 
-            strUsage += "\n" + HelpMessage(HMM_BITCOIND);
+            strUsage += "\n" + HelpMessage(HMM_BITCOIND, config);
         }
 
-        fprintf(stdout, "%s", strUsage.c_str());
+        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT(cert-err33-c)
         return true;
     }
 
     try {
         if (!fs::is_directory(GetDataDir(false))) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr,
                     "Error: Specified data directory \"%s\" does not exist.\n",
                     gArgs.GetArg("-datadir", "").c_str());
@@ -113,6 +113,7 @@ bool AppInit(int argc, char *argv[]) {
         try {
             gArgs.ReadConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME));
         } catch (const std::exception &e) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Error reading configuration file: %s\n", e.what());
             return false;
         }
@@ -121,12 +122,34 @@ bool AppInit(int argc, char *argv[]) {
         try {
             SelectParams(ChainNameFromCommandLine());
         } catch (const std::exception &e) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Error: %s\n", e.what());
             return false;
         }
 
         // Fill config with block size data
         config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+
+        // maxstackmemoryusageconsensus and excessiveblocksize are required parameters
+        if (!gArgs.IsArgSet("-maxstackmemoryusageconsensus") || !gArgs.IsArgSet("-excessiveblocksize"))
+        {
+            // NOLINTNEXTLINE(cert-err33-c)
+            fprintf(stderr, "Mandatory consensus parameter is not set. In order to start bitcoind you must set the "
+                            "following consensus parameters: \"excessiveblocksize\" and "
+                            "\"maxstackmemoryusageconsensus\". In order to start bitcoind with no limits you can set "
+                            "both of these parameters to 0 however it is strongly recommended to ensure you understand "
+                            "the implications of this setting.\n\n"
+                            "For more information of how to choose these settings safely for your use case refer to: "
+                            "https://bitcoinsv.io/choosing-consensus-settings/");
+            return false;
+        }
+        if (!gArgs.IsArgSet("-minminingtxfee"))
+        {
+            // NOLINTNEXTLINE(cert-err33-c)
+            fprintf(stderr, "Mandatory policy parameter is not set. In order to start bitcoind you must set the "
+                            "following policy parameters: \"minminingtxfee\"");
+            return false;
+        }
 
         // Command-line RPC
         bool fCommandLine = false;
@@ -136,6 +159,7 @@ bool AppInit(int argc, char *argv[]) {
                 fCommandLine = true;
 
         if (fCommandLine) {
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stderr, "Error: There is no RPC client functionality in "
                             "bitcoind anymore. Use the bitcoin-cli utility "
                             "instead.\n");
@@ -163,16 +187,19 @@ bool AppInit(int argc, char *argv[]) {
         }
         if (gArgs.GetBoolArg("-daemon", false)) {
 #if HAVE_DECL_DAEMON
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(stdout, "Bitcoin server starting\n");
 
             // Daemonize
             if (daemon(1, 0)) {
                 // don't chdir (1), do close FDs (0)
+                // NOLINTNEXTLINE(cert-err33-c)
                 fprintf(stderr, "Error: daemon() failed: %s\n",
                         strerror(errno));
                 return false;
             }
 #else
+            // NOLINTNEXTLINE(cert-err33-c)
             fprintf(
                 stderr,
                 "Error: -daemon is not supported on this operating system\n");
@@ -180,12 +207,13 @@ bool AppInit(int argc, char *argv[]) {
 #endif // HAVE_DECL_DAEMON
         }
 
-        fRet = AppInitMain(config, threadGroup, scheduler);
+        fRet = AppInitMain(config, threadGroup, scheduler, GetShutdownToken());
     } catch (const std::exception &e) {
         PrintExceptionContinue(&e, "AppInit()");
     } catch (...) {
         PrintExceptionContinue(nullptr, "AppInit()");
     }
+    GetAppInitCompleted().store(true);
 
     if (!fRet) {
         Interrupt(threadGroup);
@@ -195,7 +223,7 @@ bool AppInit(int argc, char *argv[]) {
         // thread-blocking-waiting-for-another-thread-during-startup case.
     } else {
         LogPrintf("Preload wait for shutdown\n");
-        WaitForShutdown(&threadGroup);
+        WaitForShutdown(&threadGroup, GetShutdownToken());
         LogPrintf("Preload wait for shutdown done\n");
     }
     LogPrintf("Checking Thread shutdown\n");
@@ -203,8 +231,10 @@ bool AppInit(int argc, char *argv[]) {
 
     return fRet;
 }
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) { // NOLINT(bugprone-exception-escape)
     SetupEnvironment();
 
     // Connect bitcoind signal handlers

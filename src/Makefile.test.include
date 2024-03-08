@@ -6,7 +6,6 @@ TESTS += test/test_bitcoin
 LOG_DRIVER = $(srcdir)/test/test-bitcoin-driver
 EXTRA_DIST += test/test-bitcoin-driver
 bin_PROGRAMS += test/test_bitcoin
-noinst_PROGRAMS += test/test_bitcoin_fuzzy
 TEST_SRCDIR = test
 TEST_BINARY=test/test_bitcoin$(EXEEXT)
 
@@ -25,56 +24,122 @@ GENERATED_TEST_FILES = $(JSON_TEST_FILES:.json=.json.h) $(RAW_TEST_FILES:.raw=.r
 
 # test_bitcoin binary #
 BITCOIN_TESTS =\
+  test/alertnotify_tests.cpp \
   test/arith_uint256_tests.cpp \
   test/scriptnum10.h \
   test/addrman_tests.cpp \
   test/amount_tests.cpp \
   test/allocator_tests.cpp \
+  test/array_parser_tests.cpp \
   test/base32_tests.cpp \
   test/base58_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
+  test/big_int_tests.cpp \
   test/blockcheck_tests.cpp \
+  test/block_download_tracking_tests.cpp \
   test/blockencodings_tests.cpp \
+  test/blockfile_reading_tests.cpp \
+  test/block_index_mutex_distribution_tests.cpp \
+  test/block_info_tests.cpp \
+  test/blockindex_with_descendants_tests.cpp \
+  test/blockmaxsize_tests.cpp \
+  test/block_parser_tests.cpp \
+  test/blocktxn_parser_tests.cpp \
   test/blockstatus_tests.cpp \
+  test/blockvalidationstatus_tests.cpp \
   test/bloom_tests.cpp \
+  test/bn_helpers.h \
+  test/bn_op_tests.cpp \
   test/bswap_tests.cpp \
   test/checkpoints_tests.cpp \
+  test/checkqueue_tests.cpp \
+  test/check_selfish_mining_tests.cpp \
+  test/cmpctblock_parser_tests.cpp \
+  test/cmpct_size_tests.cpp \
   test/coins_tests.cpp \
+  test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
+  test/coinbase_doc_tests.cpp \
   test/core_io_tests.cpp \
+  test/cpfp_tests.cpp \
   test/crypto_tests.cpp \
+  test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
+  test/dataref_index_tests.cpp \
+  test/datareftx_tests.cpp \
+  test/dsattempt_tests.cpp \
+  test/dsdetected_tests.cpp \
+  test/dstxn_serialiser_tests.cpp \
   test/dbwrapper_tests.cpp \
+  test/frozentxo_db_tests.cpp \
+  test/frozentxo_mempool_tests.cpp \
+  test/frozentxo_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
+  test/enum_cast_tests.cpp \
+  test/eviction_candidates_tracker_tests.cpp \
   test/excessiveblock_tests.cpp \
+  test/fixed_len_multi_parser_tests.cpp \
+  test/fixed_len_parser_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
+  test/instruction_iterator_tests.cpp \
+  test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
+  test/invalid_txn_publisher_tests.cpp \
+  test/jba_selfish_mining_tests.cpp \
+  test/journal_assembler_group_tests.cpp \
+  test/journal_tests.cpp \
   test/jsonutil.cpp \
+  test/json_tests.cpp \
   test/jsonutil.h \
   test/key_tests.cpp \
+  test/leaky_bucket_tests.cpp \
   test/limitedmap_tests.cpp \
+  test/limitedstack_tests.cpp \
+  test/locked_ref_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
+  test/mempool_test_access.h \
+  test/mempool_dump_load_tests.cpp \
+  test/mempool_limit_tests.cpp \
+  test/mempool_snapshot_tests.cpp \
   test/mempool_tests.cpp \
+  test/mempooltxdb_tests.cpp \
   test/merkle_tests.cpp \
+  test/merkletreefile_readwrite_tests.cpp \
+  test/mining_group_builder_tests.cpp \
+  test/miner_id_db_tests.cpp \
+  test/miner_id_db_tests3.cpp \
+  test/miner_info_tests.cpp \
+  test/miner_info_doc_tests.cpp \
+  test/miner_info_error_tests.cpp \
+  test/miner_info_ref_tests.cpp \
   test/miner_tests.cpp \
-  test/mod_pri_queue_tests.cpp \
-  test/opcode_tests.cpp \
+  test/minerid_tests.cpp \
+  test/mod_n_byte_parser.h \
+  test/msg_buffer_tests.cpp \
+  test/msg_parser_buffer_tests.cpp \
   test/multisig_tests.cpp \
+  test/net_association_tests.cpp \
+  test/net_message_tests.cpp \
+  test/net_message_maker_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
+  test/object_stream_deserialization_tests.cpp \
+  test/opcode_tests.cpp \
   test/pmt_tests.cpp \
-  test/policyestimator_tests.cpp \
+  test/prefilled_tx_parser_tests.cpp \
+  test/prefilled_txs_parser_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
   test/protocol_tests.cpp \
   test/raii_event_tests.cpp \
   test/random_tests.cpp \
   test/reverselock_tests.cpp \
+  test/revokemid_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
   test/scheduler_tests.cpp \
@@ -82,6 +147,7 @@ BITCOIN_TESTS =\
   test/script_tests.cpp \
   test/scriptflags.cpp \
   test/scriptflags.h \
+  test/script_macros.h \
   test/scriptnum_tests.cpp \
   test/serialize_tests.cpp \
   test/sighash_tests.cpp \
@@ -89,23 +155,43 @@ BITCOIN_TESTS =\
   test/sigopcount_tests.cpp \
   test/sigutil.cpp \
   test/sigutil.h \
+  test/single_seg_parser_tests.cpp \
   test/skiplist_tests.cpp \
   test/streams_tests.cpp \
+  test/stream_serialization_tests.cpp \
+  test/stream_test_helpers.h \
+  test/string_writer_tests.cpp \
+  test/taskcancellation_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/test_bitcoin_main.cpp \
+  test/test_double_spend_detector.cpp \
+  test/test_orphantxns.cpp \
+  test/test_recent_rejects.cpp \
+  test/test_txid_tracker.cpp \
+  test/test_txnvalidation_utils.cpp \
+  test/test_txnvalidator.cpp \
   test/testutil.cpp \
   test/testutil.h \
+  test/thread_safe_queue_tests.cpp \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
+  test/time_limited_blacklist_tests.cpp \
+  test/time_locked_mempool_tests.cpp \
+  test/ttor_tests.cpp \
   test/transaction_tests.cpp \
+  test/txn_grouper_tests.cpp \
+  test/txs_parser_tests.cpp \
+  test/tx_parser_tests.cpp \
   test/txvalidationcache_tests.cpp \
-  test/versionbits_tests.cpp \
   test/uint256_tests.cpp \
   test/undo_tests.cpp \
+  test/unique_array_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp \
-  test/validation_tests.cpp
+  test/validation_scheduler_tests.cpp \
+  test/validation_tests.cpp \
+  test/webhook_client_tests.cpp
 
 if ENABLE_WALLET
 BITCOIN_TESTS += \
@@ -124,33 +210,15 @@ if ENABLE_WALLET
 test_test_bitcoin_LDADD += $(LIBBITCOIN_WALLET)
 endif
 test_test_bitcoin_LDADD += $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CONSENSUS) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) \
-  $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(EVENT_LIBS) $(EVENT_PTHREADS_LIBS)
+  $(LIBLEVELDB) $(LIBCRC32C) $(LIBMEMENV) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(EVENT_LIBS) $(EVENT_PTHREADS_LIBS) $(AIO_LIBS) $(TBB_LIBS)
 test_test_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
-test_test_bitcoin_LDADD += $(LIBBITCOIN_CONSENSUS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+test_test_bitcoin_LDADD += $(LIBBITCOIN_CONSENSUS) $(BDB_LIBS) $(OPENSSL_LIBS) $(MINIUPNPC_LIBS)
 test_test_bitcoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -static
 
 if ENABLE_ZMQ
-test_test_bitcoin_LDADD += $(ZMQ_LIBS)
+test_test_bitcoin_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)
 endif
-#
-
-# test_bitcoin_fuzzy binary #
-test_test_bitcoin_fuzzy_SOURCES = test/test_bitcoin_fuzzy.cpp
-test_test_bitcoin_fuzzy_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-test_test_bitcoin_fuzzy_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-test_test_bitcoin_fuzzy_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
-
-test_test_bitcoin_fuzzy_LDADD = \
-  $(LIBUNIVALUE) \
-  $(LIBBITCOIN_SERVER) \
-  $(LIBBITCOIN_COMMON) \
-  $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_CONSENSUS) \
-  $(LIBBITCOIN_CRYPTO) \
-  $(LIBSECP256K1)
-
-test_test_bitcoin_fuzzy_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
 nodist_test_test_bitcoin_SOURCES = $(GENERATED_TEST_FILES)
@@ -183,6 +251,6 @@ endif
 	 echo "namespace json_tests{" && \
 	 echo "static unsigned const char $(*F)[] = {" && \
 	 $(HEXDUMP) -v -e '8/1 "0x%02x, "' -e '"\n"' $< | $(SED) -e 's/0x  ,//g' && \
-	 echo "};};"; \
+	 echo "};}"; \
 	} > "$@.new" && mv -f "$@.new" "$@"
 	@echo "Generated $@"

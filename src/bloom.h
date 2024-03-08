@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_BLOOM_H
@@ -43,12 +43,10 @@ enum bloomflags {
  */
 class CBloomFilter {
 private:
-    std::vector<uint8_t> vData;
-    bool isFull;
-    bool isEmpty;
-    unsigned int nHashFuncs;
-    unsigned int nTweak;
-    uint8_t nFlags;
+    std::vector<uint8_t> vData {};
+    unsigned int nHashFuncs {0};
+    unsigned int nTweak {0};
+    uint8_t nFlags {0};
 
     unsigned int Hash(unsigned int nHashNum, const std::vector<uint8_t> &vDataToHash) const;
 
@@ -73,9 +71,9 @@ public:
       * 1.18
      **/
     CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,uint8_t nFlagsIn);
-    CBloomFilter() : isFull(true), isEmpty(false), nHashFuncs(0), nTweak(0), nFlags(0) { return;}
+    CBloomFilter() = default;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -85,10 +83,12 @@ public:
         READWRITE(nFlags);
     }
 
+    // only elements with size up to MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS are inserted
     void insert(const std::vector<uint8_t> &vKey);
     void insert(const COutPoint &outpoint);
     void insert(const uint256 &hash);
 
+    // only elements with size up to MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS are matched
     bool contains(const std::vector<uint8_t> &vKey) const;
     bool contains(const COutPoint &outpoint) const;
     bool contains(const uint256 &hash) const;
@@ -104,9 +104,6 @@ public:
     //! Also adds any outputs which match the filter to the filter (to match
     //! their spending txes)
     bool IsRelevantAndUpdate(const CTransaction &tx);
-
-    //! Checks for empty and full filters to avoid wasting cpu
-    void UpdateEmptyFull();
 };
 
 /**

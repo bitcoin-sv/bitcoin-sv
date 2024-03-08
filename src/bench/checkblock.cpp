@@ -8,6 +8,8 @@
 #include "consensus/validation.h"
 #include "streams.h"
 #include "validation.h"
+#include "chainparams.h"
+#include "init.h"
 
 namespace block_bench {
 #include "bench/data/block413567.raw.h"
@@ -40,7 +42,12 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
     char a;
     stream.write(&a, 1); // Prevent compaction
 
-    const Config &config = GlobalConfig::GetConfig();
+    SelectParams(CBaseChainParams::MAIN);
+    ConfigInit &config = GlobalConfig::GetModifiableGlobalConfig();
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+
+    assert(AppInitParameterInteraction(config));
+
     while (state.KeepRunning()) {
         // Note that CBlock caches its checked state, so we need to recreate it
         // here.
@@ -49,9 +56,9 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
         assert(stream.Rewind(sizeof(block_bench::block413567)));
 
         CValidationState validationState;
-        assert(CheckBlock(config, block, validationState));
+        assert(CheckBlock(config, block, validationState, 413567));
     }
 }
 
-BENCHMARK(DeserializeBlockTest);
-BENCHMARK(DeserializeAndCheckBlockTest);
+BENCHMARK(DeserializeBlockTest)
+BENCHMARK(DeserializeAndCheckBlockTest)

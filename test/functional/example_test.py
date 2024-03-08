@@ -117,8 +117,8 @@ class ExampleTest(BitcoinTestFramework):
         # In this test, we're not connecting node2 to node0 or node1. Calls to
         # sync_all() should not include node2, since we're not expecting it to
         # sync.
-        connect_nodes(self.nodes[0], 1)
-        self.sync_all([self.nodes[0:1]])
+        connect_nodes(self.nodes, 0, 1)
+        self.sync_all([self.nodes[0:2]])
 
     # Use setup_nodes() to customize the node start behaviour (for example if
     # you don't want to start all nodes at the start of the test).
@@ -152,7 +152,7 @@ class ExampleTest(BitcoinTestFramework):
 
         # Generating a block on one of the nodes will get us out of IBD
         blocks = [int(self.nodes[0].generate(nblocks=1)[0], 16)]
-        self.sync_all([self.nodes[0:1]])
+        self.sync_all([self.nodes[0:2]])
 
         # Notice above how we called an RPC by calling a method with the same
         # name on the node object. Notice also how we used a keyword argument
@@ -198,7 +198,7 @@ class ExampleTest(BitcoinTestFramework):
         self.nodes[1].waitforblockheight(11)
 
         self.log.info("Connect node2 and node1")
-        connect_nodes(self.nodes[1], 2)
+        connect_nodes(self.nodes, 1, 2)
 
         self.log.info("Add P2P connection to node2")
         node2 = BaseNode()
@@ -212,7 +212,7 @@ class ExampleTest(BitcoinTestFramework):
 
         getdata_request = msg_getdata()
         for block in blocks:
-            getdata_request.inv.append(CInv(2, block))
+            getdata_request.inv.append(CInv(CInv.BLOCK, block))
         node2.send_message(getdata_request)
 
         # wait_until() will loop until a predicate condition is met. Use it to test properties of the

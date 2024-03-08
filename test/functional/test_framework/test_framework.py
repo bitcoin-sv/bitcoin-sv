@@ -15,18 +15,22 @@ import sys
 import tempfile
 import time
 import traceback
+import contextlib
 from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.mininode import NetworkThread
+from test_framework.mininode import NetworkThread, StopNetworkThread
+from .associations import Association, AssociationCB
 
 from .authproxy import JSONRPCException
 from . import coverage
-from .test_node import TestNode
+from .test_node import TestNode, TestNode_process_list, BITCOIND_PROC_WAIT_TIMEOUT
 from .util import (
     MAX_NODES,
     PortSeed,
     assert_equal,
     check_json_precision,
     connect_nodes_bi,
+    connect_nodes,
+    disconnect_nodes_bi,
     disconnect_nodes,
     initialize_datadir,
     log_filename,
@@ -34,9 +38,11 @@ from .util import (
     set_node_times,
     sync_blocks,
     sync_mempools,
+    wait_until
 )
 
 from test_framework.blocktools import *
+
 
 class TestStatus(Enum):
     PASSED = 1
@@ -70,6 +76,8 @@ class BitcoinTestFramework():
         self.setup_clean_chain = False
         self.nodes = []
         self.mocktime = 0
+        self.runNodesWithRequiredParams = True
+        self.bitcoind_proc_wait_timeout = BITCOIND_PROC_WAIT_TIMEOUT
         self.set_test_params()
 
         assert hasattr(
@@ -103,6 +111,8 @@ class BitcoinTestFramework():
                           help="Attach a python debugger if test fails")
         parser.add_option("--waitforpid", dest="waitforpid", default=False, action="store_true",
                           help="Display the bitcoind pid and wait for the user before proceeding. Useful for (eg) attaching a debugger to bitcoind.")
+        parser.add_option("--timeoutfactor", dest="timeoutfactor", default=1, type='float',
+                          help="Multiply timeouts in specific tests with this factor to enable successful tests in slower environments.")
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args()
 
@@ -147,6 +157,9 @@ class BitcoinTestFramework():
             print("Testcase failed. Attaching python debugger. Enter ? for help")
             pdb.set_trace()
 
+        # Make the NetworkThread stop if it is still running so that it does not prevent test script from exiting.
+        StopNetworkThread()
+
         if not self.options.noshutdown:
             self.log.info("Stopping nodes")
             if self.nodes:
@@ -154,6 +167,15 @@ class BitcoinTestFramework():
         else:
             self.log.info(
                 "Note: bitcoinds were not stopped and may still be running")
+            # Remove all node processes from list of running external processes
+            # so that they will not be killed when Python exists.
+            TestNode_process_list.clear()
+
+        if len(TestNode_process_list)>0:
+            self.log.warning("%i process(es) started by test are still running and will be killed." % len(TestNode_process_list))
+            if success != TestStatus.FAILED:
+                self.log.error("Because not all started processes were properly stopped, test is considered to have failed!")
+                success = TestStatus.FAILED
 
         if not self.options.nocleanup and not self.options.noshutdown and success != TestStatus.FAILED:
             self.log.info("Cleaning up {} on exit".format(self.options.tmpdir))
@@ -177,7 +199,6 @@ class BitcoinTestFramework():
                     except OSError:
                         print("Opening file %s failed." % fn)
                         traceback.print_exc()
-            
 
         if success == TestStatus.PASSED:
             self.log.info("Tests successful")
@@ -246,16 +267,22 @@ class BitcoinTestFramework():
         assert_equal(len(extra_args), num_nodes)
         assert_equal(len(binaries), num_nodes)
         for i in range(num_nodes):
-            self.nodes.append(TestNode(i, self.options.tmpdir, extra_args[i], rpchost, timewait=timewait,
-                                       binary=binaries[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+            self.add_node(i, extra_args[i], rpchost, timewait, binaries[i])
+
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        self.nodes.append(TestNode(i, self.options.tmpdir, extra_args, rpchost, timewait, binary, stderr=None,
+                                   mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+        if init_data_dir:
+            initialize_datadir(self.options.tmpdir, i)
 
     def start_node(self, i, extra_args=None, stderr=None):
         """Start a bitcoind"""
 
         node = self.nodes[i]
 
-        node.start(extra_args, stderr)
+        node.start(self.runNodesWithRequiredParams, extra_args, stderr)
         node.wait_for_rpc_connection()
+        wait_until(lambda: node.rpc.getinfo()["initcomplete"])
 
         if self.options.coveragedir is not None:
             coverage.write_all_rpc_commands(self.options.coveragedir, node.rpc)
@@ -268,9 +295,10 @@ class BitcoinTestFramework():
         assert_equal(len(extra_args), self.num_nodes)
         try:
             for i, node in enumerate(self.nodes):
-                node.start(extra_args[i])
+                node.start(self.runNodesWithRequiredParams, extra_args[i])
             for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
+                wait_until(lambda: node.rpc.getinfo()["initcomplete"])
                 if(self.options.waitforpid):
                     print('Node {} started, pid is {}'.format(i, node.process.pid))
                     print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))
@@ -285,10 +313,143 @@ class BitcoinTestFramework():
                 coverage.write_all_rpc_commands(
                     self.options.coveragedir, node.rpc)
 
+    # This method runs and stops bitcoind node with index 'node_index'.
+    # It also creates (and handles closing of) 'number_of_connections' connections to bitcoind node with index 'node_index'.
+    @contextlib.contextmanager
+    def run_node_with_connections(self, title, node_index, args, number_of_connections, connArgs=[{}], cb_class=NodeConnCB, ip='127.0.0.1', wait_for_verack=True):
+        logger.debug("setup %s", title)
+
+        self.start_node(node_index, args)
+
+        connections = []
+        connectionCbs = []
+        for i in range(number_of_connections):
+            connCb = cb_class()
+            connectionCbs.append(connCb)
+
+            thisConnArgs = {}
+            if len(connArgs) > i:
+                thisConnArgs = connArgs[i]
+
+            connection = NodeConn(ip, p2p_port(node_index), self.nodes[node_index], connCb, **thisConnArgs)
+            connections.append(connection)
+            connCb.add_connection(connection)
+
+        thr = NetworkThread()
+        thr.start()
+        if wait_for_verack:
+            for connCb in connectionCbs:
+                connCb.wait_for_verack()
+
+        logger.debug("before %s", title)
+        yield tuple(connections)
+        logger.debug("after %s", title)
+
+        for connection in connections:
+            connection.close()
+        del connections
+        # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        self.stop_node(node_index)
+        logger.debug("finished %s", title)
+
+    # this method creates following network graph
+    #
+    #      NodeConnCB
+    #          |
+    #          v
+    #      self.node[0] ---> self.node[1]  ---> ... ---> self.node[n]
+    #
+    @contextlib.contextmanager
+    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True, p2pConnections=[0], cb_class=NodeConnCB):
+        if not title:
+            title = "None"
+        logger.debug("setup %s", title)
+
+        if not args:
+            args = [[]] * self.num_nodes
+        else:
+            assert(len(args) == self.num_nodes)
+
+        self.start_nodes(args)
+
+        connections = []
+        connCb = None
+        if p2pConnections:
+            connCb = cb_class()  # one mininode connection  to node 0
+        for i in p2pConnections:
+            connection = NodeConn(ip, p2p_port(i), self.nodes[i], connCb, strSubVer=strSubVer)
+            connections.append(connection)
+            connCb.add_connection(connection)
+
+        thr = NetworkThread()
+        thr.start()
+        if wait_for_verack and connCb:
+            connCb.wait_for_verack()
+
+        logger.debug("before %s", title)
+
+        for i in range(self.num_nodes - 1):
+            connect_nodes(self.nodes, i, i + 1)
+
+        yield tuple(connections)
+        logger.debug("after %s", title)
+
+        for i in range(self.num_nodes - 1):
+            disconnect_nodes(self.nodes[i], i + 1)
+
+        for connection in connections:
+            connection.close()
+        del connections
+        # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        self.stop_nodes()
+        logger.debug("finished %s", title)
+
+    # This method runs and stops bitcoind node with index 'node_index'.
+    # It also creates (and handles closing of) some number of associations (desribed by their stream policies)
+    # to bitcoind node with index 'node_index'.
+    @contextlib.contextmanager
+    def run_node_with_associations(self, title, node_index, args, stream_policies, cb_class=AssociationCB, ip='127.0.0.1', connArgs={}):
+        logger.debug("setup %s", title)
+
+        self.start_node(node_index, args)
+
+        # Create associations and their connections to the node
+        associations = []
+        for stream_policy in stream_policies:
+            association = Association(stream_policy, cb_class)
+            association.create_streams(self.nodes[node_index], ip, connArgs)
+            associations.append(association)
+
+        # Start network handling thread
+        thr = NetworkThread()
+        thr.start()
+
+        # Allow associations to exchange their setup messages and fully initialise
+        for association in associations:
+            association.setup()
+        wait_until(lambda: len(self.nodes[node_index].getpeerinfo()) == len(associations))
+
+        # Test can now proceed
+        logger.debug("before %s", title)
+        yield tuple(associations)
+        logger.debug("after %s", title)
+
+        # Shutdown associations and their connections
+        for association in associations:
+            association.close_streams()
+        del associations
+
+        # Once all connections are closed, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        self.stop_node(node_index)
+        logger.debug("finished %s", title)
+
     def stop_node(self, i):
         """Stop a bitcoind test node"""
         self.nodes[i].stop_node()
-        self.nodes[i].wait_until_stopped()
+        self.nodes[i].wait_until_stopped(timeout=self.bitcoind_proc_wait_timeout)
 
     def stop_nodes(self):
         """Stop multiple bitcoind test nodes"""
@@ -298,7 +459,12 @@ class BitcoinTestFramework():
 
         for node in self.nodes:
             # Wait for nodes to stop
-            node.wait_until_stopped()
+            node.wait_until_stopped(timeout=self.bitcoind_proc_wait_timeout)
+
+    def restart_node(self, i, extra_args=None):
+        """Stop and start a test node"""
+        self.stop_node(i)
+        self.start_node(i, extra_args)
 
     def assert_start_raises_init_error(self, i, extra_args=None, expected_msg=None):
         with tempfile.SpooledTemporaryFile(max_size=2**16) as log_stderr:
@@ -306,9 +472,8 @@ class BitcoinTestFramework():
                 self.start_node(i, extra_args, stderr=log_stderr)
                 self.stop_node(i)
             except Exception as e:
+                self.wait_for_node_exit(i,1) # wait until process properly terminates and resources are cleaned up
                 assert 'bitcoind exited' in str(e)  # node must have shutdown
-                self.nodes[i].running = False
-                self.nodes[i].process = None
                 if expected_msg is not None:
                     log_stderr.seek(0)
                     stderr = log_stderr.read().decode('utf-8')
@@ -323,14 +488,13 @@ class BitcoinTestFramework():
                 raise AssertionError(assert_msg)
 
     def wait_for_node_exit(self, i, timeout):
-        self.nodes[i].process.wait(timeout)
+        self.nodes[i].wait_for_exit(timeout)
 
     def split_network(self):
         """
         Split the network of four nodes into nodes 0/1 and 2/3.
         """
-        disconnect_nodes(self.nodes[1], 2)
-        disconnect_nodes(self.nodes[2], 1)
+        disconnect_nodes_bi(self.nodes, 1, 2)
         self.sync_all([self.nodes[:2], self.nodes[2:]])
 
     def join_network(self):
@@ -460,8 +624,6 @@ class BitcoinTestFramework():
                 os.remove(log_filename(self.options.cachedir, i, "bitcoind.log"))
                 os.remove(log_filename(self.options.cachedir, i, "db.log"))
                 os.remove(log_filename(self.options.cachedir, i, "peers.dat"))
-                os.remove(log_filename(
-                    self.options.cachedir, i, "fee_estimates.dat"))
 
         for i in range(self.num_nodes):
             from_dir = os.path.join(self.options.cachedir, "node" + str(i))
@@ -487,9 +649,10 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - 2 binaries: 1 test binary, 1 ref binary
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
-    def __init__(self):
+    def __init__(self, destAddress = '127.0.0.1'):
         super(ComparisonTestFramework,self).__init__()
         self.chain = ChainManager()
+        self.destAddr = destAddress
         self._network_thread = None
         if not hasattr(self, "testbinary"):
             self.testbinary = [os.getenv("BITCOIND", "bitcoind")]
@@ -530,12 +693,13 @@ class ComparisonTestFramework(BitcoinTestFramework):
     def init_network(self):
         # Start creating test manager which help to manage test cases
         self.test = TestManager(self, self.options.tmpdir)
+        self.test.destAddr = self.destAddr
         # (Re)start network
         self.restart_network()
 
     # returns a test case that asserts that the current tip was accepted
-    def accepted(self):
-        return TestInstance([[self.chain.tip, True]])
+    def accepted(self, sync_timeout=300):
+        return TestInstance([[self.chain.tip, True]], sync_timeout=sync_timeout)
 
     # returns a test case that asserts that the current tip was rejected
     def rejected(self, reject=None):
@@ -543,6 +707,9 @@ class ComparisonTestFramework(BitcoinTestFramework):
             return TestInstance([[self.chain.tip, False]])
         else:
             return TestInstance([[self.chain.tip, reject]])
+
+    def check_mempool(self, rpc, should_be_in_mempool, timeout=20):
+        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=timeout)
 
 
 class SkipTest(Exception):

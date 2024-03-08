@@ -1,405 +1,196 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
 
 #include "script.h"
-
-#include "tinyformat.h"
+#include "consensus/consensus.h"
+#include "instruction_iterator.h"
+#include "int_serialization.h"
+#include "script_num.h"
 #include "utilstrencodings.h"
 
 #include <algorithm>
+#include <sstream>
 
-const char *GetOpName(opcodetype opcode) {
-    switch (opcode) {
-        // push value
-        case OP_0:
-            return "0";
-        case OP_PUSHDATA1:
-            return "OP_PUSHDATA1";
-        case OP_PUSHDATA2:
-            return "OP_PUSHDATA2";
-        case OP_PUSHDATA4:
-            return "OP_PUSHDATA4";
-        case OP_1NEGATE:
-            return "-1";
-        case OP_RESERVED:
-            return "OP_RESERVED";
-        case OP_1:
-            return "1";
-        case OP_2:
-            return "2";
-        case OP_3:
-            return "3";
-        case OP_4:
-            return "4";
-        case OP_5:
-            return "5";
-        case OP_6:
-            return "6";
-        case OP_7:
-            return "7";
-        case OP_8:
-            return "8";
-        case OP_9:
-            return "9";
-        case OP_10:
-            return "10";
-        case OP_11:
-            return "11";
-        case OP_12:
-            return "12";
-        case OP_13:
-            return "13";
-        case OP_14:
-            return "14";
-        case OP_15:
-            return "15";
-        case OP_16:
-            return "16";
+uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const
+{
+    sigOpCountError = false;
+    uint64_t n = 0;
+    bsv::instruction last_instruction;
+    const auto it_end{end_instructions()};
 
-        // control
-        case OP_NOP:
-            return "OP_NOP";
-        case OP_VER:
-            return "OP_VER";
-        case OP_IF:
-            return "OP_IF";
-        case OP_NOTIF:
-            return "OP_NOTIF";
-        case OP_VERIF:
-            return "OP_VERIF";
-        case OP_VERNOTIF:
-            return "OP_VERNOTIF";
-        case OP_ELSE:
-            return "OP_ELSE";
-        case OP_ENDIF:
-            return "OP_ENDIF";
-        case OP_VERIFY:
-            return "OP_VERIFY";
-        case OP_RETURN:
-            return "OP_RETURN";
+    int64_t scopeLevel {0};
 
-        // stack ops
-        case OP_TOALTSTACK:
-            return "OP_TOALTSTACK";
-        case OP_FROMALTSTACK:
-            return "OP_FROMALTSTACK";
-        case OP_2DROP:
-            return "OP_2DROP";
-        case OP_2DUP:
-            return "OP_2DUP";
-        case OP_3DUP:
-            return "OP_3DUP";
-        case OP_2OVER:
-            return "OP_2OVER";
-        case OP_2ROT:
-            return "OP_2ROT";
-        case OP_2SWAP:
-            return "OP_2SWAP";
-        case OP_IFDUP:
-            return "OP_IFDUP";
-        case OP_DEPTH:
-            return "OP_DEPTH";
-        case OP_DROP:
-            return "OP_DROP";
-        case OP_DUP:
-            return "OP_DUP";
-        case OP_NIP:
-            return "OP_NIP";
-        case OP_OVER:
-            return "OP_OVER";
-        case OP_PICK:
-            return "OP_PICK";
-        case OP_ROLL:
-            return "OP_ROLL";
-        case OP_ROT:
-            return "OP_ROT";
-        case OP_SWAP:
-            return "OP_SWAP";
-        case OP_TUCK:
-            return "OP_TUCK";
+    for(auto it{begin_instructions()}; it != it_end; ++it)
+    {
+        opcodetype lastOpcode{last_instruction.opcode()};
 
-        // splice ops
-        case OP_CAT:
-            return "OP_CAT";
-        case OP_SPLIT:
-            return "OP_SPLIT";
-        case OP_NUM2BIN:
-            return "OP_NUM2BIN";
-        case OP_BIN2NUM:
-            return "OP_BIN2NUM";
-        case OP_SIZE:
-            return "OP_SIZE";
+        opcodetype opcode{it->opcode()};
+        if(it->opcode() == OP_INVALIDOPCODE)
+            break;
 
-        // bit logic
-        case OP_INVERT:
-            return "OP_INVERT";
-        case OP_AND:
-            return "OP_AND";
-        case OP_OR:
-            return "OP_OR";
-        case OP_XOR:
-            return "OP_XOR";
-        case OP_EQUAL:
-            return "OP_EQUAL";
-        case OP_EQUALVERIFY:
-            return "OP_EQUALVERIFY";
-        case OP_RESERVED1:
-            return "OP_RESERVED1";
-        case OP_RESERVED2:
-            return "OP_RESERVED2";
-
-        // numeric
-        case OP_1ADD:
-            return "OP_1ADD";
-        case OP_1SUB:
-            return "OP_1SUB";
-        case OP_2MUL:
-            return "OP_2MUL";
-        case OP_2DIV:
-            return "OP_2DIV";
-        case OP_NEGATE:
-            return "OP_NEGATE";
-        case OP_ABS:
-            return "OP_ABS";
-        case OP_NOT:
-            return "OP_NOT";
-        case OP_0NOTEQUAL:
-            return "OP_0NOTEQUAL";
-        case OP_ADD:
-            return "OP_ADD";
-        case OP_SUB:
-            return "OP_SUB";
-        case OP_MUL:
-            return "OP_MUL";
-        case OP_DIV:
-            return "OP_DIV";
-        case OP_MOD:
-            return "OP_MOD";
-        case OP_LSHIFT:
-            return "OP_LSHIFT";
-        case OP_RSHIFT:
-            return "OP_RSHIFT";
-        case OP_BOOLAND:
-            return "OP_BOOLAND";
-        case OP_BOOLOR:
-            return "OP_BOOLOR";
-        case OP_NUMEQUAL:
-            return "OP_NUMEQUAL";
-        case OP_NUMEQUALVERIFY:
-            return "OP_NUMEQUALVERIFY";
-        case OP_NUMNOTEQUAL:
-            return "OP_NUMNOTEQUAL";
-        case OP_LESSTHAN:
-            return "OP_LESSTHAN";
-        case OP_GREATERTHAN:
-            return "OP_GREATERTHAN";
-        case OP_LESSTHANOREQUAL:
-            return "OP_LESSTHANOREQUAL";
-        case OP_GREATERTHANOREQUAL:
-            return "OP_GREATERTHANOREQUAL";
-        case OP_MIN:
-            return "OP_MIN";
-        case OP_MAX:
-            return "OP_MAX";
-        case OP_WITHIN:
-            return "OP_WITHIN";
-
-        // crypto
-        case OP_RIPEMD160:
-            return "OP_RIPEMD160";
-        case OP_SHA1:
-            return "OP_SHA1";
-        case OP_SHA256:
-            return "OP_SHA256";
-        case OP_HASH160:
-            return "OP_HASH160";
-        case OP_HASH256:
-            return "OP_HASH256";
-        case OP_CODESEPARATOR:
-            return "OP_CODESEPARATOR";
-        case OP_CHECKSIG:
-            return "OP_CHECKSIG";
-        case OP_CHECKSIGVERIFY:
-            return "OP_CHECKSIGVERIFY";
-        case OP_CHECKMULTISIG:
-            return "OP_CHECKMULTISIG";
-        case OP_CHECKMULTISIGVERIFY:
-            return "OP_CHECKMULTISIGVERIFY";
-
-        // expansion
-        case OP_NOP1:
-            return "OP_NOP1";
-        case OP_CHECKLOCKTIMEVERIFY:
-            return "OP_CHECKLOCKTIMEVERIFY";
-        case OP_CHECKSEQUENCEVERIFY:
-            return "OP_CHECKSEQUENCEVERIFY";
-        case OP_NOP4:
-            return "OP_NOP4";
-        case OP_NOP5:
-            return "OP_NOP5";
-        case OP_NOP6:
-            return "OP_NOP6";
-        case OP_NOP7:
-            return "OP_NOP7";
-        case OP_NOP8:
-            return "OP_NOP8";
-        case OP_NOP9:
-            return "OP_NOP9";
-        case OP_NOP10:
-            return "OP_NOP10";
-
-        case OP_INVALIDOPCODE:
-            return "OP_INVALIDOPCODE";
-
-        // Note:
-        //  The template matching params OP_SMALLINTEGER/etc are defined in
-        //  opcodetype enum as kind of implementation hack, they are *NOT*
-        //  real opcodes. If found in real Script, just let the default:
-        //  case deal with them.
-
-        default:
-            return "OP_UNKNOWN";
-    }
-}
-
-bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch,
-                                    const size_t nMaxNumSize) {
-    if (vch.size() > nMaxNumSize) {
-        return false;
-    }
-
-    if (vch.size() > 0) {
-        // Check that the number is encoded with the minimum possible number
-        // of bytes.
-        //
-        // If the most-significant-byte - excluding the sign bit - is zero
-        // then we're not minimal. Note how this test also rejects the
-        // negative-zero encoding, 0x80.
-        if ((vch.back() & 0x7f) == 0) {
-            // One exception: if there's more than one byte and the most
-            // significant bit of the second-most-significant-byte is set it
-            // would conflict with the sign bit. An example of this case is
-            // +-255, which encode to 0xff00 and 0xff80 respectively.
-            // (big-endian).
-            if (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0) {
-                return false;
+        if(fAccurate || isGenesisEnabled)
+        {
+            if(opcode == OP_RETURN && scopeLevel == 0)
+            {
+                // Everything after OP_RETURN at top level scope is unexecutable
+                break;
+            }
+            else if(opcode == OP_IF || opcode == OP_NOTIF)
+            {
+                // Entering a new scope at a new level
+                ++scopeLevel;
+            }
+            else if(opcode == OP_ENDIF)
+            {
+                // Leaving scope at this level
+                if(--scopeLevel < 0)
+                {
+                    // Invalid script with unbalanced IF/ENDIF
+                    sigOpCountError = true;
+                    return 0;
+                }
             }
         }
-    }
 
-    return true;
-}
-
-bool CScriptNum::MinimallyEncode(std::vector<uint8_t> &data) {
-    if (data.size() == 0) {
-        return false;
-    }
-
-    // If the last byte is not 0x00 or 0x80, we are minimally encoded.
-    uint8_t last = data.back();
-    if (last & 0x7f) {
-        return false;
-    }
-
-    // If the script is one byte long, then we have a zero, which encodes as an
-    // empty array.
-    if (data.size() == 1) {
-        data = {};
-        return true;
-    }
-
-    // If the next byte has it sign bit set, then we are minimaly encoded.
-    if (data[data.size() - 2] & 0x80) {
-        return false;
-    }
-
-    // We are not minimally encoded, we need to figure out how much to trim.
-    for (size_t i = data.size() - 1; i > 0; i--) {
-        // We found a non zero byte, time to encode.
-        if (data[i - 1] != 0) {
-            if (data[i - 1] & 0x80) {
-                // We found a byte with it sign bit set so we need one more
-                // byte.
-                data[i++] = last;
-            } else {
-                // the sign bit is clear, we can use it.
-                data[i - 1] |= last;
-            }
-
-            data.resize(i);
-            return true;
-        }
-    }
-
-    // If we the whole thing is zeros, then we have a zero.
-    data = {};
-    return true;
-}
-
-unsigned int CScript::GetSigOpCount(bool fAccurate) const {
-    unsigned int n = 0;
-    const_iterator pc = begin();
-    opcodetype lastOpcode = OP_INVALIDOPCODE;
-    while (pc < end()) {
-        opcodetype opcode;
-        if (!GetOp(pc, opcode)) break;
-        if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
+        if(opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
+        {
             n++;
-        else if (opcode == OP_CHECKMULTISIG ||
-                 opcode == OP_CHECKMULTISIGVERIFY) {
-            if (fAccurate && lastOpcode >= OP_1 && lastOpcode <= OP_16)
-                n += DecodeOP_N(lastOpcode);
-            else
-                n += MAX_PUBKEYS_PER_MULTISIG;
         }
-        lastOpcode = opcode;
+        else if(opcode == OP_CHECKMULTISIG || 
+            opcode == OP_CHECKMULTISIGVERIFY)
+        {
+            if ((fAccurate || isGenesisEnabled) && lastOpcode >= OP_1 && lastOpcode <= OP_16)
+            {
+                n += DecodeOP_N(lastOpcode);
+            }
+            // post Genesis we always count accurate ops because it's not significantly costlier
+            else if (isGenesisEnabled)
+            {
+                if (lastOpcode == OP_0) 
+                {
+                    // Checking multisig with 0 keys, so nothing to add to n
+                }
+                else if(last_instruction.operand().size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
+                {
+                    // When trying to spend such output EvalScript does not allow numbers bigger than 4 bytes
+                    // and the execution of such script would fail and make the coin unspendable
+                    sigOpCountError = true;
+                    return 0;
+                }
+                else
+                {
+                    //  When trying to spend such output EvalScript requires minimal encoding
+                    //  and would fail the script if number is not minimally encoded
+                    //  We check minimal encoding before calling CScriptNum to avoid
+                    //  exception in CScriptNum constructor.
+                    if(!bsv::IsMinimallyEncoded(
+                           last_instruction.operand(),
+                           CScriptNum::MAXIMUM_ELEMENT_SIZE))
+                    {
+                        sigOpCountError = true;
+                        return 0;
+                    }
+
+                    int numSigs =
+                        CScriptNum(last_instruction.operand(), true).getint();
+                    if(numSigs < 0)
+                    {
+                        sigOpCountError = true;
+                        return 0;
+                    }
+                    n += numSigs;
+                }
+            }
+            else
+            {
+                n += MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
+            }
+        }
+        last_instruction = *it;
     }
+
     return n;
 }
 
-unsigned int CScript::GetSigOpCount(const CScript &scriptSig) const {
-    if (!IsPayToScriptHash()) return GetSigOpCount(true);
+uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const 
+{
+    sigOpCountError = false;
+    if(!IsP2SH(*this))
+    {
+        return GetSigOpCount(true, isGenesisEnabled, sigOpCountError);
+    }
 
     // This is a pay-to-script-hash scriptPubKey;
     // get the last item that the scriptSig
     // pushes onto the stack:
-    const_iterator pc = scriptSig.begin();
-    std::vector<uint8_t> data;
-    while (pc < scriptSig.end()) {
-        opcodetype opcode;
-        if (!scriptSig.GetOp(pc, opcode, data)) return 0;
-        if (opcode > OP_16) return 0;
-    }
+    span<const uint8_t> data;
+    const bool valid_script = std::all_of(scriptSig.begin_instructions(), scriptSig.end_instructions(),
+            [&data](const auto& inst)
+            {
+                if((inst.opcode() > OP_16) || (inst.opcode() == OP_INVALIDOPCODE))  
+                    return false;
 
-    /// ... and return its opcount:
-    CScript subscript(data.begin(), data.end());
-    return subscript.GetSigOpCount(true);
+                data = inst.operand(); 
+                return true;
+            });
+    if(!valid_script)
+        return 0;
+
+    if (isGenesisEnabled)
+    {
+        // After Genesis P2SH is not supported and redeem script is not executed, so we return 0
+        return 0;
+    }
+    else
+    {
+        // ... and return its opcount:
+        CScript subscript(data.data(), data.data() + data.size());
+        return subscript.GetSigOpCount(true, isGenesisEnabled, sigOpCountError);
+    }
 }
 
-bool CScript::IsPayToScriptHash() const {
+bool IsP2SH(const span<const uint8_t> script) {
     // Extra-fast test for pay-to-script-hash CScripts:
-    return (this->size() == 23 && (*this)[0] == OP_HASH160 &&
-            (*this)[1] == 0x14 && (*this)[22] == OP_EQUAL);
+    return script.size() == 23 && script[0] == OP_HASH160 &&
+           script[1] == 0x14 && script[22] == OP_EQUAL;
 }
 
-// A witness program is any valid CScript that consists of a 1-byte push opcode
-// followed by a data push between 2 and 40 bytes.
-bool CScript::IsWitnessProgram(int &version,
-                               std::vector<uint8_t> &program) const {
-    if (this->size() < 4 || this->size() > 42) {
+// Quick test for double-spend enabled OP_RETURN script
+bool IsDSNotification(span<const uint8_t> script) {
+    // OP_FALSE OP_RETURN OP_PUSHDATA 0x64736e74 OP_PUSHDATA Callback Msg
+    return script.size() >= 11 && script[0] == OP_FALSE && script[1] == OP_RETURN && script[2] == 0x04 &&
+       script[3] == 0x64 && script[4] == 0x73 && script[5] == 0x6e && script[6] == 0x74;
+}
+
+bool IsDustReturnScript(const span<const uint8_t> script)
+{
+    // OP_FALSE, OP_RETURN, OP_PUSHDATA, 'dust'
+    static constexpr std::array<uint8_t, 7> dust_return = {0x00,0x6a,0x04,0x64,0x75,0x73,0x74};
+    if (script.size() != dust_return.size())
         return false;
-    }
-    if ((*this)[0] != OP_0 && ((*this)[0] < OP_1 || (*this)[0] > OP_16)) {
-        return false;
-    }
-    if ((size_t)((*this)[1] + 2) == this->size()) {
-        version = DecodeOP_N((opcodetype)(*this)[0]);
-        program = std::vector<uint8_t>(this->begin() + 2, this->end());
-        return true;
-    }
-    return false;
+
+    return std::equal(script.begin(), script.end(), dust_return.begin());
+}
+
+/*
+ * The beginning of the script should look like this: OP_FALSE OP_RETURN
+ * OP_PUSHDATA protocol_id OP_PUSHDATA data Method only works for 4-byte
+ * protocol ids. It does not check data after OP_PUSHDATA (i.e. is length of
+ * data consistent with the chosen PUSHDATA). This should be done on the
+ * call-site.
+ */
+bool IsMinerId(const span<const uint8_t> script)
+{
+    constexpr std::array<uint8_t, 4> protocol_id{0xac, 0x1e, 0xed, 0x88};
+    return script.size() >= 8 && 
+           script[0] == OP_FALSE &&
+           script[1] == OP_RETURN && 
+           script[2] == protocol_id.size() &&
+           std::equal(protocol_id.begin(), protocol_id.end(), script.begin() + 3) &&
+           script[7] <= OP_PUSHDATA4;
 }
 
 bool CScript::IsPushOnly(const_iterator pc) const {
@@ -419,13 +210,61 @@ bool CScript::IsPushOnly() const {
     return this->IsPushOnly(begin());
 }
 
-std::string CScriptWitness::ToString() const {
-    std::string ret = "CScriptWitness(";
-    for (unsigned int i = 0; i < stack.size(); i++) {
-        if (i) {
-            ret += ", ";
-        }
-        ret += HexStr(stack[i]);
+CScript &CScript::push_int64(int64_t n) {
+    if (n == -1 || (n >= 1 && n <= 16)) {
+        push_back(n + (OP_1 - 1));
+    } else if (n == 0) {
+        push_back(OP_0);
+    } else {
+        std::vector<uint8_t> v;
+        v.reserve(sizeof(n));
+        bsv::serialize(n, back_inserter(v));
+        *this << v;
     }
-    return ret + ")";
+    return *this;
+}
+
+CScript &CScript::operator<<(const CScriptNum &b) {
+    *this << b.getvch();
+    return *this;
+}
+
+bsv::instruction_iterator CScript::begin_instructions() const
+{
+    return bsv::instruction_iterator{span<const uint8_t>{data(), size()}};
+}
+
+bsv::instruction_iterator CScript::end_instructions() const
+{
+    return bsv::instruction_iterator{
+        span<const uint8_t>{data() + size(), 0}};
+}
+
+std::ostream& operator<<(std::ostream& os, const CScript& script)
+{
+    for(auto it = script.begin_instructions(); it != script.end_instructions();
+        ++it)
+    {
+        os << *it << '\n';
+    }
+
+    return os;
+}
+
+// used for debugging and pretty-printing in gdb
+std::string to_string(const CScript& s)
+{
+    std::ostringstream oss;
+    oss << s;
+    return oss.str();
+}
+
+size_t CountOp(const span<const uint8_t> s, const opcodetype opcode)
+{
+    using namespace bsv;
+    instruction_iterator first{s};
+    instruction_iterator last{s.last(0)};
+    return std::count_if(first, last, [opcode](const instruction& inst) {
+        return inst.opcode() == opcode;
+    });
 }

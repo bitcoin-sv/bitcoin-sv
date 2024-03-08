@@ -98,13 +98,11 @@ class CWalletDBWrapper {
 
 public:
     /** Create dummy DB handle */
-    CWalletDBWrapper()
-        : nLastSeen(0), nLastFlushed(0), nLastWalletUpdate(0), env(nullptr) {}
+    CWalletDBWrapper() = default;
 
     /** Create DB handle to real database */
     CWalletDBWrapper(CDBEnv *env_in, const std::string &strFile_in)
-        : nLastSeen(0), nLastFlushed(0), nLastWalletUpdate(0), env(env_in),
-          strFile(strFile_in) {}
+        : env(env_in), strFile(strFile_in) {}
 
     /** Rewrite the entire database on disk, with the exception of key pszSkip
      * if non-zero
@@ -125,15 +123,15 @@ public:
 
     void IncrementUpdateCounter();
 
-    std::atomic<unsigned int> nUpdateCounter;
-    unsigned int nLastSeen;
-    unsigned int nLastFlushed;
-    int64_t nLastWalletUpdate;
+    std::atomic<unsigned int> nUpdateCounter{};
+    unsigned int nLastSeen{};
+    unsigned int nLastFlushed{};
+    int64_t nLastWalletUpdate{};
 
 private:
     /** BerkeleyDB specific */
-    CDBEnv *env;
-    std::string strFile;
+    CDBEnv *env{};
+    std::string strFile{};
 
     /**
      * Return whether this database handle is a dummy for testing.

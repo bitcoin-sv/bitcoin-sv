@@ -1,0 +1,28 @@
+Checks: '-*,
+         performance*,
+
+         bugprone*,
+         -bugprone-easily-swappable-parameters,
+         
+         cppcoreguidelines*,
+         -cppcoreguidelines-avoid-magic-numbers,
+         -cppcoreguidelines-macro-usage,
+         -cppcoreguidelines-non-private-member-variables-in-classes,
+
+         cert-*,
+         -cert-dcl16-c,
+         -cert-dcl37-c,
+         -cert-dcl21-cpp,
+         -cert-dcl51-cpp,
+         -cert-oop54-cpp
+      '
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+CheckOptions:    
+  - key:             cppcoreguidelines-avoid-do-while.IgnoreMacros
+    value:           'true'
+  - key:             cppcoreguidelines-virtual-class-destructor.IgnoreDestructors
+    value:           'true'
+...
+

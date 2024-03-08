@@ -40,7 +40,7 @@ class MaxUploadTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 1
         # Start a node with maxuploadtarget of 200 MB (/24h)
-        self.extra_args = [["-maxuploadtarget=200"]]
+        self.extra_args = [["-maxuploadtarget=200", "-maxreceivebuffer=5", "-maxsendbuffer=1"]]
 
         # Cache for utxos, as the listunspent may take a long time later in the
         # test
@@ -96,7 +96,7 @@ class MaxUploadTest(BitcoinTestFramework):
         # the same big old block too many times (expect: disconnect)
 
         getdata_request = msg_getdata()
-        getdata_request.inv.append(CInv(2, big_old_block))
+        getdata_request.inv.append(CInv(CInv.BLOCK, big_old_block))
 
         max_bytes_per_day = 200 * 1024 * 1024
         daily_buffer = 144 * LEGACY_MAX_BLOCK_SIZE
@@ -123,7 +123,7 @@ class MaxUploadTest(BitcoinTestFramework):
         # Requesting the current block on test_nodes[1] should succeed indefinitely,
         # even when over the max upload target.
         # We'll try 200 times
-        getdata_request.inv = [CInv(2, big_new_block)]
+        getdata_request.inv = [CInv(CInv.BLOCK, big_new_block)]
         for i in range(200):
             test_nodes[1].send_message(getdata_request)
             test_nodes[1].sync_with_ping()
@@ -133,7 +133,7 @@ class MaxUploadTest(BitcoinTestFramework):
 
         # But if test_nodes[1] tries for an old block, it gets disconnected
         # too.
-        getdata_request.inv = [CInv(2, big_old_block)]
+        getdata_request.inv = [CInv(CInv.BLOCK, big_old_block)]
         test_nodes[1].send_message(getdata_request)
         test_nodes[1].wait_for_disconnect()
         assert_equal(len(self.nodes[0].getpeerinfo()), 1)
@@ -170,13 +170,13 @@ class MaxUploadTest(BitcoinTestFramework):
         test_nodes[0].wait_for_verack()
 
         # retrieve 20 blocks which should be enough to break the 1MB limit
-        getdata_request.inv = [CInv(2, big_new_block)]
+        getdata_request.inv = [CInv(CInv.BLOCK, big_new_block)]
         for i in range(20):
             test_nodes[0].send_message(getdata_request)
             test_nodes[0].sync_with_ping()
             assert_equal(test_nodes[0].block_receive_map[big_new_block], i + 1)
 
-        getdata_request.inv = [CInv(2, big_old_block)]
+        getdata_request.inv = [CInv(CInv.BLOCK, big_old_block)]
         test_nodes[0].send_and_ping(getdata_request)
         # node is still connected because of the whitelist
         assert_equal(len(self.nodes[0].getpeerinfo()), 1)

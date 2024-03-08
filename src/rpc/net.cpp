@@ -3,15 +3,15 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/server.h"
-
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
-#include "net.h"
-#include "net_processing.h"
-#include "netbase.h"
-#include "policy/policy.h"
+#include "miner_id/miner_info_tracker.h"
+#include "net/net.h"
+#include "net/net_processing.h"
+#include "net/netbase.h"
 #include "protocol.h"
+#include "pubkey.h"
 #include "sync.h"
 #include "timedata.h"
 #include "txn_propagator.h"
@@ -20,7 +20,6 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
-
 #include <univalue.h>
 
 static UniValue getconnectioncount(const Config &config,
@@ -77,9 +76,9 @@ static UniValue getpeerinfo(const Config &config,
             "[\n"
             "  {\n"
             "    \"id\": n,                   (numeric) Peer index\n"
-            "    \"addr\":\"host:port\",      (string) The ip address and port "
+            "    \"addr\":\"host:port\",        (string) The ip address and port "
             "of the peer\n"
-            "    \"addrlocal\":\"ip:port\",   (string) local address\n"
+            "    \"addrlocal\":\"ip:port\",     (string) local address (only available if peer local address is routable)\n"
             "    \"services\":\"xxxxxxxxxxxxxxxx\",   (string) The services "
             "offered\n"
             "    \"relaytxes\":true|false,    (boolean) Whether peer has asked "
@@ -89,8 +88,33 @@ static UniValue getpeerinfo(const Config &config,
             "    \"lastrecv\": ttt,           (numeric) The time in seconds "
             "since epoch (Jan 1 1970 GMT) of the last receive\n"
             "    \"bytessent\": n,            (numeric) The total bytes sent\n"
-            "    \"bytesrecv\": n,            (numeric) The total bytes "
-            "received\n"
+            "    \"bytesrecv\": n,            (numeric) The total bytes received\n"
+            "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
+            "    \"recvsize\": n,             (numeric) Current size of queued messages for receiving\n"
+            "    \"sendmemory\": n,           (numeric) Estimate of current memory usage of queued messages for sending\n"
+            "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
+            "    \"unpausesend\": true|false, (boolean) Have we temporarily unpaused sending\n"
+            "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
+            "    \"associd\": \"xxxxxxx\"       (string) The association ID if set by the peer, otherwise Null\n"
+            "    \"streampolicy\": \"xxxxxxx\"  (string) The stream policy in use\n"
+            "    \"streams\": [\n"
+            "       {\n"
+            "          \"streamtype\": \"TYPE\" (string) The type of this stream\n"
+            "          \"lastsend\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last send\n"
+            "          \"lastrecv\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last receive\n"
+            "          \"bytessent\": n,      (numeric) The total bytes sent\n"
+            "          \"bytesrecv\": n,      (numeric) The total bytes received\n"
+            "          \"sendsize\": n,       (numeric) Current size of queued messages for sending\n"
+            "          \"recvsize\": n,       (numeric) Current size of queued messages for receiving\n"
+            "          \"sendmemory\": n,     (numeric) Estimate of current memory usage of queued messages for sending\n"
+            "          \"spotrecvbw\": n,     (numeric) The spot average download bandwidth over this stream (bytes/sec)\n"
+            "          \"minuterecvbw\": n    (numeric) The 1 minute average download bandwidth over this stream (bytes/sec)\n"
+            "          \"pauserecv\": true|false, (boolean) Are we paused for receiving\n"
+            "       }\n"
+            "       ...\n"
+            "    ],\n"
+            "    \"authconn\": true|false,    (boolean) The authenticated connection is established (true) or "
+            "the public connection is in use (false)\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -111,7 +135,7 @@ static UniValue getpeerinfo(const Config &config,
             "due to addnode and is using an addnode slot\n"
             "    \"startingheight\": n,       (numeric) The starting height "
             "(block) of the peer\n"
-            "    \"txninvsize\": n,           (numeric) The number of queued transaction inventory msgs we have for this peer\n "
+            "    \"txninvsize\": n,           (numeric) The number of queued transaction inventory msgs we have for this peer\n"
             "    \"banscore\": n,             (numeric) The ban score\n"
             "    \"synced_headers\": n,       (numeric) The last header we "
             "have in common with this peer\n"
@@ -148,12 +172,12 @@ static UniValue getpeerinfo(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    std::vector<CNodeStats> vstats;
+    std::vector<NodeStats> vstats;
     g_connman->GetNodeStats(vstats);
 
     UniValue ret(UniValue::VARR);
 
-    for (const CNodeStats &stats : vstats) {
+    for (const NodeStats &stats : vstats) {
         UniValue obj(UniValue::VOBJ);
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
@@ -164,16 +188,44 @@ static UniValue getpeerinfo(const Config &config,
         }
         obj.push_back(Pair("services", strprintf("%016x", stats.nServices)));
         obj.push_back(Pair("relaytxes", stats.fRelayTxes));
-        obj.push_back(Pair("lastsend", stats.nLastSend));
-        obj.push_back(Pair("lastrecv", stats.nLastRecv));
-        obj.push_back(Pair("bytessent", stats.nSendBytes));
-        obj.push_back(Pair("bytesrecv", stats.nRecvBytes));
+        obj.push_back(Pair("lastsend", stats.associationStats.nLastSend));
+        obj.push_back(Pair("lastrecv", stats.associationStats.nLastRecv));
+        obj.push_back(Pair("sendsize", stats.associationStats.nSendSize));
+        obj.push_back(Pair("recvsize", stats.associationStats.nRecvSize));
+        obj.push_back(Pair("sendmemory", stats.associationStats.nSendMemory));
+        obj.push_back(Pair("pausesend", stats.fPauseSend));
+        obj.push_back(Pair("unpausesend", stats.fUnpauseSend));
+        obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
+        obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
+        obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));
+        obj.push_back(Pair("associd", stats.associationStats.assocID));
+        obj.push_back(Pair("streampolicy", stats.associationStats.streamPolicyName));
+
+        UniValue streams(UniValue::VARR);
+        for (const StreamStats& streamStats : stats.associationStats.streamStats) {
+            UniValue streamDetails(UniValue::VOBJ);
+            streamDetails.push_back(Pair("streamtype", streamStats.streamType));
+            streamDetails.push_back(Pair("lastsend", streamStats.nLastSend));
+            streamDetails.push_back(Pair("lastrecv", streamStats.nLastRecv));
+            streamDetails.push_back(Pair("bytessent", streamStats.nSendBytes));
+            streamDetails.push_back(Pair("bytesrecv", streamStats.nRecvBytes));
+            streamDetails.push_back(Pair("sendsize", streamStats.nSendSize));
+            streamDetails.push_back(Pair("recvsize", streamStats.nRecvSize));
+            streamDetails.push_back(Pair("sendmemory", streamStats.nSendMemory));
+            streamDetails.push_back(Pair("spotrecvbw", streamStats.nSpotBytesPerSec));
+            streamDetails.push_back(Pair("minuterecvbw", streamStats.nMinuteBytesPerSec));
+            streamDetails.push_back(Pair("pauserecv", streamStats.fPauseRecv));
+            streams.push_back(streamDetails);
+        }
+        obj.push_back(Pair("streams", streams));
+
+        obj.push_back(Pair("authconn", stats.fAuthConnEstablished));
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
             obj.push_back(Pair("pingtime", stats.dPingTime));
         }
-        if (stats.dMinPing < std::numeric_limits<int64_t>::max() / 1e6) {
+        if (stats.dMinPing < static_cast<double>(std::numeric_limits<int64_t>::max()) / 1e6) {
             obj.push_back(Pair("minping", stats.dMinPing));
         }
         if (stats.dPingWait > 0.0) {
@@ -201,7 +253,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("whitelisted", stats.fWhitelisted));
 
         UniValue sendPerMsgCmd(UniValue::VOBJ);
-        for (const mapMsgCmdSize::value_type &i : stats.mapSendBytesPerMsgCmd) {
+        for (const mapMsgCmdSize::value_type &i : stats.associationStats.mapSendBytesPerMsgCmd) {
             if (i.second > 0) {
                 sendPerMsgCmd.push_back(Pair(i.first, i.second));
             }
@@ -209,7 +261,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("bytessent_per_msg", sendPerMsgCmd));
 
         UniValue recvPerMsgCmd(UniValue::VOBJ);
-        for (const mapMsgCmdSize::value_type &i : stats.mapRecvBytesPerMsgCmd) {
+        for (const mapMsgCmdSize::value_type &i : stats.associationStats.mapRecvBytesPerMsgCmd) {
             if (i.second > 0) {
                 recvPerMsgCmd.push_back(Pair(i.first, i.second));
             }
@@ -250,8 +302,8 @@ static UniValue addnode(const Config &config, const JSONRPCRequest &request) {
     std::string strNode = request.params[0].get_str();
 
     if (strCommand == "onetry") {
-        CAddress addr;
-        g_connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str());
+        NodeConnectInfo connectInfo { CAddress{}, strNode.c_str() };
+        g_connman->OpenNetworkConnection(connectInfo, nullptr);
         return NullUniValue;
     }
 
@@ -508,13 +560,14 @@ static UniValue getnetworkinfo(const Config &config,
             "  \"connections\": xxxxx,                  (numeric) the number "
             "of connections\n"
             "  \"addresscount\": xxxxx,                 (numeric) number of known peer addresses\n"
+            "  \"streampolicies\": \"xxxxxxxxxxxxxxx\", (string) list of available stream policies to use\n"
             "  \"networkactive\": true|false,           (bool) whether p2p "
             "networking is enabled\n"
             "  \"networks\": [                          (array) information "
             "per network\n"
             "  {\n"
             "    \"name\": \"xxx\",                     (string) network "
-            "(ipv4, ipv6 or onion)\n"
+            "(ipv4 or ipv6)\n"
             "    \"limited\": true|false,               (boolean) is the "
             "network limited using -onlynet?\n"
             "    \"reachable\": true|false,             (boolean) is the "
@@ -530,9 +583,12 @@ static UniValue getnetworkinfo(const Config &config,
             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
-            "  \"excessutxocharge\": x.xxxxxxxx,        (numeric) minimum "
-            "charge for excess utxos in " +
-            CURRENCY_UNIT + "\n"
+			    "  \"minconsolidationfactor\": xxxxx               (numeric) minimum ratio between scriptPubKey inputs and outputs, "
+			    "0 disables consolidation transactions\n"
+			    "  \"maxconsolidationinputscriptsize\": xxxxx      (numeric) maximum input scriptSig size\n"
+			    "  \"minconfconsolidationinput\": xxxxx        (numeric) minimum number of confirmations for inputs spent\n"
+			    "  \"minconsolidationinputmaturity\": xxxxx    (numeric) minimum number of confirmations for inputs spent (DEPRECATED: use minconfconsolidationinput instead) \n"
+			    "  \"acceptnonstdconsolidationinput\": true|false  (boolean) true if non std inputs can be spent\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
                             "  {\n"
@@ -555,7 +611,7 @@ static UniValue getnetworkinfo(const Config &config,
     LOCK(cs_main);
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("version", CLIENT_VERSION));
-    obj.push_back(Pair("subversion", userAgent(config)));
+    obj.push_back(Pair("subversion", userAgent()));
     obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
     if (g_connman)
         obj.push_back(Pair("localservices",
@@ -568,20 +624,34 @@ static UniValue getnetworkinfo(const Config &config,
         obj.push_back(Pair("networkactive", g_connman->GetNetworkActive()));
         obj.push_back(Pair("connections", (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
         obj.push_back(Pair("addresscount", static_cast<uint64_t>(g_connman->GetAddressCount())));
+
+        // Format list of prioritised policy names
+        std::stringstream streamPoliciesStr {};
+        for(const auto& policy : g_connman->GetStreamPolicyFactory().GetPrioritisedPolicyNames()) {
+            if(!streamPoliciesStr.str().empty()) {
+                streamPoliciesStr << ",";
+            }
+            streamPoliciesStr << policy;
+        }
+        obj.push_back(Pair("streampolicies", streamPoliciesStr.str()));
     }
+
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
-    obj.push_back(Pair("excessutxocharge",
-                       ValueFromAmount(config.GetExcessUTXOCharge())));
+    obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
+    obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));
+    obj.push_back(Pair("minconfconsolidationinput",  config.GetMinConfConsolidationInput()));
+    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConfConsolidationInput()));
+    obj.push_back(Pair("acceptnonstdconsolidationinput",  config.GetAcceptNonStdConsolidationInput()));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
-        for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost) {
+        for (auto const & [address, info] : mapLocalHost) {
             UniValue rec(UniValue::VOBJ);
-            rec.push_back(Pair("address", item.first.ToString()));
-            rec.push_back(Pair("port", item.second.nPort));
-            rec.push_back(Pair("score", item.second.nScore));
+            rec.push_back(Pair("address", address.ToString()));
+            rec.push_back(Pair("port", info.nPort));
+            rec.push_back(Pair("score", info.nScore));
             localAddresses.push_back(rec);
         }
     }
@@ -774,6 +844,35 @@ static UniValue settxnpropagationfreq(const Config &config, const JSONRPCRequest
     return g_connman->getTransactionPropagator()->getRunFrequency().count();
 }
 
+static UniValue getauthconninfo(const Config &config,
+                                const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getauthconninfo\n"
+            "\nReturns authconn data used by the node.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"pubkey\": \"xxxxxxx\"      (hexstring) The authconn public key used to verify signatures\n"
+            "  \"compressed\": true|false,  (boolean),  Whether the authconn public key is compressed or not\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getauthconninfo", "") +
+            HelpExampleRpc("getauthconninfo", ""));
+
+    if (!g_connman)
+        throw JSONRPCError(
+            RPC_CLIENT_P2P_DISABLED,
+            "Error: Peer-to-peer functionality missing or disabled");
+
+    UniValue obj(UniValue::VOBJ);
+    std::optional<CPubKey> pubKey = g_BlockDatarefTracker->get_current_minerid();
+    std::string pubKeyHex = pubKey ? HexStr(ToByteVector(*pubKey)).c_str() : std::string(66, '0');
+    bool isCompressed = pubKey ? pubKey->IsCompressed() : true;
+    obj.push_back(Pair("pubkey", pubKeyHex));
+    obj.push_back(Pair("compressed", isCompressed));
+    return obj;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
@@ -791,6 +890,7 @@ static const CRPCCommand commands[] = {
     { "network",            "clearbanned",            clearbanned,            true,  {} },
     { "network",            "setnetworkactive",       setnetworkactive,       true,  {"state"} },
     { "network",            "settxnpropagationfreq",  settxnpropagationfreq,  true,  {"freq"} },
+    { "network",            "getauthconninfo",        getauthconninfo,        true,  {} },
 };
 // clang-format on
 

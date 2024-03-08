@@ -4,16 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "rpc/protocol.h"
-
 #include "random.h"
 #include "tinyformat.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "utiltime.h"
-#include "version.h"
-
-#include <cstdint>
-#include <fstream>
+#include <string>
 
 /**
  * JSON-RPC protocol.  Bitcoin speaks version 1.0 for maximum compatibility, but
@@ -67,7 +62,7 @@ static const std::string COOKIEAUTH_FILE = ".cookie";
 
 fs::path GetAuthCookieFile() {
     fs::path path(gArgs.GetArg("-rpccookiefile", COOKIEAUTH_FILE));
-    if (!path.is_complete()) path = GetDataDir() / path;
+    if (!path.is_absolute()) path = GetDataDir() / path;
     return path;
 }
 

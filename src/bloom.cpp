@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "bloom.h"
@@ -32,20 +32,17 @@
  * formulas.
  */
 CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweakIn, uint8_t nFlagsIn)
-    : vData(MAX_BLOOM_FILTER_SIZE)
-    , isFull(false)
-    , isEmpty(true)
-    , nHashFuncs(MAX_HASH_FUNCS)
-    , nTweak(nTweakIn)
-    , nFlags(nFlagsIn)
+    : nHashFuncs {MAX_HASH_FUNCS}
+    , nTweak {nTweakIn}
+    , nFlags {nFlagsIn}
 {
-    if (nFPRate <= 0 || nFPRate > 1.18){
-        LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!", nFPRate);
+    if (nFPRate <= 0 || nFPRate > 1.18) {
+        LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!\n", nFPRate);
         throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
-    vData.resize (std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
+    vData.resize(std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
     nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
-    return ;
+    return;
 }
 
 inline unsigned int
@@ -58,13 +55,20 @@ CBloomFilter::Hash(unsigned int nHashNum,
 }
 
 void CBloomFilter::insert(const std::vector<uint8_t> &vKey) {
-    if (isFull) return;
+
+    if (vKey.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    {
+        return;
+    }
+    if (vData.empty()) // Avoid divide-by-zero (CVE-2013-5700)
+    {
+        return;
+    }
     for (unsigned int i = 0; i < nHashFuncs; i++) {
         unsigned int nIndex = Hash(i, vKey);
         // Sets bit nIndex of vData
         vData[nIndex >> 3] |= (1 << (7 & nIndex));
     }
-    isEmpty = false;
 }
 
 void CBloomFilter::insert(const COutPoint &outpoint) {
@@ -80,11 +84,15 @@ void CBloomFilter::insert(const uint256 &hash) {
 }
 
 bool CBloomFilter::contains(const std::vector<uint8_t> &vKey) const {
-    if (isFull) {
-        return true;
-    }
-    if (isEmpty) {
+
+    if (vKey.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    {
         return false;
+    }
+
+    if (vData.empty()) // Avoid divide-by-zero (CVE-2013-5700)
+    {
+        return true;
     }
     for (unsigned int i = 0; i < nHashFuncs; i++) {
         unsigned int nIndex = Hash(i, vKey);
@@ -110,8 +118,6 @@ bool CBloomFilter::contains(const uint256 &hash) const {
 
 void CBloomFilter::clear() {
     vData.assign(vData.size(), 0);
-    isFull = false;
-    isEmpty = true;
 }
 
 void CBloomFilter::reset(unsigned int nNewTweak) {
@@ -128,11 +134,9 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
     bool fFound = false;
     // Match if the filter contains the hash of tx for finding tx when they
     // appear in a block
-    if (isFull) {
+    if (vData.empty()) // zero-size = "match-all" filter
+    {
         return true;
-    }
-    if (isEmpty) {
-        return false;
     }
     const uint256 &txid = tx.GetId();
     if (contains(txid)) {
@@ -162,7 +166,10 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
                            BLOOM_UPDATE_P2PUBKEY_ONLY) {
                     txnouttype type;
                     std::vector<std::vector<uint8_t>> vSolutions;
-                    if (Solver(txout.scriptPubKey, type, vSolutions) &&
+
+                    // called as script is before genesis, should be the same as after genesis
+                    // because we don't deal with  P2SH or data carrier
+                    if (Solver(txout.scriptPubKey, false, type, vSolutions) &&
                         (type == TX_PUBKEY || type == TX_MULTISIG)) {
                         insert(COutPoint(txid, i));
                     }
@@ -198,17 +205,6 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
     }
 
     return false;
-}
-
-void CBloomFilter::UpdateEmptyFull() {
-    bool full = true;
-    bool empty = true;
-    for (const auto d : vData) {
-        full &= (d == 0xff);
-        empty &= (d == 0);
-    }
-    isFull = full;
-    isEmpty = empty;
 }
 
 CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate)
@@ -255,6 +251,14 @@ RollingBloomHash(unsigned int nHashNum, uint32_t nTweak,
     return MurmurHash3(nHashNum * 0xFBA4C795 + nTweak, vDataToHash);
 }
 
+
+// A replacement for x % n. This assumes that x and n are 32bit integers, and x is a uniformly random distributed 32bit value
+// which should be the case for a good hash.
+// See https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+static inline uint32_t FastMod(uint32_t x, size_t n) {
+    return ((uint64_t)x * (uint64_t)n) >> 32;
+}
+
 void CRollingBloomFilter::insert(const std::vector<uint8_t> &vKey) {
     if (nEntriesThisGeneration == nEntriesPerGeneration) {
         nEntriesThisGeneration = 0;
@@ -277,7 +281,8 @@ void CRollingBloomFilter::insert(const std::vector<uint8_t> &vKey) {
     for (int n = 0; n < nHashFuncs; n++) {
         uint32_t h = RollingBloomHash(n, nTweak, vKey);
         int bit = h & 0x3F;
-        uint32_t pos = (h >> 6) % data.size();
+        /* FastMod works with the upper bits of h, so it is safe to ignore that the lower bits of h are already used for bit. */
+        uint32_t pos = FastMod(h, data.size());
         /* The lowest bit of pos is ignored, and set to zero for the first bit,
          * and to one for the second. */
         data[pos & ~1] = (data[pos & ~1] & ~(uint64_t(1) << bit)) |
@@ -296,7 +301,7 @@ bool CRollingBloomFilter::contains(const std::vector<uint8_t> &vKey) const {
     for (int n = 0; n < nHashFuncs; n++) {
         uint32_t h = RollingBloomHash(n, nTweak, vKey);
         int bit = h & 0x3F;
-        uint32_t pos = (h >> 6) % data.size();
+        uint32_t pos = FastMod(h, data.size());
         /* If the relevant bit is not set in either data[pos & ~1] or data[pos |
          * 1], the filter does not contain vKey */
         if (!(((data[pos & ~1] | data[pos | 1]) >> bit) & 1)) {

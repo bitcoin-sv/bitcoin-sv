@@ -4,15 +4,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script/standard.h"
-
+#include "script/script_num.h"
 #include "pubkey.h"
 #include "script/script.h"
-#include "util.h"
-#include "utilstrencodings.h"
+#include "int_serialization.h"
 
 typedef std::vector<uint8_t> valtype;
-
-bool fAcceptDatacarrier = DEFAULT_ACCEPT_DATACARRIER;
 
 CScriptID::CScriptID(const CScript &in)
     : uint160(Hash160(in.begin(), in.end())) {}
@@ -39,46 +36,53 @@ const char *GetTxnOutputType(txnouttype t) {
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction
  * types.
  */
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
-            std::vector<std::vector<uint8_t>> &vSolutionsRet) {
+bool Solver(const CScript &scriptPubKey, 
+    bool genesisEnabled,
+    txnouttype &typeRet,
+    std::vector<std::vector<uint8_t>> &vSolutionsRet) {
     // Templates
-    static std::multimap<txnouttype, CScript> mTemplates;
-    if (mTemplates.empty()) {
-        // Standard tx, sender provides pubkey, receiver adds signature
-        mTemplates.insert(
-            std::make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
+    static std::multimap<txnouttype, CScript> mTemplates{
+            // Standard tx, sender provides pubkey, receiver adds signature
+            {TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG},
 
-        // Bitcoin address tx, sender provides hash of pubkey, receiver provides
-        // signature and pubkey
-        mTemplates.insert(
-            std::make_pair(TX_PUBKEYHASH,
-                           CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH
-                                     << OP_EQUALVERIFY << OP_CHECKSIG));
+            // Bitcoin address tx, sender provides hash of pubkey, receiver
+            // provides signature and pubkey
+            {
+                TX_PUBKEYHASH,
+                CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH
+                          << OP_EQUALVERIFY << OP_CHECKSIG
+            },
 
-        // Sender provides N pubkeys, receivers provides M signatures
-        mTemplates.insert(
-            std::make_pair(TX_MULTISIG,
-                           CScript() << OP_SMALLINTEGER << OP_PUBKEYS
-                                     << OP_SMALLINTEGER << OP_CHECKMULTISIG));
-    }
+            // Sender provides N pubkeys, receivers provides M signatures
+            {
+                TX_MULTISIG,
+                CScript() << OP_SMALLINTEGER << OP_PUBKEYS
+                          << OP_SMALLINTEGER << OP_CHECKMULTISIG
+            }
+        };
 
     vSolutionsRet.clear();
 
     // Shortcut for pay-to-script-hash, which are more constrained than the
     // other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL
-    if (scriptPubKey.IsPayToScriptHash()) {
-        typeRet = TX_SCRIPTHASH;
-        std::vector<uint8_t> hashBytes(scriptPubKey.begin() + 2,
-                                       scriptPubKey.begin() + 22);
-        vSolutionsRet.push_back(hashBytes);
-        return true;
+    if (IsP2SH(scriptPubKey)) {
+        if (genesisEnabled) {
+            typeRet = TX_NONSTANDARD;
+            return false;
+        } else {
+            typeRet = TX_SCRIPTHASH;
+            std::vector<uint8_t> hashBytes(scriptPubKey.begin() + 2,
+                                           scriptPubKey.begin() + 22);
+            vSolutionsRet.push_back(hashBytes);
+            return true;
+        }
     }
-
+    
     bool isOpReturn = false;
     int offset = 0;
-    //check if starts with OP_RETURN or OP_FALSE, OP_RETURN
-    if (scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN){
+    //check if starts with OP_RETURN (only before Genesis upgrade) or OP_FALSE, OP_RETURN (both pre and post Genesis upgrade)
+    if (!genesisEnabled && scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
         isOpReturn = true;
         offset = 1;
     }
@@ -97,10 +101,11 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
         return true;
     }
 
+
     // Scan templates
     const CScript &script1 = scriptPubKey;
-    for (const std::pair<txnouttype, CScript> &tplate : mTemplates) {
-        const CScript &script2 = tplate.second;
+    for (const auto &[tp_outtype, tp_script]  : mTemplates) {
+        const CScript &script2 = tp_script;
         vSolutionsRet.clear();
 
         opcodetype opcode1, opcode2;
@@ -112,13 +117,20 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
         while (true) {
             if (pc1 == script1.end() && pc2 == script2.end()) {
                 // Found a match
-                typeRet = tplate.first;
+                typeRet = tp_outtype;
                 if (typeRet == TX_MULTISIG) {
+                    // we check minimal encoding before calling CScriptNum to prevent exception throwing in CScriptNum constructor.
+                    // This output will then be unspendable because EvalScript will fail execution of such script
+                    if (!bsv::IsMinimallyEncoded(vSolutionsRet.front(), CScriptNum::MAXIMUM_ELEMENT_SIZE) ||
+                        !bsv::IsMinimallyEncoded(vSolutionsRet.back(), CScriptNum::MAXIMUM_ELEMENT_SIZE)){
+                        typeRet = TX_NONSTANDARD;
+                        return false;
+                    }
                     // Additional checks for TX_MULTISIG:
-                    uint8_t m = vSolutionsRet.front()[0];
-                    uint8_t n = vSolutionsRet.back()[0];
-                    if (m < 1 || n < 1 || m > n ||
-                        vSolutionsRet.size() - 2 != n) {
+                    int m = CScriptNum(vSolutionsRet.front(), false).getint();
+                    int n = CScriptNum(vSolutionsRet.back(), false).getint();
+                    if (m < 1 || n < 1 || m > n || vSolutionsRet.size() < 2 ||
+                        vSolutionsRet.size() - 2 != static_cast<uint64_t>(n)) {
                         return false;
                     }
                 }
@@ -157,8 +169,15 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
                 }
                 vSolutionsRet.push_back(vch1);
             } else if (opcode2 == OP_SMALLINTEGER) {
-                // Single-byte small integer pushed onto vSolutions
-                if (opcode1 == OP_0 || (opcode1 >= OP_1 && opcode1 <= OP_16)) {
+                // OP_0 is pushed onto vector as empty element because of minimal enconding that CScriptNum class (used 40 lines higher) checks
+                if (opcode1 == OP_0 || (genesisEnabled && !vch1.empty())) {
+                    //if number size is greater than currently max allowed (4 bytes) we break the execution and mark the transaction as non-standard
+                    if (vch1.size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
+                        break;
+
+                    vSolutionsRet.push_back(vch1);
+                }
+                else if (opcode1 >= OP_1 && opcode1 <= OP_16) {
                     char n = (char)CScript::DecodeOP_N(opcode1);
                     vSolutionsRet.push_back(valtype(1, n));
                 } else {
@@ -176,11 +195,11 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
     return false;
 }
 
-bool ExtractDestination(const CScript &scriptPubKey,
+bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled,
                         CTxDestination &addressRet) {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, isGenesisEnabled, whichType, vSolutions)) {
         return false;
     }
 
@@ -201,19 +220,20 @@ bool ExtractDestination(const CScript &scriptPubKey,
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
     }
-    // Multisig txns have more than one address...
+    // Multisig txns have more than one address and OP_RETURN outputs have no addresses
     return false;
 }
 
-bool ExtractDestinations(const CScript &scriptPubKey, txnouttype &typeRet,
+bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
                          std::vector<CTxDestination> &addressRet,
                          int &nRequiredRet) {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, typeRet, vSolutions)) {
+    if (!Solver(scriptPubKey, isGenesisEnabled, typeRet, vSolutions)) {
         return false;
     }
+
     if (typeRet == TX_NULL_DATA) {
         // This is data, not addresses
         return false;
@@ -237,7 +257,7 @@ bool ExtractDestinations(const CScript &scriptPubKey, txnouttype &typeRet,
     } else {
         nRequiredRet = 1;
         CTxDestination address;
-        if (!ExtractDestination(scriptPubKey, address)) {
+        if (!ExtractDestination(scriptPubKey, isGenesisEnabled, address)) {
             return false;
         }
         addressRet.push_back(address);
@@ -289,11 +309,11 @@ CScript GetScriptForRawPubKey(const CPubKey &pubKey) {
 CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey> &keys) {
     CScript script;
 
-    script << CScript::EncodeOP_N(nRequired);
+    script << static_cast<int64_t>(nRequired); // we cast to int64_t to use operator<<(int64_t b) which uses push_int64 method that encodes numbers between 0..16 to opcodes OP_0..OP_16
     for (const CPubKey &key : keys) {
         script << ToByteVector(key);
     }
-    script << CScript::EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
+    script << (int64_t)keys.size() << OP_CHECKMULTISIG;
     return script;
 }
 

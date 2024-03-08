@@ -12,23 +12,32 @@
 #include "random.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "mining/factory.h"
+
+#include "test/testutil.h"
 
 #include <boost/thread.hpp>
 
-extern uint256 insecure_rand_seed;
-extern FastRandomContext insecure_rand_ctx;
-
-static inline void SeedInsecureRand(bool fDeterministic = false) {
-    if (fDeterministic) {
-        insecure_rand_seed = uint256();
-    } else {
-        insecure_rand_seed = GetRandHash();
+// install boost test formatters for the popular durations
+namespace std { namespace chrono {
+    inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::microseconds const& us) {
+        return ostr << us.count() << "us";
     }
-    insecure_rand_ctx = FastRandomContext(insecure_rand_seed);
-}
+    inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::milliseconds const& ms) {
+        return ostr << ms.count() << "ms";
+    }
+}}
+
+
+
+extern const uint256 insecure_rand_seed;
+extern FastRandomContext insecure_rand_ctx;
 
 static inline uint32_t insecure_rand() {
     return insecure_rand_ctx.rand32();
+}
+static inline uint64_t InsecureRand64() {
+    return insecure_rand_ctx.rand64();
 }
 static inline uint256 InsecureRand256() {
     return insecure_rand_ctx.rand256();
@@ -45,13 +54,17 @@ static inline bool InsecureRandBool() {
 static inline std::vector<uint8_t> InsecureRandBytes(size_t len) {
     return insecure_rand_ctx.randbytes(len);
 }
+class ConfigInit;
+
+void ResetGlobalRandomContext();
 
 /**
  * Basic testing setup.
  * This just configures logging and chain parameters.
  */
 struct BasicTestingSetup {
-    ECCVerifyHandle globalVerifyHandle;
+    ConfigInit& testConfig;
+    fs::path pathTemp;
 
     BasicTestingSetup(const std::string &chainName = CBaseChainParams::MAIN);
     ~BasicTestingSetup();
@@ -62,12 +75,11 @@ struct BasicTestingSetup {
  */
 class CConnman;
 struct TestingSetup : public BasicTestingSetup {
-    CCoinsViewDB *pcoinsdbview;
-    fs::path pathTemp;
     boost::thread_group threadGroup;
-    CConnman *connman;
+    CConnman *connman = nullptr;
 
-    TestingSetup(const std::string &chainName = CBaseChainParams::MAIN);
+    TestingSetup(const std::string &chainName = CBaseChainParams::MAIN, 
+                 mining::CMiningFactory::BlockAssemblerType assemblerType = mining::CMiningFactory::BlockAssemblerType::JOURNALING);
     ~TestingSetup();
 };
 
@@ -98,19 +110,23 @@ struct TestChain100Setup : public TestingSetup {
 class CTxMemPoolEntry;
 class CTxMemPool;
 
+static constexpr Amount DEFAULT_TEST_TX_FEE{10000};
+
 struct TestMemPoolEntryHelper {
     // Default values
-    Amount nFee;
-    int64_t nTime;
-    double dPriority;
-    unsigned int nHeight;
-    bool spendsCoinbase;
-    unsigned int sigOpCost;
+    Amount nFee {0};
+    int64_t nTime {0};
+    unsigned int nHeight {1};
+    bool spendsCoinbase {false};
     LockPoints lp;
 
-    TestMemPoolEntryHelper()
-        : nFee(0), nTime(0), dPriority(0.0), nHeight(1), spendsCoinbase(false),
-          sigOpCost(4) {}
+    // Default constructor just uses the default values
+    TestMemPoolEntryHelper() = default;
+
+    // Set the default fee to something other than 0
+    explicit TestMemPoolEntryHelper(const Amount& fee)
+        : nFee{fee}
+    {}
 
     CTxMemPoolEntry FromTx(const CMutableTransaction &tx,
                            CTxMemPool *pool = nullptr);
@@ -125,20 +141,12 @@ struct TestMemPoolEntryHelper {
         nTime = _time;
         return *this;
     }
-    TestMemPoolEntryHelper &Priority(double _priority) {
-        dPriority = _priority;
-        return *this;
-    }
     TestMemPoolEntryHelper &Height(unsigned int _height) {
         nHeight = _height;
         return *this;
     }
     TestMemPoolEntryHelper &SpendsCoinbase(bool _flag) {
         spendsCoinbase = _flag;
-        return *this;
-    }
-    TestMemPoolEntryHelper &SigOpsCost(unsigned int _sigopsCost) {
-        sigOpCost = _sigopsCost;
         return *this;
     }
 };

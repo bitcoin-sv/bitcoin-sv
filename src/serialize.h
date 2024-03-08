@@ -8,6 +8,8 @@
 
 #include "compat/endian.h"
 
+#include <boost/uuid/uuid.hpp>
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -19,14 +21,17 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "prevector.h"
 
-static const uint64_t MAX_SIZE = 0x02000000;
+static const uint64_t MAX_SIZE = std::numeric_limits<uint32_t>::max();
 
 /**
  * Dummy data type to identify deserializing constructors.
@@ -46,6 +51,7 @@ constexpr deserialize_type deserialize{};
  * makes sense with wrappers such as CFlatData or CTxDB
  */
 template <typename T> inline T &REF(const T &val) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return const_cast<T &>(val);
 }
 
@@ -54,6 +60,7 @@ template <typename T> inline T &REF(const T &val) {
  * serialization operations from a template
  */
 template <typename T> inline T *NCONST_PTR(const T *val) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return const_cast<T *>(val);
 }
 
@@ -62,74 +69,94 @@ template <typename T> inline T *NCONST_PTR(const T *val) {
  * @note Sizes of these types are verified in the tests
  */
 template <typename Stream> inline void ser_writedata8(Stream &s, uint8_t obj) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 1);
 }
 template <typename Stream>
 inline void ser_writedata16(Stream &s, uint16_t obj) {
     obj = htole16(obj);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 2);
 }
 template <typename Stream>
 inline void ser_writedata32(Stream &s, uint32_t obj) {
     obj = htole32(obj);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 4);
 }
 template <typename Stream>
 inline void ser_writedata64(Stream &s, uint64_t obj) {
     obj = htole64(obj);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.write((char *)&obj, 8);
 }
 template <typename Stream> inline uint8_t ser_readdata8(Stream &s) {
-    uint8_t obj;
+    uint8_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 1);
     return obj;
 }
 template <typename Stream> inline uint16_t ser_readdata16(Stream &s) {
-    uint16_t obj;
+    uint16_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 2);
     return le16toh(obj);
 }
 template <typename Stream> inline uint32_t ser_readdata32(Stream &s) {
-    uint32_t obj;
+    uint32_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 4);
     return le32toh(obj);
 }
 template <typename Stream> inline uint64_t ser_readdata64(Stream &s) {
-    uint64_t obj;
+    uint64_t obj; // NOLINT(cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     s.read((char *)&obj, 8);
     return le64toh(obj);
 }
 inline uint64_t ser_double_to_uint64(double x) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         double x;
         uint64_t y;
     } tmp;
     tmp.x = x;
     return tmp.y;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 inline uint32_t ser_float_to_uint32(float x) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         float x;
         uint32_t y;
     } tmp;
     tmp.x = x;
     return tmp.y;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 inline double ser_uint64_to_double(uint64_t y) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         double x;
         uint64_t y;
     } tmp;
     tmp.y = y;
     return tmp.x;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 inline float ser_uint32_to_float(uint32_t y) {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     union {
         float x;
         uint32_t y;
     } tmp;
     tmp.y = y;
     return tmp.x;
+    // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 }
 
 /////////////////////////////////////////////////////////////////
@@ -147,7 +174,9 @@ enum {
 };
 
 #define READWRITE(obj) (::SerReadWrite(s, (obj), ser_action))
+#define READWRITECOMPACTSIZE(obj) (::SerReadWriteCompactSize(s, (obj), ser_action))
 #define READWRITEMANY(...) (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
+#define READWRITEENUM(e) (::SerReadWriteEnum(s, (e), ser_action))
 
 /**
  * Implement three methods for serializable objects. These are actually wrappers
@@ -201,25 +230,25 @@ template <typename Stream> inline void Unserialize(Stream &s, char &a) {
     a = ser_readdata8(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int8_t &a) {
-    a = ser_readdata8(s);
+    a = static_cast<int8_t>(ser_readdata8(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint8_t &a) {
     a = ser_readdata8(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int16_t &a) {
-    a = ser_readdata16(s);
+    a = static_cast<int16_t>(ser_readdata16(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint16_t &a) {
     a = ser_readdata16(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int32_t &a) {
-    a = ser_readdata32(s);
+    a = static_cast<int32_t>(ser_readdata32(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint32_t &a) {
     a = ser_readdata32(s);
 }
 template <typename Stream> inline void Unserialize(Stream &s, int64_t &a) {
-    a = ser_readdata64(s);
+    a = static_cast<int64_t>(ser_readdata64(s));
 }
 template <typename Stream> inline void Unserialize(Stream &s, uint64_t &a) {
     a = ser_readdata64(s);
@@ -232,7 +261,7 @@ template <typename Stream> inline void Unserialize(Stream &s, double &a) {
 }
 
 template <typename Stream> inline void Serialize(Stream &s, bool a) {
-    char f = a;
+    char f = a; // NOLINT(*-narrowing-conversions)
     ser_writedata8(s, f);
 }
 template <typename Stream> inline void Unserialize(Stream &s, bool &a) {
@@ -347,6 +376,7 @@ template <typename I> inline void WriteVarInt(CSizeComputer &os, I n);
 
 template <typename Stream, typename I, class = typename std::enable_if<std::is_integral<I>::value>::type>
 void WriteVarInt(Stream &os, I n) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint8_t tmp[(sizeof(n) * 8 + 6) / 7];
     int len = 0;
     while (true) {
@@ -357,7 +387,7 @@ void WriteVarInt(Stream &os, I n) {
         n = (n >> 7) - 1;
         len++;
     }
-    do {
+    do { // NOLINT(cppcoreguidelines-avoid-do-while) 
         ser_writedata8(os, tmp[len]);
     } while (len--);
 }
@@ -392,10 +422,11 @@ I ReadVarInt(Stream &is) {
 }
 
 #define FLATDATA(obj)                                                          \
-    REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj)))
+    REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj))) // NOLINT(cppcoreguidelines-pro-*)
 #define VARINT(obj) REF(WrapVarInt(REF(obj)))
 #define COMPACTSIZE(obj) REF(CCompactSize(REF(obj)))
-#define LIMITED_STRING(obj, n) REF(LimitedString<n>(REF(obj)))
+#define LIMITED_STRING(obj, n) REF(LimitedBytes<n, std::string>(REF(obj)))
+#define LIMITED_BYTE_VEC(obj, n) REF(LimitedBytes<n, std::vector<uint8_t>>(REF(obj)))
 
 /**
  * Wrapper for serializing arrays and POD.
@@ -407,14 +438,19 @@ protected:
 
 public:
     CFlatData(void *pbeginIn, void *pendIn)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         : pbegin((char *)pbeginIn), pend((char *)pendIn) {}
     template <class T, class TAl> explicit CFlatData(std::vector<T, TAl> &v) {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pbegin = (char *)v.data();
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pend = (char *)(v.data() + v.size());
     }
     template <unsigned int N, typename T, typename S, typename D>
     explicit CFlatData(prevector<N, T, S, D> &v) {
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pbegin = (char *)v.data();
+        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         pend = (char *)(v.data() + v.size());
     }
     char *begin() { return pbegin; }
@@ -433,6 +469,7 @@ public:
 
 template <typename I> class CVarInt {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     I &n;
 
 public:
@@ -449,6 +486,7 @@ public:
 
 class CCompactSize {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     uint64_t &n;
 
 public:
@@ -463,28 +501,29 @@ public:
     }
 };
 
-template <size_t Limit> class LimitedString {
+template <size_t Limit, typename ArrayType> class LimitedBytes {
 protected:
-    std::string &string;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+    ArrayType& array;
 
 public:
-    LimitedString(std::string &_string) : string(_string) {}
+    LimitedBytes(ArrayType& _array) : array(_array) {}
 
     template <typename Stream> void Unserialize(Stream &s) {
         size_t size = ReadCompactSize(s);
         if (size > Limit) {
-            throw std::ios_base::failure("String length limit exceeded");
+            throw std::ios_base::failure("Array length limit exceeded");
         }
-        string.resize(size);
+        array.resize(size);
         if (size != 0) {
-            s.read((char *)&string[0], size);
+            s.read((char*)&array[0], size);
         }
     }
 
     template <typename Stream> void Serialize(Stream &s) const {
-        WriteCompactSize(s, string.size());
-        if (!string.empty()) {
-            s.write((char *)&string[0], string.size());
+        WriteCompactSize(s, array.size());
+        if (!array.empty()) {
+            s.write((char*)&array[0], array.size());
         }
     }
 };
@@ -498,7 +537,15 @@ template <typename I> CVarInt<I> WrapVarInt(I &n) {
  */
 
 /**
- *  string
+ * std::array
+ */
+template<typename Stream, typename T, size_t N>
+void Serialize(Stream& os, const std::array<T, N>& arr);
+template<typename Stream, typename T, size_t N>
+void Unserialize(Stream& is, std::array<T, N>& arr);
+
+/**
+ * string
  */
 template <typename Stream, typename C>
 void Serialize(Stream &os, const std::basic_string<C> &str);
@@ -560,12 +607,28 @@ template <typename Stream, typename K, typename T, typename Pred, typename A>
 void Unserialize(Stream &is, std::map<K, T, Pred, A> &m);
 
 /**
+ * unordered_map
+ */
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_map<K, T, Pred, A> &m);
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_map<K, T, Pred, A> &m);
+
+/**
  * set
  */
 template <typename Stream, typename K, typename Pred, typename A>
 void Serialize(Stream &os, const std::set<K, Pred, A> &m);
 template <typename Stream, typename K, typename Pred, typename A>
 void Unserialize(Stream &is, std::set<K, Pred, A> &m);
+
+/**
+ * unordered_set
+ */
+template <typename Stream, typename K, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_set<K, Pred, A> &m);
+template <typename Stream, typename K, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_set<K, Pred, A> &m);
 
 /**
  * shared_ptr
@@ -576,12 +639,28 @@ template <typename Stream, typename T>
 void Unserialize(Stream &os, std::shared_ptr<const T> &p);
 
 /**
+ * UUID
+ */
+template <typename Stream>
+void Serialize(Stream &os, const boost::uuids::uuid &v);
+template <typename Stream>
+void Unserialize(Stream &is, boost::uuids::uuid &v);
+
+/**
  * unique_ptr
  */
 template <typename Stream, typename T>
 void Serialize(Stream &os, const std::unique_ptr<const T> &p);
 template <typename Stream, typename T>
 void Unserialize(Stream &os, std::unique_ptr<const T> &p);
+
+/**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream &os, const std::optional<T> &o);
+template <typename Stream, typename T>
+void Unserialize(Stream &is, std::optional<T> &o);
 
 /**
  * If none of the specialized versions above matched, default to calling member
@@ -595,6 +674,19 @@ inline void Serialize(Stream &os, const T &a) {
 template <typename Stream, typename T>
 inline void Unserialize(Stream &is, T &a) {
     a.Unserialize(is);
+}
+
+/**
+ * std::array
+ */
+template<typename Stream, typename T, size_t N>
+void Serialize(Stream& os, const std::array<T, N>& arr) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+    ::Serialize(os, CFlatData(const_cast<T*>(arr.data()), const_cast<T*>(arr.data() + arr.size())));
+}
+template<typename Stream, typename T, size_t N>
+void Unserialize(Stream& is, std::array<T, N>& arr) {
+    ::Unserialize(is, REF(CFlatData(arr.data(), arr.data() + arr.size())));
 }
 
 /**
@@ -641,14 +733,19 @@ inline void Serialize(Stream &os, const prevector<N, T> &v) {
     Serialize_impl(os, v, T());
 }
 
+constexpr size_t STARTING_CHUNK_SIZE = 16000000; // 16MB
+constexpr size_t CHUNK_GROWTH_RATE = 3;
+
 template <typename Stream, unsigned int N, typename T>
 void Unserialize_impl(Stream &is, prevector<N, T> &v, const uint8_t &) {
     // Limit size per read so bogus size value won't cause out of memory
     v.clear();
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (i < nSize) {
-        size_t blk = std::min(nSize - i, size_t(1 + 4999999 / sizeof(T)));
+        size_t blk = std::min(nSize - i, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         v.resize(i + blk);
         is.read((char *)&v[i], blk * sizeof(T));
         i += blk;
@@ -661,8 +758,10 @@ void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &) {
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
     size_t nMid = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (nMid < nSize) {
-        nMid += std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
+        nMid += std::min(nSize, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         if (nMid > nSize) {
             nMid = nSize;
         }
@@ -709,8 +808,10 @@ void Unserialize_impl(Stream &is, std::vector<T, A> &v, const uint8_t &) {
     v.clear();
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (i < nSize) {
-        size_t blk = std::min(nSize - i, size_t(1 + 4999999 / sizeof(T)));
+        size_t blk = std::min(nSize - i, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         v.resize(i + blk);
         is.read((char *)&v[i], blk * sizeof(T));
         i += blk;
@@ -724,8 +825,10 @@ void Unserialize_impl(Stream &is, std::vector<T, A> &v, const V &) {
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
     size_t nMid = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (nMid < nSize) {
-        nMid += std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
+        nMid += std::min(nSize, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         if (nMid > nSize) {
             nMid = nSize;
         }
@@ -763,7 +866,7 @@ void Unserialize(Stream &is, std::pair<K, T> &item) {
 template <typename Stream, typename K, typename T, typename Pred, typename A>
 void Serialize(Stream &os, const std::map<K, T, Pred, A> &m) {
     WriteCompactSize(os, m.size());
-    for (const std::pair<K, T> &p : m) {
+    for (const auto& p : m) {
         Serialize(os, p);
     }
 }
@@ -777,6 +880,28 @@ void Unserialize(Stream &is, std::map<K, T, Pred, A> &m) {
         std::pair<K, T> item;
         Unserialize(is, item);
         mi = m.insert(mi, item);
+    }
+}
+
+/**
+ * unordered_map
+ */
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_map<K, T, Pred, A> &m) {
+    WriteCompactSize(os, m.size());
+    for (const auto& p : m) {
+        Serialize(os, p);
+    }
+}
+
+template <typename Stream, typename K, typename T, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_map<K, T, Pred, A> &m) {
+    m.clear();
+    size_t nSize = ReadCompactSize(is);
+    for (size_t i = 0; i < nSize; i++) {
+        std::pair<K, T> item;
+        Unserialize(is, item);
+        m.insert(item);
     }
 }
 
@@ -800,6 +925,28 @@ void Unserialize(Stream &is, std::set<K, Pred, A> &m) {
         K key;
         Unserialize(is, key);
         it = m.insert(it, key);
+    }
+}
+
+/**
+ * unordered_set
+ */
+template <typename Stream, typename K, typename Pred, typename A>
+void Serialize(Stream &os, const std::unordered_set<K, Pred, A> &m) {
+    WriteCompactSize(os, m.size());
+    for (const K &i : m) {
+        Serialize(os, i);
+    }
+}
+
+template <typename Stream, typename K, typename Pred, typename A>
+void Unserialize(Stream &is, std::unordered_set<K, Pred, A> &m) {
+    m.clear();
+    size_t nSize = ReadCompactSize(is);
+    for (size_t i = 0; i < nSize; i++) {
+        K key;
+        Unserialize(is, key);
+        m.insert(key);
     }
 }
 
@@ -830,6 +977,56 @@ void Unserialize(Stream &is, std::shared_ptr<const T> &p) {
 }
 
 /**
+ * UUID
+ */
+template <typename Stream>
+void Serialize(Stream &os, const boost::uuids::uuid &v) {
+    // The size of the UUID is fixed at 16 bytes.
+    static constexpr auto uuid_size = boost::uuids::uuid::static_size();
+    static_assert(uuid_size == 16);
+    static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    os.write(reinterpret_cast<const char*>(v.data), uuid_size);
+}
+
+template <typename Stream>
+void Unserialize(Stream &is, boost::uuids::uuid &v) {
+    // The size of the UUID is fixed at 16 bytes.
+    static constexpr auto uuid_size = boost::uuids::uuid::static_size();
+    static_assert(uuid_size == 16);
+    static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    is.read(reinterpret_cast<char*>(v.data), uuid_size);
+}
+
+/**
+ * optional
+ */
+template <typename Stream, typename T>
+void Serialize(Stream& os, const std::optional<T>& o) {
+    if(o.has_value()) {
+        Serialize(os, true);
+        Serialize(os, *o);
+    }
+    else {
+        Serialize(os, false);
+    }
+}
+template <typename Stream, typename T>
+void Unserialize(Stream& is, std::optional<T>& o) {
+    bool hasValue {};
+    Unserialize(is, hasValue);
+    if(hasValue) {
+        T obj {};
+        Unserialize(is, obj);
+        o = std::move(obj);
+    }
+    else {
+        o = std::nullopt;
+    }
+}
+
+/**
  * Support for ADD_SERIALIZE_METHODS and READWRITE macro
  */
 struct CSerActionSerialize {
@@ -851,6 +1048,38 @@ inline void SerReadWrite(Stream &s, T &obj, CSerActionUnserialize ser_action) {
 }
 
 /**
+ * Support for READWRITECOMPACTSIZE macro
+ */
+
+template <typename Stream>
+inline void SerReadWriteCompactSize(Stream &s, const uint64_t &obj,
+                         CSerActionSerialize ser_action) {
+    ::WriteCompactSize(s, obj);
+}
+
+template <typename Stream>
+inline void SerReadWriteCompactSize(Stream &s, uint64_t &obj, CSerActionUnserialize ser_action) {
+    obj = ::ReadCompactSize(s);
+}
+
+/**
+ * Support for READWRITEENUM macro
+ */
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, const E& e, CSerActionSerialize) {
+    typename std::underlying_type_t<E> val { static_cast<decltype(val)>(e) };
+    ::Serialize(s, val);
+}
+
+template <typename Stream, typename E, std::enable_if_t<std::is_enum_v<E>, bool> = true>
+inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
+    typename std::underlying_type_t<E> val {};
+    ::Unserialize(s, val);
+    e = static_cast<E>(val);
+}
+
+/**
  * ::GetSerializeSize implementations
  *
  * Computing the serialized size of objects is done through a special stream
@@ -864,9 +1093,11 @@ inline void SerReadWrite(Stream &s, T &obj, CSerActionUnserialize ser_action) {
  */
 class CSizeComputer {
 protected:
-    size_t nSize;
+    size_t nSize; // NOLINT(cppcoreguidelines-use-default-member-init)
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nVersion;
 
 public:
