@@ -14,7 +14,9 @@ Checks: '-*,
          -cert-dcl37-c,
          -cert-dcl21-cpp,
          -cert-dcl51-cpp,
-         -cert-oop54-cpp
+         -cert-oop54-cpp,
+
+         clang-analyzer-*
       '
 
 WarningsAsErrors: '*'
