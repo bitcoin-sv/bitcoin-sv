@@ -739,6 +739,7 @@ public:
 private:
     void  CheckSetDefaultCalled() const;
 
+    // NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
     struct GlobalConfigData {
     private: friend class GlobalConfig;
         // All fields are initialized in Reset()    
