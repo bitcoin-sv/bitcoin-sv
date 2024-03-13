@@ -24,6 +24,7 @@
  * BlockIndexStore also keeps tracks of objects that were changed during the lifetime and not yet persisted to the database: mDirtyBlockIndex.
  * When changes are persisted to database, mDirtyBlockIndex is cleared via ExtractDirtyBlockIndices method.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BlockIndexStore
 {
 public:
@@ -196,4 +197,5 @@ private:
 /**
  * Maintain a map of CBlockIndex for all known headers.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern BlockIndexStore mapBlockIndex;

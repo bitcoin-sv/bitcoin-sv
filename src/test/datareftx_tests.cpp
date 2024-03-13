@@ -34,7 +34,7 @@ namespace
         for(size_t i = 0; i < NumDatarefTx; ++i)
         {
             size_t index {0};
-            do
+            do // NOLINT(cppcoreguidelines-avoid-do-while)
             {
                 index = static_cast<size_t>(dist(mt));
                 // Have to check random index is in range due to common library bug
@@ -83,8 +83,8 @@ namespace
 
 std::ostream& operator<<(std::ostream& str, const DataRefTx& msg)
 {
-    str << "TxnId: " << msg.GetTxn()->GetId().ToString() << std::endl;
-    str << "MerkleProof: " << msg.GetProof().ToJSON().write() << std::endl;
+    str << "TxnId: " << msg.GetTxn()->GetId().ToString() << std::endl; // NOLINT(performance-avoid-endl)
+    str << "MerkleProof: " << msg.GetProof().ToJSON().write() << std::endl; // NOLINT(performance-avoid-endl)
     return str;
 }
 

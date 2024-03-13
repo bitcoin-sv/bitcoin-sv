@@ -157,7 +157,7 @@ public:
         test();
     }
 
-    void swap() {
+    void swap() { // NOLINT(bugprone-exception-escape, cppcoreguidelines-noexcept-swap,performance-noexcept-swap)
         real_vector.swap(real_vector_alt);
         pre_vector.swap(pre_vector_alt);
         test();
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt) {
         for (int i = 0; i < 2048; i++) {
             if (InsecureRandBits(2) == 0) {
                 test.insert(InsecureRandRange(test.size() + 1),
-                            insecure_rand());
+                            insecure_rand()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             }
             if (test.size() > 0 && InsecureRandBits(2) == 1) {
                 test.erase(InsecureRandRange(test.size()));
@@ -190,36 +190,36 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt) {
             if (InsecureRandBits(3) == 2) {
                 int new_size = std::max<int>(
                     0, std::min<int>(30,
-                                     test.size() + (InsecureRandRange(5)) - 2));
+                                     test.size() + (InsecureRandRange(5)) - 2)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                 test.resize(new_size);
             }
             if (InsecureRandBits(3) == 3) {
                 test.insert(InsecureRandRange(test.size() + 1),
-                            1 + InsecureRandBool(), insecure_rand());
+                            1 + InsecureRandBool(), insecure_rand()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             }
             if (InsecureRandBits(3) == 4) {
-                int del = std::min<int>(test.size(), 1 + (InsecureRandBool()));
-                int beg = InsecureRandRange(test.size() + 1 - del);
+                int del = std::min<int>(test.size(), 1 + (InsecureRandBool())); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+                int beg = InsecureRandRange(test.size() + 1 - del); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                 test.erase(beg, beg + del);
             }
             if (InsecureRandBits(4) == 5) {
-                test.push_back(insecure_rand());
+                test.push_back(insecure_rand()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             }
             if (test.size() > 0 && InsecureRandBits(4) == 6) {
                 test.pop_back();
             }
             if (InsecureRandBits(5) == 7) {
-                int values[4];
-                int num = 1 + (InsecureRandBits(2));
+                int values[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                int num = 1 + (InsecureRandBits(2)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                 for (int k = 0; k < num; k++) {
-                    values[k] = insecure_rand();
+                    values[k] = insecure_rand(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, cppcoreguidelines-pro-bounds-constant-array-index)
                 }
-                test.insert_range(InsecureRandRange(test.size() + 1), values,
-                                  values + num);
+                test.insert_range(InsecureRandRange(test.size() + 1), values, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                                  values + num); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
             }
             if (InsecureRandBits(5) == 8) {
-                int del = std::min<int>(test.size(), 1 + (InsecureRandBits(2)));
-                int beg = InsecureRandRange(test.size() + 1 - del);
+                int del = std::min<int>(test.size(), 1 + (InsecureRandBits(2))); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+                int beg = InsecureRandRange(test.size() + 1 - del); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                 test.erase(beg, beg + del);
             }
             if (InsecureRandBits(5) == 9) {
@@ -229,13 +229,13 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt) {
                 test.shrink_to_fit();
             }
             if (test.size() > 0) {
-                test.update(InsecureRandRange(test.size()), insecure_rand());
+                test.update(InsecureRandRange(test.size()), insecure_rand()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             }
             if (InsecureRandBits(10) == 11) {
                 test.clear();
             }
             if (InsecureRandBits(9) == 12) {
-                test.assign(InsecureRandBits(5), insecure_rand());
+                test.assign(InsecureRandBits(5), insecure_rand()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             }
             if (InsecureRandBits(3) == 3) {
                 test.swap();

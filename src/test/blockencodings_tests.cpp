@@ -19,13 +19,13 @@
 namespace
 {
 
-    std::vector<std::pair<uint256, CTransactionRef>> extra_txn;
+    std::vector<std::pair<uint256, CTransactionRef>> extra_txn; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     struct RegtestingSetup : public TestingSetup {
         RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
     };
 
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
@@ -53,7 +53,7 @@ static CBlock BuildBlockTestCase() {
     }
     block.vtx[2] = MakeTransactionRef(tx);
 
-    bool mutated;
+    bool mutated; // NOLINT(cppcoreguidelines-init-variables)
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
     assert(!mutated);
 
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
             partialBlock.FillBlock(block2, {block.vtx[2]}, 0);
             partialBlock = tmp;
         }
-        bool mutated;
+        bool mutated; // NOLINT(cppcoreguidelines-init-variables)
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
         {
             CMerkleTree merkleTree(block2.vtx, uint256(), 0);
@@ -153,7 +153,7 @@ public:
     std::vector<uint64_t> shorttxids;
     std::vector<PrefilledTransaction> prefilledtxn;
 
-    TestHeaderAndShortIDs(const CBlockHeaderAndShortTxIDs &orig) {
+    TestHeaderAndShortIDs(const CBlockHeaderAndShortTxIDs &orig) { // NOLINT(cppcoreguidelines-pro-type-member-init)
         CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
         stream << orig;
         stream >> *this;
@@ -245,7 +245,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
             partialBlock.FillBlock(block2, {block.vtx[1]}, 0);
             partialBlock = tmp;
         }
-        bool mutated;
+        bool mutated; // NOLINT(cppcoreguidelines-init-variables)
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
         {
             CMerkleTree merkleTree(block2.vtx, uint256(), 0);
@@ -326,7 +326,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
         BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) == READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block2.GetHash().ToString());
-        bool mutated;
+        bool mutated; // NOLINT(cppcoreguidelines-init-variables)
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block2, &mutated).ToString());
         BOOST_CHECK(!mutated);
@@ -364,7 +364,7 @@ BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
     block.hashPrevBlock = InsecureRand256();
     block.nBits = 0x207fffff;
 
-    bool mutated;
+    bool mutated; // NOLINT(cppcoreguidelines-init-variables)
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
     assert(!mutated);
 

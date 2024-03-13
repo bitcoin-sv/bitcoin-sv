@@ -31,14 +31,14 @@ std::ostream& operator<<(std::ostream& os, const CTransactionConflictData& confl
 
 namespace std
 {
-    std::ostream& operator<<(
+    std::ostream& operator<<( // NOLINT(cert-dcl58-cpp)
         std::ostream& os,
         const std::tuple<uint256,
                          MemPoolRemovalReason,
                          std::optional<CTransactionConflictData>>& x)
     {
         os << std::get<0>(x).ToString() << ' ' << std::get<1>(x) << ' '
-           << std::get<2>(x).value();
+           << std::get<2>(x).value(); // NOLINT(bugprone-unchecked-optional-access)
         return os;
     }
 }
@@ -46,14 +46,16 @@ namespace std
 namespace{
 
 CTxMemPoolEntry MakeEntry(
+    // NOLINTBEGIN(performance-unnecessary-value-param)
     CFeeRate feerate, 
     std::vector<std::tuple<TxId, size_t, Amount>> inChainInputs, 
     std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs,
     size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount{1},
+    // NOLINTEND(performance-unnecessary-value-param)
     size_t opReturnSize=0)
 {
     CMutableTransaction tx;
-    Amount totalInput;
+    Amount totalInput; // NOLINT(cppcoreguidelines-init-variables)
     for(const auto& input: inChainInputs)
     {
         auto[id, ndx, amount] = input;
@@ -65,12 +67,12 @@ CTxMemPoolEntry MakeEntry(
     {
         auto[txInput, ndx] = input;
         tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
-        totalInput += txInput->vout[ndx].nValue;
+        totalInput += txInput->vout[ndx].nValue; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     }
 
     for(size_t i = 0; i < nOutputs; i++)
     {
-        CScript script;
+        CScript script; // NOLINT(cppcoreguidelines-pro-type-member-init)
         script << OP_TRUE;
         tx.vout.push_back(CTxOut(Amount{1}, script));
     }
@@ -104,11 +106,11 @@ TxId MakeId(uint16_t n)
 {
     TxId id;
     *id.begin() = n >> 1;
-    *(id.begin() + 1) = n | 0x00ff;
+    *(id.begin() + 1) = n | 0x00ff; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return id;
 }
 
-std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count, Amount value)
+std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count, Amount value) // NOLINT(performance-unnecessary-value-param)
 {
     static uint16_t nextTxid = 1;
     std::vector<std::tuple<TxId, size_t, Amount>> inputs;
@@ -313,14 +315,14 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     changeSet->clear();
 
     // entries which we have removed, they should removed from mempool and also from the journal
-    for(auto entry: {entryNotPaying4, entryPayingFor3And4})
+    for(auto entry: {entryNotPaying4, entryPayingFor3And4}) // NOLINT(performance-for-range-copy)
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) == testAccess.mapTx().end());
         BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{entry}));
     }
 
     // unaffected entries, they should stay in the mempool and journal
-    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup})
+    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup}) // NOLINT(performance-for-range-copy)
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
@@ -340,7 +342,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     BOOST_ASSERT(payFor3And4It->IsInPrimaryMempool());
 
     // things should be as before removal
-    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup, entryNotPaying3, entryNotPaying4, entryPayingFor3And4})
+    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup, entryNotPaying3, entryNotPaying4, entryPayingFor3And4}) // NOLINT(performance-for-range-copy)
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
@@ -642,14 +644,16 @@ namespace
                                LockPoints()};
     }
     
-    struct test_validator : CValidationInterface
+    struct test_validator : CValidationInterface // NOLINT(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
     {
         test_validator()
         {
+            // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
             RegisterValidationInterface();
         }
         ~test_validator()
         {
+            // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
             UnregisterValidationInterface();
         }
 

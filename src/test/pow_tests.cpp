@@ -116,10 +116,11 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
     }
 
     for (int j = 0; j < 1000; j++) {
+        // NOLINTBEGIN(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         CBlockIndex *p1 = blocks[InsecureRandRange(10000)];
         CBlockIndex *p2 = blocks[InsecureRandRange(10000)];
         CBlockIndex *p3 = blocks[InsecureRandRange(10000)];
-
+        // NOLINTEND(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         int64_t tdiff = GetBlockProofEquivalentTime(
             *p1, *p2, *p3, config.GetChainParams().GetConsensus());
         BOOST_CHECK_EQUAL(tdiff, p1->GetBlockTime() - p2->GetBlockTime());
@@ -178,7 +179,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
         blocks.SetTip(
             GetBlockIndex(
                 blocks.Tip(),
-                2 * 3600,
+                2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
                 initialBits,
                 blockIndexStore) );
         BOOST_CHECK_EQUAL(
@@ -190,7 +191,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600,
+            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
             initialBits,
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -203,7 +204,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600,
+            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
             currentPow.GetCompact(),
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -216,7 +217,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600,
+            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
             currentPow.GetCompact(),
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -229,7 +230,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600,
+            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
             currentPow.GetCompact(),
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -243,7 +244,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600,
+            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
             currentPow.GetCompact(),
             blockIndexStore) );
     BOOST_CHECK(powLimit.GetCompact() != currentPow.GetCompact());

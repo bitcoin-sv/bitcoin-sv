@@ -15,7 +15,7 @@
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
-
+// NOLINTBEGIN(cert-err58-cpp)
 static const std::string strSecret1 =
     "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
 static const std::string strSecret2 =
@@ -30,7 +30,7 @@ static const std::string addr1C = "1NoJrossxPBKfCHuJXT4HadJrXRE9Fxiqs";
 static const std::string addr2C = "1CRj2HyM1CXWzHAXLQtiGLyggNT9WQqsDs";
 
 static const std::string strAddressBad = "1HV9Lc3sNHZxwj4Zk6fB38tEmBryq2cBiF";
-
+// NOLINTEND(cert-err58-cpp)
 #ifdef KEY_TESTS_DUMPINFO
 void dumpKeyInfo(uint256 privkey) {
     CKey key;

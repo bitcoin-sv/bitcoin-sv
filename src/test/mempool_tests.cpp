@@ -21,7 +21,7 @@
 
 namespace
 {
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany, int baseValue)
     {
@@ -55,23 +55,27 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
         txParent.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txParent.vout[i].nValue = Amount(33000LL);
     }
-    CMutableTransaction txChild[3];
+    CMutableTransaction txChild[3]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 3; i++) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         txChild[i].vin.resize(1);
         txChild[i].vin[0].scriptSig = CScript() << OP_11;
         txChild[i].vin[0].prevout = COutPoint(txParent.GetId(), i);
         txChild[i].vout.resize(1);
         txChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txChild[i].vout[0].nValue = Amount(11000LL);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
-    CMutableTransaction txGrandChild[3];
+    CMutableTransaction txGrandChild[3]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 3; i++) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         txGrandChild[i].vin.resize(1);
         txGrandChild[i].vin[0].scriptSig = CScript() << OP_11;
         txGrandChild[i].vin[0].prevout = COutPoint(txChild[i].GetId(), 0);
         txGrandChild[i].vout.resize(1);
         txGrandChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txGrandChild[i].vout[0].nValue = Amount(11000LL);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     CTxMemPool testPool;
@@ -91,9 +95,9 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     // Parent, children, grandchildren:
     testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
-        testPool.AddUnchecked(txGrandChild[i].GetId(),
-                              entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        testPool.AddUnchecked(txGrandChild[i].GetId(), // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+                              entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
     // Remove Child[0], GrandChild[0] should be removed:
     poolSize = testPool.Size();
@@ -115,9 +119,9 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     // Add children and grandchildren, but NOT the parent (simulate the parent
     // being in a block)
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
-        testPool.AddUnchecked(txGrandChild[i].GetId(),
-                              entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        testPool.AddUnchecked(txGrandChild[i].GetId(), // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+                              entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Now remove the parent, as might happen if a block-re-org occurs but the
@@ -603,21 +607,21 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
 
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 0UL);
 
-    CTestTxMemPoolEntry testTx1(const_cast<CTxMemPoolEntry&>(*tx1it));
+    CTestTxMemPoolEntry testTx1(const_cast<CTxMemPoolEntry&>(*tx1it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());
     BOOST_CHECK_EQUAL(testTx1.groupingData()->fee, tx1it->GetFee());
     BOOST_CHECK_EQUAL(testTx1.groupingData()->feeDelta, tx1it->GetFeeDelta());
     BOOST_CHECK_EQUAL(testTx1.groupingData()->size, tx1it->GetTxSize());
     BOOST_CHECK_EQUAL(testTx1.groupingData()->ancestorsCount, 0U);
 
-    CTestTxMemPoolEntry testTx2(const_cast<CTxMemPoolEntry&>(*tx2it));
+    CTestTxMemPoolEntry testTx2(const_cast<CTxMemPoolEntry&>(*tx2it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->fee, tx2it->GetFee());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->feeDelta, tx2it->GetFeeDelta());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->size, tx2it->GetTxSize());
     BOOST_CHECK_EQUAL(testTx2.groupingData()->ancestorsCount, 0U);
 
-    CTestTxMemPoolEntry testTx3(const_cast<CTxMemPoolEntry&>(*tx3it));
+    CTestTxMemPoolEntry testTx3(const_cast<CTxMemPoolEntry&>(*tx3it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     BOOST_CHECK(!tx3it->IsInPrimaryMempool());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->fee, tx1it->GetFee() + tx2it->GetFee() + tx3it->GetFee());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
@@ -652,7 +656,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
     BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());
-    CTestTxMemPoolEntry entry1access(const_cast<CTxMemPoolEntry&>(*tx1it));
+    CTestTxMemPoolEntry entry1access(const_cast<CTxMemPoolEntry&>(*tx1it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group1data = entry1access.groupingData();
     BOOST_REQUIRE(group1data.has_value());
     BOOST_CHECK_EQUAL(group1data->ancestorsCount, 0U); // exact
@@ -668,7 +672,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
     BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
-    CTestTxMemPoolEntry entry2access(const_cast<CTxMemPoolEntry&>(*tx2it));
+    CTestTxMemPoolEntry entry2access(const_cast<CTxMemPoolEntry&>(*tx2it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group2data = entry2access.groupingData();
     BOOST_REQUIRE(group2data.has_value());
     BOOST_CHECK_EQUAL(group2data->ancestorsCount, 1U); // exact
@@ -684,7 +688,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     const auto tx3it = testPoolAccess.mapTx().find(tx3.GetId());
     BOOST_CHECK(tx3it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx3it->IsInPrimaryMempool());
-    CTestTxMemPoolEntry entry3access(const_cast<CTxMemPoolEntry&>(*tx3it));
+    CTestTxMemPoolEntry entry3access(const_cast<CTxMemPoolEntry&>(*tx3it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group3data = entry3access.groupingData();
     BOOST_REQUIRE(group3data.has_value());
     BOOST_CHECK_EQUAL(group3data->ancestorsCount, 1U); // exact
@@ -708,7 +712,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 0UL);
     BOOST_CHECK_EQUAL(pool.Size(), 4UL);
 
-    CTestTxMemPoolEntry entry4access(const_cast<CTxMemPoolEntry&>(*tx4it));
+    CTestTxMemPoolEntry entry4access(const_cast<CTxMemPoolEntry&>(*tx4it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group4data = entry4access.groupingData();
     BOOST_REQUIRE(group4data.has_value());
     BOOST_CHECK_EQUAL(group4data->ancestorsCount, 5U); // not exact

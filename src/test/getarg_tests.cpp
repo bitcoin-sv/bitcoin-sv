@@ -25,10 +25,10 @@ static void ResetArgs(const std::string &strArg) {
     // Convert to char*:
     std::vector<const char *> vecChar;
     for (std::string &s : vecArg) {
-        vecChar.push_back(s.c_str());
+        vecChar.push_back(s.c_str()); // NOLINT(performance-inefficient-vector-operation)
     }
 
-    gArgs.ParseParameters(vecChar.size(), &vecChar[0]);
+    gArgs.ParseParameters(vecChar.size(), &vecChar[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
 }
 
 BOOST_AUTO_TEST_CASE(boolarg) {

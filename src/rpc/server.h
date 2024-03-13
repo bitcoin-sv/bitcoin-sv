@@ -29,14 +29,14 @@ void OnPostCommand(std::function<void(const CRPCCommand &)> slot);
 } // namespace RPCServer
 
 class CBlockIndex;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CNetAddr;
 
 /** Wrapper for UniValue::VType, which includes typeAny:
  * Used to denote don't care type. Only used by RPCTypeCheckObj */
 struct UniValueType {
     UniValueType(UniValue::VType _type) : typeAny(false), type(_type) {}
-    UniValueType() : typeAny(true) {}
+    UniValueType() : typeAny(true) {} // NOLINT(cppcoreguidelines-pro-type-member-init)
     bool typeAny;
     UniValue::VType type;
 };
@@ -51,9 +51,9 @@ public:
     std::string authUser;
 
     JSONRPCRequest() {
-        id = NullUniValue;
-        params = NullUniValue;
-        fHelp = false;
+        id = NullUniValue; // NOLINT(cppcoreguidelines-prefer-member-initializer)
+        params = NullUniValue; // NOLINT(cppcoreguidelines-prefer-member-initializer)
+        fHelp = false; // NOLINT(cppcoreguidelines-prefer-member-initializer)
     }
 
     void parse(const UniValue &valRequest);
@@ -98,7 +98,7 @@ void RPCTypeCheckObj(const UniValue &o,
  * This provides no methods at the moment, but makes sure that delete cleans up
  * the whole state.
  */
-class RPCTimerBase {
+class RPCTimerBase { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     virtual ~RPCTimerBase() {}
 };
@@ -106,7 +106,7 @@ public:
 /**
  * RPC timer "driver".
  */
-class RPCTimerInterface {
+class RPCTimerInterface { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     virtual ~RPCTimerInterface() {}
     /** Implementation name */
@@ -168,7 +168,7 @@ public:
      * Config is const or not, so we can call the command through the proper pointer.
      * Casting constness on parameters of function is undefined behavior.
      */
-    CRPCCommand(std::string category,
+    CRPCCommand(std::string category, // NOLINT(cppcoreguidelines-pro-type-member-init)
                 std::string name,
                 bool okSafeMode,
                 bool useConstConfig,
@@ -195,7 +195,7 @@ public:
                       false,
                       std::move(argNames)}
     {
-        actor.fn = fn;
+        actor.fn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
     CRPCCommand(std::string category,
@@ -210,7 +210,7 @@ public:
                       false,
                       std::move(argNames)}
     {
-        actor.cfn = fn;
+        actor.cfn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
     CRPCCommand(std::string category,
@@ -225,7 +225,7 @@ public:
                       true,
                       std::move(argNames)}
     {
-        actor.http_fn = fn;
+        actor.http_fn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
     UniValue call(Config&,
@@ -275,7 +275,7 @@ public:
     bool appendCommand(const std::string &name, const CRPCCommand *pcmd);
 };
 
-extern CRPCTable tableRPC;
+extern CRPCTable tableRPC; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * Utilities: convert hex-encoded Values

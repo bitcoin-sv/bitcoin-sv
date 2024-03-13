@@ -16,7 +16,7 @@
 using namespace std;
 using namespace bsv;
 
-static const std::vector<uint8_t> tx = []
+static const std::vector<uint8_t> tx = [] // NOLINT(cert-err58-cpp)
 {
     std::vector<uint8_t> tx;
 
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     size_t passes{};
     while(total_bytes_read < ip.size())
     {
-        std::span s{ip.data() + offset, n};
+        std::span s{ip.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)

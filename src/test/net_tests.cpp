@@ -17,7 +17,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/test/unit_test.hpp>
 
-class CAddrManSerializationMock : public CAddrMan {
+class CAddrManSerializationMock : public CAddrMan { // NOLINT(cppcoreguidelines-virtual-class-destructor)
 public:
     virtual void Serialize(CDataStream &s) const = 0;
 
@@ -28,12 +28,12 @@ public:
     }
 };
 
-class CAddrManUncorrupted : public CAddrManSerializationMock {
+class CAddrManUncorrupted : public CAddrManSerializationMock { // NOLINT(cppcoreguidelines-virtual-class-destructor)
 public:
     void Serialize(CDataStream &s) const override { CAddrMan::Serialize(s); }
 };
 
-class CAddrManCorrupted : public CAddrManSerializationMock {
+class CAddrManCorrupted : public CAddrManSerializationMock { // NOLINT(cppcoreguidelines-virtual-class-destructor)
 public:
     void Serialize(CDataStream &s) const override {
         // Produces corrupt output that claims addrman has 20 addrs when it only
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(caddrdb_read) {
 
     BOOST_CHECK(addrman1.size() == 0);
     try {
-        uint8_t pchMsgTmp[4];
+        uint8_t pchMsgTmp[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
         ssPeers1 >> FLATDATA(pchMsgTmp);
         ssPeers1 >> addrman1;
     } catch (const std::exception &e) {
@@ -123,7 +123,7 @@ BOOST_AUTO_TEST_CASE(caddrdb_read_corrupted) {
     CAddrMan addrman1;
     BOOST_CHECK(addrman1.size() == 0);
     try {
-        uint8_t pchMsgTmp[4];
+        uint8_t pchMsgTmp[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
         ssPeers1 >> FLATDATA(pchMsgTmp);
         ssPeers1 >> addrman1;
     } catch (const std::exception &e) {
@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test) {
     NodeId id = 0;
     int32_t height = 0;
 
-    in_addr ipv4Addr;
+    in_addr ipv4Addr; // NOLINT(cppcoreguidelines-pro-type-member-init)
     ipv4Addr.s_addr = 0xa0b0c001;
 
     CAddress addr = CAddress(CService(ipv4Addr, 7777), NODE_NETWORK);

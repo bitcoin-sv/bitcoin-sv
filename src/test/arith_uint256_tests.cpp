@@ -21,51 +21,51 @@ inline arith_uint256 arith_uint256V(const std::vector<uint8_t> &vch) {
     return UintToArith256(uint256(vch));
 }
 
-const uint8_t R1Array[] =
+const uint8_t R1Array[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x9c\x52\x4a\xdb\xcf\x56\x11\x12\x2b\x29\x12\x5e\x5d\x35\xd2\xd2"
     "\x22\x81\xaa\xb5\x33\xf0\x08\x32\xd5\x56\xb1\xf9\xea\xe5\x1d\x7d";
-const char R1ArrayHex[] =
+const char R1ArrayHex[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "7D1DE5EAF9B156D53208F033B5AA8122D2d2355d5e12292b121156cfdb4a529c";
 const double R1Ldouble =
     0.4887374590559308955; // R1L equals roughly R1Ldouble * 2^256
-const arith_uint256 R1L =
-    arith_uint256V(std::vector<uint8_t>(R1Array, R1Array + 32));
+const arith_uint256 R1L = // NOLINT(cert-err58-cpp)
+    arith_uint256V(std::vector<uint8_t>(R1Array, R1Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 const uint64_t R1LLow64 = 0x121156cfdb4a529cULL;
 
-const uint8_t R2Array[] =
+const uint8_t R2Array[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x70\x32\x1d\x7c\x47\xa5\x6b\x40\x26\x7e\x0a\xc3\xa6\x9c\xb6\xbf"
     "\x13\x30\x47\xa3\x19\x2d\xda\x71\x49\x13\x72\xf0\xb4\xca\x81\xd7";
-const arith_uint256 R2L =
-    arith_uint256V(std::vector<uint8_t>(R2Array, R2Array + 32));
+const arith_uint256 R2L = // NOLINT(cert-err58-cpp)
+    arith_uint256V(std::vector<uint8_t>(R2Array, R2Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
-const char R1LplusR2L[] =
+const char R1LplusR2L[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "549FB09FEA236A1EA3E31D4D58F1B1369288D204211CA751527CFC175767850C";
 
-const uint8_t ZeroArray[] =
+const uint8_t ZeroArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-const arith_uint256 ZeroL =
-    arith_uint256V(std::vector<uint8_t>(ZeroArray, ZeroArray + 32));
+const arith_uint256 ZeroL = // NOLINT(cert-err58-cpp)
+    arith_uint256V(std::vector<uint8_t>(ZeroArray, ZeroArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
-const uint8_t OneArray[] =
+const uint8_t OneArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-const arith_uint256 OneL =
-    arith_uint256V(std::vector<uint8_t>(OneArray, OneArray + 32));
+const arith_uint256 OneL = // NOLINT(cert-err58-cpp)
+    arith_uint256V(std::vector<uint8_t>(OneArray, OneArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
-const uint8_t MaxArray[] =
+const uint8_t MaxArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
     "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
-const arith_uint256 MaxL =
-    arith_uint256V(std::vector<uint8_t>(MaxArray, MaxArray + 32));
+const arith_uint256 MaxL = // NOLINT(cert-err58-cpp)
+    arith_uint256V(std::vector<uint8_t>(MaxArray, MaxArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
-const arith_uint256 HalfL = (OneL << 255);
-std::string ArrayToString(const uint8_t A[], unsigned int width) {
+const arith_uint256 HalfL = (OneL << 255); // NOLINT(cert-err58-cpp)
+std::string ArrayToString(const uint8_t A[], unsigned int width) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     std::stringstream Stream;
     Stream << std::hex;
     for (unsigned int i = 0; i < width; ++i) {
         Stream << std::setw(2) << std::setfill('0')
-               << (unsigned int)A[width - i - 1];
+               << (unsigned int)A[width - i - 1]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     return Stream.str();
 }
@@ -74,13 +74,14 @@ BOOST_AUTO_TEST_CASE(basics) // constructors, equality, inequality
 {
     BOOST_CHECK(1 == 0 + 1);
     // constructor arith_uint256(vector<char>):
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(R1L.ToString() == ArrayToString(R1Array, 32));
     BOOST_CHECK(R2L.ToString() == ArrayToString(R2Array, 32));
     BOOST_CHECK(ZeroL.ToString() == ArrayToString(ZeroArray, 32));
     BOOST_CHECK(OneL.ToString() == ArrayToString(OneArray, 32));
     BOOST_CHECK(MaxL.ToString() == ArrayToString(MaxArray, 32));
     BOOST_CHECK(OneL.ToString() != ArrayToString(ZeroArray, 32));
-
+    // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     // == and !=
     BOOST_CHECK(R1L != R2L);
     BOOST_CHECK(ZeroL != OneL);
@@ -107,7 +108,7 @@ BOOST_AUTO_TEST_CASE(basics) // constructors, equality, inequality
     BOOST_CHECK(arith_uint256(R1L.ToString()) == R1L);
     BOOST_CHECK(arith_uint256("   0x" + R1L.ToString() + "   ") == R1L);
     BOOST_CHECK(arith_uint256("") == ZeroL);
-    BOOST_CHECK(R1L == arith_uint256(R1ArrayHex));
+    BOOST_CHECK(R1L == arith_uint256(R1ArrayHex)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(arith_uint256(R1L) == R1L);
     BOOST_CHECK((arith_uint256(R1L ^ R2L) ^ R2L) == R1L);
     BOOST_CHECK(arith_uint256(ZeroL) == ZeroL);
@@ -139,11 +140,11 @@ void shiftArrayRight(uint8_t *to, const uint8_t *from, unsigned int arrayLength,
     for (unsigned int T = 0; T < arrayLength; ++T) {
         unsigned int F = (T + bitsToShift / 8);
         if (F < arrayLength)
-            to[T] = from[F] >> (bitsToShift % 8);
+            to[T] = from[F] >> (bitsToShift % 8); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         else
-            to[T] = 0;
+            to[T] = 0; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         if (F + 1 < arrayLength)
-            to[T] |= from[(F + 1)] << (8 - bitsToShift % 8);
+            to[T] |= from[(F + 1)] << (8 - bitsToShift % 8); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 }
 
@@ -152,22 +153,22 @@ void shiftArrayLeft(uint8_t *to, const uint8_t *from, unsigned int arrayLength,
     for (unsigned int T = 0; T < arrayLength; ++T) {
         if (T >= bitsToShift / 8) {
             unsigned int F = T - bitsToShift / 8;
-            to[T] = from[F] << (bitsToShift % 8);
+            to[T] = from[F] << (bitsToShift % 8); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             if (T >= bitsToShift / 8 + 1)
-                to[T] |= from[F - 1] >> (8 - bitsToShift % 8);
+                to[T] |= from[F - 1] >> (8 - bitsToShift % 8); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         } else {
-            to[T] = 0;
+            to[T] = 0; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
     }
 }
 
 BOOST_AUTO_TEST_CASE(shifts) { // "<<"  ">>"  "<<="  ">>="
-    uint8_t TmpArray[32];
+    uint8_t TmpArray[32]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     arith_uint256 TmpL;
     for (unsigned int i = 0; i < 256; ++i) {
-        shiftArrayLeft(TmpArray, OneArray, 32, i);
+        shiftArrayLeft(TmpArray, OneArray, 32, i); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(
-                        TmpArray, TmpArray + 32)) == (OneL << i));
+                        TmpArray, TmpArray + 32)) == (OneL << i)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         TmpL = OneL;
         TmpL <<= i;
         BOOST_CHECK(TmpL == (OneL << i));
@@ -176,30 +177,30 @@ BOOST_AUTO_TEST_CASE(shifts) { // "<<"  ">>"  "<<="  ">>="
         TmpL >>= (255 - i);
         BOOST_CHECK(TmpL == (OneL << i));
 
-        shiftArrayLeft(TmpArray, R1Array, 32, i);
+        shiftArrayLeft(TmpArray, R1Array, 32, i); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(
-                        TmpArray, TmpArray + 32)) == (R1L << i));
+                        TmpArray, TmpArray + 32)) == (R1L << i)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         TmpL = R1L;
         TmpL <<= i;
         BOOST_CHECK(TmpL == (R1L << i));
 
-        shiftArrayRight(TmpArray, R1Array, 32, i);
+        shiftArrayRight(TmpArray, R1Array, 32, i); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(
-                        TmpArray, TmpArray + 32)) == (R1L >> i));
+                        TmpArray, TmpArray + 32)) == (R1L >> i)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         TmpL = R1L;
         TmpL >>= i;
         BOOST_CHECK(TmpL == (R1L >> i));
 
-        shiftArrayLeft(TmpArray, MaxArray, 32, i);
+        shiftArrayLeft(TmpArray, MaxArray, 32, i); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(
-                        TmpArray, TmpArray + 32)) == (MaxL << i));
+                        TmpArray, TmpArray + 32)) == (MaxL << i)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         TmpL = MaxL;
         TmpL <<= i;
         BOOST_CHECK(TmpL == (MaxL << i));
 
-        shiftArrayRight(TmpArray, MaxArray, 32, i);
+        shiftArrayRight(TmpArray, MaxArray, 32, i); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(
-                        TmpArray, TmpArray + 32)) == (MaxL >> i));
+                        TmpArray, TmpArray + 32)) == (MaxL >> i)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         TmpL = MaxL;
         TmpL >>= i;
         BOOST_CHECK(TmpL == (MaxL >> i));
@@ -225,11 +226,11 @@ BOOST_AUTO_TEST_CASE(unaryOperators) // !    ~    -
 
     BOOST_CHECK(~ZeroL == MaxL);
 
-    uint8_t TmpArray[32];
+    uint8_t TmpArray[32]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (unsigned int i = 0; i < 32; ++i) {
-        TmpArray[i] = ~R1Array[i];
+        TmpArray[i] = ~R1Array[i]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
-    BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(TmpArray, TmpArray + 32)) ==
+    BOOST_CHECK(arith_uint256V(std::vector<uint8_t>(TmpArray, TmpArray + 32)) == // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 (~R1L));
 
     BOOST_CHECK(-ZeroL == ZeroL);
@@ -254,8 +255,8 @@ BOOST_AUTO_TEST_CASE(unaryOperators) // !    ~    -
     BOOST_CHECK(TmpL == (_A_##L _OP_ _B_##L));
 
 BOOST_AUTO_TEST_CASE(bitwiseOperators) {
-    uint8_t TmpArray[32];
-
+    uint8_t TmpArray[32]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-constant-array-index)
     CHECKBITWISEOPERATOR(R1, R2, |)
     CHECKBITWISEOPERATOR(R1, R2, ^)
     CHECKBITWISEOPERATOR(R1, R2, &)
@@ -271,7 +272,7 @@ BOOST_AUTO_TEST_CASE(bitwiseOperators) {
     CHECKBITWISEOPERATOR(Max, R1, |)
     CHECKBITWISEOPERATOR(Max, R1, ^)
     CHECKBITWISEOPERATOR(Max, R1, &)
-
+    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-constant-array-index)
     arith_uint256 TmpL;
     CHECKASSIGNMENTOPERATOR(R1, R2, |)
     CHECKASSIGNMENTOPERATOR(R1, R2, ^)
@@ -305,8 +306,8 @@ BOOST_AUTO_TEST_CASE(bitwiseOperators) {
 BOOST_AUTO_TEST_CASE(comparison) // <= >= < >
 {
     arith_uint256 TmpL;
-    for (unsigned int i = 0; i < 256; ++i) {
-        TmpL = OneL << i;
+    for (unsigned int i = 0; i < 256; ++i) { // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        TmpL = OneL << i; // NOLINT(bugprone-narrowing-conversions)
         BOOST_CHECK(TmpL >= ZeroL && TmpL > ZeroL && ZeroL < TmpL &&
                     ZeroL <= TmpL);
         BOOST_CHECK(TmpL >= 0 && TmpL > 0 && 0 < TmpL && 0 <= TmpL);
@@ -324,7 +325,7 @@ BOOST_AUTO_TEST_CASE(comparison) // <= >= < >
 
 BOOST_AUTO_TEST_CASE(plusMinus) {
     arith_uint256 TmpL = 0;
-    BOOST_CHECK(R1L + R2L == arith_uint256(R1LplusR2L));
+    BOOST_CHECK(R1L + R2L == arith_uint256(R1LplusR2L)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     TmpL += R1L;
     BOOST_CHECK(TmpL == R1L);
     TmpL += R2L;
@@ -333,14 +334,14 @@ BOOST_AUTO_TEST_CASE(plusMinus) {
     BOOST_CHECK(MaxL + OneL == ZeroL);
     for (unsigned int i = 1; i < 256; ++i) {
         BOOST_CHECK((MaxL >> i) + OneL == (HalfL >> (i - 1)));
-        BOOST_CHECK(OneL + (MaxL >> i) == (HalfL >> (i - 1)));
-        TmpL = (MaxL >> i);
+        BOOST_CHECK(OneL + (MaxL >> i) == (HalfL >> (i - 1))); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        TmpL = (MaxL >> i); // NOLINT(bugprone-narrowing-conversions)
         TmpL += OneL;
-        BOOST_CHECK(TmpL == (HalfL >> (i - 1)));
-        TmpL = (MaxL >> i);
+        BOOST_CHECK(TmpL == (HalfL >> (i - 1))); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        TmpL = (MaxL >> i); // NOLINT(bugprone-narrowing-conversions)
         TmpL += 1;
-        BOOST_CHECK(TmpL == (HalfL >> (i - 1)));
-        TmpL = (MaxL >> i);
+        BOOST_CHECK(TmpL == (HalfL >> (i - 1))); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        TmpL = (MaxL >> i); // NOLINT(bugprone-narrowing-conversions)
         BOOST_CHECK(TmpL++ == (MaxL >> i));
         BOOST_CHECK(TmpL == (HalfL >> (i - 1)));
     }
@@ -360,11 +361,11 @@ BOOST_AUTO_TEST_CASE(plusMinus) {
     BOOST_CHECK(R1L - OneL == R1L + (-OneL));
     for (unsigned int i = 1; i < 256; ++i) {
         BOOST_CHECK((MaxL >> i) - (-OneL) == (HalfL >> (i - 1)));
-        BOOST_CHECK((HalfL >> (i - 1)) - OneL == (MaxL >> i));
-        TmpL = (HalfL >> (i - 1));
+        BOOST_CHECK((HalfL >> (i - 1)) - OneL == (MaxL >> i)); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        TmpL = (HalfL >> (i - 1)); // NOLINT(bugprone-narrowing-conversions)
         BOOST_CHECK(TmpL-- == (HalfL >> (i - 1)));
-        BOOST_CHECK(TmpL == (MaxL >> i));
-        TmpL = (HalfL >> (i - 1));
+        BOOST_CHECK(TmpL == (MaxL >> i)); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        TmpL = (HalfL >> (i - 1)); // NOLINT(bugprone-narrowing-conversions)
         BOOST_CHECK(--TmpL == (MaxL >> i));
     }
     TmpL = R1L;
@@ -513,8 +514,8 @@ BOOST_AUTO_TEST_CASE(setcompact_test)
 
 BOOST_AUTO_TEST_CASE(bignum_SetCompact) {
     arith_uint256 num;
-    bool fNegative;
-    bool fOverflow;
+    bool fNegative; // NOLINT(cppcoreguidelines-init-variables)
+    bool fOverflow; // NOLINT(cppcoreguidelines-init-variables)
     num.SetCompact(0, &fNegative, &fOverflow);
     BOOST_CHECK_EQUAL(
         num.GetHex(),
@@ -695,13 +696,15 @@ BOOST_AUTO_TEST_CASE(
     BOOST_CHECK(~~R1L - R2L == R1L - ~~R2L);
     BOOST_CHECK(~R1L != R1L);
     BOOST_CHECK(R1L != ~R1L);
-    uint8_t TmpArray[32];
+    uint8_t TmpArray[32]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-constant-array-index)
     CHECKBITWISEOPERATOR(~R1, R2, |)
     CHECKBITWISEOPERATOR(~R1, R2, ^)
     CHECKBITWISEOPERATOR(~R1, R2, &)
     CHECKBITWISEOPERATOR(R1, ~R2, |)
     CHECKBITWISEOPERATOR(R1, ~R2, ^)
     CHECKBITWISEOPERATOR(R1, ~R2, &)
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
 BOOST_AUTO_TEST_SUITE_END()

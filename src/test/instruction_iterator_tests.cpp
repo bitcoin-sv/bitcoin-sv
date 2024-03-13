@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
                             OP_PUSHDATA4, 1, 0, 0, 0, 42,
                             OP_DUP
                          };
-    vector<instruction> expected{ 
+    vector<instruction> expected{   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                     {static_cast<opcodetype>(0), 0, ip.data() + 1, 0}, 
                                     {static_cast<opcodetype>(1), 0, ip.data() + 2, 1},
                                     {static_cast<opcodetype>(2), 0, ip.data() + 4, 2},
@@ -129,10 +129,10 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
                                     {OP_PUSHDATA2, 2, ip.data() + 14, 1},
                                     {OP_PUSHDATA4, 4, ip.data() + 20, 1},
                                     {OP_DUP, 0, ip.data() + 22, 0}
-                                };
+                                };  // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
-    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}};
+    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     // check op++
     auto n = std::distance(it_begin, it_end);
@@ -159,13 +159,13 @@ BOOST_AUTO_TEST_CASE(too_short_single_instruction)
                          };
 
     instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
-    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}};
+    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     // check op++
     auto n = std::distance(it_begin, it_end);
     BOOST_CHECK_EQUAL(1, n);
 
-    const instruction expected{OP_INVALIDOPCODE, 0, ip.data() + 1, 0};
+    const instruction expected{OP_INVALIDOPCODE, 0, ip.data() + 1, 0}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(expected, *it_begin);
 }
 
@@ -176,12 +176,12 @@ BOOST_AUTO_TEST_CASE(too_short_two_instructions)
                             OP_PUSHDATA4, 1, 0, 0, 0, //42, <- not enough data
                          };
     vector<instruction> expected{ 
-                                    {OP_PUSHDATA4, 0, ip.data() + 5, 1},
-                                    {OP_INVALIDOPCODE, 0, ip.data() + 7, 0},
+                                    {OP_PUSHDATA4, 0, ip.data() + 5, 1}, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                                    {OP_INVALIDOPCODE, 0, ip.data() + 7, 0}, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                 };
 
     instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
-    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}};
+    instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     // check op++
     auto n = std::distance(it_begin, it_end);

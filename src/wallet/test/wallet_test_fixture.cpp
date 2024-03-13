@@ -10,16 +10,16 @@
 #include "wallet/rpcdump.h"
 #include "wallet/wallet.h"
 
-CWallet *pwalletMain;
+CWallet *pwalletMain; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 WalletTestingSetup::WalletTestingSetup(const std::string &chainName)
     : TestingSetup(chainName) {
     bitdb.MakeMock();
 
-    bool fFirstRun;
+    bool fFirstRun; // NOLINT(cppcoreguidelines-init-variables)
     std::unique_ptr<CWalletDBWrapper> dbw(
         new CWalletDBWrapper(&bitdb, "wallet_test.dat"));
-    pwalletMain = new CWallet(Params(), std::move(dbw));
+    pwalletMain = new CWallet(Params(), std::move(dbw)); // NOLINT(cppcoreguidelines-owning-memory)
     pwalletMain->LoadWallet(fFirstRun);
     pwalletMain->RegisterValidationInterface();
 
@@ -29,7 +29,7 @@ WalletTestingSetup::WalletTestingSetup(const std::string &chainName)
 
 WalletTestingSetup::~WalletTestingSetup() {
     pwalletMain->UnregisterValidationInterface();
-    delete pwalletMain;
+    delete pwalletMain; // NOLINT(cppcoreguidelines-owning-memory)
     pwalletMain = nullptr;
 
     bitdb.Flush(true);

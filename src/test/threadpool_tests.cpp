@@ -15,7 +15,7 @@ namespace
     constexpr unsigned Increment { 1000000 };
 
     // A shared counter
-    std::atomic<unsigned> Counter {0};
+    std::atomic<unsigned> Counter {0}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     // A function task
     void Function(unsigned inc)
@@ -35,10 +35,10 @@ namespace
             Function(inc);
         }
     };
-    TaskClass taskClass {};
+    TaskClass taskClass {}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     // A lambda task
-    auto lambdaTask { [](unsigned inc){ Function(inc); } };
+    auto lambdaTask { [](unsigned inc){ Function(inc); } }; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_AUTO_TEST_SUITE(TestThreadPool)

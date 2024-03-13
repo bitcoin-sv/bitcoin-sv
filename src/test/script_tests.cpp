@@ -52,7 +52,7 @@ struct ScriptErrorDesc {
     const char *name;
 };
 
-static ScriptErrorDesc script_errors[] = {
+static ScriptErrorDesc script_errors[] = { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables, cppcoreguidelines-avoid-c-arrays)
     {SCRIPT_ERR_OK, "OK"},
     {SCRIPT_ERR_UNKNOWN_ERROR, "UNKNOWN_ERROR"},
     {SCRIPT_ERR_EVAL_FALSE, "EVAL_FALSE"},
@@ -100,8 +100,8 @@ static ScriptErrorDesc script_errors[] = {
 
 const char *FormatScriptError(ScriptError_t err) {
     for (size_t i = 0; i < ARRAYLEN(script_errors); ++i) {
-        if (script_errors[i].err == err) {
-            return script_errors[i].name;
+        if (script_errors[i].err == err) { // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+            return script_errors[i].name; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 
@@ -112,8 +112,8 @@ const char *FormatScriptError(ScriptError_t err) {
 
 ScriptError_t ParseScriptError(const std::string &name) {
     for (size_t i = 0; i < ARRAYLEN(script_errors); ++i) {
-        if (script_errors[i].name == name) {
-            return script_errors[i].err;
+        if (script_errors[i].name == name) { // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+            return script_errors[i].err; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 
@@ -124,7 +124,7 @@ ScriptError_t ParseScriptError(const std::string &name) {
 BOOST_FIXTURE_TEST_SUITE(script_tests, BasicTestingSetup)
 
 static CMutableTransaction
-BuildCreditingTransaction(const CScript &scriptPubKey, const Amount nValue) {
+BuildCreditingTransaction(const CScript &scriptPubKey, const Amount nValue) { // NOLINT(performance-unnecessary-value-param)
     CMutableTransaction txCredit;
     txCredit.nVersion = 1;
     txCredit.nLockTime = 0;
@@ -158,14 +158,14 @@ BuildSpendingTransaction(const CScript &scriptSig,
 
 static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
                    int flags, const std::string &message, int scriptError,
-                   const Amount nValue) {
+                   const Amount nValue) { // NOLINT(performance-unnecessary-value-param)
     const Config& config = GlobalConfig::GetConfig();
     bool expect = (scriptError == SCRIPT_ERR_OK);
     if (flags & SCRIPT_VERIFY_CLEANSTACK) {
         flags |= SCRIPT_VERIFY_P2SH;
     }
 
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     CMutableTransaction txCredit =
         BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
@@ -217,13 +217,14 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
 }
 
 namespace {
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
 const uint8_t vchKey0[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
 const uint8_t vchKey1[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
 const uint8_t vchKey2[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 struct KeyData {
     CKey key0, key0C, key1, key1C, key2, key2C;
     CPubKey pubkey0, pubkey0C, pubkey0H;
@@ -232,20 +233,20 @@ struct KeyData {
 
     KeyData() {
 
-        key0.Set(vchKey0, vchKey0 + 32, false);
-        key0C.Set(vchKey0, vchKey0 + 32, true);
+        key0.Set(vchKey0, vchKey0 + 32, false); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        key0C.Set(vchKey0, vchKey0 + 32, true); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
         pubkey0 = key0.GetPubKey();
         pubkey0H = key0.GetPubKey();
         pubkey0C = key0C.GetPubKey();
-        *const_cast<uint8_t *>(&pubkey0H[0]) = 0x06 | (pubkey0H[64] & 1);
+        *const_cast<uint8_t *>(&pubkey0H[0]) = 0x06 | (pubkey0H[64] & 1); // NOLINT(cppcoreguidelines-pro-type-const-cast)
 
-        key1.Set(vchKey1, vchKey1 + 32, false);
-        key1C.Set(vchKey1, vchKey1 + 32, true);
+        key1.Set(vchKey1, vchKey1 + 32, false); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        key1C.Set(vchKey1, vchKey1 + 32, true); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
         pubkey1 = key1.GetPubKey();
         pubkey1C = key1C.GetPubKey();
 
-        key2.Set(vchKey2, vchKey2 + 32, false);
-        key2C.Set(vchKey2, vchKey2 + 32, true);
+        key2.Set(vchKey2, vchKey2 + 32, false); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        key2C.Set(vchKey2, vchKey2 + 32, true); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
         pubkey2 = key2.GetPubKey();
         pubkey2C = key2C.GetPubKey();
     }
@@ -259,11 +260,11 @@ private:
     CScript redeemscript;
     CTransactionRef creditTx;
     CMutableTransaction spendTx;
-    bool havePush;
+    bool havePush; // NOLINT(cppcoreguidelines-use-default-member-init)
     std::vector<uint8_t> push;
     std::string comment;
     int flags;
-    int scriptError;
+    int scriptError; // NOLINT(cppcoreguidelines-use-default-member-init)
     Amount nValue;
 
     void DoPush() {
@@ -282,13 +283,13 @@ private:
     std::vector<uint8_t> MakeSig(CScript& script, const CKey &key,
                          SigHashType sigHashType = SigHashType(),
                          unsigned int lenR = 32, unsigned int lenS = 32,
-                         Amount amount = Amount(0),
+                         Amount amount = Amount(0), // NOLINT(performance-unnecessary-value-param)
                          uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
         uint256 hash = SignatureHash(script, CTransaction(spendTx), 0,
                                      sigHashType, amount, nullptr, flags);
         std::vector<uint8_t> vchSig, r, s;
         uint32_t iter = 0;
-        do {
+        do { // NOLINT(cppcoreguidelines-avoid-do-while)
             key.Sign(hash, vchSig, iter++);
             if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33)) {
                 NegateSignatureS(vchSig);
@@ -307,7 +308,7 @@ private:
 
 public:
     TestBuilder(const CScript &script_, const std::string &comment_, int flags_,
-                bool P2SH = false, Amount nValue_ = Amount(0))
+                bool P2SH = false, Amount nValue_ = Amount(0)) // NOLINT(performance-unnecessary-value-param)
         : script(script_), havePush(false), comment(comment_), flags(flags_),
           scriptError(SCRIPT_ERR_OK), nValue(nValue_) {
         CScript scriptPubKey = script;
@@ -352,7 +353,7 @@ public:
     TestBuilder &PushSig(const CKey &key,
                          SigHashType sigHashType = SigHashType(),
                          unsigned int lenR = 32, unsigned int lenS = 32,
-                         Amount amount = Amount(0),
+                         Amount amount = Amount(0), // NOLINT(performance-unnecessary-value-param)
                          uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
 
         DoPush(MakeSig(script, key, sigHashType, lenR, lenS, amount, flags));
@@ -365,7 +366,7 @@ public:
     TestBuilder &PushSeparatorSigs(std::vector<const CKey*> keys,
                                    SigHashType sigHashType = SigHashType(),
                                    unsigned int lenR = 32, unsigned int lenS = 32,
-                                   Amount amount = Amount(0),
+                                   Amount amount = Amount(0), // NOLINT(performance-unnecessary-value-param)
                                    uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
 
         // splitting script of the form: 
@@ -386,7 +387,7 @@ public:
         std::vector<uint8_t> data;
         
         while (pc < script.end()) {
-            opcodetype opcode;
+            opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
             if (!script.GetOp(pc, opcode, data)){
                 break;
             }
@@ -437,7 +438,7 @@ public:
             std::vector<uint8_t>(push.begin() + pos,
                                  push.begin() + pos + datain.size()) == datain,
             comment);
-        push.erase(push.begin() + pos, push.begin() + pos + datain.size());
+        push.erase(push.begin() + pos, push.begin() + pos + datain.size()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         push.insert(push.begin() + pos, dataout.begin(), dataout.end());
         return *this;
     }
@@ -1230,8 +1231,8 @@ BOOST_AUTO_TEST_CASE(script_build) {
 
     {
         UniValue json_tests = read_json(std::string(
-            json_tests::script_tests,
-            json_tests::script_tests + sizeof(json_tests::script_tests)));
+            json_tests::script_tests, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            json_tests::script_tests + sizeof(json_tests::script_tests))); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         for (unsigned int idx = 0; idx < json_tests.size(); idx++) {
             const UniValue &tv = json_tests[idx];
@@ -1271,11 +1272,11 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
     // ... where scriptSig and scriptPubKey are stringified
     // scripts.
     UniValue tests = read_json(std::string(
-        json_tests::script_tests,
-        json_tests::script_tests + sizeof(json_tests::script_tests)));
+        json_tests::script_tests, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        json_tests::script_tests + sizeof(json_tests::script_tests))); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
         std::string strTest = test.write();
         Amount nValue(0);
         unsigned int pos = 0;
@@ -1303,7 +1304,7 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
             unsigned int scriptflags = ParseScriptFlags(scriptFlagsString);
             int scriptError = ParseScriptError(scriptErrorString);
 
-            DoTest(scriptPubKey, scriptSig, scriptflags, strTest, scriptError,
+            DoTest(scriptPubKey, scriptSig, scriptflags, strTest, scriptError, // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                    nValue);
         } catch (std::runtime_error &e) {
             BOOST_TEST_MESSAGE("Script test failed.  scriptSig:  "
@@ -1318,12 +1319,14 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
 BOOST_AUTO_TEST_CASE(script_PushData) {
     // Check that PUSHDATA1, PUSHDATA2, and PUSHDATA4 create the same value on
     // the stack as the 1-75 opcodes do.
+    // NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
     static const uint8_t direct[] = {1, 0x5a};
     static const uint8_t pushdata1[] = {OP_PUSHDATA1, 1, 0x5a};
     static const uint8_t pushdata2[] = {OP_PUSHDATA2, 1, 0, 0x5a};
     static const uint8_t pushdata4[] = {OP_PUSHDATA4, 1, 0, 0, 0, 0x5a};
+    // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
 
     LimitedStack directStack(UINT32_MAX);
     auto source = task::CCancellationSource::Make();
@@ -1400,7 +1403,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError error;
+    ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto status =
@@ -1412,7 +1415,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
                     flags,
                     BaseSignatureChecker{},
                     &error);
-    BOOST_CHECK_EQUAL(true, status.value());
+    BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
@@ -1434,7 +1437,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError error;
+    ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto status =
@@ -1446,7 +1449,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
                     flags,
                     BaseSignatureChecker{},
                     &error);
-    BOOST_CHECK_EQUAL(true, status.value());
+    BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
@@ -1472,7 +1475,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError error;
+    ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto status =
@@ -1484,13 +1487,13 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
                     flags,
                     BaseSignatureChecker{},
                     &error);
-    BOOST_CHECK_EQUAL(true, status.value());
+    BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
-CScript sign_multisig(CScript scriptPubKey, std::vector<CKey> keys,
-                      CTransaction transaction) {
+CScript sign_multisig(CScript scriptPubKey, std::vector<CKey> keys, // NOLINT(performance-unnecessary-value-param)
+                      CTransaction transaction) { // NOLINT(performance-unnecessary-value-param)
     uint256 hash =
         SignatureHash(scriptPubKey, transaction, 0, SigHashType(), Amount(0));
 
@@ -1516,11 +1519,11 @@ CScript sign_multisig(CScript scriptPubKey, const CKey &key,
                       CTransaction transaction) {
     std::vector<CKey> keys;
     keys.push_back(key);
-    return sign_multisig(scriptPubKey, keys, transaction);
+    return sign_multisig(scriptPubKey, keys, transaction); // NOLINT(performance-unnecessary-value-param)
 }
 
 BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     CKey key1, key2, key3;
     key1.MakeNewKey(true);
     key2.MakeNewKey(false);
@@ -1591,7 +1594,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
 }
 
 BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     CKey key1, key2, key3, key4;
     key1.MakeNewKey(true);
     key2.MakeNewKey(false);
@@ -1951,7 +1954,7 @@ BOOST_AUTO_TEST_CASE(script_combineSigs) {
 }
 
 BOOST_AUTO_TEST_CASE(script_standard_push) {
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     auto source = task::CCancellationSource::Make();
     for (int i = 0; i < 67000; i++) {
         CScript script;
@@ -1999,8 +2002,8 @@ BOOST_AUTO_TEST_CASE(script_IsPushOnly_on_invalid_scripts) {
     // P2SH evaluation uses it, although this specific behavior should not be
     // consensus critical as the P2SH evaluation would fail first due to the
     // invalid push. Still, it doesn't hurt to test it explicitly.
-    static const uint8_t direct[] = {1};
-    BOOST_CHECK(!CScript(direct, direct + sizeof(direct)).IsPushOnly());
+    static const uint8_t direct[] = {1}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    BOOST_CHECK(!CScript(direct, direct + sizeof(direct)).IsPushOnly()); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 }
 
 BOOST_AUTO_TEST_CASE(script_GetScriptAsm) {
@@ -2258,10 +2261,10 @@ BOOST_AUTO_TEST_CASE(script_IsUnspendable) {
     BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(true));
 }
 
-void CheckSolver(const CScript scriptPubKey, bool isGenesisEnabled,
+void CheckSolver(const CScript scriptPubKey, bool isGenesisEnabled, // NOLINT(performance-unnecessary-value-param)
                        txnouttype expectedOutType, bool expectedResult) {
     std::vector<std::vector<uint8_t>> solutions;
-    txnouttype outType;
+    txnouttype outType; // NOLINT(cppcoreguidelines-init-variables)
     BOOST_CHECK(Solver(scriptPubKey, isGenesisEnabled, outType,
                              solutions) == expectedResult);
     BOOST_CHECK(outType == expectedOutType);
@@ -2348,6 +2351,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
     
     //Test solver before genesis with 2 pubkeys and 0 sigs
     CScript multisig_OP0_OP2 = CScript() << OP_0 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
+    // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
     bool result = Solver(multisig_OP0_OP2, false, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 0);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 2);
@@ -2361,6 +2365,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
         multisig_OP1_OP16 << pubKey;
     }
     multisig_OP1_OP16 << OP_16 << OP_CHECKMULTISIG;
+    // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
     result = Solver(multisig_OP1_OP16, false, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 16);
@@ -2386,6 +2391,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
         multisig_OP1_OP300 << pubKey;
     }
     multisig_OP1_OP300 << CScriptNum(300) << OP_CHECKMULTISIG;
+    // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
     result = Solver(multisig_OP1_OP300, true, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 300);
@@ -2432,7 +2438,7 @@ BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {
 
     // do not add data length, it is done automatically
     testScript = CScript();
-    testScript << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id;
+    testScript << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     BOOST_CHECK(!IsDustReturnScript(testScript));
 
     static const std::vector<uint8_t> nonsense_id = {'n','o','n','s'};
@@ -2519,7 +2525,7 @@ namespace {
         InstrumentedChecker(
             Durations& duration,
             const CTransaction& txToIn,
-            const Amount amount,
+            const Amount amount, // NOLINT(performance-unnecessary-value-param)
             PrecomputedTransactionData& txdataIn)
             : CachingTransactionSignatureChecker{&txToIn, 1, amount, true, txdataIn}
             , mDuration{duration}
@@ -2556,12 +2562,12 @@ namespace {
         }
 
     private:
-        Durations& mDuration;
+        Durations& mDuration; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 }
 
 BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     auto source = task::CCancellationSource::Make();
   
     int iterations = 30;
@@ -2588,7 +2594,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
         for(auto& key : keys){
           scriptPubKey << ToByteVector(key.GetPubKey());
         }
-        scriptPubKey << CScriptNum(keys.size()) << OP_CHECKMULTISIG;
+        scriptPubKey << CScriptNum(keys.size()) << OP_CHECKMULTISIG; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         scriptPubKey << OP_1;
         CMutableTransaction creditingTx =
             BuildCreditingTransaction(scriptPubKey, Amount(0));
@@ -2672,7 +2678,7 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
@@ -2687,7 +2693,7 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
         assert(SCRIPT_ERR_OK == error);
         assert(n == stack.size());
         const auto frame = stack.front();
-        const auto actual = frame.GetElement();
+        const auto actual = frame.GetElement(); // NOLINT(performance-unnecessary-copy-initialization)
         assert(1 == actual.size());
         assert(4 == actual[0]);
     };
@@ -2702,14 +2708,14 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
     array<future<void>, n> futures;
     for(size_t i{}; i < n; ++i)
     {
-        futures[i] = async(
+        futures[i] = async( // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
             std::launch::async,
             [&sf, &two_plus_two](auto* ready) {
                 ready->set_value();
                 sf.wait();
                 two_plus_two();
             },
-            &promises[i]);
+            &promises[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // wait until all tasks are ready
@@ -2790,7 +2796,7 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const string serialized_tx{
@@ -2824,14 +2830,14 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
     array<future<void>, n> futures;
     for(size_t i{}; i < n; ++i)
     {
-        futures[i] = async(
+        futures[i] = async( // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
             std::launch::async,
             [&sf, &p2pkh](auto* ready) {
                 ready->set_value();
                 sf.wait();
                 p2pkh();
             },
-            &promises[i]);
+            &promises[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // wait until all tasks are ready

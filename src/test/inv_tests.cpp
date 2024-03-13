@@ -25,7 +25,7 @@ BOOST_AUTO_TEST_CASE(validate_kind) {
     CheckType(GetDataMsg::MSG_DATAREF_TX, GetDataMsg::MSG_DATAREF_TX, false, false);
 }
 
-static void CheckCommand(int type, std::string expected) {
+static void CheckCommand(int type, std::string expected) { // NOLINT(performance-unnecessary-value-param)
     CInv inv(type, uint256());
     BOOST_CHECK_EQUAL(inv.GetCommand(), expected);
 }

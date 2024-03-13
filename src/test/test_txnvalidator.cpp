@@ -14,7 +14,7 @@
 #include <boost/test/unit_test.hpp>
 
 namespace {
-    std::vector<TxSource> vTxSources {
+    std::vector<TxSource> vTxSources { // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
         TxSource::wallet,
         TxSource::rpc,
         TxSource::file,
@@ -30,7 +30,7 @@ namespace {
     }
     // Support for P2P node.
     CService ip(uint32_t i) {
-        struct in_addr s;
+        struct in_addr s; // NOLINT(cppcoreguidelines-pro-type-member-init)
         s.s_addr = i;
         return CService(CNetAddr(s), Params().GetDefaultPort());
     }
@@ -116,7 +116,7 @@ namespace {
     // Create txn input data for a given txn and source
     TxInputDataSPtr TxInputData(TxSource source,
                                 CMutableTransaction& spend,
-                                std::shared_ptr<CNode> pNode = nullptr,
+                                std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
                                 TxValidationPriority priority = TxValidationPriority::normal) {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
@@ -132,13 +132,13 @@ namespace {
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr,
+                                                std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
         // Get a pointer to the TxIdTracker.
         const TxIdTrackerSPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         for (auto& elem : spends) {
-            vTxInputData.
+            vTxInputData. // NOLINT(performance-inefficient-vector-operation)
                 emplace_back(
                     std::make_shared<CTxInputData>(
                         pTxIdTracker, // a pointer to the TxIdTracker
@@ -171,7 +171,7 @@ namespace {
         // Clear mempool before validation
         pool.Clear();
         // Schedule txns for processing.
-        txnValidator->newTransaction(TxInputDataVec(source, spends, pNode));
+        txnValidator->newTransaction(TxInputDataVec(source, spends, pNode)); // NOLINT(performance-unnecessary-value-param)
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
     }
@@ -195,7 +195,7 @@ namespace {
         pool.Clear();
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
-        return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet);
+        return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet); // NOLINT(performance-unnecessary-value-param)
     }
     // Validate txn using synchronous validation interface
     void ProcessTxnsSynchApi(
@@ -203,7 +203,7 @@ namespace {
         CTxMemPool& pool,
         std::vector<CMutableTransaction>& spends,
         TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+        std::shared_ptr<CNode> pNode = nullptr) { // NOLINT(performance-unnecessary-value-param)
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -248,7 +248,7 @@ namespace {
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
-        return txnValidator->processValidation(TxInputDataVec(source, spends, pNode), changeSet);
+        return txnValidator->processValidation(TxInputDataVec(source, spends, pNode), changeSet); // NOLINT(performance-unnecessary-value-param)
     }
 
     CNodePtr DummyNode(ConfigInit& testConfig)

@@ -21,7 +21,7 @@
 typedef std::vector<uint8_t> valtype;
 typedef std::vector<valtype> stacktype;
 
-std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
+std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 
@@ -183,19 +183,19 @@ static valtype to_bitpattern(const char *str) {
  
     valtype val((len - 1) / 8 + 1, 0); 
  
-    const char *pin = &str[len - 1]; 
+    const char *pin = &str[len - 1]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     for (size_t i = 0; i < len; i++) {
-        int byte_idx = (len - 1 - i) / 8;
-        int bit_idx = i % 8; 
+        int byte_idx = (len - 1 - i) / 8; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        int bit_idx = i % 8; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
  
-        int8_t mask = 1 << bit_idx; 
+        int8_t mask = 1 << bit_idx; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
  
         if (*pin == '0') {
             val[byte_idx] &= ~mask; 
         } else {
             val[byte_idx] |= mask; 
         } 
-        pin--; 
+        pin--; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     } 
     return val; 
 }
@@ -737,26 +737,26 @@ static void CheckStringOp(const valtype &a, const valtype &b,
     CheckBinaryOp({}, b, OP_CAT, b);
 
     // Split n into a and b.
-    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT, {a, b});
+    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT, {a, b}); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
     // Combine split and cat.
-    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT << OP_CAT,
+    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT << OP_CAT, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                                {n});
     CheckTestResultForAllFlags(
-        {a, b}, CScript() << OP_CAT << a.size() << OP_SPLIT, {a, b});
+        {a, b}, CScript() << OP_CAT << a.size() << OP_SPLIT, {a, b}); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
     // Split away empty elements.
     CheckTestResultForAllFlags({a}, CScript() << 0 << OP_SPLIT, {{}, a});
     CheckTestResultForAllFlags({b}, CScript() << 0 << OP_SPLIT, {{}, b});
-    CheckTestResultForAllFlags({a}, CScript() << a.size() << OP_SPLIT, {a, {}});
-    CheckTestResultForAllFlags({b}, CScript() << b.size() << OP_SPLIT, {b, {}});
+    CheckTestResultForAllFlags({a}, CScript() << a.size() << OP_SPLIT, {a, {}}); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    CheckTestResultForAllFlags({b}, CScript() << b.size() << OP_SPLIT, {b, {}}); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
     // Out of bound split.
-    CheckErrorForAllFlags({a}, CScript() << (a.size() + 1) << OP_SPLIT,
+    CheckErrorForAllFlags({a}, CScript() << (a.size() + 1) << OP_SPLIT, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
-    CheckErrorForAllFlags({b}, CScript() << (b.size() + 1) << OP_SPLIT,
+    CheckErrorForAllFlags({b}, CScript() << (b.size() + 1) << OP_SPLIT, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
-    CheckErrorForAllFlags({n}, CScript() << (n.size() + 1) << OP_SPLIT,
+    CheckErrorForAllFlags({n}, CScript() << (n.size() + 1) << OP_SPLIT, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
     CheckErrorForAllFlags({a}, CScript() << (-1) << OP_SPLIT,
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
@@ -821,8 +821,8 @@ BOOST_AUTO_TEST_CASE(string_opcodes_test) {
     BOOST_CHECK_EQUAL(n.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
 
     for (size_t i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
-        valtype a(n.begin(), n.begin() + i);
-        valtype b(n.begin() + i, n.end());
+        valtype a(n.begin(), n.begin() + i); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        valtype b(n.begin() + i, n.end()); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
         CheckStringOp(a, b, n);
 
@@ -864,24 +864,24 @@ static void CheckTypeConversionOp(const valtype &bin, const valtype &num) {
         rebuilt_bin[rebuilt_bin.size() - 1] &= 0x7f;
     }
 
-    CheckTestResultForAllFlags({num}, CScript() << bin.size() << OP_NUM2BIN,
+    CheckTestResultForAllFlags({num}, CScript() << bin.size() << OP_NUM2BIN, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                                {rebuilt_bin});
 
     // Check roundtrip with NUM2BIN.
     CheckTestResultForAllFlags(
-        {bin}, CScript() << OP_BIN2NUM << bin.size() << OP_NUM2BIN,
+        {bin}, CScript() << OP_BIN2NUM << bin.size() << OP_NUM2BIN, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         {rebuilt_bin});
 
     // Grow and shrink back down using NUM2BIN.
     CheckTestResultForAllFlags({bin},
                                CScript()
                                    << MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS << OP_NUM2BIN
-                                   << bin.size() << OP_NUM2BIN,
+                                   << bin.size() << OP_NUM2BIN, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                                {rebuilt_bin});
     CheckTestResultForAllFlags({num},
                                CScript()
                                    << MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS << OP_NUM2BIN
-                                   << bin.size() << OP_NUM2BIN,
+                                   << bin.size() << OP_NUM2BIN, // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
                                {rebuilt_bin});
 
     // BIN2NUM is indempotent.
@@ -1192,7 +1192,7 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
     CScript::const_iterator pc = script.begin(); 
     CScript::const_iterator pend = script.end(); 
     uint64_t cnt = 0;
-    opcodetype opcode; 
+    opcodetype opcode;  // NOLINT(cppcoreguidelines-init-variables)
     valtype value; 
     while (pc < pend) 
     { 
@@ -1201,7 +1201,7 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
              ++cnt;
     }
     // Include multisig opcode count as well.
-    bool sigOpCountError;
+    bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
     return cnt + script.GetSigOpCount(true, false, sigOpCountError);
 } 
  

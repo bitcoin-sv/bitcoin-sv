@@ -9,7 +9,7 @@
 #include "txmempool.h"
 #include "mempooltxdb.h"
 
-namespace {
+namespace { // NOLINT(cert-dcl59-cpp)
     struct UnitTestAccessTag;
 }
 
@@ -23,7 +23,7 @@ struct CTxMemPool::UnitTestAccess<UnitTestAccessTag>
 public:
     using Indexed_transaction_set = indexed_transaction_set;
 
-    CTxMemPool& mempool;
+    CTxMemPool& mempool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
     UnitTestAccess(CTxMemPool& _mempool)
         :mempool(_mempool)
@@ -129,7 +129,7 @@ using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<UnitTestAccessTag>;
 
 template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
 {
-    CTxMemPoolEntry& entry;
+    CTxMemPoolEntry& entry; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     UnitTestAccess(CTxMemPoolEntry& _entry) : entry(_entry) {}
 
     auto& nFee() {return entry.nFee;};

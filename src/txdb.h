@@ -88,7 +88,7 @@ private:
 // NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
 class CoinsDB {
 private:
-    friend class CoinsDBView;
+    friend class CoinsDBView; // NOLINT(cppcoreguidelines-virtual-class-destructor)
     friend class CoinsDBSpan;
 
     /**
@@ -301,7 +301,7 @@ class CoinsDBView : public ICoinsView
 {
 public:
     friend class CoinsViewLockedMemPoolNL;
-    friend class CCoinsViewMemPool;
+    friend class CCoinsViewMemPool; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
     CoinsDBView(const CoinsDB& db)
         : mDB{db}

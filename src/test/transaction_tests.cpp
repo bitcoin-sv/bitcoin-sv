@@ -40,7 +40,7 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
 void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
     for (size_t idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
         std::string strTest = test.write();
         if (test[0].isArray()) {
             
@@ -82,7 +82,7 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                     fValid = false;
                     break;
                 }
-                UniValue vinput = input.get_array();
+                UniValue vinput = input.get_array(); // NOLINT(performance-unnecessary-copy-initialization)
                 if (vinput.size() < 3 || vinput.size() > 4) {
                     fValid = false;
                     break;
@@ -170,8 +170,8 @@ BOOST_AUTO_TEST_CASE(tx_valid) {
     // list of script verification flags to apply, or "NONE"
     // 
     UniValue tests = read_json(
-        std::string(json_tests::tx_valid,
-                    json_tests::tx_valid + sizeof(json_tests::tx_valid)));
+        std::string(json_tests::tx_valid, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                    json_tests::tx_valid + sizeof(json_tests::tx_valid))); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     RunTests(testConfig, tests, true);
 }
@@ -188,8 +188,8 @@ BOOST_AUTO_TEST_CASE(tx_invalid) {
     // list of script verification flags to apply, or "NONE"
     // 
     UniValue tests = read_json(
-        std::string(json_tests::tx_invalid,
-                    json_tests::tx_invalid + sizeof(json_tests::tx_invalid)));
+        std::string(json_tests::tx_invalid, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                    json_tests::tx_invalid + sizeof(json_tests::tx_invalid))); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     RunTests(testConfig, tests, false);
 }
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid) {
 BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
     // Random real transaction
     // (e2769b09e784f32f62ef849763d4f45b98e07ba658647343b915ff832b110436)
-    uint8_t ch[] = {
+    uint8_t ch[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays)
         0x01, 0x00, 0x00, 0x00, 0x01, 0x6b, 0xff, 0x7f, 0xcd, 0x4f, 0x85, 0x65,
         0xef, 0x40, 0x6d, 0xd5, 0xd6, 0x3d, 0x4f, 0xf9, 0x4f, 0x31, 0x8f, 0xe8,
         0x20, 0x27, 0xfd, 0x4d, 0xc4, 0x51, 0xb0, 0x44, 0x74, 0x01, 0x9f, 0x74,
@@ -220,7 +220,7 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
         0x00, 0x19, 0x76, 0xa9, 0x14, 0xc1, 0x09, 0x32, 0x48, 0x3f, 0xec, 0x93,
         0xed, 0x51, 0xf5, 0xfe, 0x95, 0xe7, 0x25, 0x59, 0xf2, 0xcc, 0x70, 0x43,
         0xf9, 0x88, 0xac, 0x00, 0x00, 0x00, 0x00, 0x00};
-    std::vector<uint8_t> vch(ch, ch + sizeof(ch) - 1);
+    std::vector<uint8_t> vch(ch, ch + sizeof(ch) - 1); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     CDataStream stream(vch, SER_DISK, CLIENT_VERSION);
     CMutableTransaction tx;
     stream >> tx;
@@ -248,10 +248,10 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4];
+    CKey key[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 4; i++) {
-        key[i].MakeNewKey(i % 2);
-        keystoreRet.AddKey(key[i]);
+        key[i].MakeNewKey(i % 2); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        keystoreRet.AddKey(key[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Create some dummy input transactions
@@ -353,7 +353,7 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
 void CheckWithFlag(const CTransactionRef &output,
                    const CMutableTransaction &input, int flags,
                    bool successBeforeGenesis, bool successAfterGenesis) {
-    ScriptError error;
+    ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
     const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
     auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
@@ -709,7 +709,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
     std::string reason;
     GlobalConfig config;
     uint64_t genesisActivationHeight = config.GetChainParams().GetConsensus().genesisHeight;
-    config.SetGenesisActivationHeight(genesisActivationHeight);
+    config.SetGenesisActivationHeight(genesisActivationHeight); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
 
     CMutableTransaction t;
     t.vin.resize(1);
@@ -754,7 +754,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
 }
 
 
-void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uint64_t initialScriptSize) {
+void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uint64_t initialScriptSize) { // NOLINT(performance-unnecessary-value-param)
 
     DummyConfig config(CBaseChainParams::MAIN);
     config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
@@ -927,10 +927,10 @@ SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCach
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4];
+    CKey key[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 4; i++) {
-        key[i].MakeNewKey(i % 2);
-        keystoreRet.AddKey(key[i]);
+        key[i].MakeNewKey(i % 2); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        keystoreRet.AddKey(key[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Create some dummy input transactions

@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE(test_number_of_priority_threads_static) {
 BOOST_AUTO_TEST_CASE(test_number_of_priority_threads_dynamic) {
     for (size_t n=25; n < 100000; ++n) {
         // A number of Low priority threads
-        size_t nEstimateNumLowPriorityThrs = static_cast<size_t>(n * 0.25);
+        size_t nEstimateNumLowPriorityThrs = static_cast<size_t>(n * 0.25); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         size_t nLowPriorityThrs = GetNumLowPriorityValidationThrs(n);
         BOOST_CHECK(nLowPriorityThrs > 0);
         BOOST_CHECK(nLowPriorityThrs >= nEstimateNumLowPriorityThrs);

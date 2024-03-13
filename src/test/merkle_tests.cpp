@@ -36,7 +36,7 @@ static uint256 BlockBuildMerkleTree(const CBlock &block, bool *fMutated,
         vMerkleTree.push_back((*it)->GetId());
     int j = 0;
     bool mutated = false;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2) {
+    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2) { // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         for (int i = 0; i < nSize; i += 2) {
             int i2 = std::min(i + 1, nSize - 1);
             if (i2 == i + 1 && i2 + 1 == nSize &&
@@ -63,7 +63,7 @@ BlockGetMerkleBranch(const CBlock &block,
                      const std::vector<uint256> &vMerkleTree, int nIndex) {
     std::vector<uint256> vMerkleBranch;
     int j = 0;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2) {
+    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2) { // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         int i = std::min(nIndex ^ 1, nSize - 1);
         vMerkleBranch.push_back(vMerkleTree[j + i]);
         nIndex >>= 1;
@@ -171,7 +171,7 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
                     std::vector<uint256> newBranch =
                         BlockMerkleBranch(block, mtx);
                     std::vector<uint256> oldBranch =
-                        BlockGetMerkleBranch(block, merkleTree, mtx);
+                        BlockGetMerkleBranch(block, merkleTree, mtx); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
                     CMerkleTree newestMerkleTree(block.vtx, uint256(), 0);
                     CMerkleTree::MerkleProof newestBranch = newestMerkleTree.GetMerkleProof(block.vtx[mtx]->GetId(), false);
@@ -495,7 +495,7 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
         vector<MerkleProof::Node> nodes{};
         for(const auto& node : treeProof.merkleTreeHashes)
         {
-            nodes.push_back(MerkleProof::Node{node});
+            nodes.push_back(MerkleProof::Node{node}); // NOLINT(performance-inefficient-vector-operation)
         }
 
         return make_tuple(nodes, checkRoot, treeProof);

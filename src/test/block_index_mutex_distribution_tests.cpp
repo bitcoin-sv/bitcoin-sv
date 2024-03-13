@@ -41,8 +41,10 @@ BOOST_AUTO_TEST_CASE(BlockIndexMutexDistributionTest)
 {
     uint32_t BLOCK_COUNT = 100000;
     uint32_t MUTEX_COUNT = 8;
-    uint32_t LOWER_LIMIT = BLOCK_COUNT / MUTEX_COUNT - 0.1 * BLOCK_COUNT;
-    uint32_t UPPER_LIMIT = BLOCK_COUNT / MUTEX_COUNT + 0.1 * BLOCK_COUNT;
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
+    uint32_t LOWER_LIMIT = BLOCK_COUNT / MUTEX_COUNT - 0.1 * BLOCK_COUNT; // NOLINT(bugprone-integer-division, cppcoreguidelines-narrowing-conversions)
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
+    uint32_t UPPER_LIMIT = BLOCK_COUNT / MUTEX_COUNT + 0.1 * BLOCK_COUNT; // NOLINT(bugprone-integer-division, cppcoreguidelines-narrowing-conversions)
 
     LOCK(cs_main);
     std::map<std::mutex*, uint32_t> blockIndexDistribution;

@@ -13,7 +13,7 @@
 #include <map>
 #include <vector>
 
-static std::map<std::string, uint32_t> mapFlagNames = {
+static std::map<std::string, uint32_t> mapFlagNames = { // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
     {"NONE", SCRIPT_VERIFY_NONE},
     {"P2SH", SCRIPT_VERIFY_P2SH},
     {"STRICTENC", SCRIPT_VERIFY_STRICTENC},

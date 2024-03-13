@@ -28,7 +28,7 @@ BOOST_FIXTURE_TEST_SUITE(dbwrapper_tests, BasicTestingSetup)
 
 namespace {
 
-struct ScopedPathDeleter
+struct ScopedPathDeleter // NOLINT(cppcoreguidelines-special-member-functions)
 {
     ScopedPathDeleter(fs::path& p)
     : p(p)
@@ -39,7 +39,7 @@ struct ScopedPathDeleter
         fs::remove_all(p);
     }
 
-    fs::path& p;
+    fs::path& p; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 
 }
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(dbwrapper_batch) {
     for (int i = 0; i < 2; i++) {
         bool obfuscate = (bool)i;
         fs::path ph = fs::temp_directory_path() / fs::unique_path();
-        CDBWrapper dbw(ph, (1 << 20), true, false, obfuscate);
+        CDBWrapper dbw(ph, (1 << 20), true, false, obfuscate); // NOLINT(performance-inefficient-vector-operation)
 
         char key = 'i';
         uint256 in = InsecureRand256();
@@ -117,12 +117,12 @@ BOOST_AUTO_TEST_CASE(dbwrapper_iterator) {
         BOOST_CHECK(dbw.Write(key2, in2));
 
         std::unique_ptr<CDBIterator> it(
-            const_cast<CDBWrapper &>(dbw).NewIterator());
+            const_cast<CDBWrapper &>(dbw).NewIterator()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
 
         // Be sure to seek past the obfuscation key (if it exists)
         it->Seek(key);
 
-        char key_res;
+        char key_res; // NOLINT(cppcoreguidelines-init-variables)
         uint256 val_res;
 
         it->GetKey(key_res);
@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(existing_data_no_obfuscate) {
     ScopedPathDeleter ph_deleter(ph);
 
     // Set up a non-obfuscated wrapper to write some initial data.
-    CDBWrapper *dbw = new CDBWrapper(ph, (1 << 10), false, false, false);
+    CDBWrapper *dbw = new CDBWrapper(ph, (1 << 10), false, false, false); // NOLINT(cppcoreguidelines-owning-memory)
     char key = 'k';
     uint256 in = InsecureRand256();
     uint256 res;
@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(existing_data_no_obfuscate) {
     BOOST_CHECK_EQUAL(res.ToString(), in.ToString());
 
     // Call the destructor to free leveldb LOCK
-    delete dbw;
+    delete dbw; // NOLINT(cppcoreguidelines-owning-memory)
 
     // Now, set up another wrapper that wants to obfuscate the same directory
     CDBWrapper odbw(ph, (1 << 10), false, false, true);
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(existing_data_reindex) {
     ScopedPathDeleter ph_deleter(ph);
 
     // Set up a non-obfuscated wrapper to write some initial data.
-    CDBWrapper *dbw = new CDBWrapper(ph, (1 << 10), false, false, false);
+    CDBWrapper *dbw = new CDBWrapper(ph, (1 << 10), false, false, false); // NOLINT(cppcoreguidelines-owning-memory)
     char key = 'k';
     uint256 in = InsecureRand256();
     uint256 res;
@@ -203,7 +203,7 @@ BOOST_AUTO_TEST_CASE(existing_data_reindex) {
     BOOST_CHECK_EQUAL(res.ToString(), in.ToString());
 
     // Call the destructor to free leveldb LOCK
-    delete dbw;
+    delete dbw; // NOLINT(cppcoreguidelines-owning-memory)
 
     // Simulate a -reindex by wiping the existing data store
     CDBWrapper odbw(ph, (1 << 10), false, true, true);
@@ -232,17 +232,17 @@ BOOST_AUTO_TEST_CASE(iterator_ordering) {
     }
 
     std::unique_ptr<CDBIterator> it(
-        const_cast<CDBWrapper &>(dbw).NewIterator());
+        const_cast<CDBWrapper &>(dbw).NewIterator()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     for (int c = 0; c < 2; ++c) {
-        int seek_start;
+        int seek_start; // NOLINT(cppcoreguidelines-init-variables)
         if (c == 0)
             seek_start = 0x00;
         else
             seek_start = 0x80;
         it->Seek((uint8_t)seek_start);
         for (unsigned x = seek_start; x < 256; ++x) {
-            uint8_t key;
-            uint32_t value;
+            uint8_t key; // NOLINT(cppcoreguidelines-init-variables)
+            uint32_t value; // NOLINT(cppcoreguidelines-init-variables)
             BOOST_CHECK(it->Valid());
             // Avoid spurious errors about invalid iterator's  key and value in
             // case of failure
@@ -295,14 +295,14 @@ struct StringContentsSerializer {
 };
 
 BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
-    char buf[16];
+    char buf[16]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
 
     fs::path ph = fs::temp_directory_path() / fs::unique_path();
     CDBWrapper dbw(ph, (1 << 20), true, false, false);
     for (int x = 0x00; x < 10; ++x) {
         for (int y = 0; y < 10; y++) {
-            sprintf(buf, "%d", x);
-            StringContentsSerializer key(buf);
+            sprintf(buf, "%d", x); // NOLINT(cppcoreguidelines-pro-type-vararg, cert-err33-c, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            StringContentsSerializer key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             for (int z = 0; z < y; z++)
                 key += key;
             uint32_t value = x * x;
@@ -311,24 +311,24 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
     }
 
     std::unique_ptr<CDBIterator> it(
-        const_cast<CDBWrapper &>(dbw).NewIterator());
+        const_cast<CDBWrapper &>(dbw).NewIterator()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     for (int c = 0; c < 2; ++c) {
-        int seek_start;
+        int seek_start; // NOLINT(cppcoreguidelines-init-variables)
         if (c == 0)
             seek_start = 0;
         else
             seek_start = 5;
-        sprintf(buf, "%d", seek_start);
-        StringContentsSerializer seek_key(buf);
+        sprintf(buf, "%d", seek_start); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg, cert-err33-c)
+        StringContentsSerializer seek_key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         it->Seek(seek_key);
         for (unsigned x = seek_start; x < 10; ++x) {
             for (unsigned y = 0; y < 10; y++) {
-                sprintf(buf, "%d", x);
-                std::string exp_key(buf);
+                sprintf(buf, "%d", x); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg, cert-err33-c)
+                std::string exp_key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 for (unsigned z = 0; z < y; z++)
                     exp_key += exp_key;
                 StringContentsSerializer key;
-                uint32_t value;
+                uint32_t value; // NOLINT(cppcoreguidelines-init-variables)
                 BOOST_CHECK(it->Valid());
                 // Avoid spurious errors about invalid iterator's key and value
                 // in case of failure
@@ -358,7 +358,7 @@ BOOST_AUTO_TEST_CASE(bulk_rw)
     CDBWrapper dbw(ph, (1 << 20), false, true, true); // do not use memory environment, wipe existing data and use obfuscation
 
     // Helper to generate random 256-bit ids so that the same seed produces same ids.
-    class
+    class // NOLINT(cert-msc32-c, cert-msc51-cpp)
     {
         std::mt19937 engine;
         std::uniform_int_distribution<unsigned int> uniform_dist{0, 255};

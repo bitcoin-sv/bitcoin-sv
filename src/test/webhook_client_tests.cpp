@@ -18,7 +18,7 @@ namespace
     class Session : public std::enable_shared_from_this<Session>
     {
       public:
-        Session(tcp::socket&& socket) : mSocket{std::move(socket)}
+        Session(tcp::socket&& socket) : mSocket{std::move(socket)} // NOLINT(cppcoreguidelines-pro-type-member-init)
         {}
 
         void start()
@@ -61,7 +61,7 @@ namespace
 
         tcp::socket mSocket;
         enum { max_length = 1024 };
-        char mData[max_length];
+        char mData[max_length]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     };
 
     // Simple asynchronous socket server
@@ -96,7 +96,7 @@ namespace
     };
 
     // A testing fixture that runs a TCP server
-    class ServerSetup
+    class ServerSetup // NOLINT(cppcoreguidelines-special-member-functions)
     {
       public:
         ServerSetup()

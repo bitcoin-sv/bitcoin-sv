@@ -257,3 +257,6 @@ if(BUILD_BITCOIN_WALLET)
 			../wallet/test/crypto_tests.cpp
 	)
 endif()
+
+include(ClangTidy)
+AddClangTidy(test_bitcoin)

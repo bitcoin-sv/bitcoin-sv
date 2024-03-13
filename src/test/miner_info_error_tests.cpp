@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
         miner_info_error e{i};
         ostringstream oss;
         oss << e;
-        const string& exp{expected[i]};
+        const string& exp{expected[i]}; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         BOOST_CHECK_EQUAL(exp, oss.str());
     }
 }

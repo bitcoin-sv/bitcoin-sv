@@ -78,7 +78,7 @@ namespace {
     // Capture this interaction with the upgraded_nop argument: set it when
     // evaluating any script flag that is implemented as an upgraded NOP code.
     void ValidateCheckInputsForAllFlags(const CMutableTransaction &mutableTx,
-                                        std::function<bool(uint32_t)> expectedResultBasedOnFlags,
+                                        std::function<bool(uint32_t)> expectedResultBasedOnFlags, // NOLINT(performance-unnecessary-value-param)
                                         bool add_to_cache,
                                         bool upgraded_nop,
                                         CFrozenTXOCheck& frozenTXOCheckTransaction,

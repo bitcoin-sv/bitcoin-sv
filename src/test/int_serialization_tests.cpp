@@ -25,7 +25,7 @@ namespace
     using int64_t_test_data_type =
         std::vector<std::pair<int64_t, std::vector<uint8_t>>>;
     // clang-format off
-    int64_t_test_data_type int64_t_test_data = 
+    int64_t_test_data_type int64_t_test_data = // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
     {
         {1, {1}},
         {std::numeric_limits<int8_t>::max()-1, {0x7e}}, // 126
@@ -66,10 +66,10 @@ namespace
         {2'150'637'584, {0x10, 0x20, 0x30, 0x80, 0x0}},
     };
 
-    const bint bn_min64{int64_min};
-    const bint bn_max64{int64_max};
+    const bint bn_min64{int64_min}; // NOLINT(cert-err58-cpp)
+    const bint bn_max64{int64_max}; // NOLINT(cert-err58-cpp)
     using bint_test_data_type = std::vector<std::pair<bint, std::vector<uint8_t>>>;
-    bint_test_data_type bint_test_data = 
+    bint_test_data_type bint_test_data = // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
     {
         {bn_max64, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f}},
         {bn_max64 + 1, {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x80, 0x0}},

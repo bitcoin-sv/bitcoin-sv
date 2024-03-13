@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(sighash_serialization_test) {
             BOOST_CHECK_EQUAL(tbase.getRawSigHashType(), rawType);
 
             // Check serialization/deserialization.
-            uint32_t unserializedOutput;
+            uint32_t unserializedOutput; // NOLINT(cppcoreguidelines-init-variables)
             (CDataStream(SER_DISK, 0) << tbase) >> unserializedOutput;
             BOOST_CHECK_EQUAL(unserializedOutput, rawType);
         }

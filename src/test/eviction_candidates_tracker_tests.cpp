@@ -49,7 +49,7 @@ CTxMemPoolEntry MakeEntry(
     }
     
     auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    auto totalFee = Amount(int64_t( feerate * txSize) / nOutputs * nOutputs);
+    auto totalFee = Amount(int64_t( feerate * txSize) / nOutputs * nOutputs); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     auto perOutput = (totalInput - totalFee) / int64_t(nOutputs);
 
     for(auto& output: tx.vout)
@@ -98,7 +98,7 @@ public:
         return iter;
     }
 
-    void AddGroup(std::vector<CTxMemPoolEntry> entries)
+    void AddGroup(std::vector<CTxMemPoolEntry> entries) // NOLINT(performance-unnecessary-value-param)
     {
         SecondaryMempoolEntryData groupData;
         std::vector<CTxMemPoolTestAccess::txiter> iters;
@@ -142,7 +142,7 @@ public:
         {
             for(auto it: entry->GetCPFPGroup()->Transactions())
             {
-                CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).group().reset();
+                CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).group().reset(); // NOLINT(cppcoreguidelines-pro-type-const-cast)
             }
         }
 
@@ -172,7 +172,7 @@ public:
                 links, 
                 [](CTxMemPoolTestAccess::txiter entry)
                 {
-                    int64_t score = entry->GetFee().GetSatoshis() * 100000 / entry->GetTxSize();
+                    int64_t score = entry->GetFee().GetSatoshis() * 100000 / entry->GetTxSize(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                     if(!entry->IsInPrimaryMempool())
                     {
                         score += std::numeric_limits<int64_t>::min();
@@ -184,7 +184,7 @@ public:
     
     void RemoveMostWorthless()
     {
-        auto iter = tracker->GetMostWorthless();
+        auto iter = tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
         RemoveTx(iter);
     }
 };
@@ -245,12 +245,12 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
     {
         for(size_t i = 0; i < 100; i++)
         {
-            auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); 
-            auto newEntry = MakeEntry(feerate, {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
+            auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+            auto newEntry = MakeEntry(feerate, {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, performance-move-const-arg)
             mempool.AddTx(newEntry);
             if(mempool.tracker)
             {
-                BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (i + 1));
+                BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (i + 1)); // NOLINT(bugprone-use-after-move)
             }
         }
 
@@ -262,9 +262,9 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         double lastRemovedFeeRate = 0;
         for(size_t i = 0; i < 100; i++)
         {
-            BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i));
-            auto txToRemove = mempool.tracker->GetMostWorthless();
-            double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
+            BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i)); // NOLINT(bugprone-unchecked-optional-access)
+            auto txToRemove = mempool.tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
+            double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             mempool.RemoveTx(txToRemove);
             BOOST_ASSERT(feeRate >= lastRemovedFeeRate);
             lastRemovedFeeRate = feeRate;
@@ -282,7 +282,7 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
 
     for(int i = 0; i < 100; i++)
     {    
-        auto newEntry = MakeEntry(100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
+        auto newEntry = MakeEntry(100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0); // NOLINT(performance-move-const-arg, bugprone-use-after-move)
         if(i % 2 == 0)
         {
             CTestTxMemPoolEntry(newEntry).groupingData() =
@@ -297,8 +297,8 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     bool lastFromSecondary = true;
     for(int i = 0; i < 100; i++)
     {
-        auto txToRemove = mempool.tracker->GetMostWorthless();
-        double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
+        auto txToRemove = mempool.tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
+        double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         bool fromSecondary = !txToRemove->IsInPrimaryMempool();
         mempool.RemoveMostWorthless();
         if(fromSecondary)
@@ -346,12 +346,12 @@ BOOST_AUTO_TEST_CASE(group) {
     group.push_back(MakeEntry(10,{}, inMempoolInputs, 1, 1000));
     mempool.AddGroup(group);
     mempool.InitializeTracker();
-    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
+    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1); // NOLINT(bugprone-unchecked-optional-access)
     mempool.AddTx(MakeEntry(1000, {}, {std::make_tuple(group[0].GetSharedTx(), 1)}, 1, 1000));
-    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
+    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1); // NOLINT(bugprone-unchecked-optional-access)
     mempool.RemoveMostWorthless();
     mempool.RemoveMostWorthless();
-    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 4);
+    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 4); // NOLINT(bugprone-unchecked-optional-access)
 
 }
 

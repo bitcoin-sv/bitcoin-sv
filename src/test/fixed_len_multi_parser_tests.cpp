@@ -256,7 +256,7 @@ BOOST_AUTO_TEST_CASE(parse_sid_70117_seg_100)
     BOOST_CHECK_EQUAL(110, parser.segment_count());
     BOOST_CHECK_EQUAL(split, total_bytes_read);
     
-    const std::span s2{ip.data() + split, ip.size() - split};
+    const std::span s2{ip.data() + split, ip.size() - split}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const auto [bytes_read_2, bytes_reqd_2] = parser(s2);
     total_bytes_read += bytes_read_2;
     BOOST_CHECK_EQUAL(ip.size()-split, bytes_read_2);
@@ -314,7 +314,7 @@ BOOST_AUTO_TEST_CASE(parse_part_msg)
     BOOST_CHECK_EQUAL(ip.size() - sid_len, parser.size());
 }
 
-const std::vector<uint8_t> mcci_msg{[]
+const std::vector<uint8_t> mcci_msg{[] // NOLINT(cert-err58-cpp)
 {
     vector<uint8_t> v;
     constexpr int n{200};
@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 
     for(size_t i{}; i < mcci_msg.size(); ++i)
     {
-        std::span s{mcci_msg.data() + i, 1};
+        std::span s{mcci_msg.data() + i, 1}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         parser(s);
     }
 
@@ -385,7 +385,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     size_t passes{};
     while(total_bytes_read < mcci_msg.size())
     {
-        span s{mcci_msg.data() + offset, n};
+        span s{mcci_msg.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)
@@ -482,7 +482,7 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
     size_t bytes_read{};
     for(size_t i{}; i < mcci_msg.size(); ++i)
     {
-        bytes_read += read(parser, i, span{out.data() + i, 1});
+        bytes_read += read(parser, i, span{out.data() + i, 1}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     BOOST_CHECK_EQUAL(mcci_msg.size(), bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(mcci_msg.cbegin(), mcci_msg.cend(),

@@ -9,7 +9,7 @@
 
 BOOST_FIXTURE_TEST_SUITE(json_tests, BasicTestingSetup)
 
-CStringWriter strWriter;
+CStringWriter strWriter; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_AUTO_TEST_CASE(CJWriter_write_array)
 {

@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(test_detector_conflicts)
 
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
     // Assign tx1's input as the first input of tx2 
-    const_cast<COutPoint&>(tx2.vin[0].prevout) = const_cast<COutPoint&>(tx1.vin[0].prevout);
+    const_cast<COutPoint&>(tx2.vin[0].prevout) = const_cast<COutPoint&>(tx1.vin[0].prevout); // NOLINT(cppcoreguidelines-pro-type-const-cast)
 
     // Try to remove inputs from a copy of tx1 that was never added
     // Should not change anything

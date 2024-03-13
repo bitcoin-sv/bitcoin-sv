@@ -21,12 +21,12 @@ BOOST_AUTO_TEST_CASE(mod_n_byte_parser_tests)
     vector<uint8_t> v(11);
 
     size_t offset{};
-    auto p = parser(span{v.data() + offset, 0});
+    auto p = parser(span{v.data() + offset, 0}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(0, p.first);
     BOOST_CHECK_EQUAL(0, p.second);
     BOOST_CHECK_EQUAL(0, parser.size());
     
-    p = parser(span{v.data() + offset, 1});
+    p = parser(span{v.data() + offset, 1}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(0, p.first);
     BOOST_CHECK_EQUAL(10, p.second);
     BOOST_CHECK_EQUAL(0, parser.size());
@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // everything gets buffered
     size_t offset{}; 
     constexpr size_t input_size{4};
-    buffer(span{in.data() + offset, input_size});
+    buffer(span{in.data() + offset, input_size}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(input_size, buffer.buffer_size());
     BOOST_CHECK_EQUAL(N, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(input_size, buffer.size());
@@ -97,7 +97,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // nothing gets read
     // everything gets buffered
     offset += input_size;
-    buffer(span{in.data() + offset, input_size});
+    buffer(span{in.data() + offset, input_size}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(2 * input_size, buffer.buffer_size());
     BOOST_CHECK_EQUAL(N, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(2 * input_size, buffer.size());
@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // buffer + half of input gets read
     // half of input gets buffered
     offset += input_size;
-    buffer(span{in.data() + offset, input_size});
+    buffer(span{in.data() + offset, input_size}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(2, buffer.buffer_size());
     BOOST_CHECK_EQUAL(N, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(3 * input_size, buffer.size());
@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // nothing gets read
     // everything gets buffered
     offset += input_size;
-    buffer(span{in.data() + offset, input_size});
+    buffer(span{in.data() + offset, input_size}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(6, buffer.buffer_size());
     BOOST_CHECK_EQUAL(N, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(4 * input_size, buffer.size());
@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // everything gets read
     // nothing gets buffered
     offset += input_size;
-    buffer(span{in.data() + offset, input_size});
+    buffer(span{in.data() + offset, input_size}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(0, buffer.buffer_size());
     BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(5 * input_size, buffer.size());
@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // nothing gets read
     // input gets buffered (overflow mode)
     offset += input_size;
-    buffer(span{in.data() + offset, input_size});
+    buffer(span{in.data() + offset, input_size}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(4, buffer.buffer_size());
     BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
 }
@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
     
     for(size_t i{}; i < in.size(); ++i)
     {
-        buffer(std::span{in.data() + i, 1});
+        buffer(std::span{in.data() + i, 1}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto remainder{(i + 1) % 10};
         BOOST_CHECK_EQUAL(remainder, buffer.buffer_size());
         BOOST_CHECK_EQUAL(remainder ? 10 : 0, buffer.buffer_size_reqd());
@@ -170,7 +170,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_n_bytes)
     const size_t inc{11};
     for(size_t i{}; i < in.size(); i += inc)
     {
-        buffer(std::span{in.data() + i, inc});
+        buffer(std::span{in.data() + i, inc}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto remainder{(i + 1) % 10};
         BOOST_CHECK_EQUAL(remainder, buffer.buffer_size());
         BOOST_CHECK_EQUAL(buffer.buffer_size_reqd() ? 10 : 0, buffer.buffer_size_reqd());

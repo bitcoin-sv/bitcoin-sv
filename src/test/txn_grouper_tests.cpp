@@ -60,7 +60,7 @@ namespace
                 {
                     return false;
                 }
-                lastIndex = txn.mIndex;
+                lastIndex = txn.mIndex; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             }
         }
 
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
         vtx.push_back(CreateRandomTransaction({}));
     }
 
-    size_t oldGroupCount;
+    size_t oldGroupCount; // NOLINT(cppcoreguidelines-init-variables)
 
     {
         // Txn that spends 2 previous txns -> All 3 txns in group A
@@ -261,6 +261,7 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
             BOOST_CHECK(CheckTxnOrdering(groups));
         }
 
+        // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
         oldGroupCount = oldGroupCount - 2 + 1;
     }
 }
@@ -271,7 +272,7 @@ BOOST_AUTO_TEST_CASE(corner_cases)
     std::vector<CTransactionRef> vtx {};
     vtx.push_back(CreateRandomTransaction({}));
 
-    size_t oldGroupCount;
+    size_t oldGroupCount; // NOLINT(cppcoreguidelines-init-variables)
 
     {
         // Block contains duplicate transaction
@@ -312,6 +313,7 @@ BOOST_AUTO_TEST_CASE(corner_cases)
         // Check txn ordering
         BOOST_CHECK(CheckTxnOrdering(groups));
 
+        // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
         oldGroupCount = oldGroupCount + 1;
     }
 }

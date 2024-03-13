@@ -28,8 +28,8 @@ BOOST_AUTO_TEST_CASE(default_move)
     BOOST_CHECK_EQUAL(0, a.size());
 
     single_seg_parser b{std::move(a)};
-    BOOST_CHECK_EQUAL(0, a.size());
-    BOOST_CHECK_EQUAL(0, b.size());
+    BOOST_CHECK_EQUAL(0, a.size()); // NOLINT(bugprone-use-after-move)
+    BOOST_CHECK_EQUAL(0, b.size()); // NOLINT(cert-err58-cpp)
 }
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
@@ -79,7 +79,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_ptr)
     BOOST_CHECK_EQUAL(42, parser->size());
 }
 
-static const std::vector<uint8_t> large_txs = []
+static const std::vector<uint8_t> large_txs = [] // NOLINT(cert-err58-cpp)
 {
     std::vector<uint8_t> txs;
 

@@ -38,7 +38,7 @@ using mining::JournalingBlockAssembler;
 
 namespace
 {
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     
     class JournalingTestingSetup : public TestingSetup
     {
@@ -108,12 +108,12 @@ struct CBlockIndex::UnitTestAccess<miner_tests_uid>
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
 
-static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
+static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE); // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 
-static struct {
+static struct { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     uint8_t extranonce;
     uint32_t nonce;
-} blockinfo[] = {
+} blockinfo[] = { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     {4, 0xa4a3e223}, {2, 0x15c32f9e}, {1, 0x0375b547}, {1, 0x7004a8a5},
     {2, 0xce440296}, {2, 0x52cfe198}, {1, 0x77a72cd0}, {2, 0xbb5d6f84},
     {2, 0x83f30c2c}, {1, 0x48a73d5b}, {1, 0xef7dcd01}, {2, 0x6809c6c4},
@@ -181,7 +181,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // blocks :)
     int32_t baseheight = 0;
     std::vector<CTransactionRef> txFirst;
-    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
+    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) { // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         // pointer for convenience.
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
@@ -190,7 +190,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         CMutableTransaction txCoinbase(*pblock->vtx[0]);
         txCoinbase.nVersion = 1;
         txCoinbase.vin[0].scriptSig = CScript();
-        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
+        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
         // Ignore the (optional) segwit commitment added by CreateNewBlock (as
         // the hardcoded nonces don't account for this)
@@ -200,7 +200,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         if (txFirst.size() == 0) baseheight = chainActive.Height();
         if (txFirst.size() < 4) txFirst.push_back(pblock->vtx[0]);
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
-        pblock->nNonce = blockinfo[i].nonce;
+        pblock->nNonce = blockinfo[i].nonce; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         std::shared_ptr<const CBlock> shared_pblock =
             std::make_shared<const CBlock>(*pblock);
         BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr, CBlockSource::MakeLocal("test")));
@@ -328,10 +328,10 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.Clear();
 
     // Invalid (pre-p2sh) txn in mempool, template creation fails.
-    std::array<int64_t, CBlockIndex::nMedianTimeSpan> times;
+    std::array<int64_t, CBlockIndex::nMedianTimeSpan> times; // NOLINT(cppcoreguidelines-pro-type-member-init)
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
-        times[i] = chainActive.Tip()
+        times[i] = chainActive.Tip() // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
                        ->GetAncestor(chainActive.Tip()->GetHeight() - i)
                        ->GetBlockTime();
         TestAccessCBlockIndex::SetTime(
@@ -368,7 +368,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         // Restore the MedianTimePast.
         TestAccessCBlockIndex::SetTime(
             *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
-            times[i]);
+            times[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Double spend txn pair in mempool, template creation fails.
@@ -721,7 +721,7 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
         // the same value to get desired median past time.
         int32_t height = 0;
         uint256 prevHash;
-        do
+        do // NOLINT(cppcoreguidelines-avoid-do-while)
         {   
             CBlockHeader header;
             header.nTime = medianPastTime;
@@ -828,7 +828,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
 
     // We can't make transactions until we have inputs. Therefore, load 100 blocks
     std::vector<CTransactionRef> txFirst;
-    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
+    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) { // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         // pointer for convenience.
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
@@ -837,7 +837,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
         CMutableTransaction txCoinbase(*pblock->vtx[0]);
         txCoinbase.nVersion = 1;
         txCoinbase.vin[0].scriptSig = CScript();
-        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
+        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
         txCoinbase.vout.resize(1);
         txCoinbase.vout[0].scriptPubKey = CScript();
@@ -845,7 +845,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
         if (txFirst.size() < 4)
             txFirst.push_back(pblock->vtx[0]);
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
-        pblock->nNonce = blockinfo[i].nonce;
+        pblock->nNonce = blockinfo[i].nonce; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
         BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr, CBlockSource::MakeLocal("test")));
         pblock->hashPrevBlock = pblock->GetHash();

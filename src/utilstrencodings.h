@@ -124,6 +124,7 @@ void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = 
     writer.ReserveAdditional((itend - itbegin) * (fSpaces ? 3 : 2));
     for (T it = itbegin; it < itend; ++it)
     {
+        // NOLINTNEXTLINE(clang-analyzer-core.uninitialized.Assign)
         uint8_t val = uint8_t(*it);
         if (fSpaces && it != itbegin)
         {

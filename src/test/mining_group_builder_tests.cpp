@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(TestGroupTxn)
     BOOST_CHECK_NO_THROW(builder.RemoveGroup(groupID2));
     BOOST_CHECK_EQUAL(BuilderAccess::GetTxns(builder).size(), 1U);
     BOOST_CHECK_EQUAL(BuilderAccess::GetGroups(builder).size(), 1U);
-    BOOST_CHECK_THROW(auto group = builder.GetGroup(groupID2), std::runtime_error);
+    BOOST_CHECK_THROW(auto group = builder.GetGroup(groupID2), std::runtime_error); // NOLINT(performance-unnecessary-copy-initialization)
 }
 
 BOOST_AUTO_TEST_CASE(TestSelfishDetection)

@@ -38,9 +38,9 @@ namespace
         }
 
     private:
-        std::mutex& mMutex;
-        std::condition_variable& mProcessPublish;
-        std::optional<InvalidTxnInfo>& mReceived;
+        std::mutex& mMutex; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::condition_variable& mProcessPublish; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::optional<InvalidTxnInfo>& mReceived; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     CMutableTransaction MakeLargeTxn(
@@ -314,8 +314,8 @@ BOOST_AUTO_TEST_CASE(callback_throw_exception)
         }
 
     private:
-        std::condition_variable& mProcessPublish;
-        std::atomic_bool& mTriggered;
+        std::condition_variable& mProcessPublish; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::atomic_bool& mTriggered; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>> sinks;

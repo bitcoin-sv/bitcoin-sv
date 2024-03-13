@@ -187,7 +187,7 @@ BOOST_AUTO_TEST_CASE(bloom_match) {
 
     // and one which spends it
     // (e2769b09e784f32f62ef849763d4f45b98e07ba658647343b915ff832b110436)
-    uint8_t ch[] = {
+    uint8_t ch[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays)
         0x01, 0x00, 0x00, 0x00, 0x01, 0x6b, 0xff, 0x7f, 0xcd, 0x4f, 0x85, 0x65,
         0xef, 0x40, 0x6d, 0xd5, 0xd6, 0x3d, 0x4f, 0xf9, 0x4f, 0x31, 0x8f, 0xe8,
         0x20, 0x27, 0xfd, 0x4d, 0xc4, 0x51, 0xb0, 0x44, 0x74, 0x01, 0x9f, 0x74,
@@ -210,7 +210,7 @@ BOOST_AUTO_TEST_CASE(bloom_match) {
         0x00, 0x19, 0x76, 0xa9, 0x14, 0xc1, 0x09, 0x32, 0x48, 0x3f, 0xec, 0x93,
         0xed, 0x51, 0xf5, 0xfe, 0x95, 0xe7, 0x25, 0x59, 0xf2, 0xcc, 0x70, 0x43,
         0xf9, 0x88, 0xac, 0x00, 0x00, 0x00, 0x00, 0x00};
-    std::vector<uint8_t> vch(ch, ch + sizeof(ch) - 1);
+    std::vector<uint8_t> vch(ch, ch + sizeof(ch) - 1); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     CDataStream spendStream(vch, SER_DISK, CLIENT_VERSION);
     CTransaction spendingTx(deserialize, spendStream);
 
@@ -1100,14 +1100,14 @@ BOOST_AUTO_TEST_CASE(rolling_bloom) {
 
     // Overfill:
     static const int DATASIZE = 399;
-    std::vector<uint8_t> data[DATASIZE];
+    std::vector<uint8_t> data[DATASIZE]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < DATASIZE; i++) {
-        data[i] = RandomData();
-        rb1.insert(data[i]);
+        data[i] = RandomData(); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        rb1.insert(data[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
     // Last 100 guaranteed to be remembered:
     for (int i = 299; i < DATASIZE; i++) {
-        BOOST_CHECK(rb1.contains(data[i]));
+        BOOST_CHECK(rb1.contains(data[i])); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // false positive rate is 1%, so we should get about 100 hits if
@@ -1133,9 +1133,9 @@ BOOST_AUTO_TEST_CASE(rolling_bloom) {
     // Now roll through data, make sure last 100 entries
     // are always remembered:
     for (int i = 0; i < DATASIZE; i++) {
-        if (i >= 100) BOOST_CHECK(rb1.contains(data[i - 100]));
-        rb1.insert(data[i]);
-        BOOST_CHECK(rb1.contains(data[i]));
+        if (i >= 100) BOOST_CHECK(rb1.contains(data[i - 100])); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        rb1.insert(data[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        BOOST_CHECK(rb1.contains(data[i])); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Insert 999 more random entries:
@@ -1147,7 +1147,7 @@ BOOST_AUTO_TEST_CASE(rolling_bloom) {
     // Sanity check to make sure the filter isn't just filling up:
     nHits = 0;
     for (int i = 0; i < DATASIZE; i++) {
-        if (rb1.contains(data[i])) ++nHits;
+        if (rb1.contains(data[i])) ++nHits; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
     // Expect about 5 false positives, more than 100 means
     // something is definitely broken.
@@ -1158,11 +1158,11 @@ BOOST_AUTO_TEST_CASE(rolling_bloom) {
     // last-1000-entry, 0.01% false positive:
     CRollingBloomFilter rb2(1000, 0.001);
     for (int i = 0; i < DATASIZE; i++) {
-        rb2.insert(data[i]);
+        rb2.insert(data[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
     // ... room for all of them:
     for (int i = 0; i < DATASIZE; i++) {
-        BOOST_CHECK(rb2.contains(data[i]));
+        BOOST_CHECK(rb2.contains(data[i])); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     BOOST_CHECK_EXCEPTION(CRollingBloomFilter filter(3, 0.0), std::runtime_error,inValidConstructorParameterException);

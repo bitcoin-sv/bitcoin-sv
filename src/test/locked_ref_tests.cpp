@@ -25,7 +25,8 @@ BOOST_AUTO_TEST_CASE(ConstructUnique)
 
     // Move construction
     auto lptrCopy { std::move(lptr) };
-    BOOST_CHECK(lptr.get() == nullptr);
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
+    BOOST_CHECK(lptr.get() == nullptr); // NOLINT(bugprone-use-after-move)
     BOOST_CHECK(lptrCopy.get() != nullptr);
     BOOST_CHECK_EQUAL(*(lptrCopy.get()), 1);
 }

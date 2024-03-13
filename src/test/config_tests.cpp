@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
     std::string reason;
 
     uint64_t testBlockSize = LEGACY_MAX_BLOCK_SIZE + 1;
-    gArgs.ForceSetArg("-excessiveblocksize", to_string(testBlockSize));
+    gArgs.ForceSetArg("-excessiveblocksize", to_string(testBlockSize)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     BOOST_CHECK(testConfig.SetMaxBlockSize(testBlockSize, &reason));
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
 
@@ -312,25 +312,25 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     std::string err {};
 
     BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), DEFAULT_MIN_BLOCK_STALLING_RATE);
-    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(2 * DEFAULT_MIN_BLOCK_STALLING_RATE, &err));
+    BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(2 * DEFAULT_MIN_BLOCK_STALLING_RATE, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBlockStallingMinDownloadSpeed(), 2 * DEFAULT_MIN_BLOCK_STALLING_RATE);
     BOOST_CHECK(config.SetBlockStallingMinDownloadSpeed(0, &err));
     BOOST_CHECK(!config.SetBlockStallingMinDownloadSpeed(-1, &err));
 
     BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), DEFAULT_BLOCK_STALLING_TIMEOUT);
-    BOOST_CHECK(config.SetBlockStallingTimeout(2 * DEFAULT_BLOCK_STALLING_TIMEOUT, &err));
+    BOOST_CHECK(config.SetBlockStallingTimeout(2 * DEFAULT_BLOCK_STALLING_TIMEOUT, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBlockStallingTimeout(), 2 * DEFAULT_BLOCK_STALLING_TIMEOUT);
     BOOST_CHECK(!config.SetBlockStallingTimeout(0, &err));
     BOOST_CHECK(!config.SetBlockStallingTimeout(-1, &err));
 
     BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), DEFAULT_BLOCK_DOWNLOAD_WINDOW);
-    BOOST_CHECK(config.SetBlockDownloadWindow(2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW, &err));
+    BOOST_CHECK(config.SetBlockDownloadWindow(2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_WINDOW);
     BOOST_CHECK(!config.SetBlockDownloadWindow(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadWindow(-1, &err));
 
     BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW);
-    BOOST_CHECK(config.SetBlockDownloadLowerWindow(2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW, &err));
+    BOOST_CHECK(config.SetBlockDownloadLowerWindow(2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadLowerWindow(), 2 * DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW);
     BOOST_CHECK(!config.SetBlockDownloadLowerWindow(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadLowerWindow(-1, &err));
@@ -341,7 +341,7 @@ BOOST_AUTO_TEST_CASE(block_download_config)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadWindow(), config.GetBlockDownloadLowerWindow());
 
     BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
-    BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err));
+    BOOST_CHECK(config.SetBlockDownloadSlowFetchTimeout(2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBlockDownloadSlowFetchTimeout(), 2 * DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT);
     BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(0, &err));
     BOOST_CHECK(!config.SetBlockDownloadSlowFetchTimeout(-1, &err));
@@ -377,7 +377,7 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     std::string err {};
 
     BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
-    BOOST_CHECK(config.SetP2PHandshakeTimeout(2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL, &err));
+    BOOST_CHECK(config.SetP2PHandshakeTimeout(2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), 2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(0, &err));
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK_EQUAL(config.GetStreamSendRateLimit(), -1);
 
     BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), DEFAULT_BANSCORE_THRESHOLD);
-    BOOST_CHECK(config.SetBanScoreThreshold(2 * DEFAULT_BANSCORE_THRESHOLD, &err));
+    BOOST_CHECK(config.SetBanScoreThreshold(2 * DEFAULT_BANSCORE_THRESHOLD, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBanScoreThreshold(), 2 * DEFAULT_BANSCORE_THRESHOLD);
     BOOST_CHECK(!config.SetBanScoreThreshold(0, &err));
     BOOST_CHECK(!config.SetBanScoreThreshold(-1, &err));
@@ -422,13 +422,13 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK(! config.DoDropMessageTest());
 
     BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
-    BOOST_CHECK(config.SetInvalidChecksumInterval(2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS, &err));
+    BOOST_CHECK(config.SetInvalidChecksumInterval(2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetInvalidChecksumInterval(), 2 * DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
     BOOST_CHECK(config.SetInvalidChecksumInterval(0, &err));
     BOOST_CHECK(!config.SetInvalidChecksumInterval(-1, &err));
 
     BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-    BOOST_CHECK(config.SetInvalidChecksumFreq(2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY, &err));
+    BOOST_CHECK(config.SetInvalidChecksumFreq(2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetInvalidChecksumFreq(), 2 * DEFAULT_INVALID_CHECKSUM_FREQUENCY);
     BOOST_CHECK(config.SetInvalidChecksumFreq(0, &err));
     BOOST_CHECK(!config.SetInvalidChecksumFreq(-1, &err));
@@ -651,7 +651,7 @@ BOOST_AUTO_TEST_CASE(minerid_config)
     BOOST_CHECK(!config.SetMinerIdsNumToKeep(-1, &err));
 
     BOOST_CHECK_EQUAL(config.GetMinerIdReputationM(), MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M);
-    BOOST_CHECK(config.SetMinerIdReputationM(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err));
+    BOOST_CHECK(config.SetMinerIdReputationM(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetMinerIdReputationM(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M);
     BOOST_CHECK(config.SetMinerIdReputationM(config.GetMinerIdReputationN(), &err));
     BOOST_CHECK(!config.SetMinerIdReputationM(config.GetMinerIdReputationN() + 1, &err));
@@ -659,7 +659,7 @@ BOOST_AUTO_TEST_CASE(minerid_config)
     BOOST_CHECK(!config.SetMinerIdReputationM(-1, &err));
 
     BOOST_CHECK_EQUAL(config.GetMinerIdReputationN(), MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N);
-    BOOST_CHECK(config.SetMinerIdReputationN(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, &err));
+    BOOST_CHECK(config.SetMinerIdReputationN(2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetMinerIdReputationN(), 2 * MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N);
     BOOST_CHECK(config.SetMinerIdReputationN(1, &err));
     BOOST_CHECK(!config.SetMinerIdReputationN(-1, &err));
@@ -768,7 +768,7 @@ BOOST_AUTO_TEST_CASE(tx_validation)
     std::string err {};
 
     BOOST_CHECK_EQUAL(config.GetBlockValidationTxBatchSize(), DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE);
-    BOOST_CHECK(config.SetBlockValidationTxBatchSize(DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2, &err));
+    BOOST_CHECK(config.SetBlockValidationTxBatchSize(DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2, &err)); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(config.GetBlockValidationTxBatchSize(), DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE*2);
     BOOST_CHECK(! config.SetBlockValidationTxBatchSize(0, &err));
     BOOST_CHECK(! config.SetBlockValidationTxBatchSize(-1, &err));

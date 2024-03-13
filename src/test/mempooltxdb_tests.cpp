@@ -18,7 +18,7 @@
 
 
 namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr};
+    mining::CJournalChangeSetPtr nullChangeSet{nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany)
     {
@@ -473,7 +473,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
     // Remove all transactions from the database.
     for (auto& td : txdata)
     {
-        txdb.Remove(std::move(td));
+        txdb.Remove(std::move(td)); // NOLINT(performance-move-const-arg)
     }
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -544,7 +544,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
     std::mt19937 generator(insecure_rand());
 
     auto entries = GetABunchOfEntries(541);
-    const auto middle = entries.begin() + entries.size() / 2;
+    const auto middle = entries.begin() + entries.size() / 2; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -648,23 +648,27 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
         txParent.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txParent.vout[i].nValue = Amount(33000LL);
     }
-    CMutableTransaction txChild[3];
+    CMutableTransaction txChild[3]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 3; i++) {
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         txChild[i].vin.resize(1);
         txChild[i].vin[0].scriptSig = CScript() << OP_11;
         txChild[i].vin[0].prevout = COutPoint(txParent.GetId(), i);
         txChild[i].vout.resize(1);
         txChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txChild[i].vout[0].nValue = Amount(11000LL);
+        //NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
-    CMutableTransaction txGrandChild[3];
+    CMutableTransaction txGrandChild[3]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 3; i++) {
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         txGrandChild[i].vin.resize(1);
         txGrandChild[i].vin[0].scriptSig = CScript() << OP_11;
         txGrandChild[i].vin[0].prevout = COutPoint(txChild[i].GetId(), 0);
         txGrandChild[i].vout.resize(1);
         txGrandChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txGrandChild[i].vout[0].nValue = Amount(11000LL);
+        //NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     CTxMemPool testPool;
@@ -681,8 +685,8 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     // Add transactions:
     testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
-        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet); //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet); //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Saving transactions to disk doesn't change the mempool size:
@@ -765,7 +769,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     BOOST_CHECK_EQUAL(poolSize, count_entries);
 
     auto jba = mining::g_miningFactory->GetAssembler();
-    CBlockIndex* bla;
+    CBlockIndex* bla; // NOLINT(cppcoreguidelines-init-variables)
 
     // Get a block template
     auto template1 = jba->CreateNewBlock(CScript{}, bla);
@@ -850,7 +854,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     BOOST_CHECK_EQUAL(vtx1.size(), vtx2.size());
     // check that both blocks share all the memory used by transactions
     auto set1 = std::set<CTransactionRef>(vtx1.cbegin(), vtx1.cend());
-    for(auto tx: vtx2) {
+    for(auto tx: vtx2) { // NOLINT(performance-for-range-copy)
         auto erased = set1.erase(tx);
         BOOST_CHECK(erased == 1);
     }
@@ -910,7 +914,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 
 
 namespace {
-    CTransactionWrapperRef MakeTxWrapper(std::shared_ptr<CMempoolTxDBReader> txdb)
+    CTransactionWrapperRef MakeTxWrapper(std::shared_ptr<CMempoolTxDBReader> txdb) // NOLINT(performance-unnecessary-value-param)
     {
         const auto entries = GetABunchOfEntries(1);
         return std::make_shared<CTransactionWrapper>(entries[0].GetSharedTx(), txdb);
@@ -918,7 +922,7 @@ namespace {
 
     struct FakeMempoolTxDB : CMempoolTxDBReader
     {
-        virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override
+        virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override // NOLINT(cppcoreguidelines-explicit-virtual-functions)
         {
             if (const auto it = database.find(txid); it != database.end())
             {
@@ -931,7 +935,7 @@ namespace {
             return false;
         }
 
-        virtual bool TransactionExists(const uint256 &txid) override
+        virtual bool TransactionExists(const uint256 &txid) override // NOLINT(cppcoreguidelines-explicit-virtual-functions)
         {
             return database.count(txid) > 0;
         }

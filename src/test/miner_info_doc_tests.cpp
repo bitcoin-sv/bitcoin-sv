@@ -28,7 +28,7 @@ namespace
     };
 
     const vector<pair<string, json_value_type>>
-        required_fields{make_pair("version", json_value_type::string),
+        required_fields{make_pair("version", json_value_type::string), // NOLINT(cert-err58-cpp)
                         make_pair("height", json_value_type::number),
                         make_pair("minerId", json_value_type::string),
                         make_pair("prevMinerId", json_value_type::string),
@@ -39,12 +39,12 @@ namespace
                         make_pair("prevRevocationKeySig",
                                    json_value_type::string)};
     
-    const string version{"0.3"};
-    const string height{"1234"};
+    const string version{"0.3"}; // NOLINT(cert-err58-cpp)
+    const string height{"1234"}; // NOLINT(cert-err58-cpp)
     constexpr int h{1234};
-    const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()};
-    const string compressed_key_3{[]{ return string{"03"} + string(64, '0');}()};
-
+    const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()}; // NOLINT(cert-err58-cpp)
+    const string compressed_key_3{[]{ return string{"03"} + string(64, '0');}()}; // NOLINT(cert-err58-cpp)
+    // NOLINTBEGIN(cert-err58-cpp)
     const string miner_id{
         "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
     const string prev_miner_id{
@@ -103,23 +103,23 @@ namespace
                         []{
                             return refs;
                         }()};
-
-    const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig};
-    const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig};
+    // NOLINTEND(cert-err58-cpp)
+    const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig}; // NOLINT(cert-err58-cpp)
+    const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig}; // NOLINT(cert-err58-cpp)
     const vector<data_ref> data_refs;
-    const miner_info_doc mi_doc{miner_info_doc::v0_3,
+    const miner_info_doc mi_doc{miner_info_doc::v0_3, // NOLINT(cert-err58-cpp)
                                 h,
                                 mi_keys,
                                 rev_keys,
                                 data_refs};
 
-    const string sig_bad_0{[] {
+    const string sig_bad_0{[] { // NOLINT(cert-err58-cpp)
         string s{"304502"};
         s.insert(s.end(), 136, '0');
         return s;
     }()};
 
-    const string sig_bad_1{[] {
+    const string sig_bad_1{[] { // NOLINT(cert-err58-cpp)
         string s{"304502"};
         s.insert(s.end(), 136, '1');
         return s;
@@ -179,16 +179,16 @@ namespace
         else if(src.size() <= 0xffff)
         {
             dst.insert(dst.end(), OP_PUSHDATA2);
-            uint8_t data[2];
-            WriteLE16(data, src.size());
-            dst.insert(dst.end(), data, data + sizeof(data));
+            uint8_t data[2]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+            WriteLE16(data, src.size()); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            dst.insert(dst.end(), data, data + sizeof(data)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
         else
         {
             dst.insert(dst.end(), OP_PUSHDATA4);
-            uint8_t data[4];
-            WriteLE32(data, src.size());
-            dst.insert(dst.end(), data, data + sizeof(data));
+            uint8_t data[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+            WriteLE32(data, src.size()); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            dst.insert(dst.end(), data, data + sizeof(data)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
         dst.insert(dst.end(), src.begin(), src.end());
     }
@@ -706,7 +706,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1_key)
     const string doc = to_json(fields.cbegin(), fields.cend());
     const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_sig1_key,
-                      std::get<miner_info_error>(var_mi_doc));
+                      std::get<miner_info_error>(var_mi_doc)); // NOLINT(performance-unnecessary-copy-initialization)
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2)
@@ -786,7 +786,7 @@ BOOST_AUTO_TEST_CASE(revocation_message_equality)
     const revocation_msg a{cmp_miner_id_1, sig_bad_0, sig_bad_1};
     BOOST_CHECK_EQUAL(a, a);
     
-    const revocation_msg b{a};
+    const revocation_msg b{a}; // NOLINT(performance-unnecessary-copy-initialization)
     BOOST_CHECK_EQUAL(a, b);
     BOOST_CHECK_EQUAL(b, a);
 

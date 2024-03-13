@@ -12,7 +12,7 @@ bool HasCustomOption(std::string option)
 {
     const auto& argc = boost::unit_test::framework::master_test_suite().argc;
     const auto& argv = boost::unit_test::framework::master_test_suite().argv;
-    return std::any_of(argv, argv+argc, [&option](auto& arg) {return option == arg;});
+    return std::any_of(argv, argv+argc, [&option](auto& arg) {return option == arg;}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 struct EnableLoggingFixture {

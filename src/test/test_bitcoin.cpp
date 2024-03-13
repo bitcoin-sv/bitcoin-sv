@@ -46,17 +46,17 @@ using mining::CBlockTemplate;
 
 constexpr auto env_var_name = "TEST_BITCOIN_RANDOM_SEED";
 
-const uint256 insecure_rand_seed = []() {
+const uint256 insecure_rand_seed = []() { // NOLINT(cert-err58-cpp)
     auto env = std::getenv(env_var_name);
     auto hash = env ? uint256S(env) : GetRandHash();
     if (env) {
-        printf("Global random seed is set by environment: %s\n", hash.GetHex().c_str());
+        printf("Global random seed is set by environment: %s\n", hash.GetHex().c_str()); // NOLINT(cppcoreguidelines-pro-type-vararg)
     } else {
-        printf("To re-run tests using the same seed, set the following environment variable:\n export %s=%s\n", env_var_name, hash.GetHex().c_str());
+        printf("To re-run tests using the same seed, set the following environment variable:\n export %s=%s\n", env_var_name, hash.GetHex().c_str()); // NOLINT(cppcoreguidelines-pro-type-vararg)
     }
     return hash;
 }();
-FastRandomContext insecure_rand_ctx(insecure_rand_seed);
+FastRandomContext insecure_rand_ctx(insecure_rand_seed); // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 
 extern void noui_connect();
 
@@ -120,7 +120,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     RegisterAllRPCCommands(tableRPC);
     mempool.SetSanityCheck(1.0);
     InitFrozenTXO(DEFAULT_FROZEN_TXO_DB_CACHE);
-    pblocktree = new CBlockTreeDB(1 << 20, true);
+    pblocktree = new CBlockTreeDB(1 << 20, true); // NOLINT(cppcoreguidelines-owning-memory)
     pcoinsTip =
         std::make_unique<CoinsDB>(
             std::numeric_limits<size_t>::max(),
@@ -152,7 +152,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testConfig);
 }
 
-TestingSetup::~TestingSetup() {
+TestingSetup::~TestingSetup() { // NOLINT(bugprone-exception-escape)
     mining::g_miningFactory.reset();
     threadGroup.interrupt_all();
     threadGroup.join_all();
@@ -172,7 +172,7 @@ TestingSetup::~TestingSetup() {
 
     ShutdownScriptCheckQueues();
     UnregisterNodeSignals(GetNodeSignals());
-    delete pblocktree;
+    delete pblocktree; // NOLINT(cppcoreguidelines-owning-memory)
     pblocktree = nullptr;
     ShutdownFrozenTXO();
 }
@@ -236,20 +236,20 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx,
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
                                                CTxMemPool *pool) {
     return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, 
-                           nHeight, spendsCoinbase, lp);
+                           nHeight, spendsCoinbase, lp); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 }
 
 namespace {
 // A place to put misc. setup code eg "the travis workaround" that needs to run
 // at program startup and exit
-struct Init {
+struct Init { // NOLINT(cppcoreguidelines-special-member-functions)
     Init();
     ~Init();
 
     std::list<std::function<void(void)>> cleanup;
 };
 
-Init init;
+Init init; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 
 Init::Init() {
     if (getenv("TRAVIS_NOHANG_WORKAROUND")) {
@@ -259,7 +259,7 @@ Init::Init() {
         // The strategy here is to let the jobs finish however long they take
         // on Travis, by feeding Travis output.  We start a parallel thread
         // that just prints out '.' once per second.
-        struct Private {
+        struct Private { // NOLINT(cppcoreguidelines-owning-memory)
             Private() : stop(false) {}
             std::atomic_bool stop;
             std::thread thr;
@@ -278,7 +278,7 @@ Init::Init() {
                 }
                 if (!(++ctr % 79)) {
                     // newline once in a while to keep travis happy
-                    std::cerr << std::endl;
+                    std::cerr << std::endl; // NOLINT(performance-avoid-endl)
                 }
                 p->cond.wait_for(lock, std::chrono::milliseconds(1000));
             }
@@ -293,7 +293,7 @@ Init::Init() {
             if (p->thr.joinable()) {
                 p->thr.join();
             }
-            delete p;
+            delete p; // NOLINT(cppcoreguidelines-owning-memory)
         });
     }
 }

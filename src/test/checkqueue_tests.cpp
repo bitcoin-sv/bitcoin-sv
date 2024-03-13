@@ -37,8 +37,8 @@ namespace
 
             return true;
         }
-
-        void swap(CBlockingValidator& check)
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap)
+        void swap(CBlockingValidator& check) // NOLINT(performance-noexcept-swap)
         {
             std::atomic<bool>* tmp = mBlocking;
             mBlocking = check.mBlocking;
@@ -54,7 +54,8 @@ namespace
         {
             return true;
         }
-        void swap(CDummyValidator& check) {/**/}
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap)
+        void swap(CDummyValidator& check) {/**/} // NOLINT(performance-noexcept-swap)
     };
 
     struct CCancellingValidator
@@ -65,8 +66,8 @@ namespace
 
             return {};
         }
-
-        void swap(CCancellingValidator& check) {/**/}
+        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap)
+        void swap(CCancellingValidator& check) {/**/} // NOLINT(performance-noexcept-swap)
     };
 }
 
@@ -111,8 +112,8 @@ BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 
     for(size_t i=0; i<checksNumber; ++i)
     {
-        blocking[i] = true;
-        checks.emplace_back(blocking[i]);
+        blocking[i] = true; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        checks.emplace_back(blocking[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
     
     auto source = task::CCancellationSource::Make();

@@ -681,6 +681,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
             // Output 0 - small locking script
             CScript scr(OP_RETURN);
             CTxOut txo(Amount(123), scr);
+            // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
             script_small_size = txo.scriptPubKey.size(); // remember size of small script for later
             span.AddCoin(COutPoint(txId, 0), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
         }
@@ -690,6 +691,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
             CTxOut txo;
             txo.nValue = Amount(456);
             txo.scriptPubKey = CScript(std::vector<uint8_t>(1024*1024, 0xde));
+            // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
             script_big_size = txo.scriptPubKey.size(); // remember size of big script for later
             span.AddCoin(COutPoint(txId, 1), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false, false), false, 0); // UTXO is not coinbase
         }

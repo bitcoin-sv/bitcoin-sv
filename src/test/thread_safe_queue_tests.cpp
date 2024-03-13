@@ -20,20 +20,20 @@ struct CThreadSafeQueue<T>::UnitTestAccess
     
     static auto Count(const CThreadSafeQueue& q)
     {
-        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
         return q.theQueue.size();
     }
 
     static auto Size(const CThreadSafeQueue& q)
     { 
-        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
         return q.currentSize;
     }
 };
 
 BOOST_AUTO_TEST_SUITE(thread_safe_queue_tests)
 
-bool WaitFor(std::function<bool()> f)
+bool WaitFor(std::function<bool()> f) // NOLINT(performance-unnecessary-value-param)
 {
     for(int i = 0; i < 100; i++)
     {
@@ -97,7 +97,7 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     // adding 7 integers in queue of capacity of 5
     for(int i = 0; i < 7; i++)
     {
-        pushers.push_back(std::async(std::launch::async, 
+        pushers.push_back(std::async(std::launch::async, // NOLINT(performance-inefficient-vector-operation)
             [&theQueue, i](){ 
                 theQueue.PushWait(i);
             }));
@@ -271,7 +271,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
                 {
                     collectingQueue.PushWait(popped.value());
                 }
-            }, &ready[i]);
+            }, &ready[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         outs.push_back(std::move(f));
     }
 
@@ -388,7 +388,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
         values.insert(maybeInt.value());
     }
     // every number between 0 and (numThreads * entriesPerThread - 1) is in set
-    BOOST_CHECK(values.size() == numThreads * entriesPerThread);
+    BOOST_CHECK(values.size() == numThreads * entriesPerThread); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK(*values.rbegin() == numThreads * entriesPerThread - 1);
     
     BOOST_CHECK(get_Count(collectingQueue) == 0);

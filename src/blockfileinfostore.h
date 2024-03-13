@@ -69,6 +69,7 @@ public:
 
 
 /** Access to info about block files */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore;
 
 #endif // BLOCKFILEINFOSTORE_H

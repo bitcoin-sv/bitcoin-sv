@@ -24,7 +24,7 @@
 
 BOOST_FIXTURE_TEST_SUITE(compress_tests, BasicTestingSetup)
 
-static bool TestEncode(Amount in) {
+static bool TestEncode(Amount in) { // NOLINT(performance-unnecessary-value-param)
     return in == CTxOutCompressor::DecompressAmount(
                      CTxOutCompressor::CompressAmount(in));
 }
@@ -34,7 +34,7 @@ static bool TestDecode(uint64_t in) {
                      CTxOutCompressor::DecompressAmount(in));
 }
 
-static bool TestPair(Amount dec, uint64_t enc) {
+static bool TestPair(Amount dec, uint64_t enc) { // NOLINT(performance-unnecessary-value-param)
     return CTxOutCompressor::CompressAmount(dec) == enc &&
            CTxOutCompressor::DecompressAmount(enc) == dec;
 }

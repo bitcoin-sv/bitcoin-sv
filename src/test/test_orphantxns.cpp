@@ -13,15 +13,17 @@
 namespace {
 
     CService ip(uint32_t i) {
-        struct in_addr s;
+        struct in_addr s; // NOLINT(cppcoreguidelines-pro-type-member-init)
         s.s_addr = i;
         return CService(CNetAddr(s), Params().GetDefaultPort());
     }
     // Use a default configuration
+    // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
     size_t maxExtraTxnsForCompactBlock = COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
     size_t maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     size_t maxOrphanPercent = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
     size_t maxInputsOutputs = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
+    // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
     // Create txn inputs
     std::vector<CTxIn> CreateTxnInputs(size_t nNumOfInputs, uint256 txid=InsecureRand256()) {
@@ -65,10 +67,10 @@ namespace {
     TxInputDataSPtr CreateOrphanTxn(TxSource source,
                                     std::vector<CTxIn> vTxnInputs = CreateTxnInputs(1),
                                     std::vector<CTxOut> vTxnOutputs = CreateTxnOutputs(1),
-                                    std::shared_ptr<CNode> pNode=nullptr) {
+                                    std::shared_ptr<CNode> pNode=nullptr) { // NOLINT(performance-unnecessary-value-param)
         CMutableTransaction tx;
-        tx.vin = vTxnInputs;
-        tx.vout = vTxnOutputs;
+        tx.vin = vTxnInputs; // NOLINT(performance-unnecessary-value-param)
+        tx.vout = vTxnOutputs; // NOLINT(performance-unnecessary-value-param)
         // Return txn's input data
         return std::make_shared<CTxInputData>(
                    g_connman->GetTxIdTracker(),
@@ -137,7 +139,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
     size_t nTxnsNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase all txns
@@ -159,7 +161,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_size) {
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Test limit function: (each generated transaction is 86 bytes long)
@@ -190,7 +192,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
     size_t nTxnsNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
@@ -214,7 +216,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
     size_t nTxnsNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
@@ -244,7 +246,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
     size_t nNodesNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase txns from a node which is not connected (there are no orphan txns from this node)

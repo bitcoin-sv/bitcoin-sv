@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE(exception)
 
             // try reading from stream for max 5 seconds and in the meantime
             // exception from the other thread should be thrown
-            do
+            do // NOLINT(cppcoreguidelines-avoid-do-while)
             {
                 auto chunk = stream.Read(5);
 
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(known_size_input_async_reader)
         }
 
         std::chrono::time_point<std::chrono::steady_clock> mStart = std::chrono::steady_clock::now();
-        size_t& mSkipCount;
+        size_t& mSkipCount; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     std::vector<uint8_t> expectedSerializedData{

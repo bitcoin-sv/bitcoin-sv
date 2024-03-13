@@ -132,7 +132,7 @@ void TestAES128CBC(const std::string &hexkey, const std::string &hexiv,
 
     // Encrypt the plaintext and verify that it equals the cipher
     AES128CBCEncrypt enc(&key[0], &iv[0], pad);
-    int size = enc.Encrypt(&in[0], in.size(), &realout[0]);
+    int size = enc.Encrypt(&in[0], in.size(), &realout[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     realout.resize(size);
     BOOST_CHECK(realout.size() == correctout.size());
     BOOST_CHECK_MESSAGE(realout == correctout,
@@ -141,7 +141,7 @@ void TestAES128CBC(const std::string &hexkey, const std::string &hexiv,
     // Decrypt the cipher and verify that it equals the plaintext
     std::vector<uint8_t> decrypted(correctout.size());
     AES128CBCDecrypt dec(&key[0], &iv[0], pad);
-    size = dec.Decrypt(&correctout[0], correctout.size(), &decrypted[0]);
+    size = dec.Decrypt(&correctout[0], correctout.size(), &decrypted[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     decrypted.resize(size);
     BOOST_CHECK(decrypted.size() == in.size());
     BOOST_CHECK_MESSAGE(decrypted == in,
@@ -152,11 +152,11 @@ void TestAES128CBC(const std::string &hexkey, const std::string &hexiv,
     for (std::vector<uint8_t>::iterator i(in.begin()); i != in.end(); ++i) {
         std::vector<uint8_t> sub(i, in.end());
         std::vector<uint8_t> subout(sub.size() + AES_BLOCKSIZE);
-        int _size = enc.Encrypt(&sub[0], sub.size(), &subout[0]);
+        int _size = enc.Encrypt(&sub[0], sub.size(), &subout[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         if (_size != 0) {
             subout.resize(_size);
             std::vector<uint8_t> subdecrypted(subout.size());
-            _size = dec.Decrypt(&subout[0], subout.size(), &subdecrypted[0]);
+            _size = dec.Decrypt(&subout[0], subout.size(), &subdecrypted[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             subdecrypted.resize(_size);
             BOOST_CHECK(decrypted.size() == in.size());
             BOOST_CHECK_MESSAGE(subdecrypted == sub,
@@ -177,7 +177,7 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
 
     // Encrypt the plaintext and verify that it equals the cipher
     AES256CBCEncrypt enc(&key[0], &iv[0], pad);
-    int size = enc.Encrypt(&in[0], in.size(), &realout[0]);
+    int size = enc.Encrypt(&in[0], in.size(), &realout[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     realout.resize(size);
     BOOST_CHECK(realout.size() == correctout.size());
     BOOST_CHECK_MESSAGE(realout == correctout,
@@ -186,7 +186,7 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
     // Decrypt the cipher and verify that it equals the plaintext
     std::vector<uint8_t> decrypted(correctout.size());
     AES256CBCDecrypt dec(&key[0], &iv[0], pad);
-    size = dec.Decrypt(&correctout[0], correctout.size(), &decrypted[0]);
+    size = dec.Decrypt(&correctout[0], correctout.size(), &decrypted[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     decrypted.resize(size);
     BOOST_CHECK(decrypted.size() == in.size());
     BOOST_CHECK_MESSAGE(decrypted == in,
@@ -197,11 +197,11 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
     for (std::vector<uint8_t>::iterator i(in.begin()); i != in.end(); ++i) {
         std::vector<uint8_t> sub(i, in.end());
         std::vector<uint8_t> subout(sub.size() + AES_BLOCKSIZE);
-        int _size = enc.Encrypt(&sub[0], sub.size(), &subout[0]);
+        int _size = enc.Encrypt(&sub[0], sub.size(), &subout[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         if (_size != 0) {
             subout.resize(_size);
             std::vector<uint8_t> subdecrypted(subout.size());
-            _size = dec.Decrypt(&subout[0], subout.size(), &subdecrypted[0]);
+            _size = dec.Decrypt(&subout[0], subout.size(), &subdecrypted[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             subdecrypted.resize(_size);
             BOOST_CHECK(decrypted.size() == in.size());
             BOOST_CHECK_MESSAGE(subdecrypted == sub,
@@ -227,16 +227,18 @@ void TestChaCha20(const std::string &hexkey, uint64_t nonce, uint64_t seek,
 std::string LongTestString(void) {
     std::string ret;
     for (int i = 0; i < 200000; i++) {
+        // NOLINTBEGIN(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         ret += uint8_t(i);
         ret += uint8_t(i >> 4);
         ret += uint8_t(i >> 8);
         ret += uint8_t(i >> 12);
         ret += uint8_t(i >> 16);
+        // NOLINTEND(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     }
     return ret;
 }
 
-const std::string test1 = LongTestString();
+const std::string test1 = LongTestString(); // NOLINT(cert-err58-cpp)
 
 BOOST_AUTO_TEST_CASE(ripemd160_testvectors) {
     TestRIPEMD160("", "9c1185a5c5e9fc54612808977ee8f548b2258d31");
@@ -619,7 +621,7 @@ BOOST_AUTO_TEST_CASE(countbits_tests) {
         } else {
             for (uint64_t k = 0; k < 1000; k++) {
                 // Randomly test 1000 samples of each length above 10 bits.
-                uint64_t j = uint64_t(1) << (i - 1) | InsecureRandBits(i - 1);
+                uint64_t j = uint64_t(1) << (i - 1) | InsecureRandBits(i - 1); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                 BOOST_CHECK_EQUAL(CountBits(j), i);
             }
         }

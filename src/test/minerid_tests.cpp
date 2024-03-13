@@ -28,19 +28,19 @@ using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(minerid_tests, BasicTestingSetup)
 
-vector<uint8_t> protocolPrefix{0xac, 0x1e, 0xed, 0x88};
+vector<uint8_t> protocolPrefix{0xac, 0x1e, 0xed, 0x88}; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 
 template <typename O>
 void hash_sha256(const string_view msg, O o)
 {
     CSHA256()
-        .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size())
+        .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size()) // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         .Finalize(o);
 }
 
 bool sign(const string_view msg, const CKey& key, vector<uint8_t>& signature)
 {
-    array<uint8_t, CSHA256::OUTPUT_SIZE> hash;
+    array<uint8_t, CSHA256::OUTPUT_SIZE> hash; // NOLINT(cppcoreguidelines-pro-type-member-init)
     hash_sha256(msg, hash.data());
 
     return key.Sign(uint256(vector<uint8_t>{begin(hash), end(hash)}),

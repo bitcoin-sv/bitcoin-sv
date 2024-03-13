@@ -15,7 +15,7 @@
 using namespace std;
 using namespace bsv;
 
-static const std::vector<uint8_t> txs = []
+static const std::vector<uint8_t> txs = [] // NOLINT(cert-err58-cpp)
 {
     std::vector<uint8_t> txs;
 
@@ -154,7 +154,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // version
         const size_t n{bsv::version_len};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
@@ -167,7 +167,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // ip count 
         const size_t n{var_int_len_1};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1, bytes_reqd);
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 1 upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_1};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1 + bsv::seq_len, bytes_reqd);
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 1 post script len
         const size_t n{script_len_1 + bsv::seq_len};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1,
@@ -207,7 +207,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 2 upto script len  
         const size_t n{bsv::outpoint_len + var_int_len_3};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_2 + bsv::seq_len, bytes_reqd);
@@ -220,7 +220,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, input 2 post script len
         const size_t n{script_len_2 + bsv::seq_len};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd); // <- output count
@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, op_count
         const size_t n{var_int_len_1};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -246,7 +246,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, output 1 upto script len  
         const size_t n{bsv::value_len + var_int_len_1};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1, bytes_reqd);
@@ -259,7 +259,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, output 1 post script len
         const size_t n{script_len_1};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, output 2 all of it
         const size_t n{bsv::value_len + var_int_len_3 + script_len_2};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::locktime_len, bytes_reqd);
@@ -285,7 +285,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx1, locktime
         const size_t n{bsv::locktime_len};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
     {
         // tx2 
         const size_t n{tx2_len};
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(0, bytes_reqd);
@@ -347,7 +347,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_2_pass)
 
     constexpr size_t split_pos{20};
     const auto [bytes_read, bytes_reqd] = parser(std::span{txs.data(), split_pos});
-    parser(std::span{txs.data() + bytes_read, txs.size() - bytes_read});
+    parser(std::span{txs.data() + bytes_read, txs.size() - bytes_read}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     constexpr size_t exp_n_tx{3};
     BOOST_CHECK_EQUAL(exp_n_tx, parser.segment_count());
@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_as_reqd)
     size_t passes{};
     while(total_bytes_read < txs.size())
     {
-        std::span s{txs.data() + offset, n};
+        std::span s{txs.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)
@@ -402,7 +402,7 @@ BOOST_AUTO_TEST_CASE(parse_0_tx_count)
     BOOST_CHECK_EQUAL(1, p.first);
     BOOST_CHECK_EQUAL(0, p.second);
     
-    p = parser(span{v.data() + p.first, v.size() - p.first});
+    p = parser(span{v.data() + p.first, v.size() - p.first}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(0, p.first);
     BOOST_CHECK_EQUAL(0, p.second);
 }
@@ -466,7 +466,7 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
     size_t total_bytes_read{};
     for(size_t i{}; i < out.size(); ++i)
     {
-        total_bytes_read += read(parser, i, std::span{out.data() + i, 1});
+        total_bytes_read += read(parser, i, std::span{out.data() + i, 1}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     BOOST_CHECK_EQUAL(out.size(), total_bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(txs.cbegin(), txs.cend(),

@@ -44,7 +44,7 @@ BOOST_AUTO_TEST_CASE(move_construction)
     BOOST_CHECK_EQUAL(42, b[0]);
     
     // moved from object should still be useable
-    BOOST_CHECK(a.empty());
+    BOOST_CHECK(a.empty()); // NOLINT(bugprone-use-after-move)
     a.push_back(101);
     BOOST_CHECK_EQUAL(101, a[0]);
 }
@@ -62,7 +62,7 @@ BOOST_AUTO_TEST_CASE(move_assignment)
     BOOST_CHECK_EQUAL(1, b[0]);
     
     // moved from object should still be useable
-    BOOST_CHECK(a.empty());
+    BOOST_CHECK(a.empty()); // NOLINT(bugprone-use-after-move)
     a.push_back(101);
     BOOST_CHECK_EQUAL(101, a[0]);
 }

@@ -26,7 +26,7 @@ class CScriptNum10 {
      * cross-comparison.
      */
 public:
-    explicit CScriptNum10(const int64_t &n) { m_value = n; }
+    explicit CScriptNum10(const int64_t &n) { m_value = n; } // NOLINT(cppcoreguidelines-prefer-member-initializer)
 
     static const size_t nDefaultMaxNumSize = 4;
 
@@ -136,7 +136,7 @@ public:
             return std::numeric_limits<int>::max();
         else if (m_value < std::numeric_limits<int>::min())
             return std::numeric_limits<int>::min();
-        return m_value;
+        return m_value; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
     }
 
     std::vector<uint8_t> getvch() const { return serialize(m_value); }

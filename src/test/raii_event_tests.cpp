@@ -19,13 +19,13 @@
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
-
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 static std::map<void *, short> tags;
 static std::map<void *, uint16_t> orders;
 static uint16_t tagSequence = 0;
-
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 static void *tag_malloc(size_t sz) {
-    void *mem = malloc(sz);
+    void *mem = malloc(sz); // NOLINT(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
     if (!mem) return mem;
     tags[mem]++;
     orders[mem] = tagSequence++;
@@ -35,7 +35,7 @@ static void *tag_malloc(size_t sz) {
 static void tag_free(void *mem) {
     tags[mem]--;
     orders[mem] = tagSequence++;
-    free(mem);
+    free(mem); // NOLINT(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
 }
 
 BOOST_FIXTURE_TEST_SUITE(raii_event_tests, BasicTestingSetup)

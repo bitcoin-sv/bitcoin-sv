@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 
-extern CWallet *pwalletMain;
+extern CWallet *pwalletMain; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // how many times to run all the tests to have a chance to catch errors that
 // only show up with particular random shuffles
@@ -34,7 +34,7 @@ extern CWallet *pwalletMain;
 // many times and only complain if all iterations of the test fail.
 #define RANDOM_REPEATS 5
 
-std::vector<std::unique_ptr<CWalletTx>> wtxn;
+std::vector<std::unique_ptr<CWalletTx>> wtxn; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 typedef std::set<std::pair<const CWalletTx *, unsigned int>> CoinSet;
 
@@ -42,11 +42,11 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
 // Critical section is used to prevent concurrent execution of
 // tests in this fixture
-static CCriticalSection walletCriticalSection;
+static CCriticalSection walletCriticalSection; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 
-static std::vector<COutput> vCoins;
+static std::vector<COutput> vCoins; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-static void add_coin(const CWallet &wallet, const Amount nValue,
+static void add_coin(const CWallet &wallet, const Amount nValue, // NOLINT(performance-unnecessary-value-param)
                      int nAge = 6 * 24, bool fIsFromMe = false,
                      int nInput = 0) {
     static int nextLockTime = 0;
@@ -77,7 +77,7 @@ static void empty_wallet(void) {
     wtxn.clear();
 }
 
-static bool equal_sets(CoinSet a, CoinSet b) {
+static bool equal_sets(CoinSet a, CoinSet b) { // NOLINT(performance-unnecessary-value-param)
     std::pair<CoinSet::iterator, CoinSet::iterator> ret =
         mismatch(a.begin(), a.end(), b.begin());
     return ret.first == a.end() && ret.second == b.end();
@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests) {
             if (amt - Amount(2000) < MIN_CHANGE) {
                 // needs more than one input:
                 uint16_t returnSize = std::ceil(
-                    (2000.0 + MIN_CHANGE.GetSatoshis()) / amt.GetSatoshis());
+                    (2000.0 + MIN_CHANGE.GetSatoshis()) / amt.GetSatoshis()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
                 Amount returnValue = returnSize * amt;
                 BOOST_CHECK_EQUAL(nValueRet, returnValue);
                 BOOST_CHECK_EQUAL(setCoinsRet.size(), returnSize);

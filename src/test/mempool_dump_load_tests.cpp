@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr};
+    mining::CJournalChangeSetPtr nullChangeSet{nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany, bool expired=false)
     {
@@ -57,7 +57,7 @@ namespace {
         }
 
     private:
-        CTxMemPool& pool;
+        CTxMemPool& pool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
         TestMemPoolEntryHelper helper;
     };
 

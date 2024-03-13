@@ -11,11 +11,11 @@
 #include "net/netbase.h"
 #include "random.h"
 
-class CAddrManTest : public CAddrMan {
+class CAddrManTest : public CAddrMan { // NOLINT(cppcoreguidelines-virtual-class-destructor)
     uint64_t state;
 
 public:
-    CAddrManTest() { state = 1; }
+    CAddrManTest() { state = 1; } // NOLINT(cppcoreguidelines-prefer-member-initializer)
 
     //! Ensure that bucket placement is always the same for testing purposes.
     void MakeDeterministic() {
@@ -25,7 +25,8 @@ public:
 
     int RandomInt(int nMax) override {
         state = (CHashWriter(SER_GETHASH, 0) << state).GetHash().GetCheapHash();
-        return (unsigned int)(state % nMax);
+        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
+        return (unsigned int)(state % nMax); // NOLINT(bugprone-narrowing-conversions)
     }
 
     CAddrInfo *Find(const CNetAddr &addr, int *pnId = nullptr) {
@@ -47,7 +48,7 @@ static CNetAddr ResolveIP(const char *ip) {
     return addr;
 }
 
-static CNetAddr ResolveIP(std::string ip) {
+static CNetAddr ResolveIP(std::string ip) { // NOLINT(performance-unnecessary-value-param)
     return ResolveIP(ip.c_str());
 }
 
@@ -58,7 +59,7 @@ static CService ResolveService(const char *ip, int port = 0) {
     return serv;
 }
 
-static CService ResolveService(std::string ip, int port = 0) {
+static CService ResolveService(std::string ip, int port = 0) { // NOLINT(performance-unnecessary-value-param)
     return ResolveService(ip.c_str(), port);
 }
 
@@ -296,7 +297,7 @@ BOOST_AUTO_TEST_CASE(addrman_create) {
     CAddress addr1 = CAddress(ResolveService("250.1.2.1", 8333), NODE_NONE);
     CNetAddr source1 = ResolveIP("250.1.2.1");
 
-    int nId;
+    int nId; // NOLINT(cppcoreguidelines-init-variables)
     CAddrInfo *pinfo = addrman.Create(addr1, source1, &nId);
 
     // Test 20: The result should be the same as the input addr.
@@ -317,7 +318,7 @@ BOOST_AUTO_TEST_CASE(addrman_delete) {
     CAddress addr1 = CAddress(ResolveService("250.1.2.1", 8333), NODE_NONE);
     CNetAddr source1 = ResolveIP("250.1.2.1");
 
-    int nId;
+    int nId; // NOLINT(cppcoreguidelines-init-variables)
     addrman.Create(addr1, source1, &nId);
 
     // Test 21: Delete should actually delete the addr.
@@ -364,15 +365,17 @@ BOOST_AUTO_TEST_CASE(addrman_getaddr) {
     BOOST_CHECK(addrman.GetAddr().size() == 1);
 
     // Test 24: Ensure GetAddr works with new and tried addresses.
-    addrman.Good(CAddress(addr1, NODE_NONE));
-    addrman.Good(CAddress(addr2, NODE_NONE));
+    addrman.Good(CAddress(addr1, NODE_NONE)); // NOLINT(cppcoreguidelines-slicing)
+    addrman.Good(CAddress(addr2, NODE_NONE)); // NOLINT(cppcoreguidelines-slicing)
     BOOST_CHECK(addrman.GetAddr().size() == 1);
 
     // Test 25: Ensure GetAddr still returns 23% when addrman has many addrs.
     for (unsigned int i = 1; i < (8 * 256); i++) {
+        // NOLINTBEGIN(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         int octet1 = i % 256;
         int octet2 = (i / 256) % 256;
         int octet3 = (i / (256 * 2)) % 256;
+        // NOLINTEND(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         std::string strAddr = std::to_string(octet1) + "." +
                               std::to_string(octet2) + "." +
                               std::to_string(octet3) + ".23";
@@ -394,7 +397,7 @@ BOOST_AUTO_TEST_CASE(addrman_getaddr) {
     // Test 26: IsTerrible() is true for stale address > ADDRMAN_HORIZON_DAYS
     CAddress addr6 = CAddress(ResolveService("252.254.5.6", 8333), NODE_NONE);
     int64_t nNow = GetAdjustedTime();
-    addr6.nTime = nNow - (ADDRMAN_HORIZON_DAYS * 24 * 60 * 60) - 1;
+    addr6.nTime = nNow - (ADDRMAN_HORIZON_DAYS * 24 * 60 * 60) - 1; // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     addrman.Add(addr6, source1);
     CAddrInfo *info6 = addrman.Find(addr6);
     BOOST_ASSERT(info6->IsTerrible(nNow));

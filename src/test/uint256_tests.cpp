@@ -17,44 +17,44 @@
 
 BOOST_FIXTURE_TEST_SUITE(uint256_tests, BasicTestingSetup)
 
-const uint8_t R1Array[] =
+const uint8_t R1Array[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x9c\x52\x4a\xdb\xcf\x56\x11\x12\x2b\x29\x12\x5e\x5d\x35\xd2\xd2"
     "\x22\x81\xaa\xb5\x33\xf0\x08\x32\xd5\x56\xb1\xf9\xea\xe5\x1d\x7d";
-const char R1ArrayHex[] =
+const char R1ArrayHex[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "7D1DE5EAF9B156D53208F033B5AA8122D2d2355d5e12292b121156cfdb4a529c";
-const uint256 R1L = uint256(std::vector<uint8_t>(R1Array, R1Array + 32));
-const uint160 R1S = uint160(std::vector<uint8_t>(R1Array, R1Array + 20));
+const uint256 R1L = uint256(std::vector<uint8_t>(R1Array, R1Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
+const uint160 R1S = uint160(std::vector<uint8_t>(R1Array, R1Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
 
-const uint8_t R2Array[] =
+const uint8_t R2Array[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x70\x32\x1d\x7c\x47\xa5\x6b\x40\x26\x7e\x0a\xc3\xa6\x9c\xb6\xbf"
     "\x13\x30\x47\xa3\x19\x2d\xda\x71\x49\x13\x72\xf0\xb4\xca\x81\xd7";
-const uint256 R2L = uint256(std::vector<uint8_t>(R2Array, R2Array + 32));
-const uint160 R2S = uint160(std::vector<uint8_t>(R2Array, R2Array + 20));
+const uint256 R2L = uint256(std::vector<uint8_t>(R2Array, R2Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
+const uint160 R2S = uint160(std::vector<uint8_t>(R2Array, R2Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
 
-const uint8_t ZeroArray[] =
+const uint8_t ZeroArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-const uint256 ZeroL = uint256(std::vector<uint8_t>(ZeroArray, ZeroArray + 32));
-const uint160 ZeroS = uint160(std::vector<uint8_t>(ZeroArray, ZeroArray + 20));
+const uint256 ZeroL = uint256(std::vector<uint8_t>(ZeroArray, ZeroArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
+const uint160 ZeroS = uint160(std::vector<uint8_t>(ZeroArray, ZeroArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
 
-const uint8_t OneArray[] =
+const uint8_t OneArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-const uint256 OneL = uint256(std::vector<uint8_t>(OneArray, OneArray + 32));
-const uint160 OneS = uint160(std::vector<uint8_t>(OneArray, OneArray + 20));
+const uint256 OneL = uint256(std::vector<uint8_t>(OneArray, OneArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 OneS = uint160(std::vector<uint8_t>(OneArray, OneArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-const uint8_t MaxArray[] =
+const uint8_t MaxArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
     "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
-const uint256 MaxL = uint256(std::vector<uint8_t>(MaxArray, MaxArray + 32));
-const uint160 MaxS = uint160(std::vector<uint8_t>(MaxArray, MaxArray + 20));
+const uint256 MaxL = uint256(std::vector<uint8_t>(MaxArray, MaxArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 MaxS = uint160(std::vector<uint8_t>(MaxArray, MaxArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-std::string ArrayToString(const uint8_t A[], unsigned int width) {
+std::string ArrayToString(const uint8_t A[], unsigned int width) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     std::stringstream Stream;
     Stream << std::hex;
     for (unsigned int i = 0; i < width; ++i) {
         Stream << std::setw(2) << std::setfill('0')
-               << (unsigned int)A[width - i - 1];
+               << (unsigned int)A[width - i - 1]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     return Stream.str();
 }
@@ -63,6 +63,7 @@ std::string ArrayToString(const uint8_t A[], unsigned int width) {
 BOOST_AUTO_TEST_CASE(basics) {
     BOOST_CHECK(1 == 0 + 1);
     // constructor uint256(vector<char>):
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(R1L.ToString() == ArrayToString(R1Array, 32));
     BOOST_CHECK(R1S.ToString() == ArrayToString(R1Array, 20));
     BOOST_CHECK(R2L.ToString() == ArrayToString(R2Array, 32));
@@ -75,6 +76,7 @@ BOOST_AUTO_TEST_CASE(basics) {
     BOOST_CHECK(MaxS.ToString() == ArrayToString(MaxArray, 20));
     BOOST_CHECK(OneL.ToString() != ArrayToString(ZeroArray, 32));
     BOOST_CHECK(OneS.ToString() != ArrayToString(ZeroArray, 20));
+    // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
     // == and !=
     BOOST_CHECK(R1L != R2L && R1S != R2S);
@@ -91,7 +93,7 @@ BOOST_AUTO_TEST_CASE(basics) {
     BOOST_CHECK(uint256S(R1L.ToString()) == R1L);
     BOOST_CHECK(uint256S("   0x" + R1L.ToString() + "   ") == R1L);
     BOOST_CHECK(uint256S("") == ZeroL);
-    BOOST_CHECK(R1L == uint256S(R1ArrayHex));
+    BOOST_CHECK(R1L == uint256S(R1ArrayHex)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(uint256(R1L) == R1L);
     BOOST_CHECK(uint256(ZeroL) == ZeroL);
     BOOST_CHECK(uint256(OneL) == OneL);
@@ -104,7 +106,7 @@ BOOST_AUTO_TEST_CASE(basics) {
     BOOST_CHECK(uint160S(R1S.ToString()) == R1S);
     BOOST_CHECK(uint160S("   0x" + R1S.ToString() + "   ") == R1S);
     BOOST_CHECK(uint160S("") == ZeroS);
-    BOOST_CHECK(R1S == uint160S(R1ArrayHex));
+    BOOST_CHECK(R1S == uint160S(R1ArrayHex)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
     BOOST_CHECK(uint160(R1S) == R1S);
     BOOST_CHECK(uint160(ZeroS) == ZeroS);
@@ -116,7 +118,7 @@ BOOST_AUTO_TEST_CASE(comparison) {
     uint256 LastL;
     for (int i = 255; i >= 0; --i) {
         uint256 TmpL;
-        *(TmpL.begin() + (i >> 3)) |= 1 << (7 - (i & 7));
+        *(TmpL.begin() + (i >> 3)) |= 1 << (7 - (i & 7)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         BOOST_CHECK(LastL < TmpL);
         LastL = TmpL;
     }
@@ -131,7 +133,7 @@ BOOST_AUTO_TEST_CASE(comparison) {
     uint160 LastS;
     for (int i = 159; i >= 0; --i) {
         uint160 TmpS;
-        *(TmpS.begin() + (i >> 3)) |= 1 << (7 - (i & 7));
+        *(TmpS.begin() + (i >> 3)) |= 1 << (7 - (i & 7)); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         BOOST_CHECK(LastS < TmpS);
         LastS = TmpS;
     }
@@ -158,38 +160,42 @@ BOOST_AUTO_TEST_CASE(methods) {
     BOOST_CHECK(TmpL == uint256());
 
     TmpL.SetHex(R1L.ToString());
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(memcmp(R1L.begin(), R1Array, 32) == 0);
     BOOST_CHECK(memcmp(TmpL.begin(), R1Array, 32) == 0);
     BOOST_CHECK(memcmp(R2L.begin(), R2Array, 32) == 0);
     BOOST_CHECK(memcmp(ZeroL.begin(), ZeroArray, 32) == 0);
     BOOST_CHECK(memcmp(OneL.begin(), OneArray, 32) == 0);
+    // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(R1L.size() == sizeof(R1L));
     BOOST_CHECK(sizeof(R1L) == 32);
     BOOST_CHECK(R1L.size() == 32);
     BOOST_CHECK(R2L.size() == 32);
     BOOST_CHECK(ZeroL.size() == 32);
     BOOST_CHECK(MaxL.size() == 32);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK(R1L.begin() + 32 == R1L.end());
     BOOST_CHECK(R2L.begin() + 32 == R2L.end());
     BOOST_CHECK(OneL.begin() + 32 == OneL.end());
     BOOST_CHECK(MaxL.begin() + 32 == MaxL.end());
     BOOST_CHECK(TmpL.begin() + 32 == TmpL.end());
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK(GetSerializeSize(R1L, 0, PROTOCOL_VERSION) == 32);
     BOOST_CHECK(GetSerializeSize(ZeroL, 0, PROTOCOL_VERSION) == 32);
 
     CDataStream ss(0, PROTOCOL_VERSION);
     ss << R1L;
-    BOOST_CHECK(ss.str() == std::string(R1Array, R1Array + 32));
+    BOOST_CHECK(ss.str() == std::string(R1Array, R1Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     ss >> TmpL;
     BOOST_CHECK(R1L == TmpL);
     ss.clear();
     ss << ZeroL;
-    BOOST_CHECK(ss.str() == std::string(ZeroArray, ZeroArray + 32));
+    BOOST_CHECK(ss.str() == std::string(ZeroArray, ZeroArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     ss >> TmpL;
     BOOST_CHECK(ZeroL == TmpL);
     ss.clear();
     ss << MaxL;
-    BOOST_CHECK(ss.str() == std::string(MaxArray, MaxArray + 32));
+    BOOST_CHECK(ss.str() == std::string(MaxArray, MaxArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     ss >> TmpL;
     BOOST_CHECK(MaxL == TmpL);
     ss.clear();
@@ -206,37 +212,41 @@ BOOST_AUTO_TEST_CASE(methods) {
     BOOST_CHECK(TmpS == uint160());
 
     TmpS.SetHex(R1S.ToString());
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(memcmp(R1S.begin(), R1Array, 20) == 0);
     BOOST_CHECK(memcmp(TmpS.begin(), R1Array, 20) == 0);
     BOOST_CHECK(memcmp(R2S.begin(), R2Array, 20) == 0);
     BOOST_CHECK(memcmp(ZeroS.begin(), ZeroArray, 20) == 0);
     BOOST_CHECK(memcmp(OneS.begin(), OneArray, 20) == 0);
+    // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     BOOST_CHECK(R1S.size() == sizeof(R1S));
     BOOST_CHECK(sizeof(R1S) == 20);
     BOOST_CHECK(R1S.size() == 20);
     BOOST_CHECK(R2S.size() == 20);
     BOOST_CHECK(ZeroS.size() == 20);
     BOOST_CHECK(MaxS.size() == 20);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK(R1S.begin() + 20 == R1S.end());
     BOOST_CHECK(R2S.begin() + 20 == R2S.end());
     BOOST_CHECK(OneS.begin() + 20 == OneS.end());
     BOOST_CHECK(MaxS.begin() + 20 == MaxS.end());
     BOOST_CHECK(TmpS.begin() + 20 == TmpS.end());
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK(GetSerializeSize(R1S, 0, PROTOCOL_VERSION) == 20);
     BOOST_CHECK(GetSerializeSize(ZeroS, 0, PROTOCOL_VERSION) == 20);
 
     ss << R1S;
-    BOOST_CHECK(ss.str() == std::string(R1Array, R1Array + 20));
+    BOOST_CHECK(ss.str() == std::string(R1Array, R1Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     ss >> TmpS;
     BOOST_CHECK(R1S == TmpS);
     ss.clear();
     ss << ZeroS;
-    BOOST_CHECK(ss.str() == std::string(ZeroArray, ZeroArray + 20));
+    BOOST_CHECK(ss.str() == std::string(ZeroArray, ZeroArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     ss >> TmpS;
     BOOST_CHECK(ZeroS == TmpS);
     ss.clear();
     ss << MaxS;
-    BOOST_CHECK(ss.str() == std::string(MaxArray, MaxArray + 20));
+    BOOST_CHECK(ss.str() == std::string(MaxArray, MaxArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
     ss >> TmpS;
     BOOST_CHECK(MaxS == TmpS);
     ss.clear();

@@ -86,7 +86,7 @@ namespace
         index.SetDiskBlockData(block.vtx.size(), blockPos, metaData, CBlockSource::MakeUnknown(), notifyDirty);
     }
 
-    struct CScopeSetupTeardown
+    struct CScopeSetupTeardown // NOLINT(cppcoreguidelines-special-member-functions)
     {
         CScopeSetupTeardown(const std::string& testName)
             : path{boost::filesystem::current_path() / "tmp_data" / testName}
@@ -206,7 +206,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
         auto runStart = std::chrono::steady_clock::now();
         bool deleted = false;
 
-        do
+        do // NOLINT(cppcoreguidelines-avoid-do-while)
         {
             using namespace std::chrono_literals;
 
@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
             serializedData.insert(
                 serializedData.end(),
-                chunk.Begin(), chunk.Begin() + chunk.Size());
+                chunk.Begin(), chunk.Begin() + chunk.Size()); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
         while(!data.stream->EndOfStream());
     }

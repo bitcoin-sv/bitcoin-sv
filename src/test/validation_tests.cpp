@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
         fp = outs.release();
     }
 
-    fseek(fp.get(), 0, SEEK_SET);
+    fseek(fp.get(), 0, SEEK_SET); // NOLINT(cert-err33-c)
     BOOST_CHECK_NO_THROW({ LoadExternalBlockFile(config, std::move(fp), 0); });
 }
 

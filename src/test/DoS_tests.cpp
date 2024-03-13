@@ -24,11 +24,11 @@
 
 namespace {
     CService ip(uint32_t i) {
-        struct in_addr s;
+        struct in_addr s; // NOLINT(cppcoreguidelines-pro-type-member-init)
         s.s_addr = i;
         return CService(CNetAddr(s), Params().GetDefaultPort());
     }
-    NodeId id = 0;
+    NodeId id = 0; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
@@ -160,10 +160,10 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
     SendMessages(config, dummyNode, *connman, interruptDummy);
     BOOST_CHECK(connman->IsBanned(addr));
 
-    SetMockTime(nStartTime + 60 * 60);
+    SetMockTime(nStartTime + 60 * 60); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK(connman->IsBanned(addr));
 
-    SetMockTime(nStartTime + 60 * 60 * 24 + 1);
+    SetMockTime(nStartTime + 60 * 60 * 24 + 1); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK(!connman->IsBanned(addr));
 }
 

@@ -26,7 +26,7 @@ using namespace bsv;
 constexpr auto type{1};
 constexpr auto version{2};
 
-static auto make_msg_header{[](const string& cmd)
+static auto make_msg_header{[](const string& cmd) // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 {
     assert(cmd.size() <= cmd_len);
 
@@ -41,7 +41,7 @@ static auto make_msg_header{[](const string& cmd)
     return v;
 }};
 
-static std::vector<uint8_t> block_msg_payload{[]
+static std::vector<uint8_t> block_msg_payload{[] // NOLINT(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
 {
     std::vector<uint8_t> v;
 

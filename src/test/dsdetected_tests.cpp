@@ -70,7 +70,7 @@ namespace
         std::vector<MerkleProof::Node> nodes{};
         for(const auto& node : treeProof.merkleTreeHashes)
         {
-            nodes.push_back(MerkleProof::Node{node});
+            nodes.push_back(MerkleProof::Node{node}); // NOLINT(performance-inefficient-vector-operation)
         }
 
         return {txn, 1, checkRoot, nodes};

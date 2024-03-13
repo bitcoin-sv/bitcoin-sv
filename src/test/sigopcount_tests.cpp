@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
 BOOST_AUTO_TEST_CASE(GetSigOpCount) {
     // Test CScript::GetSigOpCount()
 
-    bool sigOpCountError;
+    bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
     CScript s1;
     BOOST_CHECK_EQUAL(s1.GetSigOpCount(false, false, sigOpCountError), 0U);
     BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, false, sigOpCountError), 0U);
@@ -133,10 +133,10 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
     // Test policy after Genesis
     testConfig.Reset();
     CScript s4;
-    s4 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig - 1 << OP_CHECKMULTISIG;
+    s4 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig - 1 << OP_CHECKMULTISIG; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
     BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig - 1);
     CScript s5;
-    s5 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig + 1 << OP_CHECKMULTISIG;
+    s5 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig + 1 << OP_CHECKMULTISIG; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
     BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig + 1);
 
     // Test default policy before Genesis with fAccurate == true
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
  */
 ScriptError VerifyWithFlag(const CTransaction &output,
                            const CMutableTransaction &input, int flags) {
-    ScriptError error;
+    ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
     const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
     auto ret =
@@ -275,7 +275,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
     int flags = SCRIPT_VERIFY_P2SH;
     
     uint64_t genesisHeight = 10;
-    testConfig.SetGenesisActivationHeight(genesisHeight);
+    testConfig.SetGenesisActivationHeight(genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
     
 
     // Multisig script (legacy counting)
@@ -285,12 +285,12 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
                                          << OP_CHECKMULTISIGVERIFY;
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << OP_0;
-
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         for(int nHeight : {genesisHeight-1, genesisHeight}){ // test before and after genesis (should be the same)
             BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, nHeight);
             
             bool genesisEnabled =  IsGenesisEnabled(testConfig, nHeight);
-            bool sigOpCountError;
+            bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
 
             // Legacy counting only includes signature operations in scriptSigs and
             // scriptPubKeys of a transaction and does not take the actual executed
@@ -327,16 +327,16 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         CScript scriptSig = CScript()
                             << OP_0 << OP_0 << ToByteVector(redeemScript);
         { // testing before genesis
-            bool sigOpCountError;
-            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight-1);
+            bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight-1); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
                                             true, false, sigOpCountError) == 2);
             BOOST_REQUIRE(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
                     SCRIPT_ERR_CHECKMULTISIGVERIFY);
         }
         { // testing after genesis
-            bool sigOpCountError;
-            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
+            bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
                                             true, true, sigOpCountError) == 0);
             BOOST_REQUIRE(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
@@ -357,9 +357,9 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << signature;
 
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
-        bool sigOpCountError;
+        bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
 
         // Legacy counting only includes signature operations in scriptSigs and
         // scriptPubKeys of a transaction and does not take the actual executed
@@ -383,8 +383,8 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
             << OP_CHECKMULTISIGVERIFY;
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
-        bool sigOpCountError;
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
+        bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, true, sigOpCountError) == 0);
         BOOST_CHECK(sigOpCountError == true);
     }
@@ -396,8 +396,8 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
             << OP_CHECKMULTISIGVERIFY;
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
-        bool sigOpCountError;
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
+        bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, true, sigOpCountError) == 0);
         BOOST_CHECK(sigOpCountError == true);
 

@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status =
@@ -206,7 +206,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(config, true, source->GetToken(), stack, script, flags,
@@ -283,7 +283,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(config, true, source->GetToken(), stack, script, flags,
@@ -340,7 +340,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(config, true, source->GetToken(), stack, script, flags,
@@ -354,7 +354,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         {
             BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, error);
             BOOST_CHECK_EQUAL(1U, stack.size());
-            auto frame = stack.front();
+            auto frame = stack.front(); // NOLINT(performance-unnecessary-copy-initialization)
             auto actual =
                 frame.empty()
                     ? bint{0}
@@ -454,7 +454,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         CScript script = CScript() << arg0 << arg1 << op_code;
 
         const auto flags{ SCRIPT_UTXO_AFTER_GENESIS };
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(config, false, source->GetToken(), stack, script, flags,
@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         const auto status = EvalScript(
             config, false, task::CCancellationSource::Make()->GetToken(), stack,
             script, flags, BaseSignatureChecker{}, &error);
@@ -572,12 +572,12 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         const auto status = EvalScript(
             config, false, task::CCancellationSource::Make()->GetToken(), stack,
             script, flags, BaseSignatureChecker{}, &error);
 
-        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_status, status.value()); // NOLINT(bugprone-unchecked-optional-access)
         BOOST_CHECK_EQUAL(exp_error, error);
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
                                       end(op));
@@ -601,7 +601,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         const auto status = EvalScript(config, true, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
@@ -609,7 +609,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(i + 1, stack.size());
         vector<uint8_t> op;
-        bsv::serialize<int>(i, back_inserter(op));
+        bsv::serialize<int>(i, back_inserter(op)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(i)), end(stack.at(i)), begin(op),
                                       end(op));
     }
@@ -645,7 +645,7 @@ BOOST_AUTO_TEST_CASE(op_size)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -684,7 +684,7 @@ BOOST_AUTO_TEST_CASE(op_pick)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -723,7 +723,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -784,7 +784,7 @@ BOOST_AUTO_TEST_CASE(op_split)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -835,7 +835,7 @@ BOOST_AUTO_TEST_CASE(op_lshift)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -884,7 +884,7 @@ BOOST_AUTO_TEST_CASE(op_rshift)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -907,7 +907,7 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     const auto r =
         EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
                    CScript() << INT32_MAX << OP_RSHIFT, flags,
@@ -931,7 +931,7 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
+    ScriptError err; // NOLINT(cppcoreguidelines-init-variables)
     const auto r =
         EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
                    CScript() << INT32_MAX << OP_LSHIFT, flags,
@@ -949,7 +949,7 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
 namespace
 {
     const vector<uint8_t> failure = {};
-    const vector<uint8_t> success = {1};
+    const vector<uint8_t> success = {1}; // NOLINT(cert-err58-cpp)
 
     struct equality_checker : BaseSignatureChecker
     {
@@ -993,7 +993,7 @@ BOOST_AUTO_TEST_CASE(op_checksig)
         const CScript script(args.begin(), args.end());
 
         uint32_t flags{};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const equality_checker checker;
         const auto status = EvalScript(
@@ -1067,7 +1067,7 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
         const CScript script(args.begin(), args.end());
 
         uint32_t flags{};
-        ScriptError error;
+        ScriptError error; // NOLINT(cppcoreguidelines-init-variables)
         LimitedStack stack(UINT32_MAX);
         const equality_checker checker;
         const auto status = EvalScript(

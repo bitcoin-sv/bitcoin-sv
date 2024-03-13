@@ -15,7 +15,7 @@ namespace
     class protocol_tests_id;
 
     // Null header mutating function
-    auto NullHdrMutate = [](CMessageHeader&){};
+    auto NullHdrMutate = [](CMessageHeader&){}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     using HdrMutator = std::function<void(CMessageHeader&)>;
 
     // Serialise a net message with its header
@@ -31,7 +31,7 @@ namespace
         while(!payloadStream->EndOfStream())
         {      
             const CSpan& data { payloadStream->ReadAsync(msg.Size()) };
-            serialisedMsg.write(reinterpret_cast<const char*>(data.Begin()), data.Size());
+            serialisedMsg.write(reinterpret_cast<const char*>(data.Begin()), data.Size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         }
 
         return serialisedMsg;
@@ -46,7 +46,7 @@ struct CMessageHeader::UnitTestAccess<protocol_tests_id>
     template <typename... Args>
     static CMessageHeader Make(Args&&... args)
     {
-        return CMessageHeader { std::forward<Args>(args)... };
+        return CMessageHeader { std::forward<Args>(args)... }; // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     }
 
     // Get modifiable reference to command
@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(zero.IsOversized(config), false);
 
     // test with inv message with 10 tx
-    CMessageHeader inv10 { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::INV, (1UL+10*(4+32)), uint256{}) };
+    CMessageHeader inv10 { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::INV, (1UL+10*(4+32)), uint256{}) }; // NOLINT(bugprone-implicit-widening-of-multiplication-result)
     BOOST_CHECK_EQUAL(inv10.IsValid(config), true);
     BOOST_CHECK_EQUAL(inv10.IsOversized(config), false);
 
@@ -287,7 +287,7 @@ BOOST_AUTO_TEST_CASE(net_messages)
         {
             uint64_t maxToRead { std::min<uint64_t>(bytesToRead, serialisedMsg.size()) };
             uint64_t numRead { netMsg.Read(config, serialisedMsg.data(), maxToRead) };
-            serialisedMsg.erase(serialisedMsg.begin(), serialisedMsg.begin() + numRead);
+            serialisedMsg.erase(serialisedMsg.begin(), serialisedMsg.begin() + numRead); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             totRead += numRead;
         }
         BOOST_CHECK(netMsg.Complete());

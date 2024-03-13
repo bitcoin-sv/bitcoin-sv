@@ -838,7 +838,7 @@ BOOST_AUTO_TEST_CASE(http_responses)
 
         rpc::client::BinaryHTTPResponse response {};
         BOOST_CHECK(response.IsEmpty());
-        response.SetBody(reinterpret_cast<const unsigned char*>(ss.data()), ss.size());
+        response.SetBody(reinterpret_cast<const unsigned char*>(ss.data()), ss.size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         BOOST_CHECK(! response.IsEmpty());
 
         uint256 deserialised {};
@@ -852,7 +852,7 @@ BOOST_AUTO_TEST_CASE(http_responses)
         BOOST_CHECK(response.IsEmpty());
 
         std::string body { "Some string response" };
-        response.SetBody(reinterpret_cast<const unsigned char*>(body.c_str()), body.size());
+        response.SetBody(reinterpret_cast<const unsigned char*>(body.c_str()), body.size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         BOOST_CHECK(! response.IsEmpty());
         BOOST_CHECK_EQUAL(body, response.GetBody());
     }
@@ -863,7 +863,7 @@ BOOST_AUTO_TEST_CASE(http_responses)
         BOOST_CHECK(response.IsEmpty());
 
         std::string body { "{ \"field1\": \"value1\", \"field2\": \"value2\" }" };
-        response.SetBody(reinterpret_cast<const unsigned char*>(body.c_str()), body.size());
+        response.SetBody(reinterpret_cast<const unsigned char*>(body.c_str()), body.size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         BOOST_CHECK(! response.IsEmpty());
 
         UniValue jsonval { response.GetBody() };

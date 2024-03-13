@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE(byte_by_byte)
     fixed_len_parser parser{arbitary_len};
     for(size_t i{}; i < arbitary_len; ++i)
     {
-        const std::span s{msg.data() + i, 1};
+        const std::span s{msg.data() + i, 1}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(1, bytes_read);
         BOOST_CHECK_EQUAL(arbitary_len - i - 1, bytes_reqd);

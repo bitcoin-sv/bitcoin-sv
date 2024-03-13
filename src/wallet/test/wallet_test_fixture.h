@@ -10,7 +10,7 @@
 /**
  * Testing setup and teardown for wallet.
  */
-struct WalletTestingSetup : public TestingSetup {
+struct WalletTestingSetup : public TestingSetup { // NOLINT(cppcoreguidelines-special-member-functions)
     WalletTestingSetup(const std::string &chainName = CBaseChainParams::MAIN);
     ~WalletTestingSetup();
 };

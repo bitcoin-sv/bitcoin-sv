@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(read_header_only_msg)
 
     // Write the payload
     bytes_read = msg.Read(GlobalConfig::GetConfig(), 
-                          ip.data() + bytes_read,
+                          ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
     BOOST_CHECK_EQUAL(0, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
@@ -103,14 +103,14 @@ BOOST_AUTO_TEST_CASE(read_ping_msg)
     BOOST_CHECK_EQUAL(8, hdr.GetPayloadLength());
 
     // Write the payload
-    bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data() + bytes_read,
+    bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
     BOOST_CHECK_EQUAL(8, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 
     // Read payload
     msg_buffer& msg_buff = msg.GetData();
-    uint64_t nonce;
+    uint64_t nonce; // NOLINT(cppcoreguidelines-init-variables)
     msg_buff >> nonce; 
     BOOST_CHECK_EQUAL(42, nonce);
 }
@@ -151,7 +151,7 @@ BOOST_AUTO_TEST_CASE(read_extmsg_msg)
     BOOST_CHECK_EQUAL(false, msg.Complete());
    
     // Read the extended header
-    bytes_read += msg.Read(config, ip.data() + bytes_read, ip.size() - bytes_read);
+    bytes_read += msg.Read(config, ip.data() + bytes_read, ip.size() - bytes_read); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(bsv::ext_msg_header_len, bytes_read);
     BOOST_CHECK_EQUAL(false, msg.Complete());
 
@@ -162,14 +162,14 @@ BOOST_AUTO_TEST_CASE(read_extmsg_msg)
 
     // Read the payload
     bytes_read = msg.Read(config, 
-                          ip.data() + bytes_read,
+                          ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
     BOOST_CHECK_EQUAL(8, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 
     // Read payload
     msg_buffer& msg_buff = msg.GetData();
-    uint64_t nonce;
+    uint64_t nonce; // NOLINT(cppcoreguidelines-init-variables)
     msg_buff >> nonce; 
     BOOST_CHECK_EQUAL(42, nonce);
 }
@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(read_block_msg)
     BOOST_CHECK_EQUAL(payload_len, hdr.GetPayloadLength());
     
     // Write payload
-    bytes_read = msg.Read(config, ip.data() + bytes_read, ip.size() - bytes_read);
+    bytes_read = msg.Read(config, ip.data() + bytes_read, ip.size() - bytes_read); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     BOOST_CHECK_EQUAL(payload_len, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
    
@@ -280,7 +280,7 @@ BOOST_AUTO_TEST_CASE(block_msg_with_superflous_data)
     BOOST_CHECK_EQUAL(82, hdr.GetPayloadLength());
 
     // Write the payload
-    bytes_read = msg.Read(config, ip.data() + bytes_read,
+    bytes_read = msg.Read(config, ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
     BOOST_CHECK_EQUAL(82, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());

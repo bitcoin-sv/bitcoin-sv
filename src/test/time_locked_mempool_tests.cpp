@@ -65,7 +65,7 @@ namespace MempoolTesting
         }
 
       private:
-        CTimeLockedMempool& mMempool;
+        CTimeLockedMempool& mMempool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 }
 

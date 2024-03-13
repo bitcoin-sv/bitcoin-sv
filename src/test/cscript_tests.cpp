@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(GetOp2)
     {
         const CScript script(begin(ip), end(ip));
         auto it{script.begin()};
-        opcodetype opcode;
+        opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
         vector<uint8_t> v;
         const auto s = script.GetOp2(it, opcode, &v);
         BOOST_CHECK_EQUAL(exp_status, s);
@@ -67,12 +67,12 @@ BOOST_AUTO_TEST_CASE(GetOp2)
 
 BOOST_AUTO_TEST_CASE(OpCount_tests)
 {
-    uint8_t a[] = {OP_1, OP_2, OP_2};
+    uint8_t a[] = {OP_1, OP_2, OP_2}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     BOOST_CHECK_EQUAL(0U, CountOp(a, OP_0));
     BOOST_CHECK_EQUAL(1U, CountOp(a, OP_1));
     BOOST_CHECK_EQUAL(2U, CountOp(a, OP_2));
 
-    array<uint8_t, 3> arr;
+    array<uint8_t, 3> arr; // NOLINT(cppcoreguidelines-pro-type-member-init)
     copy(begin(a), end(a), begin(arr));
     BOOST_CHECK_EQUAL(0U, CountOp(arr, OP_0));
     BOOST_CHECK_EQUAL(1U, CountOp(arr, OP_1));

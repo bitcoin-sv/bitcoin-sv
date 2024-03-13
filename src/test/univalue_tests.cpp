@@ -279,8 +279,8 @@ BOOST_AUTO_TEST_CASE(univalue_object) {
     BOOST_CHECK_EQUAL(obj.size(), 0U);
 }
 
-static const char *json1 = "[1.10000000,{\"key1\":\"str\\u0000\",\"key2\":800,\"key3\":{\"name\":\"martian http://test.com\"}}]";
-
+static const char *json1 = "[1.10000000,{\"key1\":\"str\\u0000\",\"key2\":800,\"key3\":{\"name\":\"martian http://test.com\"}}]"; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static const char* json2 ="[1.10000000,{\"key1\":\"str\\u0000\",\"key2\":800, \
 		\"key3\":{\"name\":\"martian http://test.com\",\"key31\": \
           			{\"key311\":{\"key3111\":{\"key31111\":{\"deepkey\":\"deepvalue\"}}}}}}]";

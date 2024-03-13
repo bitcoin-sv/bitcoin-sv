@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(block)
         block.vtx.size());
 
     size_t itemCounter = 0;
-    do
+    do // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         // read transaction for counting but ignore the result as we are not
         // interested in the content

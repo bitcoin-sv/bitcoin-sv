@@ -35,7 +35,7 @@ namespace
 
 BOOST_FIXTURE_TEST_SUITE(serialize_tests, BasicTestingSetup)
 
-class CSerializeMethodsTestSingle {
+class CSerializeMethodsTestSingle { // NOLINT(cppcoreguidelines-pro-type-member-init)
 protected:
     int intval;
     bool boolval;
@@ -44,10 +44,10 @@ protected:
     CTransactionRef txval;
 
 public:
-    CSerializeMethodsTestSingle() = default;
+    CSerializeMethodsTestSingle() = default; // NOLINT(cppcoreguidelines-pro-type-member-init)
     CSerializeMethodsTestSingle(int intvalin, bool boolvalin,
                                 std::string stringvalin,
-                                const char *charstrvalin, CTransaction txvalin)
+                                const char *charstrvalin, CTransaction txvalin) // NOLINT(performance-unnecessary-value-param)
         : intval(intvalin), boolval(boolvalin),
           stringval(std::move(stringvalin)), charstrval(charstrvalin),
           txval(MakeTransactionRef(txvalin)) {}
@@ -172,7 +172,7 @@ BOOST_AUTO_TEST_CASE(floats) {
 
     // decode
     for (int i = 0; i < 1000; i++) {
-        float j;
+        float j; // NOLINT(cppcoreguidelines-init-variables)
         ss >> j;
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(doubles) {
 
     // decode
     for (int i = 0; i < 1000; i++) {
-        double j;
+        double j; // NOLINT(cppcoreguidelines-init-variables)
         ss >> j;
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
@@ -315,7 +315,7 @@ static bool isTooLargeWriteException(const std::ios_base::failure &ex) {
 
 BOOST_AUTO_TEST_CASE(compactsize) {
     CDataStream ss(SER_DISK, 0);
-    std::vector<char>::size_type i, j;
+    std::vector<char>::size_type i, j; // NOLINT(cppcoreguidelines-init-variables)
 
     for (i = 1; i <= MAX_SIZE; i *= 2) {
         WriteCompactSize(ss, i - 1);
@@ -352,7 +352,7 @@ BOOST_AUTO_TEST_CASE(noncanonical) {
     // Write some non-canonical CompactSize encodings, and make sure an
     // exception is thrown when read back.
     CDataStream ss(SER_DISK, 0);
-    std::vector<char>::size_type n;
+    std::vector<char>::size_type n; // NOLINT(cppcoreguidelines-init-variables)
 
     // zero encoded with three bytes:
     ss.write("\xfd\x00\x00", 3);
@@ -420,7 +420,7 @@ BOOST_AUTO_TEST_CASE(insert_delete) {
     BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[0], 0);
 
-    ss.erase(ss.begin() + ss.size() - 1);
+    ss.erase(ss.begin() + ss.size() - 1); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
 
@@ -460,7 +460,7 @@ BOOST_AUTO_TEST_CASE(class_methods) {
     BOOST_CHECK(methodtest3 == methodtest4);
 
     CDataStream ss2(SER_DISK, PROTOCOL_VERSION, intval, boolval, stringval,
-                    FLATDATA(charstrval), txval);
+                    FLATDATA(charstrval), txval); // NOLINT(bugprone-sizeof-expression)
     ss2 >> methodtest3;
     BOOST_CHECK(methodtest3 == methodtest4);
 }

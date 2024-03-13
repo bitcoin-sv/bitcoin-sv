@@ -15,16 +15,16 @@
 #include <vector>
 
 namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr};
+    mining::CJournalChangeSetPtr nullChangeSet{nullptr}; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 
     // large enough count to control integer rounding errors in fractions
     constexpr unsigned N_PRIMARY = 50;
     // fixed size transactions so we can correlate sizes and counts
     // large enough transactions so we are not dominated by index ram usage
     constexpr int TX_SIZE = 1000;
-    const CFeeRate A_PRIMARY = CFeeRate(Amount(6000));
-    const CFeeRate A_BLOCK_MIN_FEE = CFeeRate(Amount(1000));
-    const CFeeRate A_SECONDARY = CFeeRate(Amount(100));
+    const CFeeRate A_PRIMARY = CFeeRate(Amount(6000)); // NOLINT(cert-err58-cpp)
+    const CFeeRate A_BLOCK_MIN_FEE = CFeeRate(Amount(1000)); // NOLINT(cert-err58-cpp)
+    const CFeeRate A_SECONDARY = CFeeRate(Amount(100)); // NOLINT(cert-err58-cpp)
 
     // test representation of mempool entry
     struct Entry {
@@ -39,12 +39,12 @@ namespace {
 
     // a collection of entries added to mempool
 	struct Entries {
-        CTxMemPool &pool;
+        CTxMemPool &pool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
         std::vector<Entry> entries;
         Entries(CTxMemPool& pool) : pool(pool) {}
         // return entries that satisfy the predicate by consulting the actual mempool entries
         Entries that(Predicate predicate) const {
-            return filter(with(predicate));
+            return filter(with(predicate)); // NOLINT(performance-unnecessary-value-param)
         }
         // return entries that were submitted to primary mempool
         Entries for_primary() const {
@@ -67,10 +67,10 @@ namespace {
         using Filter = std::function<bool(const Entry&)>;
         Entries filter(Filter cond) const {
             Entries ret(pool);
-            std::copy_if(entries.cbegin(), entries.cend(), std::back_inserter(ret.entries), cond);
+            std::copy_if(entries.cbegin(), entries.cend(), std::back_inserter(ret.entries), cond); // NOLINT(performance-unnecessary-value-param)
             return ret;
         }
-        Filter with(Predicate predicate) const {
+        Filter with(Predicate predicate) const { // NOLINT(performance-unnecessary-value-param)
             return [this, predicate](const Entry& entry) {
                 CTxMemPoolTestAccess testPoolAccess(pool);
                 return predicate(testPoolAccess, entry);
@@ -108,7 +108,7 @@ namespace {
         return predicate;
     }
 
-	Predicate are_not(Predicate predicate) {
+	Predicate are_not(Predicate predicate) { // NOLINT(performance-unnecessary-value-param)
         return [predicate](CTxMemPoolTestAccess& pool, const Entry& entry) {
             return !predicate(pool, entry);
         };
@@ -117,10 +117,10 @@ namespace {
 	struct Demand {
         int howMany;
         CFeeRate fee;
-        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(fee) {}
+        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(fee) {} // NOLINT(performance-unnecessary-value-param)
     };
 
-    std::vector<CTxMemPoolEntry> GetABunchOfEntries(Demand demand)
+    std::vector<CTxMemPoolEntry> GetABunchOfEntries(Demand demand) // NOLINT(performance-unnecessary-value-param)
     {
         static int unique = 0;
         std::vector<uint8_t> fluff;
@@ -150,7 +150,7 @@ namespace {
         testPoolAccess.SetBlockMinTxFee(A_BLOCK_MIN_FEE);
 
         std::vector<std::vector<CTxMemPoolEntry>> all_txns;
-        for (auto d: demand) {
+        for (auto d: demand) { // NOLINT(performance-for-range-copy)
             all_txns.push_back(GetABunchOfEntries(d));
         }
         Entries entries {pool};

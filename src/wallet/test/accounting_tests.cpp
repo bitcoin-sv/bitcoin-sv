@@ -6,7 +6,7 @@
 #include "wallet/test/wallet_test_fixture.h"
 #include <boost/test/unit_test.hpp>
 
-extern CWallet *pwalletMain;
+extern CWallet *pwalletMain; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_FIXTURE_TEST_SUITE(accounting_tests, WalletTestingSetup)
 

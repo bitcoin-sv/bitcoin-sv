@@ -30,8 +30,8 @@ namespace
             assert(encodedRevocationMessage.size() == 33);
 
             // Hash revocation message
-            uint8_t hashRevocationMessageBytes[CSHA256::OUTPUT_SIZE] {};
-            CSHA256().Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()), encodedRevocationMessage.size()).Finalize(hashRevocationMessageBytes);
+            uint8_t hashRevocationMessageBytes[CSHA256::OUTPUT_SIZE] {}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+            CSHA256().Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()), encodedRevocationMessage.size()).Finalize(hashRevocationMessageBytes); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-reinterpret-cast)
             const uint256 hashRevocationMessage { std::vector<uint8_t> {std::begin(hashRevocationMessageBytes), std::end(hashRevocationMessageBytes)} };
 
             // Create signatures over hash of revocation message

@@ -18,7 +18,7 @@ namespace
     };
 
     // WrittenData holds information of Merkle Tree we want to use in later checks.
-    struct WrittenData
+    struct WrittenData // NOLINT(cppcoreguidelines-pro-type-member-init)
     {
         // blockHash is needed to read Merkle Tree from the disk
         uint256 blockHash; 
@@ -58,7 +58,7 @@ namespace
             block.vtx[i] = MakeTransactionRef(tx);
         }
 
-        bool mutated;
+        bool mutated; // NOLINT(cppcoreguidelines-init-variables)
         block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
         return block;
     }

@@ -48,7 +48,7 @@ namespace
     {
         static uint32_t lockTime {0}; // separate counter is OK as we have an input
         CMutableTransaction txn {};
-        for (auto prev: other) {
+        for (auto prev: other) { // NOLINT(performance-for-range-copy)
             txn.vin.emplace_back(CTxIn{COutPoint(prev->GetId(), 0), CScript()});
         }
         txn.nLockTime = lockTime++;
@@ -71,10 +71,10 @@ namespace
     CJournalChangeSetPtr reorg(CJournalBuilder* builder, std::initializer_list<std::pair<CJournalChangeSet::Operation, CJournalEntry>> ops) {
         return changeSet(builder, JournalUpdateReason::REORG, ops);
     }
-    std::pair<CJournalChangeSet::Operation, CJournalEntry> add(CJournalEntry entry) {
+    std::pair<CJournalChangeSet::Operation, CJournalEntry> add(CJournalEntry entry) { // NOLINT(performance-unnecessary-value-param)
         return std::make_pair(CJournalChangeSet::Operation::ADD, entry);
     }
-    std::pair<CJournalChangeSet::Operation, CJournalEntry> remove(CJournalEntry entry) {
+    std::pair<CJournalChangeSet::Operation, CJournalEntry> remove(CJournalEntry entry) { // NOLINT(performance-unnecessary-value-param)
         return std::make_pair(CJournalChangeSet::Operation::REMOVE, entry);
     }
 }

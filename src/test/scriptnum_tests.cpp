@@ -19,7 +19,7 @@ namespace
     constexpr auto min64 = numeric_limits<int64_t>::min();
     constexpr auto max64 = numeric_limits<int64_t>::max();
 
-    vector<int64_t> test_data{min64, -1, 0, 1, max64};
+    vector<int64_t> test_data{min64, -1, 0, 1, max64}; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_AUTO_TEST_SUITE(scriptnum_tests)
@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(construction)
             CScriptNum actual{v, false, max_size, big_int};
             BOOST_FAIL("should throw");
         }
-        catch(...)
+        catch(...) // NOLINT(bugprone-empty-catch)
         {
         }
     }
@@ -417,7 +417,7 @@ BOOST_AUTO_TEST_CASE(to_size_t_limited)
 // clang-format off
 /** A selection of numbers that do not trigger int64_t overflow
  *  when added/subtracted. */
-static const int64_t values[] = {0,
+static const int64_t values[] = {0, // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                  1,
                                  -2,
                                  127,
@@ -431,7 +431,7 @@ static const int64_t values[] = {0,
                                  1 - (1LL << 32),
                                  1LL << 40};
 
-static const int64_t offsets[] = {1,      0x79,   0x80,   0x81,   0xFF,
+static const int64_t offsets[] = {1,      0x79,   0x80,   0x81,   0xFF, // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                   0x7FFF, 0x8000, 0xFFFF, 0x10000};
 
 static bool verify(const CScriptNum10 &bignum, const CScriptNum &scriptnum) {
@@ -575,9 +575,11 @@ static void RunOperators(const int64_t &num1, const int64_t &num2) {
 BOOST_AUTO_TEST_CASE(creation) {
     for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
         for (size_t j = 0; j < sizeof(offsets) / sizeof(offsets[0]); ++j) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             RunCreate(values[i]);
             RunCreate(values[i] + offsets[j]);
             RunCreate(values[i] - offsets[j]);
+            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 }
@@ -585,6 +587,7 @@ BOOST_AUTO_TEST_CASE(creation) {
 BOOST_AUTO_TEST_CASE(operators) {
     for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
         for (size_t j = 0; j < sizeof(offsets) / sizeof(offsets[0]); ++j) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             RunOperators(values[i], values[i]);
             RunOperators(values[i], -values[i]);
             RunOperators(values[i], values[j]);
@@ -597,6 +600,7 @@ BOOST_AUTO_TEST_CASE(operators) {
             RunOperators(values[i] + values[j], values[i] - values[j]);
             RunOperators(values[i] - values[j], values[i] + values[j]);
             RunOperators(values[i] - values[j], values[i] - values[j]);
+            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 }

@@ -36,7 +36,7 @@ std::vector<uint8_t> StreamSerialize(
     std::vector<uint8_t> serializedData;
     auto runStart = std::chrono::steady_clock::now();
 
-    do
+    do // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         using namespace std::chrono_literals;
 
@@ -49,7 +49,7 @@ std::vector<uint8_t> StreamSerialize(
 
         serializedData.insert(
             serializedData.end(),
-            chunk.Begin(), chunk.Begin() + chunk.Size());
+            chunk.Begin(), chunk.Begin() + chunk.Size()); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     while(!serializer.EndOfStream());
 
@@ -63,7 +63,7 @@ inline std::vector<uint8_t> SerializeAsyncStream(
     std::vector<uint8_t> serializedData;
     auto runStart = std::chrono::steady_clock::now();
 
-    do
+    do // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         using namespace std::chrono_literals;
 
@@ -76,7 +76,7 @@ inline std::vector<uint8_t> SerializeAsyncStream(
 
         serializedData.insert(
             serializedData.end(),
-            chunk.Begin(), chunk.Begin() + chunk.Size());
+            chunk.Begin(), chunk.Begin() + chunk.Size()); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     while(!serializer.EndOfStream());
 
@@ -100,7 +100,7 @@ public:
             );
         std::memcpy(
             pch,
-            mSourceBuffer.data() + mSourcePosition,
+            mSourceBuffer.data() + mSourcePosition, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             copiedSize);
         mSourcePosition += copiedSize;
 
@@ -113,7 +113,7 @@ public:
     }
 
 private:
-    const std::vector<uint8_t>& mSourceBuffer;
+    const std::vector<uint8_t>& mSourceBuffer; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     size_t mSourcePosition = 0u;
 };
 
@@ -143,7 +143,7 @@ inline CBlock BuildRandomTestBlock()
     }
     block.vtx[2] = MakeTransactionRef(tx); // txIn == 1000, txOut == 1
 
-    bool mutated;
+    bool mutated; // NOLINT(cppcoreguidelines-init-variables)
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
 
     return block;

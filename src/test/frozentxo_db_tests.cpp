@@ -21,7 +21,7 @@ BOOST_FIXTURE_TEST_SUITE(frozentxo, TestingSetup)
 
 namespace {
 
-class RandomTXOGenerator
+class RandomTXOGenerator // NOLINT(cert-msc32-c,cert-msc51-cpp)
 {
     std::mt19937 engine;
     std::uniform_int_distribution<unsigned int> uniform_dist{0, 255};
@@ -607,7 +607,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     {
         auto t = it.GetWhitelistedTx();
         if(t.first == ctx1.GetId() && t.second.enforceAtHeight == 50 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo2})
-        {
+        { // NOLINT(bugprone-branch-clone)
             continue;
         }
         else if(t.first == ctx2.GetId() && t.second.enforceAtHeight == 654 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo3})
@@ -804,7 +804,7 @@ BOOST_AUTO_TEST_CASE(ValidateConfiscationTxContents_test)
 namespace {
 // Helper to run function in two threads.
 template<typename Cnt, typename F>
-void run_in_two_threads(Cnt (&cnt)[2], F f)
+void run_in_two_threads(Cnt (&cnt)[2], F f) //NOLINT(cppcoreguidelines-avoid-c-arrays)
 {
     cnt[0] = {};
     std::thread thd(f, &cnt[0]);
@@ -899,7 +899,7 @@ BOOST_AUTO_TEST_CASE(db_thread_safety_tests)
     };
 
     // Provides counters that are used to check if function completed successfully
-    struct Cnt
+    struct Cnt //NOLINT(cppcoreguidelines-avoid-c-arrays)
     {
         std::size_t ok = 0;
         std::size_t alt = 0;

@@ -12,11 +12,11 @@ namespace{
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr,
+                                                std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
         for (auto& elem : spends) {
-            vTxInputData.
+            vTxInputData. // NOLINT(performance-inefficient-vector-operation)
                     emplace_back(
                     std::make_shared<CTxInputData>(
                             TxIdTrackerWPtr{}, // a pointer to the TxIdTracker
@@ -180,7 +180,7 @@ namespace{
             std::vector<CMutableTransaction> permutedTxsToValidate{txsToValidate};
             std::sort(permutedTxsToValidate.begin(), permutedTxsToValidate.end(), CompareTxById);
             BOOST_TEST(!expectedVariants.empty());
-            do {
+            do { // NOLINT(cppcoreguidelines-avoid-do-while)
                 executedTasks.clear();
 
                 // Run the scheduler for any permutation of input txs.
@@ -196,7 +196,7 @@ namespace std {
     // Needed by Boost to print vector
     template<typename T>
     inline std::ostream &
-    operator<<(std::ostream &wrapped, std::vector<T> const &item) {
+    operator<<(std::ostream &wrapped, std::vector<T> const &item) { // NOLINT(cert-dcl58-cpp)
         wrapped << '[';
         bool first = true;
         for (auto const &element : item) {
@@ -208,7 +208,7 @@ namespace std {
     }
     // Needed by Boost to print TxId
     inline std::ostream &
-    operator<<(std::ostream &wrapped, const TxId& item) {
+    operator<<(std::ostream &wrapped, const TxId& item) { // NOLINT(cert-dcl58-cpp)
         wrapped << item.ToString();
         return wrapped;
     }

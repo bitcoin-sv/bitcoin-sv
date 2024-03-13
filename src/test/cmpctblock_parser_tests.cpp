@@ -14,7 +14,7 @@ using namespace bsv;
 
 constexpr size_t nonce_len{8};
 
-const std::vector<uint8_t> cmpctblock_msg{[]
+const std::vector<uint8_t> cmpctblock_msg{[] // NOLINT(cert-err58-cpp)
 {
     vector<uint8_t> v;
     v.insert(v.end(), version_len, 1); // version
@@ -101,7 +101,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     size_t passes{};
     while(total_bytes_read < cmpctblock_msg.size())
     {
-        span s{cmpctblock_msg.data() + offset, n};
+        span s{cmpctblock_msg.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)
@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
 
     for(size_t i{}; i < cmpctblock_msg.size(); ++i)
     {
-        std::span s{cmpctblock_msg.data() + i, 1};
+        std::span s{cmpctblock_msg.data() + i, 1}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         parser(s);
     }
 
@@ -164,7 +164,7 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
     vector<uint8_t> out(cmpctblock_msg.size());
     for(size_t i{}; i < cmpctblock_msg.size(); ++i)
     {
-        total_bytes_read += parser.read(i, std::span{out.data()+i, 1});
+        total_bytes_read += parser.read(i, std::span{out.data()+i, 1}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     BOOST_CHECK_EQUAL(cmpctblock_msg.size(), total_bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(cmpctblock_msg.cbegin(), cmpctblock_msg.cend(),

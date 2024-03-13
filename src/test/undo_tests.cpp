@@ -55,13 +55,13 @@ static void UpdateUTXOSet(const CBlock &block, CCoinsViewCache &view,
                           CBlockUndo &blockundo,
                           const CChainParams &chainparams, uint32_t nHeight) {
     auto &coinbaseTx = *block.vtx[0];
-    UpdateCoins(coinbaseTx, view, nHeight);
+    UpdateCoins(coinbaseTx, view, nHeight); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
 
     for (size_t i = 1; i < block.vtx.size(); i++) {
         auto &tx = *block.vtx[1];
 
         blockundo.vtxundo.push_back(CTxUndo());
-        UpdateCoins(tx, view, blockundo.vtxundo.back(), nHeight);
+        UpdateCoins(tx, view, blockundo.vtxundo.back(), nHeight); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     }
 
     view.SetBestBlock(block.GetHash());
@@ -73,7 +73,7 @@ static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
 
     CBlockIndex::TemporaryBlockIndex index{ {} };
 
-    TestAccessCBlockIndex::SetHeight( index, nHeight );
+    TestAccessCBlockIndex::SetHeight( index, nHeight ); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     TestAccessProcessingBlockIndex::ApplyBlockUndo(blockUndo, block, index.get(), view, task::CCancellationSource::Make()->GetToken());
 }
 
