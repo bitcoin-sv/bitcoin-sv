@@ -43,7 +43,8 @@ class SelfishMiningTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
 
         # Send 3 transactions from node1, those should be relayed to node0.
-        txids_in_block = [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
+        for x in range(3):
+            node1.sendtoaddress(node1.getnewaddress(), 1)
         sync_mempools(self.nodes)
         # Stop node1 to prevent relaying transactions from node0 and simulate selfish-mined block.
         self.stop_node(1)
@@ -65,7 +66,8 @@ class SelfishMiningTest(BitcoinTestFramework):
         # Set higher fee on node1
         node1.settxfee(Decimal("0.00100000"))
         # Send 3 transactions from node1, those should be relayed to node0
-        txids_in_block = [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
+        for x in range(3):
+            node1.sendtoaddress(node1.getnewaddress(), 1)
         sync_mempools(self.nodes)
         # Stop node1 to prevent relaying transactions from node0 and simulate selfish-mined block
         self.stop_node(1)
@@ -89,7 +91,8 @@ class SelfishMiningTest(BitcoinTestFramework):
         # Set higher fee on node1
         node1.settxfee(Decimal("0.00100000"))
         # Send 3 transactions from node1, those should be relayed to node0
-        txids_in_block = [node1.sendtoaddress(node1.getnewaddress(), 1) for x in range(3)]
+        for x in range(3):
+            node1.sendtoaddress(node1.getnewaddress(), 1)
         sync_mempools(self.nodes)
         # Stop node1 to prevent relaying transactions from node0 and simulate selfish-mined block
         self.stop_node(1)

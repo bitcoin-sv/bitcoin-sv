@@ -78,7 +78,7 @@ class ExitSafeModeForDistantFork(BitcoinTestFramework):
                 try:
                     conn1.rpc.getbalance()
                     return True
-                except JSONRPCException as e:
+                except JSONRPCException:
                     return False
             wait_until(is_not_safemode, timeout=10, check_interval=0.2) # Only a small timeout is needed since safe mode level is changed shortly after the block has become tip.
 

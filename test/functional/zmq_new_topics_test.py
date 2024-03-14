@@ -238,7 +238,6 @@ class ZMQNewTopicsTest (BitcoinTestFramework):
 
         self.log.info("Generate a new block that will contain transactions from disconnected blocks.")
         blockhash = self.nodes[0].generate(1)[0]
-        txes_added_again = set()
         for i in range(4):
             msg = self.zmqSubSocket.recv_multipart()
             topic = msg[0]

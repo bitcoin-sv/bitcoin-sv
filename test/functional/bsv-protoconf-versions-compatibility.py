@@ -101,7 +101,6 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             logger.debug("finished %s", title)
 
         ELEMENTS_PER_1MiB = 29126
-        ELEMENTS_PER_2MiB = 58254
 
         # 1. test
         # Send protoconf with 0 fields. Bitcoind should disconnect the node, since minimum number of fields is 1

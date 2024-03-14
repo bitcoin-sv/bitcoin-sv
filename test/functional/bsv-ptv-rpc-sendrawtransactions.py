@@ -67,7 +67,6 @@ class RPCSendRawTransactions(ComparisonTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n, *, key):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
         sighash = SignatureHashForkId(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
@@ -255,7 +254,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == num_of_chains * chain_length, timeout=timeout)
         assert_equal(conn.rpc.getorphaninfo()["size"], 0)
         # Submit the batch through rpc interface.
-        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+        conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
         # All transactions must be in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(rpc_txs_bulk_input))
 
@@ -308,7 +307,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Insert the parent tx at the front of the input array.
         rpc_txs_bulk_input.insert(0, {'hex': ToHex(txchain[0]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
         # Submit the batch through rpc interface.
-        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+        conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
         # All transactions must be in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(rpc_txs_bulk_input))
         # The p2p orphan pool must be empty.

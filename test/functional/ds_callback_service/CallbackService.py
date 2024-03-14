@@ -36,13 +36,6 @@ class FLAG(Enum):
 expectedProofs = []
 receivedProofs = []
 
-# Function to reset the expected/received proofs
-
-
-def reset_proofs():
-    expectedProofs = []
-    receivedProofs = []
-
 
 class CallbackService(BaseHTTPRequestHandler):
 

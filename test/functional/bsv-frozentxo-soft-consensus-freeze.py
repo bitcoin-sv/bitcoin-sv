@@ -49,7 +49,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # block is accepted but ignored since freeze is in place for previous block
         second_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(second_frozen_tx, 0), b'', CScript([OP_TRUE]))
@@ -77,7 +77,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
         first_frozen_block_height = tip_height + 1
 
         freeze_for_two_blocks = first_frozen_block_height + 2
@@ -121,7 +121,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # clear all frozen entries
         result = node.rpc.clearBlacklists({"removeAllEntries": True})
@@ -147,7 +147,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # block is accepted but ignored since freeze is in place for previous block
         second_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(second_frozen_tx, 0), b'', CScript([OP_TRUE]))
@@ -317,7 +317,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # this block is high enough for the frozen chain to become active but
         # it should not, because the block is invalid
-        new_frozen_tip = self._mine_and_send_block(None, node, False, last_valid_block.hash)
+        self._mine_and_send_block(None, node, False, last_valid_block.hash)
 
         # invalid block has now been validated
         assert (node.check_log(frozen_block_block_checked_log_string))

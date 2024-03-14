@@ -35,7 +35,6 @@ class SpamLog(BitcoinTestFramework):
         self.extra_args = [['-whitelist=127.0.0.1', '-debugexclude=net']]
 
     def run_test(self):
-        node = self.nodes[0]
         self.test_node = TestNode()
         connections = []
         connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.test_node))

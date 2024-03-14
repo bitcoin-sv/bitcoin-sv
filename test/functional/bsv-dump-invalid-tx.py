@@ -347,17 +347,17 @@ class InvalidTx(BitcoinTestFramework):
 
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[0], 0)
             conn.send_message(msg_tx(invalid_tx1))
-            names = self.assert_number_of_files_with_substring_in_name(1, invalid_tx1.hash)
+            self.assert_number_of_files_with_substring_in_name(1, invalid_tx1.hash)
             sleep(1)
 
             invalid_tx2 = make_large_invalid_tx(invalid_coinbases[1], 0)
             conn.send_message(msg_tx(invalid_tx2))
-            names = self.assert_number_of_files_with_substring_in_name(1, invalid_tx2.hash)
+            self.assert_number_of_files_with_substring_in_name(1, invalid_tx2.hash)
             sleep(1)
 
             invalid_tx3 = make_large_invalid_tx(invalid_coinbases[2], 0)
             conn.send_message(msg_tx(invalid_tx3))
-            names = self.assert_number_of_files_with_substring_in_name(1, invalid_tx3.hash)
+            self.assert_number_of_files_with_substring_in_name(1, invalid_tx3.hash)
             sleep(1)
 
             # each transaction is a bit over 1MB, that means its hex written to the file is bit over 2MB

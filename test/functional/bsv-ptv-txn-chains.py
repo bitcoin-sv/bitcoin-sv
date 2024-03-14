@@ -34,7 +34,6 @@ class PTVTxnChains(ComparisonTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
         sighash = SignatureHashForkId(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(

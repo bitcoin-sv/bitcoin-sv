@@ -101,7 +101,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         mSigObj = self.nodes[2].addmultisigaddress(
             2, [addr1Obj['pubkey'], addr2Obj['pubkey']])
-        mSigObjValid = self.nodes[2].validateaddress(mSigObj)
+        self.nodes[2].validateaddress(mSigObj)
 
         # use balance deltas instead of absolute values
         bal = self.nodes[2].getbalance()
@@ -127,12 +127,11 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         mSigObj = self.nodes[2].addmultisigaddress(
             2, [addr1Obj['pubkey'], addr2Obj['pubkey'], addr3Obj['pubkey']])
-        mSigObjValid = self.nodes[2].validateaddress(mSigObj)
+        self.nodes[2].validateaddress(mSigObj)
 
         txId = self.nodes[0].sendtoaddress(mSigObj, 2.2)
         decTx = self.nodes[0].gettransaction(txId)
         rawTx = self.nodes[0].decoderawtransaction(decTx['hex'])
-        sPK = rawTx['vout'][0]['scriptPubKey']['hex']
         self.sync_all()
         self.nodes[0].generate(1)
         self.sync_all()

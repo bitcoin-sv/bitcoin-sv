@@ -101,7 +101,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
             for block in branch_2_blocks:
                 conn2.send_message(msg_block(block))
 
-            tips = conn2.rpc.getchaintips()
+            conn2.rpc.getchaintips()
 
             # second branch should now be invalid
             wait_for_tip_status(conn1, branch_2_blocks[-1].hash, "invalid")

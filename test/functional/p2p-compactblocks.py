@@ -274,10 +274,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         address = node.getnewaddress()
 
         for i in range(num_transactions):
-            txid = node.sendtoaddress(address, 0.1)
+            node.sendtoaddress(address, 0.1)
             test_node.sync_with_ping()
-            hex_tx = node.gettransaction(txid)["hex"]
-            tx = FromHex(CTransaction(), hex_tx)
 
         # Wait until we've seen the block announcement for the resulting tip
         tip = int(node.getbestblockhash(), 16)

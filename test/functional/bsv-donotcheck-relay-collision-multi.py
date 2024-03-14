@@ -43,7 +43,7 @@ class TestNode(NodeConnCB):
 class NoCheckCollisionTest(BitcoinTestFramework):
 
     def created_signed_transaction(self, sats, node):
-        utxo = create_confirmed_utxos(sats, node, 1, age=101)[0]
+        create_confirmed_utxos(sats, node, 1, age=101)
 
     def set_test_params(self):
         self.num_nodes = 2
@@ -116,7 +116,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
                 continue
 
             txid = node1.decoderawtransaction(signed_tx)["txid"]
-            rejected_txns = node1.sendrawtransactions([{'hex': signed_tx, 'dontcheckfee': donotcheck}])
+            node1.sendrawtransactions([{'hex': signed_tx, 'dontcheckfee': donotcheck}])
             txnids.append(txid)
             signed_txns.append(signed_tx)
 
@@ -129,13 +129,13 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         # if donotcheck is False then transaction must be rejected
         # if donotcheck is True, resending must succeed
         try:
-            rejected_txns = node0.sendrawtransactions([{'hex': signed_txns[low_fee_index], 'dontcheckfee': False}]) # last param is donotcheck
+            node0.sendrawtransactions([{'hex': signed_txns[low_fee_index], 'dontcheckfee': False}]) # last param is donotcheck
         except Exception:
             self.log.info("test 0 - sent twice must be rejected:PASS")
 
         #low_fee_nocheck_txid_tmp = node0.sendrawtransaction(signed_txns[low_fee_nocheck_index], False, True)  # last param is donotcheck
         low_fee_nocheck_txid_tmp = node0.decoderawtransaction(signed_txns[low_fee_nocheck_index])["txid"]
-        rejected_txns = node0.sendrawtransactions([{'hex': signed_txns[low_fee_nocheck_index], 'dontcheckfee': True}])  # last param is donotcheck
+        node0.sendrawtransactions([{'hex': signed_txns[low_fee_nocheck_index], 'dontcheckfee': True}])  # last param is donotcheck
         assert (low_fee_nocheck_txid_tmp == txnids[low_fee_nocheck_index])
 
         # mine transactions in node0 and ensure that the low fee trasnaction with donotcheck equals true

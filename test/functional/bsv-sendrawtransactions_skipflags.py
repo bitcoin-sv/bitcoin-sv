@@ -43,7 +43,6 @@ def getInputScriptPubKey(node, input, index):
 
 
 def count_in_log(rpc, msg, node_dir, from_line=0):
-    count = 0
     txes = set()
     for line in open(glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]).readlines()[from_line:]:
         if msg in line:
@@ -627,7 +626,6 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         i_utxo += 16
 
         self.nodes[0].generate(1)
-        hash_ancestor_block = self.nodes[0].getbestblockhash()
         assert (len(self.nodes[0].getrawmempool()) == 0), "Not all transactions were mined"
         self.log.info("PASS\n")
 

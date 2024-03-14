@@ -85,7 +85,7 @@ class BlockFileStore(ComparisonTestFramework):
 
         # Mine block with new transactions.
         self.log.info("BLOCK 2 - mining")
-        minedBlock2 = node.generate(1)
+        node.generate(1)
         self.log.info("BLOCK 2 - mined")
 
         for txHash in txHashes:

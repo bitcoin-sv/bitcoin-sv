@@ -1379,7 +1379,6 @@ class msg_revokemid():
         revocationMessage = deser_string(f)
         sig1Len = revocationMessage[0]
         self.sig1 = revocationMessage[1:sig1Len]
-        sig2Len = revocationMessage[1 + sig1Len]
         self.sig2 = revocationMessage[1 + sig1Len + 1:]
 
     def serialize(self):

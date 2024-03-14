@@ -45,7 +45,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
             outputs = {node.getnewaddress(): satoshi_round(utxo['amount'] - relayfee)}
             rawtx = node.createrawtransaction(inputs, outputs)
             signed_tx = node.signrawtransaction(rawtx)["hex"]
-            x = len(signed_tx)
             txid = node.sendrawtransaction(signed_tx)
             low_paying_txs.append(txid)
             assert txid in node.getrawmempool()

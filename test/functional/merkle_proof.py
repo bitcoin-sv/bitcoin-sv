@@ -219,7 +219,7 @@ class MerkleProofTest(BitcoinTestFramework):
                 tx_in = utxos.pop()
                 tx_out = tx_in["amount"] - Decimal("0.01")
                 tx = self.nodes[0].createrawtransaction([tx_in], {self.nodes[1].getnewaddress(): tx_out})
-                txid = self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(tx)["hex"])
+                self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(tx)["hex"])
             # Mine a block
             self.nodes[0].generate(1)
             sync_blocks(self.nodes[0:1])

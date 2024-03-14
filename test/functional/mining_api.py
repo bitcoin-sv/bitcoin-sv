@@ -248,14 +248,14 @@ class MiningTest(BitcoinTestFramework):
 
         # Time call to getminingcandidate with validation
         start_time = time.time()
-        candidate = self.nodes[0].getminingcandidate(True)
+        self.nodes[0].getminingcandidate(True)
         end_time = time.time()
         validation_time = end_time - start_time
         self.log.info("Time to get candidate with validation: {}".format(validation_time))
 
         # Time call to getminingcandidate without validation
         start_time = time.time()
-        candidate = self.nodes[1].getminingcandidate(True)
+        self.nodes[1].getminingcandidate(True)
         end_time = time.time()
         novalidation_time = end_time - start_time
         self.log.info("Time to get candidate without validation: {}".format(novalidation_time))

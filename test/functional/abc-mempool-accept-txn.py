@@ -50,8 +50,6 @@ class FullBlockTest(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
         update_block = self.chain.update_block
-        save_spendable_output = self.chain.save_spendable_output
-        get_spendable_output = self.chain.get_spendable_output
         accepted = self.accepted
 
         # shorthand for variables

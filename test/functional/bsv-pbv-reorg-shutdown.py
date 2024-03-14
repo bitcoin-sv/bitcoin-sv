@@ -82,7 +82,6 @@ class PBVReorgShutdown(BitcoinTestFramework):
 
         # left branch
         block2 = self.chain.next_block(block_count, spend=out[0], extra_txns=8)
-        block2_num = block_count
         block_count += 1
         node0.send_message(msg_block(block2))
         self.log.info(f"block2 hash: {block2.hash}")

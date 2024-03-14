@@ -8,7 +8,7 @@ import json
 import http.client as httplib
 from functools import partial
 from http.server import HTTPServer
-from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG, reset_proofs
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, check_for_log_msg, assert_equal
 from test_framework.mininode import *
@@ -211,7 +211,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         # tx6 is dsnt enabled and double spends tx1. Both the txn in the mempool and the double-spend are dsnt
         # enabled, so in this case just the callback service specified by tx1 will get notified about tx6
         # (first seen rule).
-        reset_proofs()
         self.check_tx_not_received(tx1.hash)
         vin = [
             CTxIn(COutPoint(int(utxo[3]["txid"], 16), utxo[3]["vout"]), CScript([OP_FALSE]), 0xffffffff),

@@ -100,7 +100,6 @@ class BigBlockTests(BitcoinTestFramework):
         return coinbase_tx
 
     def sign_tx(self, tx, spendtx, n):
-        scriptPubKey = bytearray(spendtx.vout[n].scriptPubKey)
         sighash = SignatureHashForkId(spendtx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spendtx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript([self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 

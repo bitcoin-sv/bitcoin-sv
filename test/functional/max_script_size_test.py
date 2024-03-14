@@ -146,7 +146,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         thr.start()
         sleep(1)
         test_node.wait_for_verack()
-        hashes = node.generate(199)
+        node.generate(199)
         utxos = node.listunspent()
 
         # Create a tx with script size MAX_SCRIPT_SIZE_BEFORE_GENESIS, send it via p2p and mine it into a block

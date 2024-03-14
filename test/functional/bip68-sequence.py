@@ -458,7 +458,7 @@ class BIP68Test(BitcoinTestFramework):
         tx.nVersion = 2
         tx_signed = self.nodes[1].signrawtransaction(ToHex(tx))["hex"]
         try:
-            tx_id = self.nodes[1].sendrawtransaction(tx_signed)
+            self.nodes[1].sendrawtransaction(tx_signed)
             assert (before_activation is False)
         except Exception:
             assert (before_activation)

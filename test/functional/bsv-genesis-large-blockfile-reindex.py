@@ -70,7 +70,7 @@ class LargeBlockFileReindex(ComparisonTestFramework):
         # Wait for transaction processing
         self.check_mempool(node, [tx1], timeout=6000)
         # Mine block with new transaction.
-        minedBlock1 = node.generate(1)
+        node.generate(1)
 
         # Send 4 large (~1GB) transactions that will go into next block
         for i in range(4):
@@ -91,7 +91,7 @@ class LargeBlockFileReindex(ComparisonTestFramework):
         self.test.connections[0].send_message(msg_tx(tx2))
         self.check_mempool(node, [tx2], timeout=6000)
         # Mine block with new transactions. This will write to new block file on disk.
-        minedBlock3 = node.generate(1)
+        node.generate(1)
 
         # Get block count
         blockcount = node.getblockcount()

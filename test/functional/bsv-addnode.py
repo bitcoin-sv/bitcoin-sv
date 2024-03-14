@@ -36,7 +36,7 @@ class AddNodeTest(BitcoinTestFramework):
         subver = "testnode%d" % to_node_num
         try:
             wait_until(lambda: conn_up(subver), timeout=10)
-        except Exception as e:
+        except Exception:
             return False
 
         return True

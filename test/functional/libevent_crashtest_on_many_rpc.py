@@ -41,7 +41,7 @@ class RpcFloddingTest (BitcoinTestFramework):
         # communication will crash in following while loop if libevent-2.1.7 is used. 2.1.11 will not crash
         # looping with 100 will sometimes succeed and sometimes fail with libevent-2.1.7 hence using 2000
         for _ in range(2000):
-            r = requests.get("http://" + url.hostname + ":" + str(url.port), auth=(url.username, url.password), data=json.dumps({}))
+            requests.get("http://" + url.hostname + ":" + str(url.port), auth=(url.username, url.password), data=json.dumps({}))
 
 
 if __name__ == '__main__':

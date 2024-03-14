@@ -158,7 +158,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             headersEnriched = []
 
             # Send block with coinbase transaction larger than 1MB.
-            big_coinbase_tx = self.send_block(unspent_txns, bigCoinbaseTx=True)
+            self.send_block(unspent_txns, bigCoinbaseTx=True)
             assert_equal(startingHeight + 3, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
 
             # Obtain hdrsen for block with big coinbase transaction.

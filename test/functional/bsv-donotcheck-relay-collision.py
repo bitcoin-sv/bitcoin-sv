@@ -43,7 +43,7 @@ class TestNode(NodeConnCB):
 class NoCheckCollisionTest(BitcoinTestFramework):
 
     def created_signed_transaction(self, sats, node):
-        utxo = create_confirmed_utxos(sats, node, 1, age=101)[0]
+        create_confirmed_utxos(sats, node, 1, age=101)
 
     def set_test_params(self):
         self.num_nodes = 2

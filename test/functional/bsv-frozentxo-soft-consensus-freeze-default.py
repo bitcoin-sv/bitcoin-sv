@@ -30,7 +30,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # both blocks are still frozen
         self._mine_and_send_block(None, node, False, node.rpc.getbestblockhash())
