@@ -92,16 +92,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
         set(CMAKE_LINKER_FLAGS
             "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=thread")
     endif()
-
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        ###
-        # static analyzer
-        ###
-        option(enable_static_analyzer "Use clang static analyzer" OFF)
-        if(enable_static_analyzer)
-            set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-checks=-*,clang-analyzer-*")
-        endif()
-    endif()
 endif()
 
 # Add path for custom modules.
@@ -118,6 +108,11 @@ if(CCACHE)
 	set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE})
 	set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE})
 endif(CCACHE)
+
+###
+# static analyzer
+###
+option(enable_clang-tidy "Use clang static analyzer" ON)
 
 # Add the magic target check and check-all.
 add_custom_target(check-all)
