@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_failure_cases)
     // version, sig_len_offset, expected result
     const vector<tuple<uint8_t, uint8_t, miner_info_error>> v{
         make_tuple(1, 0, miner_info_error::script_version_unsupported),
-        make_tuple(0, -2, miner_info_error::invalid_sig_len),
+        make_tuple(0, -7, miner_info_error::invalid_sig_len),
         make_tuple(0, +3, miner_info_error::invalid_sig_len),
     };
     for(const auto& [version, sig_len_offset, expected] : v)

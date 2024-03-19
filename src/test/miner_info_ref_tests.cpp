@@ -140,7 +140,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_failure_cases)
         make_tuple(0,  1,  0,   0, mie::invalid_txid_len),
         make_tuple(0,  0, -1,   0, mie::invalid_mmr_pbh_hash_len),
         make_tuple(0,  0,  1,   0, mie::invalid_mmr_pbh_hash_len),
-        make_tuple(0,  0,  0,  -2, mie::invalid_sig_len),
+        make_tuple(0,  0,  0,  -7, mie::invalid_sig_len),
         make_tuple(0,  0,  0,   3, mie::invalid_sig_len),
     };
     for(const auto& [version,

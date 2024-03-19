@@ -184,7 +184,7 @@ bool is_der_signature(const std::string& s)
 
 bool is_der_signature(const std::span<const uint8_t> script)
 {
-    return script.size() >= 69 && script.size() <= 72;
+    return script.size() >= 64 && script.size() <= 72;
 }
 
 namespace
