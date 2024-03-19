@@ -259,6 +259,5 @@ if(BUILD_BITCOIN_WALLET)
 endif()
 
 if(enable_clang-tidy)
-	include(ClangTidy)
 	AddClangTidy(test_bitcoin)
 endif()

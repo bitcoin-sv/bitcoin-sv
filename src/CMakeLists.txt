@@ -729,7 +729,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 if(enable_clang-tidy)
-	include(ClangTidy)
 	AddClangTidy(bitcoind)
 	if(BUILD_BITCOIN_CLI)
 		AddClangTidy(bitcoin-cli)

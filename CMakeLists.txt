@@ -114,6 +114,10 @@ endif(CCACHE)
 ###
 option(enable_clang-tidy "Use clang static analyzer" ON)
 
+if(enable_clang-tidy)
+    include(ClangTidy)
+endif()
+
 # Add the magic target check and check-all.
 add_custom_target(check-all)
 add_custom_target(check)
