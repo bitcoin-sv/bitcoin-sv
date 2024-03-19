@@ -42,20 +42,18 @@ void CMempoolTxDB::ClearDatabase()
 
 bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
 {
-    const uint64_t txCountAdded = txs.size();
-    const uint64_t diskUsageAdded = [&txs]() {
-        auto accumulator = decltype(txs[0]->GetTotalSize()){0};
-        for (const auto& tx : txs)
-        {
-            accumulator += tx->GetTotalSize();
-        }
-        return accumulator;
-    }();
+    uint64_t txCountAdded {0};
+    uint64_t diskUsageAdded {0};
 
     auto batch = CDBBatch{*wrapper};
     for (const auto& tx : txs)
     {
-        batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
+        if(! TransactionExists(tx->GetId()))
+        {
+            ++txCountAdded;
+            diskUsageAdded += tx->GetTotalSize();
+            batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
+        }
     }
     batch.Write(DB_DISK_USAGE, diskUsage.load() + diskUsageAdded);
     batch.Write(DB_TX_COUNT, txCount.load() + txCountAdded);
@@ -94,18 +92,18 @@ bool CMempoolTxDB::TransactionExists(const uint256 &txid)
 
 bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& txData)
 {
-    const uint64_t txCountRemoved = txData.size();
-    const uint64_t diskUsageRemoved = [&txData]() {
-        auto accumulator = decltype(txData[0].size){0};
-        for (const auto& td : txData) {
-            accumulator += td.size;
-        }
-        return accumulator;
-    }();
+    uint64_t txCountRemoved {0};
+    uint64_t diskUsageRemoved {0};
 
     auto batch = CDBBatch{*wrapper};
-    for (const auto& td : txData) {
-        batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
+    for (const auto& td : txData)
+    {
+        if(TransactionExists(td.txid))
+        {
+            ++txCountRemoved;
+            diskUsageRemoved += td.size;
+            batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
+        }
     }
     batch.Write(DB_DISK_USAGE, diskUsage.load() - diskUsageRemoved);
     batch.Write(DB_TX_COUNT, txCount.load() - txCountRemoved);

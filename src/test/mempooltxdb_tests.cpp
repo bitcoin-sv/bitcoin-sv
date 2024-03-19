@@ -109,10 +109,8 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
     {
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_WARN_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_WARN_EQUAL(txdb.GetTxCount(), entries.size());
-    BOOST_CHECK_GE(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_GE(txdb.GetTxCount(), entries.size());
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -192,8 +190,8 @@ BOOST_AUTO_TEST_CASE(BadDeleteFromTxDB)
                 {e[1].GetTxId(), e[1].GetTxSize()},
                 {e[2].GetTxId(), e[2].GetTxSize()}
             }));
-    BOOST_WARN_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_WARN_EQUAL(txdb.GetTxCount(), 0U);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(ClearTxDB)
