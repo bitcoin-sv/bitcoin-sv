@@ -30,6 +30,14 @@ jobs:
         with:
           clean: ''
       - run: |
+          find test/functional -maxdepth 1 \
+                               -type f \
+                               -name '*.py' \
+                               ! -executable \
+                               -exec printf "%s is not executable\n" {} \; \
+                               -exec false {} +
+        shell: bash
+      - run: |
           flake8 test/functional 
         shell: bash
   
