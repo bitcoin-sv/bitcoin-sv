@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  flake8:
+  python_checks:
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
@@ -29,7 +29,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           clean: ''
-      - run: |
+      - name: Check functional tests are executable
+        run: |
           find test/functional -maxdepth 1 \
                                -type f \
                                -name '*.py' \
@@ -37,12 +38,13 @@ jobs:
                                -exec printf "%s is not executable\n" {} \; \
                                -exec false {} +
         shell: bash
-      - run: |
+      - name: Flake8 checks
+        run: |
           flake8 test/functional 
         shell: bash
   
   autotools:
-    needs: flake8
+    needs: python_checks
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
@@ -70,7 +72,7 @@ jobs:
           toolset: ${{ matrix.toolset }}
 
   cmake:
-    needs: flake8
+    needs: python_checks
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
