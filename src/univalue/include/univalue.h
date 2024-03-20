@@ -3,7 +3,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-// NOLINTBEGIN(*)
 #ifndef __UNIVALUE_H__
 #define __UNIVALUE_H__
 
@@ -314,5 +313,3 @@ extern const UniValue NullUniValue;
 const UniValue& find_value( const UniValue& obj, const std::string& name);
 
 #endif // __UNIVALUE_H__
-
-// NOLINTEND(*)
