@@ -197,12 +197,13 @@ if(ENABLE_PROD_BUILD)
 endif()
 target_compile_definitions(util PUBLIC HAVE_CONFIG_H)
 target_include_directories(util
+	SYSTEM PUBLIC
+		univalue/include
 	PUBLIC
-		.
+		${CMAKE_CURRENT_SOURCE_DIR}
+	PRIVATE
 		# To access the config.
 		${CMAKE_CURRENT_BINARY_DIR}
-	PRIVATE
-		${OPENSSL_INCLUDE_DIR}
 )
 
 # Target specific configs
@@ -407,7 +408,7 @@ add_library(common
 	write_preferring_upgradable_mutex.h
 )
 
-target_include_directories(common PRIVATE secp256k1/include)
+target_include_directories(common SYSTEM PUBLIC secp256k1/include)
 target_link_libraries(common util secp256k1)
 
 # libbitcoinconsensus
@@ -432,11 +433,6 @@ add_library(bitcoinconsensus
 )
 
 target_link_libraries(bitcoinconsensus common)
-target_include_directories(bitcoinconsensus
-	PRIVATE
-		${OPENSSL_INCLUDE_DIR}
-        secp256k1/include
-)
 
 # Bitcoin server facilities
 add_library(server
@@ -634,9 +630,11 @@ add_library(server
 find_package(Event REQUIRED)
 
 target_include_directories(server
-	PRIVATE
+	SYSTEM PRIVATE
 		leveldb/helpers/memenv
 		${EVENT_INCLUDE_DIR}
+	SYSTEM PUBLIC
+		leveldb/include
 )
 
 target_link_libraries(server
@@ -701,7 +699,7 @@ add_library(rpcclient
 	rpc/http_response.h
 	support/events.h
 )
-target_link_libraries(rpcclient univalue util)
+target_link_libraries(rpcclient util)
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)
@@ -739,11 +737,13 @@ if(BUILD_BITCOIN_MINER)
 	add_executable(bitcoin-miner bitcoin-miner.cpp
 )
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
+
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
 
     if(ENABLE_TCMALLOC)
         target_link_libraries(bitcoin-miner ${TCMALLOC_LIBRARY})
     endif()
+
 endif()
 
 # bitcoind
