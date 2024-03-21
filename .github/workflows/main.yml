@@ -40,7 +40,7 @@ jobs:
         shell: bash
       - name: Flake8 checks
         run: |
-          flake8 test/functional 
+          flake8 test
         shell: bash
   
   autotools:

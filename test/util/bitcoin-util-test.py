@@ -57,7 +57,7 @@ def bctester(testDir, input_basename, buildenv, buildconfig):
         try:
             bctest(testDir, testObj, buildenv, buildconfig)
             logging.info("PASSED: " + testObj["description"])
-        except:
+        except Exception:
             logging.info("FAILED: " + testObj["description"])
             failed_testcases.append(testObj["description"])
 
@@ -78,7 +78,7 @@ def bctest(testDir, testObj, buildenv, buildconfig):
     """
 
     # Get the exec names and arguments
-    execprog = os.path.join(buildenv["BUILDDIR"], "src", buildconfig, 
+    execprog = os.path.join(buildenv["BUILDDIR"], "src", buildconfig,
                             testObj["exec"] + buildenv["EXEEXT"])
     execargs = testObj['args']
     execrun = [execprog] + execargs
@@ -100,7 +100,7 @@ def bctest(testDir, testObj, buildenv, buildconfig):
         outputType = os.path.splitext(outputFn)[1][1:]
         try:
             outputData = open(testDir + "/" + outputFn).read()
-        except:
+        except Exception:
             logging.error("Output file " + outputFn + " can not be opened")
             raise
         if not outputData:
