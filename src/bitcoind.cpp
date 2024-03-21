@@ -140,7 +140,7 @@ bool AppInit(int argc, char *argv[]) {
                             "both of these parameters to 0 however it is strongly recommended to ensure you understand "
                             "the implications of this setting.\n\n"
                             "For more information of how to choose these settings safely for your use case refer to: "
-                            "https://bitcoinsv.io/choosing-consensus-settings/");
+                            "https://node.bitcoinsv.io/sv-node/installation/sv-node/genesis-settings/");
             return false;
         }
         if (!gArgs.IsArgSet("-minminingtxfee"))
