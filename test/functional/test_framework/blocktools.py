@@ -390,7 +390,19 @@ class TxCreator:
         if not no_rehash:
             tx.rehash()
 
-    def create_signed_transaction(self, inputs, *, num_outputs=1, value=None, pubkey=None, scriptPubKey=None, tx_customize_func=None, fee=None, fee_rate=None, pubkey_change=None, scriptPubKey_change=None, sighash_flags=SIGHASH_ALL) -> CTransaction:
+    def create_signed_transaction(self,
+                                  inputs,
+                                  *,
+                                  num_outputs=1,
+                                  value=None,
+                                  pubkey=None,
+                                  scriptPubKey=None,
+                                  tx_customize_func=None,
+                                  fee=None,
+                                  fee_rate=None,
+                                  pubkey_change=None,
+                                  scriptPubKey_change=None,
+                                  sighash_flags=SIGHASH_ALL) -> CTransaction:
         """
         Create a new signed transaction with specified number of outputs and spending outputs provided in inputs argument.
 
@@ -732,7 +744,19 @@ class ChainManager():
         self._script_number += 1
         return CScript([self._script_number, OP_RETURN])
 
-    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
+    def next_block(self,
+                   number,
+                   spend=None,
+                   script=CScript([OP_TRUE]),
+                   block_size=0,
+                   extra_sigops=0,
+                   extra_txns=0,
+                   additional_coinbase_value=0,
+                   do_solve_block=True,
+                   coinbase_pubkey=None,
+                   coinbase_key=None,
+                   simple_output=False,
+                   version=None):
         if self.tip is None:
             base_block_hash = self._genesis_hash
             block_time = int(time()) + 1
