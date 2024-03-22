@@ -384,8 +384,13 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 1, which means nonstandard transaction will not even validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000', "-maxnonstdtxvalidationduration=11", "-dsnotifylevel=1"])
-
+        self.start_node(0, extra_args=['-dsendpointport=8080',
+                                       '-banscore=100000',
+                                       '-genesisactivationheight=1',
+                                       '-maxscriptsizepolicy=0',
+                                       '-maxscriptnumlengthpolicy=250000',
+                                       "-maxnonstdtxvalidationduration=11",
+                                       "-dsnotifylevel=1"])
         self.createConnection()
         # Create double spend of tx1
         vin = [
@@ -400,7 +405,13 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 2, which means nonstandard transaction will validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000', "-maxnonstdtxvalidationduration=11", "-dsnotifylevel=2"])
+        self.start_node(0, extra_args=['-dsendpointport=8080',
+                                       '-banscore=100000',
+                                       '-genesisactivationheight=1',
+                                       '-maxscriptsizepolicy=0',
+                                       '-maxscriptnumlengthpolicy=250000',
+                                       "-maxnonstdtxvalidationduration=11",
+                                       "-dsnotifylevel=2"])
 
         self.createConnection()
         vin = [

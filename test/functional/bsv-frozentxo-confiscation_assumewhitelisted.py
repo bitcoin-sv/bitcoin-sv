@@ -120,7 +120,15 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         return ctx
 
     def _create_and_send_tx(self, node):
-        tx = self._create_tx(self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) # TXO with standard P2PKH script that can normally only be spent if private key is known
+        tx = self._create_tx(self.chain.get_spendable_output(),
+                             b'',
+                             # TXO with standard P2PKH script that can
+                             # normally only be spent if private key is known
+                             CScript([OP_DUP,
+                                      OP_HASH160,
+                                      hash160(self.pubkey),
+                                      OP_EQUALVERIFY,
+                                      OP_CHECKSIG]))
         self.log.info(f"Sending transaction {tx.hash} and generating a new block")
         node.rpc.sendrawtransaction(ToHex(tx))
         assert_equal(node.rpc.getrawmempool(), [tx.hash])
@@ -168,7 +176,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         connect_nodes_bi(self.nodes, 0, 1)
 
         block_rej3 = self.make_block_with_tx(node, confiscate_tx1, 3)
-        self.log.info(f"Submitting block {block_rej3.hash} containing a non-whitelisted confiscation transaction {confiscate_tx1.hash} and checking it is rejected because -assumewhitelistedblockdepth=1 requires at least one descendant")
+        self.log.info(f"Submitting block {block_rej3.hash} containing a non-whitelisted confiscation transaction {confiscate_tx1.hash} and checking it is rejected because -assumewhitelistedblockdepth=1 requires at least one descendant") # noqa: E501
         node.rpc.submitblock(block_rej3.serialize().hex())
         self._wait_for_block_status(node, block_rej3.hash, "invalid")
         assert_equal(root_block_hash, node.rpc.getbestblockhash())

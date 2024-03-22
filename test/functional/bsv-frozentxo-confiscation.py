@@ -203,7 +203,15 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         return ctx
 
     def _create_and_send_tx(self, node):
-        tx = self._create_tx(self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) # TXO with standard P2PKH script that can normally only be spent if private key is known
+        tx = self._create_tx(self.chain.get_spendable_output(),
+                             b'',
+                             # TXO with standard P2PKH script that can normally
+                             # only be spent if private key is known
+                             CScript([OP_DUP,
+                                      OP_HASH160,
+                                      hash160(self.pubkey),
+                                      OP_EQUALVERIFY,
+                                      OP_CHECKSIG]))
         self.log.info(f"Sending transaction {tx.hash} and generating a new block")
         node.rpc.sendrawtransaction(ToHex(tx))
         assert_equal(node.rpc.getrawmempool(), [tx.hash])
@@ -574,8 +582,12 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         node.rpc.clearConfiscationWhitelist() # remove confiscation transaction from mempool by clearing whitelist
         assert_equal(node.rpc.getrawmempool(), [])
-
-        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE, OP_NOP])) # must use a different confiscation tx so that it is relayed again to node1 (because the first one was rejected)
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0),
+                                                     b'',
+                                                     # must use a different confiscation tx
+                                                     # so that it is relayed again to node1
+                                                     # (because the first one was rejected)
+                                                     CScript([OP_TRUE, OP_NOP]))
         self._whitelistTx(node, confiscate_tx, enforce_at_height)
         self._whitelistTx(node1, confiscate_tx, enforce_at_height + 1) # whitelisted, but not at current mempool height
 

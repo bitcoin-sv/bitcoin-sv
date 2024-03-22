@@ -447,7 +447,12 @@ def connect_nodes(nodes, from_node_num, to_node_num, wait_multistreams=True):
     subver = "testnode%d" % to_node_num
     # Number of streams between nodes that will be established
     number_of_streams = number_of_additional_streams(nodes[from_node_num], nodes[to_node_num]) + 1
-    wait_until(lambda: all(peer['version'] != 0 and (not multiStreamsEnabled or subver not in peer['subver'] or (peer['associd'] != 'Not-Set' and len(peer['streams']) == number_of_streams)) for peer in nodes[from_node_num].getpeerinfo()))
+    wait_until(lambda: all(peer['version'] != 0
+                           and (not multiStreamsEnabled
+                                or subver not in peer['subver']
+                                or (peer['associd'] != 'Not-Set'
+                                    and len(peer['streams']) == number_of_streams))
+                           for peer in nodes[from_node_num].getpeerinfo()))
 
 
 def connect_nodes_bi(nodes, a, b):
