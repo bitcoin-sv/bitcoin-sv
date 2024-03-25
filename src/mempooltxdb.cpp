@@ -40,35 +40,6 @@ void CMempoolTxDB::ClearDatabase()
     wrapper = std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, true);
 }
 
-bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
-{
-    uint64_t txCountAdded {0};
-    uint64_t diskUsageAdded {0};
-
-    auto batch = CDBBatch{*wrapper};
-    for (const auto& tx : txs)
-    {
-        if(! TransactionExists(tx->GetId()))
-        {
-            ++txCountAdded;
-            diskUsageAdded += tx->GetTotalSize();
-            batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
-        }
-    }
-    batch.Write(DB_DISK_USAGE, diskUsage.load() + diskUsageAdded);
-    batch.Write(DB_TX_COUNT, txCount.load() + txCountAdded);
-    batch.Erase(DB_MEMPOOL_XREF);
-
-    ++dbWriteCount;
-    if (wrapper->WriteBatch(batch, true))
-    {
-        diskUsage.fetch_add(diskUsageAdded);
-        txCount.fetch_add(txCountAdded);
-        return true;
-    }
-    return false;
-}
-
 bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx)
 {
     const auto key = std::make_pair(DB_TRANSACTIONS, txid);
@@ -87,36 +58,6 @@ bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx)
 bool CMempoolTxDB::TransactionExists(const uint256 &txid)
 {
     return wrapper->Exists(std::make_pair(DB_TRANSACTIONS, txid));
-}
-
-
-bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& txData)
-{
-    uint64_t txCountRemoved {0};
-    uint64_t diskUsageRemoved {0};
-
-    auto batch = CDBBatch{*wrapper};
-    for (const auto& td : txData)
-    {
-        if(TransactionExists(td.txid))
-        {
-            ++txCountRemoved;
-            diskUsageRemoved += td.size;
-            batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
-        }
-    }
-    batch.Write(DB_DISK_USAGE, diskUsage.load() - diskUsageRemoved);
-    batch.Write(DB_TX_COUNT, txCount.load() - txCountRemoved);
-    batch.Erase(DB_MEMPOOL_XREF);
-
-    ++dbWriteCount;
-    if (wrapper->WriteBatch(batch, true))
-    {
-        diskUsage.fetch_sub(diskUsageRemoved);
-        txCount.fetch_sub(txCountRemoved);
-        return true;
-    }
-    return false;
 }
 
 uint64_t CMempoolTxDB::GetDiskUsage()

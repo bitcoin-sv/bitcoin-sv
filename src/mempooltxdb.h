@@ -82,11 +82,6 @@ public:
     void ClearDatabase();
 
     /*
-     * Used to add a batch of new transactions into the database
-     */
-    bool AddTransactions(const std::vector<CTransactionRef>& txs);
-
-    /*
      * Used to retrieve transaction from the database.
      */
     // NOLINTNEXTLINE (cppcoreguidelines-explicit-virtual-functions)
@@ -107,10 +102,6 @@ public:
         TxData(TxId&& txid_, uint64_t size_) : txid{std::move(txid_)}, size{size_} {}
         TxData(const TxId& txid_, uint64_t size_) : txid{txid_}, size{size_} {}
     };
-    /*
-     * Used to remove a batch of transactions from the database.
-     */
-    bool RemoveTransactions(const std::vector<TxData>& txs);
 
     /**
      * Return the total size of transactions moved to disk.
@@ -131,8 +122,7 @@ public:
     using XrefKey = boost::uuids::uuid;
     /*
      * Set the mempool.dat cross-reference key. Any later change to the
-     * database (i.e., calls to ClearDatabase(), AddTransactions() or
-     * RemoveTransactions() will remove this key.
+     * database (i.e., calls to ClearDatabase() will remove this key.
      */
     bool SetXrefKey(const XrefKey& xrefKey);
 
