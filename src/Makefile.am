@@ -215,6 +215,7 @@ BITCOIN_CORE_H = \
   protocol.h \
   random.h \
   rawtxvalidator.h \
+  protocol_era.h \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
@@ -551,6 +552,7 @@ libbitcoin_common_a_SOURCES = \
   net/netaddress.cpp \
   net/netbase.cpp \
   protocol.cpp \
+  protocol_era.cpp \
   rpc/jsonwriter.cpp \
   scheduler.cpp \
   script/sign.cpp \

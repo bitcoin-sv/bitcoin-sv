@@ -159,6 +159,7 @@ add_test_to_suite(bitcoin test_bitcoin
     prefilled_tx_parser_tests.cpp
     prefilled_txs_parser_tests.cpp
 	prevector_tests.cpp
+    protocol_era_tests.cpp
 	protocol_tests.cpp
 	raii_event_tests.cpp
 	random_tests.cpp

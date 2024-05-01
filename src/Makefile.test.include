@@ -135,6 +135,7 @@ BITCOIN_TESTS =\
   test/prefilled_txs_parser_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
+  test/protocol_era_tests.cpp \
   test/protocol_tests.cpp \
   test/raii_event_tests.cpp \
   test/random_tests.cpp \
