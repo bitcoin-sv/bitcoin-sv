@@ -30,11 +30,12 @@ struct Params {
     int32_t uahfHeight;
     /** Block height at which the new DAA becomes active */
     int32_t daaHeight;
-    /** Block height at which the Genesis becomes active.
+    /** Block heights at which the Genesis and Chronicle releases become active.
       * The specified block height is the height of the block where the new rules are active.
       * It is not the height of the last block with the old rules.
       */
     int32_t genesisHeight;
+    int32_t chronicleHeight;
     /** Proof of work parameters */
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;
