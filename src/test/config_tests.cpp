@@ -784,4 +784,24 @@ BOOST_AUTO_TEST_CASE(tx_validation)
     BOOST_CHECK(! config.SetBlockScriptValidatorsParams(1, -1, -1, 1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(chronicle)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetChronicleGracefulPeriod(), DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD);
+    BOOST_CHECK(config.SetChronicleGracefulPeriod(DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD+1, &err));
+    BOOST_CHECK_EQUAL(config.GetChronicleGracefulPeriod(), DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD+1);
+    BOOST_CHECK(config.SetChronicleGracefulPeriod(0, &err));
+    BOOST_CHECK(config.SetChronicleGracefulPeriod(MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD, &err));
+    BOOST_CHECK(! config.SetChronicleGracefulPeriod(-1, &err));
+    BOOST_CHECK(! config.SetChronicleGracefulPeriod(MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD + 1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetChronicleActivationHeight(), 0);
+    BOOST_CHECK(config.SetChronicleActivationHeight(1, &err));
+    BOOST_CHECK_EQUAL(config.GetChronicleActivationHeight(), 1);
+    BOOST_CHECK(! config.SetChronicleActivationHeight(0, &err));
+    BOOST_CHECK(! config.SetChronicleActivationHeight(-1, &err));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
