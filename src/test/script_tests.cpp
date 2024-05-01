@@ -8,6 +8,7 @@
 #include "core_io.h"
 #include "key.h"
 #include "keystore.h"
+#include "protocol_era.h"
 #include "rpc/server.h"
 #include "script/opcodes.h"
 #include "script/script.h"
@@ -1761,7 +1762,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
                         ScriptErrorString(err));
 }
 
-void TestCombineSigs(bool genesisEnabled, bool utxoAfterGenesis) {
+void TestCombineSigs(ProtocolEra genesisEnabled, ProtocolEra utxoAfterGenesis) {
     // Test the CombineSignatures function
     const Config& config = GlobalConfig::GetConfig();
     Amount amount(0);
@@ -1848,7 +1849,7 @@ void TestCombineSigs(bool genesisEnabled, bool utxoAfterGenesis) {
     combined = CombineSignatures(config, true,
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
         SignatureData(scriptSigCopy), SignatureData(scriptSig), utxoAfterGenesis);
-    if (utxoAfterGenesis) {
+    if (IsProtocolActive(utxoAfterGenesis, ProtocolName::Genesis)) {
         // after genesis scriptPubKey will be nonstandard, CombineSignature will choose bigger or first SignatureData if they are equal
         BOOST_CHECK(combined.scriptSig == scriptSigCopy);
     } else {
@@ -1858,7 +1859,7 @@ void TestCombineSigs(bool genesisEnabled, bool utxoAfterGenesis) {
     combined = CombineSignatures(config, true,
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
         SignatureData(scriptSig), SignatureData(scriptSigCopy), utxoAfterGenesis);
-    if (utxoAfterGenesis) {
+    if (IsProtocolActive(utxoAfterGenesis, ProtocolName::Genesis)) {
         // after genesis scriptPubKey will be nonstandard, CombineSignature will choose bigger or first SignatureData if they are equal
         BOOST_CHECK(combined.scriptSig == scriptSigCopy);
     } else {
@@ -1945,9 +1946,9 @@ void TestCombineSigs(bool genesisEnabled, bool utxoAfterGenesis) {
 }
 
 BOOST_AUTO_TEST_CASE(script_combineSigs) {
-    TestCombineSigs(true, true);
-    TestCombineSigs(true, false);
-    TestCombineSigs(false, false);
+    TestCombineSigs(ProtocolEra::PostGenesis, ProtocolEra::PostGenesis);
+    TestCombineSigs(ProtocolEra::PostGenesis, ProtocolEra::PreGenesis);
+    TestCombineSigs(ProtocolEra::PreGenesis, ProtocolEra::PreGenesis);
 }
 
 BOOST_AUTO_TEST_CASE(script_standard_push) {
@@ -2250,15 +2251,15 @@ BOOST_AUTO_TEST_CASE(script_FindAndDelete) {
 
 BOOST_AUTO_TEST_CASE(script_IsUnspendable) {
 
-    BOOST_CHECK((CScript() << OP_RETURN).IsUnspendable(false));
-    BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(false));
+    BOOST_CHECK((CScript() << OP_RETURN).IsUnspendable(ProtocolEra::PreGenesis));
+    BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(ProtocolEra::PreGenesis));
 
     // OP_RETURN is no longer unspendable in Genesis
-    BOOST_CHECK(!(CScript() << OP_RETURN).IsUnspendable(true));
-    BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(true));
+    BOOST_CHECK(!(CScript() << OP_RETURN).IsUnspendable(ProtocolEra::PostGenesis));
+    BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(ProtocolEra::PostGenesis));
 }
 
-void CheckSolver(const CScript scriptPubKey, bool isGenesisEnabled,
+void CheckSolver(const CScript scriptPubKey, ProtocolEra isGenesisEnabled,
                        txnouttype expectedOutType, bool expectedResult) {
     std::vector<std::vector<uint8_t>> solutions;
     txnouttype outType;
@@ -2274,7 +2275,6 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
     std::vector<uint8_t> hash160(20, 2);
     std::vector<uint8_t> data(100, 3);
 
-    bool afterGenesis = true;
     CScript nonStandard = CScript() << OP_1;
     CScript P2PK = CScript() << pubKey << OP_CHECKSIG;
     CScript P2PKH = CScript() << OP_DUP << OP_HASH160 << hash160
@@ -2286,28 +2286,28 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
                        << OP_2 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
 
     // Test CheckSolver before genesis
-    CheckSolver(nonStandard, !afterGenesis, TX_NONSTANDARD, false);
-    CheckSolver(P2PK, !afterGenesis, TX_PUBKEY, true);
-    CheckSolver(P2PKH, !afterGenesis, TX_PUBKEYHASH, true);
-    CheckSolver(P2SH, !afterGenesis, TX_SCRIPTHASH, true);
-    CheckSolver(multisig, !afterGenesis, TX_MULTISIG, true);
+    CheckSolver(nonStandard, ProtocolEra::PreGenesis, TX_NONSTANDARD, false);
+    CheckSolver(P2PK, ProtocolEra::PreGenesis, TX_PUBKEY, true);
+    CheckSolver(P2PKH, ProtocolEra::PreGenesis, TX_PUBKEYHASH, true);
+    CheckSolver(P2SH, ProtocolEra::PreGenesis, TX_SCRIPTHASH, true);
+    CheckSolver(multisig, ProtocolEra::PreGenesis, TX_MULTISIG, true);
 
     // Test CheckSolver after genesis
-    CheckSolver(nonStandard, afterGenesis, TX_NONSTANDARD, false);
-    CheckSolver(P2PK, afterGenesis, TX_PUBKEY, true);
-    CheckSolver(P2PKH, afterGenesis, TX_PUBKEYHASH, true);
-    CheckSolver(P2SH, afterGenesis, TX_NONSTANDARD, false);
-    CheckSolver(multisig, afterGenesis, TX_MULTISIG, true);
+    CheckSolver(nonStandard, ProtocolEra::PostGenesis, TX_NONSTANDARD, false);
+    CheckSolver(P2PK, ProtocolEra::PostGenesis, TX_PUBKEY, true);
+    CheckSolver(P2PKH, ProtocolEra::PostGenesis, TX_PUBKEYHASH, true);
+    CheckSolver(P2SH, ProtocolEra::PostGenesis, TX_NONSTANDARD, false);
+    CheckSolver(multisig, ProtocolEra::PostGenesis, TX_MULTISIG, true);
 
     // Test CheckSolver - before Genesis both "OP_RETURN" and "OP_FALSE
     // OP_RETURN" is recognized as data
-    CheckSolver(opReturn, !afterGenesis, TX_NULL_DATA, true);
-    CheckSolver(opFalseOpReturn, !afterGenesis, TX_NULL_DATA, true);
+    CheckSolver(opReturn, ProtocolEra::PreGenesis, TX_NULL_DATA, true);
+    CheckSolver(opFalseOpReturn, ProtocolEra::PreGenesis, TX_NULL_DATA, true);
 
     // Test CheckSolver - after Genesis only "OP_FALSE OP_RETURN" is
     // recognized as data
-    CheckSolver(opReturn, afterGenesis, TX_NONSTANDARD, false);
-    CheckSolver(opFalseOpReturn, afterGenesis, TX_NULL_DATA, true);
+    CheckSolver(opReturn, ProtocolEra::PostGenesis, TX_NONSTANDARD, false);
+    CheckSolver(opFalseOpReturn, ProtocolEra::PostGenesis, TX_NULL_DATA, true);
 
     CScript multiSig_OP_16_with_19_keys = CScript() << OP_16;
     for (int i = 0; i < 19; i++)
@@ -2330,14 +2330,14 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
     }
     multiSig280 << CScriptNum(280) << OP_CHECKMULTISIG;
     //Test CheckSolver to check more than 16 keys before and after genesis
-    CheckSolver(multiSig_OP_16_with_19_keys, !afterGenesis, TX_MULTISIG, false);
-    CheckSolver(multiSig22, !afterGenesis, TX_NONSTANDARD, false);
-    CheckSolver(multiSig22, afterGenesis, TX_MULTISIG, true);
-    CheckSolver(multiSig280, afterGenesis, TX_MULTISIG, true);
+    CheckSolver(multiSig_OP_16_with_19_keys, ProtocolEra::PreGenesis, TX_MULTISIG, false);
+    CheckSolver(multiSig22, ProtocolEra::PreGenesis, TX_NONSTANDARD, false);
+    CheckSolver(multiSig22, ProtocolEra::PostGenesis, TX_MULTISIG, true);
+    CheckSolver(multiSig280, ProtocolEra::PostGenesis, TX_MULTISIG, true);
 
     //Test CheckSolver to check for non minimal encoded numbers and mark them as TX_NONSTANDARD
     CScript nonStardandNonMinimal = CScript() << 2 << pubKey << pubKey << std::vector<uint8_t>(1, 2) << OP_CHECKMULTISIG;
-    CheckSolver(nonStardandNonMinimal, !afterGenesis, TX_NONSTANDARD, false);
+    CheckSolver(nonStardandNonMinimal, ProtocolEra::PreGenesis, TX_NONSTANDARD, false);
 }
 
 BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
@@ -2348,7 +2348,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
     
     //Test solver before genesis with 2 pubkeys and 0 sigs
     CScript multisig_OP0_OP2 = CScript() << OP_0 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
-    bool result = Solver(multisig_OP0_OP2, false, txMultiSig, solutions);
+    bool result = Solver(multisig_OP0_OP2, ProtocolEra::PreGenesis, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 0);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 2);
 
@@ -2361,7 +2361,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
         multisig_OP1_OP16 << pubKey;
     }
     multisig_OP1_OP16 << OP_16 << OP_CHECKMULTISIG;
-    result = Solver(multisig_OP1_OP16, false, txMultiSig, solutions);
+    result = Solver(multisig_OP1_OP16, ProtocolEra::PreGenesis, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 16);
 
@@ -2373,7 +2373,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
         multisig_OP1_OP18 << pubKey;
     }
     multisig_OP1_OP18 << CScriptNum(18) << OP_CHECKMULTISIG;
-    result = Solver(multisig_OP1_OP18, false, txMultiSig, solutions);
+    result = Solver(multisig_OP1_OP18, ProtocolEra::PreGenesis, txMultiSig, solutions);
     BOOST_CHECK(result == false);
     BOOST_CHECK(txMultiSig == TX_NONSTANDARD);
 
@@ -2386,7 +2386,7 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
         multisig_OP1_OP300 << pubKey;
     }
     multisig_OP1_OP300 << CScriptNum(300) << OP_CHECKMULTISIG;
-    result = Solver(multisig_OP1_OP300, true, txMultiSig, solutions);
+    result = Solver(multisig_OP1_OP300, ProtocolEra::PostGenesis, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 300);
 }
@@ -2398,11 +2398,12 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
 
     CScript opReturn = CScript() << OP_RETURN << data;
 
-    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(false));
-    BOOST_CHECK(!CTxOut(Amount(1), opReturn).IsDust(false));
+    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(ProtocolEra::PreGenesis));
+    BOOST_CHECK(!CTxOut(Amount(1), opReturn).IsDust(ProtocolEra::PreGenesis));
 
-    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(true));
-    BOOST_CHECK(CTxOut(Amount(0), opReturn).IsDust(true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
+    BOOST_CHECK(!CTxOut(Amount(1), opFalseOpReturn).IsDust(ProtocolEra::PostGenesis));
+    // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
+    BOOST_CHECK(CTxOut(Amount(0), opReturn).IsDust(ProtocolEra::PostGenesis));
 }
 
 BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {

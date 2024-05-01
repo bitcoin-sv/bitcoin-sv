@@ -7,6 +7,7 @@
 #define BITCOIN_SCRIPT_STANDARD_H
 
 #include "script/interpreter.h"
+#include "protocol_era.h"
 #include "uint256.h"
 
 #include <boost/variant.hpp>
@@ -78,19 +79,18 @@ bool IsValidDestination(const CTxDestination &dest);
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction
  * types.
  */
-bool Solver(const CScript& scriptPubKey, bool genesisEnabled, txnouttype& typeRet,
+bool Solver(const CScript& scriptPubKey, ProtocolEra era, txnouttype& typeRet,
     std::vector<std::vector<uint8_t>>& vSolutionsRet);
 
 /*
  * Extract a single destination from P2PK, P2PKH, P2SH
  */
-bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled, CTxDestination &addressRet);
+bool ExtractDestination(const CScript &scriptPubKey, ProtocolEra era, CTxDestination &addressRet);
 /**
  * Extracts all destinations from the script. P2PK, P2PKH, P2SH and MULTISIG.
  */
-bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
-                         std::vector<CTxDestination> &addressRet,
-                         int &nRequiredRet);
+bool ExtractDestinations(const CScript &scriptPubKey, ProtocolEra era, txnouttype &typeRet,
+                         std::vector<CTxDestination> &addressRet, int &nRequiredRet);
 
 CScript GetScriptForDestination(const CTxDestination &dest);
 CScript GetScriptForRawPubKey(const CPubKey &pubkey);

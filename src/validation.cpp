@@ -42,6 +42,7 @@
 #include "primitives/transaction.h"
 #include "processing_block_index.h"
 #include "pubkey.h"
+#include "protocol_era.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -367,7 +368,7 @@ bool CheckSequenceLocks(
     CCoinsViewCache* viewMemPool)
 {
     // Post-genesis we don't care about the old sequence lock calculations
-    if(IsGenesisEnabled(config, tip.GetHeight()))
+    if(IsProtocolActive(GetProtocolEra(config, tip.GetHeight()), ProtocolName::Genesis))
     {
         return true;
     }
@@ -432,14 +433,14 @@ bool CheckSequenceLocks(
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled, bool& sigOpCountError) 
+uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, ProtocolEra era, bool& sigOpCountError) 
 {
     sigOpCountError = false;
     uint64_t nSigOps = 0;
     for (const auto &txin : tx.vin) 
     {
         // After Genesis, this should return 0, since only push data is allowed in input scripts:
-        nSigOps += txin.scriptSig.GetSigOpCount(false, isGenesisEnabled, sigOpCountError);
+        nSigOps += txin.scriptSig.GetSigOpCount(false, era, sigOpCountError);
         if (sigOpCountError)
         {
             return nSigOps;
@@ -448,7 +449,7 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled,
 
     for (const auto &txout : tx.vout) 
     {
-        nSigOps += txout.scriptPubKey.GetSigOpCount(false, isGenesisEnabled, sigOpCountError);
+        nSigOps += txout.scriptPubKey.GetSigOpCount(false, era, sigOpCountError);
         if (sigOpCountError)
         {
             return nSigOps;
@@ -472,16 +473,16 @@ uint64_t GetP2SHSigOpCount(const Config& config,
         auto coin = inputs.GetCoinWithScript(i.prevout);
         assert(coin.has_value() && !coin->IsSpent());
 
-        bool genesisEnabled = true;
-        if (coin->GetHeight() != MEMPOOL_HEIGHT){
-            genesisEnabled = IsGenesisEnabled(config, coin->GetHeight());
+        ProtocolEra era { ProtocolEra::PostGenesis };
+        if (coin->GetHeight() != MEMPOOL_HEIGHT) {
+            era = GetProtocolEra(config, coin->GetHeight());
         }
-        if (genesisEnabled) {
+        if (IsProtocolActive(era, ProtocolName::Genesis)) {
             continue;
         }
         const CTxOut &prevout = coin->GetTxOut();
         if (IsP2SH(prevout.scriptPubKey)) {
-            nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig, genesisEnabled, sigOpCountError);
+            nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig, era, sigOpCountError);
             if (sigOpCountError) {
                 return nSigOps;
             }
@@ -494,11 +495,11 @@ uint64_t GetTransactionSigOpCount(const Config& config,
                                   const CTransaction& tx,
                                   const ICoinsViewCache& inputs,
                                   bool checkP2SH,
-                                  bool isGenesisEnabled, 
+                                  ProtocolEra era,
                                   bool& sigOpCountError)
 {
     sigOpCountError = false;
-    uint64_t nSigOps = GetSigOpCountWithoutP2SH(tx, isGenesisEnabled, sigOpCountError);
+    uint64_t nSigOps = GetSigOpCountWithoutP2SH(tx, era, sigOpCountError);
     if (sigOpCountError) {
         return nSigOps;
     }
@@ -518,7 +519,8 @@ static bool CheckTransactionCommon(const CTransaction& tx,
                                    CValidationState& state,
                                    uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
                                    uint64_t maxTxSizeConsensus,
-                                   bool isGenesisEnabled) {
+                                   ProtocolEra era)
+{
     // Basic checks that don't depend on any context
     if (tx.vin.empty()) {
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
@@ -554,9 +556,9 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     }
 
     // No need to count sigops after Genesis, because sigops are unlimited
-    if (!isGenesisEnabled) {
+    if (!IsProtocolActive(era, ProtocolName::Genesis)) {
         bool sigOpCountError;
-        uint64_t nSigOpCount = GetSigOpCountWithoutP2SH(tx, isGenesisEnabled, sigOpCountError);
+        uint64_t nSigOpCount = GetSigOpCountWithoutP2SH(tx, era, sigOpCountError);
         if (sigOpCountError || nSigOpCount > maxTxSigOpsCountConsensusBeforeGenesis) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
         }
@@ -565,14 +567,19 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t height)
+bool CheckCoinbase(const CTransaction& tx,
+                   CValidationState& state,
+                   uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                   uint64_t maxTxSizeConsensus,
+                   ProtocolEra era,
+                   int32_t height)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
                          "first tx is not coinbase");
     }
 
-    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -584,17 +591,23 @@ bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t max
     return true;
 }
 
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled) {
+bool CheckRegularTransaction(const CTransaction &tx,
+                             CValidationState &state,
+                             uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                             uint64_t maxTxSizeConsensus,
+                             ProtocolEra era)
+{
     if (tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-tx-coinbase");
     }
     
-    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
 
-    if (isGenesisEnabled)
+    // Genesis enabled?
+    if (IsProtocolActive(era, ProtocolName::Genesis))
     {
         bool hasP2SHOutput = std::any_of(tx.vout.begin(), tx.vout.end(), 
             [](const CTxOut& o){ 
@@ -640,33 +653,6 @@ static bool IsUAHFenabled(const Config &config, int32_t nHeight) {
 
 bool IsDAAEnabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetChainParams().GetConsensus().daaHeight;
-}
-
-bool IsGenesisEnabled(const Config &config, int32_t nHeight) {
-    if (nHeight == MEMPOOL_HEIGHT) {
-        throw std::runtime_error("A coin with height == MEMPOOL_HEIGHT was passed "
-            "to IsGenesisEnabled() overload that does not handle this case. "
-            "Use the overload that takes Coin as parameter");
-    }
-
-    return nHeight >= config.GetGenesisActivationHeight();
-}
-
-bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight) {
-    auto height = coin.GetHeight();
-    if (height == MEMPOOL_HEIGHT) {
-        return mempoolHeight >= config.GetGenesisActivationHeight();
-    }
-    return height >= config.GetGenesisActivationHeight();
-}
-
-bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    // Genesis is enabled on the currently processed block, not on the current tip.
-    return IsGenesisEnabled(config, pindexPrev->GetHeight() + 1);
 }
 
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
@@ -815,9 +801,10 @@ static bool CheckAncestorLimits(const CTxMemPool& pool,
                                     std::ref(errString));
 }
 
-uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
+uint32_t GetScriptVerifyFlags(const Config &config, ProtocolEra era)
+{
     // Check inputs based on the set of flags we activate.
-    uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(genesisEnabled, false);
+    uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(era, ProtocolEra::PreGenesis);
     if (!config.GetChainParams().RequireStandard()) {
         if (config.IsSetPromiscuousMempoolFlags())
         {
@@ -988,16 +975,6 @@ static bool DoesNonFinalSpendNonFinal(const CTransaction& txn)
     return false;
 }
 
-static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
-{
-    if (((config.GetGenesisActivationHeight() - static_cast<int32_t>(config.GetGenesisGracefulPeriod())) < spendHeight) &&
-        ((config.GetGenesisActivationHeight() + static_cast<int32_t>(config.GetGenesisGracefulPeriod())) > spendHeight))
-    {
-        return true;
-    }
-    return false;
-}
-
 static CBlockSource TxInputDataToSource(const CTxInputData& data)
 {
     switch(data.GetTxSource())
@@ -1063,22 +1040,22 @@ CTxnValResult TxnValidation(
 
     // First check against consensus limits. If this check fails, then banscore will be increased. 
     // We re-test the transaction with policy rules later in this method (without banning if rules are violated)
-    bool isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+    ProtocolEra era { GetProtocolEra(config, chainActive.Height() + 1) };
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
-    uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
+    uint64_t maxTxSizeConsensus = config.GetMaxTxSize(era, true);
     // Coinbase is only valid in a block, not as a loose transaction.
-    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) 
+    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era)) 
     {
         // We will re-check the transaction if we are in Genesis gracefull period, to check if genesis rules would 
         // allow this script transaction to be accepted. If it is valid under Genesis rules, we only reject it
         // without adding banscore
-        bool isGenesisGracefulPeriod = IsGenesisGracefulPeriod(config, chainActive.Height() + 1);
-        if (isGenesisGracefulPeriod)
+        if (InProtocolGracePeriod(config, ProtocolName::Genesis, chainActive.Height() + 1))
         {
-            uint64_t maxTxSizeGraceful = config.GetMaxTxSize(!isGenesisEnabled, true);
+            ProtocolEra inverseEra { GetInverseProtocolEra(era, ProtocolName::Genesis) };
+            uint64_t maxTxSizeGraceful = config.GetMaxTxSize(inverseEra, true);
 
             CValidationState genesisState;
-            if (CheckRegularTransaction(tx, genesisState, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeGraceful, !isGenesisEnabled))
+            if (CheckRegularTransaction(tx, genesisState, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeGraceful, inverseEra))
             {
                 genesisState.DoS(0, false, REJECT_INVALID, "flexible-" + state.GetRejectReason());
                 return Result{ genesisState, pTxInputData };
@@ -1112,14 +1089,13 @@ CTxnValResult TxnValidation(
     // Set txn validation timeout if required.
     auto source = MakeValidationCancellationSource(fUseLimits, config, pTxInputData->GetTxValidationPriority(), cancellationBudget);
 
-    bool acceptNonStandardOutput = config.GetAcceptNonStandardOutput(isGenesisEnabled);
+    bool acceptNonStandardOutput = config.GetAcceptNonStandardOutput(era);
     if(!fStandard)
     {
         if (!acceptNonStandardOutput ||
-            (isGenesisEnabled && fRequireStandard && reason != "scriptpubkey"))
+            (IsProtocolActive(era, ProtocolName::Genesis) && fRequireStandard && reason != "scriptpubkey"))
         {
-            state.DoS(0, false, REJECT_NONSTANDARD,
-                      reason);
+            state.DoS(0, false, REJECT_NONSTANDARD, reason);
             return Result{state, pTxInputData};
         }
     }
@@ -1133,7 +1109,7 @@ CTxnValResult TxnValidation(
     {
         const CBlockIndex* tip = chainActive.Tip();
         int32_t height { tip->GetHeight() };
-        lockTimeFlags = StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height));
+        lockTimeFlags = StandardNonFinalVerifyFlags(GetProtocolEra(config, height));
         ContextualCheckTransactionForCurrentBlock(config, tx, height, tip->GetMedianTimePast(),
             ctxState, lockTimeFlags);
         if(ctxState.IsNonFinal() || ctxState.IsInvalid()) {
@@ -1265,12 +1241,12 @@ CTxnValResult TxnValidation(
     }
     bool sigOpCountError;
     const uint64_t nSigOpsCount{
-                GetTransactionSigOpCount(config, tx, view, true, isGenesisEnabled, sigOpCountError)
+        GetTransactionSigOpCount(config, tx, view, true, era, sigOpCountError)
     };
     // Check that the transaction doesn't have an excessive number of
     // sigops, making it impossible to mine. We consider this an invalid rather
     // than merely non-standard transaction.
-    if (sigOpCountError || nSigOpsCount > config.GetMaxTxSigOpsCountPolicy(IsGenesisEnabled(config, chainActive.Height() + 1))) {
+    if (sigOpCountError || nSigOpsCount > config.GetMaxTxSigOpsCountPolicy(era)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "bad-txns-too-many-sigops",
                   strprintf("%d", nSigOpsCount));
@@ -1356,7 +1332,7 @@ CTxnValResult TxnValidation(
 
     // We are getting flags as they would be if the utxos are before genesis. 
     // "CheckInputs" is adding specific flags for each input based on its height in the main chain
-    uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
+    uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, era);
     // Turn off flags that may be on in scriptVerifyFlags, but we explicitly want them to be skipped
     scriptVerifyFlags &= ~pTxInputData->GetSkipScriptFlags();
     // Check against previous transactions. This is done last to help
@@ -2150,23 +2126,26 @@ static void PostValidationStepsForFinalisedTxn(
 
 /**
  * Return transaction in txOut, and if it was found inside a block, its hash is
- * placed in hashBlock and info about if this is post-Genesis transactions is placed into isGenesisEnabled
+ * placed in hashBlock and info about which releases are activated for the
+ * transaction is placed into era.
  */
-bool GetTransaction(const Config &config, const TxId &txid,
+bool GetTransaction(const Config &config,
+                    const TxId &txid,
                     CTransactionRef &txOut,
                     bool fAllowSlow,
                     uint256 &hashBlock,
-                    bool& isGenesisEnabled
-                    ) {
+                    ProtocolEra& era)
+{
     const CBlockIndex *pindexSlow = nullptr;
-    isGenesisEnabled = true;
+    era = ProtocolEra::Unknown;
 
     LOCK(cs_main);
 
     CTransactionRef ptx = mempool.Get(txid);
     if (ptx) {
         txOut = ptx;
-        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1); // assume that the transaction from mempool will be mined in next block
+        // Assume that the transaction from mempool will be mined in next block
+        era = GetProtocolEra(config, chainActive.Height() + 1);
         return true;
     }
 
@@ -2185,7 +2164,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
             {
                 return error("%s: mapBlockIndex mismatch  ", __func__);
             }
-            isGenesisEnabled = IsGenesisEnabled(config, foundBlockIndex->GetHeight());
+            era = GetProtocolEra(config, foundBlockIndex->GetHeight());
             return true;
         }
     }
@@ -2211,7 +2190,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
                 if (tx->GetId() == txid) {
                     txOut = blockStreamReader->GetLastTransactionRef();
                     hashBlock = pindexSlow->GetBlockHash();
-                    isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->GetHeight());
+                    era = GetProtocolEra(config, pindexSlow->GetHeight());
                     return true;
                 }
             }
@@ -2644,10 +2623,10 @@ std::optional<bool> CheckInputScripts(
     const PrecomputedTransactionData& txdata,
     std::vector<CScriptCheck>* pvChecks)
 {
+    // What era are activated for this coin?
     int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coinHeight);
     uint32_t perInputScriptFlags = 0;
-    bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
-    if (isGenesisEnabled)
+    if (IsProtocolActive(GetProtocolEra(config, inputScriptBlockHeight), ProtocolName::Genesis))
     {
         perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
     }
@@ -2666,11 +2645,11 @@ std::optional<bool> CheckInputScripts(
     }
     else if (!res.value())
     {
-        bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
+        bool genesisGracePeriod { InProtocolGracePeriod(config, ProtocolName::Genesis, spendHeight) };
         const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
         // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
         // A failure is detected by a script number overflow in computations.
-        if (!genesisGracefulPeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
+        if (!genesisGracePeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
             return state.DoS(
                 10, false, REJECT_INVALID,
                 strprintf("max-script-num-length-policy-limit-violated (%s)",
@@ -2702,7 +2681,7 @@ std::optional<bool> CheckInputScripts(
                 return state.Invalid(false, REJECT_NONSTANDARD,
                         strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
             } 
-            else if (genesisGracefulPeriod)
+            else if (genesisGracePeriod)
             {
                 uint32_t flags3Check = flags2Check ^ SCRIPT_UTXO_AFTER_GENESIS;
 
@@ -2913,7 +2892,7 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    if (IsGenesisEnabled(config, pChainTip->GetHeight() + 1)) {
+    if (IsProtocolActive(GetProtocolEra(config, pChainTip->GetHeight() + 1), ProtocolName::Genesis)) {
         flags |= SCRIPT_GENESIS;
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
@@ -3225,7 +3204,7 @@ private:
                            std::atomic_uint64_t& nSigOpsCount,
                            const int nLockTimeFlags,
                            const uint32_t flags,
-                           const bool isGenesisEnabled,
+                           const ProtocolEra era,
                            const bool fScriptChecks,
                            const uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
                            const uint64_t nMaxSigOpsCountConsensusBeforeGenesis)
@@ -3280,12 +3259,12 @@ private:
             }
 
             // After Genesis we don't count sigops when connecting blocks
-            if (!isGenesisEnabled) {
+            if (!IsProtocolActive(era, ProtocolName::Genesis)) {
                 // GetTransactionSigOpCount counts 2 types of sigops:
                 // * legacy (always)
                 // * p2sh (when P2SH enabled)
                 bool sigOpCountError;
-                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, shard, flags & SCRIPT_VERIFY_P2SH, false, sigOpCountError);
+                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, shard, flags & SCRIPT_VERIFY_P2SH, era, sigOpCountError);
                 if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
                     return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
                 }
@@ -3389,12 +3368,12 @@ private:
 
         const Consensus::Params& consensusParams =
             config.GetChainParams().GetConsensus();
-        bool isGenesisEnabled = IsGenesisEnabled(config, pindex->GetHeight());
+        ProtocolEra era { GetProtocolEra(config, pindex->GetHeight()) };
 
         // Start enforcing BIP68 (sequence locks).
         int nLockTimeFlags = 0;
         if (pindex->GetHeight() >= consensusParams.CSVHeight) {
-            nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->GetHeight()));
+            nLockTimeFlags |= StandardNonFinalVerifyFlags(era);
         }
 
         uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
@@ -3541,7 +3520,7 @@ private:
                 std::ref(nSigOpsCount),
                 nLockTimeFlags,
                 flags,
-                isGenesisEnabled,
+                era,
                 fScriptChecks,
                 maxTxSigOpsCountConsensusBeforeGenesis,
                 nMaxSigOpsCountConsensusBeforeGenesis
@@ -3915,8 +3894,8 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew)
 
 static void FinalizeGenesisCrossing(const Config &config, int32_t height, const CJournalChangeSetPtr& changeSet)
 {
-    if ((IsGenesisEnabled(config, height + 1)) &&
-        (!IsGenesisEnabled(config, height)))
+    if (IsProtocolActive(GetProtocolEra(config, height + 1), ProtocolName::Genesis) &&
+       !IsProtocolActive(GetProtocolEra(config, height), ProtocolName::Genesis))
     {
         mempool.Clear();
         ClearCache();
@@ -5661,12 +5640,12 @@ bool CheckBlock(const Config &config, const CBlock &block,
         }
     }
 
-    bool isGenesisEnabled = IsGenesisEnabled(config, blockHeight);
+    ProtocolEra era { GetProtocolEra(config, blockHeight) };
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
-    uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
+    uint64_t maxTxSizeConsensus = config.GetMaxTxSize(era, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled, blockHeight)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era, blockHeight)) {
         auto result = state.Invalid(false, state.GetRejectCode(),
                                     state.GetRejectReason(),
                                     strprintf("Coinbase check failed (txid %s) %s",
@@ -5693,11 +5672,11 @@ bool CheckBlock(const Config &config, const CBlock &block,
     size_t i = 0;
     while (true) {
         // After Genesis we don't count sigops when verifying blocks
-        if (!isGenesisEnabled){
+        if (!IsProtocolActive(era, ProtocolName::Genesis)) {
             // Count the sigops for the current transaction. If the total sigops
             // count is too high, the the block is invalid.
             bool sigOpCountError;
-            nSigOps += GetSigOpCountWithoutP2SH(*tx, false, sigOpCountError);
+            nSigOps += GetSigOpCountWithoutP2SH(*tx, era, sigOpCountError);
             if (sigOpCountError || nSigOps > nMaxSigOpsCountConsensusBeforeGenesis) {
                 auto result = state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
                                         "out-of-bounds SigOpCount");
@@ -5721,9 +5700,8 @@ bool CheckBlock(const Config &config, const CBlock &block,
         // the coinbase, the loop is arranged such as this only runs after at
         // least one increment.
         tx = block.vtx[i].get();
-        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
+        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era)) {
             auto result = state.Invalid(
-
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",
                           tx->GetId().ToString(), state.GetDebugMessage()));
@@ -5826,7 +5804,7 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
     if(!IsFinalTx(tx, nHeight, nLockTimeCutoff))
     {
         state.SetNonFinal();
-        if(!fromBlock && IsGenesisEnabled(config, nHeight))
+        if(!fromBlock && IsProtocolActive(GetProtocolEra(config, nHeight), ProtocolName::Genesis))
         {
             return false;
         }

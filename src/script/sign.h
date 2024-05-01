@@ -6,6 +6,7 @@
 #ifndef BITCOIN_SCRIPT_SIGN_H
 #define BITCOIN_SCRIPT_SIGN_H
 
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/sighashtype.h"
 
@@ -80,16 +81,19 @@ struct SignatureData {
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator, bool genesisEnabled, bool utxoAfterGenesis,
+bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator,
+                      ProtocolEra era, ProtocolEra utxoEra,
                       const CScript& scriptPubKey, SignatureData& sigdata);
 
 /** Produce a script signature for a transaction. */
-bool SignSignature(const Config& config, const CKeyStore& keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CScript& fromPubKey,
+bool SignSignature(const Config& config, const CKeyStore& keystore,
+                   ProtocolEra era, ProtocolEra utxoEra,
+                   const CScript& fromPubKey,
                    CMutableTransaction& txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType);
-bool SignSignature(const Config& config, const CKeyStore& keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CTransaction& txFrom,
+bool SignSignature(const Config& config, const CKeyStore& keystore,
+                   ProtocolEra era, ProtocolEra utxoEra,
+                   const CTransaction& txFrom,
                    CMutableTransaction& txTo, unsigned int nIn,
                    SigHashType sigHashType);
 
@@ -99,7 +103,7 @@ SignatureData CombineSignatures(const Config& config, bool consensus, const CScr
                                 const BaseSignatureChecker &checker,
                                 const SignatureData &scriptSig1,
                                 const SignatureData &scriptSig2,
-                                bool utxoAfterGenesis);
+                                ProtocolEra utxoEra);
 
 /** Extract signature data from a transaction, and insert it. */
 SignatureData DataFromTransaction(const CMutableTransaction &tx,

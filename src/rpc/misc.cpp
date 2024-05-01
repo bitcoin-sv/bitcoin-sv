@@ -13,13 +13,13 @@
 #include "net/net.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
 #include "timedata.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
@@ -185,8 +185,12 @@ public:
             int nRequired;
             // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
             // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
-            const bool isGenesisEnabled = !IsP2SH(subscript);
-            ExtractDestinations(subscript, isGenesisEnabled, whichType, addresses, nRequired);
+            ProtocolEra era { ProtocolEra::PostGenesis };
+            if(IsP2SH(subscript))
+            {
+                era = ProtocolEra::PreGenesis;
+            }
+            ExtractDestinations(subscript, era, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(
                 Pair("hex", HexStr(subscript.begin(), subscript.end())));
@@ -821,7 +825,7 @@ Examples:
                 // If txo.height was specified (or we got it from coinsdb),
                 // it overrides per-input script verification flags.
                 flags &= ~SCRIPT_UTXO_AFTER_GENESIS;
-                if(IsGenesisEnabled(config, *txo_height))
+                if(IsProtocolActive(GetProtocolEra(config, *txo_height), ProtocolName::Genesis))
                 {
                     flags |= SCRIPT_UTXO_AFTER_GENESIS;
                 }
@@ -1207,7 +1211,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
 
     obj.push_back(Pair("excessiveblocksize", config.GetMaxBlockSize()));
     obj.push_back(Pair("blockmaxsize", config.GetMaxGeneratedBlockSize()));
-    obj.push_back(Pair("maxtxsizepolicy", config.GetMaxTxSize(true, false)));
+    obj.push_back(Pair("maxtxsizepolicy", config.GetMaxTxSize(ProtocolEra::PostGenesis, false)));
     obj.push_back(Pair("maxorphantxsize", config.GetMaxOrphanTxSize()));
     obj.push_back(Pair("datacarriersize", config.GetDataCarrierSize()));
 
@@ -1215,7 +1219,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("maxopsperscriptpolicy", config.GetMaxOpsPerScript(true, false)));
     obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(true, false)));
     obj.push_back(Pair("maxpubkeyspermultisigpolicy", config.GetMaxPubKeysPerMultiSig(true, false)));
-    obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(true)));
+    obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis)));
     obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));
     obj.push_back(Pair("maxstackmemoryusageconsensus", config.GetMaxStackMemoryUsage(true, true)));
 
@@ -1226,7 +1230,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("maxmempoolsizedisk", config.GetMaxMempoolSizeDisk()));
     obj.push_back(Pair("mempoolmaxpercentcpfp", config.GetMempoolMaxPercentCPFP()));
 
-    obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+    obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
     obj.push_back(Pair("datacarrier", config.GetDataCarrier()));
     obj.push_back(Pair("minminingtxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));

@@ -1028,7 +1028,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
-                config.GetAcceptNonStandardOutput(true)));
+                config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
     }
     strUsage += HelpMessageOpt(
@@ -2900,7 +2900,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                       chainparams.NetworkIDString()));
 
     config.SetAcceptNonStandardOutput(
-        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
 
     // Enable selfish mining detection

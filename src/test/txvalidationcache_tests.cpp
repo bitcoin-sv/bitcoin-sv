@@ -11,6 +11,7 @@
 #include "mining/assembler.h"
 #include "pubkey.h"
 #include "random.h"
+#include "protocol_era.h"
 #include "script/scriptcache.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
@@ -525,13 +526,13 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         ProduceSignature(config, true,
             MutableTransactionSignatureCreator(&keystore, &tx, 0, 11 * CENT,
                                                SigHashType().withForkId()),
-            true, false, spend_tx.vout[0].scriptPubKey, sigdata);
+            ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, spend_tx.vout[0].scriptPubKey, sigdata);
 
         UpdateTransaction(tx, 0, sigdata);
         ProduceSignature(config, true,
             MutableTransactionSignatureCreator(&keystore, &tx, 1, 11 * CENT,
                                                SigHashType().withForkId()),
-            true, false, spend_tx.vout[3].scriptPubKey, sigdata);
+            ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, spend_tx.vout[3].scriptPubKey, sigdata);
         UpdateTransaction(tx, 1, sigdata);
 
         auto shouldPass = [](uint32_t flags) -> bool {

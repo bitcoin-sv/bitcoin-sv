@@ -5,6 +5,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/ismine.h"
 #include "script/script.h"
@@ -294,7 +295,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         txnouttype whichType;
         CScript s;
         s << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK(solutions.size() == 1);
             CTxDestination addr;
@@ -310,7 +311,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_DUP << OP_HASH160 << ToByteVector(key[0].GetPubKey().GetID())
           << OP_EQUALVERIFY << OP_CHECKSIG;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK(solutions.size() == 1);
             CTxDestination addr;        
@@ -325,12 +326,12 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         std::vector<valtype> solutions;
         CScript opReturn = CScript() << OP_RETURN << data;
         CTxDestination addr;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(!ExtractDestination(opReturn, genesisEnabled, addr));
         }
         BOOST_CHECK(!IsMine(keystore, opReturn));
         CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(!ExtractDestination(opReturn, genesisEnabled, addr));
         }
         BOOST_CHECK(!IsMine(keystore, opReturn));
@@ -342,7 +343,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             CTxDestination addr;
@@ -359,7 +360,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_1 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
 
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             
@@ -383,9 +384,9 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey())
           << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-        BOOST_CHECK(Solver(s, true, whichType, solutions));
+        BOOST_CHECK(Solver(s, ProtocolEra::PostGenesis, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
-        BOOST_CHECK(Solver(s, false, whichType, solutions));
+        BOOST_CHECK(Solver(s, ProtocolEra::PreGenesis, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
 
     }
@@ -431,11 +432,11 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     }
 
     for (int i = 0; i < 3; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, true, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));

@@ -6,6 +6,7 @@
 
 #include "keystore.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "script/int_serialization.h"
 #include "script/interpreter.h"
 #include "script/script_num.h"
@@ -1202,7 +1203,7 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
     }
     // Include multisig opcode count as well.
     bool sigOpCountError;
-    return cnt + script.GetSigOpCount(true, false, sigOpCountError);
+    return cnt + script.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError);
 } 
  
 static void CheckTestForOpCodeLimit(const CScript &script,

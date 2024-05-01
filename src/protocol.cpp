@@ -71,7 +71,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
     {
         // If the message is TX, it is limited to max consensus tx size after Genesis
         // can not use policy limit because of banning rules.
-        return config.GetMaxTxSize(true, true);
+        return config.GetMaxTxSize(ProtocolEra::PostGenesis, true);
     }
     else if (command == NetMsgType::GETBLOCKTXN)
     {

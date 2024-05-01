@@ -153,16 +153,16 @@ BOOST_AUTO_TEST_CASE(max_tx_size) {
 
 
     // default pre genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
 
     // default post genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, false) == DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, false) == DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
 
     // default pre genesis consensus tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, true) == MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, true) == MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     // default post genesis consensus tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, true) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, true) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
 
 
     // can not set policy tx size < pre genesis policy tx size
@@ -179,20 +179,20 @@ BOOST_AUTO_TEST_CASE(max_tx_size) {
     BOOST_CHECK(config.SetMaxTxSizePolicy(newMaxTxSizePolicy, &reason));
 
     // pre genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
 
     // post genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, false) == static_cast<uint64_t>(newMaxTxSizePolicy));
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, false) == static_cast<uint64_t>(newMaxTxSizePolicy));
 
 
     // set unlimited policy tx size
     BOOST_CHECK(config.SetMaxTxSizePolicy(0, &reason));
 
     // pre genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
 
     // post genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, false) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, false) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
 }
 
 BOOST_AUTO_TEST_CASE(max_bignum_length_policy) {

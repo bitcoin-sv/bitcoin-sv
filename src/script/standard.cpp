@@ -36,10 +36,12 @@ const char *GetTxnOutputType(txnouttype t) {
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction
  * types.
  */
-bool Solver(const CScript &scriptPubKey, 
-    bool genesisEnabled,
+bool Solver(
+    const CScript &scriptPubKey, 
+    ProtocolEra era,
     txnouttype &typeRet,
-    std::vector<std::vector<uint8_t>> &vSolutionsRet) {
+    std::vector<std::vector<uint8_t>> &vSolutionsRet)
+{
     // Templates
     static std::multimap<txnouttype, CScript> mTemplates{
             // Standard tx, sender provides pubkey, receiver adds signature
@@ -67,7 +69,7 @@ bool Solver(const CScript &scriptPubKey,
     // other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL
     if (IsP2SH(scriptPubKey)) {
-        if (genesisEnabled) {
+        if (IsProtocolActive(era, ProtocolName::Genesis)) {
             typeRet = TX_NONSTANDARD;
             return false;
         } else {
@@ -82,7 +84,7 @@ bool Solver(const CScript &scriptPubKey,
     bool isOpReturn = false;
     int offset = 0;
     //check if starts with OP_RETURN (only before Genesis upgrade) or OP_FALSE, OP_RETURN (both pre and post Genesis upgrade)
-    if (!genesisEnabled && scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
+    if (!IsProtocolActive(era, ProtocolName::Genesis) && scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
         isOpReturn = true;
         offset = 1;
     }
@@ -169,8 +171,8 @@ bool Solver(const CScript &scriptPubKey,
                 }
                 vSolutionsRet.push_back(vch1);
             } else if (opcode2 == OP_SMALLINTEGER) {
-                // OP_0 is pushed onto vector as empty element because of minimal enconding that CScriptNum class (used 40 lines higher) checks
-                if (opcode1 == OP_0 || (genesisEnabled && !vch1.empty())) {
+                // OP_0 is pushed onto vector as empty element because of minimal encoding that CScriptNum class (used 40 lines higher) checks
+                if (opcode1 == OP_0 || (IsProtocolActive(era, ProtocolName::Genesis) && !vch1.empty())) {
                     //if number size is greater than currently max allowed (4 bytes) we break the execution and mark the transaction as non-standard
                     if (vch1.size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
                         break;
@@ -195,11 +197,11 @@ bool Solver(const CScript &scriptPubKey,
     return false;
 }
 
-bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled,
-                        CTxDestination &addressRet) {
+bool ExtractDestination(const CScript &scriptPubKey, ProtocolEra era, CTxDestination &addressRet)
+{
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, isGenesisEnabled, whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, era, whichType, vSolutions)) {
         return false;
     }
 
@@ -224,13 +226,13 @@ bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled,
     return false;
 }
 
-bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
-                         std::vector<CTxDestination> &addressRet,
-                         int &nRequiredRet) {
+bool ExtractDestinations(const CScript &scriptPubKey, ProtocolEra era, txnouttype &typeRet,
+                         std::vector<CTxDestination> &addressRet, int &nRequiredRet)
+{
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, isGenesisEnabled, typeRet, vSolutions)) {
+    if (!Solver(scriptPubKey, era, typeRet, vSolutions)) {
         return false;
     }
 
@@ -257,7 +259,7 @@ bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txn
     } else {
         nRequiredRet = 1;
         CTxDestination address;
-        if (!ExtractDestination(scriptPubKey, isGenesisEnabled, address)) {
+        if (!ExtractDestination(scriptPubKey, era, address)) {
             return false;
         }
         addressRet.push_back(address);

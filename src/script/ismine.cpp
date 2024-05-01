@@ -7,6 +7,7 @@
 
 #include "key.h"
 #include "keystore.h"
+#include "protocol_era.h"
 #include "script/script.h"
 #include "script/sign.h"
 #include "script/standard.h"
@@ -46,8 +47,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
     txnouttype whichType;
     // We will assume that the utxo is before genesis if it is P2SH because we still want to recognize 
     // P2SH scripts as ours and we don't have utxo height here.
-    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
-    if (!Solver(scriptPubKey, isGenesisEnabled, whichType, vSolutions)) {
+    ProtocolEra utxoEra { IsP2SH(scriptPubKey)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+    if (!Solver(scriptPubKey, utxoEra, whichType, vSolutions)) {
         if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_UNSOLVABLE;
         return ISMINE_NO;
@@ -98,7 +99,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
         SignatureData sigs;
         
         const Config &config = GlobalConfig::GetConfig();
-        return ProduceSignature(config, true, DummySignatureCreator(&keystore), true, isGenesisEnabled,
+        return ProduceSignature(config, true, DummySignatureCreator(&keystore),
+                                ProtocolEra::PostGenesis, utxoEra,
                                 scriptPubKey, sigs)
                    ? ISMINE_WATCH_SOLVABLE
                    : ISMINE_WATCH_UNSOLVABLE;

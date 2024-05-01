@@ -14,6 +14,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "rpc/client_config.h"
 #include "rpc/webhook_client_defaults.h"
 #include "script/standard.h"
@@ -46,7 +47,7 @@ public:
     virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
-    virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const = 0;
     virtual uint64_t GetMinConsolidationFactor() const = 0;
     virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
     virtual uint64_t GetMinConfConsolidationInput() const = 0;
@@ -74,7 +75,7 @@ public:
     virtual uint64_t GetBlockValidationTxBatchSize() const = 0;
 
     virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
-    virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const = 0;
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
@@ -84,7 +85,7 @@ public:
     virtual PTVTaskScheduleStrategy GetPTVTaskScheduleStrategy() const = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
     virtual uint64_t GetChronicleGracefulPeriod() const = 0;
-    virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
+    virtual bool GetAcceptNonStandardOutput(ProtocolEra era) const = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
     virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
@@ -404,7 +405,7 @@ public:
     const CChainParams &GetChainParams() const override;
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
-    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const  override;
 
     bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMinConsolidationFactor() const  override;
@@ -478,7 +479,7 @@ public:
 
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
     uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override;
-    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override;
+    uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const override;
 
     uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override;
 
@@ -519,7 +520,7 @@ public:
     uint64_t GetChronicleGracefulPeriod() const override;
 
     void SetAcceptNonStandardOutput(bool accept) override;
-    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
+    bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsViewCacheSize() const override {return data->mMaxCoinsViewCacheSize;}
@@ -978,7 +979,7 @@ public:
         maxTxSizePolicy = static_cast<uint64_t>(value);
         return false;
     }
-    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override { return maxTxSizePolicy; }
 
     bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override
     {
@@ -1112,7 +1113,7 @@ public:
     }
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
-    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
 
     uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
 
@@ -1207,9 +1208,9 @@ public:
     }
 
     void SetAcceptNonStandardOutput(bool) override {}
-    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override
+    bool GetAcceptNonStandardOutput(ProtocolEra era) const override
     {
-        return isGenesisEnabled ? true : !fRequireStandard;
+        return IsProtocolActive(era, ProtocolName::Genesis) ? true : !fRequireStandard;
     }
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override

@@ -7,6 +7,7 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
+#include "protocol_era.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
@@ -204,16 +205,16 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(bool isGenesisEnabled) const {
+    Amount GetDustThreshold(ProtocolEra era) const {
         // dust threshold is now hardcoded to 1 satoshi per output
-        if (scriptPubKey.IsUnspendable(isGenesisEnabled))
+        if (scriptPubKey.IsUnspendable(era))
             return Amount{0};
 
         return Amount{1};
     }
 
-    bool IsDust(bool isGenesisEnabled) const {
-        return (nValue < GetDustThreshold(isGenesisEnabled));
+    bool IsDust(ProtocolEra era) const {
+        return (nValue < GetDustThreshold(era));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {

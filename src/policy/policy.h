@@ -7,6 +7,7 @@
 #define BITCOIN_POLICY_POLICY_H
 
 #include "consensus/consensus.h"
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
 #include "util.h"
@@ -192,13 +193,13 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
     STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
 
 /** returns flags for "standard" script*/
-inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
-                                       bool utxoAfterGenesis) {
+inline unsigned int StandardScriptVerifyFlags(ProtocolEra era, ProtocolEra utxoEra)
+{
     unsigned int scriptFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
-    if (utxoAfterGenesis) {
+    if (IsProtocolActive(utxoEra, ProtocolName::Genesis)) {
         scriptFlags |= SCRIPT_UTXO_AFTER_GENESIS;
     }
-    if (genesisEnabled) {
+    if (IsProtocolActive(era, ProtocolName::Genesis)) {
         scriptFlags |= SCRIPT_GENESIS;
         scriptFlags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
@@ -206,10 +207,11 @@ inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
 }
 
 /** Get the flags to use for non-final transaction checks */
-inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
+inline unsigned int StandardNonFinalVerifyFlags(ProtocolEra era)
 {
     unsigned int flags { LOCKTIME_MEDIAN_TIME_PAST };
-    if(!genesisEnabled) {
+    if(! IsProtocolActive(era, ProtocolName::Genesis))
+    {
         flags |= LOCKTIME_VERIFY_SEQUENCE;
     }
     return flags;
