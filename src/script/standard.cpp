@@ -171,7 +171,7 @@ bool Solver(
                 }
                 vSolutionsRet.push_back(vch1);
             } else if (opcode2 == OP_SMALLINTEGER) {
-                // OP_0 is pushed onto vector as empty element because of minimal encoding that CScriptNum class (used 40 lines higher) checks
+                // OP_0 may be pushed onto vector as empty element if minimal encoding is used
                 if (opcode1 == OP_0 || (IsProtocolActive(era, ProtocolName::Genesis) && !vch1.empty())) {
                     //if number size is greater than currently max allowed (4 bytes) we break the execution and mark the transaction as non-standard
                     if (vch1.size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
@@ -322,3 +322,13 @@ CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey> &keys) {
 bool IsValidDestination(const CTxDestination &dest) {
     return dest.which() != 0;
 }
+
+uint32_t MandatoryScriptVerifyFlags(ProtocolEra era)
+{
+    if(IsProtocolActive(era, ProtocolName::Chronicle))
+    {
+        return POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS;
+    }
+    return PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS;
+}
+

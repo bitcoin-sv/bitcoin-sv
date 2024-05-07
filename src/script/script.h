@@ -256,13 +256,11 @@ public:
      * Returns whether the script is guaranteed to fail at execution, regardless
      * of the initial stack. This allows outputs to be pruned instantly when
      * entering the UTXO set.
-     * nHeight reflects the height of the block that script was mined in
+     * era reflects the height of the block that script was mined in.
      * For Genesis OP_RETURN this can return false negatives. For example if we have:
      *   <some complex script that always return OP_FALSE> OP_RETURN
      * this function will return false even though the ouput is unspendable.
-     * 
      */
-
     bool IsUnspendable(ProtocolEra era) const
     {
         if(IsProtocolActive(era, ProtocolName::Genesis))

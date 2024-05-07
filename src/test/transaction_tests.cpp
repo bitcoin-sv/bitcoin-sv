@@ -485,7 +485,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         std::vector<CScriptCheck> vChecks;
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
         vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, static_cast<unsigned int>(i),
-                             MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
+                             PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
         
         control.Add(vChecks);
     }
@@ -538,14 +538,15 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     SignatureData sigdata;
 
     // Normal pay-to-compressed-pubkey.
+    int PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS = static_cast<int>(ScriptVerifyFlags::PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS);
     CreateCreditAndSpend(keystore, scriptPubkey1, output1, input1, true, true);
     CreateCreditAndSpend(keystore, scriptPubkey2, output2, input2, true, true);
     CheckWithFlag(output1, input1, 0, true, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
+    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
     CheckWithFlag(output1, input2, 0, false, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
+    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
 
     // P2SH pay-to-compressed-pubkey.
     CreateCreditAndSpend(keystore,
@@ -557,20 +558,20 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1);
     CheckWithFlag(output1, input1, 0, true, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
+    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
     CheckWithFlag(output1, input2, 0, true, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, true);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script
+    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script
 
     // Normal pay-to-uncompressed-pubkey.
     CreateCreditAndSpend(keystore, scriptPubkey1L, output1, input1, true, true);
     CreateCreditAndSpend(keystore, scriptPubkey2L, output2, input2, true, true);
     CheckWithFlag(output1, input1, 0, true, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
+    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
     CheckWithFlag(output1, input2, 0, false, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
+    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
 
     // P2SH pay-to-uncompressed-pubkey.
     CreateCreditAndSpend(keystore,
@@ -582,10 +583,10 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1L);
     CheckWithFlag(output1, input1, 0, true, true);                             // allways passes because redeem script is left on stack and it is converted to TRUE
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
+    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
     CheckWithFlag(output1, input2, 0, true, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, true);           // after genesis passes beacuse script matches but we dont evaluate it
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script 
+    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script 
 
     // Normal 2-of-2 multisig
     CreateCreditAndSpend(keystore, scriptMulti, output1, input1, false, false);
@@ -599,8 +600,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
                                      DataFromTransaction(input2, 0),
-                                     ProtocolEra::PreGenesis));
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
+                                     ProtocolEra::PreGenesis, ProtocolEra::PreGenesis));
+    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
 
     // P2SH 2-of-2 multisig
     CreateCreditAndSpend(keystore,
@@ -620,9 +621,9 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
                                      DataFromTransaction(input2, 0), 
-                                     ProtocolEra::PreGenesis));
+                                     ProtocolEra::PreGenesis, ProtocolEra::PreGenesis));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
+    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
 }
 
 BOOST_AUTO_TEST_CASE(test_IsStandard) {

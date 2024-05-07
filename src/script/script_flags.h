@@ -91,8 +91,7 @@ enum {
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-
-    // Is Genesis enabled - transcations that is being executed is part of block that uses Geneisis rules.
+    // Is Genesis enabled - transaction that is being executed is part of block that uses Genesis rules.
     //
     SCRIPT_GENESIS = (1U << 18),
 
@@ -101,8 +100,16 @@ enum {
     // This is per (input!) UTXO flag
     SCRIPT_UTXO_AFTER_GENESIS = (1U << 19),
 
+    // Is Chronicle enabled - transaction that is being executed is part of block that uses Chronicle rules.
+    //
+    SCRIPT_CHRONICLE = (1U << 20),
+
+    // UTXO being used in this script was created *after* Chronicle upgrade has been activated.
+    // This is per (input!) UTXO flag
+    SCRIPT_UTXO_AFTER_CHRONICLE = (1U << 21),
+
     // Not actual flag. Used for marking largest flag value.
-    SCRIPT_FLAG_LAST = (1U << 20)
+    SCRIPT_FLAG_LAST = (1U << 22)
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

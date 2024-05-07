@@ -177,44 +177,108 @@ static constexpr int64_t DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH = 60;
 * the block to be classified as selfishly mined */
 static constexpr uint64_t DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT = 10;
 
-/**
- * Standard script verification flags that standard transactions will comply
- * with. However scripts violating these flags may still be present in valid
- * blocks and we must accept those blocks.
- */
-static const unsigned int STANDARD_SCRIPT_VERIFY_FLAGS =
-    MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_DERSIG |
-    SCRIPT_VERIFY_MINIMALDATA | SCRIPT_VERIFY_NULLDUMMY |
-    SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | SCRIPT_VERIFY_CLEANSTACK |
-    SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
-
-/** For convenience, standard but not mandatory verify flags. */
-static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
-    STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
-
-/** returns flags for "standard" script*/
-inline unsigned int StandardScriptVerifyFlags(ProtocolEra era, ProtocolEra utxoEra)
+/** Useful combinations of script verification flags.  */
+enum class ScriptVerifyFlags : uint32_t
 {
-    unsigned int scriptFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
-    if (IsProtocolActive(utxoEra, ProtocolName::Genesis)) {
-        scriptFlags |= SCRIPT_UTXO_AFTER_GENESIS;
+    /**
+     * Standard script verification flags that standard transactions will comply
+     * with. However scripts violating these flags may still be present in valid
+     * blocks and we must accept those blocks.
+     */
+    PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS =
+        PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+        SCRIPT_VERIFY_DERSIG |
+        SCRIPT_VERIFY_NULLDUMMY |
+        SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
+        SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
+        SCRIPT_VERIFY_CHECKSEQUENCEVERIFY |
+        SCRIPT_VERIFY_CLEANSTACK |
+        SCRIPT_VERIFY_MINIMALDATA,
+
+    POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS =
+        POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+        SCRIPT_VERIFY_DERSIG |
+        SCRIPT_VERIFY_NULLDUMMY |
+        SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | 
+        SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
+        SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
+
+    /** For convenience, standard but not mandatory verify flags. */
+    PRE_CHRONICLE_STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
+        PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS & ~PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+
+    POST_CHRONICLE_STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
+        POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS & ~POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS
+};
+
+/** returns flags for "standard" script based on current era */
+inline uint32_t StandardScriptVerifyFlags(ProtocolEra era)
+{
+    uint32_t scriptFlags { static_cast<uint32_t>(ScriptVerifyFlags::PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS) };
+    if(IsProtocolActive(era, ProtocolName::Chronicle))
+    {
+        scriptFlags = static_cast<uint32_t>(ScriptVerifyFlags::POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS);
     }
-    if (IsProtocolActive(era, ProtocolName::Genesis)) {
+
+    if(IsProtocolActive(era, ProtocolName::Genesis))
+    {
         scriptFlags |= SCRIPT_GENESIS;
-        scriptFlags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
+    if(IsProtocolActive(era, ProtocolName::Chronicle))
+    {
+        scriptFlags |= SCRIPT_CHRONICLE;
+    }
+
     return scriptFlags;
 }
 
-/** Get the flags to use for non-final transaction checks */
-inline unsigned int StandardNonFinalVerifyFlags(ProtocolEra era)
+/** returns flags for input script based on current era and utxo era */
+inline uint32_t InputScriptVerifyFlags(ProtocolEra era, ProtocolEra utxoEra)
 {
-    unsigned int flags { LOCKTIME_MEDIAN_TIME_PAST };
+    uint32_t inputFlags {0};
+
+    // Between Genesis & Chronicle we apply SCRIPT_VERIFY_SIGPUSHONLY for all inputs.
+    // After Chronicle we apply SCRIPT_VERIFY_SIGPUSHONLY to UTXOs created between Genesis & Chronicle.
+    if((IsProtocolActive(era, ProtocolName::Genesis) && !IsProtocolActive(era, ProtocolName::Chronicle)) ||
+       (IsProtocolActive(era, ProtocolName::Chronicle) && IsProtocolActive(utxoEra, ProtocolName::Genesis) && !IsProtocolActive(utxoEra, ProtocolName::Chronicle)))
+    {
+        inputFlags |= SCRIPT_VERIFY_SIGPUSHONLY;
+    }
+
+    if(IsProtocolActive(utxoEra, ProtocolName::Genesis))
+    {
+        inputFlags |= SCRIPT_UTXO_AFTER_GENESIS;
+    }
+    if(IsProtocolActive(utxoEra, ProtocolName::Chronicle))
+    {
+        inputFlags |= SCRIPT_UTXO_AFTER_CHRONICLE;
+    }
+
+    return inputFlags;
+}
+
+/** Get the flags to use for non-final transaction checks */
+inline uint32_t StandardNonFinalVerifyFlags(ProtocolEra era)
+{
+    uint32_t flags { LOCKTIME_MEDIAN_TIME_PAST };
     if(! IsProtocolActive(era, ProtocolName::Genesis))
     {
         flags |= LOCKTIME_VERIFY_SEQUENCE;
     }
     return flags;
+}
+
+/** Returns standard, but not mandatory, script verification flags */
+inline uint32_t StandardNotMandatoryScriptVerifyFlags(ProtocolEra era)
+{
+    if(IsProtocolActive(era, ProtocolName::Chronicle))
+    {
+        return static_cast<uint32_t>(ScriptVerifyFlags::POST_CHRONICLE_STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+    }
+    else
+    {
+        return static_cast<uint32_t>(ScriptVerifyFlags::PRE_CHRONICLE_STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+    }
 }
 
 /** Consolidation transactions are free */

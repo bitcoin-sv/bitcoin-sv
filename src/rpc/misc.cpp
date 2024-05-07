@@ -185,11 +185,7 @@ public:
             int nRequired;
             // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
             // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
-            ProtocolEra era { ProtocolEra::PostGenesis };
-            if(IsP2SH(subscript))
-            {
-                era = ProtocolEra::PreGenesis;
-            }
+            ProtocolEra era { IsP2SH(subscript)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
             ExtractDestinations(subscript, era, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(
@@ -825,9 +821,14 @@ Examples:
                 // If txo.height was specified (or we got it from coinsdb),
                 // it overrides per-input script verification flags.
                 flags &= ~SCRIPT_UTXO_AFTER_GENESIS;
+                flags &= ~SCRIPT_UTXO_AFTER_CHRONICLE;
                 if(IsProtocolActive(GetProtocolEra(config, *txo_height), ProtocolName::Genesis))
                 {
                     flags |= SCRIPT_UTXO_AFTER_GENESIS;
+                }
+                if(IsProtocolActive(GetProtocolEra(config, *txo_height), ProtocolName::Chronicle))
+                {
+                    flags |= SCRIPT_UTXO_AFTER_CHRONICLE;
                 }
             }
 
@@ -1298,6 +1299,8 @@ namespace
         {"SIGHASH_FORKID", SCRIPT_ENABLE_SIGHASH_FORKID},
         {"GENESIS", SCRIPT_GENESIS},
         {"UTXO_AFTER_GENESIS", SCRIPT_UTXO_AFTER_GENESIS},
+        {"CHRONICLE", SCRIPT_CHRONICLE},
+        {"UTXO_AFTER_CHRONICLE", SCRIPT_UTXO_AFTER_CHRONICLE},
     };
 }
 
