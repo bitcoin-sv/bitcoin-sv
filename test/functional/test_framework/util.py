@@ -17,6 +17,7 @@ import random
 import re
 from subprocess import CalledProcessError
 import time
+from typing import Iterator
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
@@ -855,49 +856,74 @@ def loghash(inhash=None):
         return inhash
 
 
-def check_for_log_msg(rpc, log_msg, node_dir=None):
+# Open the node log file
+def open_log_file(rpc, node_dir=None):
+    assert hasattr(rpc, "log")
+
+    if node_dir is None:
+        assert hasattr(rpc, "datadir")
+        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
+    else:
+        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
+
+    return open(logfile_path)
+
+
+# Generator to follow a log file and return lines
+def read_log_line(log) -> Iterator[str]:
+    line = ''
+    while True:
+        tmp = log.readline()
+        if tmp is not None and tmp != '':
+            line += tmp
+            if line.endswith('\n'):
+                yield line
+                line = ''
+        else:
+            return
+
+
+def check_for_log_msg(rpc, log_msg, node_dir=None, log_file=None):
     """
     Checks for occurrence of the log_msg in the bitcoind.log
     rpc can be any object which has .log member (logger)
     If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
     """
-    assert hasattr(rpc, "log")
 
-    if node_dir is None:
-        assert hasattr(rpc, "datadir")
-        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
-    else:
-        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
-
-    with open(logfile_path) as f:
-        for line in f:
+    def search_for_line(log_msg, log_file):
+        for line in read_log_line(log_file):
             if log_msg in line:
                 rpc.log.info("Found line: %s", line.strip())
                 return True
-    return False
+        return False
+
+    if log_file:
+        return search_for_line(log_msg, log_file)
+    else:
+        with open_log_file(rpc, node_dir) as log_file:
+            return search_for_line(log_msg, log_file)
 
 
-def count_log_msg(rpc, log_msg, node_dir=None):
+def count_log_msg(rpc, log_msg, node_dir=None, log_file=None):
     """
     Checks for number of occurrences of the log_msg in the bitcoind.log
     rpc can be any object which has .log member (logger)
     If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
     """
-    assert hasattr(rpc, "log")
 
-    if node_dir is None:
-        assert hasattr(rpc, "datadir")
-        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
-    else:
-        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
-
-    count = 0
-    with open(logfile_path) as f:
-        for line in f:
+    def search_for_line(log_msg, log_file):
+        count = 0
+        for line in read_log_line(log_file):
             if log_msg in line:
                 count += 1
-    rpc.log.info(f'String "{log_msg}"" found in {count} lines')
-    return count
+        rpc.log.info(f'String "{log_msg}"" found in {count} lines')
+        return count
+
+    if log_file:
+        return search_for_line(log_msg, log_file)
+    else:
+        with open_log_file(rpc, node_dir) as log_file:
+            return search_for_line(log_msg, log_file)
 
 
 def hashToHex(hash):
