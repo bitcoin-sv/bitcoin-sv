@@ -13,6 +13,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
@@ -108,8 +109,8 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
             CValidationState state;
 
             fValid = tx.IsCoinBase() 
-                                    ? CheckCoinbase(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false)
-                                    : CheckRegularTransaction(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false);
+                                    ? CheckCoinbase(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, ProtocolEra::PreGenesis)
+                                    : CheckRegularTransaction(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, ProtocolEra::PreGenesis);
 
             if(!(fValid && state.IsValid())) {
                 if(should_be_valid) {
@@ -225,13 +226,13 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
     CMutableTransaction tx;
     stream >> tx;
     CValidationState state;
-    BOOST_CHECK_MESSAGE(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false) &&
+    BOOST_CHECK_MESSAGE(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, ProtocolEra::PreGenesis) &&
                             state.IsValid(),
                         "Simple deserialized transaction should be valid.");
 
     // Check that duplicate txins fail
     tx.vin.push_back(tx.vin[0]);
-    BOOST_CHECK_MESSAGE(!CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false) ||
+    BOOST_CHECK_MESSAGE(!CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, ProtocolEra::PreGenesis) ||
                             !state.IsValid(),
                         "Transaction with duplicate txins should be invalid.");
 }
@@ -335,10 +336,10 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
     inputm.vout.resize(1);
     inputm.vout[0].nValue = Amount(1);
     inputm.vout[0].scriptPubKey = CScript();
-    bool retAfter = SignSignature(config, keystore, true, true, *output, inputm, 0,
+    bool retAfter = SignSignature(config, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, *output, inputm, 0,
                                    SigHashType().withForkId());
     BOOST_CHECK_EQUAL(retAfter, successAfterGenesis);
-    bool retBefore = SignSignature(config, keystore, true, false, *output, inputm, 0,
+    bool retBefore = SignSignature(config, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, *output, inputm, 0,
                                    SigHashType().withForkId());
     BOOST_CHECK_EQUAL(retBefore, successBeforeGenesis);
     CDataStream ssin(SER_NETWORK, PROTOCOL_VERSION);
@@ -454,7 +455,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     // sign all inputs
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         bool hashSigned =
-            SignSignature(testConfig, keystore, true, true, scriptPubKey, mtx, i, Amount(1000),
+            SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, scriptPubKey, mtx, i, Amount(1000),
                           sigHashes.at(i % sigHashes.size()));
         BOOST_CHECK_MESSAGE(hashSigned, "Failed to sign test transaction");
     }
@@ -598,7 +599,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
                                      DataFromTransaction(input2, 0),
-                                     false));
+                                     ProtocolEra::PreGenesis));
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
 
     // P2SH 2-of-2 multisig
@@ -619,7 +620,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
                                      DataFromTransaction(input2, 0), 
-                                     false));
+                                     ProtocolEra::PreGenesis));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
 }
@@ -723,13 +724,13 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
 
     // tx size less then default max policy tx size
     CTransaction tx_lt_def = CTransaction(t);
-    BOOST_CHECK(tx_lt_def.GetTotalSize() < config.GetMaxTxSize(false, false));
+    BOOST_CHECK(tx_lt_def.GetTotalSize() < config.GetMaxTxSize(ProtocolEra::PreGenesis, false));
 
     // tx size greater then default max policy tx size
-    int64_t size_gt_def{ static_cast<int64_t>(config.GetMaxTxSize(false, false) + 1) };
+    int64_t size_gt_def{ static_cast<int64_t>(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) + 1) };
     AppendScriptPubKeyToFitTxSize(t, size_gt_def);
     CTransaction tx_gt_def = CTransaction(t); // 
-    BOOST_CHECK(tx_gt_def.GetTotalSize() > config.GetMaxTxSize(false, false));
+    BOOST_CHECK(tx_gt_def.GetTotalSize() > config.GetMaxTxSize(ProtocolEra::PreGenesis, false));
 
 
     // before SetMaxTxSizePolicy
@@ -1167,7 +1168,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
 
 
 // Create a transaction with given output script, convert it to JSON and return vout/scriptpubkey/type
-std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, bool isGenesisEnabled)
+std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, ProtocolEra isGenesisEnabled)
 {
     CMutableTransaction t;
     t.vin.resize(1);
@@ -1190,19 +1191,17 @@ std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, bool isGenes
     //std::string jsonOutput = entry.write(4); // for debugging;
 
     return  entry["vout"][0]["scriptPubKey"]["type"].getValStr();
-
-    
 }
 
 BOOST_AUTO_TEST_CASE(tst_tx_toJson_OP_RETURN) {
 
     // Check if converting transaction to JSON properly decodes type of scriptPubKey
 
-    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_RETURN << ParseHex("1234"), false), "nulldata");
-    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_RETURN << ParseHex("1234"), true), "nonstandard"); // after Genesis single OP_RETURN is nonstantard
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_RETURN << ParseHex("1234"), ProtocolEra::PreGenesis), "nulldata");
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_RETURN << ParseHex("1234"), ProtocolEra::PostGenesis), "nonstandard"); // after Genesis single OP_RETURN is nonstantard
 
-    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_FALSE << OP_RETURN << ParseHex("1234"), true), "nulldata");
-    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_FALSE << OP_RETURN << ParseHex("1234"), true), "nulldata"); // ... but OP_FALSE OP_RETURN is still nulldata
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_FALSE << OP_RETURN << ParseHex("1234"), ProtocolEra::PostGenesis), "nulldata");
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_FALSE << OP_RETURN << ParseHex("1234"), ProtocolEra::PostGenesis), "nulldata"); // ... but OP_FALSE OP_RETURN is still nulldata
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -1028,7 +1028,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
-                config.GetAcceptNonStandardOutput(true)));
+                config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
     }
     strUsage += HelpMessageOpt(
@@ -1430,7 +1430,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "for violating Genesis rules in case the calling node is not yet on Genesis height and vice versa. "
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
-            DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+            DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD));
+    strUsage += HelpMessageOpt(
+        "-maxchroniclegracefulperiod=<n>",
+        strprintf(_("Set maximum allowed number of blocks for Chronicle graceful period (default: %d) where nodes will not be banned "
+                    "for violating Chronicle rules in case the calling node is not yet on Chronicle height and vice versa. "
+                    "Seting 0 will disable Chronicle graceful period. Chronicle graceful period range :"
+                    "(CHRONICLE_ACTIVATION_HEIGHT - n |...| CHRONICLE_ACTIVATION_HEIGHT |...| CHRONICLE_ACTIVATION_HEIGHT + n)"),
+            DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD));
 
     strUsage += HelpMessageGroup(_("Invalid transactions sink options:"));
     std::string availableSinks = StringJoin(", ", config.GetAvailableInvalidTxSinks());
@@ -2396,9 +2403,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             return InitError(err);
         }
     }
-    // Configure genesis activation height.
+    // Configure genesis & chronicle activation heights.
     int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
+        return InitError(err);
+    }
+    int32_t chronicleActivationHeight = static_cast<int32_t>(gArgs.GetArg("-chronicleactivationheight", chainparams.GetConsensus().chronicleHeight));
+    if (std::string err; !config.SetChronicleActivationHeight(chronicleActivationHeight, &err)) {
         return InitError(err);
     }
 
@@ -2889,7 +2900,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                       chainparams.NetworkIDString()));
 
     config.SetAcceptNonStandardOutput(
-        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
 
     // Enable selfish mining detection
@@ -2969,13 +2980,23 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
-    // Configure max number of blocks in which Genesis graceful period is active
+    // Configure max number of blocks in which Genesis/Chronicle graceful period is active
     if (gArgs.IsArgSet("-maxgenesisgracefulperiod"))
     {
-        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD);
+        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD);
 
         std::string err;
         if (!config.SetGenesisGracefulPeriod(value, &err))
+        {
+            return InitError(err);
+        }
+    }
+    if (gArgs.IsArgSet("-maxchroniclegracefulperiod"))
+    {
+        const int64_t value = gArgs.GetArg("-maxchroniclegracefulperiod", DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD);
+
+        std::string err;
+        if (!config.SetChronicleGracefulPeriod(value, &err))
         {
             return InitError(err);
         }

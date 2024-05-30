@@ -14,6 +14,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "rpc/client_config.h"
 #include "rpc/webhook_client_defaults.h"
 #include "script/standard.h"
@@ -46,7 +47,7 @@ public:
     virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
-    virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const = 0;
     virtual uint64_t GetMinConsolidationFactor() const = 0;
     virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
     virtual uint64_t GetMinConfConsolidationInput() const = 0;
@@ -64,6 +65,7 @@ public:
     virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
     virtual int32_t GetGenesisActivationHeight() const = 0;
+    virtual int32_t GetChronicleActivationHeight() const = 0;
     virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
     virtual int GetMaxParallelBlocks() const = 0;
     virtual int GetPerBlockTxnValidatorThreadsCount() const = 0;
@@ -73,7 +75,7 @@ public:
     virtual uint64_t GetBlockValidationTxBatchSize() const = 0;
 
     virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
-    virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const = 0;
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
@@ -82,7 +84,8 @@ public:
     virtual std::chrono::milliseconds GetMaxTxnChainValidationBudget() const = 0;
     virtual PTVTaskScheduleStrategy GetPTVTaskScheduleStrategy() const = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
-    virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
+    virtual uint64_t GetChronicleGracefulPeriod() const = 0;
+    virtual bool GetAcceptNonStandardOutput(ProtocolEra era) const = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
     virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
@@ -221,6 +224,7 @@ public:
     virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
         std::string* error = nullptr) = 0;
@@ -244,6 +248,7 @@ public:
     virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
     virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
+    virtual bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual void SetAcceptNonStandardOutput(bool accept) = 0;
     virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
@@ -400,7 +405,7 @@ public:
     const CChainParams &GetChainParams() const override;
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
-    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const  override;
 
     bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMinConsolidationFactor() const  override;
@@ -450,6 +455,8 @@ public:
 
     bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override;
     int32_t GetGenesisActivationHeight() const override;
+    bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err = nullptr) override;
+    int32_t GetChronicleActivationHeight() const override;
 
     bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -472,7 +479,7 @@ public:
 
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
     uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override;
-    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override;
+    uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const override;
 
     uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override;
 
@@ -509,9 +516,11 @@ public:
 
     bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override;
     uint64_t GetGenesisGracefulPeriod() const override;
+    bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err = nullptr) override;
+    uint64_t GetChronicleGracefulPeriod() const override;
 
     void SetAcceptNonStandardOutput(bool accept) override;
-    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
+    bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsViewCacheSize() const override {return data->mMaxCoinsViewCacheSize;}
@@ -775,6 +784,7 @@ private:
         mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
 
         int32_t genesisActivationHeight;
+        int32_t chronicleActivationHeight;
 
         int mMaxConcurrentAsyncTasksPerNode;
 
@@ -788,6 +798,7 @@ private:
         uint64_t maxTxSigOpsCountPolicy;
         uint64_t maxPubKeysPerMultiSig;
         uint64_t genesisGracefulPeriod;
+        uint64_t chronicleGracefulPeriod;
 
         std::chrono::milliseconds mMaxStdTxnValidationDuration;
         std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
@@ -968,7 +979,7 @@ public:
         maxTxSizePolicy = static_cast<uint64_t>(value);
         return false;
     }
-    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override { return maxTxSizePolicy; }
 
     bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) override
     {
@@ -1041,8 +1052,24 @@ public:
         return mining::CMiningFactory::BlockAssemblerType::JOURNALING;
     }
 
-    bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = genesisActivationHeightIn; return true; }
-    int32_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
+    bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override
+    {
+        genesisActivationHeight = genesisActivationHeightIn;
+        return true;
+    }
+    int32_t GetGenesisActivationHeight() const override
+    {
+        return genesisActivationHeight;
+    }
+    bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err = nullptr) override
+    {
+        chronicleActivationHeight = chronicleActivationHeightIn;
+        return true;
+    }
+    int32_t GetChronicleActivationHeight() const override
+    {
+        return chronicleActivationHeight;
+    }
 
     bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -1086,12 +1113,14 @@ public:
     }
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
-    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
 
     uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
 
     bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override { return true; }
-    uint64_t GetGenesisGracefulPeriod() const override { return DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD; }
+    uint64_t GetGenesisGracefulPeriod() const override { return DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD; }
+    bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetChronicleGracefulPeriod() const override { return DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD; }
 
     bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override
@@ -1179,9 +1208,9 @@ public:
     }
 
     void SetAcceptNonStandardOutput(bool) override {}
-    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override
+    bool GetAcceptNonStandardOutput(ProtocolEra era) const override
     {
-        return isGenesisEnabled ? true : !fRequireStandard;
+        return IsProtocolActive(era, ProtocolName::Genesis) ? true : !fRequireStandard;
     }
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override
@@ -1548,6 +1577,7 @@ private:
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     bool dataCarrier {DEFAULT_ACCEPT_DATACARRIER};
     int32_t genesisActivationHeight;
+    int32_t chronicleActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
     uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE };

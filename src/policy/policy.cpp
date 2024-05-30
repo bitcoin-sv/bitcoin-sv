@@ -7,10 +7,11 @@
 // only local node policy logic
 
 #include "policy/policy.h"
+
+#include "config.h"
+#include "protocol_era.h"
 #include "script/script_num.h"
 #include "taskcancellation.h"
-#include "validation.h"
-#include "config.h"
 
 /**
  * Check transaction inputs to mitigate two potential denial-of-service attacks:
@@ -26,9 +27,10 @@
  * expensive-to-check-upon-redemption script like:
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType) {
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType)
+{
     std::vector<std::vector<uint8_t>> vSolutions;
-    if (!Solver(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, GetProtocolEra(config, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
     }
 
@@ -188,18 +190,21 @@ AnnotatedType<bool>  IsFreeConsolidationTxn(const Config &config, const CTransac
         return {true, strprintf("free consolidation transaction: %s", tx.GetId().ToString())};
 }
 
-bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason) {
+bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason)
+{
     if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
         reason = "version";
         return false;
     }
+
+    ProtocolEra era { GetProtocolEra(config, nHeight) };
 
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // mitigates CPU exhaustion attacks.
     unsigned int sz = tx.GetTotalSize();
-    if (sz > config.GetMaxTxSize(IsGenesisEnabled(config, nHeight), false)) {
+    if (sz > config.GetMaxTxSize(era, false)) {
         reason = "tx-size";
         return false;
     }
@@ -211,7 +216,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         // bytes of scriptSig, which we round off to 1650 bytes for some minor
         // future-proofing. That's also enough to spend a 20-of-20 CHECKMULTISIG
         // scriptPubKey, though such a scriptPubKey is not considered standard.
-        if (!IsGenesisEnabled(config, nHeight)  && txin.scriptSig.size() > 1650) {
+        if (!IsProtocolActive(era, ProtocolName::Genesis) && txin.scriptSig.size() > 1650) {
             reason = "scriptsig-size";
             return false;
         }
@@ -234,7 +239,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
-        } else if (txout.IsDust(IsGenesisEnabled(config, nHeight))) {
+        } else if (txout.IsDust(era)) {
             reason = "dust";
             return false;
         }
@@ -277,8 +282,7 @@ std::optional<bool> AreInputsStandard(
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev->GetTxOut().scriptPubKey;
 
-        if (!Solver(prevScript, IsGenesisEnabled(config, prev.value(), mempoolHeight),
-                    whichType, vSolutions)) {
+        if (!Solver(prevScript, GetProtocolEra(config, prev.value(), mempoolHeight), whichType, vSolutions)) {
             return false;
         }
 
@@ -308,10 +312,10 @@ std::optional<bool> AreInputsStandard(
                 return false;
             }
             
-            // isGenesisEnabled is set to false, because TX_SCRIPTHASH is not supported after genesis
+            // Active release is set to PreGenesis, because TX_SCRIPTHASH is not supported after genesis
             bool sigOpCountError;
             CScript subscript(stack.back().begin(), stack.back().end());
-            uint64_t nSigOpCount = subscript.GetSigOpCount(true, false, sigOpCountError);
+            uint64_t nSigOpCount = subscript.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError);
             if (sigOpCountError || nSigOpCount > MAX_P2SH_SIGOPS) {
                 return false;
             }

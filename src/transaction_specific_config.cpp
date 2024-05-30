@@ -18,18 +18,18 @@ bool TransactionSpecificConfig::SetTransactionSpecificMaxTxSize(int64_t maxTxSiz
         return false;
     }
 
-    mMaxTxSize = tmp.GetMaxTxSize(true, false);
+    mMaxTxSize = tmp.GetMaxTxSize(ProtocolEra::PostGenesis, false);
     return true;
 }
 
-uint64_t TransactionSpecificConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const
+uint64_t TransactionSpecificConfig::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
 {
-    if (isConsensus || !isGenesisEnabled)
+    if (isConsensus || !IsProtocolActive(era, ProtocolName::Genesis))
     {
-        return GlobalConfig::GetMaxTxSize(isGenesisEnabled, isConsensus);
+        return GlobalConfig::GetMaxTxSize(era, isConsensus);
     }
 
-    return mMaxTxSize.has_value() ? *mMaxTxSize : GlobalConfig::GetMaxTxSize(isGenesisEnabled, isConsensus);
+    return mMaxTxSize.has_value() ? *mMaxTxSize : GlobalConfig::GetMaxTxSize(era, isConsensus);
 }
 
 void TransactionSpecificConfig::SetTransactionSpecificDataCarrierSize(uint64_t dataCarrierSize)
@@ -161,9 +161,10 @@ void TransactionSpecificConfig::SetTransactionSpecificAcceptNonStandardOutput(bo
     mAcceptNonStdOutputs = accept;
 };
 
-bool TransactionSpecificConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
+bool TransactionSpecificConfig::GetAcceptNonStandardOutput(ProtocolEra era) const
 {
-    return (mAcceptNonStdOutputs.has_value() && isGenesisEnabled) ? *mAcceptNonStdOutputs : GlobalConfig::GetAcceptNonStandardOutput(isGenesisEnabled);
+    bool isGenesisEnabled { IsProtocolActive(era, ProtocolName::Genesis) };
+    return (mAcceptNonStdOutputs.has_value() && isGenesisEnabled) ? *mAcceptNonStdOutputs : GlobalConfig::GetAcceptNonStandardOutput(era);
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxStdTxnValidationDuration(int ms, std::string* err)

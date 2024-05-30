@@ -7,6 +7,7 @@
 #define BITCOIN_POLICY_POLICY_H
 
 #include "consensus/consensus.h"
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
 #include "util.h"
@@ -128,13 +129,23 @@ static constexpr int64_t DEFAULT_DUST_LIMIT_FACTOR{300};
 * Same applies for a node that sent a PRE-GENESIS only valid transaction after GENESIS
 * is activated
 */
-static const int DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 72;
+static const int DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD = 72;
+
+/*
+* Same as GENESIS_GRACEFUL_ACTIVATION_PERIOD but for CHRONICLE.
+*/
+static const int DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 72;
 
 /*
 * Maximum number of blocks for Genesis graceful period on either side of the Genesis 
 * activation block (span of ~100 days)
 */
-static const int MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 7200;
+static const int MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD = 7200;
+
+/*
+* Same as MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD but for CHRONICLE.
+*/
+static const int MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 7200;
 
 // Default policy value for maximum number of non-push operations per script
 static const uint64_t DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;
@@ -182,13 +193,13 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
     STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
 
 /** returns flags for "standard" script*/
-inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
-                                       bool utxoAfterGenesis) {
+inline unsigned int StandardScriptVerifyFlags(ProtocolEra era, ProtocolEra utxoEra)
+{
     unsigned int scriptFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
-    if (utxoAfterGenesis) {
+    if (IsProtocolActive(utxoEra, ProtocolName::Genesis)) {
         scriptFlags |= SCRIPT_UTXO_AFTER_GENESIS;
     }
-    if (genesisEnabled) {
+    if (IsProtocolActive(era, ProtocolName::Genesis)) {
         scriptFlags |= SCRIPT_GENESIS;
         scriptFlags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
@@ -196,10 +207,11 @@ inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
 }
 
 /** Get the flags to use for non-final transaction checks */
-inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
+inline unsigned int StandardNonFinalVerifyFlags(ProtocolEra era)
 {
     unsigned int flags { LOCKTIME_MEDIAN_TIME_PAST };
-    if(!genesisEnabled) {
+    if(! IsProtocolActive(era, ProtocolName::Genesis))
+    {
         flags |= LOCKTIME_VERIFY_SEQUENCE;
     }
     return flags;

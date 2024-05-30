@@ -22,6 +22,11 @@
 #define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
 
+#define CHRONICLE_ACTIVATION_MAIN               880000
+#define CHRONICLE_ACTIVATION_STN                150
+#define CHRONICLE_ACTIVATION_TESTNET            1660000
+#define CHRONICLE_ACTIVATION_REGTEST            15000
+
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
                                  uint32_t nTime, uint32_t nNonce,
@@ -126,6 +131,9 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_MAIN;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_MAIN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -283,6 +291,9 @@ public:
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_STN;
 
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_STN;
+
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -392,6 +403,9 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_TESTNET;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -514,6 +528,9 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_REGTEST;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_REGTEST;
 
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;

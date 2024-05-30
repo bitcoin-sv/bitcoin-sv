@@ -18,7 +18,7 @@ public:
     TransactionSpecificConfig(const GlobalConfig& config);
 
     bool SetTransactionSpecificMaxTxSize(int64_t value, std::string* err = nullptr);
-    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override;
 
     void SetTransactionSpecificDataCarrierSize(uint64_t dataCarrierSize);
     uint64_t GetDataCarrierSize() const override;
@@ -39,7 +39,7 @@ public:
     uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
 
     void SetTransactionSpecificAcceptNonStandardOutput(bool accept);
-    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
+    bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
 
     bool SetTransactionSpecificMaxStdTxnValidationDuration(int ms, std::string* err = nullptr);
     std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override;

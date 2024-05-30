@@ -203,7 +203,8 @@ void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serialFl
     ssTx << tx;
 }
 
-void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out) {
+void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, ProtocolEra era, UniValue &out)
+{
     txnouttype type;
     std::vector<CTxDestination> addresses;
     int nRequired;
@@ -213,7 +214,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
     }
 
-    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired)) {
+    if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired)) {
         out.pushKV("type", GetTxnOutputType(type));
         return;
     }
@@ -230,7 +231,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
 
 void TxToJSON(const CTransaction& tx,
               const uint256& hashBlock,
-              bool utxoAfterGenesis,
+              ProtocolEra era,
               const int serializeFlags,
               CJSONWriter& entry,
               const std::optional<CBlockDetailsData>&  blockData)
@@ -288,7 +289,7 @@ void TxToJSON(const CTransaction& tx,
         entry.pushKV("n", static_cast<int64_t>(i));
 
         entry.writeBeginObject("scriptPubKey");
-        ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
+        ScriptPublicKeyToJSON(txout.scriptPubKey, true, era, entry);
         entry.writeEndObject();
 
         entry.writeEndObject();
@@ -325,7 +326,7 @@ void TxToJSON(const CTransaction& tx,
 
 void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
                            bool fIncludeHex,
-                           bool isGenesisEnabled,
+                           ProtocolEra era,
                            CJSONWriter& entry) {
     txnouttype type;
     std::vector<CTxDestination> addresses;
@@ -343,7 +344,7 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
         entry.pushQuote();
     }
 
-    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired))
+    if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired))
     {
         entry.pushKV("type", GetTxnOutputType(type));
         return;

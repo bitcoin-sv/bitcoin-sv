@@ -164,8 +164,8 @@ COINBASE_MATURITY = 100
 MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS')
 MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS')
 
-#Gracefull period for genesis activation where nodes will not be banned for certain ops
-GENESIS_GRACEFULL_ACTIVATION_PERIOD = _extractPolicyValue('GENESIS_GRACEFULL_ACTIVATION_PERIOD')
+#Graceful period for genesis activation where nodes will not be banned for certain ops
+GENESIS_GRACEFUL_ACTIVATION_PERIOD = _extractPolicyValue('GENESIS_GRACEFUL_ACTIVATION_PERIOD')
 
 # Maximum number of non-push operations per script before GENESIS
 MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = _extractConsensusValue('MAX_OPS_PER_SCRIPT_BEFORE_GENESIS')

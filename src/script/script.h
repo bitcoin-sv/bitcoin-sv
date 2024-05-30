@@ -9,6 +9,7 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "prevector.h"
+#include "protocol_era.h"
 #include "serialize.h"
 #include "opcodes.h"
 
@@ -238,13 +239,13 @@ public:
      * If the size is bigger than that, or if the number of public keys is negative,
      * sigOpCountError is set to true,
      */
-    uint64_t GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const;
+    uint64_t GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCountError) const;
 
     /**
      * Accurately count sigOps, including sigOps in pay-to-script-hash
      * transactions:
      */
-    uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
+    uint64_t GetSigOpCount(const CScript &scriptSig, ProtocolEra era, bool& sigOpCountError) const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it
      * consensus-critical). */
@@ -262,8 +263,9 @@ public:
      * 
      */
 
-    bool IsUnspendable(bool isGenesisEnabled) const {
-        if (isGenesisEnabled)
+    bool IsUnspendable(ProtocolEra era) const
+    {
+        if(IsProtocolActive(era, ProtocolName::Genesis))
         {
             // Genesis restored OP_RETURN functionality. It no longer uncoditionally fails execution
             // The top stack value determines if execution suceeds, and OP_RETURN lock script might be spendable if 

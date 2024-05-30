@@ -334,6 +334,8 @@ add_library(common
 	protocol.cpp
 	protocol.h
 	pubkey.h
+    protocol_era.cpp
+    protocol_era.h
 	reverselock.h
 	rpc/jsonwriter.cpp
 	rpc/jsonwriter.h

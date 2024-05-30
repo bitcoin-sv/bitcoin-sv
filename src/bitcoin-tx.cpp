@@ -16,6 +16,7 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "rpc/client_utils.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
@@ -655,7 +656,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         const Amount amount = coin->GetTxOut().nValue;
 
         // we will assume that script is after genesis for every script type except p2sh
-        bool assumeUtxoAfterGenesis = !IsP2SH(prevPubKey);
+        ProtocolEra utxoEra { IsP2SH(prevPubKey)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -665,7 +666,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                              true, 
                              MutableTransactionSignatureCreator(
                                  &keystore, &mergedTx, i, amount, sigHashType),
-                             true, assumeUtxoAfterGenesis, 
+                             ProtocolEra::PostGenesis, utxoEra, 
                              prevPubKey, sigdata);
         }
 
@@ -677,7 +678,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 MutableTransactionSignatureChecker(&mergedTx, i, amount),
                 sigdata, 
                 DataFromTransaction(txv, i),
-                assumeUtxoAfterGenesis);
+                utxoEra);
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
@@ -689,7 +690,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,
-                StandardScriptVerifyFlags(true, assumeUtxoAfterGenesis),
+                StandardScriptVerifyFlags(ProtocolEra::PostGenesis, utxoEra),
                 MutableTransactionSignatureChecker(&mergedTx, i, amount));
 
         if (!res.value())
@@ -747,11 +748,12 @@ static void OutputTxJSON(const CTransaction &tx) {
         std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
             return IsP2SH(out.scriptPubKey);
         });
+    ProtocolEra era { genesisEnabled? ProtocolEra::PostGenesis : ProtocolEra::PreGenesis };
 
     CStringWriter strWriter;
     strWriter.ReserveAdditional(tx.GetTotalSize() * 2);
     CJSONWriter jWriter(strWriter, true);
-    TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
+    TxToJSON(tx, uint256(), era, 0, jWriter);
 
     fprintf(stdout, "%s\n", strWriter.MoveOutString().c_str());
 }
