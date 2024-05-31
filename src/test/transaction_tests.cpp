@@ -28,6 +28,7 @@
 
 #include <map>
 #include <string>
+#include <tuple>
 
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/test/unit_test.hpp>
@@ -351,37 +352,6 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
     BOOST_CHECK(input.vout[0] == inputm.vout[0]);
 }
 
-void CheckWithFlag(const CTransactionRef &output,
-                   const CMutableTransaction &input, int flags,
-                   bool successBeforeGenesis, bool successAfterGenesis) {
-    ScriptError error;
-    const Config& config = GlobalConfig::GetConfig();
-    CTransaction inputi(input);
-    auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
-    auto s2 = ScriptToAsmStr(output->vout[0].scriptPubKey);
-
-    bool retBefore = VerifyScript(
-        config, true,
-        task::CCancellationSource::Make()->GetToken(),
-        inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
-        flags | SCRIPT_ENABLE_SIGHASH_FORKID,
-        TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-        &error).value();
-    BOOST_CHECK_MESSAGE(retBefore == successBeforeGenesis,
-                        std::string("failed before genesis result: ") + (retBefore ? "true":"false"));
-    
-    bool retAfter = VerifyScript(
-        config, true,
-        task::CCancellationSource::Make()->GetToken(),
-        inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
-        flags | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-        TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-        &error).value();
-
-    BOOST_CHECK_MESSAGE(retAfter == successAfterGenesis,
-                      std::string("failed after genesis result: ") + (retAfter ? "true" : "false"));
-}
-
 static CScript PushAll(const LimitedStack &values) {
     CScript result;
     for (size_t i = 0; i != values.size(); ++i) {
@@ -486,6 +456,8 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
         vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, static_cast<unsigned int>(i),
                              PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
+        vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, static_cast<unsigned int>(i),
+                             POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
         
         control.Add(vChecks);
     }
@@ -495,6 +467,31 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
 
     threadGroup.interrupt_all();
     threadGroup.join_all();
+}
+
+using CheckFlagParams = std::tuple<const CTransactionRef&, const CMutableTransaction&, const std::vector<std::pair<int,bool>>&>;
+void CheckWithFlag(const CheckFlagParams& params)
+{
+    // Unpack paramaters
+    const auto [output, input, flagList] = params;
+
+    ScriptError error;
+    const Config& config = GlobalConfig::GetConfig();
+    CTransaction inputi(input);
+    //auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
+    //auto s2 = ScriptToAsmStr(output->vout[0].scriptPubKey);
+
+    for(const auto& flags : flagList)
+    {
+        bool ret = VerifyScript(
+            config, true,
+            task::CCancellationSource::Make()->GetToken(),
+            inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
+            flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
+            TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
+            &error).value();
+        BOOST_CHECK_MESSAGE(ret == flags.second, std::string("failed result: ") + (ret? "true":"false"));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_witness) {
@@ -537,62 +534,181 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     CMutableTransaction input1, input2;
     SignatureData sigdata;
 
+    // Interesting validation flag combinations
+    int flagsPreGenesis { 0 };
+    int flagsUtxoPreGenesis { SCRIPT_GENESIS };
+    int flagsPostGenesis { SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS };
+    int flagsUtxoPreGenesisPostChronicle { flagsUtxoPreGenesis | SCRIPT_CHRONICLE };
+    int flagsPostChronicle { flagsPostGenesis | SCRIPT_UTXO_AFTER_CHRONICLE | SCRIPT_CHRONICLE };
+
     // Normal pay-to-compressed-pubkey.
     int PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS = static_cast<int>(ScriptVerifyFlags::PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS);
+    int POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS = static_cast<int>(ScriptVerifyFlags::POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS);
     CreateCreditAndSpend(keystore, scriptPubkey1, output1, input1, true, true);
     CreateCreditAndSpend(keystore, scriptPubkey2, output2, input2, true, true);
-    CheckWithFlag(output1, input1, 0, true, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
-    CheckWithFlag(output1, input2, 0, false, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, false);
-    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
+    CheckWithFlag({output1, input1, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis, false },
+                                      { flagsPostGenesis, false },
+                                      { flagsUtxoPreGenesis, false },
+                                      { flagsUtxoPreGenesisPostChronicle, false },
+                                      { flagsPostChronicle, false } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, false } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
+    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
 
     // P2SH pay-to-compressed-pubkey.
-    CreateCreditAndSpend(keystore,
-                         GetScriptForDestination(CScriptID(scriptPubkey1)),
-                         output1, input1, true, false);
-    CreateCreditAndSpend(keystore,
-                         GetScriptForDestination(CScriptID(scriptPubkey2)),
-                         output2, input2, true, false);
+    CreateCreditAndSpend(keystore, GetScriptForDestination(CScriptID(scriptPubkey1)), output1, input1, true, false);
+    CreateCreditAndSpend(keystore, GetScriptForDestination(CScriptID(scriptPubkey2)), output2, input2, true, false);
     ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1);
-    CheckWithFlag(output1, input1, 0, true, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
-    CheckWithFlag(output1, input2, 0, true, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, true);
-    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script
+                                      // all pass because redeem script is left on stack and it is converted to TRUE
+    CheckWithFlag({output1, input1, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // after genesis fails because stack is not clean as we did not execute redeem script
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+                                      // after chronicle passes due to removal of clean stack policy
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      // after genesis passes beacuse script matches but we dont evaluate it
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      // after genesis fails because stack is not clean as we did not execute redeem script
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
+                                      // after chronicle passes due to removal of clean stack policy 
+    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
 
     // Normal pay-to-uncompressed-pubkey.
     CreateCreditAndSpend(keystore, scriptPubkey1L, output1, input1, true, true);
     CreateCreditAndSpend(keystore, scriptPubkey2L, output2, input2, true, true);
-    CheckWithFlag(output1, input1, 0, true, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
-    CheckWithFlag(output1, input2, 0, false, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, false);
-    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
+    CheckWithFlag({output1, input1, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis, false },
+                                      { flagsPostGenesis, false },
+                                      { flagsUtxoPreGenesis, false },
+                                      { flagsUtxoPreGenesisPostChronicle, false },
+                                      { flagsPostChronicle, false } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, false } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
+    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
+
 
     // P2SH pay-to-uncompressed-pubkey.
-    CreateCreditAndSpend(keystore,
-                         GetScriptForDestination(CScriptID(scriptPubkey1L)),
-                         output1, input1, true, false);
-    CreateCreditAndSpend(keystore,
-                         GetScriptForDestination(CScriptID(scriptPubkey2L)),
-                         output2, input2, true, false);
+    CreateCreditAndSpend(keystore, GetScriptForDestination(CScriptID(scriptPubkey1L)), output1, input1, true, false);
+    CreateCreditAndSpend(keystore, GetScriptForDestination(CScriptID(scriptPubkey2L)), output2, input2, true, false);
     ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1L);
-    CheckWithFlag(output1, input1, 0, true, true);                             // allways passes because redeem script is left on stack and it is converted to TRUE
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
-    CheckWithFlag(output1, input2, 0, true, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, true);           // after genesis passes beacuse script matches but we dont evaluate it
-    CheckWithFlag(output1, input2, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script 
+                                      // all pass because redeem script is left on stack and it is converted to TRUE
+    CheckWithFlag({output1, input1, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // after genesis fails because stack is not clean as we did not execute redeem script
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+                                      // after chronicle passes due to removal of clean stack policy
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      // after genesis passes beacuse script matches but we dont evaluate it
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input2, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      // after genesis fails because stack is not clean as we did not execute redeem script
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
+                                      // after chronicle passes due to removal of clean stack policy 
+    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
+
 
     // Normal 2-of-2 multisig
     CreateCreditAndSpend(keystore, scriptMulti, output1, input1, false, false);
-    CheckWithFlag(output1, input1, 0, false, false);
     CreateCreditAndSpend(keystore2, scriptMulti, output2, input2, false, false);
-    CheckWithFlag(output2, input2, 0, false, false);
+    CheckWithFlag({output1, input1, { { flagsPreGenesis, false },
+                                      { flagsPostGenesis, false },
+                                      { flagsUtxoPreGenesis, false },
+                                      { flagsUtxoPreGenesisPostChronicle, false },
+                                      { flagsPostChronicle, false } } });
+    CheckWithFlag({output2, input2, { { flagsPreGenesis, false },
+                                      { flagsPostGenesis, false },
+                                      { flagsUtxoPreGenesis, false },
+                                      { flagsUtxoPreGenesisPostChronicle, false },
+                                      { flagsPostChronicle, false } } });
+
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(
         input1, 0, CombineSignatures(testConfig, true, output1->vout[0].scriptPubKey,
@@ -601,19 +717,37 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                      DataFromTransaction(input1, 0),
                                      DataFromTransaction(input2, 0),
                                      ProtocolEra::PreGenesis, ProtocolEra::PreGenesis));
-    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
+
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
 
     // P2SH 2-of-2 multisig
-    CreateCreditAndSpend(keystore,
-                         GetScriptForDestination(CScriptID(scriptMulti)),
-                         output1, input1, false, false);
-    CheckWithFlag(output1, input1, 0, true, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, false, true);
-    CreateCreditAndSpend(keystore2,
-                         GetScriptForDestination(CScriptID(scriptMulti)),
-                         output2, input2, false, false);
-    CheckWithFlag(output2, input2, 0, true, true);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, false, true);
+    CreateCreditAndSpend(keystore, GetScriptForDestination(CScriptID(scriptMulti)), output1, input1, false, false);
+    CreateCreditAndSpend(keystore2, GetScriptForDestination(CScriptID(scriptMulti)), output2, input2, false, false);
+    CheckWithFlag({output1, input1, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output2, input2, { { flagsPreGenesis, true },
+                                      { flagsPostGenesis, true },
+                                      { flagsUtxoPreGenesis, true },
+                                      { flagsUtxoPreGenesisPostChronicle, true },
+                                      { flagsPostChronicle, true } } });
+    CheckWithFlag({output2, input2, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, false },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(
         input1, 0, CombineSignatures(testConfig, true, output1->vout[0].scriptPubKey,
@@ -622,8 +756,19 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                      DataFromTransaction(input1, 0),
                                      DataFromTransaction(input2, 0), 
                                      ProtocolEra::PreGenesis, ProtocolEra::PreGenesis));
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
-    CheckWithFlag(output1, input1, PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
+
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesis | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsUtxoPreGenesisPostChronicle | SCRIPT_VERIFY_P2SH, true },
+                                      { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
+    CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // after genesis fails because stack is not clean as we did not execute redeem script
+                                      { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
+                                      { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
+                                      // after chronicle passes due to removal of clean stack policy 
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
 }
 
 BOOST_AUTO_TEST_CASE(test_IsStandard) {
@@ -685,7 +830,6 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
     BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
-
 }
 
 void AppendScriptPubKeyToFitTxSize(CMutableTransaction& t, uint64_t txSizeNew)
