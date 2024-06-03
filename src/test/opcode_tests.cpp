@@ -2,6 +2,8 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "script/opcodes.h"
+#include "script/script_error.h"
 #include "script/script_flags.h"
 #include "test/test_bitcoin.h"
 
@@ -1381,4 +1383,107 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
                                       actual.begin(), actual.end());
     }
 }
+
+BOOST_AUTO_TEST_CASE(op_verif_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<int32_t,            // tx_version
+                            vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            bool,               // expected status
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data
+    {
+      { 1, { OP_VERIF }, 0, false, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_VERIF },
+           SCRIPT_UTXO_AFTER_GENESIS, false, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERIF, // not executed
+               OP_ENDIF }, 0, false, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERIF, // not executed
+               OP_ENDIF },
+            SCRIPT_UTXO_AFTER_GENESIS, true, SCRIPT_ERR_OK },
+    };
+
+    for(const auto& [tx_version,
+                     script,
+                     flags,
+                     exp_status,
+                     exp_error] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK(stack.empty());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_vernotif_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<int32_t,            // tx_version
+                            vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            bool,               // expected status
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data
+    {
+      { 1, { OP_VERNOTIF }, 0, false, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_VERNOTIF },
+           SCRIPT_UTXO_AFTER_GENESIS, false, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERNOTIF, // not executed
+               OP_ENDIF }, 0, false, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERNOTIF, // not executed
+               OP_ENDIF },
+            SCRIPT_UTXO_AFTER_GENESIS, true, SCRIPT_ERR_OK },
+    };
+
+    for(const auto& [tx_version,
+                     script,
+                     flags,
+                     exp_status,
+                     exp_error] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK(stack.empty());
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
