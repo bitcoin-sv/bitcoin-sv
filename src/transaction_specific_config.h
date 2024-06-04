@@ -26,10 +26,10 @@ public:
     bool SetTransactionSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr);
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
 
-    bool SetTransactionSpecificMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr);
-    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override;
+    bool SetTransactionSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err = nullptr);
+    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override;
 
-    bool SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
+    bool SetTransactionSpecificMaxStackMemoryUsage(ProtocolEra era, int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
     
     bool SetTransactionSpecificLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr);

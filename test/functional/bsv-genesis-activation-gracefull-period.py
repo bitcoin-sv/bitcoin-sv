@@ -103,7 +103,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         wait_until(lambda: txOpAdd2.sha256 in [msg.data for msg in rejected_txs], timeout=5, lock=mininode_lock)
 
         assert_equal(len(rejected_txs), 1) # rejected
-        assert_equal(rejected_txs[0].reason, b'max-script-num-length-policy-limit-violated (Script number overflow)')
+        assert_equal(rejected_txs[0].reason, b'mandatory-script-verify-flag-failed (Script number overflow)')
         wait_until(lambda: len(self.nodes[0].listbanned()) == 1, timeout=5)  # and banned
         self.nodes[0].clearbanned()
         wait_until(lambda: len(self.nodes[0].listbanned()) == 0, timeout=5)  # and not banned

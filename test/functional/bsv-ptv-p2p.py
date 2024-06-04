@@ -16,7 +16,6 @@ from test_framework.blocktools import create_transaction, PreviousSpendableOutpu
 from test_framework.util import assert_equal, assert_greater_than, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, CTransaction, CTxIn, CTxOut, COutPoint
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 import random
 import time
 

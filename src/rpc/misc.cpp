@@ -1218,7 +1218,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
 
     obj.push_back(Pair("maxscriptsizepolicy", config.GetMaxScriptSize(true, false)));
     obj.push_back(Pair("maxopsperscriptpolicy", config.GetMaxOpsPerScript(true, false)));
-    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(true, false)));
+    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(GetProtocolEra(config, chainActive.Height()), false)));
     obj.push_back(Pair("maxpubkeyspermultisigpolicy", config.GetMaxPubKeysPerMultiSig(true, false)));
     obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis)));
     obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));

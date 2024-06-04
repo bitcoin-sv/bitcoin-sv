@@ -1275,7 +1275,11 @@ namespace
 
 
     // Parse UniValue and set TransactionSpecificConfig
-    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc, const UniValue& jsonConfig, uint32_t skipScriptFlags, std::string& rejectReason)
+    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc,
+                                      const UniValue& jsonConfig,
+                                      uint32_t skipScriptFlags,
+                                      ProtocolEra era,
+                                      std::string& rejectReason)
     {
         const std::set<std::string> allPolicySettings = {"maxtxsizepolicy","datacarriersize","maxscriptsizepolicy","maxscriptnumlengthpolicy",
                                                          "maxstackmemoryusagepolicy","maxscriptnumlengthpolicy","limitancestorcount", "limitcpfpgroupmemberscount",
@@ -1327,19 +1331,19 @@ namespace
         }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) ||
-            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
     
        if (UniValue maxstackmemoryusagepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxstackmemoryusagepolicy", maxstackmemoryusagepolicy_uv, rejectReason) || 
-           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
+           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(era, tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
        {
           return false;
        }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) || 
-            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
@@ -1903,6 +1907,9 @@ void sendrawtransactions(const Config& config,
     std::shared_ptr<TransactionSpecificConfig> global_tsc;
     uint32_t skipScriptFlagsGlobal = 0;
 
+    // Get active protocol
+    ProtocolEra era { GetProtocolEra(config, chainActive.Height()) };
+
     // Check if we have a second parameter that provides config for all inputs
     if (!request.params[1].empty() && request.params[1].isObject())
     {
@@ -1912,7 +1919,7 @@ void sendrawtransactions(const Config& config,
         }
 
         global_tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
-        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, rejectReason))
+        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, era, rejectReason))
         {
              throw JSONRPCError(RPC_INVALID_PARAMETER, rejectReason);
         }
@@ -1997,7 +2004,7 @@ void sendrawtransactions(const Config& config,
         {
             tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
             // set transaction specific config and skipScriptFlags. Put transaction to invalid array with appropriate reject_reason if anything fails.
-            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, rejectReason))
+            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, era, rejectReason))
             {
                 RawTxValidator::RawTxValidatorResult result{ txid, CValidationState(), false };
                 result.state.value().Error(rejectReason);

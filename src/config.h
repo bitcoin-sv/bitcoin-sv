@@ -512,7 +512,7 @@ public:
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
 
     bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override;
-    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override;
 
     bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override;
     uint64_t GetGenesisGracefulPeriod() const override;
@@ -1195,16 +1195,17 @@ public:
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override { return maxScriptSizePolicy; };
 
     bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override { return true;  }
-    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override
+    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override
     {
-        if (isGenesisEnabled)
-        {
-            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
-        }
-        else
+        if(! IsProtocolActive(era, ProtocolName::Genesis))
         {
             return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS;
         }
+        if(! IsProtocolActive(era, ProtocolName::Chronicle))
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+        }
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;
     }
 
     void SetAcceptNonStandardOutput(bool) override {}

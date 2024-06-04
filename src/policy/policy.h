@@ -156,8 +156,8 @@ static const uint64_t DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = UINT32
 /** Maximum stack memory usage (used instead of MAX_SCRIPT_ELEMENT_SIZE and MAX_STACK_ELEMENTS) after Genesis. **/
 static const uint64_t DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS = 100 * ONE_MEGABYTE;
 
-// Default policy value for script number length after Genesis
-static const uint64_t DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = 10 * ONE_KILOBYTE;
+// Default policy value for script number length (unlimited).
+static const uint64_t DEFAULT_SCRIPT_NUM_LENGTH_POLICY = 0;
 
 // Default policy value for coins cache size threshold before coins are no longer
 // loaded into cache but instead returned directly to the caller.

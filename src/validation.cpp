@@ -2675,22 +2675,16 @@ std::optional<bool> CheckInputScripts(
     }
     else if (!res.value())
     {
-        bool genesisGracePeriod { InProtocolGracePeriod(config, ProtocolName::Genesis, spendHeight) };
-        // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
-        // A failure is detected by a script number overflow in computations.
-        if (!genesisGracePeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
-            return state.DoS(
-                10, false, REJECT_INVALID,
-                strprintf("max-script-num-length-policy-limit-violated (%s)",
-                          ScriptErrorString(check.GetScriptError())));
-        }
-
         // Checking script conditions with non-mandatory flags.
         ProtocolEra spendHeightEra { GetProtocolEra(config, spendHeight) };
         uint32_t standardNotMandatoryFlags { StandardNotMandatoryScriptVerifyFlags(spendHeightEra) };
         const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & standardNotMandatoryFlags) != 0;
         if (hasNonMandatoryFlags)
         {
+            // In a grace period?
+            bool genesisGracePeriod { InProtocolGracePeriod(config, ProtocolName::Genesis, spendHeight) };
+            bool chronicleGracePeriod { InProtocolGracePeriod(config, ProtocolName::Chronicle, spendHeight) };
+
             // Check whether the failure was caused by a non-mandatory
             // script verification check, such as non-standard DER encodings
             // or non-null dummy arguments; if so, don't trigger DoS
@@ -2706,6 +2700,14 @@ std::optional<bool> CheckInputScripts(
             }
             else if (res2.value())
             {
+                // A violation of policy limit for max-script-num-length results in an increase of banning score by 10.
+                if(!genesisGracePeriod && !chronicleGracePeriod && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError())
+                {
+                    return state.DoS(10, false, REJECT_INVALID,
+                        strprintf("max-script-num-length-policy-limit-violated (%s)", ScriptErrorString(check.GetScriptError())));
+                }
+
+                // All other non-consensus failures
                 return state.Invalid(false, REJECT_NONSTANDARD,
                         strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
             } 
@@ -2726,7 +2728,7 @@ std::optional<bool> CheckInputScripts(
                         strprintf("genesis-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
                 }
             }
-            else if(InProtocolGracePeriod(config, ProtocolName::Chronicle, spendHeight))
+            else if(chronicleGracePeriod)
             {
                 // Check with inverse input flags
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Chronicle)) };
@@ -2743,6 +2745,14 @@ std::optional<bool> CheckInputScripts(
                         strprintf("chronicle-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
                 }
             }
+        }
+
+        // If failure was due to underlying library overflow it's not a consensus failure,
+        // just increase ban score by 10.
+        if(check.GetScriptError() == SCRIPT_ERR_BIG_INT)
+        {
+            return state.DoS(10, false, REJECT_INVALID,
+                strprintf("max-script-num-overflow (%s)", ScriptErrorString(check.GetScriptError())));
         }
 
         // Failures of other flags indicate a transaction that is invalid in

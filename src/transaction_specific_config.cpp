@@ -64,7 +64,7 @@ uint64_t TransactionSpecificConfig::GetMaxScriptSize(bool isGenesisEnabled, bool
     return mMaxScriptSize.has_value() ? *mMaxScriptSize : GlobalConfig::GetMaxScriptSize(isGenesisEnabled, isConsensus);
 };
 
-bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err)
+bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err)
 {
     // see comment in SetTransactionSpecificMaxTxSize
     GlobalConfig tmp;
@@ -73,20 +73,36 @@ bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptNumLengthPolicy(i
         return false;
     }
 
-    mMaxScriptNumLength = tmp.GetMaxScriptNumLength(true, false);
+    mMaxScriptNumLength = tmp.GetMaxScriptNumLength(era, false);
     return true;
 };
 
-uint64_t TransactionSpecificConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const
+uint64_t TransactionSpecificConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const
 { 
-    if(isConsensus || !isGenesisEnabled)
+    if(isConsensus)
     {
-        GlobalConfig::GetMaxScriptNumLength(isGenesisEnabled, isConsensus);
+        GlobalConfig::GetMaxScriptNumLength(era, isConsensus);
     }
-    return mMaxScriptNumLength.has_value() ? *mMaxScriptNumLength : GlobalConfig::GetMaxScriptNumLength(isGenesisEnabled, isConsensus);
+
+    if(! mMaxScriptNumLength.has_value())
+    {
+        return GlobalConfig::GetMaxScriptNumLength(era, isConsensus);
+    }
+
+    // Return value as though it were set in GlobalConfig. This ensures we get the
+    // right value for the era if policy is unlimited.
+    GlobalConfig tmp {};
+    if(std::string err; !tmp.SetMaxScriptNumLengthPolicy(*mMaxScriptNumLength, &err))
+    {
+        // Someone has set the policy limit to a value incompatible with the era they
+        // are then requesting it for. Assume they know what they're doing and just give
+        // them back the value they set.
+        return *mMaxScriptNumLength;
+    }
+    return tmp.GetMaxScriptNumLength(era, isConsensus);
 };
 
-bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
+bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(ProtocolEra era, int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
 {
     // To avoid duplicating code from GlobalConfig we create temporary GlobalConfig object and call getter and setter
     // for specific policy setting.
@@ -96,7 +112,7 @@ bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(int64_
         return false;
     }
 
-    mMaxStackMemoryUsageConsensus = tmp.GetMaxScriptNumLength(true, true);
+    mMaxStackMemoryUsageConsensus = tmp.GetMaxScriptNumLength(era, true);
     mMaxStackMemoryUsagePolicy = tmp.GetMaxStackMemoryUsage(true, false);
 
     return true;

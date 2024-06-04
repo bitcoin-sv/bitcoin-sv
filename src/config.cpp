@@ -93,7 +93,7 @@ void GlobalConfig::Reset()
     data->maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
     data->maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
 
-    data->maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
+    data->maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY;
     data->genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD;
     data->chronicleGracefulPeriod = DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD;
 
@@ -1069,19 +1069,8 @@ bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std
     }
 
     uint64_t maxScriptNumLengthUnsigned = static_cast<uint64_t>(maxScriptNumLengthIn);
-    if (maxScriptNumLengthUnsigned > MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for maximum script number length must not exceed consensus limit of " + std::to_string(MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS) + ".";
-        }
-        return false;
-    }
-    else if (maxScriptNumLengthUnsigned == 0)
-    {
-        data->maxScriptNumLengthPolicy = MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
-    }
-    else if (maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
+
+    if (maxScriptNumLengthUnsigned != 0 && maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
     {
         if (err)
         {
@@ -1097,18 +1086,35 @@ bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std
     return true;
 }
 
-uint64_t GlobalConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const
+uint64_t GlobalConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const
 {
-    if (!isGenesisEnabled)
+    if (! IsProtocolActive(era, ProtocolName::Genesis))
     {
         return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS; // no changes before genesis
     }
 
     if (isConsensus)
     {
-        return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // use new limit after genesis
+        if(! IsProtocolActive(era, ProtocolName::Chronicle))
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // limit after Genesis
+        }
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;   // Chronicle removes consensus limit
     }
-    return data->maxScriptNumLengthPolicy; // use policy
+
+    // Use policy limit
+    if(data->maxScriptNumLengthPolicy == 0)
+    {
+        // Unlimited policy depends on consensus limit for whichever protocol is active
+        if(! IsProtocolActive(era, ProtocolName::Chronicle))
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+        }
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;
+    }
+
+    // Configured policy limit
+    return data->maxScriptNumLengthPolicy;
 }
 
 void GlobalConfig::SetAcceptNonStandardOutput(bool accept)

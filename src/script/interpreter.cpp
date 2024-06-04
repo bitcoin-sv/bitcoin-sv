@@ -395,9 +395,22 @@ std::optional<bool> EvalScript(
 
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
-    const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
-    const bool utxo_after_chronicle{(flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0};
-    const uint64_t maxScriptNumLength = config.GetMaxScriptNumLength(utxo_after_genesis, consensus);
+    const bool utxo_after_genesis { (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0 };
+    const bool utxo_after_chronicle { (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0 };
+
+    ProtocolEra utxoEra { ProtocolEra::PostChronicle };
+    if(!utxo_after_chronicle)
+    {
+        if(utxo_after_genesis)
+        {
+            utxoEra = ProtocolEra::PostGenesis;
+        }
+        else
+        {
+            utxoEra = ProtocolEra::PreGenesis;
+        }
+    }
+    const uint64_t maxScriptNumLength { config.GetMaxScriptNumLength(utxoEra, consensus) };
 
     if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
     {

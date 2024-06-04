@@ -24,7 +24,7 @@ from math import floor, ceil
 from time import sleep
 import re
 
-from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD, DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
+from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD
 from test_framework.mininode import NodeConn, NetworkThread, NodeConnCB, mininode_lock, FromHex
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode

@@ -199,43 +199,44 @@ BOOST_AUTO_TEST_CASE(max_bignum_length_policy) {
 
     GlobalConfig config;
     std::string reason;
-    int64_t newMaxScriptNumLengthPolicy{ MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS + 1 };
 
     // default pre genesis policy max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
 
     // default post genesis policy max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, false) == DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+
+    // default post chronicle policy max length
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false) == MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE);
 
     // default pre genesis consensus max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, true) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, true) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
 
     // default post genesis consensus max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, true) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, true) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
 
-    // can not set script number length policy > post genesis consensus script number length
-    BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1, &reason));
+    // default post chronicle consensus max length
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, true) == MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE);
+
+
+    // can not set script number length policy < pre genesis consensus script number length
+    BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS - 1, &reason));
 
     // can not set policy script number length < 0
     BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(-1, &reason));
 
-    // set new max policy script number length
+    // set and fetch a new policy script number length
+    int64_t newMaxScriptNumLengthPolicy { MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS + 1 };
     BOOST_CHECK(config.SetMaxScriptNumLengthPolicy(newMaxScriptNumLengthPolicy, &reason));
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false), MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), newMaxScriptNumLengthPolicy);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false), newMaxScriptNumLengthPolicy);
 
-    // pre genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
-
-    // post genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, false) == static_cast<uint64_t>(newMaxScriptNumLengthPolicy));
-
-    // set unlimited policy script number length
+    // set and fetch an unlimited policy script number length
     BOOST_CHECK(config.SetMaxScriptNumLengthPolicy(0, &reason));
-
-    // pre genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
-
-    // post genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, false) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false), MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE);
 }
 
 

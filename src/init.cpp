@@ -1137,9 +1137,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     strUsage += HelpMessageOpt(
         "-maxscriptnumlengthpolicy=<n>",
-        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited) after Genesis is activated. "
+        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited). "
             "The value may be given in bytes or with unit (B, kB, MB, GB).",
-            DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
+            DEFAULT_SCRIPT_NUM_LENGTH_POLICY));
 
     strUsage += HelpMessageOpt(
         "-softconsensusfreezeduration",
@@ -2973,7 +2973,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Configure maximum length of numbers in scripts
     if (gArgs.IsArgSet("-maxscriptnumlengthpolicy"))
     {
-        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
         if (std::string err; !config.SetMaxScriptNumLengthPolicy(value, &err))
         {
             return InitError(err);
