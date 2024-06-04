@@ -16,9 +16,9 @@
 #include "script/script_num.h"
 #include "taskcancellation.h"
 #include "uint256.h"
-#include "consensus/consensus.h"
 #include "script_config.h"
 
+#include <algorithm>
 #include <cstdint>
 
 namespace {
@@ -354,10 +354,6 @@ static bool IsOpcodeDisabled(opcodetype opcode) {
     return false;
 }
 
-static bool IsInvalidBranchingOpcode(opcodetype opcode) {
-    return opcode == OP_VERNOTIF || opcode == OP_VERIF;
-}
-
 inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
                                    const CScriptConfig &config,
                                    bool isGenesisEnabled, bool consensus)
@@ -617,36 +613,60 @@ std::optional<bool> EvalScript(
                         }
                     } break;
 
+                    case OP_VERIF:
+                    case OP_VERNOTIF:
+                        if(!utxo_after_chronicle) 
+                        {   
+                            if(utxo_after_genesis && !fExec)
+                                break;
+                            else
+                                return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                        }
+                            
+                        [[fallthrough]];
                     case OP_IF:
-                    case OP_NOTIF: {
+                    case OP_NOTIF:
+                    {
                         // <expression> if [statements] [else [statements]]
                         // endif
                         bool fValue = false;
-                        if (fExec) {
-                            if (stack.size() < 1) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+                        if(fExec)
+                        {
+                            if(stack.size() < 1)
+                                return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+
+                            const LimitedVector& vch = stack.stacktop(-1);
+                            if((opcode == OP_IF || opcode == OP_NOTIF)
+                                && flags & SCRIPT_VERIFY_MINIMALIF)
+                            {
+                                if(vch.size() > 1)
+                                    return set_error(serror, SCRIPT_ERR_MINIMALIF);
+
+                                if(vch.size() == 1 && vch[0] != 1)
+                                    return set_error(serror, SCRIPT_ERR_MINIMALIF);
                             }
-                            LimitedVector &vch = stack.stacktop(-1);
-                            if (flags & SCRIPT_VERIFY_MINIMALIF) {
-                                if (vch.size() > 1) {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_MINIMALIF);
-                                }
-                                if (vch.size() == 1 && vch[0] != 1) {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_MINIMALIF);
+                           
+                            if(opcode == OP_VERIF || opcode == OP_VERNOTIF)
+                            {
+                                if(vch.size() == 4)
+                                {
+                                    std::vector<uint8_t> val(sizeof(tx_version));
+                                    to_le(tx_version, val.data());
+                                    fValue = std::ranges::equal(val, vch);
                                 }
                             }
-                            fValue = CastToBool(vch.GetElement());
-                            if (opcode == OP_NOTIF) {
+                            else
+                                fValue = CastToBool(vch.GetElement());
+            
+                            if(opcode == OP_NOTIF || opcode == OP_VERNOTIF)
                                 fValue = !fValue;
-                            }
+
                             stack.pop_back();
                         }
                         vfExec.push_back(fValue);
                         vfElse.push_back(false);
-                    } break;
+                    }
+                    break;
 
                     case OP_ELSE: {
                         // Only one ELSE is allowed in IF after genesis.
@@ -1658,14 +1678,8 @@ std::optional<bool> EvalScript(
                         }
                     } break;
 
-                    default: {
-                        if (IsInvalidBranchingOpcode(opcode) && utxo_after_genesis && !fExec)
-                        {
-                            break;
-                        }
-
+                    default:
                         return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-                    }
                 }
             }
 
