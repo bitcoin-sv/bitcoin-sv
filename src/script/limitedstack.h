@@ -34,6 +34,8 @@ private:
     valtype& GetElementNonConst();
 public:
 
+    using difference_type = valtype::difference_type;
+
     // Memory usage of one stack element (without data). This is a consensus rule. Do not change.
     // It prevents someone from creating stack with millions of empty elements.
     static constexpr unsigned int ELEMENT_OVERHEAD = 32;
@@ -65,16 +67,23 @@ public:
 
     const LimitedStack& getStack() const;
 
+    void shrink(difference_type start,
+                difference_type length);
+
     friend class LimitedStack;
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class LimitedStack
 {
+public:
+    using stack_type = std::vector<LimitedVector>;
+    using size_type = stack_type::size_type;
+
 private:
     uint64_t combinedStackSize = 0;
     uint64_t maxStackSize = 0;
-    std::vector<LimitedVector> stack;
+    stack_type stack;
     LimitedStack* parentStack { nullptr };
     void decreaseCombinedStackSize(uint64_t additionalSize);
     void increaseCombinedStackSize(uint64_t additionalSize);

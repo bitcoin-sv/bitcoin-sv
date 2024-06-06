@@ -1887,4 +1887,100 @@ BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            uint32_t,                   // flags
+                            bool,                       // expected status
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top>;             // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data
+    {
+      // Stack too small
+      { {OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{} },
+      { {OP_1, OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top{{1}} },
+      { {OP_1, OP_2, OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_STACK_OPERATION, 2, exp_stack_top{{2}} },
+      // negative start 
+      { {OP_1, OP_2, OP_PUSHDATA1, 1, 0x81, OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{0x81}} },
+      // start out-of-bounds
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_3, OP_1, OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{1}} },
+      // negative length 
+      { {OP_1, OP_PUSHDATA1, 1, 0x81, OP_3, OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{3}} },
+      // length out-of-bounds
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_4, OP_SUBSTR},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{4}} },
+      // An empty stack element as input data is always an error - no valid start position
+      { {OP_0, OP_0, OP_0, OP_SUBSTR}, // empty stacktop
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{std::in_place} },
+
+      // Success cases
+      // length zero 
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_0, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_0, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_2, OP_0, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+
+      // length one 
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_1, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_1, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{1}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_2, OP_1, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+      
+      // length two 
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_2, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0, 1}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_2, OP_SUBSTR},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{1, 2}} },
+    };
+
+    for(const auto& [script,
+                     flags,
+                     exp_status,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const int32_t tx_version{0};
+        const auto status = EvalScript(config,
+                                    false,
+                                    source->GetToken(),
+                                    stack,
+                                    CScript{script.begin(), script.end()},
+                                    flags,
+                                    BaseSignatureChecker{},
+                                    tx_version,
+                                    &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -5,7 +5,8 @@
 #include "crypto/ripemd160.h"
 #include "crypto/sha256.h"
 #include "script/int_serialization.h"
-#include <iostream>
+
+#include <algorithm>
 
 LimitedVector::LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn) : stackElement(stackElementIn), stack(stackIn)
 {
@@ -119,9 +120,23 @@ bool LimitedVector::IsMinimallyEncoded(uint64_t maxSize) const
 {
     return bsv::IsMinimallyEncoded(stackElement, maxSize);
 }
+
 const LimitedStack& LimitedVector::getStack() const
 {
     return stack.get();
+}
+
+void LimitedVector::shrink(difference_type start, difference_type length)
+{ 
+    if(start < 0 || 
+       start >= ssize(stackElement) ||
+       length < 0)
+        return;
+
+    const auto len{std::min(ssize(stackElement) - start, length)};
+    valtype tmp{stackElement.begin() + start,
+                stackElement.begin() + start + len};
+    stackElement.swap(tmp);
 }
 
 LimitedStack::LimitedStack(uint64_t maxStackSizeIn)
