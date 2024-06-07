@@ -151,7 +151,11 @@ class DSDetectedTests(BitcoinTestFramework):
                     # dsdetected message requires a list of block headers from double-spending block up to the common block
                     branch = randomBranch[:random.randrange(1, len(randomBranch))]
                     previousBlock = branch[-1]
-            for _ in range(random.randint(1, maxNumberOfBlocksPerBranch)):
+
+            # Ensure we can never end up with just 2 branches each of length 1 - if that happens bitcoind will not
+            # process our dsdetected message because the maximum fork distance will be greater than the permitted maximum.
+            maxBranchLen = max([len(b) for b in branches]) if len(branches) >= 1 else 0
+            for _ in range(random.randint(1 if maxBranchLen > 1 else 2, maxNumberOfBlocksPerBranch)):
                 # To make unique blocks we need to set the last_block_time
                 previousBlock, last_block_time = make_block(None, parent_block=previousBlock, last_block_time=last_block_time)
                 branch.append(previousBlock)

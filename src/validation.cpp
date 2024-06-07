@@ -619,7 +619,6 @@ bool CheckRegularTransaction(const CTransaction &tx,
         {
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-vout-p2sh");
         }
-
     }
 
     static SaltedOutpointHasher hasher {};
@@ -803,16 +802,18 @@ static bool CheckAncestorLimits(const CTxMemPool& pool,
 
 uint32_t GetScriptVerifyFlags(const Config &config, ProtocolEra era)
 {
-    // Check inputs based on the set of flags we activate.
-    uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(era, ProtocolEra::PreGenesis);
-    if (!config.GetChainParams().RequireStandard()) {
+    // Get verification flags for overall script - individual UTXOs may need
+    // to add/remove flags (done by CheckInputScripts).
+    uint32_t scriptVerifyFlags { StandardScriptVerifyFlags(era) };
+    if (!config.GetChainParams().RequireStandard())
+    {
         if (config.IsSetPromiscuousMempoolFlags())
         {
             scriptVerifyFlags = config.GetPromiscuousMempoolFlags();
         }
-        scriptVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID | scriptVerifyFlags;
+        scriptVerifyFlags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
-    // Make sure whatever we need to activate is actually activated.
+
     return scriptVerifyFlags;
 }
 
@@ -1046,29 +1047,29 @@ CTxnValResult TxnValidation(
     // Coinbase is only valid in a block, not as a loose transaction.
     if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era)) 
     {
-        // We will re-check the transaction if we are in Genesis gracefull period, to check if genesis rules would 
-        // allow this script transaction to be accepted. If it is valid under Genesis rules, we only reject it
-        // without adding banscore
+        // Re-check the transaction if we are in the Genesis grace period to check if the opposite rules would 
+        // allow this script transaction to be accepted. If it is valid using the opposite old/new rules we
+        // only reject it without adding banscore.
         if (InProtocolGracePeriod(config, ProtocolName::Genesis, chainActive.Height() + 1))
         {
             ProtocolEra inverseEra { GetInverseProtocolEra(era, ProtocolName::Genesis) };
             uint64_t maxTxSizeGraceful = config.GetMaxTxSize(inverseEra, true);
 
-            CValidationState genesisState;
-            if (CheckRegularTransaction(tx, genesisState, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeGraceful, inverseEra))
+            CValidationState graceState;
+            if (CheckRegularTransaction(tx, graceState, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeGraceful, inverseEra))
             {
-                genesisState.DoS(0, false, REJECT_INVALID, "flexible-" + state.GetRejectReason());
-                return Result{ genesisState, pTxInputData };
+                graceState.DoS(0, false, REJECT_INVALID, "flexible-" + state.GetRejectReason());
+                return Result { graceState, pTxInputData };
             }
             else
             {
-                genesisState.DoS(state.GetNDoS(), false, REJECT_INVALID, state.GetRejectReason());
-                return Result{ genesisState, pTxInputData };
+                graceState.DoS(state.GetNDoS(), false, REJECT_INVALID, state.GetRejectReason());
+                return Result { graceState, pTxInputData };
             }
         }
         else
         {
-            // Not in Genesis grace period, so return original failure reason
+            // Not in the grace period, so return original failure reason
             return Result{state, pTxInputData};
         }
     }
@@ -1363,7 +1364,35 @@ CTxnValResult TxnValidation(
     }
     else if (!res.value())
     {
-        // State filled in by CheckInputs.
+        // Chronicle changes several script verification flags including mandatory ones,
+        // so check again with the inverse protocol era flags if we are in the grace period
+        // to see if the txn would be valid under those rules.
+        if(InProtocolGracePeriod(config, ProtocolName::Chronicle, chainActive.Height() + 1))
+        {
+            uint32_t inverseScriptFlags { GetScriptVerifyFlags(config, GetInverseProtocolEra(era, ProtocolName::Chronicle)) };
+            inverseScriptFlags &= ~pTxInputData->GetSkipScriptFlags();
+            CValidationState graceState {};
+            auto res =
+                CheckInputs(
+                    source->GetToken(),
+                    config,
+                    false,
+                    tx,
+                    graceState,
+                    view,
+                    true,
+                    inverseScriptFlags,
+                    true,
+                    false,
+                    txdata,
+                    frozenTXOCheck);
+            if(res.has_value() && res.value())
+            {
+                graceState.Invalid(false, REJECT_NONSTANDARD, "flexible-" + state.GetRejectReason());
+                state = graceState;
+            }
+        }
+
         return Result{state, pTxInputData, vCoinsToUncache};
     }
     // Check again against the current block tip's script verification flags
@@ -1423,7 +1452,7 @@ CTxnValResult TxnValidation(
                 state,
                 view,
                 true,      /* fScriptChecks */
-                MANDATORY_SCRIPT_VERIFY_FLAGS,
+                MandatoryScriptVerifyFlags(era),
                 true,      /* sigCacheStore */
                 false,     /* scriptCacheStore */
                 txdata,
@@ -2625,14 +2654,12 @@ std::optional<bool> CheckInputScripts(
 {
     // What era are activated for this coin?
     int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coinHeight);
-    uint32_t perInputScriptFlags = 0;
-    if (IsProtocolActive(GetProtocolEra(config, inputScriptBlockHeight), ProtocolName::Genesis))
-    {
-        perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
-    }
+    ProtocolEra era { GetProtocolEra(config, spendHeight) };
+    ProtocolEra utxoEra { GetProtocolEra(config, inputScriptBlockHeight) };
+    uint32_t perInputScriptFlags { InputScriptVerifyFlags(era, utxoEra) };
 
     // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
-    // cache when we are about to cross genesis activation line (see function FinalizeGenesisCrossing).
+    // cache when we are about to cross a protocol era activation line (see function FinalizeEraCrossing).
     // Verify signature
     CScriptCheck check(config, consensus, scriptPubKey, amount, tx, input, flags | perInputScriptFlags, sigCacheStore, txdata);
     if (pvChecks) 
@@ -2646,7 +2673,6 @@ std::optional<bool> CheckInputScripts(
     else if (!res.value())
     {
         bool genesisGracePeriod { InProtocolGracePeriod(config, ProtocolName::Genesis, spendHeight) };
-        const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
         // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
         // A failure is detected by a script number overflow in computations.
         if (!genesisGracePeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
@@ -2655,7 +2681,11 @@ std::optional<bool> CheckInputScripts(
                 strprintf("max-script-num-length-policy-limit-violated (%s)",
                           ScriptErrorString(check.GetScriptError())));
         }
+
         // Checking script conditions with non-mandatory flags.
+        ProtocolEra spendHeightEra { GetProtocolEra(config, spendHeight) };
+        uint32_t standardNotMandatoryFlags { StandardNotMandatoryScriptVerifyFlags(spendHeightEra) };
+        const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & standardNotMandatoryFlags) != 0;
         if (hasNonMandatoryFlags)
         {
             // Check whether the failure was caused by a non-mandatory
@@ -2663,15 +2693,10 @@ std::optional<bool> CheckInputScripts(
             // or non-null dummy arguments; if so, don't trigger DoS
             // protection to avoid splitting the network between upgraded
             // and non-upgraded nodes.
-            // FIXME: CORE-257 has to check if genesis check is necessary also in check2
-            uint32_t flags2Check = flags | perInputScriptFlags;
+            uint32_t flags2Check = (flags | perInputScriptFlags) & ~standardNotMandatoryFlags;
             // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
             // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
-            CScriptCheck check2(
-                config, true,
-                scriptPubKey, amount, tx, input,
-                ((flags2Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
-                sigCacheStore, txdata);
+            CScriptCheck check2(config, true, scriptPubKey, amount, tx, input, flags2Check, sigCacheStore, txdata);
             if (auto res2 = check2(token); !res2.has_value())
             {
                 return {};
@@ -2683,14 +2708,11 @@ std::optional<bool> CheckInputScripts(
             } 
             else if (genesisGracePeriod)
             {
-                uint32_t flags3Check = flags2Check ^ SCRIPT_UTXO_AFTER_GENESIS;
+                // Check with inverse input flags
+                uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Genesis)) };
+                uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                CScriptCheck check3(
-                    config, true,
-                    scriptPubKey, amount, tx, input,
-                    ((flags3Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
-                    sigCacheStore, txdata);
-
+                CScriptCheck check3(config, true, scriptPubKey, amount, tx, input, flags3Check, sigCacheStore, txdata);
                 if (auto res3 = check3(token); !res3.has_value())
                 {
                     return {};
@@ -2699,6 +2721,23 @@ std::optional<bool> CheckInputScripts(
                 {
                     return state.Invalid(false, REJECT_NONSTANDARD,
                         strprintf("genesis-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
+                }
+            }
+            else if(InProtocolGracePeriod(config, ProtocolName::Chronicle, spendHeight))
+            {
+                // Check with inverse input flags
+                uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Chronicle)) };
+                uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
+
+                CScriptCheck check3(config, true, scriptPubKey, amount, tx, input, flags3Check, sigCacheStore, txdata);
+                if (auto res3 = check3(token); !res3.has_value())
+                {
+                    return {};
+                }
+                else if (res3.value()) 
+                {
+                    return state.Invalid(false, REJECT_NONSTANDARD,
+                        strprintf("chronicle-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
                 }
             }
         }
@@ -2895,6 +2934,12 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
     if (IsProtocolActive(GetProtocolEra(config, pChainTip->GetHeight() + 1), ProtocolName::Genesis)) {
         flags |= SCRIPT_GENESIS;
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
+    }
+
+    if (IsProtocolActive(GetProtocolEra(config, pChainTip->GetHeight() + 1), ProtocolName::Chronicle)) {
+        flags |= SCRIPT_CHRONICLE;
+        flags &= ~SCRIPT_VERIFY_LOW_S;
+        flags &= ~SCRIPT_VERIFY_SIGPUSHONLY;
     }
 
     return flags;
@@ -3892,10 +3937,14 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew)
               pcoinsTip->GetCacheSize());
 }
 
-static void FinalizeGenesisCrossing(const Config &config, int32_t height, const CJournalChangeSetPtr& changeSet)
+static void FinalizeEraCrossing(const Config& config, int32_t height, const CJournalChangeSetPtr& changeSet)
 {
-    if (IsProtocolActive(GetProtocolEra(config, height + 1), ProtocolName::Genesis) &&
-       !IsProtocolActive(GetProtocolEra(config, height), ProtocolName::Genesis))
+    bool crossingGenesis { IsProtocolActive(GetProtocolEra(config, height + 1), ProtocolName::Genesis) &&
+                          !IsProtocolActive(GetProtocolEra(config, height), ProtocolName::Genesis) };
+    bool crossingChronicle { IsProtocolActive(GetProtocolEra(config, height + 1), ProtocolName::Chronicle) &&
+                            !IsProtocolActive(GetProtocolEra(config, height), ProtocolName::Chronicle) };
+
+    if (crossingGenesis || crossingChronicle)
     {
         mempool.Clear();
         ClearCache();
@@ -3925,7 +3974,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     assert(pindexDelete);
     int32_t blockHeight { pindexDelete->GetHeight() };
 
-    FinalizeGenesisCrossing(config, blockHeight, changeSet);
+    FinalizeEraCrossing(config, blockHeight, changeSet);
 
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -4244,7 +4293,7 @@ static bool ConnectTip(
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
     GetMainSignals().BlockConnected2(pindexNew, txNew);
 
-    FinalizeGenesisCrossing(config, pindexNew->GetHeight(), changeSet);
+    FinalizeEraCrossing(config, pindexNew->GetHeight(), changeSet);
 
     return true;
 }

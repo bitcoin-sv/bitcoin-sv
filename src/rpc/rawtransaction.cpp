@@ -1167,7 +1167,7 @@ static UniValue signrawtransaction(const Config &config,
                     prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount), sigdata,
                     DataFromTransaction(txv, i),
-                    utxoEra);
+                    era, utxoEra);
             }
         }
 
@@ -1182,7 +1182,7 @@ static UniValue signrawtransaction(const Config &config,
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,
-                StandardScriptVerifyFlags(era, utxoEra),
+                StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra),
                 TransactionSignatureChecker(&txConst, i, amount),
                 &serror);
         if (!res.value())

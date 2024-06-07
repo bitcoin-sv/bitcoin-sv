@@ -103,6 +103,7 @@ SignatureData CombineSignatures(const Config& config, bool consensus, const CScr
                                 const BaseSignatureChecker &checker,
                                 const SignatureData &scriptSig1,
                                 const SignatureData &scriptSig2,
+                                ProtocolEra era,
                                 ProtocolEra utxoEra);
 
 /** Extract signature data from a transaction, and insert it. */

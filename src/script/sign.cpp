@@ -169,7 +169,7 @@ bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureC
 
     // Test solution
 
-    uint32_t flags = StandardScriptVerifyFlags(era, utxoEra);
+    uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
     return solved &&
            VerifyScript(config, consensus, source->GetToken(), sigdata.scriptSig, fromPubKey,
                         flags, creator.Checker()).value();
@@ -286,12 +286,13 @@ struct Stacks {
     Stacks() {}
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
-    explicit Stacks(const Config& config, bool consensus, const SignatureData &data) {
+    Stacks(const Config& config, bool consensus, const SignatureData &data, ProtocolEra era)
+    {
         // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
         LimitedStack stack(UINT32_MAX);
         auto source = task::CCancellationSource::Make();
         EvalScript(config, consensus, source->GetToken(), stack, data.scriptSig,
-                   MANDATORY_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker());
+                   MandatoryScriptVerifyFlags(era), BaseSignatureChecker());
         stack.MoveToValtypes(script);
     }
 
@@ -361,13 +362,16 @@ SignatureData CombineSignatures(const Config& config, bool consensus, const CScr
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,
                                 const SignatureData& scriptSig2,
-                                ProtocolEra utxoEra) {
+                                ProtocolEra era,
+                                ProtocolEra utxoEra)
+{
     txnouttype txType;
     std::vector<std::vector<uint8_t>> vSolutions;
     Solver(scriptPubKey, utxoEra, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
-                             Stacks(config, consensus, scriptSig1), Stacks(config, consensus, scriptSig2))
+                             Stacks(config, consensus, scriptSig1, era),
+                             Stacks(config, consensus, scriptSig2, era))
         .Output();
 }
 

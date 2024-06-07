@@ -36,6 +36,9 @@ static std::map<std::string, UniValue> registers;
 // not in use but required by config.h dependency
 bool fRequireStandard = true;
 
+// Assume Chronicle active release unless configured otherwise
+ProtocolEra ActiveEra { ProtocolEra::PostChronicle };
+
 //
 // This function returns either one of EXIT_ codes when it's expected to stop
 // the process or CONTINUE_EXECUTION when it's expected to continue further.
@@ -56,6 +59,10 @@ static int AppInitRawTx(int argc, char *argv[]) {
     }
 
     fCreateBlank = gArgs.GetBoolArg("-create", false);
+    if(gArgs.GetBoolArg("-genesis", false))
+    {
+        ActiveEra = ProtocolEra::PostGenesis;
+    }
 
     if (argc < 2 || gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") ||
         gArgs.IsArgSet("-help")) {
@@ -77,6 +84,9 @@ static int AppInitRawTx(int argc, char *argv[]) {
         strUsage +=
             HelpMessageOpt("-txid", _("Output only the hex-encoded transaction "
                                       "id of the resultant transaction."));
+        strUsage += HelpMessageOpt("-genesis", _("Use Genesis rules "
+                                                 "instead of the default which is "
+                                                 "Chronicle."));
         AppendParamsHelpMessages(strUsage);
 
         fprintf(stdout, "%s", strUsage.c_str());
@@ -655,8 +665,8 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        // we will assume that script is after genesis for every script type except p2sh
-        ProtocolEra utxoEra { IsP2SH(prevPubKey)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+        // We will assume that script is after Genesis for every script type except p2sh
+        ProtocolEra utxoEra { IsP2SH(prevPubKey)? ProtocolEra::PreGenesis : ActiveEra };
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -666,7 +676,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                              true, 
                              MutableTransactionSignatureCreator(
                                  &keystore, &mergedTx, i, amount, sigHashType),
-                             ProtocolEra::PostGenesis, utxoEra, 
+                             ActiveEra, utxoEra, 
                              prevPubKey, sigdata);
         }
 
@@ -678,6 +688,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 MutableTransactionSignatureChecker(&mergedTx, i, amount),
                 sigdata, 
                 DataFromTransaction(txv, i),
+                ActiveEra,
                 utxoEra);
         }
 
@@ -690,7 +701,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,
-                StandardScriptVerifyFlags(ProtocolEra::PostGenesis, utxoEra),
+                StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
                 MutableTransactionSignatureChecker(&mergedTx, i, amount));
 
         if (!res.value())
@@ -743,12 +754,12 @@ static void MutateTx(const Config& config, CMutableTransaction& tx, const std::s
 
 static void OutputTxJSON(const CTransaction &tx) {
 
-    //treat as after genesis if no output is P2SH
+    // Treat as PreGenesis if any output is P2SH
     bool genesisEnabled =
         std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
             return IsP2SH(out.scriptPubKey);
         });
-    ProtocolEra era { genesisEnabled? ProtocolEra::PostGenesis : ProtocolEra::PreGenesis };
+    ProtocolEra era { genesisEnabled? ActiveEra : ProtocolEra::PreGenesis };
 
     CStringWriter strWriter;
     strWriter.ReserveAdditional(tx.GetTotalSize() * 2);
