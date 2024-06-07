@@ -7,7 +7,7 @@ def tests(run_only_these):
     import inspect
     import glob
     from os.path import dirname, basename, isfile, join
-    from chronicle_upgrade_tests.test_base import ChronicleHeightBasedSimpleTestsCase
+    from chronicle_upgrade_tests.test_base import ChronicleHeightTestsCase, ChronicleHeightBasedSimpleTestsCase
 
     mods = glob.glob(join(dirname(__file__), "*.py"))
     filtered_mods = []
@@ -27,9 +27,9 @@ def tests(run_only_these):
         def test_type(obj):
             if not inspect.isclass(obj):
                 return False
-            if obj in [ChronicleHeightBasedSimpleTestsCase]:
+            if obj in [ChronicleHeightTestsCase, ChronicleHeightBasedSimpleTestsCase]:
                 return False
-            ret = issubclass(obj, (ChronicleHeightBasedSimpleTestsCase))
+            ret = issubclass(obj, (ChronicleHeightTestsCase, ChronicleHeightBasedSimpleTestsCase))
             return ret
 
         test_list.extend([klass for name, klass in inspect.getmembers(mod, test_type)])
