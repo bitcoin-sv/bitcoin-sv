@@ -204,9 +204,17 @@ public:
             mtx.vin.emplace_back(*fundingOutPoint, CTxIn::SEQUENCE_FINAL);
 
             keystore.AddKeyPubKey(fundingKey.getPrivKey(), fundingKey.getPrivKey().GetPubKey());
-            ProduceSignature(config, true, MutableTransactionSignatureCreator(
-                                &keystore, &mtx, 0, fundingAmount, sigHash.withForkId()),
-                             ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, prevPubKey, sigdata);
+            SignAndVerify(config,
+                          true,
+                          MutableTransactionSignatureCreator(&keystore,
+                                                             &mtx,
+                                                             0,
+                                                             fundingAmount,
+                                                             sigHash.withForkId()),
+                          ProtocolEra::PostGenesis,
+                          ProtocolEra::PostGenesis,
+                          prevPubKey,
+                          sigdata);
             UpdateTransaction(mtx, 0, sigdata); // funding transactions only have one input
             COutPoint newOutPoint {mtx.GetId(), static_cast<uint32_t>(mtx.vout.size() - 1)};
             return {newOutPoint, *fundingOutPoint};

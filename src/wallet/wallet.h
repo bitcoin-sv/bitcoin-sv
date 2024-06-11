@@ -1205,11 +1205,18 @@ bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!ProduceSignature(config, false, DummySignatureCreator(this),
-                              ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, scriptPubKey,
-                              sigdata)) {
+        if(!SignAndVerify(config,
+                          false,
+                          DummySignatureCreator(this),
+                          ProtocolEra::PostGenesis,
+                          ProtocolEra::PreGenesis,
+                          scriptPubKey,
+                          sigdata))
+        {
             return false;
-        } else {
+        }
+        else
+        {
             UpdateTransaction(txNew, nIn, sigdata);
         }
 

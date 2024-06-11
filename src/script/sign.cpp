@@ -139,9 +139,14 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator,
-                      ProtocolEra era, ProtocolEra utxoEra,
-                      const CScript& fromPubKey, SignatureData& sigdata) {
+bool ProduceSignature(const Config& config,
+                      bool consensus,
+                      const BaseSignatureCreator& creator,
+                      ProtocolEra era,
+                      ProtocolEra utxoEra,
+                      const CScript& fromPubKey,
+                      SignatureData& sigdata)
+{
     CScript script = fromPubKey;
     bool solved = true;
     std::vector<valtype> result;
@@ -162,13 +167,28 @@ bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureC
     }
 
     sigdata.scriptSig = PushAll(result);
+    return solved;
+}
+
+bool SignAndVerify(const Config& config,
+                   bool consensus,
+                   const BaseSignatureCreator& creator,
+                   ProtocolEra era,
+                   ProtocolEra utxoEra,
+                   const CScript& fromPubKey,
+                   SignatureData& sigdata)
+{
+    const bool solved = ProduceSignature(config,
+                                         consensus,
+                                         creator,
+                                         era,
+                                         utxoEra,
+                                         fromPubKey,
+                                         sigdata);
 
     // no need to cancel script verification after n time
     // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
-
-    // Test solution
-
     uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
     return solved &&
            VerifyScript(config, consensus, source->GetToken(), sigdata.scriptSig, fromPubKey,
@@ -202,7 +222,7 @@ bool SignSignature(const Config& config, const CKeyStore& keystore,
     SignatureData sigdata;
     //Consensus parameter can be set to false or true here, because MULTISIG OP is a nonstandard transaction. 
     //Method SignSignature handles only standard transactions
-    bool ret = ProduceSignature(config, false, creator, era, utxoEra, fromPubKey, sigdata);
+    bool ret = SignAndVerify(config, false, creator, era, utxoEra, fromPubKey, sigdata);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }

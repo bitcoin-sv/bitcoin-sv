@@ -81,9 +81,21 @@ struct SignatureData {
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator,
-                      ProtocolEra era, ProtocolEra utxoEra,
-                      const CScript& scriptPubKey, SignatureData& sigdata);
+bool ProduceSignature(const Config&,
+                      bool consensus,
+                      const BaseSignatureCreator&,
+                      ProtocolEra era,
+                      ProtocolEra utxoEra,
+                      const CScript& scriptPubKey,
+                      SignatureData&);
+
+bool SignAndVerify(const Config&,
+                   bool consensus,
+                   const BaseSignatureCreator&,
+                   ProtocolEra era,
+                   ProtocolEra utxoEra,
+                   const CScript& scriptPubKey,
+                   SignatureData&);
 
 /** Produce a script signature for a transaction. */
 bool SignSignature(const Config& config, const CKeyStore& keystore,

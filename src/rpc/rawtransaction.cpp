@@ -1151,11 +1151,20 @@ static UniValue signrawtransaction(const Config &config,
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
-            (i < mergedTx.vout.size())) {
-            ProduceSignature(config, true, MutableTransactionSignatureCreator(
-                                 &keystore, &mergedTx, i, amount, sigHashType),
-                             era, utxoEra, prevPubKey, sigdata);
+        if((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
+           (i < mergedTx.vout.size()))
+        {
+            SignAndVerify(config,
+                          true,
+                          MutableTransactionSignatureCreator(&keystore,
+                                                             &mergedTx,
+                                                             i,
+                                                             amount,
+                                                             sigHashType),
+                          era,
+                          utxoEra,
+                          prevPubKey,
+                          sigdata);
         }
 
         // ... and merge in other signatures:

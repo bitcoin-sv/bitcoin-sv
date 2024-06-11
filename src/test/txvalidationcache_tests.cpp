@@ -532,16 +532,30 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // Sign
         SignatureData sigdata;
-        ProduceSignature(config, true,
-            MutableTransactionSignatureCreator(&keystore, &tx, 0, 11 * CENT,
-                                               SigHashType().withForkId()),
-            ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, spend_tx.vout[0].scriptPubKey, sigdata);
+        SignAndVerify(config,
+                      true,
+                      MutableTransactionSignatureCreator(&keystore,
+                                                         &tx,
+                                                         0,
+                                                         11 * CENT,
+                                                         SigHashType().withForkId()),
+                      ProtocolEra::PostGenesis,
+                      ProtocolEra::PreGenesis,
+                      spend_tx.vout[0].scriptPubKey,
+                      sigdata);
 
         UpdateTransaction(tx, 0, sigdata);
-        ProduceSignature(config, true,
-            MutableTransactionSignatureCreator(&keystore, &tx, 1, 11 * CENT,
-                                               SigHashType().withForkId()),
-            ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, spend_tx.vout[3].scriptPubKey, sigdata);
+        SignAndVerify(config,
+                      true,
+                      MutableTransactionSignatureCreator(&keystore,
+                                                         &tx,
+                                                         1,
+                                                         11 * CENT,
+                                                         SigHashType().withForkId()),
+                      ProtocolEra::PostGenesis,
+                      ProtocolEra::PreGenesis,
+                      spend_tx.vout[3].scriptPubKey,
+                      sigdata);
         UpdateTransaction(tx, 1, sigdata);
 
         auto shouldPass = [](uint32_t flags) -> bool {

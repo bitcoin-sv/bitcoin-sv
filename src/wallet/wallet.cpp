@@ -3023,19 +3023,27 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 const CScript &scriptPubKey =
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
-                
-                if (!ProduceSignature(config, true,
-                        TransactionSignatureCreator(
-                            this, &txNewConst, nIn,
-                            coin.first->tx->vout[coin.second].nValue,
-                            sigHashType),
-                        era, // new transaction, assume it will be mined in next block
-                        coin.first->GetProtocolEra(),
-                        scriptPubKey, 
-                        sigdata)) {
+
+                if(!SignAndVerify(config,
+                                  true,
+                                  TransactionSignatureCreator(this,
+                                                              &txNewConst,
+                                                              nIn,
+                                                              coin.first->tx
+                                                                  ->vout[coin.second]
+                                                                  .nValue,
+                                                              sigHashType),
+                                  era, // new transaction, assume it will be mined in
+                                       // next block
+                                  coin.first->GetProtocolEra(),
+                                  scriptPubKey,
+                                  sigdata))
+                {
                     strFailReason = _("Signing transaction failed");
                     return false;
-                } else {
+                }
+                else
+                {
                     UpdateTransaction(txNew, nIn, sigdata);
                 }
 
