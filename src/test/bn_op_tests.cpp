@@ -4,16 +4,22 @@
 
 #include "big_int.h"
 
-#include "bn_helpers.h"
+#include <cstdint>
+#include <limits>
+#include <vector>
+
 #include <boost/test/unit_test.hpp>
 
+#include "bn_helpers.h"
+#include "config.h"
+#include "script/instruction_iterator.h"
 #include "script/int_serialization.h"
 #include "script/interpreter.h"
+#include "script/limitedstack.h"
+#include "script/opcodes.h"
+#include "script/script_error.h"
 #include "script/script_flags.h"
 #include "taskcancellation.h"
-
-#include "config.h"
-#include <vector>
 
 using namespace std;
 
@@ -96,9 +102,16 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status =
-            EvalScript(config, false, source->GetToken(), stack, script, flags,
-                       BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1U, stack.size());
@@ -208,9 +221,16 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         auto source = task::CCancellationSource::Make();
-        const auto status =
-            EvalScript(config, true, source->GetToken(), stack, script, flags,
-                       BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       true,
+                                       source->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1U, stack.size());
@@ -285,9 +305,16 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         auto source = task::CCancellationSource::Make();
-        const auto status =
-            EvalScript(config, true, source->GetToken(), stack, script, flags,
-                       BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       true,
+                                       source->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1U, stack.size());
@@ -342,9 +369,16 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         auto source = task::CCancellationSource::Make();
-        const auto status =
-            EvalScript(config, true, source->GetToken(), stack, script, flags,
-                       BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       true,
+                                       source->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
         if(status.value())
         {
             BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -456,9 +490,16 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         const auto flags{ SCRIPT_UTXO_AFTER_GENESIS };
         ScriptError error;
         auto source = task::CCancellationSource::Make();
-        const auto status =
-            EvalScript(config, false, source->GetToken(), stack, script, flags,
-                BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_script_error, error);
         BOOST_CHECK_EQUAL(status.value() ? 1U : 2U, stack.size());
@@ -499,9 +540,16 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        const auto status = EvalScript(
-            config, false, task::CCancellationSource::Make()->GetToken(), stack,
-            script, flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       task::CCancellationSource::Make()->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -573,9 +621,16 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        const auto status = EvalScript(
-            config, false, task::CCancellationSource::Make()->GetToken(), stack,
-            script, flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       task::CCancellationSource::Make()->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -602,9 +657,16 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
         ScriptError error;
-        const auto status = EvalScript(config, true, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
-
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       true,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(i + 1, stack.size());
@@ -647,8 +709,16 @@ BOOST_AUTO_TEST_CASE(op_size)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config, false, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -686,8 +756,16 @@ BOOST_AUTO_TEST_CASE(op_pick)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config, false, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -725,8 +803,16 @@ BOOST_AUTO_TEST_CASE(op_roll)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config, false, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -786,8 +872,16 @@ BOOST_AUTO_TEST_CASE(op_split)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config, false, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -837,8 +931,16 @@ BOOST_AUTO_TEST_CASE(op_lshift)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config, false, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -886,8 +988,16 @@ BOOST_AUTO_TEST_CASE(op_rshift)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config, false, token, stack, script,
-                                       flags, BaseSignatureChecker{}, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       token,
+                                       stack,
+                                       script,
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -908,10 +1018,16 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
     ScriptError err;
-    const auto r =
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << INT32_MAX << OP_RSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
+    const int32_t tx_version{42};
+    const auto r = EvalScript(GlobalConfig::GetConfig(),
+                              true,
+                              source->GetToken(),
+                              stack,
+                              CScript() << INT32_MAX << OP_RSHIFT,
+                              flags,
+                              BaseSignatureChecker{},
+                              tx_version,
+                              &err);
     BOOST_CHECK(r.value());
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
     const auto& top = stack.front();
@@ -932,10 +1048,16 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
     ScriptError err;
-    const auto r =
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << INT32_MAX << OP_LSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
+    const int32_t tx_version{42};
+    const auto r = EvalScript(GlobalConfig::GetConfig(),
+                              true,
+                              source->GetToken(),
+                              stack,
+                              CScript() << INT32_MAX << OP_LSHIFT,
+                              flags,
+                              BaseSignatureChecker{},
+                              tx_version,
+                              &err);
     BOOST_CHECK(r.value());
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
     const auto& top = stack.front();
@@ -996,9 +1118,16 @@ BOOST_AUTO_TEST_CASE(op_checksig)
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const equality_checker checker;
-        const auto status = EvalScript(
-            config, false, task::CCancellationSource::Make()->GetToken(), stack,
-            script, flags, checker, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       task::CCancellationSource::Make()->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       checker,
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -1070,9 +1199,16 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
         ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const equality_checker checker;
-        const auto status = EvalScript(
-            config, false, task::CCancellationSource::Make()->GetToken(), stack,
-            script, flags, checker, &error);
+        const int32_t tx_version{42};
+        const auto status = EvalScript(config,
+                                       false,
+                                       task::CCancellationSource::Make()->GetToken(),
+                                       stack,
+                                       script,
+                                       flags,
+                                       checker,
+                                       tx_version,
+                                       &error);
 
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);

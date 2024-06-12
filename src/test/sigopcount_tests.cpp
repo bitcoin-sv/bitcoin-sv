@@ -220,6 +220,7 @@ ScriptError VerifyWithFlag(const CTransaction &output,
             output.vout[0].scriptPubKey,
             flags,
             TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
+            inputi.nVersion,
             &error);
     BOOST_CHECK((ret.value() == true) == (error == SCRIPT_ERR_OK));
 

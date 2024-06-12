@@ -8,6 +8,7 @@
 #include "script/interpreter.h"
 #include "script/script.h"
 #include "taskcancellation.h"
+#include <cstdint>
 
 using namespace std;
 
@@ -19,11 +20,18 @@ static void interpreter_lshift_int32_max_minus_1(benchmark::State& state)
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
     ScriptError err;
+    constexpr int32_t tx_version{42};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << INT32_MAX - 1 << OP_LSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
+        EvalScript(GlobalConfig::GetConfig(),
+                   true,
+                   source->GetToken(),
+                   stack,
+                   CScript() << INT32_MAX - 1 << OP_LSHIFT,
+                   flags,
+                   BaseSignatureChecker{},
+                   tx_version,
+                   &err);
     }
 }
 BENCHMARK(interpreter_lshift_int32_max_minus_1)
@@ -36,11 +44,18 @@ static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
     ScriptError err;
+    constexpr int32_t tx_version{42};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << INT32_MAX - 1 << OP_RSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
+        EvalScript(GlobalConfig::GetConfig(),
+                   true,
+                   source->GetToken(),
+                   stack,
+                   CScript() << INT32_MAX - 1 << OP_RSHIFT,
+                   flags,
+                   BaseSignatureChecker{},
+                   tx_version,
+                   &err);
     }
 }
 BENCHMARK(interpreter_rshift_int32_max_minus_1)
@@ -54,11 +69,18 @@ static void interpreter_lshift_6m_minus_1(benchmark::State& state)
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
     ScriptError err;
+    constexpr int32_t tx_version{42};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << (size*8) - 1 << OP_LSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
+        EvalScript(GlobalConfig::GetConfig(),
+                   true,
+                   source->GetToken(),
+                   stack,
+                   CScript() << (size * 8) - 1 << OP_LSHIFT,
+                   flags,
+                   BaseSignatureChecker{},
+                   tx_version,
+                   &err);
     }
 }
 BENCHMARK(interpreter_lshift_6m_minus_1)
@@ -72,11 +94,18 @@ static void interpreter_rshift_6m_minus_1(benchmark::State& state)
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
     ScriptError err;
+    constexpr int32_t tx_version{42};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << (size*8) - 1 << OP_RSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
+        EvalScript(GlobalConfig::GetConfig(),
+                   true,
+                   source->GetToken(),
+                   stack,
+                   CScript() << (size * 8) - 1 << OP_RSHIFT,
+                   flags,
+                   BaseSignatureChecker{},
+                   tx_version,
+                   &err);
     }
 }
 BENCHMARK(interpreter_rshift_6m_minus_1)

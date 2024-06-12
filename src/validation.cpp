@@ -2492,17 +2492,20 @@ void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs, int32_t nHeigh
 std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& token)
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    return
-        VerifyScript(
-            config,
-            consensus,
-            token,
-            scriptSig,
-            scriptPubKey,
-            nFlags,
-            CachingTransactionSignatureChecker(
-                ptxTo, nIn, amount, cacheStore, txdata),
-            &error);
+
+    return VerifyScript(config,
+                        consensus,
+                        token,
+                        scriptSig,
+                        scriptPubKey,
+                        nFlags,
+                        CachingTransactionSignatureChecker(ptxTo,
+                                                           nIn,
+                                                           amount,
+                                                           cacheStore,
+                                                           txdata),
+                        ptxTo->nVersion,
+                        &error);
 }
 
 std::pair<int32_t,int> GetSpendHeightAndMTP(const ICoinsViewCache& inputs)

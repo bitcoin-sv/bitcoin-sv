@@ -5,17 +5,21 @@
 
 #include "interpreter.h"
 #include "script_flags.h"
+#include "compat/endian.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
+#include "script/opcodes.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "consensus/consensus.h"
 #include "script_config.h"
+
+#include <cstdint>
 
 namespace {
 
@@ -361,6 +365,12 @@ inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
     return (nOpCount <= config.GetMaxOpsPerScript(isGenesisEnabled, consensus));
 }
 
+static void to_le(const int32_t n, uint8_t* o)
+{
+    const int32_t le_n{static_cast<int32_t>(htole32(n))};
+    memcpy(o, &le_n, sizeof(le_n));
+}
+
 std::optional<bool> EvalScript(
     const CScriptConfig& config,
     bool consensus,
@@ -369,6 +379,7 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    const int32_t tx_version,
     LimitedStack& altstack,
     long& ipc,
     std::vector<bool>& vfExec,
@@ -389,6 +400,7 @@ std::optional<bool> EvalScript(
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
+    const bool utxo_after_chronicle{(flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0};
     const uint64_t maxScriptNumLength = config.GetMaxScriptNumLength(utxo_after_genesis, consensus);
 
     if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
@@ -581,7 +593,16 @@ std::optional<bool> EvalScript(
 
                         break;
                     }
+                    case OP_VER:
+                    {
+                        if(!utxo_after_chronicle)
+                            return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
 
+                        std::vector<uint8_t> val(sizeof(tx_version));
+                        to_le(tx_version, val.data());
+                        stack.push_back(val);
+                        break;
+                    }
                     case OP_NOP1:
                     case OP_NOP4:
                     case OP_NOP5:
@@ -1692,12 +1713,25 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    const int32_t tx_version,
     ScriptError* serror)
 {
     LimitedStack altstack {stack.makeChildStack()};
     long ipc{0};
     std::vector<bool> vfExec, vfElse;
-    return EvalScript(config, consensus, token, stack, script, flags, checker, altstack, ipc, vfExec, vfElse, serror);
+    return EvalScript(config,
+                      consensus,
+                      token,
+                      stack,
+                      script,
+                      flags,
+                      checker,
+                      tx_version,
+                      altstack,
+                      ipc,
+                      vfExec,
+                      vfElse,
+                      serror);
 }
 
 namespace {
@@ -2052,6 +2086,7 @@ std::optional<bool> VerifyScript(
     const CScript& scriptPubKey,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    const int32_t tx_version,
     ScriptError* serror)
 {
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
@@ -2067,16 +2102,32 @@ std::optional<bool> VerifyScript(
 
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
-    if (auto res = EvalScript(config, consensus, token, stack, scriptSig, flags, checker, serror);
-        !res.has_value() || !res.value())
+    if(auto res = EvalScript(config,
+                             consensus,
+                             token,
+                             stack,
+                             scriptSig,
+                             flags,
+                             checker,
+                             tx_version,
+                             serror);
+       !res.has_value() || !res.value())
     {
         return res;
     }
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack.makeRootStackCopy();
     }
-    if (auto res = EvalScript(config, consensus, token, stack, scriptPubKey, flags, checker, serror);
-        !res.has_value() || !res.value())
+    if(auto res = EvalScript(config,
+                             consensus,
+                             token,
+                             stack,
+                             scriptPubKey,
+                             flags,
+                             checker,
+                             tx_version,
+                             serror);
+       !res.has_value() || !res.value())
     {
         return res;
     }
@@ -2111,8 +2162,16 @@ std::optional<bool> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         stack.pop_back();
 
-        if (auto res = EvalScript(config, consensus, token, stack, pubKey2, flags, checker, serror);
-            !res.has_value() || !res.value())
+        if(auto res = EvalScript(config,
+                                 consensus,
+                                 token,
+                                 stack,
+                                 pubKey2,
+                                 flags,
+                                 checker,
+                                 tx_version,
+                                 serror);
+           !res.has_value() || !res.value())
         {
             return res;
         }

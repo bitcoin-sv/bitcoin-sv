@@ -52,6 +52,7 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
             (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
                 SCRIPT_ENABLE_SIGHASH_FORKID,
             MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
+            txTo.nVersion,
             &err);
 
     return res.value();

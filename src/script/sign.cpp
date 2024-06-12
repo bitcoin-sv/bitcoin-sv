@@ -8,10 +8,14 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
+#include "script/interpreter.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "config.h"
+
+#include <cstdint>
 
 TransactionSignatureCreator::TransactionSignatureCreator(
     const CKeyStore *keystoreIn, const CTransaction *txToIn, unsigned int nInIn,
@@ -171,10 +175,11 @@ bool ProduceSignature(const Config& config,
 }
 
 bool SignAndVerify(const Config& config,
-                   bool consensus,
+                   const bool consensus,
                    const BaseSignatureCreator& creator,
-                   ProtocolEra era,
-                   ProtocolEra utxoEra,
+                   const int32_t tx_version,
+                   const ProtocolEra era,
+                   const ProtocolEra utxoEra,
                    const CScript& fromPubKey,
                    SignatureData& sigdata)
 {
@@ -190,9 +195,14 @@ bool SignAndVerify(const Config& config,
     // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
     uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
-    return solved &&
-           VerifyScript(config, consensus, source->GetToken(), sigdata.scriptSig, fromPubKey,
-                        flags, creator.Checker()).value();
+    return solved && VerifyScript(config,
+                                  consensus,
+                                  source->GetToken(),
+                                  fromPubKey,
+                                  sigdata.scriptSig,
+                                  flags,
+                                  creator.Checker(),
+                                  tx_version);
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,
@@ -222,7 +232,14 @@ bool SignSignature(const Config& config, const CKeyStore& keystore,
     SignatureData sigdata;
     //Consensus parameter can be set to false or true here, because MULTISIG OP is a nonstandard transaction. 
     //Method SignSignature handles only standard transactions
-    bool ret = SignAndVerify(config, false, creator, era, utxoEra, fromPubKey, sigdata);
+    const bool ret = SignAndVerify(config,
+                                   false,
+                                   creator,
+                                   txToConst.nVersion,
+                                   era,
+                                   utxoEra,
+                                   fromPubKey,
+                                   sigdata);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }
@@ -306,13 +323,24 @@ struct Stacks {
     Stacks() {}
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
-    Stacks(const Config& config, bool consensus, const SignatureData &data, ProtocolEra era)
+
+    Stacks(const Config& config,
+           bool consensus,
+           const SignatureData& data,
+           int32_t tx_version,
+           ProtocolEra era)
     {
         // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
         LimitedStack stack(UINT32_MAX);
         auto source = task::CCancellationSource::Make();
-        EvalScript(config, consensus, source->GetToken(), stack, data.scriptSig,
-                   MandatoryScriptVerifyFlags(era), BaseSignatureChecker());
+        EvalScript(config,
+                   consensus,
+                   source->GetToken(),
+                   stack,
+                   data.scriptSig,
+                   MandatoryScriptVerifyFlags(era),
+                   BaseSignatureChecker(),
+                   tx_version);
         stack.MoveToValtypes(script);
     }
 
@@ -378,10 +406,14 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
     }
 }
 
-SignatureData CombineSignatures(const Config& config, bool consensus, const CScript& scriptPubKey,
+SignatureData CombineSignatures(const Config& config,
+                                bool consensus,
+                                const CScript& scriptPubKey,
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,
+                                const int32_t tx_version1,
                                 const SignatureData& scriptSig2,
+                                const int32_t tx_version2,
                                 ProtocolEra era,
                                 ProtocolEra utxoEra)
 {
@@ -390,8 +422,8 @@ SignatureData CombineSignatures(const Config& config, bool consensus, const CScr
     Solver(scriptPubKey, utxoEra, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
-                             Stacks(config, consensus, scriptSig1, era),
-                             Stacks(config, consensus, scriptSig2, era))
+                             Stacks(config, consensus, scriptSig1, tx_version1, era),
+                             Stacks(config, consensus, scriptSig2, tx_version2, era))
         .Output();
 }
 

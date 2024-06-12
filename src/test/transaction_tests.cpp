@@ -26,6 +26,7 @@
 #include "chainparams.h"
 #include "config.h"
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <tuple>
@@ -146,6 +147,7 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                                             mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                             verify_flags, 
                                             TransactionSignatureChecker(&tx, i, amount, txdata),
+                                            tx.nVersion,
                                             &err).value();
                 }
                 if (is_valid != should_be_valid){
@@ -370,13 +372,15 @@ void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
     const Config& config = GlobalConfig::GetConfig();
 
     LimitedStack stack(UINT32_MAX);
-    EvalScript(
-        config, true,
-        task::CCancellationSource::Make()->GetToken(),
-        stack,
-        script,
-        SCRIPT_VERIFY_STRICTENC,
-        BaseSignatureChecker());
+    const int32_t tx_version{42};
+    EvalScript(config,
+               true,
+               task::CCancellationSource::Make()->GetToken(),
+               stack,
+               script,
+               SCRIPT_VERIFY_STRICTENC,
+               BaseSignatureChecker(),
+               tx_version);
 
     BOOST_CHECK(stack.size() > 0);
     stack.pop_back();
@@ -489,6 +493,7 @@ void CheckWithFlag(const CheckFlagParams& params)
             inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
             flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
             TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
+            inputi.nVersion,
             &error).value();
         BOOST_CHECK_MESSAGE(ret == flags.second, std::string("failed result: ") + (ret? "true":"false"));
     }
@@ -710,13 +715,22 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       { flagsPostChronicle, false } } });
 
     BOOST_CHECK(*output1 == *output2);
-    UpdateTransaction(
-        input1, 0, CombineSignatures(testConfig, true, output1->vout[0].scriptPubKey,
-                                     MutableTransactionSignatureChecker(
-                                         &input1, 0, output1->vout[0].nValue),
-                                     DataFromTransaction(input1, 0),
-                                     DataFromTransaction(input2, 0),
-                                     ProtocolEra::PreGenesis, ProtocolEra::PreGenesis));
+    UpdateTransaction(input1,
+                      0,
+                      CombineSignatures(testConfig,
+                                        true,
+                                        output1->vout[0].scriptPubKey,
+                                        MutableTransactionSignatureChecker(&input1,
+                                                                           0,
+                                                                           output1
+                                                                               ->vout[0]
+                                                                               .nValue),
+                                        DataFromTransaction(input1, 0),
+                                        input1.nVersion,
+                                        DataFromTransaction(input2, 0),
+                                        input2.nVersion,
+                                        ProtocolEra::PreGenesis,
+                                        ProtocolEra::PreGenesis));
 
     CheckWithFlag({output1, input1, { { flagsPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
                                       { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
@@ -749,13 +763,22 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       { flagsPostChronicle | SCRIPT_VERIFY_P2SH, true } } });
 
     BOOST_CHECK(*output1 == *output2);
-    UpdateTransaction(
-        input1, 0, CombineSignatures(testConfig, true, output1->vout[0].scriptPubKey,
-                                     MutableTransactionSignatureChecker(
-                                         &input1, 0, output1->vout[0].nValue),
-                                     DataFromTransaction(input1, 0),
-                                     DataFromTransaction(input2, 0), 
-                                     ProtocolEra::PreGenesis, ProtocolEra::PreGenesis));
+    UpdateTransaction(input1,
+                      0,
+                      CombineSignatures(testConfig,
+                                        true,
+                                        output1->vout[0].scriptPubKey,
+                                        MutableTransactionSignatureChecker(&input1,
+                                                                           0,
+                                                                           output1
+                                                                               ->vout[0]
+                                                                               .nValue),
+                                        DataFromTransaction(input1, 0),
+                                        input1.nVersion,
+                                        DataFromTransaction(input2, 0),
+                                        input2.nVersion,
+                                        ProtocolEra::PreGenesis,
+                                        ProtocolEra::PreGenesis));
 
     CheckWithFlag({output1, input1, { { flagsPreGenesis | SCRIPT_VERIFY_P2SH, true },
                                       { flagsPostGenesis | SCRIPT_VERIFY_P2SH, true },

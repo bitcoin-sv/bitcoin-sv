@@ -680,22 +680,27 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                                                              i,
                                                              amount,
                                                              sigHashType),
+                          mergedTx.nVersion,
                           ActiveEra,
                           utxoEra,
                           prevPubKey,
                           sigdata);
         }
-
-        // ... and merge in other signatures:
-        for (const CTransaction &txv : txVariants) {
-            sigdata = CombineSignatures(config, 
-                true,
-                prevPubKey,
-                MutableTransactionSignatureChecker(&mergedTx, i, amount),
-                sigdata, 
-                DataFromTransaction(txv, i),
-                ActiveEra,
-                utxoEra);
+        for(const CTransaction& txv : txVariants)
+        {
+            // ... and merge in other signatures:
+            sigdata = CombineSignatures(config,
+                                        true,
+                                        prevPubKey,
+                                        MutableTransactionSignatureChecker(&mergedTx,
+                                                                           i,
+                                                                           amount),
+                                        sigdata,
+                                        mergedTx.nVersion,
+                                        DataFromTransaction(txv, i),
+                                        txv.nVersion,
+                                        ActiveEra,
+                                        utxoEra);
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
@@ -708,8 +713,8 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 txin.scriptSig,
                 prevPubKey,
                 StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
-                MutableTransactionSignatureChecker(&mergedTx, i, amount));
-
+                MutableTransactionSignatureChecker(&mergedTx, i, amount),
+                mergedTx.nVersion);
         if (!res.value())
         {
             fComplete = false;

@@ -211,10 +211,12 @@ public:
                                                              0,
                                                              fundingAmount,
                                                              sigHash.withForkId()),
+                          mtx.nVersion,
                           ProtocolEra::PostGenesis,
                           ProtocolEra::PostGenesis,
                           prevPubKey,
                           sigdata);
+
             UpdateTransaction(mtx, 0, sigdata); // funding transactions only have one input
             COutPoint newOutPoint {mtx.GetId(), static_cast<uint32_t>(mtx.vout.size() - 1)};
             return {newOutPoint, *fundingOutPoint};

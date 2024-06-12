@@ -2,6 +2,7 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "script/script_flags.h"
 #include "test/test_bitcoin.h"
 
 #include "keystore.h"
@@ -18,6 +19,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <array>
+#include <cstdint>
 
 typedef std::vector<uint8_t> valtype;
 typedef std::vector<valtype> stacktype;
@@ -38,15 +40,16 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
 
     LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
 
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            script,
-            flagset[0] | 0,
-            sigchecker,
-            &err);
+    const int32_t tx_version{42};
+    auto r = EvalScript(config,
+                        true,
+                        source->GetToken(),
+                        stack,
+                        script,
+                        flagset[0] | 0,
+                        sigchecker,
+                        tx_version,
+                        &err);
 
     if (expected_error == SCRIPT_ERR_OK)
     {
@@ -76,30 +79,31 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
 
         LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
         LimitedStack expectedStack = LimitedStack(expected, UINT32_MAX);
-        auto r =
-            EvalScript(
-                config, true,
-                source->GetToken(),
-                stack,
-                script,
-                flags | upgradeFlag,
-                sigchecker,
-                &err);
+        const int32_t tx_version{42};
+        auto r = EvalScript(config,
+                            true,
+                            source->GetToken(),
+                            stack,
+                            script,
+                            flags | upgradeFlag,
+                            sigchecker,
+                            tx_version,
+                            &err);
         BOOST_CHECK(r.value());
         BOOST_CHECK(stack == expectedStack);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
         if (upgradeFlag) {
             stack = LimitedStack(original_stack, UINT32_MAX);
-            r =
-                EvalScript(
-                    config, true,
-                    source->GetToken(),
-                    stack,
-                    script,
-                    flags,
-                    sigchecker,
-                    &err);
+            r = EvalScript(config,
+                           true,
+                           source->GetToken(),
+                           stack,
+                           script,
+                           flags,
+                           sigchecker,
+                           tx_version,
+                           &err);
             BOOST_CHECK(r.value());
             BOOST_CHECK(stack == expectedStack);
         }
@@ -114,15 +118,16 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
 
     auto source = task::CCancellationSource::Make();
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            script,
-            flags | upgradeFlag,
-            sigchecker,
-            &err);
+    const int32_t tx_version{42};
+    auto r = EvalScript(config,
+                        true,
+                        source->GetToken(),
+                        stack,
+                        script,
+                        flags | upgradeFlag,
+                        sigchecker,
+                        tx_version,
+                        &err);
     BOOST_CHECK(!r.value());
 
     BOOST_CHECK_EQUAL(err, expected_error);
@@ -131,15 +136,15 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     if(upgradeFlag)
     {
         stack = LimitedStack(original_stack, UINT32_MAX);
-        r =
-            EvalScript(
-                config, true,
-                source->GetToken(),
-                stack,
-                script,
-                flags,
-                sigchecker,
-                &err);
+        r = EvalScript(config,
+                       true,
+                       source->GetToken(),
+                       stack,
+                       script,
+                       flags,
+                       sigchecker,
+                       tx_version,
+                       &err);
         BOOST_CHECK(!r.value());
         BOOST_CHECK_EQUAL(err, expected_error);
     }
@@ -688,15 +693,16 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
     ScriptError err = SCRIPT_ERR_OK;
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            CScript() << 1 << OP_RSHIFT,
-            flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
-            sigchecker,
-            &err);
+    const int32_t tx_version{42};
+    auto r = EvalScript(config,
+                        true,
+                        source->GetToken(),
+                        stack,
+                        CScript() << 1 << OP_RSHIFT,
+                        flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
+                        sigchecker,
+                        tx_version,
+                        &err);
     BOOST_CHECK(r.value());
     BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
 }
@@ -713,15 +719,16 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
     ScriptError err = SCRIPT_ERR_OK;
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            CScript() << 1 << OP_LSHIFT,
-            flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
-            sigchecker,
-            &err);
+    const int32_t tx_version{42};
+    auto r = EvalScript(config,
+                        true,
+                        source->GetToken(),
+                        stack,
+                        CScript() << 1 << OP_LSHIFT,
+                        flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
+                        sigchecker,
+                        tx_version,
+                        &err);
     BOOST_CHECK(r.value());
     BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
 }
@@ -1213,19 +1220,20 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                                     const BaseSignatureChecker& sigchecker)
 { 
     const Config& config = GlobalConfig::GetConfig();
+    const int32_t tx_version{42};
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
 
         LimitedStack stack(UINT32_MAX);
-        auto r =
-            EvalScript(
-                config, true,
-                task::CCancellationSource::Make(),
-                stack,
-                script,
-                flags,
-                sigchecker,
-                &err);
+        auto r = EvalScript(config,
+                            true,
+                            task::CCancellationSource::Make(),
+                            stack,
+                            script,
+                            flags,
+                            sigchecker,
+                            tx_version,
+                            &err);
         uint64_t nonPushOpcodeCount = NonPushOpCodeCount(script);
 
         // // flagset does not contain SCRIPT_UTXO_AFTER_GENESIS flag, so we will test with isGenesisEnabled=false in if
@@ -1301,4 +1309,76 @@ BOOST_AUTO_TEST_CASE(opcode_limit_tests)
     CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-3) + dummy_multisig, testLimit+1, sigchecker);
 }
 
+BOOST_AUTO_TEST_CASE(op_ver_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    const vector<uint8_t> args{OP_VER};
+    CScript script(args.begin(), args.end());
+
+    const auto flags{SCRIPT_GENESIS};
+    ScriptError error{SCRIPT_ERR_OK};
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    constexpr int32_t tx_version{42};
+    const auto status = EvalScript(config,
+                                   false,
+                                   source->GetToken(),
+                                   stack,
+                                   script,
+                                   flags,
+                                   BaseSignatureChecker{},
+                                   tx_version,
+                                   &error);
+    BOOST_CHECK_EQUAL(false, status.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_BAD_OPCODE, error);
+    BOOST_CHECK(stack.empty());
+}
+
+BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    // tx_version, script, exp_status, scriptError, exp stack top
+    using test_args = tuple<int32_t, vector<uint8_t>, bool, ScriptError, vector<uint8_t>>;
+    vector<test_args> test_data = 
+    {
+      { 0, {OP_VER}, true, SCRIPT_ERR_OK, { 0, 0, 0, 0}},
+      
+      { 1, {OP_VER}, true, SCRIPT_ERR_OK, { 1, 0, 0, 0 }},
+      { 0x12345678, {OP_VER}, true, SCRIPT_ERR_OK, { 0x78, 0x56, 0x34, 0x12 }},
+      { INT32_MAX, {OP_VER}, true, SCRIPT_ERR_OK, { 0xff, 0xff, 0xff, 0x7f }},
+
+      { -1, {OP_VER}, true, SCRIPT_ERR_OK, { 0xff, 0xff, 0xff, 0xff }},
+      { -2, {OP_VER}, true, SCRIPT_ERR_OK, { 0xfe, 0xff, 0xff, 0xff }},
+      { INT32_MIN, {OP_VER}, true, SCRIPT_ERR_OK, { 0x0, 0x0, 0x0, 0x80 }},
+    };
+
+    for(const auto& [tx_version, script, exp_status, exp_error, exp_stack_top] : test_data)
+    {
+        const auto flags{SCRIPT_UTXO_AFTER_CHRONICLE};
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(config,
+                                    false,
+                                    source->GetToken(),
+                                    stack,
+                                    CScript{script.begin(), script.end()},
+                                    flags,
+                                    BaseSignatureChecker{},
+                                    tx_version,
+                                    &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(1, stack.size());
+        const auto& actual{stack.stacktop(-1)};
+        BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top.begin(), exp_stack_top.end(),
+                                      actual.begin(), actual.end());
+    }
+}
 BOOST_AUTO_TEST_SUITE_END()

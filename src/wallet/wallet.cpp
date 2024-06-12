@@ -3033,8 +3033,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                                                                   ->vout[coin.second]
                                                                   .nValue,
                                                               sigHashType),
-                                  era, // new transaction, assume it will be mined in
-                                       // next block
+                                  coin.first->tx->nVersion,
+                                  era, // new transaction, assume it will be mined in next block
                                   coin.first->GetProtocolEra(),
                                   scriptPubKey,
                                   sigdata))

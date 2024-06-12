@@ -299,7 +299,8 @@ std::optional<bool> AreInputsStandard(
                     stack,
                     tx.vin[i].scriptSig,
                     SCRIPT_VERIFY_NONE,
-                    BaseSignatureChecker());
+                    BaseSignatureChecker(),
+                    tx.nVersion);
             if (!res.has_value())
             {
                 return {};

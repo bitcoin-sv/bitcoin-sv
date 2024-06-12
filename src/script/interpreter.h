@@ -115,6 +115,7 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    int32_t tx_version,
     LimitedStack& altstack,
     long& ipc,
     std::vector<bool>& vfExec,
@@ -128,6 +129,7 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    int32_t tx_version,
     ScriptError* error = nullptr);
 std::optional<bool> VerifyScript(
     const CScriptConfig& config,
@@ -137,6 +139,7 @@ std::optional<bool> VerifyScript(
     const CScript& scriptPubKey,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    int32_t tx_version,
     ScriptError* serror = nullptr);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

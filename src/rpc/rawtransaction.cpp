@@ -1161,6 +1161,7 @@ static UniValue signrawtransaction(const Config &config,
                                                              i,
                                                              amount,
                                                              sigHashType),
+                          mergedTx.nVersion,
                           era,
                           utxoEra,
                           prevPubKey,
@@ -1168,15 +1169,22 @@ static UniValue signrawtransaction(const Config &config,
         }
 
         // ... and merge in other signatures:
-        for (const CMutableTransaction &txv : txVariants) {
-            if (txv.vin.size() > i) {
-                sigdata = CombineSignatures(
-                    config, 
-                    true,
-                    prevPubKey,
-                    TransactionSignatureChecker(&txConst, i, amount), sigdata,
-                    DataFromTransaction(txv, i),
-                    era, utxoEra);
+        for(const CMutableTransaction& txv : txVariants)
+        {
+            if(txv.vin.size() > i)
+            {
+               sigdata = CombineSignatures(config,
+                                           true,
+                                           prevPubKey,
+                                           TransactionSignatureChecker(&txConst,
+                                                                       i,
+                                                                       amount),
+                                           sigdata,
+                                           txConst.nVersion,
+                                           DataFromTransaction(txv, i),
+                                           txv.nVersion,
+                                           era,
+                                           utxoEra);
             }
         }
 
@@ -1193,6 +1201,7 @@ static UniValue signrawtransaction(const Config &config,
                 prevPubKey,
                 StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra),
                 TransactionSignatureChecker(&txConst, i, amount),
+                txConst.nVersion,
                 &serror);
         if (!res.value())
         {
