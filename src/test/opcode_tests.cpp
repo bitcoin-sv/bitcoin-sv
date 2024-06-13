@@ -1996,4 +1996,43 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            bool,               // expected status
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data 
+    {
+        { {OP_NOP5}, 0, true, SCRIPT_ERR_OK },
+        { {OP_NOP5}, SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS, 
+                        false, SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS}
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_status,
+                     exp_error] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const uint32_t tx_version{};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
