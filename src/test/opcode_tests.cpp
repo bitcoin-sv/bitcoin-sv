@@ -22,6 +22,7 @@
 
 #include <array>
 #include <cstdint>
+#include <utility>
 
 typedef std::vector<uint8_t> valtype;
 typedef std::vector<valtype> stacktype;
@@ -2032,6 +2033,89 @@ BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            uint32_t,                   // flags
+                            bool,                       // expected status
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top>;             // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data
+    {
+      // Stack too small
+      { {OP_LEFT},
+            flags, false, SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{} },
+      { {OP_1, OP_LEFT},
+            flags, false, SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top{{1}} },
+      // negative length 
+      { {OP_1, OP_1, OP_NEGATE, OP_LEFT},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{0x81}} },
+      
+      // Empty string
+      { {OP_0, OP_0, OP_LEFT},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+      { {OP_0, OP_1, OP_LEFT},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{1}} },
+     
+      // Single element
+      { {OP_PUSHDATA1, 1, 0, OP_0, OP_LEFT},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+      { {OP_PUSHDATA1, 1, 0, OP_1, OP_LEFT},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+      { {OP_PUSHDATA1, 1, 0, OP_2, OP_LEFT},
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{2}} },
+     
+      // Multiple elements
+      { {OP_PUSHDATA1, 2, 0, 1, OP_0, OP_LEFT},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_1, OP_LEFT},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_2, OP_LEFT},
+            flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0, 1}} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_LEFT}, // length out-of-bounds
+            flags, false, SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{3}} },
+    };
+
+    for(const auto& [script,
+                     flags,
+                     exp_status,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const int32_t tx_version{0};
+        const auto status = EvalScript(config,
+                                    false,
+                                    source->GetToken(),
+                                    stack,
+                                    CScript{script.begin(), script.end()},
+                                    flags,
+                                    BaseSignatureChecker{},
+                                    tx_version,
+                                    &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
     }
 }
 

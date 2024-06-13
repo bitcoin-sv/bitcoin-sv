@@ -649,8 +649,35 @@ std::optional<bool> EvalScript(
                         stack.pop_back();
                         break;
                     }
+                    case OP_LEFT:
+                    {
+                        if(!utxo_after_chronicle)
+                        {
+                            if(flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                                return set_error(serror,
+                                                 SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS);
+                            else
+                                break;
+                        }
+
+                        if(stack.size() < 2)
+                            return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
+                                                fRequireMinimal,
+                                                maxScriptNumLength};
+                        const auto len{bn_len.getint()};
+
+                        auto& data{stack.stacktop(-2)};
+                        const auto size{std::ssize(data)};
+                        if(len < 0 || len > size)
+                            return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
+
+                        data.shrink(0, len);
+                        stack.pop_back();
+                        break;
+                    }
                     case OP_NOP1:
-                    case OP_NOP5:
                     case OP_NOP6:
                     case OP_NOP7:
                     case OP_NOP8:
