@@ -128,12 +128,15 @@ const LimitedStack& LimitedVector::getStack() const
 
 void LimitedVector::shrink(difference_type start, difference_type length)
 { 
+    const auto size{ssize(stackElement)};
+
     if(start < 0 || 
-       start >= ssize(stackElement) ||
-       length < 0)
+       start > size ||
+       length < 0 ||
+       start + length > size)
         return;
 
-    const auto len{std::min(ssize(stackElement) - start, length)};
+    const auto len{std::min(size - start, length)};
     valtype tmp{stackElement.begin() + start,
                 stackElement.begin() + start + len};
     stackElement.swap(tmp);
