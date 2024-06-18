@@ -4,6 +4,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "interpreter.h"
+#include "protocol_era.h"
 #include "script_flags.h"
 #include "compat/endian.h"
 #include "crypto/ripemd160.h"
@@ -340,12 +341,15 @@ static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
     return true;
 }
 
-static bool IsOpcodeDisabled(opcodetype opcode) {
-    switch (opcode) {
+static bool IsOpcodeDisabled(const opcodetype opcode,
+                             const ProtocolEra utxo_era)
+{
+    switch(opcode)
+    {
         case OP_2MUL:
         case OP_2DIV:
             // Disabled opcodes.
-            return true;
+            return utxo_era != ProtocolEra::PostChronicle;
 
         default:
             break;
@@ -456,9 +460,9 @@ std::optional<bool> EvalScript(
             }
 
             // Some opcodes are disabled.
-            if (IsOpcodeDisabled(opcode) && (!utxo_after_genesis || fExec )) {
+            if(IsOpcodeDisabled(opcode, utxoEra)
+               && (!utxo_after_genesis || fExec ))
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
-            }
 
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
                 if (fRequireMinimal &&
@@ -1216,6 +1220,8 @@ std::optional<bool> EvalScript(
                     //
                     case OP_1ADD:
                     case OP_1SUB:
+                    case OP_2MUL:
+                    case OP_2DIV:
                     case OP_NEGATE:
                     case OP_ABS:
                     case OP_NOT:
@@ -1239,7 +1245,14 @@ std::optional<bool> EvalScript(
                                 bn -= utxo_after_genesis
                                           ? CScriptNum{bsv::bint{1}}
                                           : bnOne;
-                                // bn -= bnOne;
+                                break;
+                            case OP_2MUL:
+                                // post-Chronicle only
+                                bn += bn; 
+                                break;
+                            case OP_2DIV:
+                                // post-Chronicle only
+                                bn /= CScriptNum{bsv::bint{2}};
                                 break;
                             case OP_NEGATE:
                                 bn = -bn;

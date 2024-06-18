@@ -22,6 +22,7 @@
 
 #include <array>
 #include <cstdint>
+#include <tuple>
 #include <utility>
 
 typedef std::vector<uint8_t> valtype;
@@ -2287,6 +2288,100 @@ BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    
+    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            uint32_t,                   // flags
+                            bool,                       // expected status
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top>;             // expected top of stack
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+        // stack too small
+        {{OP_2MUL}, flags,
+                false, SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{}},
+       
+        // Happy cases
+        {{OP_0, OP_2MUL}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+        {{OP_1, OP_2MUL}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {2} }},
+        {{OP_1, OP_NEGATE, OP_2MUL}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0x82} }},
+        {{OP_2, OP_2MUL}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {4} } },
+        {{OP_2, OP_NEGATE, OP_2MUL}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0x84} }},
+
+        // byte boundary and sign convention 
+        {{OP_PUSHDATA1, 1, 0xff, OP_2, OP_MUL, // -127 * 2
+          OP_PUSHDATA1, 1, 0xff, OP_2MUL,      // -127 * 2
+          OP_2DUP,
+          OP_EQUALVERIFY}, flags,
+                true, SCRIPT_ERR_OK, 2, exp_stack_top{ {0xfe, 0x80} }},
+        
+        // INT64_MAX
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2MUL},
+                flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0xfe, 0xff, 0xff, 0xff, 0x0} }},
+        // INT64_MIN
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2MUL},
+                flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0xfe, 0xff, 0xff, 0xff, 0x80} }},
+        
+        // conditionals 
+        {{OP_0,
+          OP_IF,
+            OP_1, OP_2MUL, // not executed
+          OP_ENDIF}, flags,
+                true, SCRIPT_ERR_OK, 0, exp_stack_top{}},
+        {{OP_1,
+          OP_IF,
+            OP_1, OP_2MUL,
+          OP_ENDIF}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {2} }},
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_status,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const int32_t tx_version{0};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
 BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
 {
     using namespace std;
@@ -2330,6 +2425,100 @@ BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    
+    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            uint32_t,                   // flags
+                            bool,                       // expected status
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top>;             // expected top of stack
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+        // stack too small
+        {{OP_2DIV}, flags,
+                false, SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{}},
+       
+        // Happy cases
+        {{OP_0, OP_2DIV}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+        {{OP_1, OP_2DIV}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+        {{OP_1, OP_NEGATE, OP_2DIV}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+        {{OP_2, OP_2DIV}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {1} }},
+        {{OP_2, OP_NEGATE, OP_2DIV}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0x81} }},
+
+        // byte boundary and sign convention 
+        {{OP_PUSHDATA1, 2, 0xfe, 0x80, OP_2, OP_DIV, // -127 * 2
+          OP_PUSHDATA1, 2, 0xfe, 0x80, OP_2DIV,      // -127 * 2
+          OP_2DUP,
+          OP_EQUALVERIFY}, flags,
+                true, SCRIPT_ERR_OK, 2, exp_stack_top{ {0xff} }},
+
+        // INT64_MAX
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2DIV},
+                flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0xff, 0xff, 0xff, 0x3f} }},
+        // INT64_MIN
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2DIV},
+                flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {0xff, 0xff, 0xff, 0xbf} }},
+
+        // conditionals 
+        {{OP_0,
+          OP_IF,
+            OP_2, OP_2DIV, // not executed
+          OP_ENDIF}, flags,
+                true, SCRIPT_ERR_OK, 0, exp_stack_top{}},
+        {{OP_1,
+          OP_IF,
+            OP_2, OP_2DIV,
+          OP_ENDIF}, flags,
+                true, SCRIPT_ERR_OK, 1, exp_stack_top{ {1} }},
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_status,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const int32_t tx_version{0};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
     }
 }
 
