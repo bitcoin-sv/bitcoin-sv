@@ -22,6 +22,7 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
             f"-maxchroniclegracefulperiod={GRACE_PERIOD}"]
 
     TESTING_HEIGHTS = [
+        (GENESIS_ACTIVATION_HEIGHT - 2,    None,                        "PRE_GENESIS"),                # No-test, just build UTXOs
         (GENESIS_ACTIVATED_HEIGHT,         None,                        "PRE_CHRONICLE"),              # No-test, just build UTXOs
         (GENESIS_ACTIVATED_HEIGHT + 1,     "PRE_CHRONICLE",             "CHRONICLE_PRE_GRACE"),        # Post-Genesis but pre anything Chronicle
         (CHRONICLE_GRACE_START_HEIGHT - 1, "CHRONICLE_PRE_GRACE",       "CHRONICLE_GRACE_BEGIN"),      # Block before Chronicle grace period starts
