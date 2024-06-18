@@ -2241,5 +2241,50 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            bool,               // expected status
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data 
+    {
+        {{OP_2MUL}, 0, false, SCRIPT_ERR_DISABLED_OPCODE },
+        {{OP_2MUL}, SCRIPT_UTXO_AFTER_GENESIS, false, SCRIPT_ERR_DISABLED_OPCODE },
+        {{OP_0,
+            OP_IF,
+              OP_2MUL,  // not executed
+            OP_ENDIF}, 0, false, SCRIPT_ERR_DISABLED_OPCODE},
+        {{OP_0,
+            OP_IF,
+              OP_2MUL,  // not executed
+            OP_ENDIF}, SCRIPT_UTXO_AFTER_GENESIS, true, SCRIPT_ERR_OK},
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_status,
+                     exp_error] : test_data)
+    {
+        ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const uint32_t tx_version{};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{},
+                                       tx_version,
+                                       &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
