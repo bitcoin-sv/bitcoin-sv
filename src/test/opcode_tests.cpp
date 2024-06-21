@@ -1442,77 +1442,80 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
     const Config& config = GlobalConfig::GetConfig();
 
     using exp_stack_top = std::optional<std::vector<uint8_t>>;
-    using test_args = tuple<int32_t,            // tx_version
-                            vector<uint8_t>,    // script
-                            int32_t,            // flags
-                            bool,               // expected status
-                            ScriptError,        // expected scriptError
-                            exp_stack_top>;     // expected top of stack
+    using test_args = tuple<int32_t,                    // tx_version
+                            vector<uint8_t>,            // script
+                            int32_t,                    // flags
+                            bool,                       // expected status
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top>;             // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE };
     const vector<test_args> test_data 
     {
       // Unbalanced cases
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
-              OP_2 }, flags, false, SCRIPT_ERR_UNBALANCED_CONDITIONAL, exp_stack_top{} },
+              OP_2 }, 
+            flags, false, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2,
-            OP_ELSE}, flags, false, SCRIPT_ERR_UNBALANCED_CONDITIONAL, exp_stack_top{} },
+            OP_ELSE},
+            flags, false, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top{{2}} },
       
       // Non-matching cases
       // Too short
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF, // no statements
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 0, exp_stack_top{} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF,
               OP_2, // statement not executed
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 0, exp_stack_top{} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3, // else executed 
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{3}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
               OP_NEGATE, // multiple statements
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{0x83}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0x83}} },
       { 1, {OP_PUSHDATA1, 2, 1, 0,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{3}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
       { 1, {OP_PUSHDATA1, 3, 1, 0, 0, 
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3, 
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{3}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
 
       { 1, {OP_PUSHDATA1, 5, 1, 0, 0, 0, 0, // Too long
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{3}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,    // Wrong value
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{3}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
       { 1, {OP_PUSHDATA1, 4, 0, 0, 0, 1,    // Wrong endian
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{3}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
       
       // Matching cases
       { 0, {OP_PUSHDATA1, 4, 0, 0, 0, 0,
@@ -1520,36 +1523,36 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { INT32_MAX, {OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f,
                     OP_VERIF,
                       OP_2,
                     OP_ELSE,
                       OP_3,
-                    OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+                    OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { INT32_MIN, {OP_PUSHDATA1, 4, 0x0, 0x0, 0x0, 0x80,
                     OP_VERIF,
                       OP_2,
                     OP_ELSE,
                       OP_3,
-                    OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+                    OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF, // No statements
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 0, exp_stack_top{} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2,   // no else 
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2, OP_NEGATE,  // multiple statements
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{0x82}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{0x82}} },
       // nesting
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_PUSHDATA1, 4, 1, 0, 0, 0,
@@ -1557,7 +1560,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_VERIF,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_VERIF,
@@ -1565,7 +1568,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_VERIF,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
@@ -1573,7 +1576,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_ELSE,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_VERIF,
@@ -1582,7 +1585,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_ELSE,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, exp_stack_top{{2}} },
+            OP_ENDIF}, flags, true, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
     };
 
     for(const auto& [tx_version,
@@ -1590,6 +1593,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
                      flags,
                      exp_status,
                      exp_error,
+                     exp_stack_size,
                      exp_stack_top] : test_data)
     {
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
@@ -1606,9 +1610,10 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
                                     &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
         if(exp_stack_top.has_value())
         {
-            BOOST_CHECK_EQUAL(1, stack.size());
             const auto& actual{stack.stacktop(-1)};
             BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
                                           actual.begin(), actual.end());
