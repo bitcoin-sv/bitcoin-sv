@@ -1345,12 +1345,15 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
 
-    // tx_version, script, exp_status, scriptError, exp stack top
-    using test_args = tuple<int32_t, vector<uint8_t>, bool, ScriptError, vector<uint8_t>>;
-    vector<test_args> test_data = 
+    using test_args = tuple<int32_t,            // tx_version
+                            vector<uint8_t>,    // script
+                            bool,               // expected status
+                            ScriptError,        // expected scriptError
+                            vector<uint8_t>>;   // expected top of stack
+    const vector<test_args> test_data 
     {
       { 0, {OP_VER}, true, SCRIPT_ERR_OK, { 0, 0, 0, 0}},
-      
+
       { 1, {OP_VER}, true, SCRIPT_ERR_OK, { 1, 0, 0, 0 }},
       { 0x12345678, {OP_VER}, true, SCRIPT_ERR_OK, { 0x78, 0x56, 0x34, 0x12 }},
       { INT32_MAX, {OP_VER}, true, SCRIPT_ERR_OK, { 0xff, 0xff, 0xff, 0x7f }},
