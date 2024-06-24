@@ -38,7 +38,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCoun
                 // Everything after OP_RETURN at top level scope is unexecutable
                 break;
             }
-            else if(opcode == OP_IF || opcode == OP_NOTIF)
+            else if(opcode == OP_IF || opcode == OP_NOTIF || opcode == OP_VERIF || opcode == OP_VERNOTIF)
             {
                 // Entering a new scope at a new level
                 ++scopeLevel;
