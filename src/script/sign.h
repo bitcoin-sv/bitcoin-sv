@@ -82,18 +82,9 @@ struct SignatureData {
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const Config&,
-                      bool consensus,
-                      const BaseSignatureCreator&,
-                      ProtocolEra era,
-                      ProtocolEra utxoEra,
-                      const CScript& scriptPubKey,
-                      SignatureData&);
-
 bool SignAndVerify(const Config& config,
                    bool consensus,
                    const BaseSignatureCreator&,
-                   int32_t tx_version,
                    ProtocolEra era,
                    ProtocolEra utxoEra,
                    const CScript& fromPubKey,

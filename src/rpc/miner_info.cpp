@@ -211,7 +211,6 @@ public:
                                                              0,
                                                              fundingAmount,
                                                              sigHash.withForkId()),
-                          mtx.nVersion,
                           ProtocolEra::PostGenesis,
                           ProtocolEra::PostGenesis,
                           prevPubKey,

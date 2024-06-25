@@ -380,7 +380,6 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
-    const int32_t tx_version,
     LimitedStack& altstack,
     long& ipc,
     std::vector<bool>& vfExec,
@@ -614,6 +613,7 @@ std::optional<bool> EvalScript(
                         if(!utxo_after_chronicle)
                             return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
 
+                        const auto tx_version{checker.Version()};
                         std::vector<uint8_t> val(sizeof(tx_version));
                         to_le(tx_version, val.data());
                         stack.push_back(val);
@@ -760,8 +760,8 @@ std::optional<bool> EvalScript(
                             {
                                 if(vch.size() == 4)
                                 {
-                                    std::vector<uint8_t> val(sizeof(tx_version));
-                                    to_le(tx_version, val.data());
+                                    std::vector<uint8_t> val(sizeof(checker.Version()));
+                                    to_le(checker.Version(), val.data());
                                     fValue = std::ranges::equal(val, vch);
                                 }
                             }
@@ -1846,7 +1846,6 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
-    const int32_t tx_version,
     ScriptError* serror)
 {
     LimitedStack altstack {stack.makeChildStack()};
@@ -1859,7 +1858,6 @@ std::optional<bool> EvalScript(
                       script,
                       flags,
                       checker,
-                      tx_version,
                       altstack,
                       ipc,
                       vfExec,
@@ -2211,6 +2209,11 @@ bool TransactionSignatureChecker::CheckSequence(
     return true;
 }
 
+int32_t TransactionSignatureChecker::Version() const
+{
+    return txTo->nVersion;
+}
+
 std::optional<bool> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
@@ -2219,7 +2222,6 @@ std::optional<bool> VerifyScript(
     const CScript& scriptPubKey,
     uint32_t flags,
     const BaseSignatureChecker& checker,
-    const int32_t tx_version,
     ScriptError* serror)
 {
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
@@ -2242,7 +2244,6 @@ std::optional<bool> VerifyScript(
                              scriptSig,
                              flags,
                              checker,
-                             tx_version,
                              serror);
        !res.has_value() || !res.value())
     {
@@ -2258,7 +2259,6 @@ std::optional<bool> VerifyScript(
                              scriptPubKey,
                              flags,
                              checker,
-                             tx_version,
                              serror);
        !res.has_value() || !res.value())
     {
@@ -2302,7 +2302,6 @@ std::optional<bool> VerifyScript(
                                  pubKey2,
                                  flags,
                                  checker,
-                                 tx_version,
                                  serror);
            !res.has_value() || !res.value())
         {

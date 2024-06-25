@@ -2504,7 +2504,6 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
                                                            amount,
                                                            cacheStore,
                                                            txdata),
-                        ptxTo->nVersion,
                         &error);
 }
 

@@ -44,7 +44,6 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
 
     LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
 
-    const int32_t tx_version{42};
     auto r = EvalScript(config,
                         true,
                         source->GetToken(),
@@ -52,7 +51,6 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
                         script,
                         flagset[0] | 0,
                         sigchecker,
-                        tx_version,
                         &err);
 
     if (expected_error == SCRIPT_ERR_OK)
@@ -83,7 +81,6 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
 
         LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
         LimitedStack expectedStack = LimitedStack(expected, UINT32_MAX);
-        const int32_t tx_version{42};
         auto r = EvalScript(config,
                             true,
                             source->GetToken(),
@@ -91,7 +88,6 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                             script,
                             flags | upgradeFlag,
                             sigchecker,
-                            tx_version,
                             &err);
         BOOST_CHECK(r.value());
         BOOST_CHECK(stack == expectedStack);
@@ -106,7 +102,6 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                            script,
                            flags,
                            sigchecker,
-                           tx_version,
                            &err);
             BOOST_CHECK(r.value());
             BOOST_CHECK(stack == expectedStack);
@@ -122,7 +117,6 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
 
     auto source = task::CCancellationSource::Make();
-    const int32_t tx_version{42};
     auto r = EvalScript(config,
                         true,
                         source->GetToken(),
@@ -130,7 +124,6 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                         script,
                         flags | upgradeFlag,
                         sigchecker,
-                        tx_version,
                         &err);
     BOOST_CHECK(!r.value());
 
@@ -147,7 +140,6 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                        script,
                        flags,
                        sigchecker,
-                       tx_version,
                        &err);
         BOOST_CHECK(!r.value());
         BOOST_CHECK_EQUAL(err, expected_error);
@@ -697,7 +689,6 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
     ScriptError err = SCRIPT_ERR_OK;
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    const int32_t tx_version{42};
     auto r = EvalScript(config,
                         true,
                         source->GetToken(),
@@ -705,7 +696,6 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
                         CScript() << 1 << OP_RSHIFT,
                         flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
                         sigchecker,
-                        tx_version,
                         &err);
     BOOST_CHECK(r.value());
     BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
@@ -723,7 +713,6 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
     ScriptError err = SCRIPT_ERR_OK;
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    const int32_t tx_version{42};
     auto r = EvalScript(config,
                         true,
                         source->GetToken(),
@@ -731,7 +720,6 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
                         CScript() << 1 << OP_LSHIFT,
                         flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
                         sigchecker,
-                        tx_version,
                         &err);
     BOOST_CHECK(r.value());
     BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
@@ -1224,7 +1212,6 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                                     const BaseSignatureChecker& sigchecker)
 { 
     const Config& config = GlobalConfig::GetConfig();
-    const int32_t tx_version{42};
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
 
@@ -1236,7 +1223,6 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                             script,
                             flags,
                             sigchecker,
-                            tx_version,
                             &err);
         uint64_t nonPushOpcodeCount = NonPushOpCodeCount(script);
 
@@ -1326,7 +1312,6 @@ BOOST_AUTO_TEST_CASE(op_ver_pre_chronicle)
     ScriptError error{SCRIPT_ERR_OK};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    constexpr int32_t tx_version{42};
     const auto status = EvalScript(config,
                                    false,
                                    source->GetToken(),
@@ -1334,7 +1319,6 @@ BOOST_AUTO_TEST_CASE(op_ver_pre_chronicle)
                                    script,
                                    flags,
                                    BaseSignatureChecker{},
-                                   tx_version,
                                    &error);
     BOOST_CHECK_EQUAL(false, status.value());
     BOOST_CHECK_EQUAL(SCRIPT_ERR_BAD_OPCODE, error);
@@ -1371,15 +1355,18 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
+        CMutableTransaction mtx;
+        mtx.nVersion = tx_version;
+        MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
+
         const auto status = EvalScript(config,
-                                    false,
-                                    source->GetToken(),
-                                    stack,
-                                    CScript{script.begin(), script.end()},
-                                    flags,
-                                    BaseSignatureChecker{},
-                                    tx_version,
-                                    &error);
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       checker,
+                                       &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
         BOOST_CHECK_EQUAL(1, stack.size());
@@ -1432,7 +1419,6 @@ BOOST_AUTO_TEST_CASE(op_verif_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -1604,14 +1590,17 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
+        CMutableTransaction mtx;
+        mtx.nVersion = tx_version;
+        MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
+
         const auto status = EvalScript(config,
                                     false,
                                     source->GetToken(),
                                     stack,
                                     CScript{script.begin(), script.end()},
                                     flags,
-                                    BaseSignatureChecker{},
-                                    tx_version,
+                                    checker,
                                     &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -1669,7 +1658,6 @@ BOOST_AUTO_TEST_CASE(op_vernotif_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -1840,14 +1828,16 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
+        CMutableTransaction mtx;
+        mtx.nVersion = tx_version;
+        MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
         const auto status = EvalScript(config,
                                     false,
                                     source->GetToken(),
                                     stack,
                                     CScript{script.begin(), script.end()},
                                     flags,
-                                    BaseSignatureChecker{},
-                                    tx_version,
+                                    checker,
                                     &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -1887,7 +1877,6 @@ BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const uint32_t tx_version{};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -1895,7 +1884,6 @@ BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -1975,7 +1963,6 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const int32_t tx_version{0};
         const auto status = EvalScript(config,
                                     false,
                                     source->GetToken(),
@@ -1983,7 +1970,6 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
                                     CScript{script.begin(), script.end()},
                                     flags,
                                     BaseSignatureChecker{},
-                                    tx_version,
                                     &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2022,7 +2008,6 @@ BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const uint32_t tx_version{};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2030,7 +2015,6 @@ BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2097,7 +2081,6 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const int32_t tx_version{0};
         const auto status = EvalScript(config,
                                     false,
                                     source->GetToken(),
@@ -2105,7 +2088,6 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
                                     CScript{script.begin(), script.end()},
                                     flags,
                                     BaseSignatureChecker{},
-                                    tx_version,
                                     &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2144,7 +2126,6 @@ BOOST_AUTO_TEST_CASE(op_right_pre_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const uint32_t tx_version{};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2152,7 +2133,6 @@ BOOST_AUTO_TEST_CASE(op_right_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2219,7 +2199,6 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const int32_t tx_version{0};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2227,7 +2206,6 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2273,7 +2251,6 @@ BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const uint32_t tx_version{};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2281,7 +2258,6 @@ BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2359,7 +2335,6 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const int32_t tx_version{0};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2367,7 +2342,6 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2413,7 +2387,6 @@ BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const uint32_t tx_version{};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2421,7 +2394,6 @@ BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2499,7 +2471,6 @@ BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const int32_t tx_version{0};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2507,7 +2478,6 @@ BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -2530,7 +2500,6 @@ BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE}; // <- NO SCRIPT_UTXO_AFTER_GENESIS
-    const int32_t tx_version{0};
     ScriptError error{SCRIPT_ERR_BAD_OPCODE};
     const auto status = EvalScript(config,
                                    false,
@@ -2539,7 +2508,6 @@ BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
                                    CScript{},
                                    flags,
                                    BaseSignatureChecker{},
-                                   tx_version,
                                    &error);
     BOOST_CHECK_EQUAL(false, status.value());
     BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, error);

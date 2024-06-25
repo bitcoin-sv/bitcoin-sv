@@ -179,7 +179,6 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
             scriptPubKey,
             flags,
             MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue),
-            tx.nVersion,
             &err);
     BOOST_CHECK_MESSAGE(res.value() == expect, message);
     BOOST_CHECK_MESSAGE(
@@ -1329,7 +1328,6 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
 
     LimitedStack directStack(UINT32_MAX);
     auto source = task::CCancellationSource::Make();
-    constexpr uint32_t tx_version{42};
     auto res = EvalScript(testConfig,
                           true,
                           source->GetToken(),
@@ -1337,7 +1335,6 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                           CScript(&direct[0], &direct[sizeof(direct)]),
                           SCRIPT_VERIFY_P2SH,
                           BaseSignatureChecker(),
-                          tx_version,
                           &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -1350,7 +1347,6 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      CScript(&pushdata1[0], &pushdata1[sizeof(pushdata1)]),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker(),
-                     tx_version,
                      &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK(pushdata1Stack == directStack);
@@ -1364,7 +1360,6 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      CScript(&pushdata2[0], &pushdata2[sizeof(pushdata2)]),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker(),
-                     tx_version,
                      &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK(pushdata2Stack == directStack);
@@ -1378,7 +1373,6 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      CScript(&pushdata4[0], &pushdata4[sizeof(pushdata4)]),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker(),
-                     tx_version,
                      &err);
     BOOST_CHECK(res.value());
 
@@ -1406,7 +1400,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
     ScriptError error;
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const int32_t tx_version{42};
     const auto status = EvalScript(config,
                                    false,
                                    source->GetToken(),
@@ -1414,7 +1407,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
                                    script,
                                    flags,
                                    BaseSignatureChecker{},
-                                   tx_version,
                                    &error);
     BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -1441,7 +1433,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
     ScriptError error;
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const int32_t tx_version{42};
     const auto status = EvalScript(config,
                                    false,
                                    source->GetToken(),
@@ -1449,7 +1440,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
                                    script,
                                    flags,
                                    BaseSignatureChecker{},
-                                   tx_version,
                                    &error);
     BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -1480,7 +1470,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
     ScriptError error;
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const int32_t tx_version{42};
     const auto status = EvalScript(config,
                                    false,
                                    source->GetToken(),
@@ -1488,7 +1477,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
                                    script,
                                    flags,
                                    BaseSignatureChecker{},
-                                   tx_version,
                                    &error);
     BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
     BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -1552,7 +1540,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             scriptPubKey12,
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            txTo12.nVersion,
             &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -1565,7 +1552,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             scriptPubKey12,
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            txTo12.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1580,7 +1566,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             scriptPubKey12,
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            txTo12.nVersion,
             &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -1594,7 +1579,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             scriptPubKey12,
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            txTo12.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1639,7 +1623,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -1656,7 +1639,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -1673,7 +1655,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -1690,7 +1671,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1707,7 +1687,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1724,7 +1703,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1741,7 +1719,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1758,7 +1735,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -1773,7 +1749,6 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             scriptPubKey23,
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            txTo23.nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
@@ -2111,7 +2086,6 @@ BOOST_AUTO_TEST_CASE(script_combineSigs) {
 BOOST_AUTO_TEST_CASE(script_standard_push) {
     ScriptError err;
     auto source = task::CCancellationSource::Make();
-    const int32_t tx_version{42};
     for (int i = 0; i < 67000; i++) {
         CScript script;
         script << i;
@@ -2125,7 +2099,6 @@ BOOST_AUTO_TEST_CASE(script_standard_push) {
                 CScript() << OP_1,
                 SCRIPT_VERIFY_MINIMALDATA,
                 BaseSignatureChecker(),
-                tx_version,
                 &err);
         BOOST_CHECK_MESSAGE(res.value(),
                             "Number " << i << " push is not minimal data.");
@@ -2146,7 +2119,6 @@ BOOST_AUTO_TEST_CASE(script_standard_push) {
                 CScript() << OP_1,
                 SCRIPT_VERIFY_MINIMALDATA,
                 BaseSignatureChecker(),
-                tx_version,
                 &err);
         BOOST_CHECK_MESSAGE(res.value(),
                             "Length " << i << " push is not minimal data.");
@@ -2775,7 +2747,6 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
               scriptPubKey,
               flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
               InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
-              nmSpendingTx.nVersion,
               &err);
         auto stop_noncached = std::chrono::steady_clock::now();
 
@@ -2793,7 +2764,6 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
               scriptPubKey,
               flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
               InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
-              nmSpendingTx.nVersion,
               &err);
          auto stop_cached = std::chrono::steady_clock::now();
 
@@ -2838,7 +2808,6 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const int32_t tx_version{42};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -2846,7 +2815,6 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
                                        script,
                                        flags,
                                        BaseSignatureChecker{},
-                                       tx_version,
                                        &error);
         assert(true == status.value());
         assert(SCRIPT_ERR_OK == error);
@@ -2973,7 +2941,6 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
                                        script,
                                        flags,
                                        sig_checker,
-                                       tx.nVersion,
                                        &error);
         assert(true == status.value());
         assert(SCRIPT_ERR_OK == error);

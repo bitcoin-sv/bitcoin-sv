@@ -680,7 +680,6 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                                                              i,
                                                              amount,
                                                              sigHashType),
-                          mergedTx.nVersion,
                           ActiveEra,
                           utxoEra,
                           prevPubKey,
@@ -713,8 +712,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 txin.scriptSig,
                 prevPubKey,
                 StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
-                MutableTransactionSignatureChecker(&mergedTx, i, amount),
-                mergedTx.nVersion);
+                MutableTransactionSignatureChecker(&mergedTx, i, amount));
         if (!res.value())
         {
             fComplete = false;

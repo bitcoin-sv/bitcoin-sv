@@ -96,7 +96,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             a_and_b,
             flags,
             MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-            txTo[0].nVersion,
             &err);
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -112,7 +111,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                 a_and_b,
                 flags,
                 MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                txTo[0].nVersion,
                 &err);
         BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 1: %d", i));
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
@@ -129,7 +127,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                 a_and_b,
                 flags,
                 MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                txTo[0].nVersion,
                 &err);
         BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 2: %d", i));
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
@@ -149,7 +146,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                     a_or_b,
                     flags,
                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    txTo[1].nVersion,
                     &err);
             BOOST_CHECK_MESSAGE(res.value(), strprintf("a|b: %d", i));
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
@@ -162,7 +158,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                     a_or_b,
                     flags,
                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    txTo[1].nVersion, 
                     &err);
             BOOST_CHECK_MESSAGE(!res.value(), strprintf("a|b: %d", i));
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
@@ -179,7 +174,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             a_or_b,
             flags,
             MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-            txTo[1].nVersion,
             &err);
     BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_SIG_DER, ScriptErrorString(err));
@@ -198,7 +192,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                         escrow,
                         flags,
                         MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        txTo[2].nVersion,
                         &err);
                 BOOST_CHECK_MESSAGE(res.value(), strprintf("escrow 1: %d %d", i, j));
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK,
@@ -212,7 +205,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                         escrow,
                         flags,
                         MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        txTo[2].nVersion,
                         &err);
                 BOOST_CHECK_MESSAGE(
                     !res.value(),

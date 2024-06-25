@@ -1161,7 +1161,6 @@ static UniValue signrawtransaction(const Config &config,
                                                              i,
                                                              amount,
                                                              sigHashType),
-                          mergedTx.nVersion,
                           era,
                           utxoEra,
                           prevPubKey,
@@ -1201,7 +1200,6 @@ static UniValue signrawtransaction(const Config &config,
                 prevPubKey,
                 StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra),
                 TransactionSignatureChecker(&txConst, i, amount),
-                txConst.nVersion,
                 &serror);
         if (!res.value())
         {

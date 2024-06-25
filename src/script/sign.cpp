@@ -143,13 +143,13 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-bool ProduceSignature(const Config& config,
-                      bool consensus,
-                      const BaseSignatureCreator& creator,
-                      ProtocolEra era,
-                      ProtocolEra utxoEra,
-                      const CScript& fromPubKey,
-                      SignatureData& sigdata)
+static bool ProduceSignature(const Config& config,
+                             const bool consensus,
+                             const BaseSignatureCreator& creator,
+                             ProtocolEra era,
+                             ProtocolEra utxoEra,
+                             const CScript& fromPubKey,
+                             SignatureData& sigdata)
 {
     CScript script = fromPubKey;
     bool solved = true;
@@ -177,7 +177,6 @@ bool ProduceSignature(const Config& config,
 bool SignAndVerify(const Config& config,
                    const bool consensus,
                    const BaseSignatureCreator& creator,
-                   const int32_t tx_version,
                    const ProtocolEra era,
                    const ProtocolEra utxoEra,
                    const CScript& fromPubKey,
@@ -201,8 +200,7 @@ bool SignAndVerify(const Config& config,
                                   fromPubKey,
                                   sigdata.scriptSig,
                                   flags,
-                                  creator.Checker(),
-                                  tx_version);
+                                  creator.Checker());
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,
@@ -235,7 +233,6 @@ bool SignSignature(const Config& config, const CKeyStore& keystore,
     const bool ret = SignAndVerify(config,
                                    false,
                                    creator,
-                                   txToConst.nVersion,
                                    era,
                                    utxoEra,
                                    fromPubKey,
@@ -339,8 +336,7 @@ struct Stacks {
                    stack,
                    data.scriptSig,
                    MandatoryScriptVerifyFlags(era),
-                   BaseSignatureChecker(),
-                   tx_version);
+                   BaseSignatureChecker());
         stack.MoveToValtypes(script);
     }
 

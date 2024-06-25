@@ -147,7 +147,6 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                                             mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                             verify_flags, 
                                             TransactionSignatureChecker(&tx, i, amount, txdata),
-                                            tx.nVersion,
                                             &err).value();
                 }
                 if (is_valid != should_be_valid){
@@ -372,16 +371,13 @@ void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
     const Config& config = GlobalConfig::GetConfig();
 
     LimitedStack stack(UINT32_MAX);
-    const int32_t tx_version{42};
     EvalScript(config,
                true,
                task::CCancellationSource::Make()->GetToken(),
                stack,
                script,
                SCRIPT_VERIFY_STRICTENC,
-               BaseSignatureChecker(),
-               tx_version);
-
+               BaseSignatureChecker());
     BOOST_CHECK(stack.size() > 0);
     stack.pop_back();
     stack.push_back(std::vector<uint8_t>(redeemScript.begin(), redeemScript.end()));
@@ -493,7 +489,6 @@ void CheckWithFlag(const CheckFlagParams& params)
             inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
             flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
             TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-            inputi.nVersion,
             &error).value();
         BOOST_CHECK_MESSAGE(ret == flags.second, std::string("failed result: ") + (ret? "true":"false"));
     }

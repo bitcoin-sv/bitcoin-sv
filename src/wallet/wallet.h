@@ -1206,7 +1206,6 @@ bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
         SignatureData sigdata;
 
         if (!SignAndVerify(config, false, DummySignatureCreator(this),
-                          coin.first->tx->nVersion,
                           ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, scriptPubKey,
                           sigdata)) {
             return false;

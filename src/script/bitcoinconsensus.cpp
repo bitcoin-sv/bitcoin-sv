@@ -96,7 +96,6 @@ static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKe
               tx.vin[nIn].scriptSig,
               CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
               TransactionSignatureChecker(&tx, nIn, amount, txdata), 
-              tx.nVersion,
               nullptr);
 
         return res.value();
