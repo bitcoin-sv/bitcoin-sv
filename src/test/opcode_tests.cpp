@@ -1367,7 +1367,7 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
 
     for(const auto& [tx_version, script, exp_status, exp_error, exp_stack_top] : test_data)
     {
-        const auto flags{SCRIPT_UTXO_AFTER_CHRONICLE};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
         ScriptError error{SCRIPT_ERR_BAD_OPCODE};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
@@ -1454,7 +1454,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
                             exp_stack_top>;             // expected top of stack
-    const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE };
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data 
     {
       // Unbalanced cases
@@ -1691,7 +1691,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
                             exp_stack_top>;             // expected top of stack
-    const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE};
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data = 
     {
       // Unbalanced cases
@@ -1915,7 +1915,7 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
                             exp_stack_top>;             // expected top of stack
-    const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE};
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data
     {
       // Stack too small
@@ -2520,6 +2520,30 @@ BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
                                           actual.begin(), actual.end());
         }
     }
+}
+
+BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE}; // <- NO SCRIPT_UTXO_AFTER_GENESIS
+    const int32_t tx_version{0};
+    ScriptError error{SCRIPT_ERR_BAD_OPCODE};
+    const auto status = EvalScript(config,
+                                   false,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{},
+                                   flags,
+                                   BaseSignatureChecker{},
+                                   tx_version,
+                                   &error);
+    BOOST_CHECK_EQUAL(false, status.value());
+    BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, error);
+    BOOST_CHECK_EQUAL(0, stack.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

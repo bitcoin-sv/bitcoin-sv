@@ -12,6 +12,7 @@
 #include "pubkey.h"
 #include "random.h"
 #include "protocol_era.h"
+#include "script/script_flags.h"
 #include "script/scriptcache.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
@@ -100,6 +101,9 @@ namespace {
                 continue; 
             } 
             if ((test_flags & SCRIPT_UTXO_AFTER_CHRONICLE) && !(test_flags & SCRIPT_CHRONICLE)) {
+                continue; 
+            }
+            if ((test_flags & SCRIPT_UTXO_AFTER_CHRONICLE) && !(test_flags & SCRIPT_UTXO_AFTER_GENESIS)) {
                 continue; 
             }
 

@@ -14,6 +14,7 @@
 #include "pubkey.h"
 #include "script/opcodes.h"
 #include "script/script.h"
+#include "script/script_error.h"
 #include "script/script_num.h"
 #include "taskcancellation.h"
 #include "uint256.h"
@@ -401,6 +402,8 @@ std::optional<bool> EvalScript(
 
     const bool utxo_after_genesis { (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0 };
     const bool utxo_after_chronicle { (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0 };
+    if(utxo_after_chronicle && !utxo_after_genesis)
+        return set_error(serror, SCRIPT_ERR_INVALID_FLAGS);
 
     ProtocolEra utxoEra { ProtocolEra::PostChronicle };
     if(!utxo_after_chronicle)

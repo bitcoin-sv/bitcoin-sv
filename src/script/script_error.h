@@ -77,6 +77,8 @@ typedef enum ScriptError_t
 
     SCRIPT_ERR_BIG_INT,
 
+    SCRIPT_ERR_INVALID_FLAGS,
+
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;
 
