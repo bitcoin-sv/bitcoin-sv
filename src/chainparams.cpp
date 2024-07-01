@@ -22,9 +22,9 @@
 #define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
 
-#define CHRONICLE_ACTIVATION_MAIN               880000
-#define CHRONICLE_ACTIVATION_STN                150
-#define CHRONICLE_ACTIVATION_TESTNET            1660000
+#define CHRONICLE_ACTIVATION_MAIN               882687
+#define CHRONICLE_ACTIVATION_STN                250
+#define CHRONICLE_ACTIVATION_TESTNET            1621670
 #define CHRONICLE_ACTIVATION_REGTEST            15000
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
