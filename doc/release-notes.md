@@ -1,53 +1,28 @@
-# Bitcoin SV Node Software – v1.1.0 Release
+# Bitcoin SV Node Software – v1.2.0 Release
 
-## Overview
+This release is a hard fork which updates the BSV protocol.   
 
-Security enhancements and peer management features for node operators are the main features included in this release.
+The scheduled TestNet activation height is 1,621,670 (Target is 12:00 midday 31-Oct-2024)
 
-The 1.1.0 node release is a recommended upgrade from version 1.0.16.
+The scheduled MainNet activation height is 882,687 (Target is 12:00 midday 4-Feb-2025)
 
-## Security Enhancements
+**What’s changed**  
 
-*   Network peer connection management.
-    *   Configurable numbers of:
-        *   pending p2p message response queue management.
-        *   connections from the same IP address.
-        *   connections to both inbound and outbound peers.
-*   General code security enhancements.
+The following opcodes are restored:  
 
-## Security Dependency Updates
+*   **OP\_VER** – pushes the transaction version (4 byte array) onto the top of the stack.
+*   **OP\_VERIF, OP\_VERNOTIF** – provides conditional logic based on the transaction version.
+*   **OP\_SUBSTR** – creates an arbitrary substring of the string on top of the stack.
+*   **OP\_LEFT, OP\_RIGHT –** creates the left/right most substring of specific length from the string on the top of the stack respectively.
+*   **OP\_2MUL** – doubles the number on top of the stack
+*   **OP\_2DIV** – halves the number on top of the stack
 
-*   Updated secp256k1 library version.
-*   Updated OpenSSL library version in build system.
+Please refer to the Protocol Restoration specification for further details.  
 
-## Alert System
-Version 1.1.0 reintroduces the Alert System. The Alert System, originally implemented in the v0.3.10 Bitcoin release, enables the BSV Association to send signed messages to the network. Messages can be of an informational or directive nature. This release also contains native support for Digital Asset Recovery alerts.
+The limitations in the following areas are removed.   
 
-Node operators are required to run the Alert System in conjunction with the BSV Node. Node operators who do not interact with the Alert System risk being banned and/or having their blocks rejected by node operators who do.
-
-Detailed instructions on how to run the Alert System are available here: [node.bitcoinsv.io/sv-node/alert-system](https://node.bitcoinsv.io/sv-node/alert-system).
-
-## Network Access Rules
-The BSV Association is also releasing the BSV Blockchain Network Access Rules. The Network Access Rules formalize the terms and conditions for operating a node on the BSV Blockchain. Read more about the Network access rules here: [bsvblockchain.org/network-access-rules](https://bsvblockchain.org/network-access-rules).
-
-## Updated Open BSV License
-The Open BSV License has been updated to version 5 and is available here: [github.com/bitcoin-sv/bitcoin-sv/blob/v1.1.0/LICENSE](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.1.0/LICENSE).
-
-## Other items
-
-*   STN Reset - includes an updated chain height block hash.
-*   Include GitHub workflows configuration file structure.
-
-## Specific Configuration Details
-
-### Inbound and Outbound Connection Management
-
-Max Connections gives node operators flexibility in how to manage peers they interact with on the network.
-
-| **Configuration parameter** | **Default value** | **Description** |
-| -------------- | ---------------  | --------------- |
-| `maxconnections`                 | 125    |    Maintain at most *n* connections to peers |
-| `maxconnectionsfromaddr`         | 0     | Maximum number of inbound connections from a single address. Not applicable to whitelisted peers.<br/><br/>A value of 0 = unrestricted |
-| `maxpendingresponses_getheaders` | 0     | Maximum allowed number of pending responses in the sending queue for received GETHEADERS P2P requests before the connection is closed. Not applicable to whitelisted peers. The main purpose of this setting is to limit memory usage. The specified value should be small (e.g. ~50) since in practice connected peers do not need to send many GETHEADERS requests in parallel. <br/><br/>A value of 0 = unrestricted. |
-| `maxpendingresponses_gethdrsen`  | 0     | Maximum allowed number of pending responses in the sending queue for received GETHDRSEN P2P requests before the connection is closed. Not applicable to whitelisted peers. The main purpose of this setting is to limit memory usage. The specified value should be small (e.g. ~10) since in practice connected peers do not need to send many GETHDRSEN requests in parallel. <br/><br/>A value of 0 = unrestricted. |
-|       |       |       |
+*   **Script numbers** – Limits on the maximum size of script numbers are removed. Please note that practical limits are imposed by the external libraries used to implement script numbers (max size is currently 64MB)
+*   **Minimal Encoding Requirement** – Previously releases required transactions to encode numbers as efficiently as possible. For example, the number two can be encoded as 0002 (2 bytes) or 02 (1 byte). Prior to this release only the second version is accepted. Minimal encoding places an unnecessary burden on users that was not present in the original Satoshi implementation and it is removed from this release.
+*   **Low S signatures -** If S is a signature, then so is -S. The “low S” signature requirement was introduced to decrease transaction malleability but is an unnecessary requirement and is removed. Either signature S or -S can now be used.
+*   **Clean Stack Policy** – Previous releases required that after the execution of the unlocking and locking script, the stack is “clean”. i.e. there is only a single item (interpreted as true/false) on the stack that indicates whether the transaction has permission to spend the relevant input. The requirement is unnecessary and adds complexity to scripts. This release removes the clean stack requirement.
+*   **No opcodes in Unlocking Scripts Policy-** Previous releases do not allow unlocking scripts to include non-data opcodes. That restriction is removed in this release.
