@@ -299,8 +299,8 @@ const char* GetOpName(opcodetype opcode)
         return "OP_CHECKLOCKTIMEVERIFY";
     case OP_CHECKSEQUENCEVERIFY:
         return "OP_CHECKSEQUENCEVERIFY";
-    case OP_NOP4:
-        return "OP_NOP4";
+    case OP_SUBSTR:
+        return "OP_SUBSTR";
     case OP_NOP5:
         return "OP_NOP5";
     case OP_NOP6:
