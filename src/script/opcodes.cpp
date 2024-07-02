@@ -301,8 +301,8 @@ const char* GetOpName(opcodetype opcode)
         return "OP_CHECKSEQUENCEVERIFY";
     case OP_SUBSTR:
         return "OP_SUBSTR";
-    case OP_NOP5:
-        return "OP_NOP5";
+    case OP_LEFT:
+        return "OP_LEFT";
     case OP_NOP6:
         return "OP_NOP6";
     case OP_NOP7:
