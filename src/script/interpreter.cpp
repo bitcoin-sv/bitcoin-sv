@@ -2323,7 +2323,9 @@ std::optional<bool> VerifyScript(
         // Disallow CLEANSTACK without P2SH, as otherwise a switch
         // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
         // softfork (and P2SH should be one).
-        assert((flags & SCRIPT_VERIFY_P2SH) != 0);
+        if((flags & SCRIPT_VERIFY_P2SH) == 0)
+            return set_error(serror, SCRIPT_ERR_INVALID_FLAGS);
+
         if (stack.size() != 1) {
             return set_error(serror, SCRIPT_ERR_CLEANSTACK);
         }
