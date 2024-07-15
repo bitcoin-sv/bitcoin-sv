@@ -26,3 +26,8 @@ The limitations in the following areas are removed. 
 *   **Low S signatures -** If S is a signature, then so is -S. The “low S” signature requirement was introduced to decrease transaction malleability but is an unnecessary requirement and is removed. Either signature S or -S can now be used.
 *   **Clean Stack Policy** – Previous releases required that after the execution of the unlocking and locking script, the stack is “clean”. i.e. there is only a single item (interpreted as true/false) on the stack that indicates whether the transaction has permission to spend the relevant input. The requirement is unnecessary and adds complexity to scripts. This release removes the clean stack requirement.
 *   **No opcodes in Unlocking Scripts Policy-** Previous releases do not allow unlocking scripts to include non-data opcodes. That restriction is removed in this release.
+
+## Other items
+
+*   STN Reset - includes an updated chain height block hash.
+
