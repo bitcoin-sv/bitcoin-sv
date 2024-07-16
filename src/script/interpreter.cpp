@@ -456,7 +456,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                 if (fRequireMinimal && !CheckMinimalPush(vchPushValue, opcode))
                     return SCRIPT_ERR_MINIMALDATA;
 
-                stack.push_back(vchPushValue);
+                stack.push_back(std::move(vchPushValue));
             } else if (fExec || (OP_IF <= opcode && opcode <= OP_ENDIF)) {
                 switch (opcode) {
                     //
@@ -583,7 +583,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         const auto tx_version{checker.Version()};
                         std::vector<uint8_t> val(sizeof(tx_version));
                         to_le(tx_version, val.data());
-                        stack.push_back(val);
+                        stack.push_back(std::move(val));
                         break;
                     }
                     case OP_SUBSTR:
@@ -824,8 +824,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
 
                         LimitedVector vch1 = stack.stacktop(-2);
                         LimitedVector vch2 = stack.stacktop(-1);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
                     } break;
 
                     case OP_3DUP: {
@@ -836,9 +836,9 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         LimitedVector vch1 = stack.stacktop(-3);
                         LimitedVector vch2 = stack.stacktop(-2);
                         LimitedVector vch3 = stack.stacktop(-1);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
-                        stack.push_back(vch3);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
+                        stack.push_back(std::move(vch3));
                     } break;
 
                     case OP_2OVER: {
@@ -848,8 +848,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
 
                         LimitedVector vch1 = stack.stacktop(-4);
                         LimitedVector vch2 = stack.stacktop(-3);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
                     } break;
 
                     case OP_2ROT: {
@@ -860,8 +860,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         LimitedVector vch1 = stack.stacktop(-6);
                         LimitedVector vch2 = stack.stacktop(-5);
                         stack.erase(- 6, - 4);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
                     } break;
 
                     case OP_2SWAP: {
@@ -880,7 +880,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
 
                         LimitedVector vch = stack.stacktop(-1);
                         if (CastToBool(vch.GetElement())) {
-                            stack.push_back(vch);
+                            stack.push_back(std::move(vch));
                         }
                     } break;
 
@@ -904,7 +904,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         LimitedVector vch = stack.stacktop(-1);
-                        stack.push_back(vch);
+                        stack.push_back(std::move(vch));
                     } break;
 
                     case OP_NIP: {
@@ -921,7 +921,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         LimitedVector vch = stack.stacktop(-2);
-                        stack.push_back(vch);
+                        stack.push_back(std::move(vch));
                     } break;
 
                     case OP_PICK:
@@ -947,7 +947,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         if (opcode == OP_ROLL) {
                             stack.erase(- n - 1);
                         }
-                        stack.push_back(vch);
+                        stack.push_back(std::move(vch));
                     } break;
 
                     case OP_ROT: {
@@ -1075,7 +1075,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                                          : CScriptNum{INT32_MAX};
                             } while(n > 0);
                         }
-                        stack.push_back(values);
+                        stack.push_back(std::move(values));
                     }
                     break;
 
@@ -1110,7 +1110,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                                          : CScriptNum{INT32_MAX};
                             } while(n > 0);
                         }
-                        stack.push_back(values);
+                        stack.push_back(std::move(values));
                     }
                     break;
 
@@ -1383,7 +1383,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                                 .Finalize(vchHash.data());
                         }
                         stack.pop_back();
-                        stack.push_back(vchHash);
+                        stack.push_back(std::move(vchHash));
                     } break;
 
                     case OP_CODESEPARATOR: {
@@ -1631,8 +1631,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         stack.pop_back();
 
                         // Replace existing stack values by the new values.
-                        stack.push_back(n1);
-                        stack.push_back(n2);
+                        stack.push_back(std::move(n1));
+                        stack.push_back(std::move(n2));
                     } break;
 
                     //

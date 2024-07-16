@@ -4,8 +4,10 @@
 #ifndef BITCOIN_SCRIPT_LIMITEDSTACK_H
 #define BITCOIN_SCRIPT_LIMITEDSTACK_H
 
+#include <concepts>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <stdexcept>
 #include <vector>
 
@@ -28,7 +30,7 @@ private:
     valtype stackElement;
     std::reference_wrapper<LimitedStack> stack;
 
-    LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn);
+    LimitedVector(valtype stackElementIn, LimitedStack& stackIn);
 
     // WARNING: modifying returned element will NOT adjust stack size
     valtype& GetElementNonConst();
@@ -93,7 +95,7 @@ private:
 
 public:
     LimitedStack(uint64_t maxStackSizeIn);
-    LimitedStack(const std::vector<valtype>& stackElements, uint64_t maxStackSizeIn);
+    LimitedStack(std::vector<valtype> stackElements, uint64_t maxStackSizeIn);
 
     LimitedStack(LimitedStack&&) = default;
     LimitedStack& operator=(LimitedStack&&) = default;
@@ -114,8 +116,13 @@ public:
     bool empty() const;
 
     void pop_back();
-    void push_back(const LimitedVector &element);
-    void push_back(const valtype& element);
+    template<typename T>
+        requires(std::same_as<std::remove_cvref_t<T>, LimitedVector>)
+    void push_back(T&&);
+    template<typename T>
+        requires(std::same_as<std::remove_cvref_t<T>, valtype>)
+    void push_back(T&&);
+	void push_back(const std::initializer_list<uint8_t>&);
 
     // erase elements from including (top - first). element until excluding (top - last). element
     // first and last should be negative numbers (distance from the top)
@@ -142,5 +149,27 @@ public:
 
     friend class LimitedVector;
 };
+
+template<typename T>
+    requires(std::same_as<std::remove_cvref_t<T>, LimitedVector>)
+void LimitedStack::push_back(T&& element)
+{
+    if(&element.getStack() != this)
+    {
+        throw std::invalid_argument(
+            "Invalid argument - element that is added should have the same "
+            "parent stack as the one we are adding to.");
+    }
+    increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
+    stack.push_back(std::forward<T>(element));
+}
+
+template<typename T>
+    requires(std::same_as<std::remove_cvref_t<T>, valtype>)
+void LimitedStack::push_back(T&& element)
+{
+    increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
+    stack.push_back(LimitedVector{std::forward<T>(element), *this});
+}
 
 #endif

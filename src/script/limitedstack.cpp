@@ -2,15 +2,17 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "script/limitedstack.h"
-#include "crypto/ripemd160.h"
-#include "crypto/sha256.h"
+
 #include "script/int_serialization.h"
 
 #include <algorithm>
+#include <utility>
 
-LimitedVector::LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn) : stackElement(stackElementIn), stack(stackIn)
-{
-}
+LimitedVector::LimitedVector(valtype stackElementIn,
+                             LimitedStack& stackIn):
+	stackElement(std::move(stackElementIn)),
+	stack(stackIn)
+{}
 
 const valtype& LimitedVector::GetElement() const
 {
@@ -142,19 +144,18 @@ void LimitedVector::shrink(difference_type start, difference_type length)
     stackElement.swap(tmp);
 }
 
-LimitedStack::LimitedStack(uint64_t maxStackSizeIn)
+LimitedStack::LimitedStack(uint64_t maxStackSizeIn):
+    maxStackSize{maxStackSizeIn}
 {
-    maxStackSize = maxStackSizeIn;
-    parentStack = nullptr;
 }
 
-LimitedStack::LimitedStack(const std::vector<valtype>& stackElements, uint64_t maxStackSizeIn)
+LimitedStack::LimitedStack(std::vector<valtype> stackElements,
+                           uint64_t maxStackSizeIn)
+    : maxStackSize{maxStackSizeIn}
 {
-    maxStackSize = maxStackSizeIn;
-    parentStack = nullptr;
-    for (const auto& element : stackElements)
+    for(auto&& element : std::move(stackElements))
     {
-        push_back(element);
+        push_back(std::move(element));
     }
 }
 
@@ -215,20 +216,9 @@ void LimitedStack::pop_back()
     stack.pop_back();
 }
 
-void LimitedStack::push_back(const LimitedVector &element)
+void LimitedStack::push_back(const std::initializer_list<unsigned char>& v)
 {
-    if (&element.getStack() != this)
-    {
-        throw std::invalid_argument("Invalid argument - element that is added should have the same parent stack as the one we are adding to.");
-    }
-    increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.push_back(element);
-}
-
-void LimitedStack::push_back(const valtype& element)
-{
-    increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.push_back(LimitedVector{element, *this});
+	push_back(valtype{v});
 }
 
 LimitedVector& LimitedStack::stacktop(int index)
