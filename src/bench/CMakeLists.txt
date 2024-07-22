@@ -23,6 +23,7 @@ add_executable(bench_bitcoin
         lockedpool.cpp
         mempool_eviction.cpp
         mempooltxdb.cpp
+        op_codes.cpp
         perf.cpp
         rollingbloom.cpp
         serialisation.cpp
