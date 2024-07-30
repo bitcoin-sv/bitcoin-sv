@@ -7,7 +7,6 @@
 #include "config.h"
 #include "script/interpreter.h"
 #include "script/opcodes.h"
-#include "script/script_error.h"
 #include "taskcancellation.h"
 
 #include <cstdint>
@@ -126,4 +125,32 @@ static void op_roll(benchmark::State& state)
     }
 }
 BENCHMARK(op_roll);
+
+static void op_pick(benchmark::State& state)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    const int32_t flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const vector<uint8_t> script{ OP_1, 2, 0xff, 0x7f, OP_NUM2BIN,
+                                  OP_DUP,
+                                  OP_DUP,
+								  OP_2, OP_PICK, 
+                                  OP_2, OP_PICK};
+    while(state.KeepRunning())
+    {
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack{INT64_MAX};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        assert(status);
+        assert(status->index() == 1);
+    }
+}
+BENCHMARK(op_pick);
 
