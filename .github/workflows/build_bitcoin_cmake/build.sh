@@ -6,6 +6,7 @@ build_type=${1,,}
 
 args="-D CMAKE_BUILD_TYPE=$build_type"
 args+=' -D CMAKE_CXX_FLAGS=-Werror'
+args+=' -D CMAKE_CXX_FLAGS=-fno-omit-frame-pointer'
     
 if [[ $build_type == debug ]];
 then

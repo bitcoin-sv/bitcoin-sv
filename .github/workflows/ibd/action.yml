@@ -1,0 +1,74 @@
+# Copyright (c) 2024 BSV Blockchain Association
+# Distributed under the Open BSV software license,
+# see the accompanying file LICENSE.
+
+name: 'Initial Block Download'
+description:  'Initial Block Download Performance'
+inputs:
+  duration:
+    description: Duration in seconds 
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Install Perf
+      run: |
+        apt-get update \
+        && apt-get install -y \
+                   linux-tools-$(uname -r) \
+                   linux-headers-$(uname -r)
+      shell: bash
+    - name: Configure bitcoind
+      run: |
+        mkdir ~/.bitcoin
+        cp .github/workflows/docker/cargo/bitcoin.conf ~/.bitcoin/
+      shell: bash
+    - name: Run bitcoind
+      run: |
+        ./src/bitcoind&
+        perf record -g \
+                    -F 99 \
+                    -p $(pidof bitcoind) \
+                    -o tmp.dat \
+                    -- sleep ${{ inputs.duration }}
+        ./src/bitcoin-cli stop
+        while pidof -q bitcoind; \
+        do \
+          echo "waiting for bitcoind to stop"; \
+          sleep 1; \
+        done
+      shell: bash
+    - name: Set height environment variable
+      run: |
+        echo "height=$(<~/.bitcoin/bitcoind.log .github/workflows/ibd/block_height)" \
+        >> $GITHUB_ENV
+      shell: bash
+    - name: Set now environment variable
+      run: |
+        echo "now=$(date +'%Y-%m-%dT%H-%M-%S')" \
+        >> $GITHUB_ENV
+      shell: bash
+    - name: Upload bitcoind files
+      uses: actions/upload-artifact@v4
+      with:
+       name: ${{ env.now }}-ibd-${{ env.height }}-.bitcoin
+       path: |
+          ~/.bitcoin/bitcoin.conf
+          ~/.bitcoin/bitcoind.log
+    - name: Produce flamegraph
+      run: |
+        perf script -i tmp.dat \
+        | /FlameGraph/stackcollapse-perf.pl \
+        | /FlameGraph/flamegraph.pl \
+            --title "IBD to Block Height ${{ env.height }}" \
+            --subtitle "(${{ env.now }}, duration: ${{ inputs.duration }} seconds)" \
+        > ${{ env.now }}-ibd-flamegraph.svg
+      shell: bash
+    - name: Upload flamegraph
+      uses: actions/upload-artifact@v4
+      with:
+       name: ${{ env.now }}-ibd-${{ env.height }}-flamegraph.svg
+       path: |
+          ${{ env.now }}-ibd-flamegraph.svg
+
+
