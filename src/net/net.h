@@ -20,6 +20,7 @@
 #include "limitedmap.h"
 #include "net/association.h"
 #include "net/authconn.h"
+#include "net/mempool_msg.h"
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
@@ -368,12 +369,11 @@ public:
     DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
-    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     template <typename Callable> void ForEachNode(Callable&& func) const { 
         LOCK(cs_vNodes);
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
-                func(node);
+                std::forward<Callable>(func)(node);
         }
     }
 
@@ -671,7 +671,7 @@ private:
     bool AttemptToEvictConnection();
     CNodePtr ConnectNode(NodeConnectInfo& connect);
     bool IsWhitelistedRange(const CNetAddr &addr);
-    bool IsMempoolSyncPeer(const CNetAddr &addr);
+    bool IsMempoolSyncPeer(const CNetAddr &addr) const;
 
     void DeleteNode(const CNodePtr& pnode);
 
@@ -697,6 +697,9 @@ private:
     // Peer average bandwidth calculation
     void PeerAvgBandwithCalc();
 
+    // Mempool syncing
+    void SyncMempool();
+
     const Config *config;
 
     // Network usage totals
@@ -716,9 +719,9 @@ private:
     std::vector<CSubNet> vWhitelistedRange;
     CCriticalSection cs_vWhitelistedRange;
 
-    // Peers with whome we should periodically synchronise mempools
+    // Peers with whom we should periodically synchronise mempools
     std::vector<CSubNet> vMempoolSyncPeers {};
-    CCriticalSection cs_vMempoolSyncPeers {};
+    mutable CCriticalSection cs_vMempoolSyncPeers {};
 
     unsigned int nSendBufferMaxSize;
     unsigned int nReceiveFloodSize;
@@ -1005,7 +1008,7 @@ public:
     // protected by cs_inventory.
     std::vector<uint256> vBlockHashesToAnnounce {};
     // Used for BIP35 mempool sending, also protected by cs_inventory.
-    bool fSendMempool {false};
+    std::optional<MempoolMsg> mempoolRequest {};
 
     // Last time a "MEMPOOL" request was serviced.
     std::atomic<int64_t> timeLastMempoolReq {0};

@@ -32,6 +32,7 @@
 #include "miner_id/revokemid.h"
 #include "net/authconn.h"
 #include "net/block_download_tracker.h"
+#include "net/mempool_msg.h"
 #include "net/net.h"
 #include "net/netbase.h"
 #include "net/node_state.h"
@@ -4048,29 +4049,50 @@ static void ProcessMempoolMessage(const Config& config,
                                   msg_buffer& vRecv,
                                   CConnman& connman)
 {
-    if (config.GetRejectMempoolRequest() && !pfrom->fWhitelisted) {
-        LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
-                 pfrom->GetId());
-        pfrom->fDisconnect = true;
-        return;
-    }
+    // Read full message
+    MempoolMsg msg {};
+    vRecv >> msg;
 
-    if(!(pfrom->GetLocalServices() & NODE_BLOOM) && !pfrom->fWhitelisted) {
-        LogPrint(BCLog::NETMSG, "mempool request with bloom filters disabled, disconnect peer=%d\n",
-                 pfrom->GetId());
-        pfrom->fDisconnect = true;
-        return;
-    }
+    if(! msg.GetAge().has_value())
+    {
+        // Apply checks to old-style mempool request
+        if(config.GetRejectMempoolRequest() && !pfrom->fWhitelisted)
+        {
+            LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
+                     pfrom->GetId());
+            pfrom->fDisconnect = true;
+            return;
+        }
 
-    if(connman.OutboundTargetReached(false) && !pfrom->fWhitelisted) {
-        LogPrint(BCLog::NETMSG, "mempool request with bandwidth limit reached, disconnect peer=%d\n",
-                 pfrom->GetId());
-        pfrom->fDisconnect = true;
-        return;
+        if(!(pfrom->GetLocalServices() & NODE_BLOOM) && !pfrom->fWhitelisted)
+        {
+            LogPrint(BCLog::NETMSG, "mempool request with bloom filters disabled, disconnect peer=%d\n",
+                     pfrom->GetId());
+            pfrom->fDisconnect = true;
+            return;
+        }
+
+        if(connman.OutboundTargetReached(false) && !pfrom->fWhitelisted)
+        {
+            LogPrint(BCLog::NETMSG, "mempool request with bandwidth limit reached, disconnect peer=%d\n",
+                     pfrom->GetId());
+            pfrom->fDisconnect = true;
+            return;
+        }
+    }
+    else
+    {
+        // New extended mempool sync request can only come from peer we're configured to synchronise with
+        if(!pfrom->fMempoolSync)
+        {
+            // Ignore the request but don't disconnect, they might just have misconfigured
+            LogPrint(BCLog::NETMSG, "Ignoring mempool sync request from unknown peer=%d\n", pfrom->GetId());
+            return;
+        }
     }
 
     LOCK(pfrom->cs_inventory);
-    pfrom->fSendMempool = true;
+    pfrom->mempoolRequest = msg;
 }
  
 /**
@@ -5408,9 +5430,27 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     }
 
     // Respond to BIP35 mempool requests
-    if (fSendTrickle && pto->fSendMempool) {
-        auto vtxinfo = mempool.InfoAll();
-        pto->fSendMempool = false;
+    if (fSendTrickle && pto->mempoolRequest)
+    {
+        std::vector<TxMempoolInfo> vtxinfo {};
+        const auto& age { pto->mempoolRequest->GetAge() };
+        if(age)
+        {
+            // Only synchronise txns that are old enough and pay sufficient fee
+            int64_t now { GetTime() };
+            vtxinfo = mempool.InfoMatching(
+                [age=age.value(), now](const CTxMemPoolEntry& entry)
+                {
+                    int64_t txAge { now - entry.GetTime() };
+                    return txAge >= age && entry.IsInPrimaryMempool();
+                }
+            );
+        }
+        else
+        {
+            vtxinfo = mempool.InfoAll();
+        }
+
         Amount filterrate(0);
         {
             LOCK(pto->cs_feeFilter);
@@ -5419,26 +5459,32 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
 
         LOCK(pto->cs_filter);
 
-        for (const auto &txinfo : vtxinfo) {
+        for (const auto &txinfo : vtxinfo)
+        {
             const uint256 &txid = txinfo.GetTxId();
             CInv inv(MSG_TX, txid);
-            if (filterrate != Amount(0)) {
-                if (txinfo.feeRate.GetFeePerK() < filterrate) {
+            if (filterrate != Amount(0))
+            {
+                if (txinfo.feeRate.GetFeePerK() < filterrate)
+                {
                     continue;
                 }
             }
-            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.GetTx())) {
+            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.GetTx()))
+            {
                 continue;
             }
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
             // if next element will cause too large message, then we send it now, as message size is still under limit
-            if (vInv.size() == pto->maxInvElements) {
+            if (vInv.size() == pto->maxInvElements)
+            {
                 connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
                 vInv.clear();
             }
         }
         pto->timeLastMempoolReq = GetTime();
+        pto->mempoolRequest = std::nullopt;
     }
 
     // Determine transactions to relay

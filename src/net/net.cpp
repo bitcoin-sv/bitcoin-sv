@@ -17,8 +17,10 @@
 #include "crypto/common.h"
 #include "crypto/sha256.h"
 #include "hash.h"
+#include "mempool_msg.h"
 #include "miner_id/miner_info_tracker.h"
 #include "net/netbase.h"
+#include "netmessagemaker.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
 #include "taskcancellation.h"
@@ -417,6 +419,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
                 connect.pszDest ? connect.pszDest : "",
                 false);
         pnode->nServicesExpected = ServiceFlags(connect.addrConnect.nServices & nRelevantServices);
+        pnode->fMempoolSync = IsMempoolSyncPeer(connect.addrConnect);
 
         return pnode;
     } else if (!proxyConnectionFailed) {
@@ -624,7 +627,7 @@ bool CConnman::IsWhitelistedRange(const CNetAddr &addr) {
     return false;
 }
 
-bool CConnman::IsMempoolSyncPeer(const CNetAddr& addr)
+bool CConnman::IsMempoolSyncPeer(const CNetAddr& addr) const
 {
     LOCK(cs_vMempoolSyncPeers);
     for(const CSubNet &subnet : vMempoolSyncPeers)
@@ -749,6 +752,7 @@ void CNode::copyStats(NodeStats &stats)
     stats.fPauseSend = GetPausedForSending();
     stats.fUnpauseSend = stats.fPauseSend && !GetPausedForSending(true);
     stats.fAuthConnEstablished = fAuthConnEstablished;
+    stats.fMempoolSync = fMempoolSync;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();
@@ -2629,6 +2633,16 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     scheduler.scheduleEvery(std::bind(&CConnman::PeerAvgBandwithCalc, this),
                             PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS * 1000);
 
+    // Schedule mempool syncing
+    {
+        LOCK(cs_vMempoolSyncPeers);
+        if(! vMempoolSyncPeers.empty())
+        {
+            scheduler.scheduleEvery([this]{ SyncMempool(); },
+                config->GetMempoolSyncPeriod() * 1000);
+        }
+    }
+
     return true;
 }
 
@@ -2964,6 +2978,23 @@ void CConnman::PeerAvgBandwithCalc()
     }
 }
 
+// Send message to all whitelisted peers to sync our mempools
+void CConnman::SyncMempool()
+{
+    const int64_t age { config->GetMempoolSyncAge() };
+
+    ForEachNode(
+        [this, age](const CNodePtr& node)
+        {
+            if(node->fMempoolSync && NodeFullyConnected(node))
+            {
+                LogPrint(BCLog::NETMSG, "Sending mempool sync request age %ld to peer=%d\n", age, node->id);
+                PushMessage(node, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::MEMPOOL,
+                    MempoolMsg(age)));
+            }
+        }
+    );
+}
 
 CNode::MonitoredPendingResponses::PendingResponses::PendingResponses(unsigned int max_allowed)
 : max_allowed(max_allowed)

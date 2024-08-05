@@ -809,4 +809,41 @@ BOOST_AUTO_TEST_CASE(rolling_min_tests)
     BOOST_CHECK_EQUAL(CTxMemPool::MAX_ROLLING_FEE_HALFLIFE, pool.GetRollingMinFee());
 }
 
+BOOST_AUTO_TEST_CASE(InfoAllTest)
+{
+    CTxMemPool pool {};
+    CTxMemPoolTestAccess testPoolAccess {pool};
+    TestMemPoolEntryHelper entry {};
+
+    testPoolAccess.SetBlockMinTxFee({Amount{100}, 1});
+
+    // Add a txn each to the primary and secondary mempools
+    CMutableTransaction tx1 { CMutableTransaction() };
+    tx1.vout.resize(1);
+    tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx1.vout[0].nValue = 10 * COIN;
+    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount{10000LL}).FromTx(tx1), TxStorage::memory, nullChangeSet);
+    const auto tx1it { testPoolAccess.mapTx().find(tx1.GetId()) };
+    BOOST_REQUIRE(tx1it != testPoolAccess.mapTx().end());
+    BOOST_CHECK(tx1it->IsInPrimaryMempool());
+
+    CMutableTransaction tx2 { CMutableTransaction() };
+    tx2.vout.resize(1);
+    tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx2.vout[0].nValue = 2 * COIN;
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), TxStorage::memory, nullChangeSet);
+    const auto tx2it { testPoolAccess.mapTx().find(tx2.GetId()) };
+    BOOST_REQUIRE(tx2it != testPoolAccess.mapTx().end());
+    BOOST_CHECK(!tx2it->IsInPrimaryMempool());
+
+    // InfoAll gets both txns
+    const auto& allTxns { pool.InfoAll() };
+    BOOST_CHECK_EQUAL(allTxns.size(), 2);
+
+    // InfoMatching gets just those matching the predicate
+    const auto& matchingTxns { pool.InfoMatching([](const CTxMemPoolEntry& entry){ return entry.IsInPrimaryMempool(); }) };
+    BOOST_REQUIRE_EQUAL(matchingTxns.size(), 1);
+    BOOST_CHECK_EQUAL(matchingTxns[0].GetTxId(), tx1.GetId());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

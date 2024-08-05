@@ -28,6 +28,7 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/uuid/uuid.hpp>
 
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -969,6 +970,27 @@ public:
     TxMempoolInfo Info(const uint256& hash) const;
 
     std::vector<TxMempoolInfo> InfoAll() const;
+
+    template<typename F> requires std::predicate<F, const CTxMemPoolEntry&>
+    std::vector<TxMempoolInfo> InfoMatching(F&& func) const
+    {
+        std::vector<TxMempoolInfo> ret {};
+        ret.reserve(mapTx.size());
+
+        {
+            std::shared_lock lock {smtx};
+            for(const auto& entry : mapTx.get<insertion_order>())
+            {
+                if(std::forward<F>(func)(entry))
+                {
+                    ret.push_back(TxMempoolInfo{entry});
+                }
+            }
+        }
+
+        ret.shrink_to_fit();
+        return ret;
+    }
 
     size_t DynamicMemoryUsage() const;
     size_t SecondaryMempoolUsage() const;
