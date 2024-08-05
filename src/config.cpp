@@ -213,6 +213,10 @@ void GlobalConfig::Reset()
     data->minBlockMempoolTimeDifferenceSelfish = DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
     data->mDetectSelfishMining = DEFAULT_DETECT_SELFISH_MINING;
     data->mSelfishTxThreshold = DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
+
+    // Mempool syncing
+    data->mempoolSyncAge = MempoolMsg::DEFAULT_AGE;
+    data->mempoolSyncPeriod = MempoolMsg::DEFAULT_PERIOD;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -2841,6 +2845,45 @@ bool GlobalConfig::SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std
         return false;
     }
     data->mSelfishTxThreshold = selfishTxPercentThreshold;
+    return true;
+}
+
+// Mempool syncing
+int64_t GlobalConfig::GetMempoolSyncAge() const
+{
+    return data->mempoolSyncAge;
+}
+
+bool GlobalConfig::SetMempoolSyncAge(int64_t age, std::string* err)
+{
+    if(age <= 0)
+    {
+        if(err)
+        {
+            *err = "Mempool sync age must be > 0";
+        }
+        return false;
+    }
+    data->mempoolSyncAge = age;
+    return true;
+}
+
+int64_t GlobalConfig::GetMempoolSyncPeriod() const
+{
+    return data->mempoolSyncPeriod;
+}
+
+bool GlobalConfig::SetMempoolSyncPeriod(int64_t period, std::string* err)
+{
+    if(period <= 0)
+    {
+        if(err)
+        {
+            *err = "Mempool sync period must be > 0";
+        }
+        return false;
+    }
+    data->mempoolSyncPeriod = period;
     return true;
 }
 

@@ -1142,6 +1142,23 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             DEFAULT_SCRIPT_NUM_LENGTH_POLICY));
 
     strUsage += HelpMessageOpt(
+        "-mempoolsyncpeer=<ip or subnet>",
+        strprintf("Specify IPs or subnets of peers with which we want to periodically synchronise "
+            "mempools. NOTE: As well as specifying the address here you must also add a "
+            "corresponding entry on the other peer specifying OUR address otherwise they will "
+            "ignore our requests to synchronise with them. Can be used more than once to specify "
+            "multiple peers / networks."));
+    strUsage += HelpMessageOpt(
+        "-mempoolsyncage=<n>",
+        strprintf("An inventory of transactions greater than or equal to this age (in seconds) "
+            "will periodically be requested from all peers listed using -mempoolsyncpeer (default: %lus).",
+            MempoolMsg::DEFAULT_AGE));
+    strUsage += HelpMessageOpt(
+        "-mempoolsyncperiod",
+        strprintf("Set how frequently mempool synchronisation should be performed (in seconds, "
+            "default: %lus).", MempoolMsg::DEFAULT_PERIOD));
+
+    strUsage += HelpMessageOpt(
         "-softconsensusfreezeduration",
         strprintf("Set for how many blocks a block that contains transaction spending "
                   "consensus frozen TXO will remain frozen before it auto unfreezes "
@@ -2826,6 +2843,16 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    // Mempool sync parameters
+    if(std::string err; !config.SetMempoolSyncAge(gArgs.GetArg("-mempoolsyncage", MempoolMsg::DEFAULT_AGE), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMempoolSyncPeriod(gArgs.GetArg("-mempoolsyncperiod", MempoolMsg::DEFAULT_PERIOD), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -3368,6 +3395,20 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                 return InitError(strprintf(
                     _("Invalid netmask specified in -whitelist: '%s'"), net));
             connman.AddWhitelistedRange(subnet);
+        }
+    }
+
+    if(gArgs.IsArgSet("-mempoolsyncpeer"))
+    {
+        for(const std::string& net : gArgs.GetArgs("-mempoolsyncpeer"))
+        {
+            CSubNet subnet {};
+            LookupSubNet(net.c_str(), subnet);
+            if(!subnet.IsValid())
+            {
+                return InitError(strprintf(_("Invalid netmask specified in -mempoolsyncpeer: '%s'"), net));
+            }
+            connman.AddMempoolSyncPeer(subnet);
         }
     }
 

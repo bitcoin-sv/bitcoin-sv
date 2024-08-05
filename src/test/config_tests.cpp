@@ -817,4 +817,21 @@ BOOST_AUTO_TEST_CASE(leveldb)
     BOOST_CHECK(! config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE - 1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(mempool_sync_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncAge(), MempoolMsg::DEFAULT_AGE);
+    BOOST_CHECK(config.SetMempoolSyncAge(1, &err));
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncAge(), 1);
+    BOOST_CHECK(!config.SetMempoolSyncAge(0, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncPeriod(), MempoolMsg::DEFAULT_PERIOD);
+    BOOST_CHECK(config.SetMempoolSyncPeriod(MempoolMsg::DEFAULT_PERIOD * 2, &err));
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncPeriod(), MempoolMsg::DEFAULT_PERIOD * 2);
+    BOOST_CHECK(!config.SetMempoolSyncPeriod(0, &err));
+    BOOST_CHECK(!config.SetMempoolSyncPeriod(-1, &err));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

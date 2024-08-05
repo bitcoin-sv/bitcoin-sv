@@ -12,6 +12,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "miner_id/miner_id_db_defaults.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "mining/factory.h"
+#include "net/mempool_msg.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "protocol_era.h"
@@ -200,6 +201,10 @@ public:
     virtual int64_t GetMinBlockMempoolTimeDifferenceSelfish() const = 0;
     virtual uint64_t GetSelfishTxThreshold() const = 0;
 
+    // Mempool syncing
+    virtual int64_t GetMempoolSyncAge() const = 0;
+    virtual int64_t GetMempoolSyncPeriod() const = 0;
+
 protected:
     virtual ~Config() = default;
 };
@@ -381,6 +386,10 @@ public:
     virtual void SetDetectSelfishMining(bool detectSelfishMining) = 0;
     virtual bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err = nullptr) = 0;
     virtual bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) = 0;
+
+    // Mempool syncing
+    virtual bool SetMempoolSyncAge(int64_t age, std::string* err = nullptr) = 0;
+    virtual bool SetMempoolSyncPeriod(int64_t period, std::string* err = nullptr) = 0;
 
 protected:
     // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
@@ -742,6 +751,12 @@ public:
     uint64_t GetSelfishTxThreshold() const override;
     bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) override;
 
+    // Mempool syncing
+    int64_t GetMempoolSyncAge() const override;
+    bool SetMempoolSyncAge(int64_t age, std::string* err) override;
+    int64_t GetMempoolSyncPeriod() const override;
+    bool SetMempoolSyncPeriod(int64_t period, std::string* err) override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset() override;
@@ -934,6 +949,10 @@ private:
         bool mDetectSelfishMining;
         int64_t minBlockMempoolTimeDifferenceSelfish;
         uint64_t mSelfishTxThreshold;
+
+        // Mempool syncing
+        int64_t mempoolSyncAge;
+        int64_t mempoolSyncPeriod;
 
     #if ENABLE_ZMQ
         int64_t invalidTxZMQMaxMessageSize;
@@ -1581,6 +1600,12 @@ public:
     {
         return true;
     }
+
+    // Mempool syncing
+    int64_t GetMempoolSyncAge() const override { return MempoolMsg::DEFAULT_AGE; }
+    bool SetMempoolSyncAge(int64_t age, std::string* err) override { return true; }
+    int64_t GetMempoolSyncPeriod() const override { return MempoolMsg::DEFAULT_PERIOD; }
+    bool SetMempoolSyncPeriod(int64_t period, std::string* err) override { return true; }
 
     void Reset() override;
 

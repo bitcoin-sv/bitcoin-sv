@@ -624,9 +624,28 @@ bool CConnman::IsWhitelistedRange(const CNetAddr &addr) {
     return false;
 }
 
+bool CConnman::IsMempoolSyncPeer(const CNetAddr& addr)
+{
+    LOCK(cs_vMempoolSyncPeers);
+    for(const CSubNet &subnet : vMempoolSyncPeers)
+    {
+        if(subnet.Match(addr))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
     LOCK(cs_vWhitelistedRange);
     vWhitelistedRange.push_back(subnet);
+}
+
+void CConnman::AddMempoolSyncPeer(const CSubNet& subnet)
+{
+    LOCK(cs_vMempoolSyncPeers);
+    vMempoolSyncPeers.push_back(subnet);
 }
 
 CConnman::CAsyncTaskPool::CAsyncTaskPool(const Config& config)
@@ -1348,6 +1367,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
             "",
             true);
     pnode->fWhitelisted = whitelisted;
+    pnode->fMempoolSync = IsMempoolSyncPeer(addr);
 
     GetNodeSignals().InitializeNode(pnode, *this, nullptr);
 

@@ -548,6 +548,7 @@ public:
     unsigned int GetSendBufferSize() const;
 
     void AddWhitelistedRange(const CSubNet &subnet);
+    void AddMempoolSyncPeer(const CSubNet &subnet);
 
     ServiceFlags GetLocalServices() const;
 
@@ -670,6 +671,7 @@ private:
     bool AttemptToEvictConnection();
     CNodePtr ConnectNode(NodeConnectInfo& connect);
     bool IsWhitelistedRange(const CNetAddr &addr);
+    bool IsMempoolSyncPeer(const CNetAddr &addr);
 
     void DeleteNode(const CNodePtr& pnode);
 
@@ -713,6 +715,10 @@ private:
     // whitelisted (as well as those connecting to whitelisted binds).
     std::vector<CSubNet> vWhitelistedRange;
     CCriticalSection cs_vWhitelistedRange;
+
+    // Peers with whome we should periodically synchronise mempools
+    std::vector<CSubNet> vMempoolSyncPeers {};
+    CCriticalSection cs_vMempoolSyncPeers {};
 
     unsigned int nSendBufferMaxSize;
     unsigned int nReceiveFloodSize;
@@ -916,6 +922,8 @@ public:
     CCriticalSection cs_SubVer {};
     // This peer can bypass DoS banning.
     std::atomic_bool fWhitelisted {false};
+    // This peer is one to sync mempools with
+    std::atomic_bool fMempoolSync {false};
     // If true this node is being used as a short lived feeler.
     bool fFeeler {false};
     bool fOneShot {false};
