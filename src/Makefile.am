@@ -184,6 +184,7 @@ BITCOIN_CORE_H = \
   net/cmpctblock_parser.h \
   net/fixed_len_multi_parser.h \
   net/fixed_len_parser.h \
+  net/mempool_msg.h \
   net/msg_buffer.h \
   net/msg_parser.h \
   net/msg_parser_buffer.h \
