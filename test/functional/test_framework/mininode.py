@@ -313,7 +313,7 @@ def deser_optional(typename, f):
 
 def ser_optional(o):
     r = b""
-    if o:
+    if (o is not None):
         r += struct.pack("<b", 1)
         r += o.serialize()
     else:
@@ -1680,17 +1680,38 @@ class msg_pong():
 class msg_mempool():
     command = b"mempool"
 
-    def __init__(self):
-        pass
+    class Age():
+        def __init__(self, age=None):
+            self.age = age
+
+        def deserialize(self, f):
+            self.age = struct.unpack("<q", f.read(8))[0]
+
+        def serialize(self):
+            return struct.pack("<q", self.age)
+
+        def __repr__(self):
+            return "{}".format(self.age)
+
+    def __init__(self, age=None):
+        if age is not None:
+            self.age = self.Age(age)
+        else:
+            self.age = None
 
     def deserialize(self, f):
-        pass
+        age = deser_optional(self.Age, f)
+        if age is not None:
+            self.age = age.age
+        else:
+            self.age = None
 
     def serialize(self):
-        return b""
+        return b"".join((
+            ser_optional(self.age),))
 
     def __repr__(self):
-        return "msg_mempool()"
+        return "msg_mempool(age={})".format(repr(self.age))
 
 
 class msg_sendheaders():
