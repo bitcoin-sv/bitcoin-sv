@@ -84,6 +84,7 @@ BITCOIN_CORE_H = \
   block_index.h \
   block_index_store.h \
   block_index_store_loader.h \
+  block_read_cache.h \
   dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
@@ -325,6 +326,7 @@ libbitcoin_server_a_SOURCES = \
   blockfileinfostore.cpp \
   block_file_access.cpp \
   block_index_store_loader.cpp \
+  block_read_cache.cpp \
   chain.cpp \
   checkpoints.cpp \
   miner_id/coinbase_doc.cpp \

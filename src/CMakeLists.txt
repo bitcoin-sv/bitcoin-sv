@@ -454,6 +454,8 @@ add_library(server
 	blockfileinfostore.cpp
 	blockfileinfostore.h
 	blockindex_with_descendants.h
+    block_read_cache.cpp
+    block_read_cache.h
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
