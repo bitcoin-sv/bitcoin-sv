@@ -13,6 +13,7 @@
 #include "block_index_store_loader.h"
 #include "blockfileinfostore.h"
 #include "blockindex_with_descendants.h"
+#include "block_read_cache.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -4192,9 +4193,11 @@ static bool ConnectTip(
     ConnectTrace &connectTrace,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet,
-    std::int32_t mostWorkBlockHeight,
-    const arith_uint256& mostWorkOnChain)
+    const CBlockIndex* pindexMostWork)
 {
+    int32_t mostWorkBlockHeight { pindexMostWork->GetHeight() };
+    const arith_uint256& mostWorkOnChain { pindexMostWork->GetChainWork() };
+
     auto guard =
         blockValidationStatus.getScopedCurrentlyValidatingBlock( *pindexNew );
 
@@ -4202,13 +4205,18 @@ static bool ConnectTip(
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
     std::shared_ptr<const CBlock> pthisBlock;
-    if (!pblock) {
+    if (!pblock)
+    {
         std::shared_ptr<CBlock> pblockNew = std::make_shared<CBlock>();
-        if (!pindexNew->ReadBlockFromDisk(*pblockNew, config)) {
+        if(!g_blockReadCache->ReadBlock(pindexNew, pindexMostWork, *pblockNew, config))
+        {
             return AbortNode(state, "Failed to read block");
         }
         pthisBlock = pblockNew;
-    } else {
+    }
+    else
+    {
+        g_blockReadCache->CacheNextBlock(pindexNew, pindexMostWork, config);
         pthisBlock = pblock;
     }
 
@@ -4639,8 +4647,7 @@ static bool ActivateBestChainStep(
                         connectTrace,
                         reorgUpdate.GetDisconnectpool(),
                         changeSet,
-                        pindexMostWork->GetHeight(),
-                        pindexMostWork->GetChainWork() ))
+                        pindexMostWork))
                 {
                     auto result =
                         RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(

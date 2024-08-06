@@ -625,6 +625,7 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune);
 
 /** Create a new block index entry for a given block hash */
 CBlockIndex *InsertBlockIndex(uint256 hash);
+
 /**
  * Update the on-disk chain state.
  * The caches and indexes are flushed depending on the mode we're called with if

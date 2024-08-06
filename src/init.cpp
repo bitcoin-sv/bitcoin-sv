@@ -12,6 +12,7 @@
 #include "amount.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
+#include "block_read_cache.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "compat/sanity.h"
@@ -229,6 +230,9 @@ void Shutdown() {
     g_minerIDs.reset();
     // Destroy dataRef index
     g_dataRefIndex.reset();
+
+    // Destroy block read cache
+    g_blockReadCache.reset();
 
 #ifdef ENABLE_WALLET
     for (CWalletRef pwallet : vpwallets) {
@@ -3337,6 +3341,9 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     }
 
     int64_t nStart=0;
+
+    // Create block read cache
+    g_blockReadCache = std::make_unique<BlockReadCache>();
 
 // Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET

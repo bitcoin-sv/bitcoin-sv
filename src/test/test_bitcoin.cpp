@@ -4,6 +4,7 @@
 
 #include "test_bitcoin.h"
 
+#include "block_read_cache.h"
 #include "chainparams.h"
 #include "config.h"
 #include "consensus/consensus.h"
@@ -115,6 +116,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     : BasicTestingSetup(chainName) {
     
     testConfig.SetMiningCandidateBuilder(assemblerType);
+    g_blockReadCache = std::make_unique<BlockReadCache>();
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
@@ -176,6 +178,7 @@ TestingSetup::~TestingSetup() { // NOLINT(bugprone-exception-escape)
     delete pblocktree; // NOLINT(cppcoreguidelines-owning-memory)
     pblocktree = nullptr;
     ShutdownFrozenTXO();
+    g_blockReadCache.reset();
 }
 
 TestChain100Setup::TestChain100Setup()
