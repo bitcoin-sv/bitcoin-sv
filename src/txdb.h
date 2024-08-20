@@ -114,6 +114,7 @@ public:
     CoinsDB(
         uint64_t cacheSizeThreshold,
         size_t nCacheSize,
+        size_t nMaxFileSize,
         MaxFiles maxFiles,
         bool fMemory = false,
         bool fWipe = false);

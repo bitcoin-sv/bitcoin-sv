@@ -125,6 +125,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
         std::make_unique<CoinsDB>(
             std::numeric_limits<size_t>::max(),
             1 << 23,
+            CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE,
             CoinsDB::MaxFiles::Default(),
             true);
     if (!InitBlockIndex(testConfig)) {

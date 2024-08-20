@@ -367,23 +367,27 @@ public:
         static MaxFiles Default() { return MaxFiles{64}; }
     };
 
+    // Default levelDB maximum file size (2MB)
+    static constexpr size_t MaxFileSize { 2 * ONE_MEBIBYTE };
+
     /**
      * @param[in] path        Location in the filesystem where leveldb data will
      * be stored.
      * @param[in] nCacheSize  Configures various leveldb cache settings.
+     * @param[in] nFileSize   Max size for levelDB .ldb files.
      * @param[in] fMemory     If true, use leveldb's memory environment.
      * @param[in] fWipe       If true, remove all existing data.
      * @param[in] obfuscate   If true, store data obfuscated via simple XOR. If
-     * false, XOR
-     *                        with a zero'd byte array.
+     *                        false, XOR with a zero'd byte array.
      */
     CDBWrapper(const CDBWrapper&) = delete;
     CDBWrapper& operator=(const CDBWrapper&) = delete;
     CDBWrapper(CDBWrapper&&) = delete;
     CDBWrapper& operator=(CDBWrapper&&) = delete;
-    CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory = false,
-               bool fWipe = false, bool obfuscate = false,
-               MaxFiles nMaxFiles = MaxFiles::Default());
+    CDBWrapper(const fs::path &path, size_t nCacheSize,
+               bool fMemory = false, bool fWipe = false, bool obfuscate = false,
+               MaxFiles nMaxFiles = MaxFiles::Default(),
+               size_t nMaxFileSize = MaxFileSize);
     ~CDBWrapper();
 
 public:
