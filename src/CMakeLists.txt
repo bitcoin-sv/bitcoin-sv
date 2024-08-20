@@ -369,6 +369,7 @@ add_library(common
 	timedata.h
 	transaction_specific_config.cpp
 	transaction_specific_config.h
+    txdb_defaults.h
 	tx_mempool_info.h
 	txhasher.cpp
 	txhasher.h

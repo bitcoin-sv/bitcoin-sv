@@ -18,6 +18,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "rpc/client_config.h"
 #include "rpc/webhook_client_defaults.h"
 #include "script/standard.h"
+#include "txdb_defaults.h"
 #include "txn_validation_config.h"
 #include "validation.h"
 #include "script_config.h"
@@ -149,6 +150,7 @@ public:
     virtual unsigned int GetMaxProtocolSendPayloadLength() const = 0;
     virtual unsigned int GetRecvInvQueueFactor() const = 0;
     virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
+    virtual uint64_t GetCoinsDBMaxFileSize() const = 0;
     virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
     virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
     virtual bool GetDisableBIP30Checks() const = 0;
@@ -253,6 +255,7 @@ public:
     virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
+    virtual bool SetCoinsDBMaxFileSize(int64_t max, std::string* err) = 0;
     virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
     virtual void SetBanClientUA(std::set<std::string> uaClients) = 0;
     virtual void SetAllowClientUA(std::set<std::string> uaClients) = 0;
@@ -530,6 +533,9 @@ public:
 
     bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsDbOpenFiles() const override {return data->mMaxCoinsDbOpenFiles; }
+
+    bool SetCoinsDBMaxFileSize(int64_t max, std::string* err) override;
+    uint64_t GetCoinsDBMaxFileSize() const override {return data->mMaxCoinsDBFileSize; }
 
     void SetInvalidBlocks(const std::set<uint256>& hashes) override; 
     const std::set<uint256>& GetInvalidBlocks() const override;
@@ -822,6 +828,7 @@ private:
         uint64_t mMaxCoinsProviderCacheSize;
 
         uint64_t mMaxCoinsDbOpenFiles;
+        uint64_t mMaxCoinsDBFileSize;
 
         uint64_t mMaxMempool;
         uint64_t mMaxMempoolSizeDisk;
@@ -1237,6 +1244,9 @@ public:
         return false;
     }
     uint64_t GetMaxCoinsDbOpenFiles() const override {return 64; /* old default */}
+
+    bool SetCoinsDBMaxFileSize(int64_t max, std::string* err)  override { return true; }
+    uint64_t GetCoinsDBMaxFileSize() const override { return CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE; }
 
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override
     {

@@ -805,4 +805,16 @@ BOOST_AUTO_TEST_CASE(chronicle)
     BOOST_CHECK(! config.SetChronicleActivationHeight(-1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(leveldb)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetCoinsDBMaxFileSize(), CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE);
+    BOOST_CHECK(config.SetCoinsDBMaxFileSize(CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE * 2, &err));
+    BOOST_CHECK_EQUAL(config.GetCoinsDBMaxFileSize(), CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE * 2);
+    BOOST_CHECK(config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE, &err));
+    BOOST_CHECK(! config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE - 1, &err));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

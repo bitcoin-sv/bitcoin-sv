@@ -101,6 +101,7 @@ void GlobalConfig::Reset()
 
     data->mMaxCoinsViewCacheSize = 0;
     data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+    data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
 
     data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
     data->maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
@@ -1166,6 +1167,21 @@ bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
     }
 
     data->mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsDBMaxFileSize(int64_t max, std::string* err)
+{
+    if(LessThan(max, err,
+        "Value for maximum coins DB file size must not be less than "
+            + std::to_string(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE),
+            CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE))
+    {
+        return false;
+    }
+
+    data->mMaxCoinsDBFileSize = static_cast<uint64_t>(max);
 
     return true;
 }

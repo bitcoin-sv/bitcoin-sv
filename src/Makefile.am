@@ -262,6 +262,7 @@ BITCOIN_CORE_H = \
   time_locked_mempool.h \
   transaction_specific_config.h \
   txdb.h \
+  txdb_defaults.h \
   txhasher.h \
   txmempool.h \
   txmempoolevictioncandidates.h \

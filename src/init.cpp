@@ -1416,6 +1416,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
                   CoinsDB::MaxFiles::Default().maxFiles));
     strUsage += HelpMessageOpt(
+        "-maxcoinsdbfilesize=<n>",
+        strprintf(_("Set maximum file size used by the coins leveldb (default: %d MB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE / ONE_MEBIBYTE));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -2688,16 +2693,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
-
     if(std::string err; !config.SetMaxCoinsProviderCacheSize(
         gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
         &err))
     {
         return InitError(err);
     }
-
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetCoinsDBMaxFileSize(
+        gArgs.GetArgAsBytes("-maxcoinsdbfilesize", CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE), &err))
     {
         return InitError(err);
     }
@@ -3552,6 +3560,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                     std::make_unique<CoinsDB>(
                         config.GetMaxCoinsProviderCacheSize(),
                         nCoinDBCache,
+                        config.GetCoinsDBMaxFileSize(),
                         CDBWrapper::MaxFiles{config.GetMaxCoinsDbOpenFiles()},
                         false,
                         fReindex || fReindexChainState);
