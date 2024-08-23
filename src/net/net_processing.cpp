@@ -2411,7 +2411,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
         bool fAlreadyHave = AlreadyHave(inv);
 
-        if(inv.type == MSG_BLOCK) {
+        if(inv.type == MSG_BLOCK)
+        {
             LogPrint(BCLog::NETMSG, "got block inv: %s %s peer=%d\n", inv.hash.ToString(),
                 fAlreadyHave ? "have" : "new", pfrom->id);
             UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
@@ -2434,7 +2435,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                          pfrom->id);
             }
         }
-        else {
+        else if(inv.type == MSG_TX)
+        {
             LogPrint(BCLog::TXNSRC | BCLog::NETMSGVERB, "got txn inv: %s %s txnsrc peer=%d\n",
                 inv.hash.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
             pfrom->AddInventoryKnown(inv);
@@ -2445,6 +2447,12 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
             else if(!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
                 pfrom->AskFor(inv, config);
             }
+        }
+        else
+        {
+            LogPrint(BCLog::NETMSG, "Got invalid inv type %d from peer=%d\n", static_cast<int>(inv.type), pfrom->id);
+            // Disconnect them
+            pfrom->fDisconnect = true;
         }
 
         // Track requests for our stuff
