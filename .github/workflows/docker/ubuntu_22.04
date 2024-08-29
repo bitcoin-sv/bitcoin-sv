@@ -40,7 +40,8 @@ RUN set -xeu \
 RUN set -xeu \
     && apt-get update \
     && apt-get install -y \
-    sysbench 
+    sysbench \
+    zstd
 
 RUN update-alternatives \
     --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-17 17

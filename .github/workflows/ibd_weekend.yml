@@ -2,11 +2,9 @@
 # Distributed under the Open BSV software license,
 # see the accompanying file LICENSE.
 
-name: Weeknight IBD
+name: IBD - Weekend
 
 on:
-  schedule:
-    - cron: '59 23 * * MON-FRI'
   workflow_dispatch:
 
 concurrency:
@@ -14,11 +12,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  weeknight_ibd:
+  ibd_weekend:
     runs-on: [ self-hosted, docker, large, perf ]
     container:
       image: nchain/svn_dev:ubuntu_22.04
       options: --cap-add SYS_ADMIN --volume /lib/modules:/lib/modules
+    strategy:
+      max-parallel: 1
+      matrix:
+        array: [
+          { duration: $((5 * 60 * 60)), clean: true },
+          { duration: $((5 * 60 * 60)), clean: false },
+          { duration: $((5 * 60 * 60)), clean: false },
+          { duration: $((5 * 60 * 60)), clean: false },
+          { duration: $((5 * 60 * 60)), clean: false },
+          { duration: $((5 * 60 * 60)), clean: false },
+        ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,4 +40,5 @@ jobs:
       - name: Initial Block Download
         uses: ./.github/workflows/ibd
         with:
-          duration: $((5 * 60 * 60)) # Note: Each job must be < 6hrs
+          duration: ${{ matrix.array.duration }}
+          clean: ${{ matrix.array.clean }}
