@@ -3,8 +3,8 @@
 # Distributed under the Open BSV software license,
 # see the accompanying file LICENSE.
 
-/height/ {
-    split($7, arr, "=")
+/Accepted block/ {
+    split($7, arr, "=|,")
     if(arr[2] > h)
         h = arr[2]
 }
