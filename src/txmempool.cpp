@@ -25,6 +25,7 @@
 #include "txn_validator.h"
 
 #include <boost/range/adaptor/reversed.hpp>
+#include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <exception>
 #include <mutex>
@@ -3061,7 +3062,7 @@ UniqueCFile CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_
     }
 
     uint64_t version;
-    DumpFileID instanceId {0};
+    DumpFileID instanceId { boost::uuids::nil_uuid() };
 
     file >> version;
     if (version > MEMPOOL_DUMP_VERSION || version < MEMPOOL_DUMP_COMPAT_VERSION)

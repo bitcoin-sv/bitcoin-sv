@@ -3,6 +3,7 @@
 
 #include <net/association_id.h>
 #include <sstream>
+#include <boost/random.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
@@ -32,7 +33,7 @@ std::unique_ptr<AssociationID> AssociationID::Make(const std::vector<uint8_t>& b
 UUIDAssociationID::UUIDAssociationID()
 {
     // Generate a new random UUID
-    boost::uuids::basic_random_generator<boost::mt19937> gen {};
+    boost::uuids::basic_random_generator<boost::random::mt19937> gen {};
     mID = gen();
 }
 
