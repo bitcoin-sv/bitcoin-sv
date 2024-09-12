@@ -49,7 +49,7 @@ runs:
       run: |
         if [[ -f ~/.bitcoin/bitcoind.log ]];
         then
-          echo "begin_height=$(<~/.bitcoin/bitcoind.log .github/workflows/ibd/block_height)" \
+          echo "begin_height=$(<~/.bitcoin/bitcoind.log .github/actions/ibd/block_height)" \
           >> $GITHUB_ENV
         else
           echo "begin_height=0" >> $GITHUB_ENV
@@ -72,7 +72,7 @@ runs:
       shell: bash
     - name: Set end height environment variable
       run: |
-        echo "end_height=$(<~/.bitcoin/bitcoind.log .github/workflows/ibd/block_height)" \
+        echo "end_height=$(<~/.bitcoin/bitcoind.log .github/actions/ibd/block_height)" \
         >> $GITHUB_ENV
       shell: bash
     - name: Set now environment variable

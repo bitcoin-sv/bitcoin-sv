@@ -41,7 +41,7 @@ jobs:
         with: 
           targets: bitcoind bitcoin-cli
       - name: Initial Block Download
-        uses: ./.github/workflows/ibd
+        uses: ./.github/actions/ibd
         with:
           duration: ${{ matrix.array.duration }}
           restore: ${{ matrix.array.restore }}
