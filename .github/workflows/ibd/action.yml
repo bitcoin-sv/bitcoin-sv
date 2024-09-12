@@ -8,8 +8,11 @@ inputs:
   duration:
     description: Duration in seconds 
     required: true
-  clean:
-    description: Start from block 0
+  restore:
+    description: restore ~/.bitcoin/ from cache
+    required: true
+  save:
+    description: save ~/.bitcoin/ to cache
     required: true
 runs:
   using: "composite"
@@ -28,7 +31,7 @@ runs:
         echo "prune=1000" >> ~/.bitcoin/bitcoin.conf
       shell: bash
     - name: restore cache
-      if: inputs.clean == 'false'
+      if: inputs.restore == 'true'
       uses: actions/cache/restore@v4
       with:
        key: ibd-
@@ -37,6 +40,11 @@ runs:
        path: |
          ~/.bitcoin/
          !~/.bitcoin/.lock
+    - name: delete restored cache
+      if: inputs.restore == 'true'
+      run: |
+        gh cache delete --all
+      shell: bash
     - name: Set begin height environment variable
       run: |
         if [[ -f ~/.bitcoin/bitcoind.log ]];
@@ -97,11 +105,12 @@ runs:
        name: ${{ env.prefix }}-flamegraph.svg
        path: ${{ env.prefix }}-flamegraph.svg
     - name: cache save
+      if: inputs.save == 'true'
       uses: actions/cache/save@v4
       with:
        path: |
          ~/.bitcoin/
          !~/.bitcoin/.lock
-       key: ${{ env.prefix }}-flamegraph.svg
+       key: ${{ env.prefix }}
 
 

@@ -13,6 +13,8 @@ concurrency:
 
 jobs:
   ibd_weekend:
+    env:
+      GITHUB_TOKEN: ${{ secrets.ACTIONS_PAT }}
     runs-on: [ self-hosted, docker, large, perf ]
     container:
       image: nchain/svn_dev:ubuntu_22.04
@@ -21,12 +23,13 @@ jobs:
       max-parallel: 1
       matrix:
         array: [
-          { duration: $((5 * 60 * 60)), clean: true },
-          { duration: $((5 * 60 * 60)), clean: false },
-          { duration: $((5 * 60 * 60)), clean: false },
-          { duration: $((5 * 60 * 60)), clean: false },
-          { duration: $((5 * 60 * 60)), clean: false },
-          { duration: $((5 * 60 * 60)), clean: false },
+          { duration: $((5 * 60 * 60 )), restore: false, save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: false },
         ]
     steps:
       - name: Checkout
@@ -36,9 +39,10 @@ jobs:
       - name: Build Bitcoin
         uses: ./.github/workflows/build_bitcoin_cmake
         with: 
-          build_type: Release
+          targets: bitcoind bitcoin-cli
       - name: Initial Block Download
         uses: ./.github/workflows/ibd
         with:
           duration: ${{ matrix.array.duration }}
-          clean: ${{ matrix.array.clean }}
+          restore: ${{ matrix.array.restore }}
+          save: ${{ matrix.array.save }}
