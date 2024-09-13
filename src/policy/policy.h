@@ -134,7 +134,7 @@ static const int DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD = 72;
 /*
 * Same as GENESIS_GRACEFUL_ACTIVATION_PERIOD but for CHRONICLE.
 */
-static const int DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 72;
+static const unsigned DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 72;
 
 /*
 * Maximum number of blocks for Genesis graceful period on either side of the Genesis 
@@ -145,7 +145,7 @@ static const int MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD = 7200;
 /*
 * Same as MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD but for CHRONICLE.
 */
-static const int MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 7200;
+static const unsigned MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 7200;
 
 // Default policy value for maximum number of non-push operations per script
 static const uint64_t DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;

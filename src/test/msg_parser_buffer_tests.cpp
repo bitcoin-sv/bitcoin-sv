@@ -22,34 +22,34 @@ BOOST_AUTO_TEST_CASE(mod_n_byte_parser_tests)
 
     size_t offset{};
     auto p = parser(span{v.data() + offset, 0});
-    BOOST_CHECK_EQUAL(0, p.first);
-    BOOST_CHECK_EQUAL(0, p.second);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, p.first);
+    BOOST_CHECK_EQUAL(0U, p.second);
+    BOOST_CHECK_EQUAL(0U, parser.size());
     
     p = parser(span{v.data() + offset, 1});
-    BOOST_CHECK_EQUAL(0, p.first);
-    BOOST_CHECK_EQUAL(10, p.second);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, p.first);
+    BOOST_CHECK_EQUAL(10U, p.second);
+    BOOST_CHECK_EQUAL(0U, parser.size());
 
     p = parser(span{v.data(), 2});
-    BOOST_CHECK_EQUAL(0, p.first);
-    BOOST_CHECK_EQUAL(10, p.second);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, p.first);
+    BOOST_CHECK_EQUAL(10U, p.second);
+    BOOST_CHECK_EQUAL(0U, parser.size());
     
     p = parser(span{v.data(), 10});
-    BOOST_CHECK_EQUAL(10, p.first);
-    BOOST_CHECK_EQUAL(0, p.second);
-    BOOST_CHECK_EQUAL(10, parser.size());
+    BOOST_CHECK_EQUAL(10U, p.first);
+    BOOST_CHECK_EQUAL(0U, p.second);
+    BOOST_CHECK_EQUAL(10U, parser.size());
     
     p = parser(span{v.data(), 11});
-    BOOST_CHECK_EQUAL(10, p.first);
-    BOOST_CHECK_EQUAL(10, p.second);
-    BOOST_CHECK_EQUAL(20, parser.size());
+    BOOST_CHECK_EQUAL(10U, p.first);
+    BOOST_CHECK_EQUAL(10U, p.second);
+    BOOST_CHECK_EQUAL(20U, parser.size());
     
     p = parser(span{v.data(), 11});
-    BOOST_CHECK_EQUAL(0, p.first);
-    BOOST_CHECK_EQUAL(0, p.second);
-    BOOST_CHECK_EQUAL(20, parser.size());
+    BOOST_CHECK_EQUAL(0U, p.first);
+    BOOST_CHECK_EQUAL(0U, p.second);
+    BOOST_CHECK_EQUAL(20U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(buffer_unread_input)
@@ -63,13 +63,13 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input)
     }()};
 
     buffer(span{in.data(), in.size()});
-    BOOST_CHECK_EQUAL(10, buffer.buffer_size());
-    BOOST_CHECK_EQUAL(10, buffer.buffer_size_reqd());
+    BOOST_CHECK_EQUAL(10U, buffer.buffer_size());
+    BOOST_CHECK_EQUAL(10U, buffer.buffer_size_reqd());
 
     buffer.clear();
-    BOOST_CHECK_EQUAL(0, buffer.size());
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size());
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
+    BOOST_CHECK_EQUAL(0U, buffer.size());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
 }
 
 BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // half of input gets buffered
     offset += input_size;
     buffer(span{in.data() + offset, input_size});
-    BOOST_CHECK_EQUAL(2, buffer.buffer_size());
+    BOOST_CHECK_EQUAL(2U, buffer.buffer_size());
     BOOST_CHECK_EQUAL(N, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(3 * input_size, buffer.size());
     
@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // everything gets buffered
     offset += input_size;
     buffer(span{in.data() + offset, input_size});
-    BOOST_CHECK_EQUAL(6, buffer.buffer_size());
+    BOOST_CHECK_EQUAL(6U, buffer.buffer_size());
     BOOST_CHECK_EQUAL(N, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(4 * input_size, buffer.size());
     
@@ -125,8 +125,8 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // nothing gets buffered
     offset += input_size;
     buffer(span{in.data() + offset, input_size});
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size());
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
     BOOST_CHECK_EQUAL(5 * input_size, buffer.size());
     
     // nothing is buffered
@@ -134,8 +134,8 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
     // input gets buffered (overflow mode)
     offset += input_size;
     buffer(span{in.data() + offset, input_size});
-    BOOST_CHECK_EQUAL(4, buffer.buffer_size());
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
+    BOOST_CHECK_EQUAL(4U, buffer.buffer_size());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
 }
 
 BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
@@ -153,7 +153,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_byte)
         buffer(std::span{in.data() + i, 1});
         const auto remainder{(i + 1) % 10};
         BOOST_CHECK_EQUAL(remainder, buffer.buffer_size());
-        BOOST_CHECK_EQUAL(remainder ? 10 : 0, buffer.buffer_size_reqd());
+        BOOST_CHECK_EQUAL(remainder ? 10U : 0U, buffer.buffer_size_reqd());
     }
 }
 
@@ -173,7 +173,7 @@ BOOST_AUTO_TEST_CASE(parse_byte_by_n_bytes)
         buffer(std::span{in.data() + i, inc});
         const auto remainder{(i + 1) % 10};
         BOOST_CHECK_EQUAL(remainder, buffer.buffer_size());
-        BOOST_CHECK_EQUAL(buffer.buffer_size_reqd() ? 10 : 0, buffer.buffer_size_reqd());
+        BOOST_CHECK_EQUAL(buffer.buffer_size_reqd() ? 10U : 0U, buffer.buffer_size_reqd());
     }
 }
 
@@ -194,19 +194,19 @@ BOOST_AUTO_TEST_CASE(parse_buffer_size)
     {
         parser(s.first(n));
         BOOST_CHECK_EQUAL(n, parser.buffer_size());
-        BOOST_CHECK_EQUAL(10, parser.buffer_size_reqd());
+        BOOST_CHECK_EQUAL(10U, parser.buffer_size_reqd());
         s = s.subspan(n);
     }
     {
         parser(s.first(m));
         BOOST_CHECK_EQUAL(n + m - 10, parser.buffer_size());
-        BOOST_CHECK_EQUAL(10, parser.buffer_size_reqd());
+        BOOST_CHECK_EQUAL(10U, parser.buffer_size_reqd());
         s = s.subspan(m);
     }
     {
         parser(s.first(q));
         BOOST_CHECK_EQUAL(n + m + q - 30, parser.buffer_size());
-        BOOST_CHECK_EQUAL(10, parser.buffer_size_reqd());
+        BOOST_CHECK_EQUAL(10U, parser.buffer_size_reqd());
     }
 }
 
@@ -243,11 +243,11 @@ BOOST_AUTO_TEST_CASE(overflow_on_nothing_read_or_reqd)
     const std::span s{v.data(), v.size()};
     buffer(s);
     BOOST_CHECK_EQUAL(v.size(), buffer.buffer_size());
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
     
     buffer(s);
     BOOST_CHECK_EQUAL(2 * v.size(), buffer.buffer_size());
-    BOOST_CHECK_EQUAL(0, buffer.buffer_size_reqd());
+    BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

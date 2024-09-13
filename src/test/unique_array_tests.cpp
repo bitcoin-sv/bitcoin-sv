@@ -19,8 +19,8 @@ BOOST_AUTO_TEST_CASE(default_construction)
 {
     unique_array a;
     BOOST_CHECK(a.empty());
-    BOOST_CHECK_EQUAL(0, a.size());
-    BOOST_CHECK_EQUAL(0, a.capacity());
+    BOOST_CHECK_EQUAL(0U, a.size());
+    BOOST_CHECK_EQUAL(0U, a.capacity());
 }
 
 BOOST_AUTO_TEST_CASE(span_construction)
@@ -28,8 +28,8 @@ BOOST_AUTO_TEST_CASE(span_construction)
     std::vector<uint8_t> v{1, 2, 3};
     unique_array a{std::span<const uint8_t>{v.data(), v.size()}};
     BOOST_CHECK(!a.empty());
-    BOOST_CHECK_EQUAL(3, a.capacity());
-    BOOST_CHECK_EQUAL(3, a.size());
+    BOOST_CHECK_EQUAL(3U, a.capacity());
+    BOOST_CHECK_EQUAL(3U, a.size());
     BOOST_CHECK_EQUAL_COLLECTIONS(v.cbegin(), v.cend(),
                                   a.cbegin(), a.cend());
 }
@@ -39,8 +39,8 @@ BOOST_AUTO_TEST_CASE(move_construction)
     unique_array a;
     a.push_back(42);
     unique_array b{std::move(a)};
-    BOOST_CHECK_EQUAL(1, b.size());
-    BOOST_CHECK_EQUAL(1, b.capacity());
+    BOOST_CHECK_EQUAL(1U, b.size());
+    BOOST_CHECK_EQUAL(1U, b.capacity());
     BOOST_CHECK_EQUAL(42, b[0]);
     
     // moved from object should still be useable
@@ -57,8 +57,8 @@ BOOST_AUTO_TEST_CASE(move_assignment)
     b.push_back(2);
     b.push_back(3);
     b = std::move(a);
-    BOOST_CHECK_EQUAL(1, b.size());
-    BOOST_CHECK_EQUAL(1, b.capacity());
+    BOOST_CHECK_EQUAL(1U, b.size());
+    BOOST_CHECK_EQUAL(1U, b.capacity());
     BOOST_CHECK_EQUAL(1, b[0]);
     
     // moved from object should still be useable
@@ -70,22 +70,22 @@ BOOST_AUTO_TEST_CASE(move_assignment)
 BOOST_AUTO_TEST_CASE(reserve_capacity)
 {
     unique_array a;
-    BOOST_CHECK_EQUAL(0, a.capacity());
-    BOOST_CHECK_EQUAL(0, a.size());
+    BOOST_CHECK_EQUAL(0U, a.capacity());
+    BOOST_CHECK_EQUAL(0U, a.size());
 
     a.reserve(0);
-    BOOST_CHECK_EQUAL(0, a.capacity());
-    BOOST_CHECK_EQUAL(0, a.size());
+    BOOST_CHECK_EQUAL(0U, a.capacity());
+    BOOST_CHECK_EQUAL(0U, a.size());
 
-    constexpr auto cap{42};
+    constexpr auto cap{42U};
     a.reserve(cap);
     BOOST_CHECK_EQUAL(cap, a.capacity());
-    BOOST_CHECK_EQUAL(0, a.size());
+    BOOST_CHECK_EQUAL(0U, a.size());
 
     // reserve doesn't shrink
     a.reserve(cap/2);
     BOOST_CHECK_EQUAL(cap, a.capacity());
-    BOOST_CHECK_EQUAL(0, a.size());
+    BOOST_CHECK_EQUAL(0U, a.size());
 }
 
 BOOST_AUTO_TEST_CASE(push_back)
@@ -93,21 +93,21 @@ BOOST_AUTO_TEST_CASE(push_back)
     unique_array a;
 
     a.push_back(42);
-    BOOST_CHECK_EQUAL(1, a.capacity());
-    BOOST_CHECK_EQUAL(1, a.size());
+    BOOST_CHECK_EQUAL(1U, a.capacity());
+    BOOST_CHECK_EQUAL(1U, a.size());
     
     a.push_back(42);
-    BOOST_CHECK_EQUAL(2, a.capacity());
-    BOOST_CHECK_EQUAL(2, a.size());
+    BOOST_CHECK_EQUAL(2U, a.capacity());
+    BOOST_CHECK_EQUAL(2U, a.size());
     
     a.push_back(42);
-    BOOST_CHECK_EQUAL(4, a.capacity());
-    BOOST_CHECK_EQUAL(3, a.size());
+    BOOST_CHECK_EQUAL(4U, a.capacity());
+    BOOST_CHECK_EQUAL(3U, a.size());
 }
     
 BOOST_AUTO_TEST_CASE(insert_into_default_constructed)
 {
-    constexpr auto n{10};
+    constexpr auto n{10U};
     constexpr auto half{n/2};
     std::vector<uint8_t> v(n);
     iota(v.begin(), v.end(), 0);
@@ -130,14 +130,14 @@ BOOST_AUTO_TEST_CASE(insert_into_default_constructed)
 
 BOOST_AUTO_TEST_CASE(insert_into_non_empty)
 {
-    constexpr auto n{10};
+    constexpr auto n{10U};
     constexpr auto half{n/2};
     std::vector<uint8_t> v(n);
     iota(v.begin(), v.end(), 0);
 
     unique_array a;
     a.push_back(42);
-    BOOST_CHECK_EQUAL(1, a.size());
+    BOOST_CHECK_EQUAL(1U, a.size());
     a.insert(a.end(), v.cbegin(), v.cbegin() + half);
     BOOST_CHECK(!a.empty());
     BOOST_CHECK_EQUAL(half + 1, a.size());
@@ -202,7 +202,7 @@ BOOST_AUTO_TEST_CASE(read_empty_input)
     unique_array a;
     vector<uint8_t> v(1);
     const auto bytes_read = read(a, 0, span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
 }
 
 BOOST_AUTO_TEST_CASE(read_empty_output)
@@ -211,7 +211,7 @@ BOOST_AUTO_TEST_CASE(read_empty_output)
     a.push_back(42);
     vector<uint8_t> v;
     const auto bytes_read = read(a, 0, span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
 }
 
 BOOST_AUTO_TEST_CASE(read_1)
@@ -220,7 +220,7 @@ BOOST_AUTO_TEST_CASE(read_1)
     a.push_back(42);
     vector<uint8_t> v(1);
     const auto bytes_read = read(a, 0, span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(1, bytes_read);
+    BOOST_CHECK_EQUAL(1U, bytes_read);
     BOOST_CHECK_EQUAL(42, v[0]);
 }
 
@@ -232,7 +232,7 @@ BOOST_AUTO_TEST_CASE(read_many)
 
     vector<uint8_t> v(2);
     const auto bytes_read = read(a, 0, span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(2, bytes_read);
+    BOOST_CHECK_EQUAL(2U, bytes_read);
     BOOST_CHECK_EQUAL_COLLECTIONS(a.cbegin(), a.cend(),
                                   v.cbegin(), v.cend());
 }
@@ -245,7 +245,7 @@ BOOST_AUTO_TEST_CASE(read_too_many)
 
     vector<uint8_t> v(2);
     const auto bytes_read = read(a, 1, span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(1, bytes_read);
+    BOOST_CHECK_EQUAL(1U, bytes_read);
     BOOST_CHECK_EQUAL(69, v[0]);
 }
 

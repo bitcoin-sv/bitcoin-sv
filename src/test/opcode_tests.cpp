@@ -1369,7 +1369,7 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
                                        &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
-        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(1U, stack.size());
         const auto& actual{stack.stacktop(-1)};
         BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top.begin(), exp_stack_top.end(),
                                       actual.begin(), actual.end());
@@ -2511,7 +2511,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
                                    &error);
     BOOST_CHECK_EQUAL(false, status.value());
     BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, error);
-    BOOST_CHECK_EQUAL(0, stack.size());
+    BOOST_CHECK_EQUAL(0U, stack.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

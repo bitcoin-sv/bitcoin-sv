@@ -53,8 +53,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
         std::span s{block_msg.data(), block_header_len - 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(block_header_len - 1, bytes_read);
-        BOOST_CHECK_EQUAL(1, bytes_reqd);
-        
+        BOOST_CHECK_EQUAL(1U, bytes_reqd);
         BOOST_CHECK_EQUAL(block_header_len - 1, parser.size());
     }
 
@@ -64,8 +63,8 @@ BOOST_AUTO_TEST_CASE(parse_all)
         std::span s{block_msg.data(), block_header_len};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(block_header_len, bytes_read);
-        BOOST_CHECK_EQUAL(1, bytes_reqd);
-        BOOST_CHECK_EQUAL(80, parser.size());
+        BOOST_CHECK_EQUAL(1U, bytes_reqd);
+        BOOST_CHECK_EQUAL(80U, parser.size());
     }
 
     {
@@ -74,7 +73,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
         std::span s{block_msg.data(), block_msg.size()};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(block_msg.size(), bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
         BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
     }
 }
@@ -104,7 +103,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
         }
     }
     BOOST_CHECK_EQUAL(block_msg.size(), total_bytes_read);
-    BOOST_CHECK_EQUAL(11, passes);
+    BOOST_CHECK_EQUAL(11U, passes);
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
 }
 
@@ -127,7 +126,7 @@ BOOST_AUTO_TEST_CASE(read_all)
     std::span s{block_msg.data(), block_msg.size()};
     const auto [read, reqd] = parser(s);
     BOOST_CHECK_EQUAL(block_msg.size(), read);
-    BOOST_CHECK_EQUAL(0, reqd);
+    BOOST_CHECK_EQUAL(0U, reqd);
 
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
 
@@ -145,7 +144,7 @@ BOOST_AUTO_TEST_CASE(read_byte_by_byte)
     std::span s{block_msg.data(), block_msg.size()};
     const auto [read, reqd] = parser(s);
     BOOST_CHECK_EQUAL(block_msg.size(), read);
-    BOOST_CHECK_EQUAL(0, reqd);
+    BOOST_CHECK_EQUAL(0U, reqd);
 
     size_t total_bytes_read{};
     vector<uint8_t> out(block_msg.size());
@@ -164,7 +163,7 @@ BOOST_AUTO_TEST_CASE(read_beyond_parser_size)
     std::span s{block_msg.data(), block_msg.size()};
     const auto [read, reqd] = parser(s);
     BOOST_CHECK_EQUAL(block_msg.size(), read);
-    BOOST_CHECK_EQUAL(0, reqd);
+    BOOST_CHECK_EQUAL(0U, reqd);
     BOOST_CHECK_EQUAL(block_msg.size(), parser.size());
 
     vector<uint8_t> out(block_msg.size() + 1);

@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
         const size_t n{};
         std::span s{tx.data(), n};
         const auto [bytes_read, bytes_reqd] = parser(s);
-        BOOST_CHECK_EQUAL(0, bytes_read);
+        BOOST_CHECK_EQUAL(0U, bytes_read);
         BOOST_CHECK_EQUAL(version_len, bytes_reqd);
         BOOST_CHECK_EQUAL(exp_buffer_len, parser.buffer_size());
         offset += bytes_read;
@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
         const size_t n{outpoint_len + var_int_len_1};
         std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
-        BOOST_CHECK_EQUAL(0, bytes_read);
+        BOOST_CHECK_EQUAL(0U, bytes_read);
         BOOST_CHECK_EQUAL(outpoint_len + var_int_len_3, bytes_reqd);
         BOOST_CHECK_EQUAL(exp_buffer_len, parser.buffer_size());
         offset += bytes_read;
@@ -317,7 +317,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
         const size_t n{bsv::value_len + var_int_len_1};
         std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
-        BOOST_CHECK_EQUAL(0, bytes_read);
+        BOOST_CHECK_EQUAL(0U, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_3, bytes_reqd);
         exp_buffer_len += bytes_read; 
         BOOST_CHECK_EQUAL(exp_buffer_len, parser.buffer_size());
@@ -368,8 +368,8 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
         std::span s{tx.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
-        BOOST_CHECK_EQUAL(0, parser.buffer_size());
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, parser.buffer_size());
         offset += bytes_read;
     }
     
@@ -377,8 +377,8 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
         // Check reports 0, 0 once complete 
         std::vector<uint8_t> tx{42};
         const auto [bytes_read, bytes_reqd] = parser(tx);
-        BOOST_CHECK_EQUAL(0, bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_read);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
     }
 }
 
@@ -388,8 +388,8 @@ BOOST_AUTO_TEST_CASE(tx_parser_1_pass)
     std::span s{tx.data(), tx.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(tx.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.buffer_size());
+    BOOST_CHECK_EQUAL(0U, bytes_reqd);
+    BOOST_CHECK_EQUAL(0U, parser.buffer_size());
     BOOST_CHECK_EQUAL(tx.size(), parser.size());
 }
 
@@ -400,7 +400,7 @@ BOOST_AUTO_TEST_CASE(tx_parser_2_pass)
     constexpr size_t split_pos{20};
     const auto [bytes_read, bytes_reqd] = parser(std::span{tx.data(), split_pos});
     parser(std::span{tx.data() + bytes_read, tx.size() - bytes_read});
-    BOOST_CHECK_EQUAL(0, parser.buffer_size());
+    BOOST_CHECK_EQUAL(0U, parser.buffer_size());
     BOOST_CHECK_EQUAL(tx.size(), parser.size());
 }
 
@@ -429,8 +429,8 @@ BOOST_AUTO_TEST_CASE(tx_parser_as_reqd)
         }
     }
     BOOST_CHECK_EQUAL(tx.size(), total_bytes_read);
-    BOOST_CHECK_EQUAL(0, parser.buffer_size());
-    BOOST_CHECK_EQUAL(27, passes);
+    BOOST_CHECK_EQUAL(0U, parser.buffer_size());
+    BOOST_CHECK_EQUAL(27U, passes);
     BOOST_CHECK_EQUAL(tx.size(), parser.size());
 }
 
@@ -445,7 +445,7 @@ BOOST_AUTO_TEST_CASE(parse_large_input_count_and_script_len)
     tx.insert(tx.cend(), 9, 0xff);              // <- large script len
     std::span s{tx.data(), tx.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(58, bytes_read);
+    BOOST_CHECK_EQUAL(58U, bytes_read);
     BOOST_CHECK_EQUAL(0xffff'ffff'ffff'ffff, bytes_reqd);
 }
 
@@ -466,7 +466,7 @@ BOOST_AUTO_TEST_CASE(parse_large_output_count_and_script_len)
 
     std::span s{tx.data(), tx.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(73, bytes_read);
+    BOOST_CHECK_EQUAL(73U, bytes_read);
     BOOST_CHECK_EQUAL(0xffff'ffff'ffff'ffff, bytes_reqd);
 }
 

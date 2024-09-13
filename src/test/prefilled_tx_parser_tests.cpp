@@ -117,9 +117,9 @@ BOOST_AUTO_TEST_CASE(parse_empty_input)
     std::span s{ip.data(), 0};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_3)
@@ -128,9 +128,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_3)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_3, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_5)
@@ -139,9 +139,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_5)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_5, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_9)
@@ -150,9 +150,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_9)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_9, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_1)
@@ -161,9 +161,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_1)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(1, bytes_read);
+    BOOST_CHECK_EQUAL(1U, bytes_read);
     BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
-    BOOST_CHECK_EQUAL(1, parser.size());
+    BOOST_CHECK_EQUAL(1U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_in_one_pass)
@@ -176,7 +176,7 @@ BOOST_AUTO_TEST_CASE(parse_in_one_pass)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd); 
+    BOOST_CHECK_EQUAL(0U, bytes_reqd); 
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
 
     unique_array a{std::move(parser).buffer()};
@@ -214,7 +214,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     }
     BOOST_CHECK_EQUAL(ip.size(), total_bytes_read);
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
-    BOOST_CHECK_EQUAL(27, passes);
+    BOOST_CHECK_EQUAL(27U, passes);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

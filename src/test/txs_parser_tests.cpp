@@ -112,9 +112,9 @@ static const std::vector<uint8_t> txs = []
 constexpr size_t script_len_1{1};
 constexpr size_t script_len_2{2};
 
-constexpr auto tx_n_len{1};
-constexpr auto tx1_len{120};
-constexpr auto tx2_len{138};
+constexpr auto tx_n_len{1U};
+constexpr auto tx1_len{120U};
+constexpr auto tx2_len{138U};
 
 using txs_parser = array_parser<tx_parser>;
     
@@ -131,9 +131,9 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const size_t n{};
         std::span s{txs.data(), n};
         const auto [bytes_read, bytes_reqd] = parser(s);
-        BOOST_CHECK_EQUAL(0, bytes_read);
+        BOOST_CHECK_EQUAL(0U, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
-        BOOST_CHECK_EQUAL(0, parser.segment_count());
+        BOOST_CHECK_EQUAL(0U, parser.segment_count());
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
     }
@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_read);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += 1;
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bsv::version_len;
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -171,7 +171,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += var_int_len_1;
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1 + bsv::seq_len, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bsv::outpoint_len + var_int_len_1;
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::outpoint_len + var_int_len_1,
                           bytes_reqd); // <- expect another tx
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -211,7 +211,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_2 + bsv::seq_len, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bsv::outpoint_len + var_int_len_3;
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -224,7 +224,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd); // <- output count
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -250,7 +250,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(script_len_1, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -263,7 +263,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::value_len + var_int_len_1, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::locktime_len, bytes_reqd);
-        BOOST_CHECK_EQUAL(1, parser.segment_count());
+        BOOST_CHECK_EQUAL(1U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -289,7 +289,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
-        BOOST_CHECK_EQUAL(2, parser.segment_count());
+        BOOST_CHECK_EQUAL(2U, parser.segment_count());
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
         offset += bytes_read;
@@ -301,11 +301,11 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         std::span s{txs.data() + offset, n};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(n, bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
 
         exp_parser_size += bytes_read; 
         BOOST_CHECK_EQUAL(exp_parser_size, parser.size());
-        BOOST_CHECK_EQUAL(3, parser.segment_count());
+        BOOST_CHECK_EQUAL(3U, parser.segment_count());
 
         BOOST_CHECK_EQUAL(tx1_len, parser[1].size());
         const auto tx1_begin{txs.cbegin() + tx_n_len};
@@ -323,8 +323,8 @@ BOOST_AUTO_TEST_CASE(txs_parser_by_parts)
         // Check reports 0, 0 once complete 
         std::vector<uint8_t> txs{42};
         const auto [bytes_read, bytes_reqd] = parser(txs);
-        BOOST_CHECK_EQUAL(0, bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_read);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
     }
 }
 
@@ -334,7 +334,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_1_pass)
     std::span s{txs.data(), txs.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(txs.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd);
+    BOOST_CHECK_EQUAL(0U, bytes_reqd);
 
     constexpr size_t exp_n_tx{3};
     BOOST_CHECK_EQUAL(exp_n_tx, parser.segment_count());
@@ -380,7 +380,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_as_reqd)
     }
     BOOST_CHECK_EQUAL(txs.size(), total_bytes_read);
     BOOST_CHECK_EQUAL(total_bytes_read, parser.size());
-    BOOST_CHECK_EQUAL(3, parser.segment_count());
+    BOOST_CHECK_EQUAL(3U, parser.segment_count());
     BOOST_CHECK_EQUAL(tx1_len, parser[1].size());
     const auto tx1_begin{txs.cbegin() + tx_n_len};
     BOOST_CHECK_EQUAL_COLLECTIONS(parser[1].cbegin(), parser[1].cend(),
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE(txs_parser_as_reqd)
     BOOST_CHECK_EQUAL_COLLECTIONS(parser[2].cbegin(), parser[2].cend(),
                                   tx2_begin, tx2_begin + tx2_len);
 
-    BOOST_CHECK_EQUAL(31, passes);
+    BOOST_CHECK_EQUAL(31U, passes);
     BOOST_CHECK_EQUAL(txs.size(), parser.size());
 }
 
@@ -399,12 +399,12 @@ BOOST_AUTO_TEST_CASE(parse_0_tx_count)
     txs_parser parser;
     vector<uint8_t> v(2, 0);
     auto p = parser(span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(1, p.first);
-    BOOST_CHECK_EQUAL(0, p.second);
+    BOOST_CHECK_EQUAL(1U, p.first);
+    BOOST_CHECK_EQUAL(0U, p.second);
     
     p = parser(span{v.data() + p.first, v.size() - p.first});
-    BOOST_CHECK_EQUAL(0, p.first);
-    BOOST_CHECK_EQUAL(0, p.second);
+    BOOST_CHECK_EQUAL(0U, p.first);
+    BOOST_CHECK_EQUAL(0U, p.second);
 }
 
 BOOST_AUTO_TEST_CASE(read_txs)
@@ -412,7 +412,7 @@ BOOST_AUTO_TEST_CASE(read_txs)
     txs_parser parser;
     std::span s{txs.data(), txs.size()};
     parser(s);
-    BOOST_CHECK_EQUAL(3, parser.segment_count());
+    BOOST_CHECK_EQUAL(3U, parser.segment_count());
     BOOST_CHECK_EQUAL(txs.size(), parser.size());
 
     size_t total_bytes_read{};
@@ -420,21 +420,21 @@ BOOST_AUTO_TEST_CASE(read_txs)
     vector<uint8_t> out_0(parser[0].size());
     size_t read_pos{};
     total_bytes_read += read(parser, read_pos, std::span{out_0.data(), out_0.size()});
-    BOOST_CHECK_EQUAL(2, out_0[0]);
-    BOOST_CHECK_EQUAL(0, parser[0].size());
+    BOOST_CHECK_EQUAL(2U, out_0[0]);
+    BOOST_CHECK_EQUAL(0U, parser[0].size());
     BOOST_CHECK_EQUAL(txs.size(), parser.size());
     
     vector<uint8_t> out_1(parser[1].size());
     read_pos += parser[0].size();
     total_bytes_read += read(parser, read_pos, std::span{out_1.data(), out_1.size()});
-    BOOST_CHECK_EQUAL(3, out_1[0]);
-    BOOST_CHECK_EQUAL(0, parser[1].size());
+    BOOST_CHECK_EQUAL(3U, out_1[0]);
+    BOOST_CHECK_EQUAL(0U, parser[1].size());
     
     vector<uint8_t> out_2(parser[2].size());
     read_pos += parser[1].size();
     total_bytes_read += read(parser, read_pos, std::span{out_2.data(), out_2.size()});
-    BOOST_CHECK_EQUAL(11, out_2[0]);
-    BOOST_CHECK_EQUAL(0, parser[2].size());
+    BOOST_CHECK_EQUAL(11U, out_2[0]);
+    BOOST_CHECK_EQUAL(0U, parser[2].size());
 
     BOOST_CHECK_EQUAL(txs.size(), total_bytes_read);
     BOOST_CHECK_EQUAL(txs.size(), parser.size());

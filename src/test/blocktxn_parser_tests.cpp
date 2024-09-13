@@ -47,8 +47,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
         std::span s{blocktxn_msg.data(), blocktxn_header_len - 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(blocktxn_header_len - 1, bytes_read);
-        BOOST_CHECK_EQUAL(1, bytes_reqd);
-        
+        BOOST_CHECK_EQUAL(1U, bytes_reqd);
         BOOST_CHECK_EQUAL(blocktxn_header_len - 1, parser.size());
     }
 
@@ -58,7 +57,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
         std::span s{blocktxn_msg.data(), blocktxn_header_len};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(blocktxn_header_len, bytes_read);
-        BOOST_CHECK_EQUAL(1, bytes_reqd);
+        BOOST_CHECK_EQUAL(1U, bytes_reqd);
         BOOST_CHECK_EQUAL(blocktxn_header_len, parser.size());
     }
 
@@ -68,7 +67,7 @@ BOOST_AUTO_TEST_CASE(parse_all)
         std::span s{blocktxn_msg.data(), blocktxn_msg.size()};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(blocktxn_msg.size(), bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
         BOOST_CHECK_EQUAL(blocktxn_msg.size(), parser.size());
     }
 }
@@ -100,7 +99,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
         }
     }
     BOOST_CHECK_EQUAL(blocktxn_msg.size(), total_bytes_read);
-    BOOST_CHECK_EQUAL(11, passes);
+    BOOST_CHECK_EQUAL(11U, passes);
     BOOST_CHECK_EQUAL(blocktxn_msg.size(), parser.size());
 }
 

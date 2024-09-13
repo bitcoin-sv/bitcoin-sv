@@ -226,7 +226,7 @@ BOOST_AUTO_TEST_CASE(max_bignum_length_policy) {
     BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(-1, &reason));
 
     // set and fetch a new policy script number length
-    int64_t newMaxScriptNumLengthPolicy { MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS + 1 };
+    uint64_t newMaxScriptNumLengthPolicy { MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS + 1 };
     BOOST_CHECK(config.SetMaxScriptNumLengthPolicy(newMaxScriptNumLengthPolicy, &reason));
     BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false), MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
     BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), newMaxScriptNumLengthPolicy);
@@ -415,10 +415,10 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK(! config.DoDropMessageTest());
     BOOST_CHECK(config.SetDropMessageTest(1));
     BOOST_CHECK(config.DoDropMessageTest());
-    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1);
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1U);
     BOOST_CHECK(config.SetDropMessageTest(0));
     BOOST_CHECK(config.DoDropMessageTest());
-    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0);
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0U);
     BOOST_CHECK(! config.SetDropMessageTest(-1));
     BOOST_CHECK(! config.DoDropMessageTest());
 

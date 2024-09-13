@@ -19,64 +19,64 @@ BOOST_AUTO_TEST_SUITE(single_seg_parser_tests)
 BOOST_AUTO_TEST_CASE(default_construction)
 {
     single_seg_parser parser;
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(default_move)
 {
     single_seg_parser a;
-    BOOST_CHECK_EQUAL(0, a.size());
+    BOOST_CHECK_EQUAL(0U, a.size());
 
     single_seg_parser b{std::move(a)};
-    BOOST_CHECK_EQUAL(0, a.size());
-    BOOST_CHECK_EQUAL(0, b.size());
+    BOOST_CHECK_EQUAL(0U, a.size());
+    BOOST_CHECK_EQUAL(0U, b.size());
 }
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
 {
     single_seg_parser dp;
     msg_parser parser{dp};
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
     parser(std::span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(42, parser.size());
+    BOOST_CHECK_EQUAL(42U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_xvalue)
 {
     single_seg_parser dp;
     msg_parser parser{std::move(dp)};
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
     parser(std::span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(42, parser.size());
+    BOOST_CHECK_EQUAL(42U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_prvalue)
 {
     msg_parser parser{single_seg_parser{}};
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
     parser(std::span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(42, parser.size());
+    BOOST_CHECK_EQUAL(42U, parser.size());
 }
             
 BOOST_AUTO_TEST_CASE(single_seg_parser_ptr)
 {
     single_seg_parser x;
     auto parser = make_unique<msg_parser>(x);
-    BOOST_CHECK_EQUAL(0, parser->size());
+    BOOST_CHECK_EQUAL(0U, parser->size());
     
     vector<uint8_t> v(42);
     iota(v.begin(), v.end(), 0);
     (*parser)(std::span{v.data(), v.size()});
-    BOOST_CHECK_EQUAL(42, parser->size());
+    BOOST_CHECK_EQUAL(42U, parser->size());
 }
 
 static const std::vector<uint8_t> large_txs = []
@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(parse_large_outputs)
     std::span s{large_txs.data(), large_txs.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     //BOOST_CHECK_EQUAL(large_txs.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd);
+    BOOST_CHECK_EQUAL(0U, bytes_reqd);
 
     //BOOST_CHECK_EQUAL(0, parser.size());
     //BOOST_CHECK_EQUAL(large_txs.size(), parser.size());

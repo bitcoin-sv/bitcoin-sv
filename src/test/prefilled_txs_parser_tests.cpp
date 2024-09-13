@@ -115,9 +115,9 @@ BOOST_AUTO_TEST_CASE(parse_empty_input)
     vector<uint8_t> ip;
     std::span s{ip.data(), 0};
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_count_0)
@@ -128,7 +128,7 @@ BOOST_AUTO_TEST_CASE(parse_count_0)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd);
+    BOOST_CHECK_EQUAL(0U, bytes_reqd);
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
 }
 
@@ -143,7 +143,7 @@ BOOST_AUTO_TEST_CASE(parse_count_1)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd);
+    BOOST_CHECK_EQUAL(0U, bytes_reqd);
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
 }
 
