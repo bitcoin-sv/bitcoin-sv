@@ -28,7 +28,6 @@ runs:
       run: |
         mkdir ~/.bitcoin
         cp .github/workflows/docker/cargo/bitcoin.conf ~/.bitcoin/
-        echo "prune=1000" >> ~/.bitcoin/bitcoin.conf
       shell: bash
     - name: restore cache
       if: inputs.restore == 'true'
