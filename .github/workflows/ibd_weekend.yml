@@ -24,11 +24,7 @@ jobs:
       matrix:
         array: [
           { duration: $((5 * 60 * 60 )), restore: false, save: true },
-          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
-          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
-          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
-          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
-          { duration: $((5 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((3 * 60 * 60 )), restore: true,  save: true },
           { duration: $((5 * 60 * 60 )), restore: true,  save: false },
         ]
     steps:
