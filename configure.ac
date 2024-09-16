@@ -166,9 +166,9 @@ AC_ARG_ENABLE([asm],
 
 AC_ARG_ENABLE([tcmalloc],
   [AS_HELP_STRING([--enable-tcmalloc],
-  [Link with Google tcmalloc (default is no)])],
+  [Link with Google tcmalloc (default is yes)])],
   [use_tcmalloc=$enableval],
-  [use_tcmalloc=no])
+  [use_tcmalloc=yes])
 
 AC_ARG_ENABLE([jemalloc],
   [AS_HELP_STRING([--enable-jemalloc],
@@ -566,18 +566,6 @@ if test x$use_lcov = xyes; then
     [AC_MSG_ERROR("lcov testing requested but --coverage linker flag does not work")])
   AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"],
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
-fi
-
-if test x$use_tcmalloc = xyes; then
-  AC_MSG_RESULT([Enabling tcmalloc])
-  AC_CHECK_LIB([tcmalloc], [malloc],
-    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc $LIBS"],
-    [AC_MSG_ERROR(tcmalloc not found)])
-else
-  if test x$use_jemalloc = xyes; then
-    AC_MSG_RESULT([Enabling jemalloc])
-    AC_CHECK_LIB([jemalloc], [malloc],, [AC_MSG_ERROR(jemalloc not found)])
-  fi
 fi
 
 dnl Check for endianness
@@ -1034,6 +1022,18 @@ fi
 
 fi
 
+if test x$use_tcmalloc = xyes; then
+  AC_MSG_RESULT([Enabling tcmalloc])
+  AC_CHECK_LIB([tcmalloc_minimal], [main],
+    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; MALLOC_LIBS="-ltcmalloc_minimal"],
+    [AC_MSG_ERROR(tcmalloc not found)])
+else
+  if test x$use_jemalloc = xyes; then
+    AC_MSG_RESULT([Enabling jemalloc])
+    AC_CHECK_LIB([jemalloc], [main],, [AC_MSG_ERROR(jemalloc not found)])
+  fi
+fi
+
 if test x$use_pkgconfig = xyes; then
   : dnl
   m4_ifdef(
@@ -1310,6 +1310,7 @@ AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
 AC_SUBST(AIO_LIBS)
 AC_SUBST(TBB_LIBS)
+AC_SUBST(MALLOC_LIBS)
 AC_SUBST(HAVE_BUILTIN_PREFETCH)
 AC_SUBST(HAVE_MM_PREFETCH)
 AC_SUBST(HAVE_STRONG_GETAUXVAL)

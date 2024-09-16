@@ -645,7 +645,8 @@ bitcoind_LDADD += \
   $(EVENT_LIBS) \
   $(ZMQ_LIBS) \
   $(AIO_LIBS) \
-  $(TBB_LIBS)
+  $(TBB_LIBS) \
+  $(MALLOC_LIBS)
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp
