@@ -25,7 +25,7 @@ jobs:
     runs-on: [ self-hosted ]
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
-    timeout-minutes: 1 
+    timeout-minutes: 5 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
