@@ -49,7 +49,7 @@ Optional dependencies:
  libdb       | Berkeley DB      | Wallet storage (only needed when wallet enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
  libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.3.2)
- tcmalloc    | Memory allocator | Alternative memory allocator (may be helpful for nodes on the STN)
+ tcmalloc    | Memory allocator | Used by default in bitcoind, but can be disabled using --disable-tcmalloc
 
 ### Toolchain dependency build instructions
 
@@ -119,6 +119,17 @@ sudo apt-get install libboost-all-dev
 On older versions of Debian and Ubuntu you will need to download a more recent
 version of boost yourself than is available by default. See the section
 [below](#manually-installing-boost-libraries) for instructions.
+
+##### TCMalloc
+
+TCMalloc is now the default memory allocator used by bitcoind. If you don't want
+this you will need to pass the --disable-tcmalloc flag to configure.
+
+To install TCMalloc:
+
+```bash
+sudo apt-get install libgoogle-perftools-dev
+```
 
 ##### Other dependencies
 
