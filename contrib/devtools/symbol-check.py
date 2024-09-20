@@ -33,7 +33,9 @@ IGNORE_EXPORTS = {
     # Figure out why we get this symbol exported on Ubuntu
     'in6addr_any',
     # From TCMalloc
-    'environ', '_environ', '__environ'
+    'environ', '_environ', '__environ', 'memcpy','memalign','posix_memalign','__libc_valloc','mallopt','mallinfo','free','__libc_free',
+    '__libc_calloc','pvalloc','realloc','valloc','__libc_memalign','calloc','__libc_malloc','__libc_pvalloc','aligned_alloc','__libc_realloc',
+    'malloc_usable_size','malloc_stats','malloc'
 }
 READELF_CMD = os.getenv('READELF', '/usr/bin/readelf')
 CPPFILT_CMD = os.getenv('CPPFILT', '/usr/bin/c++filt')

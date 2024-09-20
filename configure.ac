@@ -894,7 +894,6 @@ fi
 
 if test x$use_reduce_exports = xyes; then
     CXXFLAGS="$CXXFLAGS $RE_CXXFLAGS"
-    AX_CHECK_LINK_FLAG([[-Wl,--exclude-libs,ALL]], [RELDFLAGS="-Wl,--exclude-libs,ALL"])
 fi
 
 if test x$use_tests = xyes; then
@@ -1025,7 +1024,7 @@ fi
 if test x$use_tcmalloc = xyes; then
   AC_MSG_RESULT([Enabling tcmalloc])
   AC_CHECK_LIB([tcmalloc_minimal], [main],
-    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; MALLOC_LIBS="-ltcmalloc_minimal"],
+    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc_minimal $LIBS"],
     [AC_MSG_ERROR(tcmalloc not found)])
 else
   if test x$use_jemalloc = xyes; then
@@ -1310,7 +1309,6 @@ AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
 AC_SUBST(AIO_LIBS)
 AC_SUBST(TBB_LIBS)
-AC_SUBST(MALLOC_LIBS)
 AC_SUBST(HAVE_BUILTIN_PREFETCH)
 AC_SUBST(HAVE_MM_PREFETCH)
 AC_SUBST(HAVE_STRONG_GETAUXVAL)
