@@ -76,6 +76,16 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
 /** Increase a node's misbehavior score. */
 void Misbehaving(NodeId nodeid, int howmuch, const std::string &reason);
 
+// Declared here to allow access for fuzz testing
+bool ProcessMessage(const Config& config,
+                    const CNodePtr& pfrom,
+                    const std::string& strCommand,
+                    msg_buffer& vRecv,
+                    int64_t nTimeReceived,
+                    const CChainParams& chainparams,
+                    CConnman& connman,
+                    const std::atomic<bool>& interruptMsgProc);
+
 /** Process protocol messages received from a given node */
 bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
                      const std::atomic<bool> &interrupt,

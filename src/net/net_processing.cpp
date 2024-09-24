@@ -563,15 +563,6 @@ private:
 
 } // namespace
 
-static bool ProcessMessage(const Config& config,
-                           const CNodePtr& pfrom,
-                           const std::string& strCommand,
-                           msg_buffer& vRecv,
-                           int64_t nTimeReceived,
-                           const CChainParams& chainparams,
-                           CConnman& connman,
-                           const std::atomic<bool>& interruptMsgProc);
-
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     // Try to obtain an access to the node's state data.
     const CNodeStateRef stateRef { GetState(nodeid) };
@@ -4554,14 +4545,14 @@ static void ProcessDoubleSpendMessage(const Config& config,
 /**
 * Process next message.
 */
-static bool ProcessMessage(const Config& config,
-                           const CNodePtr& pfrom,
-                           const std::string& strCommand,
-                           msg_buffer& vRecv,
-                           int64_t nTimeReceived,
-                           const CChainParams& chainparams,
-                           CConnman& connman,
-                           const std::atomic<bool>& interruptMsgProc)
+bool ProcessMessage(const Config& config,
+                    const CNodePtr& pfrom,
+                    const std::string& strCommand,
+                    msg_buffer& vRecv,
+                    int64_t nTimeReceived,
+                    const CChainParams& chainparams,
+                    CConnman& connman,
+                    const std::atomic<bool>& interruptMsgProc)
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
              SanitizeString(strCommand), vRecv.size(), pfrom->id);
