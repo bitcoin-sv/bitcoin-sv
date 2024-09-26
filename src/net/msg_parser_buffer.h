@@ -19,7 +19,7 @@ class msg_parser_buffer
     std::unique_ptr<msg_parser> parser_;
     unique_array buffer_;
     size_t buffer_size_reqd_{};
-    bool overflow_{};
+    bool parser_full_{};
 
 public:
     explicit msg_parser_buffer(std::unique_ptr<msg_parser> parser):parser_{std::move(parser)}
@@ -33,6 +33,7 @@ public:
 
     size_t buffer_size() const { return buffer_.size(); }
     size_t buffer_size_reqd() const { return buffer_size_reqd_; }
+    [[nodiscard]] bool parser_full() const { return parser_full_; }
 };
 
  

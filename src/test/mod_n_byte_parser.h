@@ -24,21 +24,21 @@ public:
             return std::make_pair(0, 0);
 
         const auto old_size{buffer_.size()};
-        while(s.size() >= N && (max_size - buffer_.size() >= N))
+
+
+        while(s.size() >= N && (buffer_.size() + N <= max_size_))
         {
             buffer_.insert(buffer_.end(), s.begin(), s.begin() + N);
             s = s.subspan(N);
         }
         
-        const size_t remainder{s.size() % N};
         return std::make_pair(buffer_.size() - old_size,
-                         remainder ? N : 0);
+                              buffer_.size() >= max_size_ ? 0 : N);
     }
 
     [[nodiscard]] std::size_t readable_size() const
     {
-        assert(false);
-        return 0;
+        return buffer_.size(); 
     }
 
     size_t read(size_t read_pos, std::span<uint8_t>)

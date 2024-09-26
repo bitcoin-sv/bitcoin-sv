@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(parse_max_items)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0U, bytes_reqd);
+    BOOST_CHECK_EQUAL(1U, bytes_reqd);
     BOOST_CHECK(!parser.empty());
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
     BOOST_CHECK_EQUAL(2U, parser.segment_count());
@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(parse_many_items)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0U, bytes_reqd);
+    BOOST_CHECK_EQUAL(1U, bytes_reqd);
     BOOST_CHECK(!parser.empty());
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
     BOOST_CHECK_EQUAL(2U, parser.segment_count());
