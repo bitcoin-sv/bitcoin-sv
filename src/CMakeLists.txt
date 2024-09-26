@@ -21,6 +21,9 @@ option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
+option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
+option(ENABLE_CLANG_TIDY "Use ClangTidy" ON)
+
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	list(APPEND CMAKE_RC_FLAGS "-DWINDRES_PREPROC")
@@ -78,6 +81,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
             "LINKER:-pie"
         )
     endif()
+endif()
+
+# TCMalloc
+if(ENABLE_TCMALLOC)
+    find_package(GooglePerf REQUIRED)
+    add_compile_options(-fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free)
 endif()
 
 if(MSVC)
@@ -698,6 +707,10 @@ if(BUILD_BITCOIN_CLI)
 
 	target_include_directories(bitcoin-cli PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-cli common rpcclient ${EVENT_LIBRARY})
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-cli ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoin-tx
@@ -709,6 +722,10 @@ if(BUILD_BITCOIN_TX)
 	endif()
 
 	target_link_libraries(bitcoin-tx bitcoinconsensus)
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-tx ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoin-miner
@@ -717,6 +734,10 @@ if(BUILD_BITCOIN_MINER)
 )
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-miner ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoind
@@ -731,10 +752,16 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()
 
-include(ClangTidy)
-AddClangTidy(bitcoind)
-if(BUILD_BITCOIN_CLI)
-    AddClangTidy(bitcoin-cli)
+if(ENABLE_TCMALLOC)
+    target_link_libraries(bitcoind ${TCMALLOC_LIBRARY})
+endif()
+
+if(ENABLE_CLANG_TIDY)
+    include(ClangTidy)
+    AddClangTidy(bitcoind)
+    if(BUILD_BITCOIN_CLI)
+        AddClangTidy(bitcoin-cli)
+    endif()
 endif()
 
 if (MSVC)
