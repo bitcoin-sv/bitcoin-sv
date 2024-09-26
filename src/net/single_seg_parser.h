@@ -15,8 +15,13 @@
 class single_seg_parser
 {
     std::vector<uint8_t> segment_{};
+    uint64_t payload_len_{};
 
 public:
+    explicit single_seg_parser(uint64_t len):
+        payload_len_{len}
+    {}
+    
     std::pair<size_t, size_t> operator()(std::span<const uint8_t>);
     size_t read(size_t read_pos, std::span<uint8_t>);
     size_t size() const;

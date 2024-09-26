@@ -46,7 +46,8 @@ void msg_buffer::payload_len(uint64_t len)
     payload_len_ = len;
 }
 
-static std::unique_ptr<msg_parser> make_parser(const string& cmd)
+static std::unique_ptr<msg_parser> make_parser(const string& cmd,
+                                               const uint64_t payload_len)
 {
     // Note: It's not a protocol error to call make_parser with an
     // empty cmd string, that's just another example of an unknown
@@ -59,7 +60,7 @@ static std::unique_ptr<msg_parser> make_parser(const string& cmd)
     else if(cmd == "cmpctblock")
         return make_unique<msg_parser>(cmpctblock_parser{});
     else
-        return make_unique<msg_parser>(single_seg_parser{});
+        return make_unique<msg_parser>(single_seg_parser{payload_len});
 }
 
 void msg_buffer::write(span<const uint8_t> s)
@@ -71,7 +72,8 @@ void msg_buffer::write(span<const uint8_t> s)
     else
     {
         if(!payload_)
-            payload_ = make_unique<msg_parser_buffer>(make_parser(command_));
+            payload_ = make_unique<msg_parser_buffer>(make_parser(command_, 
+                                                                  payload_len_.value()));
 
         (*payload_)(s);
     }

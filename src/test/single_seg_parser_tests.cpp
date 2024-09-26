@@ -18,13 +18,13 @@ BOOST_AUTO_TEST_SUITE(single_seg_parser_tests)
 
 BOOST_AUTO_TEST_CASE(default_construction)
 {
-    single_seg_parser parser;
+    single_seg_parser parser{0};
     BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(default_move)
 {
-    single_seg_parser a;
+    single_seg_parser a{0};
     BOOST_CHECK_EQUAL(0U, a.size());
 
     single_seg_parser b{std::move(a)};
@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(default_move)
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
 {
-    single_seg_parser dp;
+    single_seg_parser dp{0};
     msg_parser parser{dp};
     BOOST_CHECK_EQUAL(0U, parser.size());
 
@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_xvalue)
 {
-    single_seg_parser dp;
+    single_seg_parser dp{0};
     msg_parser parser{std::move(dp)};
     BOOST_CHECK_EQUAL(0U, parser.size());
 
@@ -58,7 +58,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_xvalue)
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_prvalue)
 {
-    msg_parser parser{single_seg_parser{}};
+    msg_parser parser{single_seg_parser{0}};
     BOOST_CHECK_EQUAL(0U, parser.size());
 
     vector<uint8_t> v(42);
@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_prvalue)
             
 BOOST_AUTO_TEST_CASE(single_seg_parser_ptr)
 {
-    single_seg_parser x;
+    single_seg_parser x{0};
     auto parser = make_unique<msg_parser>(x);
     BOOST_CHECK_EQUAL(0U, parser->size());
     
@@ -123,14 +123,12 @@ static const std::vector<uint8_t> large_txs = []
 
 BOOST_AUTO_TEST_CASE(parse_large_outputs)
 {
-    single_seg_parser parser;
+    single_seg_parser parser{large_txs.size()};
     std::span s{large_txs.data(), large_txs.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
-    //BOOST_CHECK_EQUAL(large_txs.size(), bytes_read);
+    BOOST_CHECK_EQUAL(large_txs.size(), bytes_read);
     BOOST_CHECK_EQUAL(0U, bytes_reqd);
-
-    //BOOST_CHECK_EQUAL(0, parser.size());
-    //BOOST_CHECK_EQUAL(large_txs.size(), parser.size());
+    BOOST_CHECK_EQUAL(large_txs.size(), parser.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
