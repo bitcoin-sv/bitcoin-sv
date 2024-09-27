@@ -37,7 +37,6 @@ noinst_HEADERS += src/field_10x26_impl.h
 noinst_HEADERS += src/field_5x52.h
 noinst_HEADERS += src/field_5x52_impl.h
 noinst_HEADERS += src/field_5x52_int128_impl.h
-noinst_HEADERS += src/field_5x52_asm_impl.h
 noinst_HEADERS += src/modinv32.h
 noinst_HEADERS += src/modinv32_impl.h
 noinst_HEADERS += src/modinv64.h
@@ -46,6 +45,7 @@ noinst_HEADERS += src/precomputed_ecmult.h
 noinst_HEADERS += src/precomputed_ecmult_gen.h
 noinst_HEADERS += src/assumptions.h
 noinst_HEADERS += src/checkmem.h
+noinst_HEADERS += src/testutil.h
 noinst_HEADERS += src/util.h
 noinst_HEADERS += src/int128.h
 noinst_HEADERS += src/int128_impl.h
@@ -64,6 +64,8 @@ noinst_HEADERS += src/field.h
 noinst_HEADERS += src/field_impl.h
 noinst_HEADERS += src/bench.h
 noinst_HEADERS += src/wycheproof/ecdsa_secp256k1_sha256_bitcoin_test.h
+noinst_HEADERS += src/hsort.h
+noinst_HEADERS += src/hsort_impl.h
 noinst_HEADERS += contrib/lax_der_parsing.h
 noinst_HEADERS += contrib/lax_der_parsing.c
 noinst_HEADERS += contrib/lax_der_privatekey_parsing.h
@@ -181,6 +183,17 @@ if BUILD_WINDOWS
 schnorr_example_LDFLAGS += -lbcrypt
 endif
 TESTS += schnorr_example
+endif
+if ENABLE_MODULE_ELLSWIFT
+noinst_PROGRAMS += ellswift_example
+ellswift_example_SOURCES = examples/ellswift.c
+ellswift_example_CPPFLAGS = -I$(top_srcdir)/include -DSECP256K1_STATIC
+ellswift_example_LDADD = libsecp256k1.la
+ellswift_example_LDFLAGS = -static
+if BUILD_WINDOWS
+ellswift_example_LDFLAGS += -lbcrypt
+endif
+TESTS += ellswift_example
 endif
 endif
 
