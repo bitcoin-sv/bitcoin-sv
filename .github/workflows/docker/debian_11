@@ -17,5 +17,6 @@ RUN set -xeu \
     libzmq3-dev \
     python3-ecdsa python3-zmq python3-bip32utils \
     git \
+    libgoogle-perftools-dev \
     gcc-10 g++-10
 
