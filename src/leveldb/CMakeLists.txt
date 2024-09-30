@@ -270,9 +270,9 @@ endif(HAVE_CRC32C)
 if(HAVE_SNAPPY)
   target_link_libraries(leveldb snappy)
 endif(HAVE_SNAPPY)
-if(HAVE_TCMALLOC)
-  target_link_libraries(leveldb tcmalloc)
-endif(HAVE_TCMALLOC)
+#if(HAVE_TCMALLOC)
+#  target_link_libraries(leveldb tcmalloc)
+#endif(HAVE_TCMALLOC)
 
 # Needed by port_stdcxx.h
 find_package(Threads REQUIRED)
