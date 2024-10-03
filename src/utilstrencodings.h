@@ -120,7 +120,6 @@ inline constexpr std::array<char, 16> hexmap = {'0', '1', '2', '3', '4', '5', '6
 template <typename T>
 void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
 {
-    std::string rv;
     writer.ReserveAdditional((itend - itbegin) * (fSpaces ? 3 : 2));
     for (T it = itbegin; it < itend; ++it)
     {
