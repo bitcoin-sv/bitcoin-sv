@@ -286,7 +286,7 @@ private:
                          Amount amount = Amount(0),
                          uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
         uint256 hash = SignatureHash(script, CTransaction(spendTx), 0,
-                                     sigHashType, amount, nullptr, flags);
+                                     sigHashType, amount, nullptr, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
         std::vector<uint8_t> vchSig, r, s;
         uint32_t iter = 0;
         do {
@@ -3039,6 +3039,72 @@ BOOST_AUTO_TEST_CASE(get_script_verify_flags)
     BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY));
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_GENESIS);
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_CHRONICLE);
+}
+
+BOOST_AUTO_TEST_CASE(chronicle_forkid_script_validation)
+{
+    const KeyData keys {};
+    const Amount TEST_AMOUNT {12345};
+    std::vector<TestBuilder> tests {};
+
+    auto preGenesisFlags { StandardScriptVerifyFlags(ProtocolEra::PreGenesis) | InputScriptVerifyFlags(ProtocolEra::PreGenesis, ProtocolEra::PreGenesis) };
+    auto preChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostGenesis) | InputScriptVerifyFlags(ProtocolEra::PostGenesis, ProtocolEra::PostGenesis) };
+    auto postChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostChronicle) | InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle) };
+    auto forkidNotEnabledFlags { preGenesisFlags & ~SCRIPT_ENABLE_SIGHASH_FORKID };
+ 
+    // Pre-ForkID, signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreForkID FORKID", forkidNotEnabledFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_FORKID));
+    // Pre-ForkID, signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreForkID not FORKID", forkidNotEnabledFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Pre-Genesis, signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreGenesis FORKID", preGenesisFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, preGenesisFlags)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Pre-Genesis, signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreGenesis not FORKID", preGenesisFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT, preGenesisFlags)
+            .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
+    // Pre-Chronicle, signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreChronicle FORKID", preChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, preChronicleFlags)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Pre-Chronicle, signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreChronicle not FORKID", preChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT, preChronicleFlags)
+            .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
+    // Post-Chronicle, signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PostChronicle FORKID", postChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PostChronicle not FORKID", postChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    for(TestBuilder& test : tests)
+    {
+        test.Test();
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
