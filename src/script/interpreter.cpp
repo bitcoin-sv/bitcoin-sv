@@ -291,7 +291,9 @@ bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
         if (!forkIdEnabled && usesForkId) {
             return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
         }
-        if (forkIdEnabled && !usesForkId) {
+        // ForkID becomes optional post-Chronicle
+        bool preChronicle = !(flags & SCRIPT_CHRONICLE);
+        if (preChronicle && forkIdEnabled && !usesForkId) {
             return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
         }
     }
