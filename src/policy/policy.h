@@ -185,8 +185,7 @@ enum class ScriptVerifyFlags : uint32_t
      * with. However scripts violating these flags may still be present in valid
      * blocks and we must accept those blocks.
      */
-    PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS =
-        PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+    STANDARD_SCRIPT_VERIFY_FLAGS =
         SCRIPT_VERIFY_DERSIG |
         SCRIPT_VERIFY_NULLDUMMY |
         SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
@@ -195,13 +194,13 @@ enum class ScriptVerifyFlags : uint32_t
         SCRIPT_VERIFY_CLEANSTACK |
         SCRIPT_VERIFY_MINIMALDATA,
 
+    PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS =
+        PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+        STANDARD_SCRIPT_VERIFY_FLAGS,
+
     POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS =
         POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
-        SCRIPT_VERIFY_DERSIG |
-        SCRIPT_VERIFY_NULLDUMMY |
-        SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | 
-        SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
-        SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
+        STANDARD_SCRIPT_VERIFY_FLAGS,
 
     /** For convenience, standard but not mandatory verify flags. */
     PRE_CHRONICLE_STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
@@ -224,10 +223,6 @@ inline uint32_t StandardScriptVerifyFlags(ProtocolEra era)
     {
         scriptFlags |= SCRIPT_GENESIS;
     }
-    if(IsProtocolActive(era, ProtocolName::Chronicle))
-    {
-        scriptFlags |= SCRIPT_CHRONICLE;
-    }
 
     return scriptFlags;
 }
@@ -237,10 +232,7 @@ inline uint32_t InputScriptVerifyFlags(ProtocolEra era, ProtocolEra utxoEra)
 {
     uint32_t inputFlags {0};
 
-    // Between Genesis & Chronicle we apply SCRIPT_VERIFY_SIGPUSHONLY for all inputs.
-    // After Chronicle we apply SCRIPT_VERIFY_SIGPUSHONLY to UTXOs created between Genesis & Chronicle.
-    if((IsProtocolActive(era, ProtocolName::Genesis) && !IsProtocolActive(era, ProtocolName::Chronicle)) ||
-       (IsProtocolActive(era, ProtocolName::Chronicle) && IsProtocolActive(utxoEra, ProtocolName::Genesis) && !IsProtocolActive(utxoEra, ProtocolName::Chronicle)))
+    if(IsProtocolActive(era, ProtocolName::Genesis))
     {
         inputFlags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }

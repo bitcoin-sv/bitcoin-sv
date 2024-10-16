@@ -2746,11 +2746,6 @@ std::optional<bool> CheckInputScripts(
             {
                 // Check with inverse input flags
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Chronicle)) };
-                if((perInputScriptFlags & SCRIPT_VERIFY_SIGPUSHONLY) == (inverseInputFlags & SCRIPT_VERIFY_SIGPUSHONLY))
-                {
-                    // Ensure we check with inverse of SIGPUSHONLY flag
-                    inverseInputFlags ^= SCRIPT_VERIFY_SIGPUSHONLY;
-                }
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
                 CScriptCheck check3(config, true, scriptPubKey, amount, tx, input, flags3Check, sigCacheStore, txdata);
@@ -2970,8 +2965,6 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
 
     if (IsProtocolActive(GetProtocolEra(config, pChainTip->GetHeight() + 1), ProtocolName::Chronicle)) {
         flags |= SCRIPT_CHRONICLE;
-        flags &= ~SCRIPT_VERIFY_LOW_S;
-        flags &= ~SCRIPT_VERIFY_SIGPUSHONLY;
     }
 
     return flags;

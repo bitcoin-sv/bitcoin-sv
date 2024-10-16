@@ -48,7 +48,9 @@ static const uint32_t POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS =
     SCRIPT_VERIFY_P2SH |
     SCRIPT_VERIFY_STRICTENC |
     SCRIPT_ENABLE_SIGHASH_FORKID |
-    SCRIPT_VERIFY_NULLFAIL;
+    SCRIPT_VERIFY_NULLFAIL |
+    SCRIPT_VERIFY_LOW_S |
+    SCRIPT_CHRONICLE;
 
 // Get mandatory script verify flags for the given protocol era
 uint32_t MandatoryScriptVerifyFlags(ProtocolEra era);
