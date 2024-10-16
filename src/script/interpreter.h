@@ -11,10 +11,11 @@
 #include "script_error.h"
 #include "sighashtype.h"
 #include "limitedstack.h"
+#include "malleability_status.h"
 
 #include <cstdint>
 #include <optional>
-#include <string>
+#include <variant>
 #include <vector>
 
 class CPubKey;
@@ -28,8 +29,10 @@ namespace task
   class CCancellationToken;
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
-                            ScriptError *serror);
+bool CheckSignatureEncoding(
+    const std::vector<uint8_t>& sig,
+    uint32_t flags,
+    ScriptError*);
 
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
@@ -113,7 +116,7 @@ public:
 * Consensus should be true when validating scripts of transactions that are part of block
 * and it should be false when validating scripts of transactions that are validated for acceptance to mempool
 */
-std::optional<bool> EvalScript(
+std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -124,8 +127,8 @@ std::optional<bool> EvalScript(
     LimitedStack& altstack,
     long& ipc,
     std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse,
-    ScriptError* error = nullptr);
+    std::vector<bool>& vfElse);
+
 std::optional<bool> EvalScript(
     const CScriptConfig& config,
     bool consensus,
@@ -135,6 +138,7 @@ std::optional<bool> EvalScript(
     uint32_t flags,
     const BaseSignatureChecker& checker,
     ScriptError* error = nullptr);
+
 std::optional<bool> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
