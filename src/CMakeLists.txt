@@ -353,6 +353,7 @@ add_library(common
 	script/int_serialization.h
 	script/interpreter.h
 	script/limitedstack.h
+    script/malleability_status.h
 	script/opcodes.h
 	script/script.h
 	script/script_error.h
