@@ -463,15 +463,13 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                 return SCRIPT_ERR_OP_COUNT;
 
             // Some opcodes are disabled.
-            if(IsOpcodeDisabled(opcode, utxoEra)
-               && (!utxo_after_genesis || fExec ))
+            if(IsOpcodeDisabled(opcode, utxoEra) && (!utxo_after_genesis || fExec ))
                 return SCRIPT_ERR_DISABLED_OPCODE;
 
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
-                if (fRequireMinimal &&
-                    !CheckMinimalPush(vchPushValue, opcode)) {
+                if (fRequireMinimal && !CheckMinimalPush(vchPushValue, opcode))
                     return SCRIPT_ERR_MINIMALDATA;
-                }
+
                 stack.push_back(vchPushValue);
             } else if (fExec || (OP_IF <= opcode && opcode <= OP_ENDIF)) {
                 switch (opcode) {
@@ -512,8 +510,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                     case OP_CHECKLOCKTIMEVERIFY: {
                         if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) || utxo_after_genesis) {
                             // not enabled; treat as a NOP2
-                            if (flags &
-                                SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                            if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
                                 return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
                             
                             break;
@@ -557,8 +554,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                     case OP_CHECKSEQUENCEVERIFY: {
                         if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) || utxo_after_genesis) {
                             // not enabled; treat as a NOP3
-                            if (flags &
-                                SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                            if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
                                 return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
 
                             break;
@@ -633,7 +629,9 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                            offset >= size ||
                            len < 0 ||
                            len > size - offset)
+                        {
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+                        }
 
                         data.shrink(offset, len);
                         stack.pop_back();
@@ -795,7 +793,6 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             if (vfExec.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
-                                //return set_success(serror).first;
                                 return malleability_status{};
                             }
 
@@ -1432,10 +1429,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
                                                          scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
-                        if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
-                            vchSig.size())
+                        if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
                             return SCRIPT_ERR_SIG_NULLFAIL;
-
 
                         stack.pop_back();
                         stack.pop_back();
@@ -1551,8 +1546,9 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             // If the operation failed, we require that all
                             // signatures must be empty vector
                             if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
-                                !ikey2 && stack.stacktop(-1).size())
+                                !ikey2 && stack.stacktop(-1).size()) {
                                 return SCRIPT_ERR_SIG_NULLFAIL;
+                            }
  
                             if (ikey2 > 0) {
                                 ikey2--;
@@ -1569,8 +1565,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         if (stack.size() < 1)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
  
-                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) &&
-                            stack.stacktop(-1).size())
+                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stack.stacktop(-1).size())
                             return SCRIPT_ERR_SIG_NULLDUMMY;
 
                         stack.pop_back();
@@ -1601,8 +1596,9 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         LimitedVector vch2 = stack.stacktop(-1);
 
                         if (!utxo_after_genesis &&
-                            (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
+                            (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)){
                             return SCRIPT_ERR_PUSH_SIZE;
+                        }
 
                         stack.pop_back();
                         vch1.append(vch2);
@@ -1736,24 +1732,22 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
         return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
     }
 
-    //return set_success(serror).first; cjg
     return malleability_status{};
 }
 
-std::optional<bool> EvalScript(
+std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
     uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* serror)
+    const BaseSignatureChecker& checker)
 {
     LimitedStack altstack {stack.makeChildStack()};
     long ipc{0};
     std::vector<bool> vfExec, vfElse;
-    const auto o = EvalScript(config,
+    return EvalScript(config,
                       consensus,
                       token,
                       stack,
@@ -1764,24 +1758,6 @@ std::optional<bool> EvalScript(
                       ipc,
                       vfExec,
                       vfElse);
-    if(!o.has_value())
-        return {};
-
-    const auto v = o.value();
-
-    const auto i{v.index()};
-    if(i == 1)
-    {
-        if(serror)
-            *serror = SCRIPT_ERR_OK;
-        return true;
-    }
-    else
-    {
-        if(serror)
-            *serror = std::get<ScriptError>(v);
-        return false;
-    }
 }
 
 namespace {
@@ -2156,33 +2132,51 @@ std::optional<bool> VerifyScript(
 
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
-    if(auto res = EvalScript(config,
-                             consensus,
-                             token,
-                             stack,
-                             scriptSig,
-                             flags,
-                             checker,
-                             serror);
-       !res.has_value() || !res.value())
+
+    if(const auto o = EvalScript(config,
+                                 consensus,
+                                 token,
+                                 stack,
+                                 scriptSig,
+                                 flags,
+                                 checker);
+       !o.has_value())
+        return {};
+    else
     {
-        return res;
+        const auto v{o.value()};
+        if(std::holds_alternative<ScriptError>(v))
+        {
+            if(serror)
+                *serror = std::get<ScriptError>(v);
+            return false;
+        }
     }
+
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack.makeRootStackCopy();
     }
-    if(auto res = EvalScript(config,
-                             consensus,
-                             token,
-                             stack,
-                             scriptPubKey,
-                             flags,
-                             checker,
-                             serror);
-       !res.has_value() || !res.value())
+
+    if(const auto o = EvalScript(config,
+                                 consensus,
+                                 token,
+                                 stack,
+                                 scriptPubKey,
+                                 flags,
+                                 checker);
+       !o.has_value())
+        return {};
+    else
     {
-        return res;
+        const auto v{o.value()};
+        if(std::holds_alternative<ScriptError>(v))
+        {
+            if(serror)
+                *serror = std::get<ScriptError>(v);
+            return false;
+        }
     }
+
     if (stack.empty()) {
         return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
     }
@@ -2214,18 +2208,26 @@ std::optional<bool> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         stack.pop_back();
 
-        if(auto res = EvalScript(config,
-                                 consensus,
-                                 token,
-                                 stack,
-                                 pubKey2,
-                                 flags,
-                                 checker,
-                                 serror);
-           !res.has_value() || !res.value())
+        if(const auto o = EvalScript(config,
+                                     consensus,
+                                     token,
+                                     stack,
+                                     pubKey2,
+                                     flags,
+                                     checker);
+           !o.has_value())
+            return {};
+        else
         {
-            return res;
+            const auto v{o.value()};
+            if(std::holds_alternative<ScriptError>(v))
+            {
+                if(serror)
+                    *serror = std::get<ScriptError>(v);
+                return false;
+            }
         }
+
         if (stack.empty()) {
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
         }

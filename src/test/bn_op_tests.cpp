@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <variant>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -99,7 +100,6 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
@@ -108,10 +108,10 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -217,7 +217,6 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status = EvalScript(config,
                                        true,
@@ -225,10 +224,10 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -299,7 +298,6 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status = EvalScript(config,
                                        true,
@@ -307,10 +305,10 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -361,7 +359,6 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status = EvalScript(config,
                                        true,
@@ -369,18 +366,19 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        if(status.value())
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(std::holds_alternative<malleability_status>(v))
         {
-            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
             BOOST_CHECK(stack.empty());
         }
         else
         {
-            BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, error);
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, std::get<ScriptError>(v));
             BOOST_CHECK_EQUAL(1U, stack.size());
-            auto frame = stack.front();
+            const auto& frame = stack.front();
             auto actual =
                 frame.empty()
                     ? bint{0}
@@ -395,7 +393,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 BOOST_AUTO_TEST_CASE(operands_too_large)
 {
     ConfigInit& config = GlobalConfig::GetModifiableGlobalConfig();
-    using test_args = tuple<uint64_t, uint64_t, opcodetype, bool, ScriptError>;
+    using test_args = tuple<uint64_t, uint64_t, opcodetype, ScriptError>;
     const auto max_arg_len{ MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS };
 
     // set policy for script size, stack memory usage and max number length in scripts 
@@ -406,71 +404,70 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
 
     // clang-format off
     vector<test_args> test_data = {
-    {max_arg_len,   max_arg_len,   OP_ADD, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_ADD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_ADD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_ADD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_SUB, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_SUB, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_SUB, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_SUB, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_MUL, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_MUL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_MUL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_MUL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_DIV, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_DIV, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_DIV, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_DIV, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_MOD, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_MOD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_MOD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_MOD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_BOOLAND, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_BOOLAND, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_BOOLAND, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_BOOLAND, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_BOOLOR, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_BOOLOR, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_BOOLOR, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_BOOLOR, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_NUMEQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_NUMEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_NUMEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_NUMEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_NUMNOTEQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_NUMNOTEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_NUMNOTEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_NUMNOTEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_LESSTHAN, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_LESSTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_LESSTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_LESSTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_LESSTHANOREQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_LESSTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_LESSTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_LESSTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_GREATERTHAN, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_GREATERTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_GREATERTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_GREATERTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_GREATERTHANOREQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_MIN, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_MIN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_MIN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_MIN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_MAX, true,  SCRIPT_ERR_OK},
-    {max_arg_len + 1, max_arg_len,   OP_MAX, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len + 1, OP_MAX, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len + 1, max_arg_len + 1, OP_MAX, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len, OP_ADD, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len, OP_ADD, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_ADD, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_ADD, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_SUB, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_SUB, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_SUB, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_SUB, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_MUL, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_DIV, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_DIV, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_DIV, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_DIV, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_MOD, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_MOD, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MOD, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MOD, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_BOOLAND, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_BOOLAND, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_BOOLAND, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_BOOLAND, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_BOOLOR, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_BOOLOR, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_BOOLOR, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_BOOLOR, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_NUMEQUAL, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_NUMEQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_NUMEQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_NUMEQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_NUMNOTEQUAL, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_NUMNOTEQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_NUMNOTEQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_NUMNOTEQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_LESSTHAN, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_LESSTHAN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_LESSTHAN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_LESSTHAN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_LESSTHANOREQUAL, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_LESSTHANOREQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_LESSTHANOREQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_LESSTHANOREQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_GREATERTHAN, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_GREATERTHAN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_GREATERTHAN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_GREATERTHAN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_GREATERTHANOREQUAL, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_GREATERTHANOREQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_GREATERTHANOREQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_GREATERTHANOREQUAL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_MIN, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_MIN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MIN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MIN, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len,   OP_MAX, SCRIPT_ERR_OK},
+    {max_arg_len + 1, max_arg_len,   OP_MAX, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MAX, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MAX, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     };
     // clang-format on
 
-    for (const auto& [arg0_size, arg1_size, op_code, exp_status,
-        exp_script_error] : test_data)
+    for(const auto& [arg0_size, arg1_size, op_code, exp_script_error] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
 
@@ -480,7 +477,6 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         CScript script = CScript() << arg0 << arg1 << op_code;
 
         const auto flags{ SCRIPT_UTXO_AFTER_GENESIS };
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status = EvalScript(config,
                                        false,
@@ -488,11 +484,20 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(exp_status, status.value());
-        BOOST_CHECK_EQUAL(exp_script_error, error);
-        BOOST_CHECK_EQUAL(status.value() ? 1U : 2U, stack.size());
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(exp_script_error == SCRIPT_ERR_OK)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK_EQUAL(1U, stack.size());
+        }
+        else
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_script_error, std::get<ScriptError>(v));
+            BOOST_CHECK_EQUAL(2U, stack.size());
+        }
     }
 }
 
@@ -529,17 +534,16 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         const auto status = EvalScript(config,
                                        false,
                                        task::CCancellationSource::Make()->GetToken(),
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(op.size(), stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
@@ -553,43 +557,42 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
     // clang-format off
     vector<tuple<vector<uint8_t>, 
                  vector<uint8_t>,
-                 bool,
                  ScriptError,
                  vector<uint8_t>>> test_data = {
 
-        { {}, {}, true, SCRIPT_ERR_OK, {}},
-        { {}, {0x0}, true, SCRIPT_ERR_OK, {}},
-        { {}, {0x1}, true, SCRIPT_ERR_OK, {0x0}},
-        { {}, {0x2}, true, SCRIPT_ERR_OK, {0x0, 0x0}},
-        { {0x0}, {0x0}, true, SCRIPT_ERR_OK, {}},
-        { {0x0}, {0x1}, true, SCRIPT_ERR_OK, {0x0}},
-        { {0x0}, {0x2}, true, SCRIPT_ERR_OK, {0x0, 0x0}},
-        { {0x1}, {0x1}, true, SCRIPT_ERR_OK, { 0x1}},
-        { {0x1, 0x2}, {0x2}, true, SCRIPT_ERR_OK, { 0x1, 0x2}},
-        { {0x1, 0x2, 0x3}, {0x3}, true, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3}},
-        { {0x1, 0x2, 0x3, 0x4}, {0x4}, true, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3, 0x4}},
-        { {0x1, 0x2, 0x3, 0x4, 0x5}, {0x5}, true, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3, 0x4, 0x5}},
+        { {}, {}, SCRIPT_ERR_OK, {}},
+        { {}, {0x0}, SCRIPT_ERR_OK, {}},
+        { {}, {0x1}, SCRIPT_ERR_OK, {0x0}},
+        { {}, {0x2}, SCRIPT_ERR_OK, {0x0, 0x0}},
+        { {0x0}, {0x0}, SCRIPT_ERR_OK, {}},
+        { {0x0}, {0x1}, SCRIPT_ERR_OK, {0x0}},
+        { {0x0}, {0x2}, SCRIPT_ERR_OK, {0x0, 0x0}},
+        { {0x1}, {0x1}, SCRIPT_ERR_OK, { 0x1}},
+        { {0x1, 0x2}, {0x2}, SCRIPT_ERR_OK, { 0x1, 0x2}},
+        { {0x1, 0x2, 0x3}, {0x3}, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3}},
+        { {0x1, 0x2, 0x3, 0x4}, {0x4}, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3, 0x4}},
+        { {0x1, 0x2, 0x3, 0x4, 0x5}, {0x5}, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3, 0x4, 0x5}},
         
         // 0x0 used as padding
-        { {0x1}, {0x2}, true, SCRIPT_ERR_OK, {0x1, 0x0}},
-        { {0x2}, {0x2}, true, SCRIPT_ERR_OK, {0x2, 0x0}},
+        { {0x1}, {0x2}, SCRIPT_ERR_OK, {0x1, 0x0}},
+        { {0x2}, {0x2}, SCRIPT_ERR_OK, {0x2, 0x0}},
 
         // -ve numbers 
-        { {0x81}, {0x1}, true, SCRIPT_ERR_OK, {0x81}},          
-        { {0x81}, {0x2}, true, SCRIPT_ERR_OK, {0x1, 0x80}},     
-        { {0x81}, {0x3}, true, SCRIPT_ERR_OK, {0x1, 0x0, 0x80}},
+        { {0x81}, {0x1}, SCRIPT_ERR_OK, {0x81}},          
+        { {0x81}, {0x2}, SCRIPT_ERR_OK, {0x1, 0x80}},     
+        { {0x81}, {0x3}, SCRIPT_ERR_OK, {0x1, 0x0, 0x80}},
 
         // -ve length
-        { {0x1}, {0x81}, false, SCRIPT_ERR_PUSH_SIZE, {0x1}},
+        { {0x1}, {0x81}, SCRIPT_ERR_PUSH_SIZE, {0x1}},
 
         // requested length to short
-        { {0x1}, {}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
-        { {0x1}, {0x0}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
-        { {0x1, 0x2}, {0x1}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, { 0x1, 0x2}},
+        { {0x1}, {}, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
+        { {0x1}, {0x0}, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
+        { {0x1, 0x2}, {0x1}, SCRIPT_ERR_IMPOSSIBLE_ENCODING, { 0x1, 0x2}},
 
     };
     // clang-format on
-    for(auto& [arg1, arg2, exp_status, exp_error, op] : test_data)
+    for(auto& [arg1, arg2, exp_error, op] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
         vector<uint8_t> args;
@@ -607,19 +610,26 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         const auto status = EvalScript(config,
                                        false,
                                        task::CCancellationSource::Make()->GetToken(),
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(exp_status, status.value());
-        BOOST_CHECK_EQUAL(exp_error, error);
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
-                                      end(op));
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(exp_error == SCRIPT_ERR_OK)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        }
+        else
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+        }
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
+                                      begin(op), end(op));
     }
 }
 
@@ -640,22 +650,21 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
-        ScriptError error;
         const auto status = EvalScript(config,
                                        true,
                                        token,
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(i + 1, stack.size());
         vector<uint8_t> op;
         bsv::serialize<int>(i, back_inserter(op));
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(i)), end(stack.at(i)), begin(op),
-                                      end(op));
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(i)), end(stack.at(i)),
+                                      begin(op), end(op));
     }
 }
 
@@ -689,7 +698,6 @@ BOOST_AUTO_TEST_CASE(op_size)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
                                        false,
@@ -697,10 +705,10 @@ BOOST_AUTO_TEST_CASE(op_size)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(2U, stack.size());
         const auto expected{stack.front().size()};
         const auto actual{bsv::deserialize(begin(stack.at(1)), end(stack.at(1)))};
@@ -733,7 +741,6 @@ BOOST_AUTO_TEST_CASE(op_pick)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
                                        false,
@@ -741,10 +748,10 @@ BOOST_AUTO_TEST_CASE(op_pick)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(4U, stack.size());
         if(op_code == OP_2)
             BOOST_CHECK(stack.at(3).empty());
@@ -777,7 +784,6 @@ BOOST_AUTO_TEST_CASE(op_roll)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
                                        false,
@@ -785,10 +791,10 @@ BOOST_AUTO_TEST_CASE(op_roll)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(3U, stack.size());
 
         if(op_code == OP_0)
@@ -843,7 +849,6 @@ BOOST_AUTO_TEST_CASE(op_split)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
                                        false,
@@ -851,10 +856,10 @@ BOOST_AUTO_TEST_CASE(op_split)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(2U, stack.size());
         BOOST_CHECK_EQUAL(2 - i, stack.at(1).size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(1)), end(stack.at(1)),
@@ -899,7 +904,6 @@ BOOST_AUTO_TEST_CASE(op_lshift)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
                                        false,
@@ -907,10 +911,10 @@ BOOST_AUTO_TEST_CASE(op_lshift)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
@@ -953,7 +957,6 @@ BOOST_AUTO_TEST_CASE(op_rshift)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
                                        false,
@@ -961,10 +964,10 @@ BOOST_AUTO_TEST_CASE(op_rshift)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        BOOST_CHECK_EQUAL(true, status.value());
-        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
@@ -981,17 +984,16 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
     const auto r = EvalScript(GlobalConfig::GetConfig(),
                               true,
                               source->GetToken(),
                               stack,
                               CScript() << INT32_MAX << OP_RSHIFT,
                               flags,
-                              BaseSignatureChecker{},
-                              &err);
-    BOOST_CHECK(r.value());
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
+                              BaseSignatureChecker{});
+    BOOST_CHECK(r.has_value());
+    const auto v{r.value()};
+    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
     const auto& top = stack.front();
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
@@ -1009,17 +1011,16 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
     const auto r = EvalScript(GlobalConfig::GetConfig(),
                               true,
                               source->GetToken(),
                               stack,
                               CScript() << INT32_MAX << OP_LSHIFT,
                               flags,
-                              BaseSignatureChecker{},
-                              &err);
-    BOOST_CHECK(r.value());
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
+                              BaseSignatureChecker{});
+    BOOST_CHECK(r.has_value());
+    const auto v{r.value()};
+    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
     const auto& top = stack.front();
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
@@ -1075,7 +1076,6 @@ BOOST_AUTO_TEST_CASE(op_checksig)
         const CScript script(args.begin(), args.end());
 
         uint32_t flags{};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const equality_checker checker;
         const auto status = EvalScript(config,
@@ -1084,10 +1084,10 @@ BOOST_AUTO_TEST_CASE(op_checksig)
                                        stack,
                                        script,
                                        flags,
-                                       checker,
-                                       &error);
-        BOOST_CHECK_EQUAL(exp_status, status.value());
-        BOOST_CHECK_EQUAL(exp_error, error);
+                                       checker);
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto stack_0{stack.at(0)};
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
@@ -1100,7 +1100,7 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
     const Config& config = GlobalConfig::GetConfig();
 
     using test_args = tuple<int, vector<opcodetype>, int, vector<opcodetype>,
-                            bool, ScriptError, vector<uint8_t>>;
+                            ScriptError, vector<uint8_t>>;
     // clang-format off
     vector<test_args> test_data = 
     {
@@ -1109,33 +1109,33 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
         // exp_status, exp_error, top_stack_value 
 
         // Success True
-        {1, {OP_1}, 1, {OP_1}, true, SCRIPT_ERR_OK, success },
-        {1, {OP_1}, 2, {OP_1, OP_16}, true, SCRIPT_ERR_OK, success },
-        {1, {OP_1}, 2, {OP_16, OP_1}, true, SCRIPT_ERR_OK, success },
+        {1, {OP_1}, 1, {OP_1}, SCRIPT_ERR_OK, success },
+        {1, {OP_1}, 2, {OP_1, OP_16}, SCRIPT_ERR_OK, success },
+        {1, {OP_1}, 2, {OP_16, OP_1}, SCRIPT_ERR_OK, success },
 
-        {2, {OP_1, OP_2}, 2, {OP_1, OP_2}, true, SCRIPT_ERR_OK, success },
+        {2, {OP_1, OP_2}, 2, {OP_1, OP_2}, SCRIPT_ERR_OK, success },
 
-        {2, {OP_1, OP_2}, 3, {OP_16, OP_1, OP_2}, true, SCRIPT_ERR_OK, success},
-        {2, {OP_1, OP_2}, 3, {OP_1, OP_16, OP_2}, true, SCRIPT_ERR_OK, success},
-        {2, {OP_1, OP_2}, 3, {OP_1, OP_2, OP_16}, true, SCRIPT_ERR_OK, success},
+        {2, {OP_1, OP_2}, 3, {OP_16, OP_1, OP_2}, SCRIPT_ERR_OK, success},
+        {2, {OP_1, OP_2}, 3, {OP_1, OP_16, OP_2}, SCRIPT_ERR_OK, success},
+        {2, {OP_1, OP_2}, 3, {OP_1, OP_2, OP_16}, SCRIPT_ERR_OK, success},
 
-        {2, {OP_1, OP_2}, 4, {OP_16, OP_1, OP_16, OP_2}, true, SCRIPT_ERR_OK, success},
+        {2, {OP_1, OP_2}, 4, {OP_16, OP_1, OP_16, OP_2}, SCRIPT_ERR_OK, success},
 
         // Success false
-        {1, {OP_1}, 1, {OP_16}, true, SCRIPT_ERR_OK, failure},
+        {1, {OP_1}, 1, {OP_16}, SCRIPT_ERR_OK, failure},
 
-        {2, {OP_1, OP_2}, 2, {OP_1, OP_16}, true, SCRIPT_ERR_OK, failure},
-        {2, {OP_1, OP_2}, 2, {OP_16, OP_2}, true, SCRIPT_ERR_OK, failure},
-        {2, {OP_1, OP_2}, 2, {OP_2, OP_1}, true, SCRIPT_ERR_OK, failure},
+        {2, {OP_1, OP_2}, 2, {OP_1, OP_16}, SCRIPT_ERR_OK, failure},
+        {2, {OP_1, OP_2}, 2, {OP_16, OP_2}, SCRIPT_ERR_OK, failure},
+        {2, {OP_1, OP_2}, 2, {OP_2, OP_1}, SCRIPT_ERR_OK, failure},
         
         // Fails 
-        {2, {OP_1, OP_2}, 1, {OP_1}, false, SCRIPT_ERR_SIG_COUNT, failure},
-        {-1, {OP_1}, 1, {OP_1}, false, SCRIPT_ERR_SIG_COUNT, failure},
-        {1, {OP_1}, -1, {OP_1}, false, SCRIPT_ERR_PUBKEY_COUNT, failure},
+        {2, {OP_1, OP_2}, 1, {OP_1}, SCRIPT_ERR_SIG_COUNT, failure},
+        {-1, {OP_1}, 1, {OP_1}, SCRIPT_ERR_SIG_COUNT, failure},
+        {1, {OP_1}, -1, {OP_1}, SCRIPT_ERR_PUBKEY_COUNT, failure},
     };
     // clang-format on
 
-    for(const auto& [n_sigs, signatures, n_pub_keys, public_keys, exp_status,
+    for(const auto& [n_sigs, signatures, n_pub_keys, public_keys,
                      exp_error, exp_stack_top] : test_data)
     {
         vector<uint8_t> args{OP_0}; // historic bug start with OP_0
@@ -1153,7 +1153,6 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
         const CScript script(args.begin(), args.end());
 
         uint32_t flags{};
-        ScriptError error;
         LimitedStack stack(UINT32_MAX);
         const equality_checker checker;
         const auto status = EvalScript(config,
@@ -1162,13 +1161,21 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
                                        stack,
                                        script,
                                        flags,
-                                       checker,
-                                       &error);
-        BOOST_CHECK_EQUAL(exp_status, status.value());
-        BOOST_CHECK_EQUAL(exp_error, error);
-        BOOST_CHECK_EQUAL(
-            exp_status ? 1 : signatures.size() + public_keys.size() + 3,
-            stack.size());
+                                       checker);
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(exp_error == SCRIPT_ERR_OK)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK_EQUAL(1, stack.size());
+        }
+        else
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK_EQUAL(signatures.size() + public_keys.size() + 3,
+                              stack.size());
+        }
         const auto stack_0{stack.at(0)};
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
                                       begin(exp_stack_top), end(exp_stack_top));

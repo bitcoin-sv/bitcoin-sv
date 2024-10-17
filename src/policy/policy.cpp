@@ -291,27 +291,25 @@ std::optional<bool> AreInputsStandard(
             LimitedStack stack(UINT32_MAX);
             // convert the scriptSig into a stack, so we can inspect the
             // redeemScript
-            auto res =
-                EvalScript(
-                    config,
-                    false,
-                    token,
-                    stack,
-                    tx.vin[i].scriptSig,
-                    SCRIPT_VERIFY_NONE,
-                    BaseSignatureChecker());
-            if (!res.has_value())
-            {
+            if(const auto o = EvalScript(config,
+                                        false,
+                                        token,
+                                        stack,
+                                        tx.vin[i].scriptSig,
+                                        SCRIPT_VERIFY_NONE,
+                                        BaseSignatureChecker());
+                !o.has_value())
                 return {};
-            }
-            else if (!res.value())
+            else
             {
-                return false;
+                const auto v{o.value()};
+                if(std::holds_alternative<ScriptError>(v))
+                    return false;
             }
-            if (stack.empty()) {
+
+            if(stack.empty())
                 return false;
-            }
-            
+
             // Active release is set to PreGenesis, because TX_SCRIPTHASH is not supported after genesis
             bool sigOpCountError;
             CScript subscript(stack.back().begin(), stack.back().end());

@@ -129,15 +129,14 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     std::vector<bool>& vfExec,
     std::vector<bool>& vfElse);
 
-std::optional<bool> EvalScript(
+std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
     uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* error = nullptr);
+    const BaseSignatureChecker&);
 
 std::optional<bool> VerifyScript(
     const CScriptConfig& config,

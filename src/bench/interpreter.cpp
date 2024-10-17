@@ -19,7 +19,6 @@ static void interpreter_lshift_int32_max_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
     while(state.KeepRunning())
     {
         EvalScript(GlobalConfig::GetConfig(),
@@ -28,8 +27,7 @@ static void interpreter_lshift_int32_max_minus_1(benchmark::State& state)
                    stack,
                    CScript() << INT32_MAX - 1 << OP_LSHIFT,
                    flags,
-                   BaseSignatureChecker{},
-                   &err);
+                   BaseSignatureChecker{});
     }
 }
 BENCHMARK(interpreter_lshift_int32_max_minus_1)
@@ -41,7 +39,6 @@ static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
     while(state.KeepRunning())
     {
         EvalScript(GlobalConfig::GetConfig(),
@@ -50,8 +47,7 @@ static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
                    stack,
                    CScript() << INT32_MAX - 1 << OP_RSHIFT,
                    flags,
-                   BaseSignatureChecker{},
-                   &err);
+                   BaseSignatureChecker{});
     }
 }
 BENCHMARK(interpreter_rshift_int32_max_minus_1)
@@ -64,7 +60,6 @@ static void interpreter_lshift_6m_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
     while(state.KeepRunning())
     {
         EvalScript(GlobalConfig::GetConfig(),
@@ -73,8 +68,7 @@ static void interpreter_lshift_6m_minus_1(benchmark::State& state)
                    stack,
                    CScript() << (size * 8) - 1 << OP_LSHIFT,
                    flags,
-                   BaseSignatureChecker{},
-                   &err);
+                   BaseSignatureChecker{});
     }
 }
 BENCHMARK(interpreter_lshift_6m_minus_1)
@@ -87,7 +81,6 @@ static void interpreter_rshift_6m_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
     while(state.KeepRunning())
     {
         EvalScript(GlobalConfig::GetConfig(),
@@ -96,8 +89,7 @@ static void interpreter_rshift_6m_minus_1(benchmark::State& state)
                    stack,
                    CScript() << (size * 8) - 1 << OP_RSHIFT,
                    flags,
-                   BaseSignatureChecker{},
-                   &err);
+                   BaseSignatureChecker{});
     }
 }
 BENCHMARK(interpreter_rshift_6m_minus_1)

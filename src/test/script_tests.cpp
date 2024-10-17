@@ -25,6 +25,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "config.h"
+#include <variant>
 
 #if defined(HAVE_CONSENSUS_LIB)
 #include "script/bitcoinconsensus.h"
@@ -1324,8 +1325,6 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
     static const uint8_t pushdata2[] = {OP_PUSHDATA2, 1, 0, 0x5a};
     static const uint8_t pushdata4[] = {OP_PUSHDATA4, 1, 0, 0, 0, 0x5a};
 
-    ScriptError err;
-
     LimitedStack directStack(UINT32_MAX);
     auto source = task::CCancellationSource::Make();
     auto res = EvalScript(testConfig,
@@ -1334,10 +1333,9 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                           directStack,
                           CScript(&direct[0], &direct[sizeof(direct)]),
                           SCRIPT_VERIFY_P2SH,
-                          BaseSignatureChecker(),
-                          &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+                          BaseSignatureChecker());
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
 
     LimitedStack pushdata1Stack(UINT32_MAX);
     res = EvalScript(testConfig,
@@ -1346,11 +1344,10 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      pushdata1Stack,
                      CScript(&pushdata1[0], &pushdata1[sizeof(pushdata1)]),
                      SCRIPT_VERIFY_P2SH,
-                     BaseSignatureChecker(),
-                     &err);
-    BOOST_CHECK(res.value());
+                     BaseSignatureChecker());
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
     BOOST_CHECK(pushdata1Stack == directStack);
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 
     LimitedStack pushdata2Stack(UINT32_MAX);
     res = EvalScript(testConfig,
@@ -1359,11 +1356,10 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      pushdata2Stack,
                      CScript(&pushdata2[0], &pushdata2[sizeof(pushdata2)]),
                      SCRIPT_VERIFY_P2SH,
-                     BaseSignatureChecker(),
-                     &err);
-    BOOST_CHECK(res.value());
+                     BaseSignatureChecker());
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
     BOOST_CHECK(pushdata2Stack == directStack);
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 
     LimitedStack pushdata4Stack(UINT32_MAX);
     res = EvalScript(testConfig,
@@ -1372,12 +1368,10 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      pushdata4Stack,
                      CScript(&pushdata4[0], &pushdata4[sizeof(pushdata4)]),
                      SCRIPT_VERIFY_P2SH,
-                     BaseSignatureChecker(),
-                     &err);
-    BOOST_CHECK(res.value());
-
+                     BaseSignatureChecker());
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
     BOOST_CHECK(pushdata4Stack == directStack);
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 }
 
 BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
@@ -1397,7 +1391,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError error;
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto status = EvalScript(config,
@@ -1406,10 +1399,9 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
                                    stack,
                                    script,
                                    flags,
-                                   BaseSignatureChecker{},
-                                   &error);
-    BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
+    BOOST_CHECK(std::holds_alternative<malleability_status>(status.value()));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
@@ -1430,7 +1422,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError error;
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto status = EvalScript(config,
@@ -1439,10 +1430,9 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
                                    stack,
                                    script,
                                    flags,
-                                   BaseSignatureChecker{},
-                                   &error);
-    BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
+    BOOST_CHECK(std::holds_alternative<malleability_status>(status.value()));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
         
@@ -1467,7 +1457,6 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError error;
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto status = EvalScript(config,
@@ -1476,10 +1465,9 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
                                    stack,
                                    script,
                                    flags,
-                                   BaseSignatureChecker{},
-                                   &error);
-    BOOST_CHECK_EQUAL(true, status.value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
+    BOOST_CHECK(std::holds_alternative<malleability_status>(status.value()));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
@@ -2805,7 +2793,6 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config,
@@ -2814,10 +2801,9 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
                                        stack,
                                        script,
                                        flags,
-                                       BaseSignatureChecker{},
-                                       &error);
-        assert(true == status.value());
-        assert(SCRIPT_ERR_OK == error);
+                                       BaseSignatureChecker{});
+        assert(true == status.has_value());
+        assert(std::holds_alternative<malleability_status>(status.value()));
         assert(n == stack.size());
         const auto frame = stack.front();
         const auto actual = frame.GetElement();
@@ -2923,7 +2909,6 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-        ScriptError error;
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const string serialized_tx{
@@ -2940,10 +2925,9 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
                                        stack,
                                        script,
                                        flags,
-                                       sig_checker,
-                                       &error);
-        assert(true == status.value());
-        assert(SCRIPT_ERR_OK == error);
+                                       sig_checker);
+        assert(true == status.has_value());
+        assert(std::holds_alternative<malleability_status>(status.value()));
         assert(0 == stack.size());
     };
 
