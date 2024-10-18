@@ -11,5 +11,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=False)
     args, unknown_args = parser.parse_known_args()
 
+    # Filter unknown args that look like command line options
+    unknown_args = [arg for arg in unknown_args if not arg.startswith('--')]
+
     t = SimplifiedTestFramework([t() for t in tests(unknown_args if len(unknown_args) > 0 else None)])
     t.main()
