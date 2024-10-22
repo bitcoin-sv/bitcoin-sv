@@ -37,6 +37,7 @@
 #include "consensus/merkle.h"
 #include "util.h"
 #include "rawtxvalidator.h"
+#include <variant>
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -1189,9 +1190,8 @@ static UniValue signrawtransaction(const Config &config,
 
         UpdateTransaction(mergedTx, i, sigdata);
 
-        ScriptError serror = SCRIPT_ERR_OK;
         auto source = task::CCancellationSource::Make();
-        auto res =
+        const auto res =
             VerifyScript(
                 config,
                 true,
@@ -1199,11 +1199,12 @@ static UniValue signrawtransaction(const Config &config,
                 txin.scriptSig,
                 prevPubKey,
                 StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra),
-                TransactionSignatureChecker(&txConst, i, amount),
-                &serror);
-        if (!res.value())
+                TransactionSignatureChecker(&txConst, i, amount));
+        if(std::holds_alternative<ScriptError>(res.value()))
         {
-            TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+            TxInErrorToJSON(txin,
+                            vErrors,
+                            ScriptErrorString(std::get<ScriptError>(res.value())));
         }
     }
 

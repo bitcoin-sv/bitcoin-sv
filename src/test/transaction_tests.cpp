@@ -29,7 +29,6 @@
 #include <cstdint>
 #include <map>
 #include <string>
-#include <tuple>
 
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/test/unit_test.hpp>
@@ -140,14 +139,25 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                         amount = Amount(mapprevOutValues[tx.vin[i].prevout]);
                     }
 
-                    is_valid = VerifyScript(globalConfig,
-                                            true,
-                                            task::CCancellationSource::Make()->GetToken(),
-                                            tx.vin[i].scriptSig,
-                                            mapprevOutScriptPubKeys[tx.vin[i].prevout],
-                                            verify_flags, 
-                                            TransactionSignatureChecker(&tx, i, amount, txdata),
-                                            &err).value();
+                    const auto o =
+                        VerifyScript(
+                            globalConfig, true,
+                            task::CCancellationSource::Make()->GetToken(),
+                            tx.vin[i].scriptSig,
+                            mapprevOutScriptPubKeys[tx.vin[i].prevout],
+                            verify_flags,
+                            TransactionSignatureChecker(&tx, i, amount, txdata));
+                    const auto v{o.value()};
+                    if(std::holds_alternative<malleability_status>(v))
+                    {
+                        err = SCRIPT_ERR_OK;
+                        is_valid = true;
+                    }
+                    else
+                    {
+                        err = std::get<ScriptError>(v);
+                        is_valid = false; 
+                    }
                 }
                 if (is_valid != should_be_valid){
                     BOOST_ERROR("Bad test: " << strTest << 
@@ -475,7 +485,6 @@ void CheckWithFlag(const CheckFlagParams& params)
     // Unpack paramaters
     const auto [output, input, flagList] = params;
 
-    ScriptError error;
     const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
     //auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
@@ -483,13 +492,17 @@ void CheckWithFlag(const CheckFlagParams& params)
 
     for(const auto& flags : flagList)
     {
-        bool ret = VerifyScript(
-            config, true,
-            task::CCancellationSource::Make()->GetToken(),
-            inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
-            flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
-            TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-            &error).value();
+        const auto o =
+            VerifyScript(
+                config,
+                true,
+                task::CCancellationSource::Make()->GetToken(),
+                inputi.vin[0].scriptSig,
+                output->vout[0].scriptPubKey,
+                flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
+                TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue));
+        const auto v{o.value()};
+        const bool ret = std::holds_alternative<malleability_status>(v); 
         BOOST_CHECK_MESSAGE(ret == flags.second, std::string("failed result: ") + (ret? "true":"false"));
     }
 }

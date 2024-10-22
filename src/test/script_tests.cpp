@@ -162,32 +162,46 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
                    int flags, const std::string &message, int scriptError,
                    const Amount nValue) {
     const Config& config = GlobalConfig::GetConfig();
-    bool expect = (scriptError == SCRIPT_ERR_OK);
     if (flags & SCRIPT_VERIFY_CLEANSTACK) {
         flags |= SCRIPT_VERIFY_P2SH;
     }
 
-    ScriptError err;
     CMutableTransaction txCredit =
         BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
     CMutableTransaction tx2 = tx;
-    auto res =
-        VerifyScript(
-            config, true,
-            task::CCancellationSource::Make()->GetToken(),
-            scriptSig,
-            scriptPubKey,
-            flags,
-            MutableTransactionSignatureChecker(&tx, 0, txCredit.vout[0].nValue),
-            &err);
-    BOOST_CHECK_MESSAGE(res.value() == expect, message);
-    BOOST_CHECK_MESSAGE(
-        err == scriptError,
-        std::string(FormatScriptError(err)) + " where " +
-            std::string(FormatScriptError((ScriptError_t)scriptError)) +
-            " expected: " + message);
+    const auto res = VerifyScript(config,
+                                  true,
+                                  task::CCancellationSource::Make()->GetToken(),
+                                  scriptSig,
+                                  scriptPubKey,
+                                  flags,
+                                  MutableTransactionSignatureChecker(&tx,
+                                                                     0,
+                                                                     txCredit.vout[0]
+                                                                         .nValue));
+    BOOST_CHECK(res.has_value());
+    const auto v{res.value()};
+    if(scriptError == SCRIPT_ERR_OK)
+    {
+        BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(v),
+                            message);
+    }
+    else
+    {
+        BOOST_CHECK_MESSAGE(std::holds_alternative<ScriptError>(v),
+                            message);
+        const ScriptError err{std::get<ScriptError>(v)};
+        BOOST_CHECK_MESSAGE(
+            err == scriptError,
+            std::string(FormatScriptError(err)) + " where " +
+                std::string(FormatScriptError((ScriptError_t)scriptError)) +
+                " expected: " + message);
+    }
 #if defined(HAVE_CONSENSUS_LIB)
+
+    const bool expect = (scriptError == SCRIPT_ERR_OK);
+
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << tx2;
     int libconsensus_flags = flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL;
@@ -1527,10 +1541,9 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             goodsig1,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
     txTo12.vout[0].nValue = Amount(2);
     res =
         VerifyScript(
@@ -1539,9 +1552,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             goodsig1,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    err = std::get<ScriptError>(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
 
     CScript goodsig2 =
@@ -1553,10 +1567,9 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             goodsig2,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
 
     CScript badsig1 = sign_multisig(scriptPubKey12, key3, CTransaction(txTo12));
     res =
@@ -1566,14 +1579,15 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             badsig1,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    err = std::get<ScriptError>(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
 }
 
-BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
-    ScriptError err;
+BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
+{
     CKey key1, key2, key3, key4;
     key1.MakeNewKey(true);
     key2.MakeNewKey(false);
@@ -1610,10 +1624,9 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             goodsig1,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
 
     keys.clear();
     keys.push_back(key1);
@@ -1626,10 +1639,9 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             goodsig2,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
 
     keys.clear();
     keys.push_back(key2);
@@ -1642,10 +1654,9 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             goodsig3,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
 
     keys.clear();
     keys.push_back(key2);
@@ -1658,10 +1669,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             badsig1,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
 
     keys.clear();
     keys.push_back(key2);
@@ -1674,10 +1685,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             badsig2,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
 
     keys.clear();
     keys.push_back(key3);
@@ -1690,10 +1701,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             badsig3,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
 
     keys.clear();
     keys.push_back(key4);
@@ -1706,10 +1717,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             badsig4,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
 
     keys.clear();
     keys.push_back(key1);
@@ -1722,10 +1733,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             badsig5,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
 
     keys.clear(); // Must have signatures
     CScript badsig6 = sign_multisig(scriptPubKey23, keys, txTo23);
@@ -1736,11 +1747,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
             badsig6,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
-            &err);
-    BOOST_CHECK(!res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
-                        ScriptErrorString(err));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_INVALID_STACK_OPERATION, std::get<ScriptError>(res.value()));
 }
 
 void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
@@ -2071,26 +2081,25 @@ BOOST_AUTO_TEST_CASE(script_combineSigs) {
     TestCombineSigs(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle);
 }
 
-BOOST_AUTO_TEST_CASE(script_standard_push) {
-    ScriptError err;
+BOOST_AUTO_TEST_CASE(script_standard_push)
+{
     auto source = task::CCancellationSource::Make();
     for (int i = 0; i < 67000; i++) {
         CScript script;
         script << i;
         BOOST_CHECK_MESSAGE(script.IsPushOnly(),
                             "Number " << i << " is not pure push.");
-        auto res =
+        const auto res =
             VerifyScript(
                 testConfig, true,
                 source->GetToken(),
                 script,
                 CScript() << OP_1,
                 SCRIPT_VERIFY_MINIMALDATA,
-                BaseSignatureChecker(),
-                &err);
-        BOOST_CHECK_MESSAGE(res.value(),
+                BaseSignatureChecker());
+        BOOST_CHECK(res.has_value());
+        BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(res.value()),
                             "Number " << i << " push is not minimal data.");
-        BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
     }
 
     for (unsigned int i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
@@ -2099,18 +2108,17 @@ BOOST_AUTO_TEST_CASE(script_standard_push) {
         script << data;
         BOOST_CHECK_MESSAGE(script.IsPushOnly(),
                             "Length " << i << " is not pure push.");
-        auto res =
+        const auto res =
             VerifyScript(
                 testConfig, true,
                 source->GetToken(),
                 script,
                 CScript() << OP_1,
                 SCRIPT_VERIFY_MINIMALDATA,
-                BaseSignatureChecker(),
-                &err);
-        BOOST_CHECK_MESSAGE(res.value(),
+                BaseSignatureChecker());
+        BOOST_CHECK(res.has_value());
+        BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(res.value()),
                             "Length " << i << " push is not minimal data.");
-        BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
     }
 }
 
@@ -2681,8 +2689,8 @@ namespace {
     };
 }
 
-BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
-    ScriptError err;
+BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
+{
     auto source = task::CCancellationSource::Make();
   
     int iterations = 30;
@@ -2726,7 +2734,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
         // Verify the same script twice. In the second iteration it should run
         // much faster, since we cached invalid signatures.
         auto start_noncached = std::chrono::steady_clock::now();
-        auto res =
+        const auto res =
           VerifyScript(
               testConfig,
               true,
@@ -2734,16 +2742,15 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
               scriptSig,
               scriptPubKey,
               flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-              InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
-              &err);
+              InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata));
         auto stop_noncached = std::chrono::steady_clock::now();
 
         // check if script successfully verified
-        BOOST_CHECK(res.value());
-        BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+        BOOST_CHECK(res.has_value());
+        BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
 
         auto start_cached = std::chrono::steady_clock::now();
-        auto res2 =
+        const auto res2 =
           VerifyScript(
               testConfig,
               true,
@@ -2751,13 +2758,12 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
               scriptSig,
               scriptPubKey,
               flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-              InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
-              &err);
+              InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata));
          auto stop_cached = std::chrono::steady_clock::now();
 
          // check if script successfully verified
-        BOOST_CHECK(res2.value());
-        BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+        BOOST_CHECK(res2.has_value());
+        BOOST_CHECK(std::holds_alternative<malleability_status>(res2.value()));
 
         duration_total_noncached += std::chrono::duration_cast<std::chrono::microseconds>(
                       stop_noncached - start_noncached);

@@ -43,6 +43,7 @@
 #include "processing_block_index.h"
 #include "pubkey.h"
 #include "protocol_era.h"
+#include "script/script_error.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -76,6 +77,7 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
+#include <variant>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -2493,18 +2495,31 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
 
-    return VerifyScript(config,
-                        consensus,
-                        token,
-                        scriptSig,
-                        scriptPubKey,
-                        nFlags,
-                        CachingTransactionSignatureChecker(ptxTo,
-                                                           nIn,
-                                                           amount,
-                                                           cacheStore,
-                                                           txdata),
-                        &error);
+    const auto o = VerifyScript(config,
+                                consensus,
+                                token,
+                                scriptSig,
+                                scriptPubKey,
+                                nFlags,
+                                CachingTransactionSignatureChecker(ptxTo,
+                                                                   nIn,
+                                                                   amount,
+                                                                   cacheStore,
+                                                                   txdata));
+    if(!o.has_value())
+        return {};
+
+    const auto v{o.value()};
+    if(std::holds_alternative<malleability_status>(v))
+    {
+        error = SCRIPT_ERR_OK;
+        return true;
+    }
+    else
+    {
+        error = std::get<ScriptError>(v);
+        return false;
+    }
 }
 
 std::pair<int32_t,int> GetSpendHeightAndMTP(const ICoinsViewCache& inputs)

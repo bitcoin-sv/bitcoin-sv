@@ -9,6 +9,7 @@
 #include "pubkey.h"
 #include "protocol_era.h"
 #include "script/script.h"
+#include "script/script_error.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "script/script_num.h"
@@ -20,6 +21,7 @@
 
 #include <limits>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -209,21 +211,20 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
  */
 ScriptError VerifyWithFlag(const CTransaction &output,
                            const CMutableTransaction &input, int flags) {
-    ScriptError error;
     const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
-    auto ret =
+    const auto ret =
         VerifyScript(
             config, true,
             task::CCancellationSource::Make(),
             inputi.vin[0].scriptSig,
             output.vout[0].scriptPubKey,
             flags,
-            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
-            &error);
-    BOOST_CHECK((ret.value() == true) == (error == SCRIPT_ERR_OK));
-
-    return error;
+            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue));
+    BOOST_CHECK(ret.has_value());
+    const auto v{ret.value()};
+    BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+    return std::get<ScriptError>(v);
 }
 
 /**

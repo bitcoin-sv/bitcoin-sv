@@ -18,6 +18,7 @@
 #include "validation.h"
 #include "taskcancellation.h"
 
+#include <variant>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -43,7 +44,7 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = Amount(1);
 
-    auto res =
+    const auto res =
         VerifyScript(
             config, true,
             task::CCancellationSource::Make()->GetToken(),
@@ -51,10 +52,19 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
             scriptPubKey,
             (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
                 SCRIPT_ENABLE_SIGHASH_FORKID,
-            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
-            &err);
+            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue));
 
-    return res.value();
+    const auto v{res.value()};
+    if(std::holds_alternative<malleability_status>(v))
+    {
+        err = SCRIPT_ERR_OK;
+        return true;
+    }
+    else
+    {
+        err = std::get<ScriptError>(v);
+        return false;
+    }
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)

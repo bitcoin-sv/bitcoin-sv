@@ -19,6 +19,7 @@
 #include "config.h"
 
 #include <boost/test/unit_test.hpp>
+#include <variant>
 
 typedef std::vector<uint8_t> valtype;
 
@@ -95,10 +96,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             s,
             a_and_b,
             flags,
-            MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            MutableTransactionSignatureChecker(&txTo[0], 0, amount));
+    BOOST_CHECK(res.has_value());
+    const auto v{res.value()};
+    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
 
     for (int i = 0; i < 4; i++) {
         keys.assign(1, key[i]);
@@ -110,9 +111,12 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                 s,
                 a_and_b,
                 flags,
-                MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                &err);
-        BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 1: %d", i));
+                MutableTransactionSignatureChecker(&txTo[0], 0, amount));
+        BOOST_CHECK(res.has_value());
+        const auto v{res.value()};
+        BOOST_CHECK_MESSAGE(std::holds_alternative<ScriptError>(v),
+                            strprintf("a&b 1: %d", i));
+        err = std::get<ScriptError>(v);
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
                             ScriptErrorString(err));
 
@@ -126,9 +130,11 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                 s,
                 a_and_b,
                 flags,
-                MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                &err);
-        BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 2: %d", i));
+                MutableTransactionSignatureChecker(&txTo[0], 0, amount));
+        BOOST_CHECK(res.has_value());
+        BOOST_CHECK_MESSAGE(std::holds_alternative<ScriptError>(res.value()),
+                            strprintf("a&b 2: %d", i));
+        err = std::get<ScriptError>(res.value());
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                             ScriptErrorString(err));
     }
@@ -145,10 +151,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                     s,
                     a_or_b,
                     flags,
-                    MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    &err);
-            BOOST_CHECK_MESSAGE(res.value(), strprintf("a|b: %d", i));
-            BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+                    MutableTransactionSignatureChecker(&txTo[1], 0, amount));
+            BOOST_CHECK(res.has_value());
+            BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(res.value()),
+                                strprintf("a|b: %d", i));
         } else {
             res =
                 VerifyScript(
@@ -157,9 +163,12 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                     s,
                     a_or_b,
                     flags,
-                    MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    &err);
-            BOOST_CHECK_MESSAGE(!res.value(), strprintf("a|b: %d", i));
+                    MutableTransactionSignatureChecker(&txTo[1], 0, amount));
+            BOOST_CHECK(res.has_value());
+            const auto v{res.value()};
+            BOOST_CHECK_MESSAGE(std::holds_alternative<ScriptError>(v),
+                                strprintf("a|b: %d", i));
+            err = std::get<ScriptError>(v);
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                 ScriptErrorString(err));
         }
@@ -173,9 +182,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             s,
             a_or_b,
             flags,
-            MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-            &err);
-    BOOST_CHECK(!res.value());
+            MutableTransactionSignatureChecker(&txTo[1], 0, amount));
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
+    err = std::get<ScriptError>(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_SIG_DER, ScriptErrorString(err));
 
     for (int i = 0; i < 4; i++)
@@ -191,11 +201,11 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                         s,
                         escrow,
                         flags,
-                        MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        &err);
-                BOOST_CHECK_MESSAGE(res.value(), strprintf("escrow 1: %d %d", i, j));
-                BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK,
-                                    ScriptErrorString(err));
+                        MutableTransactionSignatureChecker(&txTo[2], 0, amount));
+                BOOST_CHECK(res.has_value());
+                const auto v{res.value()};
+                BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(v),
+                                    strprintf("escrow 1: %d %d", i, j));
             } else {
                 res =
                     VerifyScript(
@@ -204,11 +214,11 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                         s,
                         escrow,
                         flags,
-                        MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        &err);
-                BOOST_CHECK_MESSAGE(
-                    !res.value(),
-                    strprintf("escrow 2: %d %d", i, j));
+                        MutableTransactionSignatureChecker(&txTo[2], 0, amount));
+                BOOST_CHECK(res.has_value());
+                BOOST_CHECK_MESSAGE(std::holds_alternative<ScriptError>(res.value()),
+                                    strprintf("escrow 2: %d %d", i, j));
+                err = std::get<ScriptError>(res.value());
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                     ScriptErrorString(err));
             }

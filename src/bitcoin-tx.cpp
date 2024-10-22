@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "script/script_error.h"
+#include <variant>
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #endif
@@ -705,7 +707,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         UpdateTransaction(mergedTx, i, sigdata);
 
         auto source = task::CCancellationSource::Make();
-        auto res =
+        const auto res =
             VerifyScript(
                 config, true,
                 source->GetToken(),
@@ -713,7 +715,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 prevPubKey,
                 StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
                 MutableTransactionSignatureChecker(&mergedTx, i, amount));
-        if (!res.value())
+        if(!res.has_value() || std::holds_alternative<ScriptError>(res.value()))
         {
             fComplete = false;
         }

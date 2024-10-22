@@ -29,13 +29,6 @@
 
 namespace {
 
-inline bool set_success(ScriptError *ret) {
-    if (ret) {
-        *ret = SCRIPT_ERR_OK;
-    }
-    return true;
-}
-
 inline bool set_error(ScriptError *ret, const ScriptError serror) {
     if (ret) {
         *ret = serror;
@@ -2109,26 +2102,22 @@ int32_t TransactionSignatureChecker::Version() const
     return txTo->nVersion;
 }
 
-std::optional<bool> VerifyScript(
+std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
     uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* serror)
+    const BaseSignatureChecker& checker)
 {
-    set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-
     // If FORKID is enabled, we also ensure strict encoding.
     if (flags & SCRIPT_ENABLE_SIGHASH_FORKID) {
         flags |= SCRIPT_VERIFY_STRICTENC;
     }
 
-    if ((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly()) {
-        return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
-    }
+    if((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly())
+        return SCRIPT_ERR_SIG_PUSHONLY;
 
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
@@ -2146,11 +2135,7 @@ std::optional<bool> VerifyScript(
     {
         const auto v{o.value()};
         if(std::holds_alternative<ScriptError>(v))
-        {
-            if(serror)
-                *serror = std::get<ScriptError>(v);
-            return false;
-        }
+            return o;
     }
 
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
@@ -2170,20 +2155,14 @@ std::optional<bool> VerifyScript(
     {
         const auto v{o.value()};
         if(std::holds_alternative<ScriptError>(v))
-        {
-            if(serror)
-                *serror = std::get<ScriptError>(v);
-            return false;
-        }
+            return o;        
     }
 
-    if (stack.empty()) {
-        return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-    }
+    if(stack.empty())
+        return SCRIPT_ERR_EVAL_FALSE;
 
-    if (CastToBool(stack.back().GetElement()) == false) {
-        return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-    }
+    if(CastToBool(stack.back().GetElement()) == false)
+        return SCRIPT_ERR_EVAL_FALSE;
 
     // Additional validation for spend-to-script-hash transactions:
     // But only if if the utxo is before genesis
@@ -2192,9 +2171,8 @@ std::optional<bool> VerifyScript(
         IsP2SH(scriptPubKey))
     {
         // scriptSig must be literals-only or validation fails
-        if (!scriptSig.IsPushOnly()) {
-            return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
-        }
+        if(!scriptSig.IsPushOnly())
+            return SCRIPT_ERR_SIG_PUSHONLY;
 
         // Restore stack.
         stack = std::move(stackCopy);
@@ -2221,19 +2199,15 @@ std::optional<bool> VerifyScript(
         {
             const auto v{o.value()};
             if(std::holds_alternative<ScriptError>(v))
-            {
-                if(serror)
-                    *serror = std::get<ScriptError>(v);
-                return false;
-            }
+                return o;
         }
 
-        if (stack.empty()) {
-            return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-        }
-        if (!CastToBool(stack.back().GetElement())) {
-            return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-        }
+        if(stack.empty())
+            return SCRIPT_ERR_EVAL_FALSE;
+
+        if(!CastToBool(stack.back().GetElement()))
+            return SCRIPT_ERR_EVAL_FALSE;
+
     }
 
     // The CLEANSTACK check is only performed after potential P2SH evaluation,
@@ -2245,12 +2219,11 @@ std::optional<bool> VerifyScript(
         // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
         // softfork (and P2SH should be one).
         if((flags & SCRIPT_VERIFY_P2SH) == 0)
-            return set_error(serror, SCRIPT_ERR_INVALID_FLAGS);
+            return SCRIPT_ERR_INVALID_FLAGS;
 
-        if (stack.size() != 1) {
-            return set_error(serror, SCRIPT_ERR_CLEANSTACK);
-        }
+        if(stack.size() != 1)
+            return SCRIPT_ERR_CLEANSTACK;
     }
 
-    return set_success(serror);
+    return malleability_status{};
 }

@@ -138,14 +138,13 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     uint32_t flags,
     const BaseSignatureChecker&);
 
-std::optional<bool> VerifyScript(
+std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
     uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* serror = nullptr);
+    const BaseSignatureChecker&);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H
