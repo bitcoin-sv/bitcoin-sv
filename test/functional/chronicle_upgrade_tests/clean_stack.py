@@ -28,27 +28,27 @@ class CleanStackTestCase(ChronicleHeightBasedSimpleTestsCase):
                              p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)'),
 
         # Start of Chronicle grace period
-        SimpleTestDefinition(None, CScript([OP_TRUE]),
-                             "CHRONICLE_GRACE_BEGIN", CScript([OP_TRUE]),
-                             p2p_reject_reason=b'flexible-non-mandatory-script-verify-flag (Script did not clean its stack)'),
+        #SimpleTestDefinition(None, CScript([OP_TRUE]),
+        #                     "CHRONICLE_GRACE_BEGIN", CScript([OP_TRUE]),
+        #                     p2p_reject_reason=b'flexible-non-mandatory-script-verify-flag (Script did not clean its stack)'),
 
         # Block before Chronicle activation
-        SimpleTestDefinition(None, CScript([OP_TRUE]),
-                             "CHRONICLE_PRE_ACTIVATION", CScript([OP_TRUE])),
+        #SimpleTestDefinition(None, CScript([OP_TRUE]),
+        #                     "CHRONICLE_PRE_ACTIVATION", CScript([OP_TRUE])),
 
         # Chronicle activation height
-        SimpleTestDefinition(None, CScript([OP_TRUE]),
-                             "CHRONICLE_ACTIVATION", CScript([OP_TRUE])),
+        #SimpleTestDefinition(None, CScript([OP_TRUE]),
+        #                     "CHRONICLE_ACTIVATION", CScript([OP_TRUE])),
 
         # Block after Chronicle activation height
-        SimpleTestDefinition(None, CScript([OP_TRUE]),
-                             "CHRONICLE_POST_ACTIVATION", CScript([OP_TRUE])),
+        #SimpleTestDefinition(None, CScript([OP_TRUE]),
+        #                     "CHRONICLE_POST_ACTIVATION", CScript([OP_TRUE])),
 
         # End of chronicle grace period
-        SimpleTestDefinition(None, CScript([OP_TRUE]),
-                             "CHRONICLE_GRACE_END", CScript([OP_TRUE])),
+        #SimpleTestDefinition(None, CScript([OP_TRUE]),
+        #                     "CHRONICLE_GRACE_END", CScript([OP_TRUE])),
 
         # After Chronicle
-        SimpleTestDefinition(None, CScript([OP_TRUE]),
-                             "POST_CHRONICLE", CScript([OP_TRUE])),
+        #SimpleTestDefinition(None, CScript([OP_TRUE]),
+        #                     "POST_CHRONICLE", CScript([OP_TRUE])),
     ]

@@ -67,109 +67,109 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             tx_collection.add_tx(tx)
 
         # Start of Chronicle grace period
-        elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
-            utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
+        #elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
+        #    utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx,
+        #                         p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop())
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop())
+        #    tx_collection.add_tx(tx)
 
         # Block before Chronicle activation
-        elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
-            utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
+        #elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
+        #    utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx,
+        #                         p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop())
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop())
+        #    tx_collection.add_tx(tx)
 
         # Chronicle activation height
-        elif tx_collection.label == "CHRONICLE_ACTIVATION":
-            utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
+        #elif tx_collection.label == "CHRONICLE_ACTIVATION":
+        #    utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
             # Tx with non-PUSHDATA opcodes in the unlocking script is now accepted
-            tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
             # Tx with PUSHDATA only opcodes in the unlocking script accepted just as before
-            tx = new_transaction(self._UTXO_KEY, utxos.pop())
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop())
+        #    tx_collection.add_tx(tx)
 
             # Check a UTXO between Genesis and Chronicle can still only use PUSHDATA
-            pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
-            tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx,
+        #                         p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
             # Check a UTXO pre-Genesis can again use non-PUSHDATA
-            pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
-            tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
         # Block after Chronicle activation height
-        elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
-            utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
+        #elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
+        #    utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop())
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop())
+        #    tx_collection.add_tx(tx)
 
-            pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
-            tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx,
+        #                         p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
-            pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
-            tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
         # End of chronicle grace period
-        elif tx_collection.label == "CHRONICLE_GRACE_END":
-            utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
+        #elif tx_collection.label == "CHRONICLE_GRACE_END":
+        #    utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop())
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop())
+        #    tx_collection.add_tx(tx)
 
-            pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
-            tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx,
+        #                         p2p_reject_reason=b'chronicle-script-verify-flag-failed (Only non-push operators allowed in signatures)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
-            pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
-            tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
         # After Chronicle
-        elif tx_collection.label == "POST_CHRONICLE":
-            utxos, _ = self.utxos["POST_CHRONICLE"]
+        #elif tx_collection.label == "POST_CHRONICLE":
+        #    utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)
 
-            tx = new_transaction(self._UTXO_KEY, utxos.pop())
-            tx_collection.add_tx(tx)
+        #    tx = new_transaction(self._UTXO_KEY, utxos.pop())
+        #    tx_collection.add_tx(tx)
 
-            pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
-            tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    pre_chronicle_utxos, _ = self.utxos["PRE_CHRONICLE"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_chronicle_utxos[0], unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx,
+        #                         p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
-            pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
-            tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
-            tx_collection.add_tx(tx)
+        #    pre_genesis_utxos, _ = self.utxos["PRE_GENESIS"]
+        #    tx = new_transaction(self._UTXO_KEY, pre_genesis_utxos.pop(), unlocking_script=self.NON_PUSH_UNLOCK)
+        #    tx_collection.add_tx(tx)

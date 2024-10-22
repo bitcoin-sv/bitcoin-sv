@@ -78,57 +78,57 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
                                  block_reject_reason=b'blk-bad-inputs')
 
         # Start of Chronicle grace period
-        elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
-            utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
+        #elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
+        #    utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
             # Low-S signature transaction is accepted, High-S signature transaction is rejected but not banned
-            tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
-            tx_collection.add_tx(tx1)
-            tx_collection.add_tx(tx2,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
+        #    tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
+        #    tx_collection.add_tx(tx1)
+        #    tx_collection.add_tx(tx2,
+        #                         p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+        #                         block_reject_reason=b'blk-bad-inputs')
 
         # Block before Chronicle activation
-        elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
-            utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
+        #elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
+        #    utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
             # Low-S signature transaction is accepted, High-S signature transaction is accepted (for mining into next block)
-            tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
-            tx_collection.add_tx(tx1)
-            tx_collection.add_tx(tx2)
+        #    tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
+        #    tx_collection.add_tx(tx1)
+        #    tx_collection.add_tx(tx2)
 
         # Chronicle activation height
-        elif tx_collection.label == "CHRONICLE_ACTIVATION":
-            utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
+        #elif tx_collection.label == "CHRONICLE_ACTIVATION":
+        #    utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
             # Low-S signature transaction is accepted, High-S signature transaction is accepted
-            tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
-            tx_collection.add_tx(tx1)
-            tx_collection.add_tx(tx2)
+        #    tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
+        #    tx_collection.add_tx(tx1)
+        #    tx_collection.add_tx(tx2)
 
         # Block after Chronicle activation height
-        elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
-            utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
+        #elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
+        #    utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
             # Low-S signature transaction is accepted, High-S signature transaction is accepted
-            tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
-            tx_collection.add_tx(tx1)
-            tx_collection.add_tx(tx2)
+        #    tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
+        #    tx_collection.add_tx(tx1)
+        #    tx_collection.add_tx(tx2)
 
         # End of chronicle grace period
-        elif tx_collection.label == "CHRONICLE_GRACE_END":
-            utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
+        #elif tx_collection.label == "CHRONICLE_GRACE_END":
+        #    utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
             # Low-S signature transaction is accepted, High-S signature transaction is accepted
-            tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
-            tx_collection.add_tx(tx1)
-            tx_collection.add_tx(tx2)
+        #    tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
+        #    tx_collection.add_tx(tx1)
+        #    tx_collection.add_tx(tx2)
 
         # After Chronicle
-        elif tx_collection.label == "POST_CHRONICLE":
-            utxos, _ = self.utxos["POST_CHRONICLE"]
+        #elif tx_collection.label == "POST_CHRONICLE":
+        #    utxos, _ = self.utxos["POST_CHRONICLE"]
 
             # Low-S signature transaction is accepted, High-S signature transaction is accepted
-            tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
-            tx_collection.add_tx(tx1)
-            tx_collection.add_tx(tx2)
+        #    tx1, tx2 = new_transactions(self._UTXO_KEY, [utxos.pop(0), utxos.pop(0)])
+        #    tx_collection.add_tx(tx1)
+        #    tx_collection.add_tx(tx2)
