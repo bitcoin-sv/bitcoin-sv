@@ -160,7 +160,7 @@ public:
     /**
      * Check whether a signature is normalized (lower-S).
      */
-    static bool CheckLowS(const std::vector<uint8_t> &vchSig);
+    static bool CheckLowS(std::span<const uint8_t> sig);
 
     //! Recover a public key from a compact signature.
     bool RecoverCompact(const uint256 &hash,

@@ -232,13 +232,11 @@ static bool IsValidSignatureEncoding(const std::vector<uint8_t> &sig) {
     return true;
 }
 
-static bool IsLowDERSignature(const valtype &vchSig, ScriptError *serror)
+static bool IsLowDERSignature(const valtype& vchSig, ScriptError* serror)
 {
-    std::vector<uint8_t> vchSigCopy(vchSig.begin(),
-                                    vchSig.begin() + vchSig.size() - 1);
-    if (!CPubKey::CheckLowS(vchSigCopy)) {
+    if(!CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
         return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
-    }
+
     return true;
 }
 
