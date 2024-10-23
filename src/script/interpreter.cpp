@@ -29,13 +29,6 @@
 
 namespace {
 
-inline bool set_error(ScriptError *ret, const ScriptError serror) {
-    if (ret) {
-        *ret = serror;
-    }
-    return false;
-}
-
 constexpr auto bits_per_byte{8};
 
 } // namespace
@@ -291,19 +284,23 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
     return malleability_status{};
 }
 
-static bool CheckPubKeyEncoding(const valtype &vchPubKey, uint32_t flags,
-                                ScriptError *serror) {
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 &&
-        !IsCompressedOrUncompressedPubKey(vchPubKey)) {
-        return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
+static ScriptError CheckPubKeyEncoding(const valtype& vchPubKey, uint32_t flags)
+{
+    if((flags & SCRIPT_VERIFY_STRICTENC) != 0 &&
+       !IsCompressedOrUncompressedPubKey(vchPubKey))
+    {
+        return SCRIPT_ERR_PUBKEYTYPE;
     }
+    
     // Only compressed keys are accepted when
     // SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE is enabled.
-    if (flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE &&
-        !IsCompressedPubKey(vchPubKey)) {
-        return set_error(serror, SCRIPT_ERR_NONCOMPRESSED_PUBKEY);
+    if(flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE &&
+       !IsCompressedPubKey(vchPubKey))
+    {
+        return SCRIPT_ERR_NONCOMPRESSED_PUBKEY;
     }
-    return true;
+
+    return SCRIPT_ERR_OK;
 }
 
 static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
@@ -388,8 +385,6 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     CScript::const_iterator pbegincodehash = script.begin();
     opcodetype opcode;
     valtype vchPushValue;
-
-    ScriptError serror{SCRIPT_ERR_UNKNOWN_ERROR};
 
     const bool utxo_after_genesis { (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0 };
     const bool utxo_after_chronicle { (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0 };
@@ -1404,9 +1399,13 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         const auto v{CheckSignatureEncoding(vchSig.GetElement(), flags)};
                         if(std::holds_alternative<ScriptError>(v))
                             return v;
-                            
-                        if(!CheckPubKeyEncoding(vchPubKey.GetElement(), flags, &serror))
-                            return serror;
+
+                        if(const ScriptError error{
+                               CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
+                           error != SCRIPT_ERR_OK)
+                        {
+                            return error;
+                        }
                             
                         // Subset of script starting at the most recent
                         // codeseparator
@@ -1510,8 +1509,12 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             if(std::holds_alternative<ScriptError>(v))
                                 return v;
 
-                            if(!CheckPubKeyEncoding(vchPubKey.GetElement(), flags, &serror))
-                                return serror;
+                            if(const auto error{
+                                   CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
+                               error != SCRIPT_ERR_OK)
+                            {
+                                return error;
+                            }
 
                             // Check signature
                             bool fOk = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
