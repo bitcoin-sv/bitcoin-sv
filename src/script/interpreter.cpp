@@ -232,14 +232,6 @@ static bool IsValidSignatureEncoding(const std::vector<uint8_t> &sig) {
     return true;
 }
 
-static bool IsLowDERSignature(const valtype& vchSig, ScriptError* serror)
-{
-    if(!CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
-        return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
-
-    return true;
-}
-
 static SigHashType GetHashType(const valtype &vchSig) {
     if (vchSig.size() == 0) {
         return SigHashType(0);
@@ -270,11 +262,13 @@ bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
         !IsValidSignatureEncoding(vchSig)) {
         return set_error(serror, SCRIPT_ERR_SIG_DER);
     }
-    if ((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
-        !IsLowDERSignature(vchSig, serror)) {
-        // serror is set
-        return false;
+    
+    if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
+       !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
+    {
+        return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
     }
+    
     if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) {
         if (!GetHashType(vchSig).isDefined()) {
             return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
