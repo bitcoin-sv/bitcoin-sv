@@ -29,10 +29,9 @@ namespace task
   class CCancellationToken;
 }
 
-bool CheckSignatureEncoding(
+std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
     const std::vector<uint8_t>& sig,
-    uint32_t flags,
-    ScriptError*);
+    uint32_t flags);
 
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,

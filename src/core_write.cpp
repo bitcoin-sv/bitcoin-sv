@@ -14,6 +14,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include <univalue.h>
+#include <variant>
 
 std::string FormatScript(const CScript &script) {
     std::string ret;
@@ -140,7 +141,9 @@ void ScriptToAsmStr(const CScript& script,
                         // TODO: Remove after the Hard Fork.
                         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
                     }
-                    if (CheckSignatureEncoding(vch, flags, nullptr))
+                    
+                    const auto v = CheckSignatureEncoding(vch, flags); 
+                    if(std::holds_alternative<malleability_status>(v))
                     {
                         const uint8_t chSigHashType = vch.back();
                         if (mapSigHashTypes.count(chSigHashType))

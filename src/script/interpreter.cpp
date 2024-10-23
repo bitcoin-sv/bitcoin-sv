@@ -250,41 +250,45 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
-                            ScriptError *serror) {
+std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
+    const std::vector<uint8_t>& vchSig,
+    uint32_t flags)
+{
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
-    if (vchSig.size() == 0) {
-        return true;
-    }
-    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
-                  SCRIPT_VERIFY_STRICTENC)) != 0 &&
-        !IsValidSignatureEncoding(vchSig)) {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+    if(vchSig.empty())
+        return malleability_status{};
+    
+    if((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
+                 SCRIPT_VERIFY_STRICTENC)) != 0 &&
+        !IsValidSignatureEncoding(vchSig))
+    {
+        return SCRIPT_ERR_SIG_DER;
     }
     
     if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
        !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
     {
-        return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
+        return SCRIPT_ERR_SIG_HIGH_S;
     }
     
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) {
-        if (!GetHashType(vchSig).isDefined()) {
-            return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
-        }
-        bool usesForkId = GetHashType(vchSig).hasForkId();
-        bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (!forkIdEnabled && usesForkId) {
-            return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
-        }
+    if((flags & SCRIPT_VERIFY_STRICTENC) != 0)
+    {
+        if(!GetHashType(vchSig).isDefined())
+            return SCRIPT_ERR_SIG_HASHTYPE;
+
+        const bool usesForkId = GetHashType(vchSig).hasForkId();
+        const bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
+        if(!forkIdEnabled && usesForkId)
+            return SCRIPT_ERR_ILLEGAL_FORKID;
+
         // ForkID becomes optional post-Chronicle
-        bool preChronicle = !(flags & SCRIPT_CHRONICLE);
-        if (preChronicle && forkIdEnabled && !usesForkId) {
-            return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
-        }
+        const bool preChronicle = !(flags & SCRIPT_CHRONICLE);
+        if(preChronicle && forkIdEnabled && !usesForkId)
+            return SCRIPT_ERR_MUST_USE_FORKID;
     }
-    return true;
+
+    return malleability_status{};
 }
 
 static bool CheckPubKeyEncoding(const valtype &vchPubKey, uint32_t flags,
@@ -1397,11 +1401,13 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         LimitedVector &vchSig = stack.stacktop(-2);
                         LimitedVector &vchPubKey = stack.stacktop(-1);
 
-                        if (!CheckSignatureEncoding(vchSig.GetElement(), flags, &serror) ||
-                            !CheckPubKeyEncoding(vchPubKey.GetElement(), flags, &serror)) {
+                        const auto v{CheckSignatureEncoding(vchSig.GetElement(), flags)};
+                        if(std::holds_alternative<ScriptError>(v))
+                            return v;
+                            
+                        if(!CheckPubKeyEncoding(vchPubKey.GetElement(), flags, &serror))
                             return serror;
-                        }
-
+                            
                         // Subset of script starting at the most recent
                         // codeseparator
                         CScript scriptCode(pbegincodehash, pend);
@@ -1500,10 +1506,12 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             // CHECKMULTISIG NOT if the STRICTENC flag is set.
                             // See the script_(in)valid tests for details.
 
-                            if (!CheckSignatureEncoding(vchSig.GetElement(), flags, &serror) ||
-                                !CheckPubKeyEncoding(vchPubKey.GetElement(), flags, &serror)) {
+                            const auto v = CheckSignatureEncoding(vchSig.GetElement(), flags);
+                            if(std::holds_alternative<ScriptError>(v))
+                                return v;
+
+                            if(!CheckPubKeyEncoding(vchPubKey.GetElement(), flags, &serror))
                                 return serror;
-                            }
 
                             // Check signature
                             bool fOk = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
