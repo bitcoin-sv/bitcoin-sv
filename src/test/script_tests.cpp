@@ -3114,6 +3114,15 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
         {0, high_s_min, {}, malleability_status::non_malleable},
         {SCRIPT_VERIFY_LOW_S, low_s_max, {}, malleability_status::non_malleable},
         {SCRIPT_VERIFY_LOW_S, high_s_min, SCRIPT_ERR_SIG_HIGH_S, {}},
+        
+        {SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
+                low_s_max, {}, malleability_status::non_malleable},
+        {SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
+                high_s_min, {}, malleability_status::non_malleable},
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
+                low_s_max, {}, malleability_status::non_malleable},
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
+                high_s_min, {}, malleability_status::high_s},
     };
     for(const auto& [flags, s_str, exp_error, exp_mall] : test_data)
     {
@@ -3174,5 +3183,4 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
             assert(false);
     }
 }
-
 BOOST_AUTO_TEST_SUITE_END()

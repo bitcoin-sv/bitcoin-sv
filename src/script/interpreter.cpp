@@ -262,7 +262,10 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
     if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
        !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
     {
-        return SCRIPT_ERR_SIG_HIGH_S;
+        if(flags & SCRIPT_CHRONICLE)
+            return malleability_status{malleability_status::high_s};
+        else
+            return SCRIPT_ERR_SIG_HIGH_S;
     }
     
     if((flags & SCRIPT_VERIFY_STRICTENC) != 0)
@@ -414,7 +417,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     // if OP_RETURN is found in executed branches after genesis is activated,
     // we still have to check if the rest of the script is valid
     bool nonTopLevelReturnAfterGenesis = false;
-    
+
+    malleability_status ms;
     try {
         while (pc < pend) {
             if (token.IsCanceled())
@@ -1399,6 +1403,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         const auto v{CheckSignatureEncoding(vchSig.GetElement(), flags)};
                         if(std::holds_alternative<ScriptError>(v))
                             return v;
+                        else
+                            ms = std::get<malleability_status>(v);
 
                         if(const ScriptError error{
                                CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
@@ -1726,7 +1732,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
         return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
     }
 
-    return malleability_status{};
+    return ms;
 }
 
 std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
