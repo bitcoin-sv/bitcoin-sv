@@ -3,6 +3,7 @@
 // LICENSE.
 
 #include <cstdint>
+#include <iosfwd>
 
 struct malleability_status
 {
@@ -16,19 +17,26 @@ struct malleability_status
     };
 
     constexpr malleability_status() = default;
-    constexpr explicit malleability_status(uint8_t e):
+    constexpr malleability_status(uint8_t e):
         value_{static_cast<Enum>(0xf & e)}
+    {}
+    
+    constexpr malleability_status(Enum value): value_{value}
     {}
 
     constexpr Enum value() const { return value_; }
+
+    constexpr bool operator==(const malleability_status&) const = default;
 
 private:
     Enum value_{non_malleable};
 };
 
+std::ostream& operator<<(std::ostream&, const malleability_status&);
+
 constexpr bool is_malleable(malleability_status s)
 {
-    return s.value() != malleability_status::non_malleable;
+    return s != malleability_status::non_malleable;
 }
 
 constexpr bool is_unclean_stack(malleability_status s)
