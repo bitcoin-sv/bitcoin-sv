@@ -2996,42 +2996,36 @@ BOOST_AUTO_TEST_CASE(get_script_verify_flags)
     // Node pre-genesis, utxo pre-genesis
     flags = InputScriptVerifyFlags(ProtocolEra::PreGenesis, ProtocolEra::PreGenesis);
     BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY));
-    BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY_WITH_FORKID));
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_GENESIS));
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_CHRONICLE));
 
     // Node post-genesis, utxo pre-genesis
     flags = InputScriptVerifyFlags(ProtocolEra::PostGenesis, ProtocolEra::PreGenesis);
     BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY);
-    BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY_WITH_FORKID));
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_GENESIS));
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_CHRONICLE));
 
     // Node post-chronicle, utxo pre-genesis
     flags = InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PreGenesis);
-    BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY));
-    BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY_WITH_FORKID);
+    BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY);
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_GENESIS));
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_CHRONICLE));
 
     // Node post-genesis, utxo post-genesis
     flags = InputScriptVerifyFlags(ProtocolEra::PostGenesis, ProtocolEra::PostGenesis);
     BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY);
-    BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY_WITH_FORKID));
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_GENESIS);
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_CHRONICLE));
 
     // Node post-chronicle, utxo post-genesis
     flags = InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostGenesis);
-    BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY));
-    BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY_WITH_FORKID);
+    BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY);
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_GENESIS);
     BOOST_CHECK(!(flags & SCRIPT_UTXO_AFTER_CHRONICLE));
 
     // Node post-chronicle, utxo post-chronicle
     flags = InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle);
-    BOOST_CHECK(!(flags & SCRIPT_VERIFY_SIGPUSHONLY));
-    BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY_WITH_FORKID);
+    BOOST_CHECK(flags & SCRIPT_VERIFY_SIGPUSHONLY);
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_GENESIS);
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_CHRONICLE);
 }

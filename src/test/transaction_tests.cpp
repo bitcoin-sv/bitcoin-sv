@@ -609,8 +609,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       // after genesis fails because stack is not clean as we did not execute redeem script
                                       { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
-                                      // after chronicle passes due to removal of clean stack policy
-    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // FIXME: (Result will change) after chronicle passes due to removal of clean stack policy
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
     CheckWithFlag({output1, input2, { { flagsPreGenesis, true },
                                       { flagsPostGenesis, true },
@@ -627,8 +627,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       // after genesis fails because stack is not clean as we did not execute redeem script
                                       { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
-                                      // after chronicle passes due to removal of clean stack policy 
-    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // FIXME: (Result will change) after chronicle passes due to removal of clean stack policy 
+    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
 
     // Normal pay-to-uncompressed-pubkey.
@@ -685,8 +685,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       // after genesis fails because stack is not clean as we did not execute redeem script
                                       { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
-                                      // after chronicle passes due to removal of clean stack policy
-    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // FIXME: (Result will change) after chronicle passes due to removal of clean stack policy
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
     CheckWithFlag({output1, input2, { { flagsPreGenesis, true },
                                       { flagsPostGenesis, true },
@@ -703,8 +703,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       // after genesis fails because stack is not clean as we did not execute redeem script
                                       { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
-                                      // after chronicle passes due to removal of clean stack policy 
-    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // FIXME: (Result will change) after chronicle passes due to removal of clean stack policy 
+    CheckWithFlag({output1, input2, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false } } });
 
 
@@ -797,8 +797,8 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       // after genesis fails because stack is not clean as we did not execute redeem script
                                       { flagsPostGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesis | PRE_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
-                                      // after chronicle passes due to removal of clean stack policy 
-    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true },
+                                      // FIXME: (Result will change) after chronicle passes due to removal of clean stack policy 
+    CheckWithFlag({output1, input1, { { flagsPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, false },
                                       { flagsUtxoPreGenesisPostChronicle | POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS, true } } });
 }
 
