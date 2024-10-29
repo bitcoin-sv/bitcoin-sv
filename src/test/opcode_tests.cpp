@@ -18,6 +18,7 @@
 #include "config.h"
 #include "script/limitedstack.h"
 
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <array>
@@ -2557,6 +2558,57 @@ BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
     const auto v{status.value()};
     BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, std::get<ScriptError>(v));
     BOOST_CHECK_EQUAL(0U, stack.size());
+}
+
+BOOST_AUTO_TEST_CASE(op_2rot)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    
+    using test_args = tuple<vector<uint8_t>,            // script
+                            uint32_t,                   // flags
+                            ScriptError,                // expected scriptError
+                            vector<uint8_t>>;           // expected stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+        // stack too small
+        {{OP_5, OP_4, OP_3, OP_2, OP_1, OP_2ROT}, flags,
+                SCRIPT_ERR_INVALID_STACK_OPERATION, {1, 2, 3, 4, 5}},
+       
+        // Happy case
+        {{OP_6, OP_5, OP_4, OP_3, OP_2, OP_1, OP_2ROT}, flags,
+                SCRIPT_ERR_OK, {5, 6, 1, 2, 3, 4}},
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_error,
+                     exp_stack] : test_data)
+    {
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        else
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+        }
+
+        for(auto i=1u; i <= exp_stack.size(); ++i)
+            BOOST_CHECK_EQUAL(exp_stack[i-1],
+                              stack.stacktop(-1 * i).front());
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
