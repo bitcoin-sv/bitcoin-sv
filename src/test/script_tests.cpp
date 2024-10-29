@@ -22,10 +22,8 @@
 #include "test/scriptflags.h"
 #include "test/sigutil.h"
 #include "test/test_bitcoin.h"
-#include "util.h"
 #include "utilstrencodings.h"
 #include "config.h"
-#include <variant>
 
 #if defined(HAVE_CONSENSUS_LIB)
 #include "script/bitcoinconsensus.h"
@@ -34,12 +32,13 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include <fstream>
 #include <string>
 #include <tuple>
 #include <vector>
+#include <variant>
 
 #include <boost/test/unit_test.hpp>
+#include <boost/algorithm/hex.hpp>
 
 #include <univalue.h>
 
@@ -3094,6 +3093,85 @@ BOOST_AUTO_TEST_CASE(chronicle_forkid_script_validation)
     for(TestBuilder& test : tests)
     {
         test.Test();
+    }
+}
+
+BOOST_AUTO_TEST_CASE(EvalScript_lows)
+{
+    using namespace std;
+
+    const string low_s_max{     // See BIP-146
+            "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"};
+    const string high_s_min{
+            "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1"};
+    using test_args = tuple<uint32_t,   // flags
+                            string,     // s 
+                            std::optional<ScriptError>,
+                            std::optional<malleability_status::Enum>>;
+    const vector<test_args> test_data 
+    {
+        {0, low_s_max,  {}, malleability_status::non_malleable},
+        {0, high_s_min, {}, malleability_status::non_malleable},
+        {SCRIPT_VERIFY_LOW_S, low_s_max, {}, malleability_status::non_malleable},
+        {SCRIPT_VERIFY_LOW_S, high_s_min, SCRIPT_ERR_SIG_HIGH_S, {}},
+    };
+    for(const auto& [flags, s_str, exp_error, exp_mall] : test_data)
+    {
+        const Config& config = GlobalConfig::GetConfig();
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto rs_len{32};
+        const auto sig_len{2 * (2 + rs_len)};
+        const auto der_len{sig_len + 2};
+        const auto type_code{2};
+
+        // signature
+        vector<uint8_t> script{der_len + 1,
+                               0x30,
+                               sig_len,
+                               type_code,
+                               rs_len};
+        script.insert(script.end(), rs_len, 42);  // r
+        script.push_back(type_code);
+        const auto s{[](const string& s)
+        {
+            vector<uint8_t> v;
+            boost::algorithm::unhex(s.begin(), s.end(),back_inserter(v));
+            return v;
+        }(s_str)};
+        script.push_back(s.size());
+        script.insert(script.end(), s.begin(), s.end());
+        const auto sighash{0};
+        script.push_back(sighash);
+
+        // pub key
+        const auto pk_len{32};
+        script.push_back(pk_len);
+        script.insert(script.end(), pk_len, 101);
+        
+        script.push_back(OP_CHECKSIG);
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(!exp_error && exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK_EQUAL(malleability_status{exp_mall.value()},
+                              std::get<malleability_status>(v));
+        }
+        else if(exp_error && !exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+        }
+        else
+            assert(false);
     }
 }
 
