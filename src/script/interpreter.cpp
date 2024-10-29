@@ -856,12 +856,12 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         // (x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2)
                         if (stack.size() < 6)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
- 
-                        LimitedVector vch1 = stack.stacktop(-6);
-                        LimitedVector vch2 = stack.stacktop(-5);
-                        stack.erase(- 6, - 4);
-                        stack.push_back(std::move(vch1));
-                        stack.push_back(std::move(vch2));
+
+						const auto stack_size{stack.size()};
+						stack.swapElements(stack_size-1, stack_size-3);
+						stack.swapElements(stack_size-2, stack_size-4);
+						stack.swapElements(stack_size-1, stack_size-5);
+						stack.swapElements(stack_size-2, stack_size-6);
                     } break;
 
                     case OP_2SWAP: {
