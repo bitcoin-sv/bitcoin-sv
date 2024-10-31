@@ -283,12 +283,15 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
         if(forkIdEnabled)
         {
             if(usesForkId)
+            {
                 ms |= malleability::disallowed;
-            
-            if(!usesForkId)
+            }
+            else
+            {
                 // ForkID optional post-Chronicle
                 if((flags & SCRIPT_CHRONICLE) == 0)
                     return SCRIPT_ERR_MUST_USE_FORKID;
+            }
         }
     }
 
@@ -2245,20 +2248,9 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
 
     }
 
-    // The CLEANSTACK check is only performed after potential P2SH evaluation,
-    // as the non-P2SH evaluation of a P2SH script will obviously not result in
-    // a clean stack (the P2SH inputs remain). The same holds for witness
-    // evaluation.
-    if ((flags & SCRIPT_VERIFY_CLEANSTACK) != 0) {
-        // Disallow CLEANSTACK without P2SH, as otherwise a switch
-        // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
-        // softfork (and P2SH should be one).
-        if((flags & SCRIPT_VERIFY_P2SH) == 0)
-            return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
-
-        if(stack.size() != 1)
-            return std::make_pair(false, SCRIPT_ERR_CLEANSTACK);
-    }
+    // Set unclean stack bit in malleability status
+    if(stack.size() != 1)
+        our_malleability |= malleability::unclean_stack;
 
     // malleability::status fully atomically combined for us after this point.
     // We then use value we wrote to atomic without reading it again to
@@ -2266,6 +2258,29 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     // below (not that it would really matter if we did see different values,
     // but it avoids confusion).
     malleability::status combined_malleability { malleability |= our_malleability };
+
+    // The CLEANSTACK check is only performed after potential P2SH evaluation,
+    // as the non-P2SH evaluation of a P2SH script will obviously not result in
+    // a clean stack (the P2SH inputs remain). The same holds for witness
+    // evaluation.
+    if (flags & SCRIPT_VERIFY_CLEANSTACK)
+    {
+        // Disallow CLEANSTACK without P2SH, as otherwise a switch
+        // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
+        // softfork (and P2SH should be one).
+        if(!(flags & SCRIPT_VERIFY_P2SH))
+            return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
+
+        // If Chronicle is activated then apply clean stack check only if FORKID is set.
+        // (Since clean stack rule was only ever a policy rule (not consensus) it doesn't
+        // make sense to make it dependent on UTXO age).
+        bool checkCleanStack { (flags & SCRIPT_CHRONICLE)? is_disallowed(combined_malleability) : true };
+
+        if(checkCleanStack && is_unclean_stack(combined_malleability))
+        {
+            return std::make_pair(false, SCRIPT_ERR_CLEANSTACK);
+        }
+    }
 
     // Checks for non-push-only scriptSig
     if(flags & SCRIPT_VERIFY_SIGPUSHONLY)
@@ -2288,6 +2303,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         }
     }
 
+    // Checks for Low-S
     if(flags & SCRIPT_CHRONICLE)
     {
        if(flags & SCRIPT_VERIFY_LOW_S)
