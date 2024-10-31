@@ -8,24 +8,45 @@
 
 std::ostream& operator<<(std::ostream& os, const malleability_status& ms)
 {
-    switch(ms.value())
+    if(!is_malleable(ms))
+        os << "non_malleable";
+    else
     {
-        case malleability_status::non_malleable:
-            os << "non_malleable";
-            break;
-        case malleability_status::unclean_stack:
+        bool separate{false};
+        if(is_unclean_stack(ms))
+        {
             os << "unclean_stack";
-            break;
-        case malleability_status::non_minimal_encoding:
+            separate = true;
+        }   
+        if(is_non_minimal_encoding(ms))
+        {
+            if(separate)
+                os << " | ";
+            else
+                separate = true;
             os << "non_minimal_encoding";
-            break;
-        case malleability_status::high_s:
+        }
+        if(is_high_s(ms))
+        {
+            if(separate)
+                os << " | ";
+            else
+                separate = true;
             os << "high_s";
-            break;
-        case malleability_status::non_push_data:
+        }
+        if(has_non_push_data(ms))
+        {
+            if(separate)
+                os << " | ";
+            else
+                separate = true;
             os << "non_push_data";
-            break;
+        }
     }
+
+    if(is_disallowed(ms))
+        os << " | disallowed";
+
     return os;
 }
 
