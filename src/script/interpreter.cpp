@@ -259,11 +259,12 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
         return SCRIPT_ERR_SIG_DER;
     }
     
+    malleability_status ms;
     if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
        !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
     {
         if(flags & SCRIPT_CHRONICLE)
-            return malleability_status{malleability_status::high_s};
+            ms |= malleability_status::high_s;
         else
             return SCRIPT_ERR_SIG_HIGH_S;
     }
@@ -278,13 +279,23 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
         if(!forkIdEnabled && usesForkId)
             return SCRIPT_ERR_ILLEGAL_FORKID;
 
-        // ForkID becomes optional post-Chronicle
-        const bool preChronicle = !(flags & SCRIPT_CHRONICLE);
-        if(preChronicle && forkIdEnabled && !usesForkId)
-            return SCRIPT_ERR_MUST_USE_FORKID;
+        if(forkIdEnabled)
+        {
+            // ForkID becomes optional post-Chronicle
+            if(flags & SCRIPT_CHRONICLE)
+            {
+                if(usesForkId)
+                    ms |= malleability_status::disallowed;
+            }
+            else
+            {
+                if(!usesForkId)
+                    return SCRIPT_ERR_MUST_USE_FORKID;
+            }
+        }
     }
 
-    return malleability_status{};
+    return ms;
 }
 
 static ScriptError CheckPubKeyEncoding(const valtype& vchPubKey, uint32_t flags)
@@ -1404,7 +1415,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         if(std::holds_alternative<ScriptError>(v))
                             return v;
                         else
-                            ms = std::get<malleability_status>(v);
+                            ms |= std::get<malleability_status>(v);
 
                         if(const ScriptError error{
                                CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
