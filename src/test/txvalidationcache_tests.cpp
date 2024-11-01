@@ -564,7 +564,9 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         auto shouldPass = [](uint32_t flags) -> bool {
             bool isUtxoAfterGenesis = flags & SCRIPT_UTXO_AFTER_GENESIS;
-            bool isCleanStackEnforced = flags & SCRIPT_VERIFY_CLEANSTACK;
+            bool p2shExecuted = (flags & SCRIPT_VERIFY_P2SH) && !isUtxoAfterGenesis;
+            bool isCleanStackEnforced = (flags & SCRIPT_VERIFY_CLEANSTACK) && (!(flags & SCRIPT_CHRONICLE) || p2shExecuted);
+
             return !(isUtxoAfterGenesis && isCleanStackEnforced); 
         };
 

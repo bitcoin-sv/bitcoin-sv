@@ -1711,6 +1711,193 @@ BOOST_AUTO_TEST_CASE(chronicle_pushdata_only)
     }
 }
 
+BOOST_AUTO_TEST_CASE(chronicle_clean_stack)
+{
+    const KeyData keys;
+
+    std::vector<TestBuilder> tests;
+
+    auto postChronicleFlags { SCRIPT_GENESIS |
+                              SCRIPT_UTXO_AFTER_GENESIS |
+                              SCRIPT_CHRONICLE |
+                              SCRIPT_UTXO_AFTER_CHRONICLE |
+                              SCRIPT_ENABLE_SIGHASH_FORKID |
+                              SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_P2SH };
+
+    // Post-Chronicle, stack is clean, signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                "PostChronicle, stack is clean, with FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, stack is clean, signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                "PostChronicle, stack is clean, without FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, stack is clean, mixed-sig forkid
+    tests.push_back(
+        TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
+                                      << ToByteVector(keys.pubkey1C)
+                                      << ToByteVector(keys.pubkey2C) << OP_3
+                                      << OP_CHECKMULTISIG,
+                "PostChronicle, stack is clean, mixed-sig FORKID", postChronicleFlags, false)
+            .Num(0)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    // Post-Chronicle, stack is unclean (top item true), signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE,
+                "PostChronicle, stack is unclean (top item true), with FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed | malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_CLEANSTACK));
+    // Post-Chronicle, stack is unclean (top item true), signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE,
+                "PostChronicle, stack is unclean (top item true), without FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, stack is unclean (top item true), mixed-sig forkid
+    tests.push_back(
+        TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
+                                      << ToByteVector(keys.pubkey1C)
+                                      << ToByteVector(keys.pubkey2C) << OP_3
+                                      << OP_CHECKMULTISIG << OP_TRUE,
+                "PostChronicle, stack is unclean (top item true), mixed-sig FORKID", postChronicleFlags, false)
+            .Num(0)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed | malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_CLEANSTACK));
+
+    // Post-Chronicle, stack is unclean (top item false), signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_FALSE,
+                "PostChronicle, stack is unclean (top item false), with FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable) // FALSE check occurs before we even hit malleability checks
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+    // Post-Chronicle, stack is unclean (top item false), signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_FALSE,
+                "PostChronicle, stack is unclean (top item false), without FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable) // FALSE check occurs before we even hit malleability checks
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+    // Post-Chronicle, stack is unclean (top item false), mixed-sig forkid
+    tests.push_back(
+        TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
+                                      << ToByteVector(keys.pubkey1C)
+                                      << ToByteVector(keys.pubkey2C) << OP_3
+                                      << OP_CHECKMULTISIG << OP_FALSE,
+                "PostChronicle, stack is unclean (top item false), mixed-sig FORKID", postChronicleFlags, false)
+            .Num(0)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable) // FALSE check occurs before we even hit malleability checks
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+
+    // Post-Chronicle, stack is unclean (multiple items, top item true), signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE << OP_TRUE,
+                "PostChronicle, stack is unclean (multiple items, top item true), with FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed | malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_CLEANSTACK));
+    // Post-Chronicle, stack is unclean (multiple items, top item true), signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE << OP_TRUE,
+                "PostChronicle, stack is unclean (multiple items, top item true), without FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, stack is unclean (multiple items, top item true), mixed-sig forkid
+    tests.push_back(
+        TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
+                                      << ToByteVector(keys.pubkey1C)
+                                      << ToByteVector(keys.pubkey2C) << OP_3
+                                      << OP_CHECKMULTISIG << OP_TRUE << OP_TRUE,
+                "PostChronicle, stack is unclean (multiple items, top item true), mixed-sig FORKID", postChronicleFlags, false)
+            .Num(0)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed | malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_CLEANSTACK));
+
+    // Post-Chronicle, stack is unclean (multiple items, top item false), signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE << OP_FALSE,
+                "PostChronicle, stack is unclean (multiple items, top item false), with FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable) // FALSE check occurs before we even hit malleability checks
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+    // Post-Chronicle, stack is unclean (multiple items, top item false), signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE << OP_FALSE,
+                "PostChronicle, stack is unclean (multiple items, top item false), without FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable) // FALSE check occurs before we even hit malleability checks
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+    // Post-Chronicle, stack is unclean (multiple items, top item false), mixed-sig forkid
+    tests.push_back(
+        TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
+                                      << ToByteVector(keys.pubkey1C)
+                                      << ToByteVector(keys.pubkey2C) << OP_3
+                                      << OP_CHECKMULTISIG << OP_TRUE << OP_FALSE,
+                "PostChronicle, stack is unclean (multiple items, top item false), mixed-sig FORKID", postChronicleFlags, false)
+            .Num(0)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::non_malleable) // FALSE check occurs before we even hit malleability checks
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+
+    // Post-Chronicle, stack is unclean (multiple items, top item castable true), signed with forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE << OP_9,
+                "PostChronicle, stack is unclean (multiple items, top item castable true), with FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed | malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_CLEANSTACK));
+    // Post-Chronicle, stack is unclean (multiple items, top item castable true), signed without forkid
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_TRUE << OP_9,
+                "PostChronicle, stack is unclean (multiple items, top item castable true), without FORKID", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, stack is unclean (multiple items, top item castable true), mixed-sig forkid
+    tests.push_back(
+        TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
+                                      << ToByteVector(keys.pubkey1C)
+                                      << ToByteVector(keys.pubkey2C) << OP_3
+                                      << OP_CHECKMULTISIG << OP_TRUE << OP_9,
+                "PostChronicle, stack is unclean (multiple items, top item castable true), mixed-sig FORKID", postChronicleFlags, false)
+            .Num(0)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+            .Malleability(malleability::disallowed | malleability::unclean_stack)
+            .ScriptError(SCRIPT_ERR_CLEANSTACK));
+
+    for (TestBuilder& test : tests)
+    {
+        test.Test();
+    }
+}
+
 BOOST_AUTO_TEST_CASE(script_PushData) {
     // Check that PUSHDATA1, PUSHDATA2, and PUSHDATA4 create the same value on
     // the stack as the 1-75 opcodes do.
