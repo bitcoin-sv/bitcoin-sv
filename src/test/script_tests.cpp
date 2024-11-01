@@ -12,6 +12,7 @@
 #include "rpc/server.h"
 #include "script/opcodes.h"
 #include "script/script.h"
+#include "script/script_flags.h"
 #include "script/script_num.h"
 #include "script/sigcache.h"
 #include "script/script_error.h"
@@ -120,6 +121,32 @@ ScriptError_t ParseScriptError(const std::string &name) {
 
     BOOST_ERROR("Unknown scripterror \"" << name << "\" in test description");
     return SCRIPT_ERR_UNKNOWN_ERROR;
+}
+
+static const auto unhex{[](const std::string& s)
+{
+    std::vector<uint8_t> v;
+    boost::algorithm::unhex(s.begin(), s.end(),
+                            back_inserter(v));
+    return v;
+}};
+
+static const std::vector<uint8_t>& low_s_max()
+{
+    // see bip-146 
+    static std::string low_s_max{"7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+                                 "5D576E7357A4501DDFE92F46681B20A0"};
+    static const std::vector<uint8_t> v{unhex(low_s_max)};
+    return v;
+}
+
+static const std::vector<uint8_t>& high_s_min()
+{
+    // see bip-146 
+    static const std::string high_s_min{"7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+                                        "5D576E7357A4501DDFE92F46681B20A1"};
+    static const std::vector<uint8_t> v{unhex(high_s_min)};
+    return v;
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_tests, BasicTestingSetup)
@@ -3100,31 +3127,27 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
 {
     using namespace std;
 
-    const string low_s_max{     // See BIP-146
-            "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"};
-    const string high_s_min{
-            "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1"};
-    using test_args = tuple<uint32_t,   // flags
-                            string,     // s 
+    using test_args = tuple<uint32_t,           // flags
+                            vector<uint8_t>,    // s 
                             std::optional<ScriptError>,
                             std::optional<malleability_status::Enum>>;
     const vector<test_args> test_data 
     {
-        {0, low_s_max,  {}, malleability_status::non_malleable},
-        {0, high_s_min, {}, malleability_status::non_malleable},
-        {SCRIPT_VERIFY_LOW_S, low_s_max, {}, malleability_status::non_malleable},
-        {SCRIPT_VERIFY_LOW_S, high_s_min, SCRIPT_ERR_SIG_HIGH_S, {}},
+        {0, low_s_max(),  {}, malleability_status::non_malleable},
+        {0, high_s_min(), {}, malleability_status::non_malleable},
+        {SCRIPT_VERIFY_LOW_S, low_s_max(), {}, malleability_status::non_malleable},
+        {SCRIPT_VERIFY_LOW_S, high_s_min(), SCRIPT_ERR_SIG_HIGH_S, {}},
         
         {SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
-                low_s_max, {}, malleability_status::non_malleable},
+                low_s_max(), {}, malleability_status::non_malleable},
         {SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
-                high_s_min, {}, malleability_status::non_malleable},
+                high_s_min(), {}, malleability_status::non_malleable},
         {SCRIPT_VERIFY_LOW_S | SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
-                low_s_max, {}, malleability_status::non_malleable},
+                low_s_max(), {}, malleability_status::non_malleable},
         {SCRIPT_VERIFY_LOW_S | SCRIPT_CHRONICLE | SCRIPT_UTXO_AFTER_GENESIS,
-                high_s_min, {}, malleability_status::high_s},
+                high_s_min(), {}, malleability_status::high_s},
     };
-    for(const auto& [flags, s_str, exp_error, exp_mall] : test_data)
+    for(const auto& [flags, s, exp_error, exp_mall] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
         auto source = task::CCancellationSource::Make();
@@ -3142,12 +3165,6 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
                                rs_len};
         script.insert(script.end(), rs_len, 42);  // r
         script.push_back(type_code);
-        const auto s{[](const string& s)
-        {
-            vector<uint8_t> v;
-            boost::algorithm::unhex(s.begin(), s.end(),back_inserter(v));
-            return v;
-        }(s_str)};
         script.push_back(s.size());
         script.insert(script.end(), s.begin(), s.end());
         const auto sighash{0};
@@ -3183,4 +3200,121 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
             assert(false);
     }
 }
+
+BOOST_AUTO_TEST_CASE(EvalScript_forkid)
+{
+    using namespace std;
+
+    using test_args = tuple<uint32_t,   // flags
+                            int,        // sighash 
+                            std::optional<ScriptError>,
+                            std::optional<malleability_status>>;
+    const vector<test_args> test_data 
+    {
+        {0,
+         0x0,
+         {},
+         std::make_optional<malleability_status>()},
+        {0,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+
+        {SCRIPT_VERIFY_STRICTENC,
+         0x0,
+         SCRIPT_ERR_SIG_HASHTYPE,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_VERIFY_STRICTENC,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_ILLEGAL_FORKID,
+         {}},
+        
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         0x0,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_FORKID,
+         SCRIPT_ERR_SIG_HASHTYPE,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL,
+         {SCRIPT_ERR_MUST_USE_FORKID},
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+    };
+    for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
+    {
+        const Config& config = GlobalConfig::GetConfig();
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto rs_len{32};
+        const auto sig_len{2 * (2 + rs_len)};
+        const auto der_len{sig_len + 2};
+        const auto type_code{2};
+
+        // signature
+        vector<uint8_t> script{der_len + 1,
+                               0x30,
+                               sig_len,
+                               type_code,
+                               rs_len};
+        script.insert(script.end(), rs_len, 42);  // r
+        script.push_back(type_code);
+        const auto& s = low_s_max();
+        script.push_back(s.size());
+        script.insert(script.end(), s.begin(), s.end());
+        script.push_back(sighash);
+
+        // pub key
+        const auto pk_len{33};
+        script.push_back(pk_len);
+        script.push_back(2);
+        script.insert(script.end(), pk_len - 1, 101);
+        
+        script.push_back(OP_CHECKSIG);
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(!exp_error && exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            
+            BOOST_CHECK_EQUAL(malleability_status{exp_mall.value()},
+                              std::get<malleability_status>(v));
+            const auto ms{std::get<malleability_status>(v)};
+            BOOST_CHECK_EQUAL(exp_mall.value(), ms);
+        }
+        else if(exp_error && !exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+        }
+        else
+            BOOST_CHECK(false);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
