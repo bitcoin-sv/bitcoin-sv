@@ -20,6 +20,7 @@
 #include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "protocol_era.h"
+#include "script/malleability_status.h"
 #include "script/script_error.h"
 #include "sync.h"
 #include "streams.h"
@@ -892,6 +893,7 @@ std::optional<bool> CheckInputScripts(
     const uint32_t flags,
     bool sigCacheStore,
     const PrecomputedTransactionData& txdata,
+    const std::shared_ptr<std::atomic<malleability::status>>& malleability,
     std::vector<CScriptCheck>* pvChecks);
 
 /**
@@ -1007,17 +1009,20 @@ private:
     PrecomputedTransactionData txdata;
     std::reference_wrapper<const Config> config;
     bool consensus = false;
+    std::shared_ptr<std::atomic<malleability::status>> malleability {nullptr};
 
 public:
     // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
                  const CTransaction &txToIn, unsigned int nInIn,
                  uint32_t nFlagsIn, bool cacheIn,
-                 const PrecomputedTransactionData& txdataIn)
+                 const PrecomputedTransactionData& txdataIn,
+                 const std::shared_ptr<std::atomic<malleability::status>>& malleabilityIn)
         : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
           nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
-          // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-          error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn), config(configIn), consensus(consensusIn) {}
+          txdata(txdataIn), config(configIn), consensus(consensusIn),
+          malleability{malleabilityIn}
+    {}
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
 

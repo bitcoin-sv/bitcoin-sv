@@ -14,6 +14,7 @@
 #include "malleability_status.h"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <variant>
 #include <vector>
@@ -29,7 +30,7 @@ namespace task
   class CCancellationToken;
 }
 
-std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
+std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
     const std::vector<uint8_t>& sig,
     uint32_t flags);
 
@@ -115,7 +116,7 @@ public:
 * Consensus should be true when validating scripts of transactions that are part of block
 * and it should be false when validating scripts of transactions that are validated for acceptance to mempool
 */
-std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -128,22 +129,23 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     std::vector<bool>& vfExec,
     std::vector<bool>& vfElse);
 
-std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
     uint32_t flags,
-    const BaseSignatureChecker&);
+    const BaseSignatureChecker& checker);
 
-std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
+std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
     uint32_t flags,
-    const BaseSignatureChecker&);
+    const BaseSignatureChecker& checker,
+    std::atomic<malleability::status>& malleability);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

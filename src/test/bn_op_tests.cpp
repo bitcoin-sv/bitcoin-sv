@@ -111,7 +111,7 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -308,7 +308,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        if(std::holds_alternative<malleability_status>(v))
+        if(std::holds_alternative<malleability::status>(v))
         {
             BOOST_CHECK(stack.empty());
         }
@@ -489,7 +489,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         const auto v{status.value()};
         if(exp_script_error == SCRIPT_ERR_OK)
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
             BOOST_CHECK_EQUAL(1U, stack.size());
         }
         else
@@ -543,7 +543,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(op.size(), stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
@@ -621,7 +621,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         }
         else
         {
@@ -659,7 +659,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(i + 1, stack.size());
         vector<uint8_t> op;
         bsv::serialize<int>(i, back_inserter(op));
@@ -708,7 +708,7 @@ BOOST_AUTO_TEST_CASE(op_size)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(2U, stack.size());
         const auto expected{stack.front().size()};
         const auto actual{bsv::deserialize(begin(stack.at(1)), end(stack.at(1)))};
@@ -751,7 +751,7 @@ BOOST_AUTO_TEST_CASE(op_pick)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(4U, stack.size());
         if(op_code == OP_2)
             BOOST_CHECK(stack.at(3).empty());
@@ -794,7 +794,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(3U, stack.size());
 
         if(op_code == OP_0)
@@ -859,7 +859,7 @@ BOOST_AUTO_TEST_CASE(op_split)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(2U, stack.size());
         BOOST_CHECK_EQUAL(2 - i, stack.at(1).size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(1)), end(stack.at(1)),
@@ -914,7 +914,7 @@ BOOST_AUTO_TEST_CASE(op_lshift)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
@@ -967,7 +967,7 @@ BOOST_AUTO_TEST_CASE(op_rshift)
                                        BaseSignatureChecker{});
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
@@ -993,7 +993,7 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
                               BaseSignatureChecker{});
     BOOST_CHECK(r.has_value());
     const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
     const auto& top = stack.front();
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
@@ -1020,7 +1020,7 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
                               BaseSignatureChecker{});
     BOOST_CHECK(r.has_value());
     const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
     const auto& top = stack.front();
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
@@ -1087,7 +1087,7 @@ BOOST_AUTO_TEST_CASE(op_checksig)
                                        checker);
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto stack_0{stack.at(0)};
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
@@ -1166,7 +1166,7 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
             BOOST_CHECK_EQUAL(1, stack.size());
         }
         else

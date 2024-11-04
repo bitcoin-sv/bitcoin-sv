@@ -56,7 +56,7 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
     if(const auto v=r.value(); expected_error == SCRIPT_ERR_OK)
     {
         LimitedStack expected = LimitedStack(expected_stack_elements, maxStackSize);
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK(stack == expected);
     }
     else 
@@ -91,7 +91,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                             sigchecker);
         BOOST_CHECK(r.has_value());
         const auto v{r.value()};
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK(stack == expectedStack);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
@@ -107,7 +107,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                            sigchecker);
             BOOST_CHECK(r.has_value());
             const auto v{r.value()};
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
             BOOST_CHECK(stack == expectedStack);
         }
     }
@@ -701,7 +701,7 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
                               sigchecker);
     BOOST_CHECK(r.has_value());
     const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
     BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
 }
 
@@ -725,7 +725,7 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
                               sigchecker);
     BOOST_CHECK(r.has_value());
     const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
     BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
 }
 
@@ -1238,7 +1238,7 @@ static void CheckTestForOpCodeLimit(const CScript &script,
         }
         else
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         }
         BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
     }
@@ -1372,7 +1372,7 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
                                        checker);
         const auto v{status.value()};
         BOOST_CHECK(status.has_value());
-        BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto& actual{stack.stacktop(-1)};
         BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top.begin(), exp_stack_top.end(),
@@ -1423,7 +1423,7 @@ BOOST_AUTO_TEST_CASE(op_verif_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -1608,7 +1608,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -1669,7 +1669,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -1852,7 +1852,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -1901,7 +1901,7 @@ BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -1990,7 +1990,7 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else 
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2038,7 +2038,7 @@ BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2114,7 +2114,7 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2162,7 +2162,7 @@ BOOST_AUTO_TEST_CASE(op_right_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2238,7 +2238,7 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2293,7 +2293,7 @@ BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2380,7 +2380,7 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2435,7 +2435,7 @@ BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2522,7 +2522,7 @@ BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
@@ -2598,7 +2598,7 @@ BOOST_AUTO_TEST_CASE(op_2rot)
         BOOST_CHECK(status.has_value());
         const auto v{status.value()};
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
         else
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));

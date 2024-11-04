@@ -189,18 +189,24 @@ bool SignAndVerify(const Config& config,
                                          utxoEra,
                                          fromPubKey,
                                          sigdata);
+    if(!solved)
+        return false;
 
     // no need to cancel script verification after n time
     // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
     uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
-    return solved && VerifyScript(config,
-                                  consensus,
-                                  source->GetToken(),
-                                  fromPubKey,
-                                  sigdata.scriptSig,
-                                  flags,
-                                  creator.Checker());
+    std::atomic<malleability::status> ms {};
+    const auto o = VerifyScript(config,
+                                consensus,
+                                source->GetToken(),
+                                sigdata.scriptSig,
+                                fromPubKey,
+                                flags,
+                                creator.Checker(),
+                                ms);
+
+    return (o.has_value() && o->first);
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,

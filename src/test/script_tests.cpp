@@ -270,6 +270,7 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
         BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
     CMutableTransaction tx2 = tx;
+    std::atomic<malleability::status> ms {};
     const auto res = VerifyScript(config,
                                   true,
                                   task::CCancellationSource::Make()->GetToken(),
@@ -279,22 +280,18 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
                                   MutableTransactionSignatureChecker(&tx,
                                                                      0,
                                                                      txCredit.vout[0]
-                                                                         .nValue));
+                                                                         .nValue),
+                                  ms);
     BOOST_CHECK(res.has_value());
-    const auto v{res.value()};
     if(scriptError == SCRIPT_ERR_OK)
     {
-        BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(v),
-                            message);
+        BOOST_CHECK_MESSAGE(res->first, message);
     }
     else
     {
-        BOOST_CHECK_MESSAGE(std::holds_alternative<ScriptError>(v),
-                            message);
-        const ScriptError err{std::get<ScriptError>(v)};
         BOOST_CHECK_MESSAGE(
-            err == scriptError,
-            std::string(FormatScriptError(err)) + " where " +
+            res->second == scriptError,
+            std::string(FormatScriptError(res->second)) + " where " +
                 std::string(FormatScriptError((ScriptError_t)scriptError)) +
                 " expected: " + message);
     }
@@ -1449,7 +1446,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                           SCRIPT_VERIFY_P2SH,
                           BaseSignatureChecker());
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
 
     LimitedStack pushdata1Stack(UINT32_MAX);
     res = EvalScript(testConfig,
@@ -1460,7 +1457,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
     BOOST_CHECK(pushdata1Stack == directStack);
 
     LimitedStack pushdata2Stack(UINT32_MAX);
@@ -1472,7 +1469,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
     BOOST_CHECK(pushdata2Stack == directStack);
 
     LimitedStack pushdata4Stack(UINT32_MAX);
@@ -1484,7 +1481,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
     BOOST_CHECK(pushdata4Stack == directStack);
 }
 
@@ -1515,7 +1512,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
                                    flags,
                                    BaseSignatureChecker{});
     BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK(std::holds_alternative<malleability_status>(status.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(status.value()));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
@@ -1546,7 +1543,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
                                    flags,
                                    BaseSignatureChecker{});
     BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK(std::holds_alternative<malleability_status>(status.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(status.value()));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
         
@@ -1581,7 +1578,7 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
                                    flags,
                                    BaseSignatureChecker{});
     BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK(std::holds_alternative<malleability_status>(status.value()));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(status.value()));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
@@ -1631,6 +1628,8 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
         BuildCreditingTransaction(scriptPubKey12, Amount(0));
     CMutableTransaction txTo12 = BuildSpendingTransaction(CScript(), txFrom12);
 
+    std::atomic<malleability::status> ms {};
+
     CScript goodsig1 =
         sign_multisig(scriptPubKey12, key1, CTransaction(txTo12));
     auto source = task::CCancellationSource::Make();
@@ -1641,9 +1640,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             goodsig1,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(res->first);
     txTo12.vout[0].nValue = Amount(2);
     res =
         VerifyScript(
@@ -1652,10 +1652,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             goodsig1,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    err = std::get<ScriptError>(res.value());
+    BOOST_CHECK(!res->first);
+    err = res->second;
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
 
     CScript goodsig2 =
@@ -1667,9 +1668,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             goodsig2,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(res->first);
 
     CScript badsig1 = sign_multisig(scriptPubKey12, key3, CTransaction(txTo12));
     res =
@@ -1679,10 +1681,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             badsig1,
             scriptPubKey12,
             flags,
-            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue));
+            MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    err = std::get<ScriptError>(res.value());
+    BOOST_CHECK(!res->first);
+    err = res->second;
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
 }
 
@@ -1712,6 +1715,8 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
 
     const CTransaction txTo23(mutableTxTo23);
 
+    std::atomic<malleability::status> ms {};
+
     std::vector<CKey> keys;
     keys.push_back(key1);
     keys.push_back(key2);
@@ -1724,9 +1729,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             goodsig1,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(res->first);
 
     keys.clear();
     keys.push_back(key1);
@@ -1739,9 +1745,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             goodsig2,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(res->first);
 
     keys.clear();
     keys.push_back(key2);
@@ -1754,9 +1761,10 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             goodsig3,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+    BOOST_CHECK(res->first);
 
     keys.clear();
     keys.push_back(key2);
@@ -1769,10 +1777,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             badsig1,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
+    BOOST_CHECK(!res->first);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
     keys.clear();
     keys.push_back(key2);
@@ -1785,10 +1794,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             badsig2,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
+    BOOST_CHECK(!res->first);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
     keys.clear();
     keys.push_back(key3);
@@ -1801,10 +1811,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             badsig3,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
+    BOOST_CHECK(!res->first);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
     keys.clear();
     keys.push_back(key4);
@@ -1817,10 +1828,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             badsig4,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
+    BOOST_CHECK(!res->first);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
     keys.clear();
     keys.push_back(key1);
@@ -1833,10 +1845,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             badsig5,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, std::get<ScriptError>(res.value()));
+    BOOST_CHECK(!res->first);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
     keys.clear(); // Must have signatures
     CScript badsig6 = sign_multisig(scriptPubKey23, keys, txTo23);
@@ -1847,10 +1860,11 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             badsig6,
             scriptPubKey23,
             flags,
-            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue));
+            TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
+            ms);
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<ScriptError>(res.value()));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_INVALID_STACK_OPERATION, std::get<ScriptError>(res.value()));
+    BOOST_CHECK(!res->first);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_INVALID_STACK_OPERATION, res->second);
 }
 
 void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
@@ -2189,6 +2203,7 @@ BOOST_AUTO_TEST_CASE(script_standard_push)
         script << i;
         BOOST_CHECK_MESSAGE(script.IsPushOnly(),
                             "Number " << i << " is not pure push.");
+        std::atomic<malleability::status> ms {};
         const auto res =
             VerifyScript(
                 testConfig, true,
@@ -2196,9 +2211,10 @@ BOOST_AUTO_TEST_CASE(script_standard_push)
                 script,
                 CScript() << OP_1,
                 SCRIPT_VERIFY_MINIMALDATA,
-                BaseSignatureChecker());
+                BaseSignatureChecker(),
+                ms);
         BOOST_CHECK(res.has_value());
-        BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(res.value()),
+        BOOST_CHECK_MESSAGE(res->first,
                             "Number " << i << " push is not minimal data.");
     }
 
@@ -2208,6 +2224,7 @@ BOOST_AUTO_TEST_CASE(script_standard_push)
         script << data;
         BOOST_CHECK_MESSAGE(script.IsPushOnly(),
                             "Length " << i << " is not pure push.");
+        std::atomic<malleability::status> ms {};
         const auto res =
             VerifyScript(
                 testConfig, true,
@@ -2215,9 +2232,10 @@ BOOST_AUTO_TEST_CASE(script_standard_push)
                 script,
                 CScript() << OP_1,
                 SCRIPT_VERIFY_MINIMALDATA,
-                BaseSignatureChecker());
+                BaseSignatureChecker(),
+                ms);
         BOOST_CHECK(res.has_value());
-        BOOST_CHECK_MESSAGE(std::holds_alternative<malleability_status>(res.value()),
+        BOOST_CHECK_MESSAGE(res->first,
                             "Length " << i << " push is not minimal data.");
     }
 }
@@ -2834,6 +2852,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
         // Verify the same script twice. In the second iteration it should run
         // much faster, since we cached invalid signatures.
         auto start_noncached = std::chrono::steady_clock::now();
+        std::atomic<malleability::status> ms1 {};
         const auto res =
           VerifyScript(
               testConfig,
@@ -2842,14 +2861,16 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
               scriptSig,
               scriptPubKey,
               flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-              InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata));
+              InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
+              ms1);
         auto stop_noncached = std::chrono::steady_clock::now();
 
         // check if script successfully verified
         BOOST_CHECK(res.has_value());
-        BOOST_CHECK(std::holds_alternative<malleability_status>(res.value()));
+        BOOST_CHECK(res->first);
 
         auto start_cached = std::chrono::steady_clock::now();
+        std::atomic<malleability::status> ms2 {};
         const auto res2 =
           VerifyScript(
               testConfig,
@@ -2858,12 +2879,13 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
               scriptSig,
               scriptPubKey,
               flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-              InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata));
+              InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
+              ms2);
          auto stop_cached = std::chrono::steady_clock::now();
 
          // check if script successfully verified
         BOOST_CHECK(res2.has_value());
-        BOOST_CHECK(std::holds_alternative<malleability_status>(res2.value()));
+        BOOST_CHECK(res2->first);
 
         duration_total_noncached += std::chrono::duration_cast<std::chrono::microseconds>(
                       stop_noncached - start_noncached);
@@ -2909,7 +2931,7 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
                                        flags,
                                        BaseSignatureChecker{});
         assert(true == status.has_value());
-        assert(std::holds_alternative<malleability_status>(status.value()));
+        assert(std::holds_alternative<malleability::status>(status.value()));
         assert(n == stack.size());
         const auto frame = stack.front();
         const auto actual = frame.GetElement();
@@ -3033,7 +3055,7 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
                                        flags,
                                        sig_checker);
         assert(true == status.has_value());
-        assert(std::holds_alternative<malleability_status>(status.value()));
+        assert(std::holds_alternative<malleability::status>(status.value()));
         assert(0 == stack.size());
     };
 
@@ -3204,20 +3226,20 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
     using test_args = tuple<uint32_t,           // flags
                             vector<uint8_t>,    // s 
                             std::optional<ScriptError>,
-                            std::optional<malleability_status>>;
+                            std::optional<malleability::status>>;
     const vector<test_args> test_data 
     {
-        {0, low_s_max(),  {}, malleability_status::non_malleable},
-        {0, high_s_min(), {}, malleability_status::non_malleable},
-        {SCRIPT_VERIFY_LOW_S, low_s_max(), {}, malleability_status::non_malleable},
+        {0, low_s_max(),  {}, malleability::non_malleable},
+        {0, high_s_min(), {}, malleability::non_malleable},
+        {SCRIPT_VERIFY_LOW_S, low_s_max(), {}, malleability::non_malleable},
         {SCRIPT_VERIFY_LOW_S, high_s_min(), SCRIPT_ERR_SIG_HIGH_S, {}},
         
-        {SCRIPT_CHRONICLE, low_s_max(), {}, malleability_status::non_malleable},
-        {SCRIPT_CHRONICLE, high_s_min(), {}, malleability_status::non_malleable},
+        {SCRIPT_CHRONICLE, low_s_max(), {}, malleability::non_malleable},
+        {SCRIPT_CHRONICLE, high_s_min(), {}, malleability::non_malleable},
         {SCRIPT_VERIFY_LOW_S | SCRIPT_CHRONICLE,
-                low_s_max(), {}, malleability_status::non_malleable},
+                low_s_max(), {}, malleability::non_malleable},
         {SCRIPT_VERIFY_LOW_S | SCRIPT_CHRONICLE,
-                high_s_min(), {}, malleability_status::high_s},
+                high_s_min(), {}, malleability::high_s},
 
         {SCRIPT_VERIFY_LOW_S
          | SCRIPT_CHRONICLE
@@ -3225,7 +3247,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
          | SCRIPT_ENABLE_SIGHASH_FORKID,
          high_s_min(),
          {}, 
-         make_optional<malleability_status>(malleability_status::high_s)},
+         make_optional<malleability::status>(malleability::high_s)},
     };
     for(const auto& [flags, s, exp_error, exp_mall] : test_data)
     {
@@ -3245,9 +3267,9 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
         const auto v{status.value()};
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
-            BOOST_CHECK_EQUAL(malleability_status{exp_mall.value()},
-                              std::get<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
+                              std::get<malleability::status>(v));
         }
         else if(exp_error && !exp_mall)
         {
@@ -3266,21 +3288,21 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
     using test_args = tuple<uint32_t,   // flags
                             int,        // sighash 
                             std::optional<ScriptError>,
-                            std::optional<malleability_status>>;
+                            std::optional<malleability::status>>;
     const vector<test_args> test_data 
     {
         {0,
          0,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
 
         {SCRIPT_VERIFY_STRICTENC,
          0,
@@ -3293,11 +3315,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_ILLEGAL_FORKID,
@@ -3310,27 +3332,27 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          0,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          0,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
 
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_FORKID,
@@ -3347,15 +3369,15 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>(malleability_status::disallowed)},
+         std::make_optional<malleability::status>(malleability::disallowed)},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>(malleability_status::disallowed)},
+         std::make_optional<malleability::status>(malleability::disallowed)},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -3374,11 +3396,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
         const auto v{status.value()};
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
             
-            BOOST_CHECK_EQUAL(malleability_status{exp_mall.value()},
-                              std::get<malleability_status>(v));
-            const auto ms{std::get<malleability_status>(v)};
+            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
+                              std::get<malleability::status>(v));
+            const auto ms{std::get<malleability::status>(v)};
             BOOST_CHECK_EQUAL(exp_mall.value(), ms);
         }
         else if(exp_error && !exp_mall)
@@ -3398,21 +3420,21 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
     using test_args = tuple<uint32_t,   // flags
                             int,        // sighash 
                             std::optional<ScriptError>,
-                            std::optional<malleability_status>>;
+                            std::optional<malleability::status>>;
     const vector<test_args> test_data 
     {
         {0,
          0,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
 
         {SCRIPT_VERIFY_STRICTENC,
          0,
@@ -3425,11 +3447,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_ILLEGAL_FORKID,
@@ -3442,27 +3464,27 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          0,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          0,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
 
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_FORKID,
@@ -3479,15 +3501,15 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability_status>()},
+         std::make_optional<malleability::status>()},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>(malleability_status::disallowed)},
+         std::make_optional<malleability::status>(malleability::disallowed)},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>(malleability_status::disallowed)},
+         std::make_optional<malleability::status>(malleability::disallowed)},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -3506,11 +3528,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
         const auto v{status.value()};
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
             
-            BOOST_CHECK_EQUAL(malleability_status{exp_mall.value()},
-                              std::get<malleability_status>(v));
-            const auto ms{std::get<malleability_status>(v)};
+            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
+                              std::get<malleability::status>(v));
+            const auto ms{std::get<malleability::status>(v)};
             BOOST_CHECK_EQUAL(exp_mall.value(), ms);
         }
         else if(exp_error && !exp_mall)
@@ -3553,10 +3575,10 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_multiple_forkids)
                                     BaseSignatureChecker{});
     BOOST_CHECK(status.has_value());
     const auto v{status.value()};
-    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
-    malleability_status exp_mall{malleability_status::non_malleable
-                                 | malleability_status::disallowed};
-    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability_status>(v));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+    malleability::status exp_mall{malleability::non_malleable
+                                 | malleability::disallowed};
+    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
 }
 
 BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_multiple_forkids)
@@ -3589,10 +3611,10 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_multiple_forkids)
                                     BaseSignatureChecker{});
     BOOST_CHECK(status.has_value());
     const auto v{status.value()};
-    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
-    malleability_status exp_mall{malleability_status::non_malleable
-                                 | malleability_status::disallowed};
-    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability_status>(v));
+    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+    malleability::status exp_mall{malleability::non_malleable
+                                 | malleability::disallowed};
+    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

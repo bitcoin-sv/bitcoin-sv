@@ -244,14 +244,14 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
-std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
+std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
     const std::vector<uint8_t>& vchSig,
     uint32_t flags)
 {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
     if(vchSig.empty())
-        return malleability_status{};
+        return malleability::status{};
     
     if((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
                  SCRIPT_VERIFY_STRICTENC)) != 0 &&
@@ -260,12 +260,12 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
         return SCRIPT_ERR_SIG_DER;
     }
     
-    malleability_status ms;
+    malleability::status ms {};
     if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
        !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
     {
         if(flags & SCRIPT_CHRONICLE)
-            ms |= malleability_status::high_s;
+            ms |= malleability::high_s;
         else
             return SCRIPT_ERR_SIG_HIGH_S;
     }
@@ -283,7 +283,7 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
         if(forkIdEnabled)
         {
             if(usesForkId)
-                ms |= malleability_status::disallowed;
+                ms |= malleability::disallowed;
             
             if(!usesForkId)
                 // ForkID optional post-Chronicle
@@ -373,7 +373,7 @@ static void to_le(const int32_t n, uint8_t* o)
     memcpy(o, &le_n, sizeof(le_n));
 }
 
-std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -426,7 +426,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     // we still have to check if the rest of the script is valid
     bool nonTopLevelReturnAfterGenesis = false;
 
-    malleability_status ms;
+    malleability::status ms {};
     try {
         while (pc < pend) {
             if (token.IsCanceled())
@@ -787,7 +787,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             if (vfExec.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
-                                return malleability_status{};
+                                return malleability::status{};
                             }
 
                             // op_return encountered inside if statement after genesis --> check for invalid grammar
@@ -1412,7 +1412,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                         if(std::holds_alternative<ScriptError>(v))
                             return v;
                         else
-                            ms |= std::get<malleability_status>(v);
+                            ms |= std::get<malleability::status>(v);
 
                         if(const ScriptError error{
                                CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
@@ -1523,7 +1523,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             if(std::holds_alternative<ScriptError>(v))
                                 return v;
                             else
-                                ms |= std::get<malleability_status>(v);
+                                ms |= std::get<malleability::status>(v);
 
                             if(const auto error{
                                    CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
@@ -1745,7 +1745,7 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
     return ms;
 }
 
-std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -2119,22 +2119,26 @@ int32_t TransactionSignatureChecker::Version() const
     return txTo->nVersion;
 }
 
-std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
+std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
-    uint32_t flags,
-    const BaseSignatureChecker& checker)
+    uint32_t flags,       
+    const BaseSignatureChecker& checker, 
+    std::atomic<malleability::status>& malleability)
 {
     // If FORKID is enabled, we also ensure strict encoding.
     if (flags & SCRIPT_ENABLE_SIGHASH_FORKID) {
         flags |= SCRIPT_VERIFY_STRICTENC;
     }
 
+    // Track malleability for just this execution of VerifyScript
+    malleability::status our_malleability {};
+
     if((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly())
-        return SCRIPT_ERR_SIG_PUSHONLY;
+        return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
 
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
@@ -2147,12 +2151,16 @@ std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
                                  flags,
                                  checker);
        !o.has_value())
+    {
         return {};
+    }
     else
     {
         const auto v{o.value()};
         if(std::holds_alternative<ScriptError>(v))
-            return o;
+            return std::make_pair(false, std::get<ScriptError>(v));
+        else
+            our_malleability |= std::get<malleability::status>(v);
     }
 
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
@@ -2167,19 +2175,23 @@ std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
                                  flags,
                                  checker);
        !o.has_value())
+    {
         return {};
+    }
     else
     {
         const auto v{o.value()};
         if(std::holds_alternative<ScriptError>(v))
-            return o;        
+            return std::make_pair(false, std::get<ScriptError>(v));
+        else
+            our_malleability |= std::get<malleability::status>(v);
     }
 
     if(stack.empty())
-        return SCRIPT_ERR_EVAL_FALSE;
+        return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
 
     if(CastToBool(stack.back().GetElement()) == false)
-        return SCRIPT_ERR_EVAL_FALSE;
+        return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
 
     // Additional validation for spend-to-script-hash transactions:
     // But only if if the utxo is before genesis
@@ -2189,7 +2201,7 @@ std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
     {
         // scriptSig must be literals-only or validation fails
         if(!scriptSig.IsPushOnly())
-            return SCRIPT_ERR_SIG_PUSHONLY;
+            return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
 
         // Restore stack.
         stack = std::move(stackCopy);
@@ -2211,19 +2223,23 @@ std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
                                      flags,
                                      checker);
            !o.has_value())
+        {
             return {};
+        }
         else
         {
             const auto v{o.value()};
             if(std::holds_alternative<ScriptError>(v))
-                return o;
+                return std::make_pair(false, std::get<ScriptError>(v));
+            else
+                our_malleability |= std::get<malleability::status>(v);
         }
 
         if(stack.empty())
-            return SCRIPT_ERR_EVAL_FALSE;
+            return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
 
         if(!CastToBool(stack.back().GetElement()))
-            return SCRIPT_ERR_EVAL_FALSE;
+            return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
 
     }
 
@@ -2236,11 +2252,21 @@ std::optional<std::variant<ScriptError, malleability_status>> VerifyScript(
         // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
         // softfork (and P2SH should be one).
         if((flags & SCRIPT_VERIFY_P2SH) == 0)
-            return SCRIPT_ERR_INVALID_FLAGS;
+            return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
 
         if(stack.size() != 1)
-            return SCRIPT_ERR_CLEANSTACK;
+            return std::make_pair(false, SCRIPT_ERR_CLEANSTACK);
     }
 
-    return malleability_status{};
+    // malleability::status fully atomically combined for us after this point.
+    // We then use value we wrote to atomic without reading it again to
+    // ensure this thread doesn't see different values at different times
+    // below (not that it would really matter if we did see different values,
+    // but it avoids confusion).
+    malleability::status combined_malleability { malleability |= our_malleability };
+
+    // TODO: Checks at the end for malleability related failures.
+
+    return std::make_pair(true, SCRIPT_ERR_OK);
 }
+

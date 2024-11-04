@@ -11,6 +11,7 @@
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "script/ismine.h"
+#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
@@ -44,6 +45,7 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = Amount(1);
 
+    std::atomic<malleability::status> ms {};
     const auto res =
         VerifyScript(
             config, true,
@@ -52,19 +54,11 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
             scriptPubKey,
             (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
                 SCRIPT_ENABLE_SIGHASH_FORKID,
-            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue));
+            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
+            ms);
 
-    const auto v{res.value()};
-    if(std::holds_alternative<malleability_status>(v))
-    {
-        err = SCRIPT_ERR_OK;
-        return true;
-    }
-    else
-    {
-        err = std::get<ScriptError>(v);
-        return false;
-    }
+    err = res->second;
+    return res->first;
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
@@ -168,7 +162,7 @@ BOOST_AUTO_TEST_CASE(sign) {
                 output.scriptPubKey, output.nValue, CTransaction(txTo[i]), 0,
                 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC |
                     SCRIPT_ENABLE_SIGHASH_FORKID,
-                false, txdata)(source->GetToken());
+                false, txdata, std::make_shared<std::atomic<malleability::status>>())(source->GetToken());
             if (i == j) {
                 BOOST_CHECK_MESSAGE(sigOK.value(),
                                     strprintf("VerifySignature %d %d", i, j));

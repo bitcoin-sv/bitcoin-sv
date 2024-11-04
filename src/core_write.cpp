@@ -143,7 +143,7 @@ void ScriptToAsmStr(const CScript& script,
                     }
                     
                     const auto v = CheckSignatureEncoding(vch, flags); 
-                    if(std::holds_alternative<malleability_status>(v))
+                    if(std::holds_alternative<malleability::status>(v))
                     {
                         const uint8_t chSigHashType = vch.back();
                         if (mapSigHashTypes.count(chSigHashType))

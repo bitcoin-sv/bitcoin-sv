@@ -866,7 +866,8 @@ Examples:
             scr.n,
             scr.flags,
             false, // no cache
-            PrecomputedTransactionData(scr.tx)
+            PrecomputedTransactionData(scr.tx),
+            std::make_shared<std::atomic<malleability::status>>()
         };
 
         auto t0 = std::chrono::steady_clock::now();

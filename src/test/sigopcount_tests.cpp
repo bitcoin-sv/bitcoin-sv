@@ -8,6 +8,7 @@
 #include "key.h"
 #include "pubkey.h"
 #include "protocol_era.h"
+#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/standard.h"
@@ -213,6 +214,7 @@ ScriptError VerifyWithFlag(const CTransaction &output,
                            const CMutableTransaction &input, int flags) {
     const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
+    std::atomic<malleability::status> ms {};
     const auto ret =
         VerifyScript(
             config, true,
@@ -220,11 +222,11 @@ ScriptError VerifyWithFlag(const CTransaction &output,
             inputi.vin[0].scriptSig,
             output.vout[0].scriptPubKey,
             flags,
-            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue));
+            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
+            ms);
     BOOST_CHECK(ret.has_value());
-    const auto v{ret.value()};
-    BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-    return std::get<ScriptError>(v);
+    BOOST_CHECK(!ret->first);
+    return ret->second;
 }
 
 /**

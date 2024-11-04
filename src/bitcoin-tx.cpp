@@ -2,8 +2,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "script/script_error.h"
-#include <variant>
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #endif
@@ -12,6 +10,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "coins.h"
+#include "config.h"
 #include "consensus/consensus.h"
 #include "core_io.h"
 #include "dstencode.h"
@@ -20,6 +19,8 @@
 #include "primitives/transaction.h"
 #include "protocol_era.h"
 #include "rpc/client_utils.h"
+#include "script/malleability_status.h"
+#include "script/script_error.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "univalue.h"
@@ -28,9 +29,9 @@
 #include "utilstrencodings.h"
 
 #include <cstdio>
+#include <variant>
 
 #include <boost/algorithm/string.hpp>
-#include "config.h"
 
 static bool fCreateBlank;
 static std::map<std::string, UniValue> registers;
@@ -655,6 +656,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     const CKeyStore &keystore = tempKeystore;
 
     // Sign what we can:
+    std::atomic<malleability::status> ms {};
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
         auto coin = view.GetCoinWithScript(txin.prevout);
@@ -714,8 +716,9 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 txin.scriptSig,
                 prevPubKey,
                 StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
-                MutableTransactionSignatureChecker(&mergedTx, i, amount));
-        if(!res.has_value() || std::holds_alternative<ScriptError>(res.value()))
+                MutableTransactionSignatureChecker(&mergedTx, i, amount),
+                ms);
+        if(!res.has_value() || !res->first)
         {
             fComplete = false;
         }
