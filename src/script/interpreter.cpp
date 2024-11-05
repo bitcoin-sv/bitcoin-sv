@@ -6,6 +6,7 @@
 #include "interpreter.h"
 
 #include "protocol_era.h"
+#include "script/malleability_status.h"
 #include "script_flags.h"
 #include "compat/endian.h"
 #include "crypto/ripemd160.h"
@@ -281,17 +282,13 @@ std::variant<ScriptError, malleability_status> CheckSignatureEncoding(
 
         if(forkIdEnabled)
         {
-            // ForkID becomes optional post-Chronicle
-            if(flags & SCRIPT_CHRONICLE)
-            {
-                if(usesForkId)
-                    ms |= malleability_status::disallowed;
-            }
-            else
-            {
-                if(!usesForkId)
+            if(usesForkId)
+                ms |= malleability_status::disallowed;
+            
+            if(!usesForkId)
+                // ForkID optional post-Chronicle
+                if((flags & SCRIPT_CHRONICLE) == 0)
                     return SCRIPT_ERR_MUST_USE_FORKID;
-            }
         }
     }
 
@@ -1525,6 +1522,8 @@ std::optional<std::variant<ScriptError, malleability_status>> EvalScript(
                             const auto v = CheckSignatureEncoding(vchSig.GetElement(), flags);
                             if(std::holds_alternative<ScriptError>(v))
                                 return v;
+                            else
+                                ms |= std::get<malleability_status>(v);
 
                             if(const auto error{
                                    CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};

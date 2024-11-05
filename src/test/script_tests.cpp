@@ -152,8 +152,8 @@ static const std::vector<uint8_t>& high_s_min()
     return v;
 }
 
-const std::vector<uint8_t> make_op_checksig_script(const int sighash,
-                                                   const std::vector<uint8_t>& s)
+std::vector<uint8_t> make_op_checksig_script(const int sighash,
+                                             const std::vector<uint8_t>& s)
 {
     const auto rs_len{32};
     const auto sig_len{2 * (2 + rs_len)};
@@ -179,6 +179,46 @@ const std::vector<uint8_t> make_op_checksig_script(const int sighash,
     script.insert(script.end(), pk_len - 1, 101);
     
     script.push_back(OP_CHECKSIG);
+
+    return script;
+}
+
+std::vector<uint8_t> make_op_check_multi_sig_script(const int sighash,
+                                                    const std::vector<uint8_t>& s)
+{
+    const auto rs_len{32};
+    const auto sig_len{2 * (2 + rs_len)};
+    const auto der_len{sig_len + 2};
+    const auto type_code{2};
+
+    // signature
+    std::vector<uint8_t> script{OP_0,   // historic bug start with OP_0 
+                                der_len + 1,
+                                0x30,
+                                sig_len,
+                                type_code,
+                                rs_len};
+    script.insert(script.end(), rs_len, 42);  // r
+    script.push_back(type_code);
+    script.push_back(s.size());
+    script.insert(script.end(), s.begin(), s.end());
+    script.push_back(static_cast<uint8_t>(sighash));
+    
+    script.push_back(1);
+    const auto n_sigs{1};
+    script.push_back(n_sigs);
+
+    // pub key
+    const auto pk_len{33};
+    script.push_back(pk_len);
+    script.push_back(2);
+    script.insert(script.end(), pk_len - 1, 101);
+    
+    script.push_back(1);
+    const auto n_pub_keys{1};
+    script.push_back(n_pub_keys);
+    
+    script.push_back(OP_CHECKMULTISIG);
 
     return script;
 }
@@ -3219,7 +3259,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_forkid)
+BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
 {
     using namespace std;
 
@@ -3311,7 +3351,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_forkid)
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability_status>(malleability_status::non_malleable)},
+         std::make_optional<malleability_status>(malleability_status::disallowed)},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
@@ -3351,7 +3391,139 @@ BOOST_AUTO_TEST_CASE(EvalScript_forkid)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_multiple_forkids)
+BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
+{
+    using namespace std;
+
+    using test_args = tuple<uint32_t,   // flags
+                            int,        // sighash 
+                            std::optional<ScriptError>,
+                            std::optional<malleability_status>>;
+    const vector<test_args> test_data 
+    {
+        {0,
+         0,
+         {},
+         std::make_optional<malleability_status>()},
+        {0,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+        {0,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+
+        {SCRIPT_VERIFY_STRICTENC,
+         0,
+         SCRIPT_ERR_SIG_HASHTYPE,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
+         0,
+         SCRIPT_ERR_SIG_HASHTYPE,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_VERIFY_STRICTENC,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_ILLEGAL_FORKID,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_ILLEGAL_FORKID,
+         {}},
+
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         0,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         0,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>()},
+
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_FORKID,
+         SCRIPT_ERR_SIG_HASHTYPE,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_FORKID,
+         SCRIPT_ERR_SIG_HASHTYPE,
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL,
+         {SCRIPT_ERR_MUST_USE_FORKID},
+         {}},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL,
+         {},
+         std::make_optional<malleability_status>()},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>(malleability_status::disallowed)},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         std::make_optional<malleability_status>(malleability_status::disallowed)},
+    };
+    for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
+    {
+        const Config& config = GlobalConfig::GetConfig();
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto script{make_op_check_multi_sig_script(sighash, low_s_max())};
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(!exp_error && exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+            
+            BOOST_CHECK_EQUAL(malleability_status{exp_mall.value()},
+                              std::get<malleability_status>(v));
+            const auto ms{std::get<malleability_status>(v)};
+            BOOST_CHECK_EQUAL(exp_mall.value(), ms);
+        }
+        else if(exp_error && !exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+        }
+        else
+            BOOST_CHECK(false);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_multiple_forkids)
 {
     using namespace std;
 
@@ -3364,6 +3536,42 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_forkids)
         const auto script_2{
                    make_op_checksig_script(SIGHASH_ALL | SIGHASH_FORKID,
                                            low_s_max())};
+        script.insert(script.end(), script_2.begin(), script_2.end());
+        return script;
+    }()};
+
+    const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
+                         | SCRIPT_VERIFY_STRICTENC
+                         | SCRIPT_CHRONICLE
+                         };
+    const auto status = EvalScript(config,
+                                    false,
+                                    source->GetToken(),
+                                    stack,
+                                    CScript{script.begin(), script.end()},
+                                    flags,
+                                    BaseSignatureChecker{});
+    BOOST_CHECK(status.has_value());
+    const auto v{status.value()};
+    BOOST_CHECK(std::holds_alternative<malleability_status>(v));
+    malleability_status exp_mall{malleability_status::non_malleable
+                                 | malleability_status::disallowed};
+    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability_status>(v));
+}
+
+BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_multiple_forkids)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const auto script{[]
+    {
+        auto script{make_op_check_multi_sig_script(SIGHASH_ALL, low_s_max())};
+        const auto script_2{
+                    make_op_check_multi_sig_script(SIGHASH_ALL | SIGHASH_FORKID,
+                                                   low_s_max())};
         script.insert(script.end(), script_2.begin(), script_2.end());
         return script;
     }()};
