@@ -6,6 +6,7 @@
 
 #include <iostream>
 
+#if 0
 std::ostream& operator<<(std::ostream& os, const malleability_status& ms)
 {
     if(!is_malleable(ms))
@@ -49,4 +50,4 @@ std::ostream& operator<<(std::ostream& os, const malleability_status& ms)
 
     return os;
 }
-
+#endif
