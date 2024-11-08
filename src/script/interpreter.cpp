@@ -2137,8 +2137,10 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     // Track malleability for just this execution of VerifyScript
     malleability::status our_malleability {};
 
-    if((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly())
-        return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
+    if(!scriptSig.IsPushOnly())
+    {
+        our_malleability |= malleability::non_push_data;
+    }
 
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
@@ -2266,6 +2268,27 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     malleability::status combined_malleability { malleability |= our_malleability };
 
     // TODO: Checks at the end for malleability related failures.
+
+    // Checks for non-push-only scriptSig
+    if(flags & SCRIPT_VERIFY_SIGPUSHONLY)
+    {
+        bool checkSigPushOnly {false};
+        if((flags & SCRIPT_GENESIS) && !(flags & SCRIPT_CHRONICLE))
+        {
+            // Apply Genesis push only consensus rules
+            checkSigPushOnly = true;
+        }
+        else if(flags & SCRIPT_CHRONICLE)
+        {
+            // After Chronicle apply push only checks if FORKID is set
+            checkSigPushOnly = is_disallowed(combined_malleability);
+        }
+
+        if(checkSigPushOnly && has_non_push_data(combined_malleability))
+        {
+            return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
+        }
+    }
 
     return std::make_pair(true, SCRIPT_ERR_OK);
 }
