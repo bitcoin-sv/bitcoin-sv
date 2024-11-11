@@ -101,7 +101,7 @@
 ["0","RETURN","P2SH,STRICTENC,UTXO_AFTER_GENESIS","EVAL_FALSE","Genesis: top stack value used to determine success"],
 ["RETURN","1","P2SH,STRICTENC","OP_RETURN"],
 ["RETURN","1","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK"],
-["RETURN","1","P2SH,STRICTENC,UTXO_AFTER_GENESIS,SIGPUSHONLY","SIG_PUSHONLY", "Originally, due to a bug, OP_TRUE OP_RETURN could be used to solve any lock script. SIGPUSHONLY now prohibits OP_RETURN in unlock scripts. If UTXO_AFTER_GENESIS is set, SIGPUSHONLY will also always be set (Genesis will enforce it), since we are being mined into a block that is spending post-genesis outputs."],
+["RETURN","1","P2SH,STRICTENC,GENESIS,UTXO_AFTER_GENESIS,SIGPUSHONLY","SIG_PUSHONLY", "Originally, due to a bug, OP_TRUE OP_RETURN could be used to solve any lock script. SIGPUSHONLY now prohibits OP_RETURN in unlock scripts. If UTXO_AFTER_GENESIS is set, SIGPUSHONLY will also always be set (Genesis will enforce it), since we are being mined into a block that is spending post-genesis outputs."],
 
 ["Clean stack Chronicle changes"],
 ["1","1","UTXO_AFTER_GENESIS,CLEANSTACK","CLEANSTACK"],
@@ -2238,13 +2238,13 @@
     "OK",
     "2-of-2 with two identical keys and sigs pushed using OP_DUP but no SIGPUSHONLY"
 ],
-[
+[   
     "0 0x47 0x304402200abeb4bd07f84222f474aed558cfbdfc0b4e96cde3c2935ba7098b1ff0bd74c302204a04c1ca67b2a20abee210cf9a21023edccbbf8024b988812634233115c6b73901 DUP",
     "2 0x21 0x038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508 0x21 0x038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508 2 CHECKMULTISIG",
-    "SIGPUSHONLY",
+    "GENESIS,SIGPUSHONLY",
     "SIG_PUSHONLY",
     "2-of-2 with two identical keys and sigs pushed using OP_DUP"
-],
+],  
 [
     "0x47 0x3044022018a2a81a93add5cb5f5da76305718e4ea66045ec4888b28d84cb22fae7f4645b02201e6daa5ed5d2e4b2b2027cf7ffd43d8d9844dd49f74ef86899ec8e669dfd39aa01 NOP8 0x23 0x2103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640ac",
     "HASH160 0x14 0x215640c2f72f0d16b4eced26762035a42ffed39a EQUAL",
@@ -2269,7 +2269,7 @@
 [
     "0x47 0x3044022018a2a81a93add5cb5f5da76305718e4ea66045ec4888b28d84cb22fae7f4645b02201e6daa5ed5d2e4b2b2027cf7ffd43d8d9844dd49f74ef86899ec8e669dfd39aa01 NOP8 0x23 0x2103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640ac",
     "HASH160 0x14 0x215640c2f72f0d16b4eced26762035a42ffed39a EQUAL",
-    "SIGPUSHONLY",
+    "GENESIS,SIGPUSHONLY",
     "SIG_PUSHONLY",
     "P2SH(P2PK) with non-push scriptSig but not P2SH"
 ],

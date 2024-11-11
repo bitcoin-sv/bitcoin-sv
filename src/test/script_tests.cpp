@@ -1211,7 +1211,7 @@ BOOST_AUTO_TEST_CASE(script_build) {
                       << ToByteVector(keys.pubkey1C) << OP_2
                       << OP_CHECKMULTISIG,
             "2-of-2 with two identical keys and sigs pushed using OP_DUP",
-            SCRIPT_VERIFY_SIGPUSHONLY)
+            SCRIPT_VERIFY_SIGPUSHONLY | SCRIPT_GENESIS)
             .Num(0)
             .PushSig(keys.key1)
             .Add(CScript() << OP_DUP)
@@ -1240,7 +1240,7 @@ BOOST_AUTO_TEST_CASE(script_build) {
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey2C) << OP_CHECKSIG,
                     "P2SH(P2PK) with non-push scriptSig but not P2SH",
-                    SCRIPT_VERIFY_SIGPUSHONLY, true)
+                    SCRIPT_VERIFY_SIGPUSHONLY | SCRIPT_GENESIS, true)
             .PushSig(keys.key2)
             .Add(CScript() << OP_NOP8)
             .PushRedeem()
