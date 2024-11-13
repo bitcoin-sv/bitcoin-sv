@@ -3,6 +3,9 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.height_based_test_framework import HeightBasedTestsCase, HeightBasedSimpleTestsCase
+from test_framework.key import CECKey
+from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
+from test_framework.script import CScript, OP_CHECKSIG, SignatureHashForkId, SignatureHash, SIGHASH_FORKID
 
 
 class ChronicleHeightTestsCase(HeightBasedTestsCase):
@@ -33,6 +36,55 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
         (CHRONICLE_GRACE_END_HEIGHT - 2,   "CHRONICLE_GRACE_END",       "POST_CHRONICLE"),             # Last block in Chronicle grace period
         (CHRONICLE_GRACE_END_HEIGHT,       "POST_CHRONICLE",            None),                         # Chronicle is activated and we've left the grace period
     ]
+
+    # Make a key for signing
+    @staticmethod
+    def make_key():
+        key = CECKey()
+        key.set_secretbytes(b"randombytes")
+        return key
+
+    # Details about an input for spending
+    class Input:
+        utxo = None
+        hash_type = None
+        unlocking_script = None
+
+        def __init__(self, utxo, hash_type, unlocking_script=[]):
+            self.utxo = utxo
+            self.hash_type = hash_type
+            self.unlocking_script = unlocking_script
+
+    # Spend UTXOs and create a txn with unlocking_script + the usual signature
+    def new_transaction(self, key, inputs):
+        tx = CTransaction()
+        total_input = 0
+
+        # Add inputs
+        for inp in inputs:
+            utxo = inp.utxo
+            n, tx_to_spend = utxo
+
+            tx.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, n), b''))
+            total_input += tx_to_spend.vout[n].nValue
+
+        # 1 output
+        tx.vout.append(CTxOut(total_input - 100, CScript([key.get_pubkey(), OP_CHECKSIG])))
+
+        # Sign
+        for index, (inp, tx_input) in enumerate(zip(inputs, tx.vin)):
+            utxo = inp.utxo
+            hash_type = inp.hash_type
+            unlocking_script = inp.unlocking_script
+            n, tx_to_spend = utxo
+
+            sighash = SignatureHashForkId(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type, tx_to_spend.vout[n].nValue) \
+                if hash_type & SIGHASH_FORKID else SignatureHash(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type)
+            sig = key.sign(sighash) + bytes(bytearray([hash_type]))
+            tx_input.scriptSig = CScript(unlocking_script + [sig])
+
+        tx.rehash()
+        return tx
 
 
 class ChronicleHeightBasedSimpleTestsCase(HeightBasedSimpleTestsCase):
