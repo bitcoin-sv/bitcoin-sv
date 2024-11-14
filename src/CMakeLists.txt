@@ -44,6 +44,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
 	)
 
+    if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+        if(CMAKE_CXX_COMPILER_VERSION MATCHES 18.*)
+            add_compile_options(-Wno-deprecated-declarations)
+        endif()
+    endif()
+
 	if(EXTRA_WARNINGS)
 		add_compile_options(
 			-Wshadow
