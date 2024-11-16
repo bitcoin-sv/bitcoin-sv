@@ -1,7 +1,7 @@
 Developer Notes
 ===============
 
-These notes will be updated for Bitcoin SV when the Bitcoin SV team begin
+These notes will be updated for Final Bitcoin when the Final Bitcoin team begin
 accepting code contributions.
 
 Various coding styles have been used during the history of the codebase,
