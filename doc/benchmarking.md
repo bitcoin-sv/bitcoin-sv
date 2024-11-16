@@ -1,7 +1,7 @@
 Benchmarking
 ============
 
-Bitcoin SV has an internal benchmarking framework, with benchmarks
+Final Bitcoin has an internal benchmarking framework, with benchmarks
 for cryptographic algorithms such as SHA1, SHA256, SHA512 and RIPEMD160. As well as the rolling bloom filter.
 
 After compiling bitcoin-sv, the benchmarks can be run with:
