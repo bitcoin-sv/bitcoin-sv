@@ -1,4 +1,4 @@
-# Bitcoin SV Node software – Upgrade to v1.0.13 Release
+# Final Bitcoin Node software – Upgrade to v1.0.13 Release
 
 This pages contains notes for specific features of the release. It is aimed at potential users, Customer Services and QA. Please refer to specific Jiras for more details.
 
@@ -55,7 +55,7 @@ Miner ID is a cryptographic way for miners to declare that they created a partic
 
 The miner ID information can include data such as server endpoints and contact details, information which users need to be able to trust. It is important that a 3rd party who mines a block cannot pretend to be another miner.
 
-The specification can be found at ['](https://confluence.stressedsharks.com/pages/viewpage.action?pageId=1936753337)[https://github.com/bitcoin-sv-specs/brfc-minerid](https://github.com/bitcoin-sv-specs/brfc-minerid)'. 1.0.13 supports Miner ID specification v1.0 as well as earlier versions.
+The specification can be found at ['](https://confluence.stressedsharks.com/pages/viewpage.action?pageId=1936753337)[https://github.com/Final-Bitcoin-specs/brfc-minerid](https://github.com/Final-Bitcoin-specs/brfc-minerid)'. 1.0.13 supports Miner ID specification v1.0 as well as earlier versions.
 
 Security Features
 -----------------
@@ -66,7 +66,7 @@ It is possible that the miner ID private key can become compromised (e.g. a disg
 *   Forcibly roll miner ID to a new value using the revocation key (used for example if the miner ID key was already compromised and rolled away to a value not controlled by the legitimate owner of the miner ID)
 *   Forcibly revoke all miner ID keys.
 
-The user is directed to [https://github.com/bitcoin-sv/minerid-reference](https://github.com/bitcoin-sv/minerid-reference) for other operations and further details.
+The user is directed to [https://github.com/Final-Bitcoin/minerid-reference](https://github.com/Final-Bitcoin/minerid-reference) for other operations and further details.
 
 ### Miner ID Key Storage
 
@@ -137,17 +137,17 @@ Remote peers can use P2P message_gethdrsen_to request block headers together wit
 
 | Field Size | Name | Data Type | Description |
 | --- | --- | --- | --- |
-| 1+  | count | [var\_int](https://wiki.bitcoinsv.io/index.php/Peer-To-Peer_Protocol#Variable_length_integer) | Number of enriched block headers<br><br>May be 0 if no header matches parameters specified in _gethdrsen_ message.<br><br>No more than 2000 enriched block headers are returned in a single message.<br><br>Since the contents of coinbase transactions can be large, maximum size of _hdrsen_ message is limited to maximum packet size that was agreed on in _protoconf_ message with `maxRecvPayloadLength` parameter (value is specified in peer configuration). The number of returned enriched block headers is reduced as needed to stay below this limit, but not below 1. This is so that one header requested by _gethdrsen_ message can be returned even if limit imposed by `maxRecvPayloadLength` parameter is exceeded.<br><br>This limit is always honored if message is sent to announce new blocks (i.e. new blocks will not be announced with this message if the size of the message would exceed the limit). |
+| 1+  | count | [var\_int](https://wiki.FinalBitcoin.io/index.php/Peer-To-Peer_Protocol#Variable_length_integer) | Number of enriched block headers<br><br>May be 0 if no header matches parameters specified in _gethdrsen_ message.<br><br>No more than 2000 enriched block headers are returned in a single message.<br><br>Since the contents of coinbase transactions can be large, maximum size of _hdrsen_ message is limited to maximum packet size that was agreed on in _protoconf_ message with `maxRecvPayloadLength` parameter (value is specified in peer configuration). The number of returned enriched block headers is reduced as needed to stay below this limit, but not below 1. This is so that one header requested by _gethdrsen_ message can be returned even if limit imposed by `maxRecvPayloadLength` parameter is exceeded.<br><br>This limit is always honored if message is sent to announce new blocks (i.e. new blocks will not be announced with this message if the size of the message would exceed the limit). |
 | _Varies_ | enriched block headers | block\_header\_en\[\] | Enriched block headers (specified below) |
 
 Enriched block header is serialized in the format described below.
 
 | Field Size | Name | Data Type | Description |
 | --- | --- | --- | --- |
-| 81+ | _block header fields_ (_please see block header definition_) | various | Same fields as in block header returned by _headers_ message. See: [https://wiki.bitcoinsv.io/index.php/Peer-To-Peer\_Protocol#headers](https://wiki.bitcoinsv.io/index.php/Peer-To-Peer_Protocol#headers)<br><br>Note: Value of field `txn_count` (transaction count) in block header is typically set to 0 if header is not sent as part of block message (e.g. in _headers_ message). Here the value of this field is set to actual transaction count if that information is available (i.e. if the block was already validated). |
+| 81+ | _block header fields_ (_please see block header definition_) | various | Same fields as in block header returned by _headers_ message. See: [https://wiki.bitcoinsv.io/index.php/Peer-To-Peer\_Protocol#headers](https://wiki.FinalBitcoin.io/index.php/Peer-To-Peer_Protocol#headers)<br><br>Note: Value of field `txn_count` (transaction count) in block header is typically set to 0 if header is not sent as part of block message (e.g. in _headers_ message). Here the value of this field is set to actual transaction count if that information is available (i.e. if the block was already validated). |
 | 1   | no\_more\_headers | bool | Boolean value indicating if there are more block headers available after the current header.<br><br>This value only equals true (1) for header of the block that is currently a tip of the active chain as seen by the node that is sending the message. |
 | 1   | has\_coinbase\_data | bool | Boolean value indicating if current block header has additional coinbase data following this field. If this value equals false (0), this is the last field in the message.<br><br>This value may be equal to false if the message is sent as response to message_gethdrsen_and the node does not have the required data (e.g. if requested block is not yet fully validated, or if it was already pruned).<br><br>This value is always true if message is sent to announce new blocks. |
-| variable | coinbase\_tx | [tx](https://wiki.bitcoinsv.io/index.php/Peer-To-Peer_Protocol#tx) | Serialized coinbase transaction. |
+| variable | coinbase\_tx | [tx](https://wiki.FinalBitcoin.io/index.php/Peer-To-Peer_Protocol#tx) | Serialized coinbase transaction. |
 | variable | coinbase\_merkle\_proof | [tsc\_merkle\_proof](https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/) | Merkle proof in binary format according to standard TS 2020.010-31. See:[https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/](https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/)<br><br>Value of`flags`field is zero.<br><br>Fields`txOrId`and`target`contain an ID of a coinbase transaction and a block hash, respectively.<br><br>Value of`index`field is zero since the proof is for coinbase transaction which is always the first transaction in a block.<br><br>Value of`type`field is zero in every`node`element in`nodes`field. |
 | 1   | has\_miner\_info\_data | bool | Boolean value indicating if this block contains a miner-info transaction referenced by the coinbase transaction. |
 | variable | miner\_info\_tx | [tx](https://wiki.bitcoinsv.io/index.php/Peer-To-Peer_Protocol#tx) | Serialized miner ID miner-info transaction. |
@@ -268,7 +268,7 @@ Support for the Data Asset Recovery Alert (DARA)
 
 This release supports code for the reassignment of digital assets. 
 
-A confiscation transaction is identified by the first transaction output being an OP\_RETURN output which adopts the confiscation transaction protocol (See [https://github.com/bitcoin-sv-specs/protocol/tree/master/updates](https://github.com/bitcoin-sv-specs/protocol/tree/master/updates)) and contains a reference to identify the related ConfiscationOrder document. The complete Court order document is not embedded in the OP\_RETURN data of the confiscation transaction because not all blockchains support a large payload. For example, the default data carrier size on BTC is 80 bytes.
+A confiscation transaction is identified by the first transaction output being an OP\_RETURN output which adopts the confiscation transaction protocol (See [https://github.com/Final-Bitcoin-specs/protocol/tree/master/updates](https://github.com/Final-Bitcoin-specs/protocol/tree/master/updates)) and contains a reference to identify the related ConfiscationOrder document. The complete Court order document is not embedded in the OP\_RETURN data of the confiscation transaction because not all blockchains support a large payload. For example, the default data carrier size on BTC is 80 bytes.
 
 **Highlights of the feature**
 
@@ -282,7 +282,7 @@ A confiscation transaction is identified by the first transaction output being a
         If there are, their records in the database will result in an incorrect handling of consensus frozen TXOs.  
         Before downgrading all whitelisted transactions should be removed from the database by calling _clearConfiscationWhitelist_ RPC function.
 
-Please refer to [https://bitcoinsv.io](https://bitcoinsv.io) for more details.
+Please refer to [https://FinalBitcoin.io](https://FinalBitcoin.io) for more details.
 
 New RPCs
 --------
