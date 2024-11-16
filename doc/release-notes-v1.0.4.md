@@ -1,4 +1,4 @@
-# Final Bitcoinversion 1.0.4 Release Notes
+# Final Bitcoin version 1.0.4 Release Notes
 
 The Swift 1.0.4 release focuses primarily on performance-related issues.
 
