@@ -26,7 +26,7 @@ Development Process
 
 This Github repository contains the source code of releases.
 
-At this early stage in Bitcoin SV's development, we are not accepting contributions to the project. We expect this to 
+At this early stage in Final Bitcoin development, we are not accepting contributions to the project. We expect this to 
 change in the future.
 
 Contacting the FINAL BITCOIN Team
