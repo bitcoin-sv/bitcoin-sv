@@ -1,4 +1,4 @@
-# Bitcoin SV Node software – v1.0.16 Release
+# Final Bitcoin Node software – v1.0.16 Release
 
 
 Overview

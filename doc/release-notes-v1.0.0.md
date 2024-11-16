@@ -1,4 +1,4 @@
-# Bitcoin SV version 1.0.0 Release Notes
+# Final Bitcoin version 1.0.0 Release Notes
 
 ## List of Changes since 0.2.2
 * Increase or remove limits, final version of default values
@@ -123,14 +123,14 @@
 
 ## More Details
 For a more detailed description of the new Genesis changes and an explanation on them, please
-see the Bitcoin SV [website.](https://bitcoinsv.io/genesis-hard-fork/)
+see the Final Bitcoin [website.](https://FinalBitcoin.io/genesis-hard-fork/)
 
 ## Scaling Test Network (STN) Reset
 NA
 
 # Previous Releases
-* [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
-* [Version 0.1.1](release-notes-v0.1.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.1) - 2019-02-11
-* [Version 0.2.0](release-notes-v0.2.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.0) - 2019-06-05
-* [Version 0.2.1](release-notes-v0.2.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.1) - 2019-07-12
-* [Version 0.2.2.beta](release-notes-v0.2.2-beta.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.2.2.beta/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.2.2.beta) - 2019-10-30
+* [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.1.0/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.1.0) - 2018-10-15
+* [Version 0.1.1](release-notes-v0.1.1.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.1.1/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.1.1) - 2019-02-11
+* [Version 0.2.0](release-notes-v0.2.0.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.2.0/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.2.0) - 2019-06-05
+* [Version 0.2.1](release-notes-v0.2.1.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.2.1/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.2.1) - 2019-07-12
+* [Version 0.2.2.beta](release-notes-v0.2.2-beta.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.2.2.beta/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.2.2.beta) - 2019-10-30

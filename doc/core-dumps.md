@@ -2,7 +2,7 @@
 
 This document describes options that allow us to enable generating core dumps on Linux operating system. They contain detailed information about the state of the application at a time when crash occurred and can can be useful for debugging purposes.
 
-Since BitcoinSV Node software can run on different Linux distributions and also inside Docker container this document contains information about settings that we have to use in our systems to be able to produce a core dump.
+Since Final-Bitcoin Node software can run on different Linux distributions and also inside Docker container this document contains information about settings that we have to use in our systems to be able to produce a core dump.
 
 The information about location where core dumps are saved is in file `/proc/sys/kernel/core_pattern`. It can be an absolute path, relative path or (if starting with `|`) location of the program that will receive core dump as a standard input.
 
@@ -28,7 +28,7 @@ Change `enabled` setting in `/etc/default/apport` from `1` to `0`. By doing this
 
 > Note: Using apport (even if enabled and with high ulimit) may result in not producing core dump due to its size.
 
-## Running BSV node directly on host machine
+## Running FNL node directly on host machine
 
 The maximum size of core files is limited by `ulimit -c` setting. On many distributions, the default value is set to 0, and that disables the creation of core dump.
 
@@ -56,7 +56,7 @@ It increases soft limit for core files to unlimited for all users.
 
 > Note: soft limit can be changed by the user, but cannot exceed the hard limit.
 
-When running BitcoinSV Node directly on your machine you have to set your `ulimit -c` to high enough / unlimited value (see instructions above).
+When running Final Bitcoin Node directly on your machine you have to set your `ulimit -c` to high enough / unlimited value (see instructions above).
 
 `core_pattern` (explanations above) tells you where core files will be generated (assuming you set ulimit -c to high enough value).
 
@@ -66,7 +66,7 @@ Some distributions have default `core_pattern` set to pipe core dump to some of 
 
 ## Running BSV node in Docker
 
-When running BitcoinSV Node in Docker container, whether core dump will or won't be generated, depends on settings on the host machine.
+When running Final Bitcoin Node in Docker container, whether core dump will or won't be generated, depends on settings on the host machine.
 
 `/proc/sys/kernel/core_pattern` is a global setting and does not support setting it separately per container.
 
@@ -84,6 +84,6 @@ docker cp <container_name>:<path_to_core_dump> <location_on_host_machine>
 
 > Note: docker cp command does not support wildcards. We recommend copying whole directory with core dumps.
 
-## Running BSV node as a systemd service
+## Running FNL node as a systemd service
 
-When running BitcoinSV Node as a systemd service add `LimitCORE=infinity ` to the service file in order to disable limit on core dump size. [More details about systemd process properties.](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Process%20Properties)
+When running Final Bitcoin Node as a systemd service add `LimitCORE=infinity ` to the service file in order to disable limit on core dump size. [More details about systemd process properties.](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Process%20Properties)

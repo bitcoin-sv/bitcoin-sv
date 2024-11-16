@@ -1,7 +1,7 @@
 #!/bin/sh
 # Copyright (c) 2013-2016 The Bitcoin Core developers
 # Copyright (c) 2019 Bitcoin Association
-# Distributed under the Open BSV software license, see the accompanying file LICENSE.
+# Distributed under the Open FNL software license, see the accompanying file LICENSE.
 
 set -e
 srcdir="$(dirname $0)"

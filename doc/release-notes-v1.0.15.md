@@ -1,4 +1,4 @@
-# Bitcoin SV Node software – v1.0.15 Release
+# Final Bitcoin Node software – v1.0.15 Release
 
 Overview
 ========
@@ -44,7 +44,7 @@ This release has also been updated to use the latest upstream version **0.3.1** 
 
 Building the node software from source requires at least version **10.2** of the **GCC compiler** and at least version **1.74** of the **Boost libraries**.
 
-See the instructions in [build-unix.md](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/build-unix.md) for a detailed description on how to build from source, or alternatively see the provided docker images [here](https://hub.docker.com/r/bitcoinsv/bitcoin-sv-src/) of suitable build environments already setup (scripts to generate the docker images can be found [here](https://github.com/bitcoin-sv/docker-sv-src)).
+See the instructions in [build-unix.md](https://github.com/Final-Bitcoin/Final-Bitcoin/blob/master/doc/build-unix.md) for a detailed description on how to build from source, or alternatively see the provided docker images [here](https://hub.docker.com/r/FinalBitcoin/Final-Bitcoin-src/) of suitable build environments already setup (scripts to generate the docker images can be found [here](https://github.com/Final-Bitcoin/docker-sv-src)).
 
 Other items:
 ------------

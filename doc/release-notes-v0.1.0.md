@@ -1,4 +1,4 @@
-# Bitcoin SV version 0.1.0 Release Notes
+# Final Bitcoin version 0.1.0 Release Notes
 
 This release includes support for the November 2018 Upgrade. When the upgrade activates, the 
 following changes take effect:

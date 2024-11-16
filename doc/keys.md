@@ -1,11 +1,11 @@
 # Public Keys
 The following public keys are used for signing releases and for communicating with 
-the Bitcoin SV Security Team.
+the Final Bitcoin Security Team.
 
 
-## Bitcoin SV Node Implementation Release Keys
+## Final Bitcoin Node Implementation Release Keys
 
-* User id: Daniel Connolly (Bitcoin SV binary release signing key) <d.connolly@nchain.com>
+* User id: Daniel Connolly (Final Bitcoin binary release signing key) <d.connolly@nchain.com>
 * Fingerprint: `2E6B64609F97BD0C3ABD89E1169E3EC06431FF95`
 
 ```
@@ -52,7 +52,7 @@ vxs6Yrz+Qc/XncC1NcoM3WbvkH19BzWYuSTZfDS/oD04tdY8AKU81n9jArHVIg==
 -----END PGP PUBLIC KEY BLOCK-----
 ```
 
-* User id: Richard Mills (Bitcoin SV binary release signing key) <r.mills@nchain.com>
+* User id: Richard Mills (Final Bitcoin binary release signing key)
 * Fingerprint: `AF6A46C19D67A45F502F9C4CED31BEA249693597`
 
 ```
@@ -225,9 +225,9 @@ o2dIxjQ/Q+bxN85jrmFk2Syt
 -----END PGP PUBLIC KEY BLOCK-----
 ```
 
-## Bitcoin SV Security Team
+## Final Bitcoin Security Team
 
-* User id: Bitcoin SV Security Team <security@bitcoinsv.io>
+* User id: Final-Bitcoin Security Team <security@FinalBitcoin.io>
 * Fingerprint: `E8EB970A1C607DF0822E1388F96976FD7A20AB62`
 ```
 -----BEGIN PGP PUBLIC KEY BLOCK-----

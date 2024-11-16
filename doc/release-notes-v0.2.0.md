@@ -1,4 +1,4 @@
-# Bitcoin SV version 0.2.0 Release Notes
+# Final Bitcoin version 0.2.0 Release Notes
 
 ## List of Changes
 * Update to C++17
@@ -36,5 +36,5 @@ The Scaling Test Network has been reset at block height 2951. This block has has
 `0000000076b49c5857b2daf2b363478a799f95a18852155113bbace94321b0d0`.
 
 # Previous Releases
-* [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
-* [Version 0.1.1](release-notes-v0.1.1.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.1/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.1) - 2019-02-11
+* [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.1.0/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.1.0) - 2018-10-15
+* [Version 0.1.1](release-notes-v0.1.1.md) - [Download](https://download.FinalBitcoin.io/FinalBitcoin/0.1.1/) - [Source](https://github.com/Final-Bitcoin/Final-Bitcoin/tree/v0.1.1) - 2019-02-11

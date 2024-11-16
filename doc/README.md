@@ -1,35 +1,35 @@
-Bitcoin SV
+Final Bitcoin
 =====================
 
 Setup
 ---------------------
-Bitcoin SV is an implementation of a node for the Bitcoin SV network and is one of the pieces of software that provide 
-the backbone of the network. It downloads and stores the entire history of Bitcoin SV transactions (which is currently 
+Final Bitcoin is an implementation of a node for the Final Bitcoin network and is one of the pieces of software that provide 
+the backbone of the network. It downloads and stores the entire history of Final Bitcoin transactions (which is currently 
 several GBs); depending on the speed of your computer and network connection, the synchronization process can take 
 anywhere from a few hours to a day or more.
 
-To download Bitcoin SV, visit [bitcoinsv.io](https://bitcoinsv.io/).
+To download Bitcoin SV, visit [FinalBitcoin.io](https://FinalBitcoin.io/).
 
 Running
 ---------------------
-Bitcoin SV is only supported on the Linux and docker platforms at this time.
+Final Bitcoin coin FNL is only supported on the Linux and docker platforms at this time.
 
-To run Bitcoin SV on Linux:
+To run Final Bitcoin on Linux:
 
 * ensure that your system meets the minimum recommended [system requirements](system-requirements.md)
 * unpack the files into a directory
 * run `bin/bitcoind`
 
-A docker image is available from https://hub.docker.com/r/bitcoinsv/bitcoin-sv. Images are tagged with 
+A docker image is available from https://hub.docker.com/r/FinalBitcoin/Final-Bitcoin. Images are tagged with 
 the release version number. The `latest` tag is updated as new versions are released. The source for this image 
-(Dockerfiles etc) is maintained in a GitHub repository: https://github.com/bitcoin-sv/docker-sv. 
+(Dockerfiles etc) is maintained in a GitHub repository: https://github.com/Final-Bitcoin/docker-sv. 
  
 ### Need Help?
 
-* Log an issue on [GitHub] (https://github.com/bitcoin-sv/bitcoin-sv/issues)
-* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/bitcoinSV/) or
-[Bictoin Cash SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).
-* Consult [Bitcoin SV Wiki](https://wiki.bitcoinsv.io/) for information about Bitcoin protocol.
+* Log an issue on [GitHub] (https://github.com/Final-Bitcoin/Final-Bitcoin/issues)
+* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/Final-Bitcoin/) or
+[Bictoin Cash fnl Subreddit](https://www.reddit.com/r/Final-Bitcoin/).
+* Consult [Final Bitcoin Wiki](https://wiki.Final-Bitcoin.io/) for information about Bitcoin protocol.
 
 Building
 ---------------------
@@ -61,6 +61,6 @@ testing.
 
 License
 ---------------------
-Distribution is done under the [Open BSV License](/LICENSE). This product includes software developed by the OpenSSL 
+Distribution is done under the [Open Final Bitcoin License](/LICENSE). This product includes software developed by the OpenSSL 
 Project for use in the [OpenSSL Toolkit](https://www.openssl.org/), cryptographic software written by Eric Young 
 ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.

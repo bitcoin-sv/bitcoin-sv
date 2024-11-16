@@ -1,4 +1,4 @@
-# Bitcoin SV version 0.1.1 Release Notes
+# Final Bitcoin version 0.1.1 Release Notes
 
 ## List of Changes
 * added `broadcastdelay` configuration parameter. Sets the number of milliseconds
@@ -15,5 +15,5 @@
 * various other fixes
 
 ## Scaling Test Network Reset
-The Scaling Test Network has been reset to block height 2300 on 31st of January 2019.
+The Scaling Test Network has been reset to block height 2300 on 31st of January 2024.
  
