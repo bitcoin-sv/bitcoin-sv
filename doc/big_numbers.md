@@ -1,4 +1,4 @@
-Author: Chris Gibson
+Author: helder costa
 
 Copyright: 
 
@@ -15,17 +15,17 @@ Copyright:
     liability for any errors or inaccuracies that may appear in this
     documentation."
 
-Date: 01.07.2019
+Date: 01.07.2024
 
-Organization: nChain
+Organization: Home
 
-Title: BSV Script Big Numbers
+Title: Final-Bitcoin Script Big Numbers
 
 Introduction
 ============
 
 This document describes the reinstatement of big number arithmetic into
-Bitcoin SV. Big Number arithmetic will remove the current limit
+Final Bitcoin. Big Number arithmetic will remove the current limit
 on the size of numbers in the Script language. Big number support will
 enable cryptographic functionality in Script.
 
@@ -226,5 +226,5 @@ be implemented in terms of an existing Big Number library such as
 [GMPlib](https://gmplib.org/). We propose to use OpenSSL in the first
 instance to be consistent with the SDK.
 
-Chris Gibson 
+Helder Costa
 
