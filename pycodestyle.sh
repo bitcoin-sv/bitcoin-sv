@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open FNL
 # software license, see the accompanying file LICENSE
 
 shopt -s globstar
