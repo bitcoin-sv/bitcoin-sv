@@ -1,4 +1,4 @@
-# Bitcoin SV version 1.0.6 Release Notes
+# Final Bitcoin version 1.0.6 Release Notes
 
 ## List of Changes since 1.0.5
 * New RPC to retrieve UTXOs.
