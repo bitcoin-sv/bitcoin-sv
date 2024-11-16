@@ -3,7 +3,7 @@
 ## Building using a pre-built docker image
 
 Docker images containing all the required tools, build dependencies and
-Bitcoin SV node source code are available [here](https://hub.docker.com/r/bitcoinsv/bitcoin-sv-src/).
+Final Bitcoin node source code are available [here](https://hub.docker.com/r/finalbitcoin/final-bitcoin-src/).
 
 Pre-built images are available for Debian, Ubuntu and Centos.
 
@@ -12,7 +12,7 @@ to worry about installing all the required dependencies as detailed below.
 
 ## Manual building notes
 
-Some notes on how to build Bitcoin SV in Unix.
+Some notes on how to build Final Bitcoin in Unix.
 
 Always use absolute paths to configure and compile bitcoin and the dependencies,
 for example, when specifying the path of the dependency:
