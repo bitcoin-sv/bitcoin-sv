@@ -1388,10 +1388,16 @@ CTxnValResult TxnValidation(
                     false,
                     txdata,
                     frozenTXOCheck);
-            if(res.has_value() && res.value())
+            if(res.has_value())
             {
-                graceState.Invalid(false, REJECT_NONSTANDARD, "flexible-" + state.GetRejectReason());
-                state = graceState;
+                // If inverse flags allow checks to pass, or if they change the failure cause
+                // to a less serious one, give the sender some benefit of the doubt during
+                // the grace period.
+                if(res.value() || graceState.GetNDoS() < state.GetNDoS())
+                {
+                    graceState.Invalid(false, REJECT_NONSTANDARD, "flexible-" + state.GetRejectReason());
+                    state = graceState;
+                }
             }
         }
 
