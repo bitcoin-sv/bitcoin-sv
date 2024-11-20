@@ -945,7 +945,7 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
             }
         }
 
-        bool pausedForSending { mAssociation.GetTotalSendQueueSize() > maxBuffSize };
+        bool pausedForSending { mAssociation.GetTotalSendQueueMemoryUsage() > maxBuffSize };
 
         // This complex if/else is just to try and limit logging so that we only log
         // as we enter or leave the pause send & recv state.
