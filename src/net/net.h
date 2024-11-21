@@ -144,7 +144,6 @@ static const bool DEFAULT_FORCEDNSSEED = true;
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
 // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
-static const size_t DEFAULT_MAXSENDBUFFER_MULTIPLIER = 10;
 
 static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 
@@ -1204,6 +1203,7 @@ public:
 
     bool GetDisconnect() const { return fDisconnect; }
     bool GetPausedForSending(bool checkPauseRecv = false);
+    bool GetPausedForReceiving() const;
 
     void SetRecvVersion(int nVersionIn) { nRecvVersion = nVersionIn; }
     int GetRecvVersion() { return nRecvVersion; }

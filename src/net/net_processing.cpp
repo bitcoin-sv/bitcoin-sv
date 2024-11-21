@@ -4820,7 +4820,16 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Don't bother if send buffer is too full to respond anyway
-    if (pfrom->GetPausedForSending(true)) {
+
+    // If the send buffer is full, but we're still able to receive more, wait
+    // until the other end has drained some of the backlog to avoid filling
+    // the sending queue even more.
+    //
+    // In the unlikely event that both the send and recv buffers are full,
+    // then allow message processing a chance to free things up and drain some
+    // incoming data, but special handling in PushMessage will discard any
+    // resulting replies that would further saturate the send queue.
+    if (pfrom->GetPausedForSending(true) && ! pfrom->GetPausedForReceiving()) {
         return false;
     }
 
