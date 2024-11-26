@@ -57,7 +57,7 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
             self.unlocking_script = unlocking_script
 
     # Spend UTXOs and create a txn with unlocking_script + the usual signature
-    def new_transaction(self, key, inputs):
+    def new_transaction(self, key, inputs, sign_fn=None):
         tx = CTransaction()
         total_input = 0
 
@@ -72,6 +72,10 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
         # 1 output
         tx.vout.append(CTxOut(total_input - 100, CScript([key.get_pubkey(), OP_CHECKSIG])))
 
+        # Standard txn signing function
+        def sign_txn_input(sighash, hash_type):
+            return key.sign(sighash) + bytes(bytearray([hash_type]))
+
         # Sign
         for index, (inp, tx_input) in enumerate(zip(inputs, tx.vin)):
             utxo = inp.utxo
@@ -81,7 +85,7 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
 
             sighash = SignatureHashForkId(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type, tx_to_spend.vout[n].nValue) \
                 if hash_type & SIGHASH_FORKID else SignatureHash(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type)
-            sig = key.sign(sighash) + bytes(bytearray([hash_type]))
+            sig = sign_txn_input(sighash, hash_type) if sign_fn is None else sign_fn(sighash, hash_type)
             tx_input.scriptSig = CScript(unlocking_script + [sig])
 
         tx.rehash()
