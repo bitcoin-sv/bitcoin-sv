@@ -3564,6 +3564,84 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
     }
 }
 
+BOOST_AUTO_TEST_CASE(VerifyScript_lows)
+{
+    using namespace std;
+
+    struct always_true_sig_checker : BaseSignatureChecker
+    {
+        bool CheckSig(const std::vector<uint8_t> &,
+                      const std::vector<uint8_t> &,
+                      const CScript&,
+                      bool) const override
+        {
+            return true;
+        }
+    };
+
+    using test_args = tuple<uint32_t,               // flags
+                            vector<uint8_t>,        // unlocking script
+                            int,                    // sighash
+                            ScriptError,            // expect error
+                            malleability::status>;  // expected malleability_status
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID,
+         high_s_min(),
+         SIGHASH_ALL,
+         SCRIPT_ERR_SIG_HIGH_S, malleability::non_malleable},
+
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_SIG_HIGH_S, malleability::non_malleable},
+
+        // Post Chronicle
+        {SCRIPT_VERIFY_LOW_S
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         high_s_min(),
+         SIGHASH_ALL,
+         SCRIPT_ERR_OK, malleability::high_s},
+
+        {SCRIPT_VERIFY_LOW_S
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_SIG_HIGH_S,
+         malleability::high_s | malleability::disallowed },
+    };
+    for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
+    {
+        const Config& config = GlobalConfig::GetConfig();
+        auto source = task::CCancellationSource::Make();
+
+        const vector<uint8_t> scriptSig;
+        const auto scriptPubKey{make_op_checksig_script(sig_hash, s)};
+        std::atomic<malleability::status> ms;
+        const auto status = VerifyScript(config,
+                                         false,
+                                         source->GetToken(),
+                                         CScript{scriptSig.begin(), scriptSig.end()},
+                                         CScript{scriptPubKey.begin(), scriptPubKey.end()},
+                                         flags,
+                                         always_true_sig_checker{},
+                                         ms);
+        BOOST_CHECK(status.has_value());
+        const auto p{status.value()};
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, p.first);
+        BOOST_CHECK_EQUAL(exp_error, p.second);
+        BOOST_CHECK_EQUAL(exp_mall, malleability::status{ms});
+    }
+}
+
 BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
 {
     using namespace std;

@@ -2267,8 +2267,6 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     // but it avoids confusion).
     malleability::status combined_malleability { malleability |= our_malleability };
 
-    // TODO: Checks at the end for malleability related failures.
-
     // Checks for non-push-only scriptSig
     if(flags & SCRIPT_VERIFY_SIGPUSHONLY)
     {
@@ -2287,6 +2285,18 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         if(checkSigPushOnly && has_non_push_data(combined_malleability))
         {
             return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
+        }
+    }
+
+    if(flags & SCRIPT_CHRONICLE)
+    {
+       if(flags & SCRIPT_VERIFY_LOW_S)
+        {
+            if(is_high_s(combined_malleability)
+               && is_disallowed(combined_malleability))
+            {
+                return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
+            }
         }
     }
 
