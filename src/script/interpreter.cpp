@@ -463,12 +463,20 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
             if(IsOpcodeDisabled(opcode, utxoEra) && (!utxo_after_genesis || fExec ))
                 return SCRIPT_ERR_DISABLED_OPCODE;
 
-            if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
-                if (fRequireMinimal && !CheckMinimalPush(vchPushValue, opcode))
-                    return SCRIPT_ERR_MINIMALDATA;
+            if(fExec && 0 <= opcode && opcode <= OP_PUSHDATA4)
+            {
+                if(fRequireMinimal && !CheckMinimalPush(vchPushValue, opcode))
+                {
+                    if(flags & SCRIPT_CHRONICLE)
+                        ms |= malleability::non_minimal_encoding;
+                    else
+                        return SCRIPT_ERR_MINIMALDATA;
+                }
 
                 stack.push_back(std::move(vchPushValue));
-            } else if (fExec || (OP_IF <= opcode && opcode <= OP_ENDIF)) {
+            }
+            else if(fExec || (OP_IF <= opcode && opcode <= OP_ENDIF))
+            {
                 switch (opcode) {
                     //
                     // Push value
@@ -1726,7 +1734,10 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     }
     catch(scriptnum_minencode_error& err)
     {
-        return SCRIPT_ERR_SCRIPTNUM_MINENCODE;
+        if(flags & SCRIPT_CHRONICLE)
+            ms |= malleability::non_minimal_encoding;
+        else
+            return SCRIPT_ERR_SCRIPTNUM_MINENCODE;
     }
     catch(stack_overflow_error& err)
     {
@@ -2306,12 +2317,21 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     // Checks for Low-S
     if(flags & SCRIPT_CHRONICLE)
     {
-       if(flags & SCRIPT_VERIFY_LOW_S)
+        if(flags & SCRIPT_VERIFY_LOW_S)
         {
             if(is_high_s(combined_malleability)
                && is_disallowed(combined_malleability))
             {
                 return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
+            }
+        }
+
+        if(flags & SCRIPT_VERIFY_MINIMALDATA)
+        {
+            if(is_non_minimal_encoding(combined_malleability)
+               && is_disallowed(combined_malleability))
+            {
+                return std::make_pair(false, SCRIPT_ERR_MINIMALDATA);
             }
         }
     }
