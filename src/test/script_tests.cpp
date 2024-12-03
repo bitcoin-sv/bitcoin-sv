@@ -4217,6 +4217,38 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
          SIGHASH_ALL | SIGHASH_FORKID,
          {SCRIPT_ERR_SCRIPTNUM_MINENCODE}, {}},
 
+        // Post Chronicle
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         {OP_PUSHDATA1, 0, OP_1ADD}, // Non-minimal encoding (use OP_0)
+         SIGHASH_ALL,
+         {}, {malleability::non_minimal_encoding}},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         {OP_PUSHDATA1, 0, OP_1ADD},
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {}, {malleability::non_minimal_encoding | malleability::disallowed}},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         {2, 0, 0, OP_1ADD}, // Minimal encoded (2 bytes of raw data)
+         SIGHASH_ALL,
+         {}, {malleability::non_minimal_encoding}},
+        
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         {2, 0, 0, OP_1ADD},
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {}, {malleability::non_minimal_encoding}},
     };
     for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
     {
@@ -4281,6 +4313,21 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_MINIMALDATA, malleability::non_malleable},
 
+        // Post Chronicle
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         {OP_PUSHDATA1, 1, 1},
+         SIGHASH_ALL,
+         SCRIPT_ERR_OK, malleability::non_minimal_encoding},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+         {OP_PUSHDATA1, 1, 1},
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_MINIMALDATA,
+         malleability::non_minimal_encoding | malleability::disallowed },
     };
     for(const auto& [flags, scriptSig, sig_hash, exp_error, exp_mall] : test_data)
     {
