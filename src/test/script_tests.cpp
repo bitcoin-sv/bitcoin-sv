@@ -4165,4 +4165,149 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_multiple_forkids)
     BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
 }
 
+BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
+{
+    using namespace std;
+
+    using test_args = tuple<uint32_t,           // flags
+                            vector<uint8_t>,    // pushdata script
+                            int,                // sighash
+                            std::optional<ScriptError>,
+                            std::optional<malleability::status>>;
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 0}, // Non-minimal encoding - could have used OP_0
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {}, {malleability::disallowed}},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 0},
+         SIGHASH_ALL,
+         {SCRIPT_ERR_MINIMALDATA}, {}},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 0},
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {SCRIPT_ERR_MINIMALDATA}, {}},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 0}, // Non-minimal encoding (use OP_0)
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {SCRIPT_ERR_MINIMALDATA}, {}},
+        
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {2, 0, 0 }, // Minimal encoded (2 bytes of raw data)
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {}, {malleability::disallowed}},
+        
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {2, 0, 0, OP_1ADD}, // OP_1ADD ensures CScriptNum can be created from the stack
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {SCRIPT_ERR_SCRIPTNUM_MINENCODE}, {}},
+
+    };
+    for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
+    {
+        const Config& config = GlobalConfig::GetConfig();
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+      
+        vector<uint8_t> script{s};
+        const auto op_checksig_script{make_op_checksig_script(sig_hash, low_s_max())};
+        script.insert(script.end(), op_checksig_script.begin(), op_checksig_script.end());
+        const auto status = EvalScript(config,
+                                       false,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        if(!exp_error && exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
+                              std::get<malleability::status>(v));
+        }
+        else if(exp_error && !exp_mall)
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+        }
+        else
+            assert(false);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
+{
+    using namespace std;
+
+    using test_args = tuple<uint32_t,               // flags
+                            vector<uint8_t>,        // unlocking script
+                            int,                    // sighash
+                            ScriptError,            // expect error
+                            malleability::status>;  // expected malleability_status
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 1, 1}, // Non-minimal encoding - could have used OP_1
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 1, 1},
+         SIGHASH_ALL,
+         SCRIPT_ERR_MINIMALDATA, malleability::non_malleable},
+
+        {SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
+         {OP_PUSHDATA1, 1, 1},
+         SIGHASH_ALL | SIGHASH_FORKID,
+         SCRIPT_ERR_MINIMALDATA, malleability::non_malleable},
+
+    };
+    for(const auto& [flags, scriptSig, sig_hash, exp_error, exp_mall] : test_data)
+    {
+        const Config& config = GlobalConfig::GetConfig();
+        auto source = task::CCancellationSource::Make();
+      
+        const auto scriptPubKey{[&sig_hash]{
+            vector<uint8_t> v{make_op_checksig_script(sig_hash, low_s_max())};
+            v.push_back(OP_DROP); // ignore result of OP_CHECKSIG (always false)
+            return v;
+        }()};
+
+        std::atomic<malleability::status> ms;
+        const auto status = VerifyScript(config,
+                                         false,
+                                         source->GetToken(),
+                                         CScript{scriptSig.begin(), scriptSig.end()},
+                                         CScript{scriptPubKey.begin(), scriptPubKey.end()},
+                                         flags,
+                                         BaseSignatureChecker{},
+                                         ms);
+        BOOST_CHECK(status.has_value());
+        const auto p{status.value()};
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, p.first);
+        BOOST_CHECK_EQUAL(exp_error, p.second);
+        BOOST_CHECK_EQUAL(exp_mall, malleability::status{ms});
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
