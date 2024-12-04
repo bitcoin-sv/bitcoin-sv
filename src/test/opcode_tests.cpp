@@ -2,6 +2,7 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "script/malleability_status.h"
 #include "script/opcodes.h"
 #include "script/script_error.h"
 #include "script/script_flags.h"
@@ -129,8 +130,25 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                         sigchecker);
     BOOST_CHECK(r.has_value());
     const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-    BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
+    if(expected_error == SCRIPT_ERR_SCRIPTNUM_MINENCODE)
+    {
+        if(flags & SCRIPT_CHRONICLE)
+        {
+            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK_EQUAL(malleability::non_minimal_encoding,
+                              std::get<malleability::status>(v));
+        }
+        else
+        {
+            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
+        }
+    }
+    else
+    {
+        BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+        BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
+    }
 
     // Make sure that if we do not pass the opcodes flags, we get the same result
     if(upgradeFlag)
