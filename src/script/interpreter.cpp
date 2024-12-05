@@ -423,8 +423,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
         return SCRIPT_ERR_SCRIPT_SIZE;
 
     uint64_t nOpCount = 0;
-    const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-
+    const min_encoding_check min_encode_check{flags & SCRIPT_VERIFY_MINIMALDATA
+                                                  ? flags & SCRIPT_CHRONICLE
+                                                        ? min_encoding_check::soft
+                                                        : min_encoding_check::hard
+                                                  : min_encoding_check::no};
     // if OP_RETURN is found in executed branches after genesis is activated,
     // we still have to check if the rest of the script is valid
     bool nonTopLevelReturnAfterGenesis = false;
@@ -465,9 +468,10 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
             if(fExec && 0 <= opcode && opcode <= OP_PUSHDATA4)
             {
-                if(fRequireMinimal && !CheckMinimalPush(vchPushValue, opcode))
+                if(require_min_encoding(min_encode_check)
+                   && !CheckMinimalPush(vchPushValue, opcode))
                 {
-                    if(flags & SCRIPT_CHRONICLE)
+                    if(min_encode_check == min_encoding_check::soft)
                         ms |= malleability::non_minimal_encoding;
                     else
                         return SCRIPT_ERR_MINIMALDATA;
@@ -540,7 +544,9 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // well beyond the 2**32-1 limit of the nLockTime field
                         // itself.
                         const CScriptNum nLockTime(stack.stacktop(-1).GetElement(),
-                                                   fRequireMinimal, 5);
+                                                   min_encode_check,
+                                                   ms,
+                                                   5);
 
                         // In the rare event that the argument may be < 0 due to
                         // some arithmetic being done first, you can always use
@@ -572,7 +578,9 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // integer field. See the comment in CHECKLOCKTIMEVERIFY
                         // regarding 5-byte numeric operands.
                         const CScriptNum nSequence(stack.stacktop(-1).GetElement(),
-                                                   fRequireMinimal, 5);
+                                                   min_encode_check,
+                                                   ms,
+                                                   5);
 
                         // In the rare event that the argument may be < 0 due to
                         // some arithmetic being done first, you can always use
@@ -619,12 +627,14 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
-                                                fRequireMinimal,
+                                                min_encode_check,
+                                                ms,
                                                 maxScriptNumLength};
                         const auto len{bn_len.getint()};
 
                         const CScriptNum bn_begin{stack.stacktop(-2).GetElement(),
-                                                  fRequireMinimal,
+                                                  min_encode_check,
+                                                  ms,
                                                   maxScriptNumLength};
                         const auto offset{bn_begin.getint()};
                         
@@ -657,7 +667,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
-                                                fRequireMinimal,
+                                                min_encode_check,
+                                                ms,
                                                 maxScriptNumLength};
                         const auto len{bn_len.getint()};
 
@@ -684,7 +695,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
-                                                fRequireMinimal,
+                                                min_encode_check,
+                                                ms,
                                                 maxScriptNumLength};
                         const auto len{bn_len.getint()};
 
@@ -952,10 +964,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
 
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum sn{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum sn{top,
+                                            min_encode_check,
+                                            ms,
+                                            maxScriptNumLength,
+                                            utxo_after_genesis};
                         stack.pop_back();
                         if(sn < 0 || sn >= stack.size())
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
@@ -1071,7 +1084,10 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                        CScriptNum n{top,
+                                     min_encode_check,
+                                     ms,
+                                     maxScriptNumLength,
                                      utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
@@ -1106,7 +1122,10 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                        CScriptNum n{top,
+                                     min_encode_check,
+                                     ms,
+                                     maxScriptNumLength,
                                      utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
@@ -1180,7 +1199,9 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto &top{stack.stacktop(-1).GetElement()};
-                        CScriptNum bn{top, fRequireMinimal,
+                        CScriptNum bn{top,
+                                      min_encode_check,
+                                      ms,
                                       maxScriptNumLength,
                                       utxo_after_genesis};
                         switch (opcode) {
@@ -1247,12 +1268,16 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const auto& arg_2 = stack.stacktop(-2);                        
                         const auto& arg_1 = stack.stacktop(-1);
 
-                        CScriptNum bn1(arg_2.GetElement(), fRequireMinimal,
-                                       maxScriptNumLength,
-                                       utxo_after_genesis);
-                        CScriptNum bn2(arg_1.GetElement(), fRequireMinimal,
-                                       maxScriptNumLength,
-                                       utxo_after_genesis);
+                        const CScriptNum bn1(arg_2.GetElement(),
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis);
+                        const CScriptNum bn2(arg_1.GetElement(),
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis);
                         CScriptNum bn;
                         switch (opcode) {
                             case OP_ADD:
@@ -1340,20 +1365,23 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
 
                         const auto& top_3{stack.stacktop(-3).GetElement()};
-                        const CScriptNum bn1{
-                            top_3, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum bn1{top_3,
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis};
                         const auto& top_2{stack.stacktop(-2).GetElement()};
-                        const CScriptNum bn2{
-                            top_2, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum bn2{top_2,
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis};
                         const auto& top_1{stack.stacktop(-1).GetElement()};
-                        const CScriptNum bn3{
-                            top_1, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum bn3{top_1,
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis};
                         const bool fValue = (bn2 <= bn1 && bn1 < bn3);
                         stack.pop_back();
                         stack.pop_back();
@@ -1467,8 +1495,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes) 
                         // because only 4 byte integers are supported by  OP_CHECKMULTISIG / OP_CHECKMULTISIGVERIFY
-                        int64_t nKeysCountSigned =
-                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal, CScriptNum::MAXIMUM_ELEMENT_SIZE).getint();
+                        const int64_t
+                            nKeysCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
+                                                          min_encode_check,
+                                                          ms,
+                                                          CScriptNum::
+                                                              MAXIMUM_ELEMENT_SIZE)
+                                                   .getint();
                         if (nKeysCountSigned < 0)
                             return SCRIPT_ERR_PUBKEY_COUNT;
 
@@ -1490,8 +1523,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         if (stack.size() < i)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        int64_t nSigsCountSigned =
-                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal, CScriptNum::MAXIMUM_ELEMENT_SIZE).getint();
+                        const int64_t
+                            nSigsCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
+                                                          min_encode_check,
+                                                          ms,
+                                                          CScriptNum::
+                                                              MAXIMUM_ELEMENT_SIZE)
+                                                   .getint();
 
                         if (nSigsCountSigned < 0)
                             return SCRIPT_ERR_SIG_COUNT;
@@ -1634,10 +1672,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         // Make sure the split point is apropriate.
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum n{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum n{top,
+                                           min_encode_check,
+                                           ms,
+                                           maxScriptNumLength,
+                                           utxo_after_genesis};
                         if(n < 0 || n > data.size())
                             return SCRIPT_ERR_INVALID_SPLIT_RANGE;
 
@@ -1665,10 +1704,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto& arg_1 = stack.stacktop(-1).GetElement();
-                        const CScriptNum n{
-                            arg_1, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum n{arg_1,
+                                           min_encode_check,
+                                           ms,
+                                           maxScriptNumLength,
+                                           utxo_after_genesis};
                         if(n < 0 || n > std::numeric_limits<int32_t>::max())
                             return SCRIPT_ERR_PUSH_SIZE;
 
@@ -1734,10 +1774,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     }
     catch(scriptnum_minencode_error& err)
     {
-        if(flags & SCRIPT_CHRONICLE)
-            ms |= malleability::non_minimal_encoding;
-        else
-            return SCRIPT_ERR_SCRIPTNUM_MINENCODE;
+        return SCRIPT_ERR_SCRIPTNUM_MINENCODE;
     }
     catch(stack_overflow_error& err)
     {

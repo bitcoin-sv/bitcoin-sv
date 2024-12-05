@@ -130,15 +130,9 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                         sigchecker);
     BOOST_CHECK(r.has_value());
     const auto v{r.value()};
-    if(expected_error == SCRIPT_ERR_SCRIPTNUM_MINENCODE)
+    if(flags & SCRIPT_CHRONICLE)
     {
-        if(flags & SCRIPT_CHRONICLE)
-        {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-            BOOST_CHECK_EQUAL(malleability::non_minimal_encoding,
-                              std::get<malleability::status>(v));
-        }
-        else
+        if(expected_error != SCRIPT_ERR_SCRIPTNUM_MINENCODE)
         {
             BOOST_CHECK(std::holds_alternative<ScriptError>(v));
             BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
@@ -1149,8 +1143,9 @@ static void CheckDivMod(const valtype &a, const valtype &b,
 
     // Modulo identities
     // a % b % b = a % b
+    malleability::status ms{};
     CheckTestResultForAllFlags(
-        {a, b}, CScript() << OP_MOD << CScriptNum(b, true).getint() << OP_MOD,
+        {a, b}, CScript() << OP_MOD << CScriptNum(b, min_encoding_check::hard, ms).getint() << OP_MOD,
         {modExpected});
 }
 

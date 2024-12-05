@@ -10,6 +10,7 @@
 
 #include "config.h"
 #include "protocol_era.h"
+#include "script/malleability_status.h"
 #include "script/script_num.h"
 #include "taskcancellation.h"
 
@@ -36,8 +37,9 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 
     if (whichType == TX_MULTISIG) {
         // we don't require minimal encoding here because Solver method is already checking minimal encoding
-        int m = CScriptNum(vSolutions.front(), false).getint();
-        int n = CScriptNum(vSolutions.back(), false).getint();
+        malleability::status ms{};
+        int m = CScriptNum(vSolutions.front(), min_encoding_check::no, ms).getint();
+        int n = CScriptNum(vSolutions.back(), min_encoding_check::no, ms).getint();
         // Support up to x-of-3 multisig txns as standard
         if (n < 1 || n > 3) return false;
         if (m < 1 || m > n) return false;

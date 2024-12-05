@@ -6,6 +6,7 @@
 
 #include "dstencode.h"
 #include "primitives/transaction.h"
+#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "script/standard.h"
@@ -118,7 +119,10 @@ void ScriptToAsmStr(const CScript& script,
         {
             if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4))
             {
-                textWriter.Write(strprintf("%d", CScriptNum(vch, false).getint()));
+                malleability::status ms{};
+                textWriter.Write(
+                    strprintf("%d",
+                              CScriptNum(vch, min_encoding_check::no, ms).getint()));
             }
             else
             {

@@ -3065,8 +3065,9 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
     //Test solver before genesis with 2 pubkeys and 0 sigs
     CScript multisig_OP0_OP2 = CScript() << OP_0 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
     bool result = Solver(multisig_OP0_OP2, ProtocolEra::PreGenesis, txMultiSig, solutions);
-    BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 0);
-    BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 2);
+    malleability::status ms{};
+    BOOST_CHECK(CScriptNum(solutions.front(), min_encoding_check::hard, ms).getint() == 0);
+    BOOST_CHECK(CScriptNum(solutions.back(), min_encoding_check::hard, ms).getint() == 2);
 
     
     //Test solver before genesis with 16 pubkeys and 1 sig
@@ -3078,8 +3079,8 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
     }
     multisig_OP1_OP16 << OP_16 << OP_CHECKMULTISIG;
     result = Solver(multisig_OP1_OP16, ProtocolEra::PreGenesis, txMultiSig, solutions);
-    BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
-    BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 16);
+    BOOST_CHECK(CScriptNum(solutions.front(), min_encoding_check::hard, ms).getint() == 1);
+    BOOST_CHECK(CScriptNum(solutions.back(), min_encoding_check::hard, ms).getint() == 16);
 
     //Test solver before genesis with 18 pubkeys and 1 sig but without using OP code, it should fail
     solutions.clear();
@@ -3103,8 +3104,8 @@ BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
     }
     multisig_OP1_OP300 << CScriptNum(300) << OP_CHECKMULTISIG;
     result = Solver(multisig_OP1_OP300, ProtocolEra::PostGenesis, txMultiSig, solutions);
-    BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
-    BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 300);
+    BOOST_CHECK(CScriptNum(solutions.front(), min_encoding_check::hard, ms).getint() == 1);
+    BOOST_CHECK(CScriptNum(solutions.back(), min_encoding_check::hard, ms).getint() == 300);
 }
 
 BOOST_AUTO_TEST_CASE(txout_IsDust) {
@@ -4248,7 +4249,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
          | SCRIPT_CHRONICLE,
          {2, 0, 0, OP_1ADD},
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, {malleability::non_minimal_encoding}},
+         {}, {malleability::disallowed | malleability::non_minimal_encoding}},
     };
     for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
     {

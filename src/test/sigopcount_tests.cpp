@@ -42,7 +42,12 @@ BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
 {
     // Tests for GitHub #296 & SVN-2388
-    CScriptNum BigNum { std::vector<uint8_t>{1,2,3,4,5}, false, 6, true };
+    malleability::status ms{};
+    const CScriptNum BigNum{std::vector<uint8_t>{1, 2, 3, 4, 5},
+                            min_encoding_check::no,
+                            ms,
+                            6,
+                            true};
     using TestParams = std::tuple<CScript, bool, uint64_t>; // <Script, triggers error, sig op count>
     std::vector<TestParams> tests {
         {
