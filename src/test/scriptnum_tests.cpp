@@ -110,7 +110,6 @@ BOOST_AUTO_TEST_CASE(chronicle_construction)
             min_encoding_check::no,
             malleability::non_malleable
         },
-       
         // min-encoding checks=soft
         {
             {},
@@ -120,7 +119,7 @@ BOOST_AUTO_TEST_CASE(chronicle_construction)
         {
             {42, 0},
             min_encoding_check::soft,
-            malleability::non_minimal_encoding
+            malleability::non_minimal_scriptnum
         },
         // min-encoding checks=hard
         {

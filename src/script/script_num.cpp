@@ -35,7 +35,7 @@ CScriptNum::CScriptNum(span<const uint8_t> span,
        && !bsv::IsMinimallyEncoded(span, nMaxNumSize))
     {
         if(min_encode_check == min_encoding_check::soft)
-            ms |= malleability::non_minimal_encoding;
+            ms |= malleability::non_minimal_scriptnum;
         else
             throw scriptnum_minencode_error("non-minimally encoded script number");
     }

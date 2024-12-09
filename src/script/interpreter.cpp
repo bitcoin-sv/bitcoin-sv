@@ -472,7 +472,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                    && !CheckMinimalPush(vchPushValue, opcode))
                 {
                     if(min_encode_check == min_encoding_check::soft)
-                        ms |= malleability::non_minimal_encoding;
+                        ms |= malleability::non_minimal_push;
                     else
                         return SCRIPT_ERR_MINIMALDATA;
                 }
@@ -2351,24 +2351,23 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         }
     }
 
-    // Checks for Low-S
     if(flags & SCRIPT_CHRONICLE)
     {
-        if(flags & SCRIPT_VERIFY_LOW_S)
+        if(is_disallowed(combined_malleability))
         {
-            if(is_high_s(combined_malleability)
-               && is_disallowed(combined_malleability))
+            if(flags & SCRIPT_VERIFY_LOW_S)
             {
-                return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
+                if(is_high_s(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
             }
-        }
 
-        if(flags & SCRIPT_VERIFY_MINIMALDATA)
-        {
-            if(is_non_minimal_encoding(combined_malleability)
-               && is_disallowed(combined_malleability))
+            if(flags & SCRIPT_VERIFY_MINIMALDATA)
             {
-                return std::make_pair(false, SCRIPT_ERR_MINIMALDATA);
+                if(is_non_minimal_push(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_MINIMALDATA);
+
+                if(is_non_minimal_scriptnum(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             }
         }
     }
