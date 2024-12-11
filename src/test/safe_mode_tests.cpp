@@ -8,10 +8,31 @@
 #include "safe_mode.h"
 #include "config.h"
 #include "sync.h"
+#include "validation.h"
+
+struct chain_guard
+{
+    chain_guard()
+    {
+        chainActive.SetTip(nullptr);
+        mapBlockIndex.clear();
+    }
+
+    ~chain_guard()
+    {
+        chainActive.SetTip(nullptr);
+        mapBlockIndex.clear();
+    }
+
+    chain_guard(const chain_guard&) = default;
+    chain_guard(chain_guard&&) = default;
+    chain_guard& operator=(const chain_guard&) = default;
+    chain_guard& operator=(chain_guard&&) = default;
+};
 
 BOOST_AUTO_TEST_SUITE(safe_mode_tests)
 
-BOOST_AUTO_TEST_CASE(get_min_relevant_block_height)
+BOOST_FIXTURE_TEST_CASE(get_min_relevant_block_height, chain_guard)
 {
     SelectParams(CBaseChainParams::REGTEST);
     const auto& config{GlobalConfig::GetConfig()};

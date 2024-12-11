@@ -101,12 +101,13 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
 int64_t GetMinimumRelevantBlockHeight(const Config& config)
 {
     AssertLockHeld(cs_main);
-    auto tipHeight = chainActive.Tip() ? chainActive.Tip()->GetHeight() : 0;
-    if(tipHeight < config.GetSafeModeMaxForkDistance())
-    {
+
+    const auto tipHeight = chainActive.Tip() ? chainActive.Tip()->GetHeight() : 0;
+    const auto safemode_max_fork_dist = config.GetSafeModeMaxForkDistance();
+    if(tipHeight < safemode_max_fork_dist)
         return 0;
-    }
-    return tipHeight - config.GetSafeModeMaxForkDistance();
+
+    return tipHeight - safemode_max_fork_dist;
 }
 
 void SafeMode::CreateForkData(const Config& config, const CBlockIndex* pindexNew)
