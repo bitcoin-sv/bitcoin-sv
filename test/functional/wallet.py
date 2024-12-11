@@ -443,6 +443,11 @@ class WalletTest(BitcoinTestFramework):
         assert (extra_txid in [tx["txid"]
                 for tx in self.nodes[0].listtransactions()])
 
+        # Check parameter overflow handling
+        assert_equal(len(self.nodes[0].listtransactions()), 10)
+        assert_equal(len(self.nodes[0].listtransactions("*", 0x7fffffff, 0x7fffffff)), 0)
+        assert_raises_rpc_error(-1, "JSON integer out of range", self.nodes[0].listtransactions, "*", 0x80000000, 0x80000000)
+
 
 if __name__ == '__main__':
     WalletTest().main()

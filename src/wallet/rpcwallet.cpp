@@ -1852,13 +1852,19 @@ static UniValue listtransactions(const Config &config,
         strAccount = request.params[0].get_str();
     }
 
-    int nCount = 10;
+    uint32_t nCount = 10;
     if (request.params.size() > 1) {
+        if (request.params[1].get_int() < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
+        }
         nCount = request.params[1].get_int();
     }
 
-    int nFrom = 0;
+    uint32_t nFrom = 0;
     if (request.params.size() > 2) {
+        if (request.params[2].get_int() < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative skip");
+        }
         nFrom = request.params[2].get_int();
     }
 
@@ -1867,12 +1873,6 @@ static UniValue listtransactions(const Config &config,
         filter = filter | ISMINE_WATCH_ONLY;
     }
 
-    if (nCount < 0) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
-    }
-    if (nFrom < 0) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
-    }
     UniValue ret(UniValue::VARR);
 
     const CWallet::TxItems &txOrdered = pwallet->wtxOrdered;
@@ -1889,17 +1889,17 @@ static UniValue listtransactions(const Config &config,
             AcentryToJSON(*pacentry, strAccount, ret);
         }
 
-        if ((int)ret.size() >= (nCount + nFrom)) {
+        if (ret.size() >= (nCount + nFrom)) {
             break;
         }
     }
 
     // ret is newest to oldest
 
-    if (nFrom > (int)ret.size()) {
+    if (nFrom > ret.size()) {
         nFrom = ret.size();
     }
-    if ((nFrom + nCount) > (int)ret.size()) {
+    if ((nFrom + nCount) > ret.size()) {
         nCount = ret.size() - nFrom;
     }
 
