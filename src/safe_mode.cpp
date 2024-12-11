@@ -98,7 +98,7 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     return SafeModeLevel::UNKNOWN;
 }
 
-int64_t SafeMode::GetMinimumRelevantBlockHeight(const Config& config) const
+int64_t GetMinimumRelevantBlockHeight(const Config& config)
 {
     AssertLockHeld(cs_main);
     auto tipHeight = chainActive.Tip() ? chainActive.Tip()->GetHeight() : 0;

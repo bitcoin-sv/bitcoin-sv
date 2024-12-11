@@ -29,11 +29,6 @@ class SafeMode
     SafeModeLevel ShouldForkTriggerSafeMode(const Config& config, const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const;
 
     /**
-    * Returns block height for the ro
-    */
-    int64_t GetMinimumRelevantBlockHeight(const Config& config) const;
-
-    /**
      * Creates or updates entry in the safeModeForks for fork which is 
      * determined with pindexNew
      */
@@ -147,6 +142,8 @@ public:
     void GetStatus(CJSONWriter& writer);
     std::string GetStatus();
 };
+    
+int64_t GetMinimumRelevantBlockHeight(const Config&);
 
 /**
  * Calling SafeMode::Clear()

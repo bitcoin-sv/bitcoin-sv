@@ -143,6 +143,7 @@ BITCOIN_TESTS =\
   test/reverselock_tests.cpp \
   test/revokemid_tests.cpp \
   test/rpc_tests.cpp \
+  test/safe_mode_tests.cpp \
   test/sanity_tests.cpp \
   test/scheduler_tests.cpp \
   test/script_P2SH_tests.cpp \
