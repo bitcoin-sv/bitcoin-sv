@@ -37,7 +37,7 @@ static void op_dup(benchmark::State& state)
         assert(status->index() == 1);
     }
 }
-BENCHMARK(op_dup);
+BENCHMARK(op_dup); // NOLINT(cert-err58-cpp)
 
 static void op_2rot(benchmark::State& state)
 {
@@ -66,7 +66,7 @@ static void op_2rot(benchmark::State& state)
         assert(status->index() == 1);
     }
 }
-BENCHMARK(op_2rot);
+BENCHMARK(op_2rot); // NOLINT(cert-err58-cpp)
 
 static void op_split(benchmark::State& state)
 {
@@ -96,7 +96,7 @@ static void op_split(benchmark::State& state)
         assert(status->index() == 1);
     }
 }
-BENCHMARK(op_split);
+BENCHMARK(op_split); // NOLINT(cert-err58-cpp)
 
 static void op_roll(benchmark::State& state)
 {
@@ -124,7 +124,7 @@ static void op_roll(benchmark::State& state)
         assert(status->index() == 1);
     }
 }
-BENCHMARK(op_roll);
+BENCHMARK(op_roll); // NOLINT(cert-err58-cpp)
 
 static void op_pick(benchmark::State& state)
 {
@@ -152,5 +152,5 @@ static void op_pick(benchmark::State& state)
         assert(status->index() == 1);
     }
 }
-BENCHMARK(op_pick);
+BENCHMARK(op_pick); // NOLINT(cert-err58-cpp)
 

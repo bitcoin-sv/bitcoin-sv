@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
                             OP_PUSHDATA4, 1, 0, 0, 0, 42,
                             OP_DUP
                          };
-    vector<instruction> expected{   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    vector<instruction> expected{   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic, clang-analyzer-optin.core.EnumCastOutOfRange)
                                     {static_cast<opcodetype>(0), 0, ip.data() + 1, 0}, 
                                     {static_cast<opcodetype>(1), 0, ip.data() + 2, 1},
                                     {static_cast<opcodetype>(2), 0, ip.data() + 4, 2},
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
                                     {OP_PUSHDATA2, 2, ip.data() + 14, 1},
                                     {OP_PUSHDATA4, 4, ip.data() + 20, 1},
                                     {OP_DUP, 0, ip.data() + 22, 0}
-                                };  // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                                };  // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, clang-analyzer-optin.core.EnumCastOutOfRange)
 
     instruction_iterator it_begin{std::span{ip.data(), ip.size()}};
     instruction_iterator it_end{std::span{ip.data() + ip.size(), 0}}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)

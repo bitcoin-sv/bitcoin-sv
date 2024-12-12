@@ -22,9 +22,9 @@ BOOST_AUTO_TEST_CASE(GetOp2)
 
     vector<test_data_type> test_data {
         { {OP_0}, true, static_cast<opcodetype>(0), {} }, // Note: OP_0 = 0
-        { {1, 1}, true, static_cast<opcodetype>(1), {1} },
-        { {2, 1, 2}, true, static_cast<opcodetype>(2), {1, 2} },
-        { {3, 1, 2, 3}, true, static_cast<opcodetype>(3), {1, 2, 3} },
+        { {1, 1}, true, static_cast<opcodetype>(1), {1} }, // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
+        { {2, 1, 2}, true, static_cast<opcodetype>(2), {1, 2} }, // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
+        { {3, 1, 2, 3}, true, static_cast<opcodetype>(3), {1, 2, 3} }, // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
 
         { {OP_PUSHDATA1, 3, 1, 2, 3}, true, OP_PUSHDATA1, {1, 2, 3} },
         { {OP_PUSHDATA2, 3, 0, 1, 2, 3}, true, OP_PUSHDATA2, {1, 2, 3} },

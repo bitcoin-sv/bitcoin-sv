@@ -40,7 +40,7 @@ static std::map<std::string, UniValue> registers; // NOLINT (cppcoreguidelines-a
 bool fRequireStandard = true; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 
 // Assume Chronicle active release unless configured otherwise
-ProtocolEra ActiveEra { ProtocolEra::PostChronicle };
+ProtocolEra ActiveEra { ProtocolEra::PostChronicle }; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 
 //
 // This function returns either one of EXIT_ codes when it's expected to stop
