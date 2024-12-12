@@ -25,17 +25,17 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
             f"-maxchroniclegracefulperiod={GRACE_PERIOD}"]
 
     TESTING_HEIGHTS = [
-        (GENESIS_ACTIVATION_HEIGHT - 3,    None,                        "PRE_GENESIS"),                # Just build UTXOs
-        (GENESIS_ACTIVATION_HEIGHT - 2,    "PRE_GENESIS",               None),                         # Pre-Genesis
-        (GENESIS_ACTIVATED_HEIGHT,         None,                        "PRE_CHRONICLE"),              # No-test, just build UTXOs
-        (GENESIS_ACTIVATED_HEIGHT + 1,     "PRE_CHRONICLE",             "CHRONICLE_PRE_GRACE"),        # Post-Genesis but pre anything Chronicle
-        (CHRONICLE_GRACE_START_HEIGHT - 1, "CHRONICLE_PRE_GRACE",       "CHRONICLE_GRACE_BEGIN"),      # Block before Chronicle grace period starts
-        (CHRONICLE_GRACE_START_HEIGHT,     "CHRONICLE_GRACE_BEGIN",     "CHRONICLE_PRE_ACTIVATION"),   # First block in Chronicle grace period
-        (CHRONICLE_ACTIVATION_HEIGHT - 1,  "CHRONICLE_PRE_ACTIVATION",  "CHRONICLE_ACTIVATION"),       # Block before Chronicle activation
-        (CHRONICLE_ACTIVATION_HEIGHT,      "CHRONICLE_ACTIVATION",      "CHRONICLE_POST_ACTIVATION"),  # Chronicle activates
-        (CHRONICLE_ACTIVATION_HEIGHT + 1,  "CHRONICLE_POST_ACTIVATION", "CHRONICLE_GRACE_END"),        # Block after Chronicle activation
-        (CHRONICLE_GRACE_END_HEIGHT - 2,   "CHRONICLE_GRACE_END",       "POST_CHRONICLE"),             # Last block in Chronicle grace period
-        (CHRONICLE_GRACE_END_HEIGHT,       "POST_CHRONICLE",            None),                         # Chronicle is activated and we've left the grace period
+        (GENESIS_ACTIVATION_HEIGHT - 3,    None,                        "PRE_GENESIS"),                # noqa Just build UTXOs
+        (GENESIS_ACTIVATION_HEIGHT - 2,    "PRE_GENESIS",               None),                         # noqa Pre-Genesis
+        (GENESIS_ACTIVATED_HEIGHT,         None,                        "PRE_CHRONICLE"),              # noqa No-test, just build UTXOs
+        (GENESIS_ACTIVATED_HEIGHT + 1,     "PRE_CHRONICLE",             "CHRONICLE_PRE_GRACE"),        # noqa Post-Genesis but pre anything Chronicle
+        (CHRONICLE_GRACE_START_HEIGHT - 1, "CHRONICLE_PRE_GRACE",       "CHRONICLE_GRACE_BEGIN"),      # noqa Block before Chronicle grace period starts
+        (CHRONICLE_GRACE_START_HEIGHT,     "CHRONICLE_GRACE_BEGIN",     "CHRONICLE_PRE_ACTIVATION"),   # noqa First block in Chronicle grace period
+        (CHRONICLE_ACTIVATION_HEIGHT - 1,  "CHRONICLE_PRE_ACTIVATION",  "CHRONICLE_ACTIVATION"),       # noqa Block before Chronicle activation
+        (CHRONICLE_ACTIVATION_HEIGHT,      "CHRONICLE_ACTIVATION",      "CHRONICLE_POST_ACTIVATION"),  # noqa Chronicle activates
+        (CHRONICLE_ACTIVATION_HEIGHT + 1,  "CHRONICLE_POST_ACTIVATION", "CHRONICLE_GRACE_END"),        # noqa Block after Chronicle activation
+        (CHRONICLE_GRACE_END_HEIGHT - 2,   "CHRONICLE_GRACE_END",       "POST_CHRONICLE"),             # noqa Last block in Chronicle grace period
+        (CHRONICLE_GRACE_END_HEIGHT,       "POST_CHRONICLE",            None),                         # noqa Chronicle is activated and we've left the grace period
     ]
 
     # Make a key for signing
@@ -107,12 +107,12 @@ class ChronicleHeightBasedSimpleTestsCase(HeightBasedSimpleTestsCase):
             f"-maxchroniclegracefulperiod={GRACE_PERIOD}"]
 
     TESTING_HEIGHTS = [
-        (GENESIS_ACTIVATED_HEIGHT + 1,     "PRE_CHRONICLE",             None),  # Post-Genesis but pre anything Chronicle
-        (CHRONICLE_GRACE_START_HEIGHT - 1, "CHRONICLE_PRE_GRACE",       None),  # Block before Chronicle grace period starts
-        (CHRONICLE_GRACE_START_HEIGHT,     "CHRONICLE_GRACE_BEGIN",     None),  # First block in Chronicle grace period
-        (CHRONICLE_ACTIVATION_HEIGHT - 1,  "CHRONICLE_PRE_ACTIVATION",  None),  # Block before Chronicle activation
-        (CHRONICLE_ACTIVATION_HEIGHT,      "CHRONICLE_ACTIVATION",      None),  # Chronicle activates
-        (CHRONICLE_ACTIVATION_HEIGHT + 1,  "CHRONICLE_POST_ACTIVATION", None),  # Block after Chronicle activation
-        (CHRONICLE_GRACE_END_HEIGHT - 2,   "CHRONICLE_GRACE_END",       None),  # Last block in Chronicle grace period
-        (CHRONICLE_GRACE_END_HEIGHT,       "POST_CHRONICLE",            None),  # Chronicle is activated and we've left the grace period
+        (GENESIS_ACTIVATED_HEIGHT + 1,     "PRE_CHRONICLE",             None),  # noqa Post-Genesis but pre anything Chronicle
+        (CHRONICLE_GRACE_START_HEIGHT - 1, "CHRONICLE_PRE_GRACE",       None),  # noqa Block before Chronicle grace period starts
+        (CHRONICLE_GRACE_START_HEIGHT,     "CHRONICLE_GRACE_BEGIN",     None),  # noqa First block in Chronicle grace period
+        (CHRONICLE_ACTIVATION_HEIGHT - 1,  "CHRONICLE_PRE_ACTIVATION",  None),  # noqa Block before Chronicle activation
+        (CHRONICLE_ACTIVATION_HEIGHT,      "CHRONICLE_ACTIVATION",      None),  # noqa Chronicle activates
+        (CHRONICLE_ACTIVATION_HEIGHT + 1,  "CHRONICLE_POST_ACTIVATION", None),  # noqa Block after Chronicle activation
+        (CHRONICLE_GRACE_END_HEIGHT - 2,   "CHRONICLE_GRACE_END",       None),  # noqa Last block in Chronicle grace period
+        (CHRONICLE_GRACE_END_HEIGHT,       "POST_CHRONICLE",            None),  # noqa Chronicle is activated and we've left the grace period
     ]

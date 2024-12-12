@@ -35,7 +35,7 @@ class InvalidInv(BitcoinTestFramework):
             wait_until(lambda: check_for_log_msg(self, "got txn inv", "/node0"))
 
             time.sleep(2)
-            assert(conn.cb.connected)
+            assert conn.cb.connected
 
             # Send invalid Inv type
             conn.send_message(msg_inv([CInv(CInv.ERROR, 2)]))

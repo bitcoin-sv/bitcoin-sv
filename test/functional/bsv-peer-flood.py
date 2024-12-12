@@ -73,7 +73,7 @@ class PeerFlood(BitcoinTestFramework):
         continue_sending = True
 
         def send_msg():
-            while(continue_sending):
+            while continue_sending:
                 test_node.send_message(bad_msg)
         send_thread = threading.Thread(target=send_msg)
         send_thread.start()
