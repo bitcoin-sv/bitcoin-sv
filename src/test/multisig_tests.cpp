@@ -5,8 +5,10 @@
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/ismine.h"
+#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sighashtype.h"
@@ -18,6 +20,7 @@
 #include "config.h"
 
 #include <boost/test/unit_test.hpp>
+#include <variant>
 
 typedef std::vector<uint8_t> valtype;
 
@@ -81,6 +84,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
 
     std::vector<CKey> keys;
     CScript s;
+    std::atomic<malleability::status> ms {};
 
     // Test a AND b:
     keys.assign(1, key[0]);
@@ -95,9 +99,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             a_and_b,
             flags,
             MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-            &err);
-    BOOST_CHECK(res.value());
-    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+            ms);
+    BOOST_CHECK(res.has_value() && res->first);
 
     for (int i = 0; i < 4; i++) {
         keys.assign(1, key[i]);
@@ -110,8 +113,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                 a_and_b,
                 flags,
                 MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                &err);
-        BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 1: %d", i));
+                ms);
+        BOOST_CHECK(res.has_value());
+        BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 1: %d", i));
+        err = res->second;
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
                             ScriptErrorString(err));
 
@@ -126,8 +131,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                 a_and_b,
                 flags,
                 MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                &err);
-        BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 2: %d", i));
+                ms);
+        BOOST_CHECK(res.has_value());
+        BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 2: %d", i));
+        err = res->second;
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                             ScriptErrorString(err));
     }
@@ -145,9 +152,9 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                     a_or_b,
                     flags,
                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    &err);
-            BOOST_CHECK_MESSAGE(res.value(), strprintf("a|b: %d", i));
-            BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+                    ms);
+            BOOST_CHECK(res.has_value());
+            BOOST_CHECK_MESSAGE(res->first, strprintf("a|b: %d", i));
         } else {
             res =
                 VerifyScript(
@@ -157,8 +164,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                     a_or_b,
                     flags,
                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    &err);
-            BOOST_CHECK_MESSAGE(!res.value(), strprintf("a|b: %d", i));
+                    ms);
+            BOOST_CHECK(res.has_value());
+            BOOST_CHECK_MESSAGE(!res->first, strprintf("a|b: %d", i));
+            err = res->second;
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                 ScriptErrorString(err));
         }
@@ -173,8 +182,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             a_or_b,
             flags,
             MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-            &err);
-    BOOST_CHECK(!res.value());
+            ms);
+    BOOST_CHECK(res.has_value());
+    BOOST_CHECK(!res->first);
+    err = res->second;
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_SIG_DER, ScriptErrorString(err));
 
     for (int i = 0; i < 4; i++)
@@ -191,10 +202,9 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                         escrow,
                         flags,
                         MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        &err);
-                BOOST_CHECK_MESSAGE(res.value(), strprintf("escrow 1: %d %d", i, j));
-                BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK,
-                                    ScriptErrorString(err));
+                        ms);
+                BOOST_CHECK(res.has_value());
+                BOOST_CHECK_MESSAGE(res->first, strprintf("escrow 1: %d %d", i, j));
             } else {
                 res =
                     VerifyScript(
@@ -204,10 +214,10 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
                         escrow,
                         flags,
                         MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        &err);
-                BOOST_CHECK_MESSAGE(
-                    !res.value(),
-                    strprintf("escrow 2: %d %d", i, j));
+                        ms);
+                BOOST_CHECK(res.has_value());
+                BOOST_CHECK_MESSAGE(!res->first, strprintf("escrow 2: %d %d", i, j));
+                err = res->second;
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                     ScriptErrorString(err));
             }
@@ -294,7 +304,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         txnouttype whichType;
         CScript s;
         s << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK(solutions.size() == 1);
             CTxDestination addr;
@@ -310,7 +320,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_DUP << OP_HASH160 << ToByteVector(key[0].GetPubKey().GetID())
           << OP_EQUALVERIFY << OP_CHECKSIG;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK(solutions.size() == 1);
             CTxDestination addr;        
@@ -325,12 +335,12 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         std::vector<valtype> solutions;
         CScript opReturn = CScript() << OP_RETURN << data;
         CTxDestination addr;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(!ExtractDestination(opReturn, genesisEnabled, addr));
         }
         BOOST_CHECK(!IsMine(keystore, opReturn));
         CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(!ExtractDestination(opReturn, genesisEnabled, addr));
         }
         BOOST_CHECK(!IsMine(keystore, opReturn));
@@ -342,7 +352,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             CTxDestination addr;
@@ -359,7 +369,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_1 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
 
-        for(bool genesisEnabled : {true, false}){
+        for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
             BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             
@@ -383,9 +393,9 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey())
           << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-        BOOST_CHECK(Solver(s, true, whichType, solutions));
+        BOOST_CHECK(Solver(s, ProtocolEra::PostGenesis, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
-        BOOST_CHECK(Solver(s, false, whichType, solutions));
+        BOOST_CHECK(Solver(s, ProtocolEra::PreGenesis, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
 
     }
@@ -431,11 +441,11 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     }
 
     for (int i = 0; i < 3; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, true, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));

@@ -474,10 +474,11 @@ bool CoinsDB::IsOldDBFormat()
 CoinsDB::CoinsDB(
         uint64_t cacheSizeThreshold,
         size_t nCacheSize,
+        size_t nMaxFileSize,
         CDBWrapper::MaxFiles maxFiles,
         bool fMemory,
         bool fWipe)
-    : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true, maxFiles }
+    : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true, maxFiles, nMaxFileSize }
     , mCacheSizeThreshold{cacheSizeThreshold}
 {}
 

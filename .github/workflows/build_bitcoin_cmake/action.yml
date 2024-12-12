@@ -8,6 +8,10 @@ inputs:
     description: Build type (Release/Debug/etc)
     required: false
     default: 'Release'
+  targets:
+    description: Targets (bitcoind/bitcoin-cli/etc)
+    required: false
+    default: ''
   sanitizers:
     description: Sanitizers (asan/tsan/usan/etc)
     required: false
@@ -15,8 +19,19 @@ runs:
   using: "composite"
   steps:
     - run: |
-        args=$(.github/workflows/build_bitcoin_cmake/build.sh ${{ inputs.build_type }} ${{ inputs.sanitizers }})
+        args=$(.github/workflows/build_bitcoin_cmake/build.sh \
+             ${{ inputs.build_type }} \
+             ${{ inputs.sanitizers }})
         cmake -G Ninja . ${args}
-        cmake --build .
+        cmake --build . --target ${{ inputs.targets }}
+      if: inputs.targets
+      shell: bash
+    - run: |
+        args=$(.github/workflows/build_bitcoin_cmake/build.sh \
+             ${{ inputs.build_type }} \
+             ${{ inputs.sanitizers }})
+        cmake -G Ninja . ${args}
         cmake --build . --target test_bitcoin
+        cmake --build .
+      if: ${{ ! inputs.targets }}
       shell: bash

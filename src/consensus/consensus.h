@@ -7,6 +7,7 @@
 #define BITCOIN_CONSENSUS_CONSENSUS_H
 
 #include <cstdint>
+#include <limits>
 
 /** 1KB */
 static const uint64_t ONE_KILOBYTE = 1000;
@@ -59,9 +60,10 @@ static const uint64_t MAX_SCRIPT_SIZE_BEFORE_GENESIS = 10000;
 static const uint64_t MAX_SCRIPT_SIZE_AFTER_GENESIS = UINT32_MAX; // 4GB - limited by maximum P2P message size  
 // Maximum script number length before Genesis (equal to CScriptNum::MAXIMUM_ELEMENT_SIZE)
 static const uint64_t MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = 4; 
-
 // Maximum script number length after Genesis
 static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = 750 * ONE_KILOBYTE; 
+// Maximum script number length after Chronicle
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE = std::numeric_limits<uint64_t>::max();
 
 // Maximum coinbase scriptSig size
 static const uint64_t MAX_COINBASE_SCRIPTSIG_SIZE = 100;

@@ -22,6 +22,11 @@
 #define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
 
+#define CHRONICLE_ACTIVATION_MAIN               882687
+#define CHRONICLE_ACTIVATION_STN                250
+#define CHRONICLE_ACTIVATION_TESTNET            1621670
+#define CHRONICLE_ACTIVATION_REGTEST            15000
+
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
                                  uint32_t nTime, uint32_t nNonce,
@@ -126,6 +131,9 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_MAIN;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_MAIN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -283,6 +291,9 @@ public:
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_STN;
 
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_STN;
+
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -329,7 +340,8 @@ public:
                 {7, uint256S("000000001f15fe3dac966c6bb873c63348ca3d877cd606759d26bd9ad41e5545")},
                 {8, uint256S("0000000074230d332b2ed9d87af3ad817b6f2616c154372311c9b2e4f386c24c")},
                 {9, uint256S("00000000ca21de811f04f5ec031aa3a102f8e27f2a436cde588786da1996ec9b")},
-                {10, uint256S("0000000046ceee1b7d771594c6c75f11f14f96822fd520e86ec5c703ec231e87")}
+                {10, uint256S("0000000046ceee1b7d771594c6c75f11f14f96822fd520e86ec5c703ec231e87")},
+                {11, uint256S("00000000e1ad0ed45011a4c7fe5afde3211b4bdcf60370234355338afbf70e2d")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{
@@ -392,6 +404,9 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_TESTNET;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -514,6 +529,9 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_REGTEST;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_REGTEST;
 
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;

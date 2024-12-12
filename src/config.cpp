@@ -73,6 +73,7 @@ void GlobalConfig::Reset()
     data->blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
 
     data->genesisActivationHeight = 0;
+    data->chronicleActivationHeight = 0;
 
     data->mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
 
@@ -92,13 +93,15 @@ void GlobalConfig::Reset()
     data->maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
     data->maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
 
-    data->maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
-    data->genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
+    data->maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY;
+    data->genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD;
+    data->chronicleGracefulPeriod = DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD;
 
     data->mAcceptNonStandardOutput = true;
 
     data->mMaxCoinsViewCacheSize = 0;
     data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+    data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
 
     data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
     data->maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
@@ -356,9 +359,9 @@ bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* er
     return true;
 }
 
-uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const
+uint64_t GlobalConfig::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
 {
-    if (!isGenesisEnabled) // no changes before genesis
+    if (!IsProtocolActive(era, ProtocolName::Genesis)) // no changes before genesis
     {
         if (isConsensus)
         {
@@ -547,11 +550,11 @@ bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std
     }
 
     uint64_t genesisGracefulPeriodUnsigned = static_cast<uint64_t>(genesisGracefulPeriodIn);
-    if (genesisGracefulPeriodUnsigned > MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD)
+    if (genesisGracefulPeriodUnsigned > MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD)
     {
         if (err)
         {
-            *err = "Value for maximum number of blocks for Genesis graceful period must not exceed the limit of " + std::to_string(MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD) + ".";
+            *err = "Value for maximum number of blocks for Genesis graceful period must not exceed the limit of " + std::to_string(MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD) + ".";
         }
         return false;
     }
@@ -567,6 +570,37 @@ bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std
 uint64_t GlobalConfig::GetGenesisGracefulPeriod() const
 {
     return data->genesisGracefulPeriod;
+}
+
+bool GlobalConfig::SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err)
+{
+    if (LessThanZero(chronicleGracefulPeriodIn, err, "Value for Chronicle graceful period must not be less than zero."))
+    {
+        return false;
+    }
+
+    uint64_t chronicleGracefulPeriodUnsigned = static_cast<uint64_t>(chronicleGracefulPeriodIn);
+    if (chronicleGracefulPeriodUnsigned > MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD)
+    {
+        if (err)
+        {
+            *err = "Value for maximum number of blocks for Chronicle graceful period must not exceed the limit of " +
+                std::to_string(MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD) + ".";
+        }
+        return false;
+    }
+    else
+    {
+        data->chronicleGracefulPeriod = chronicleGracefulPeriodUnsigned;
+    }
+
+    return true;
+
+}
+
+uint64_t GlobalConfig::GetChronicleGracefulPeriod() const
+{
+    return data->chronicleGracefulPeriod;
 }
 
 Config& GlobalConfig::GetConfig()
@@ -612,6 +646,23 @@ bool GlobalConfig::SetGenesisActivationHeight(int32_t genesisActivationHeightIn,
 
 int32_t GlobalConfig::GetGenesisActivationHeight() const {
     return data->genesisActivationHeight;
+}
+
+bool GlobalConfig::SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err) {
+    if (chronicleActivationHeightIn <= 0)
+    {
+        if (err)
+        {
+            *err = "Chronicle activation height cannot be configured with a zero or negative value.";
+        }
+        return false;
+    }
+    data->chronicleActivationHeight = chronicleActivationHeightIn;
+    return true;
+}
+
+int32_t GlobalConfig::GetChronicleActivationHeight() const {
+    return data->chronicleActivationHeight;
 }
 
 bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
@@ -1019,19 +1070,8 @@ bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std
     }
 
     uint64_t maxScriptNumLengthUnsigned = static_cast<uint64_t>(maxScriptNumLengthIn);
-    if (maxScriptNumLengthUnsigned > MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for maximum script number length must not exceed consensus limit of " + std::to_string(MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS) + ".";
-        }
-        return false;
-    }
-    else if (maxScriptNumLengthUnsigned == 0)
-    {
-        data->maxScriptNumLengthPolicy = MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
-    }
-    else if (maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
+
+    if (maxScriptNumLengthUnsigned != 0 && maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
     {
         if (err)
         {
@@ -1047,18 +1087,35 @@ bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std
     return true;
 }
 
-uint64_t GlobalConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const
+uint64_t GlobalConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const
 {
-    if (!isGenesisEnabled)
+    if (! IsProtocolActive(era, ProtocolName::Genesis))
     {
         return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS; // no changes before genesis
     }
 
     if (isConsensus)
     {
-        return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // use new limit after genesis
+        if(! IsProtocolActive(era, ProtocolName::Chronicle))
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // limit after Genesis
+        }
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;   // Chronicle removes consensus limit
     }
-    return data->maxScriptNumLengthPolicy; // use policy
+
+    // Use policy limit
+    if(data->maxScriptNumLengthPolicy == 0)
+    {
+        // Unlimited policy depends on consensus limit for whichever protocol is active
+        if(! IsProtocolActive(era, ProtocolName::Chronicle))
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+        }
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;
+    }
+
+    // Configured policy limit
+    return data->maxScriptNumLengthPolicy;
 }
 
 void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
@@ -1066,9 +1123,9 @@ void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
     data->mAcceptNonStandardOutput = accept;
 }
 
-bool GlobalConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
+bool GlobalConfig::GetAcceptNonStandardOutput(ProtocolEra era) const
 {
-    return isGenesisEnabled ? data->mAcceptNonStandardOutput : !fRequireStandard;
+    return IsProtocolActive(era, ProtocolName::Genesis) ? data->mAcceptNonStandardOutput : !fRequireStandard;
 }
 
 bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
@@ -1110,6 +1167,21 @@ bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
     }
 
     data->mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsDBMaxFileSize(int64_t max, std::string* err)
+{
+    if(LessThan(max, err,
+        "Value for maximum coins DB file size must not be less than "
+            + std::to_string(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE),
+            CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE))
+    {
+        return false;
+    }
+
+    data->mMaxCoinsDBFileSize = static_cast<uint64_t>(max);
 
     return true;
 }
@@ -2508,9 +2580,9 @@ uint64_t GlobalConfig::GetMaxTxSigOpsCountConsensusBeforeGenesis() const
     return MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS;
 }
 
-uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const
+uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(ProtocolEra era) const
 {
-    if (!isGenesisEnabled)
+    if (!IsProtocolActive(era, ProtocolName::Genesis))
     {
         return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
     }

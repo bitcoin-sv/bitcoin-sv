@@ -11,10 +11,12 @@
 #include "script_error.h"
 #include "sighashtype.h"
 #include "limitedstack.h"
+#include "malleability_status.h"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
-#include <string>
+#include <variant>
 #include <vector>
 
 class CPubKey;
@@ -28,8 +30,9 @@ namespace task
   class CCancellationToken;
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
-                            ScriptError *serror);
+std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
+    const std::vector<uint8_t>& sig,
+    uint32_t flags);
 
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
@@ -52,6 +55,11 @@ public:
 
     virtual bool CheckSequence(const CScriptNum &nSequence) const {
         return false;
+    }
+    
+    virtual std::int32_t Version() const
+    {
+        return 0;
     }
 
     virtual ~BaseSignatureChecker() {}
@@ -86,6 +94,7 @@ public:
                   const CScript &scriptCode, bool enabledSighashForkid) const override;
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
     bool CheckSequence(const CScriptNum &nSequence) const override;
+    int32_t Version() const override;
 };
 
 class MutableTransactionSignatureChecker : public TransactionSignatureChecker {
@@ -107,7 +116,7 @@ public:
 * Consensus should be true when validating scripts of transactions that are part of block
 * and it should be false when validating scripts of transactions that are validated for acceptance to mempool
 */
-std::optional<bool> EvalScript(
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -118,18 +127,18 @@ std::optional<bool> EvalScript(
     LimitedStack& altstack,
     long& ipc,
     std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse,
-    ScriptError* error = nullptr);
-std::optional<bool> EvalScript(
+    std::vector<bool>& vfElse);
+
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
     uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* error = nullptr);
-std::optional<bool> VerifyScript(
+    const BaseSignatureChecker& checker);
+
+std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -137,6 +146,6 @@ std::optional<bool> VerifyScript(
     const CScript& scriptPubKey,
     uint32_t flags,
     const BaseSignatureChecker& checker,
-    ScriptError* serror = nullptr);
+    std::atomic<malleability::status>& malleability);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

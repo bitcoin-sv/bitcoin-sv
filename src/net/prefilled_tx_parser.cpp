@@ -3,8 +3,6 @@
 
 #include "prefilled_tx_parser.h"
 
-#include <iostream>
-
 #include "cmpct_size.h"
 #include "p2p_msg_lengths.h"
 
@@ -42,9 +40,14 @@ std::size_t prefilled_tx_parser::size() const
     return buffer_.size() + tx_parser_.size();
 }
 
-unique_array prefilled_tx_parser::buffer() &&
+std::size_t prefilled_tx_parser::readable_size() const
 {
-    unique_array a{std::move(tx_parser_).buffer()};
+    return tx_parser_.readable_size();
+}
+
+prefilled_tx_parser::value_type prefilled_tx_parser::buffer() &&
+{
+    value_type a{std::move(tx_parser_).buffer()};
     buffer_.insert(buffer_.cend(), a.cbegin(), a.cend());
     return std::move(buffer_);
 }

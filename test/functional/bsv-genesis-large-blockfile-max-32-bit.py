@@ -41,6 +41,7 @@ class LargeBlockFileMax32Bit(ComparisonTestFramework):
                 '-maxtxnvalidatorasynctasksrunduration=15002',
                 '-rpcservertimeout=6000',
                 '-rpcclienttimeout=0',
+                '-dbcache=256MB',
                 '-genesisactivationheight=%d' % self.genesisactivationheight
             ]
         ]

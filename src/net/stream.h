@@ -149,7 +149,7 @@ class Stream
     // Receive message queue
     std::list<QueuedNetMessage> mRecvMsgQueue {};
     uint64_t mTotalBytesRecv {0};
-    uint64_t mRecvMsgQueueSize {0};
+    uint64_t mRecvMsgQueueMemory {0};
     std::atomic_bool mPauseRecv {false};
     mapMsgCmdSize mRecvBytesPerMsgCmd {};
     std::list<QueuedNetMessage> mRecvCompleteMsgQueue {};

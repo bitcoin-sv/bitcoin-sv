@@ -22,6 +22,7 @@
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "scheduler.h"
 #include "script/script.h"
 #include "script/sighashtype.h"
@@ -32,7 +33,6 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
-#include "validation.h"
 #include "wallet/coincontrol.h"
 #include "wallet/finaltx.h"
 
@@ -85,9 +85,10 @@ struct CompareValueOnly {
     }
 };
 
-bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
-    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
-    return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
+bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
+{
+    const ProtocolEra era { IsP2SH(scriptPubKey)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+    return ::ExtractDestination(scriptPubKey, era, addressRet);
 }
 
 std::string COutput::ToString() const {
@@ -110,8 +111,8 @@ public:
         std::vector<CTxDestination> vDest;
         int nRequired;
         // We will treat all scripts as after genesis except P2SH.
-        const bool isGenesisEnabled = !IsP2SH(script);
-        if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
+        const ProtocolEra era { IsP2SH(script)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+        if (ExtractDestinations(script, era, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
             }
@@ -2337,8 +2338,8 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
                 !(IsP2SH(pcoin->tx->vout[i].scriptPubKey) &&
-                  pcoin->IsGenesisEnabled()) && // we don't want to select p2sh
-                                                // utxos created after genesis
+                  pcoin->IsProtocolActive(ProtocolName::Genesis)) && // we don't want to select p2sh
+                                                                    // utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
@@ -2762,6 +2763,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         AvailableCoins(vAvailableCoins, true, &coinControl);
 
         Config &config = GlobalConfig::GetConfig();
+        ProtocolEra era { GetProtocolEra(config, chainActive.Height() + 1) };
 
         nFeeRet = Amount(0);
         // Start with no fee and loop until there is enough fee.
@@ -2793,7 +2795,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     }
                 }
 
-                if (txout.IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                if (txout.IsDust(era)) {
                     if (recipient.fSubtractFeeFromAmount &&
                         nFeeRet > Amount(0)) {
                         if (txout.nValue < Amount(0)) {
@@ -2876,17 +2878,15 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 // end up paying more than requested. This would be against the
                 // purpose of the all-inclusive feature. So instead we raise the
                 // change and deduct from the recipient.
-                if (nSubtractFeeFromAmount > 0 &&
-                    newTxOut.IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
-                    Amount nDust = newTxOut.GetDustThreshold(IsGenesisEnabled(config, chainActive.Height() + 1)) -
-                                   newTxOut.nValue;
+                if (nSubtractFeeFromAmount > 0 && newTxOut.IsDust(era)) {
+                    Amount nDust = newTxOut.GetDustThreshold(era) - newTxOut.nValue;
                     // Raise change until no more dust.
                     newTxOut.nValue += nDust;
                     // Subtract from first recipient.
                     for (unsigned int i = 0; i < vecSend.size(); i++) {
                         if (vecSend[i].fSubtractFeeFromAmount) {
                             txNew.vout[i].nValue -= nDust;
-                            if (txNew.vout[i].IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                            if (txNew.vout[i].IsDust(era)) {
                                 strFailReason =
                                     _("The transaction amount is too small "
                                       "to send after the fee has been "
@@ -2901,7 +2901,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
                 // Never create dust outputs; if we would, just add the dust to
                 // the fee.
-                if (newTxOut.IsDust(IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                if (newTxOut.IsDust(era)) {
                     nChangePosInOut = -1;
                     nFeeRet += nChange;
                     reservekey.ReturnKey();
@@ -3023,19 +3023,26 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 const CScript &scriptPubKey =
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
-                
-                if (!ProduceSignature(config, true,
-                        TransactionSignatureCreator(
-                            this, &txNewConst, nIn,
-                            coin.first->tx->vout[coin.second].nValue,
-                            sigHashType),
-                        IsGenesisEnabled(config, chainActive.Height() + 1), // new transaction, assume it will be mined in next block
-                        coin.first->IsGenesisEnabled(),
-                        scriptPubKey, 
-                        sigdata)) {
+
+                if(!SignAndVerify(config,
+                                  true,
+                                  TransactionSignatureCreator(this,
+                                                              &txNewConst,
+                                                              nIn,
+                                                              coin.first->tx
+                                                                  ->vout[coin.second]
+                                                                  .nValue,
+                                                              sigHashType),
+                                  era, // new transaction, assume it will be mined in next block
+                                  coin.first->GetProtocolEra(),
+                                  scriptPubKey,
+                                  sigdata))
+                {
                     strFailReason = _("Signing transaction failed");
                     return false;
-                } else {
+                }
+                else
+                {
                     UpdateTransaction(txNew, nIn, sigdata);
                 }
 
@@ -3047,7 +3054,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         wtxNew.SetTx(MakeTransactionRef(std::move(txNew)));
 
         // Limit size.
-        if (CTransaction(wtxNew).GetTotalSize() >= config.GetMaxTxSize(IsGenesisEnabled(config, chainActive.Height() + 1), false)) {
+        if (CTransaction(wtxNew).GetTotalSize() >= config.GetMaxTxSize(era, false)) {
             strFailReason = _("Transaction too large");
             return false;
         }
@@ -4557,13 +4564,20 @@ int CMerkleTx::GetHeightInMainChain() const {
     return pindex->GetHeight();
 }
 
-bool CMerkleTx::IsGenesisEnabled() const {
+bool CMerkleTx::IsProtocolActive(ProtocolName name) const
+{
+    return ::IsProtocolActive(this->GetProtocolEra(), name);
+}
+
+ProtocolEra CMerkleTx::GetProtocolEra() const
+{
     int32_t height = GetHeightInMainChain();
-    if (height == MEMPOOL_HEIGHT) {
+    if (height == MEMPOOL_HEIGHT)
+    {
         AssertLockHeld(cs_main);
-        return ::IsGenesisEnabled(GlobalConfig::GetConfig(), chainActive.Height() + 1);
+        return ::GetProtocolEra(GlobalConfig::GetConfig(), chainActive.Height() + 1);
     }
-    return ::IsGenesisEnabled(GlobalConfig::GetConfig(), height);
+    return ::GetProtocolEra(GlobalConfig::GetConfig(), height);
 }
 
 int CMerkleTx::GetBlocksToMaturity() const {

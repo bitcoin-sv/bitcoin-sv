@@ -1,0 +1,14 @@
+#!/usr/bin/awk -f
+# Copyright (c) 2024 BSV Blockchain Association
+# Distributed under the Open BSV software license,
+# see the accompanying file LICENSE.
+
+/Accepted block/ {
+    split($7, arr, "=|,")
+    if(arr[2] > h)
+        h = arr[2]
+}
+
+END {
+    print(h)
+}

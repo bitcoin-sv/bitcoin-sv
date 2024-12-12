@@ -986,7 +986,7 @@ void Serialize(Stream &os, const boost::uuids::uuid &v) {
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    os.write(reinterpret_cast<const char*>(v.data), uuid_size);
+    os.write(reinterpret_cast<const char*>(v.begin()), uuid_size);
 }
 
 template <typename Stream>
@@ -996,7 +996,7 @@ void Unserialize(Stream &is, boost::uuids::uuid &v) {
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    is.read(reinterpret_cast<char*>(v.data), uuid_size);
+    is.read(reinterpret_cast<char*>(v.begin()), uuid_size);
 }
 
 /**

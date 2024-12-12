@@ -15,15 +15,17 @@
 #include "miner_id/dataref_index.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "timedata.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utiltime.h"
-#include "validation.h"
 #include "validationinterface.h"
 #include "txn_validator.h"
+
 #include <boost/range/adaptor/reversed.hpp>
+#include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <exception>
 #include <mutex>
@@ -2368,7 +2370,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
                 *pcoinsTip,
                 changeSet,
                 tip,
-                StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+                StandardNonFinalVerifyFlags(GetProtocolEra(config, tip.GetHeight())));
 
         if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
         {
@@ -2434,7 +2436,7 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
             *pcoinsTip,
             changeSet,
             tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+            StandardNonFinalVerifyFlags(GetProtocolEra(config, tip.GetHeight())));
     }
 
     // Check mempool & journal
@@ -3060,7 +3062,7 @@ UniqueCFile CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_
     }
 
     uint64_t version;
-    DumpFileID instanceId {0};
+    DumpFileID instanceId { boost::uuids::nil_uuid() };
 
     file >> version;
     if (version > MEMPOOL_DUMP_VERSION || version < MEMPOOL_DUMP_COMPAT_VERSION)

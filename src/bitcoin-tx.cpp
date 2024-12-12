@@ -10,13 +10,17 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "coins.h"
+#include "config.h"
 #include "consensus/consensus.h"
 #include "core_io.h"
 #include "dstencode.h"
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "rpc/client_utils.h"
+#include "script/malleability_status.h"
+#include "script/script_error.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "univalue.h"
@@ -25,15 +29,18 @@
 #include "utilstrencodings.h"
 
 #include <cstdio>
+#include <variant>
 
 #include <boost/algorithm/string.hpp>
-#include "config.h"
 
 static bool fCreateBlank; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 static std::map<std::string, UniValue> registers; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
 
 // not in use but required by config.h dependency
 bool fRequireStandard = true; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
+
+// Assume Chronicle active release unless configured otherwise
+ProtocolEra ActiveEra { ProtocolEra::PostChronicle };
 
 //
 // This function returns either one of EXIT_ codes when it's expected to stop
@@ -56,6 +63,10 @@ static int AppInitRawTx(int argc, char *argv[]) {
     }
 
     fCreateBlank = gArgs.GetBoolArg("-create", false);
+    if(gArgs.GetBoolArg("-genesis", false))
+    {
+        ActiveEra = ProtocolEra::PostGenesis;
+    }
 
     if (argc < 2 || gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") ||
         gArgs.IsArgSet("-help")) {
@@ -77,6 +88,9 @@ static int AppInitRawTx(int argc, char *argv[]) {
         strUsage +=
             HelpMessageOpt("-txid", _("Output only the hex-encoded transaction "
                                       "id of the resultant transaction."));
+        strUsage += HelpMessageOpt("-genesis", _("Use Genesis rules "
+                                                 "instead of the default which is "
+                                                 "Chronicle."));
         AppendParamsHelpMessages(strUsage);
 
         fprintf(stdout, "%s", strUsage.c_str()); // NOLINT (cert-err33-c)
@@ -653,6 +667,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     const CKeyStore &keystore = tempKeystore;
 
     // Sign what we can:
+    std::atomic<malleability::status> ms {};
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
         auto coin = view.GetCoinWithScript(txin.prevout);
@@ -665,45 +680,56 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        // we will assume that script is after genesis for every script type except p2sh
-        bool assumeUtxoAfterGenesis = !IsP2SH(prevPubKey);
+        // We will assume that script is after Genesis for every script type except p2sh
+        ProtocolEra utxoEra { IsP2SH(prevPubKey)? ProtocolEra::PreGenesis : ActiveEra };
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
-            (i < mergedTx.vout.size())) {
-            ProduceSignature(config, 
-                             true, 
-                             MutableTransactionSignatureCreator(
-                                 &keystore, &mergedTx, i, amount, sigHashType),
-                             true, assumeUtxoAfterGenesis, 
-                             prevPubKey, sigdata);
+        if((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
+           (i < mergedTx.vout.size()))
+        {
+            SignAndVerify(config,
+                          true,
+                          MutableTransactionSignatureCreator(&keystore,
+                                                             &mergedTx,
+                                                             i,
+                                                             amount,
+                                                             sigHashType),
+                          ActiveEra,
+                          utxoEra,
+                          prevPubKey,
+                          sigdata);
         }
-
-        // ... and merge in other signatures:
-        for (const CTransaction &txv : txVariants) {
-            sigdata = CombineSignatures(config, 
-                true,
-                prevPubKey,
-                MutableTransactionSignatureChecker(&mergedTx, i, amount),
-                sigdata, 
-                DataFromTransaction(txv, i),
-                assumeUtxoAfterGenesis);
+        for(const CTransaction& txv : txVariants)
+        {
+            // ... and merge in other signatures:
+            sigdata = CombineSignatures(config,
+                                        true,
+                                        prevPubKey,
+                                        MutableTransactionSignatureChecker(&mergedTx,
+                                                                           i,
+                                                                           amount),
+                                        sigdata,
+                                        mergedTx.nVersion,
+                                        DataFromTransaction(txv, i),
+                                        txv.nVersion,
+                                        ActiveEra,
+                                        utxoEra);
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
 
         auto source = task::CCancellationSource::Make();
-        auto res =
+        const auto res =
             VerifyScript(
                 config, true,
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,
-                StandardScriptVerifyFlags(true, assumeUtxoAfterGenesis),
-                MutableTransactionSignatureChecker(&mergedTx, i, amount));
-
-        if (!res.value())
+                StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
+                MutableTransactionSignatureChecker(&mergedTx, i, amount),
+                ms);
+        if(!res.has_value() || !res->first)
         {
             fComplete = false;
         }
@@ -753,17 +779,18 @@ static void MutateTx(const Config& config, CMutableTransaction& tx, const std::s
 
 static void OutputTxJSON(const CTransaction &tx) {
 
-    //treat as after genesis if no output is P2SH
+    // Treat as PreGenesis if any output is P2SH
     bool genesisEnabled =
         std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
             return IsP2SH(out.scriptPubKey);
         });
+    ProtocolEra era { genesisEnabled? ActiveEra : ProtocolEra::PreGenesis };
 
     CStringWriter strWriter;
     // NOLINTNEXTLINE (bugprone-implicit-widening-of-multiplication-result)
     strWriter.ReserveAdditional(tx.GetTotalSize() * 2);
     CJSONWriter jWriter(strWriter, true);
-    TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
+    TxToJSON(tx, uint256(), era, 0, jWriter);
 
     fprintf(stdout, "%s\n", strWriter.MoveOutString().c_str()); // NOLINT (cert-err33-c)
 }

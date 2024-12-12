@@ -18,7 +18,7 @@ public:
     TransactionSpecificConfig(const GlobalConfig& config);
 
     bool SetTransactionSpecificMaxTxSize(int64_t value, std::string* err = nullptr);
-    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override;
 
     void SetTransactionSpecificDataCarrierSize(uint64_t dataCarrierSize);
     uint64_t GetDataCarrierSize() const override;
@@ -26,10 +26,10 @@ public:
     bool SetTransactionSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr);
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
 
-    bool SetTransactionSpecificMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr);
-    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override;
+    bool SetTransactionSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err = nullptr);
+    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override;
 
-    bool SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
+    bool SetTransactionSpecificMaxStackMemoryUsage(ProtocolEra era, int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
     
     bool SetTransactionSpecificLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr);
@@ -39,7 +39,7 @@ public:
     uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
 
     void SetTransactionSpecificAcceptNonStandardOutput(bool accept);
-    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
+    bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
 
     bool SetTransactionSpecificMaxStdTxnValidationDuration(int ms, std::string* err = nullptr);
     std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override;

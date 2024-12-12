@@ -9,6 +9,7 @@
 
 #include "crypto/common.h"
 #include "hash.h"
+#include "script/malleability_status.h"
 #include "script/script_num.h"
 #include "streams.h"
 #include "tinyformat.h"
@@ -72,7 +73,8 @@ int32_t CBlock::GetHeightFromCoinbase()
         throw std::runtime_error("Badly formatted height in coinbase");
     std::vector<unsigned char> heightScript(numlen);
     copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
-    CScriptNum coinbaseHeight(heightScript, false, numlen);
+    malleability::status ms{};
+    CScriptNum coinbaseHeight(heightScript, min_encoding_check::no, ms, numlen);
     return coinbaseHeight.getint();
 }
 

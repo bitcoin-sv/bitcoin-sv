@@ -11,6 +11,8 @@
 #include "mining/assembler.h"
 #include "pubkey.h"
 #include "random.h"
+#include "protocol_era.h"
+#include "script/script_flags.h"
 #include "script/scriptcache.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
@@ -95,19 +97,31 @@ namespace {
         for (size_t test_flags = 0; test_flags < SCRIPT_FLAG_LAST; test_flags += 1) {
 
             // skipping impossible combination
-            if ((test_flags & SCRIPT_UTXO_AFTER_GENESIS) && !(test_flags & SCRIPT_GENESIS)){
+            if ((test_flags & SCRIPT_UTXO_AFTER_GENESIS) && !(test_flags & SCRIPT_GENESIS)) {
+                continue; 
+            } 
+            if ((test_flags & SCRIPT_UTXO_AFTER_CHRONICLE) && !(test_flags & SCRIPT_CHRONICLE)) {
+                continue; 
+            }
+            if ((test_flags & SCRIPT_UTXO_AFTER_CHRONICLE) && !(test_flags & SCRIPT_UTXO_AFTER_GENESIS)) {
                 continue; 
             }
 
-            // If all mandatory flags are not set no point to test.
-            if((test_flags & MANDATORY_SCRIPT_VERIFY_FLAGS) != MANDATORY_SCRIPT_VERIFY_FLAGS) {
+            // If any mandatory flags are not set no point to test.
+            if((test_flags & PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS) != PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS) {
                 continue;
             }
 
             if (test_flags & SCRIPT_UTXO_AFTER_GENESIS) {
-                config.SetGenesisActivationHeight(1); // put genesis activation low to be sure that every utxo is before genesis
+                config.SetGenesisActivationHeight(1); // put genesis activation low to be sure that every utxo is after genesis
             } else {
                 config.SetGenesisActivationHeight(chainActive.Height() + 2); // put genesis activation one block above mempool height
+            }
+
+            if (test_flags & SCRIPT_UTXO_AFTER_CHRONICLE) {
+                config.SetChronicleActivationHeight(1); // put chronicle activation low to be sure that every utxo is after chronicle
+            } else {
+                config.SetChronicleActivationHeight(chainActive.Height() + 2); // put chronicle activation one block above mempool height
             }
 
             CValidationState state;
@@ -330,7 +344,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                     state,
                     cache,
                     true,
-                    MANDATORY_SCRIPT_VERIFY_FLAGS |
+                    PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
                         SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
                     true,
                     true,
@@ -351,7 +365,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                     state,
                     cache,
                     true,
-                    MANDATORY_SCRIPT_VERIFY_FLAGS |
+                    PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
                         SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
                     true,
                     true,
@@ -445,7 +459,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 state,
                 cache,
                 true,
-                MANDATORY_SCRIPT_VERIFY_FLAGS |
+                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
                     SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_GENESIS,
                 true,
                 true,
@@ -497,7 +511,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 state,
                 cache,
                 true,
-                MANDATORY_SCRIPT_VERIFY_FLAGS |
+                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
                     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_GENESIS,
                 true,
                 true,
@@ -522,21 +536,37 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // Sign
         SignatureData sigdata;
-        ProduceSignature(config, true,
-            MutableTransactionSignatureCreator(&keystore, &tx, 0, 11 * CENT,
-                                               SigHashType().withForkId()),
-            true, false, spend_tx.vout[0].scriptPubKey, sigdata);
+        SignAndVerify(config,
+                      true,
+                      MutableTransactionSignatureCreator(&keystore,
+                                                         &tx,
+                                                         0,
+                                                         11 * CENT,
+                                                         SigHashType().withForkId()),
+                      ProtocolEra::PostGenesis,
+                      ProtocolEra::PreGenesis,
+                      spend_tx.vout[0].scriptPubKey,
+                      sigdata);
 
         UpdateTransaction(tx, 0, sigdata);
-        ProduceSignature(config, true,
-            MutableTransactionSignatureCreator(&keystore, &tx, 1, 11 * CENT,
-                                               SigHashType().withForkId()),
-            true, false, spend_tx.vout[3].scriptPubKey, sigdata);
+        SignAndVerify(config,
+                      true,
+                      MutableTransactionSignatureCreator(&keystore,
+                                                         &tx,
+                                                         1,
+                                                         11 * CENT,
+                                                         SigHashType().withForkId()),
+                      ProtocolEra::PostGenesis,
+                      ProtocolEra::PreGenesis,
+                      spend_tx.vout[3].scriptPubKey,
+                      sigdata);
         UpdateTransaction(tx, 1, sigdata);
 
         auto shouldPass = [](uint32_t flags) -> bool {
             bool isUtxoAfterGenesis = flags & SCRIPT_UTXO_AFTER_GENESIS;
-            bool isCleanStackEnforced = flags & SCRIPT_VERIFY_CLEANSTACK;
+            bool p2shExecuted = (flags & SCRIPT_VERIFY_P2SH) && !isUtxoAfterGenesis;
+            bool isCleanStackEnforced = (flags & SCRIPT_VERIFY_CLEANSTACK) && (!(flags & SCRIPT_CHRONICLE) || p2shExecuted);
+
             return !(isUtxoAfterGenesis && isCleanStackEnforced); 
         };
 
@@ -565,7 +595,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 state,
                 cache,
                 true,
-                MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
+                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
                 true,
                 true,
                 txdata,
@@ -584,7 +614,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 state,
                 cache,
                 true,
-                MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
+                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
                 true,
                 true,
                 txdata,

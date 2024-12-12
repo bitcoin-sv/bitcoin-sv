@@ -1,0 +1,36 @@
+# Copyright (c) 2024 BSV Blockchain Association
+# Distributed under the Open BSV software license,
+# see the accompanying file LICENSE.
+
+name: IBD - Weeknight
+
+on:
+  schedule:
+    - cron: '59 23 * * MON-THU'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ibd_weeknight:
+    runs-on: [ self-hosted, docker, large, perf ]
+    container:
+      image: nchain/svn_dev:ubuntu_22.04
+      options: --cap-add SYS_ADMIN --volume /lib/modules:/lib/modules
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: ''
+      - name: Build Bitcoin
+        uses: ./.github/workflows/build_bitcoin_cmake
+        with: 
+          build_type: Release
+      - name: Initial Block Download
+        uses: ./.github/actions/ibd
+        with:
+          duration: $((5 * 60 * 60)) # Note: Each job must be < 6hrs
+          restore: false
+          save: false

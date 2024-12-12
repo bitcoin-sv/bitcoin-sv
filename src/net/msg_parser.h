@@ -25,6 +25,7 @@ class msg_parser
         virtual std::pair<size_t, size_t> operator()(std::span<const uint8_t>) = 0;
         virtual size_t read(size_t read_pos, std::span<uint8_t>) = 0;
         virtual size_t size() const = 0;
+        virtual size_t readable_size() const = 0;
 
         virtual void clear() = 0;
         
@@ -58,6 +59,11 @@ class msg_parser
         {
             return object_.size();
         }
+        
+        [[nodiscard]] size_t readable_size() const override
+        {
+            return object_.readable_size();
+        }
 
         void clear() override
         {
@@ -87,6 +93,7 @@ public:
 
     size_t read(size_t read_pos, std::span<uint8_t> s) { return pimpl_->read(read_pos, s); }
     size_t size() const { return pimpl_->size(); }
+    [[nodiscard]] size_t readable_size() const { return pimpl_->readable_size(); }
 
     void clear() { return pimpl_->clear(); }
 

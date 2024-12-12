@@ -21,6 +21,9 @@ option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
+option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
+option(ENABLE_CLANG_TIDY "Use ClangTidy" ON)
+
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	list(APPEND CMAKE_RC_FLAGS "-DWINDRES_PREPROC")
@@ -40,6 +43,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 		$<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
 	)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+        if(CMAKE_CXX_COMPILER_VERSION MATCHES 18.*)
+            add_compile_options(-Wno-deprecated-declarations)
+        endif()
+    endif()
 
 	if(EXTRA_WARNINGS)
 		add_compile_options(
@@ -78,6 +87,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
             "LINKER:-pie"
         )
     endif()
+endif()
+
+# TCMalloc
+if(ENABLE_TCMALLOC)
+    find_package(GooglePerf REQUIRED)
+    add_compile_options(-fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free)
 endif()
 
 if(MSVC)
@@ -334,6 +349,8 @@ add_library(common
 	protocol.cpp
 	protocol.h
 	pubkey.h
+    protocol_era.cpp
+    protocol_era.h
 	reverselock.h
 	rpc/jsonwriter.cpp
 	rpc/jsonwriter.h
@@ -342,6 +359,7 @@ add_library(common
 	script/int_serialization.h
 	script/interpreter.h
 	script/limitedstack.h
+    script/malleability_status.h
 	script/opcodes.h
 	script/script.h
 	script/script_error.h
@@ -367,6 +385,7 @@ add_library(common
 	timedata.h
 	transaction_specific_config.cpp
 	transaction_specific_config.h
+    txdb_defaults.h
 	tx_mempool_info.h
 	txhasher.cpp
 	txhasher.h
@@ -378,8 +397,6 @@ add_library(common
 	txn_validation_config.h
 	txn_validation_data.h
 	txn_validation_result.h
-    unique_array.h
-    unique_array.cpp
 	validation.h
 	version.h
 	versionbits.h
@@ -695,6 +712,10 @@ if(BUILD_BITCOIN_CLI)
 
 	target_include_directories(bitcoin-cli PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-cli common rpcclient ${EVENT_LIBRARY})
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-cli ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoin-tx
@@ -706,6 +727,10 @@ if(BUILD_BITCOIN_TX)
 	endif()
 
 	target_link_libraries(bitcoin-tx bitcoinconsensus)
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-tx ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoin-miner
@@ -714,6 +739,10 @@ if(BUILD_BITCOIN_MINER)
 )
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-miner ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoind
@@ -728,11 +757,16 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()
 
-if(enable_clang-tidy)
-	AddClangTidy(bitcoind)
-	if(BUILD_BITCOIN_CLI)
-		AddClangTidy(bitcoin-cli)
-	endif()
+if(ENABLE_TCMALLOC)
+    target_link_libraries(bitcoind ${TCMALLOC_LIBRARY})
+endif()
+
+if(ENABLE_CLANG_TIDY)
+    include(ClangTidy)
+    AddClangTidy(bitcoind)
+    if(BUILD_BITCOIN_CLI)
+        AddClangTidy(bitcoin-cli)
+    endif()
 	if(BUILD_BITCOIN_TX)
 		AddClangTidy(bitcoin-tx)
 	endif()

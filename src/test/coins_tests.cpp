@@ -60,7 +60,7 @@ struct CoinsDB::UnitTestAccess<coins_tests_uid> : public CoinsDB
 {
 public:
     UnitTestAccess( std::size_t cacheSize )
-        : CoinsDB{ cacheSize, 0, CoinsDB::MaxFiles::Default(), false, false }
+        : CoinsDB{ cacheSize, 0, CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE, CoinsDB::MaxFiles::Default(), false, false }
     {}
 
     const std::optional<CoinImpl>& GetLatestCoin() const { return mLatestGetCoin; }
@@ -351,7 +351,7 @@ public:
     }
 
 private:
-    CoinsDB base{ std::numeric_limits<size_t>::max(), 0, CoinsDB::MaxFiles::Default(), false, false };
+    CoinsDB base{ std::numeric_limits<size_t>::max(), 0, CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE, CoinsDB::MaxFiles::Default(), false, false };
 
 public:
     std::unique_ptr<CCoinsViewCacheTest> cache;

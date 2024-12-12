@@ -13,6 +13,7 @@
 #include "miner_id/revokemid.h"
 #include "miner_id/miner_info.h"
 #include "netmessagemaker.h"
+#include "protocol_era.h"
 #include "rpc/server.h"
 #include "script/instruction_iterator.h"
 #include "script/script.h"
@@ -203,9 +204,18 @@ public:
             mtx.vin.emplace_back(*fundingOutPoint, CTxIn::SEQUENCE_FINAL);
 
             keystore.AddKeyPubKey(fundingKey.getPrivKey(), fundingKey.getPrivKey().GetPubKey());
-            ProduceSignature(config, true, MutableTransactionSignatureCreator(
-                                     &keystore, &mtx, 0, fundingAmount, sigHash.withForkId()),
-                             true, true, prevPubKey, sigdata);
+            SignAndVerify(config,
+                          true,
+                          MutableTransactionSignatureCreator(&keystore,
+                                                             &mtx,
+                                                             0,
+                                                             fundingAmount,
+                                                             sigHash.withForkId()),
+                          ProtocolEra::PostGenesis,
+                          ProtocolEra::PostGenesis,
+                          prevPubKey,
+                          sigdata);
+
             UpdateTransaction(mtx, 0, sigdata); // funding transactions only have one input
             COutPoint newOutPoint {mtx.GetId(), static_cast<uint32_t>(mtx.vout.size() - 1)};
             return {newOutPoint, *fundingOutPoint};

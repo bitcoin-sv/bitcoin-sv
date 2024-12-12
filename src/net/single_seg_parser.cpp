@@ -7,7 +7,7 @@
 std::pair<size_t, size_t> single_seg_parser::operator()(const std::span<const uint8_t> s)
 {
     segment_.insert(segment_.end(), s.begin(), s.end());
-    return std::make_pair(s.size(), 0);
+    return std::make_pair(s.size(), payload_len_ - segment_.size());
 };
 
 size_t single_seg_parser::read(const size_t read_pos, std::span<uint8_t> s)

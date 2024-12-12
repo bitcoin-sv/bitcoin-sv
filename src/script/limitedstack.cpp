@@ -2,14 +2,17 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "script/limitedstack.h"
-#include "crypto/ripemd160.h"
-#include "crypto/sha256.h"
-#include "script/int_serialization.h"
-#include <iostream>
 
-LimitedVector::LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn) : stackElement(stackElementIn), stack(stackIn)
-{
-}
+#include "script/int_serialization.h"
+
+#include <algorithm>
+#include <utility>
+
+LimitedVector::LimitedVector(valtype stackElementIn,
+                             LimitedStack& stackIn):
+	stackElement(std::move(stackElementIn)),
+	stack(stackIn)
+{}
 
 const valtype& LimitedVector::GetElement() const
 {
@@ -119,24 +122,40 @@ bool LimitedVector::IsMinimallyEncoded(uint64_t maxSize) const
 {
     return bsv::IsMinimallyEncoded(stackElement, maxSize);
 }
+
 const LimitedStack& LimitedVector::getStack() const
 {
     return stack.get();
 }
 
-LimitedStack::LimitedStack(uint64_t maxStackSizeIn)
-{
-    maxStackSize = maxStackSizeIn;
-    parentStack = nullptr;
+void LimitedVector::shrink(difference_type start, difference_type length)
+{ 
+    const auto size{ssize(stackElement)};
+
+    if(start < 0 || 
+       start > size ||
+       length < 0 ||
+       start + length > size)
+        return;
+
+    const auto len{std::min(size - start, length)};
+    valtype tmp{stackElement.begin() + start,
+                stackElement.begin() + start + len};
+    stackElement.swap(tmp);
 }
 
-LimitedStack::LimitedStack(const std::vector<valtype>& stackElements, uint64_t maxStackSizeIn)
+LimitedStack::LimitedStack(uint64_t maxStackSizeIn):
+    maxStackSize{maxStackSizeIn}
 {
-    maxStackSize = maxStackSizeIn;
-    parentStack = nullptr;
-    for (const auto& element : stackElements)
+}
+
+LimitedStack::LimitedStack(std::vector<valtype> stackElements,
+                           uint64_t maxStackSizeIn)
+    : maxStackSize{maxStackSizeIn}
+{
+    for(auto&& element : std::move(stackElements))
     {
-        push_back(element);
+        push_back(std::move(element));
     }
 }
 
@@ -197,20 +216,9 @@ void LimitedStack::pop_back()
     stack.pop_back();
 }
 
-void LimitedStack::push_back(const LimitedVector &element)
+void LimitedStack::push_back(const std::initializer_list<unsigned char>& v)
 {
-    if (&element.getStack() != this)
-    {
-        throw std::invalid_argument("Invalid argument - element that is added should have the same parent stack as the one we are adding to.");
-    }
-    increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.push_back(element);
-}
-
-void LimitedStack::push_back(const valtype& element)
-{
-    increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.push_back(LimitedVector{element, *this});
+	push_back(valtype{v});
 }
 
 LimitedVector& LimitedStack::stacktop(int index)

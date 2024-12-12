@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(write_read_happy_case)
 {
     msg_buffer buff{type, version};
    
-    constexpr auto n{10};
+    constexpr auto n{10U};
     vector<uint8_t> ip1(n);
     std::iota(ip1.begin(), ip1.end(), 0);
     buff.write(span{ip1.data(), ip1.size()});
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(write_read_happy_case)
                                   ip1.cend(),
                                   op1.cbegin(),
                                   op1.cend());
-    BOOST_CHECK_EQUAL(0, buff.size());
+    BOOST_CHECK_EQUAL(0U, buff.size());
    
     buff.command("default");
     constexpr auto payload_len{42};
@@ -126,7 +126,7 @@ BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_header)
 {
     msg_buffer buff{type, version};
    
-    constexpr auto n{10};
+    constexpr auto n{10U};
     vector<uint8_t> ip(n);
     std::iota(ip.begin(), ip.end(), 0);
     buff.write(span{ip.data(), ip.size()});
@@ -148,7 +148,7 @@ BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_payload)
 {
     msg_buffer buff{type, version};
    
-    constexpr auto n{10};
+    constexpr auto n{10U};
     vector<uint8_t> ip1(n);
     std::iota(ip1.begin(), ip1.end(), 0);
     buff.write(span{ip1.data(), ip1.size()});
@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_payload)
                                   ip1.cend(),
                                   op1.cbegin(),
                                   op1.cend());
-    BOOST_CHECK_EQUAL(0, buff.size());
+    BOOST_CHECK_EQUAL(0U, buff.size());
     
     buff.command("default");
     constexpr auto payload_len{42};
@@ -216,7 +216,7 @@ BOOST_AUTO_TEST_CASE(write_read_block_msg)
 
     vector<uint8_t> header(msg_header_len);
     buff.read(span{header.data(), header.size()});
-    BOOST_CHECK_EQUAL(0, buff.size());
+    BOOST_CHECK_EQUAL(0U, buff.size());
 
     buff.command("default");
     buff.payload_len(block_msg_payload.size());

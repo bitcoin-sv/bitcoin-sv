@@ -1,16 +1,17 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
-#include <mining/journaling_block_assembler.h>
 
-#include <chainparams.h>
-#include <config.h>
-#include <consensus/validation.h>
-#include <logging.h>
-#include <mining/journal_builder.h>
-#include <timedata.h>
-#include <txmempool.h>
-#include <util.h>
-#include <validation.h>
+#include "mining/journaling_block_assembler.h"
+
+#include "chainparams.h"
+#include "config.h"
+#include "consensus/validation.h"
+#include "logging.h"
+#include "mining/journal_builder.h"
+#include "protocol_era.h"
+#include "timedata.h"
+#include "txmempool.h"
+#include "util.h"
 
 #include <limits>
 
@@ -181,7 +182,8 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         if(pindex)
         {
             int32_t height { pindex->GetHeight() + 1 };
-            mLockTimeCutoff = (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, height)) & LOCKTIME_MEDIAN_TIME_PAST) ?
+            ProtocolEra era { GetProtocolEra(mConfig, height) };
+            mLockTimeCutoff = (StandardNonFinalVerifyFlags(era) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }
 

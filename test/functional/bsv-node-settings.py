@@ -29,7 +29,7 @@ class BSVNodeSettings(BitcoinTestFramework):
 
     def test_getsettings(self, parameters):
 
-        node_params = []
+        node_params = ['-genesisactivationheight=1']
         for param in parameters:
             node_params.append(f"-{param}={parameters[param]}")
 
@@ -56,6 +56,7 @@ class BSVNodeSettings(BitcoinTestFramework):
             assert_equal(expected, actual)
 
     def run_test(self):
+        self.nodes[0].generate(1)
 
         parameters1 = {'excessiveblocksize': 9223372036854775807,
                        'blockmaxsize': 9223372036854775807,

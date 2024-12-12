@@ -1,7 +1,7 @@
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
-define(_CLIENT_VERSION_MINOR, 1)
+define(_CLIENT_VERSION_MINOR, 2)
 define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)
 define(_COPYRIGHT_YEAR, 2024)
@@ -166,9 +166,9 @@ AC_ARG_ENABLE([asm],
 
 AC_ARG_ENABLE([tcmalloc],
   [AS_HELP_STRING([--enable-tcmalloc],
-  [Link with Google tcmalloc (default is no)])],
+  [Link with Google tcmalloc (default is yes)])],
   [use_tcmalloc=$enableval],
-  [use_tcmalloc=no])
+  [use_tcmalloc=yes])
 
 AC_ARG_ENABLE([jemalloc],
   [AS_HELP_STRING([--enable-jemalloc],
@@ -568,18 +568,6 @@ if test x$use_lcov = xyes; then
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
 fi
 
-if test x$use_tcmalloc = xyes; then
-  AC_MSG_RESULT([Enabling tcmalloc])
-  AC_CHECK_LIB([tcmalloc], [malloc],
-    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc $LIBS"],
-    [AC_MSG_ERROR(tcmalloc not found)])
-else
-  if test x$use_jemalloc = xyes; then
-    AC_MSG_RESULT([Enabling jemalloc])
-    AC_CHECK_LIB([jemalloc], [malloc],, [AC_MSG_ERROR(jemalloc not found)])
-  fi
-fi
-
 dnl Check for endianness
 AC_C_BIGENDIAN
 
@@ -906,7 +894,6 @@ fi
 
 if test x$use_reduce_exports = xyes; then
     CXXFLAGS="$CXXFLAGS $RE_CXXFLAGS"
-    AX_CHECK_LINK_FLAG([[-Wl,--exclude-libs,ALL]], [RELDFLAGS="-Wl,--exclude-libs,ALL"])
 fi
 
 if test x$use_tests = xyes; then
@@ -1032,6 +1019,18 @@ if test x$boost_sleep != xyes; then
   AC_MSG_ERROR(No working boost sleep implementation found.)
 fi
 
+fi
+
+if test x$use_tcmalloc = xyes; then
+  AC_MSG_RESULT([Enabling tcmalloc])
+  AC_CHECK_LIB([tcmalloc_minimal], [main],
+    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc_minimal $LIBS"],
+    [AC_MSG_ERROR(tcmalloc not found)])
+else
+  if test x$use_jemalloc = xyes; then
+    AC_MSG_RESULT([Enabling jemalloc])
+    AC_CHECK_LIB([jemalloc], [main],, [AC_MSG_ERROR(jemalloc not found)])
+  fi
 fi
 
 if test x$use_pkgconfig = xyes; then

@@ -9,6 +9,7 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "prevector.h"
+#include "protocol_era.h"
 #include "serialize.h"
 #include "opcodes.h"
 
@@ -238,13 +239,13 @@ public:
      * If the size is bigger than that, or if the number of public keys is negative,
      * sigOpCountError is set to true,
      */
-    uint64_t GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const;
+    uint64_t GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCountError) const;
 
     /**
      * Accurately count sigOps, including sigOps in pay-to-script-hash
      * transactions:
      */
-    uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
+    uint64_t GetSigOpCount(const CScript &scriptSig, ProtocolEra era, bool& sigOpCountError) const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it
      * consensus-critical). */
@@ -255,15 +256,14 @@ public:
      * Returns whether the script is guaranteed to fail at execution, regardless
      * of the initial stack. This allows outputs to be pruned instantly when
      * entering the UTXO set.
-     * nHeight reflects the height of the block that script was mined in
+     * era reflects the height of the block that script was mined in.
      * For Genesis OP_RETURN this can return false negatives. For example if we have:
      *   <some complex script that always return OP_FALSE> OP_RETURN
      * this function will return false even though the ouput is unspendable.
-     * 
      */
-
-    bool IsUnspendable(bool isGenesisEnabled) const {
-        if (isGenesisEnabled)
+    bool IsUnspendable(ProtocolEra era) const
+    {
+        if(IsProtocolActive(era, ProtocolName::Genesis))
         {
             // Genesis restored OP_RETURN functionality. It no longer uncoditionally fails execution
             // The top stack value determines if execution suceeds, and OP_RETURN lock script might be spendable if 

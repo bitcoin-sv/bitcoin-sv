@@ -9,8 +9,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
-#include "unique_array.h"
 #include "msg_parser_buffer.h"
 #include "streams.h"
 
@@ -21,7 +21,7 @@ class CMessageHeader;
 // allocation can be more finely controlled.
 class msg_buffer 
 {
-    using buffer_type = unique_array;
+    using buffer_type = std::vector<uint8_t>;
 
     buffer_type header_;
     std::string command_;

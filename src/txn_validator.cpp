@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txn_validator.h"
+#include "protocol_era.h"
 #include "txn_validation_config.h"
 #include "config.h"
 #include "net/net_processing.h"
@@ -30,7 +31,7 @@ CTxnValidator::CTxnValidator(
    
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
         maxExtraTxnsForCompactBlock,
-        config.GetMaxTxSize(true, false), /*orphan tx before genesis might not get accepted by mempool */
+        config.GetMaxTxSize(ProtocolEra::PostGenesis, false), /*orphan tx before genesis might not get accepted by mempool */
         config.GetMaxOrphansInBatchPercentage(),
         config.GetMaxInputsForSecondLayerOrphan());
     
