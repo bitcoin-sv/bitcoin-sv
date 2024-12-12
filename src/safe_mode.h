@@ -45,13 +45,6 @@ class SafeMode
     void PruneStaleForkData(const Config& config);
 
     /**
-     * Returns a new fork tip which is result of ignoring specific blocks for the safe mode,
-     * and set of all blocks that should be ignored.
-     * If the whole fork is marked for ignoring nullptr is returned.
-     */
-    std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const;
-
-    /**
     * Represents single forking of the main chain
     */
     struct SafeModeFork
@@ -144,6 +137,12 @@ public:
 };
     
 int64_t GetMinimumRelevantBlockHeight(const Config&);
+  
+// Returns a new fork tip which is the result of ignoring specific blocks for safe mode,
+// and set of all blocks that should be ignored.
+// If the whole fork is marked for ignoring nullptr is returned.
+std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>>
+ExcludeIgnoredBlocks(const Config&, const CBlockIndex* tip);
 
 /**
  * Calling SafeMode::Clear()

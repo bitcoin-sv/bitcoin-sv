@@ -58,4 +58,59 @@ BOOST_FIXTURE_TEST_CASE(get_min_relevant_block_height, chain_guard)
     }
 }
 
+BOOST_FIXTURE_TEST_CASE(exclude_ignored_blocks_nullptr, chain_guard)
+{
+    LOCK(cs_main);
+
+    const auto& config{GlobalConfig::GetConfig()};
+    const auto [new_tip, ignored_blocks] = ExcludeIgnoredBlocks(config, nullptr);
+    BOOST_CHECK_EQUAL(new_tip, nullptr);
+    BOOST_CHECK_EQUAL(0, ignored_blocks.size());
+}
+
+BOOST_FIXTURE_TEST_CASE(exclude_ignored_blocks, chain_guard)
+{
+    SelectParams(CBaseChainParams::REGTEST);
+
+    CBlockHeader hdr;
+    uint256 prev_hash;
+    hdr.hashPrevBlock = prev_hash;
+    BlockIndexStore blockIndexStore;
+    CBlockIndex* tip{blockIndexStore.Insert(hdr)};
+    prev_hash = tip->GetBlockHash();
+    
+    CBlockIndex* tip_1{};
+    uint256 prev_hash_1{prev_hash};
+
+    CBlockIndex* tip_2{};
+    uint256 prev_hash_2{prev_hash};
+
+    const auto max_safemode_fork_dist{3};
+    uint32_t timestamp{};
+    for(int64_t i{}; i < max_safemode_fork_dist; ++i)
+    {
+        CBlockHeader hdr_1;
+        hdr_1.hashPrevBlock = prev_hash_1;
+        hdr_1.nTime = ++timestamp;
+        tip_1 = blockIndexStore.Insert(hdr_1);
+        prev_hash_1 = tip_1->GetBlockHash();
+        
+        CBlockHeader hdr_2;
+        hdr_2.hashPrevBlock = prev_hash_2;
+        hdr_2.nTime = ++timestamp;
+        tip_2 = blockIndexStore.Insert(hdr_2);
+        prev_hash_2 = tip_2->GetBlockHash();
+    }
+    
+    chainActive.SetTip(tip_1);
+
+    LOCK(cs_main);
+    tip_2->SetIgnoredForSafeMode(true);
+    const auto& config{GlobalConfig::GetConfig()};
+    const auto [new_tip, ignored_blocks] = ExcludeIgnoredBlocks(config, tip_2);
+    BOOST_CHECK_EQUAL(new_tip, tip_2->GetPrev());
+    BOOST_CHECK_EQUAL(1, ignored_blocks.size());
+    BOOST_CHECK_EQUAL(tip_2, ignored_blocks[0]);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

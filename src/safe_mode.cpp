@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "safe_mode.h"
+
 #include "validation.h"
 #include "config.h"
 #include "rpc/http_request.h"
@@ -208,7 +209,8 @@ void SafeMode::PruneStaleForkData(const Config& config)
     }
 }
 
-std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const
+std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> 
+ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip)
 {
     AssertLockHeld(cs_main);
 
@@ -219,7 +221,7 @@ std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::Exclud
 
     auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
 
-    while (!chainActive.Contains(pindexWalk))
+    while(pindexWalk && !chainActive.Contains(pindexWalk))
     {
         if(pindexWalk->GetHeight() < minimumRelevantBlockHeight)
         {
