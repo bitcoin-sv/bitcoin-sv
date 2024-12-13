@@ -88,6 +88,16 @@ public:
 
         return mStore.size();
     }
+    
+    // may only be used in contexts where we are certain that nobody is using
+    // CBlockIndex instances that are owned by this class
+    void clear()
+    {
+        std::lock_guard lock{ mMutex };
+        mStore.clear();
+        mDirtyBlockIndex.Clear();
+        mBestHeader = nullptr;
+    }
 
     template<class Func>
     void ForEach(Func callback) const

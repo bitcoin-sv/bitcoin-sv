@@ -7052,7 +7052,7 @@ void UnloadBlockIndex() {
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
 
-    BlockIndexStoreLoader(mapBlockIndex).ForceClear();
+    mapBlockIndex.clear();
     fHavePruned = false;
 }
 

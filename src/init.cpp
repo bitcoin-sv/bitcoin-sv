@@ -264,7 +264,7 @@ void Shutdown() {
     vpwallets.clear();
 #endif
     ShutdownFrozenTXO();
-    BlockIndexStoreLoader(mapBlockIndex).ForceClear();
+    mapBlockIndex.clear();
 
     LogPrintf("%s: done\n", __func__);
 }
