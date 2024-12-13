@@ -18,6 +18,7 @@ RUN set -xeu \
     python3 python3-ecdsa python3-zmq pip \
     git \
     sysbench \
+    gperftools-devel \
     && dnf clean all -y
 
 RUN set -xeu && pip install bip32utils

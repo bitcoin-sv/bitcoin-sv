@@ -3,11 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script/int_serialization.h"
+#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "scriptnum10.h"
 
 #include <boost/test/unit_test.hpp>
+#include <cstdint>
 
 #include "big_int.h"
 
@@ -21,6 +23,10 @@ namespace
 
     vector<int64_t> test_data{min64, -1, 0, 1, max64}; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 }
+
+static_assert(!require_min_encoding(min_encoding_check::no));
+static_assert(require_min_encoding(min_encoding_check::soft));
+static_assert(require_min_encoding(min_encoding_check::hard));
 
 BOOST_AUTO_TEST_SUITE(scriptnum_tests)
 
@@ -53,7 +59,8 @@ BOOST_AUTO_TEST_CASE(construction)
     {
         try
         {
-            CScriptNum actual{v, false, max_size, big_int};
+            malleability::status ms{};
+            CScriptNum actual{v, min_encoding_check::no, ms, max_size, big_int};
         }
         catch(...)
         {
@@ -73,11 +80,72 @@ BOOST_AUTO_TEST_CASE(construction)
     {
         try
         {
-            CScriptNum actual{v, false, max_size, big_int};
+            malleability::status ms{};
+            CScriptNum actual{v, min_encoding_check::no, ms, max_size, big_int};
             BOOST_FAIL("should throw");
         }
         catch(...) // NOLINT(bugprone-empty-catch)
         {
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(chronicle_construction)
+{
+    using namespace std;
+
+    using test_args = tuple<vector<uint8_t>,        // stack item 
+                            min_encoding_check,     // expect error
+                            malleability::status>;  // expected malleability_status
+    const vector<test_args> test_data
+    {
+        // min-encoding checks=no
+        {
+            {},
+            min_encoding_check::no,
+            malleability::non_malleable
+        },
+        {
+            {42, 0}, // Non-minimal - leading 0
+            min_encoding_check::no,
+            malleability::non_malleable
+        },
+        // min-encoding checks=soft
+        {
+            {},
+            min_encoding_check::soft,
+            malleability::non_malleable
+        },
+        {
+            {42, 0},
+            min_encoding_check::soft,
+            malleability::non_minimal_scriptnum
+        },
+        // min-encoding checks=hard
+        {
+            {},
+            min_encoding_check::hard,
+            malleability::non_malleable
+        },
+        {
+            {42, 0},
+            min_encoding_check::hard,
+            malleability::non_malleable
+        },
+    };
+    for(const auto& [script, min_encoding, exp_ms] : test_data)
+    {
+        malleability::status ms{};
+        try
+        {
+            const CScriptNum n{script, min_encoding, ms};
+            BOOST_CHECK_EQUAL(exp_ms, ms);
+        }
+        catch(const scriptnum_minencode_error& e)
+        {
+            BOOST_CHECK_EQUAL(min_encoding_check::hard, min_encoding);
+            BOOST_CHECK(!bsv::IsMinimallyEncoded(script,
+                                                 CScriptNum::MAXIMUM_ELEMENT_SIZE));
         }
     }
 }
@@ -448,11 +516,12 @@ static void CheckCreateVch(const int64_t &num) {
 
     CScriptNum10 bignum2(bignum.getvch(), false);
     vch = scriptnum.getvch();
-    CScriptNum scriptnum2(scriptnum.getvch(), false);
+    malleability::status ms{};
+    CScriptNum scriptnum2(scriptnum.getvch(), min_encoding_check::no, ms);
     BOOST_CHECK(verify(bignum2, scriptnum2));
 
     CScriptNum10 bignum3(scriptnum2.getvch(), false);
-    CScriptNum scriptnum3(bignum2.getvch(), false);
+    CScriptNum scriptnum3(bignum2.getvch(), min_encoding_check::no, ms);
     BOOST_CHECK(verify(bignum3, scriptnum3));
 }
 

@@ -102,6 +102,7 @@ BITCOIN_TESTS =\
   test/locked_ref_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
+  test/malleability_status_tests.cpp \
   test/mempool_test_access.h \
   test/mempool_dump_load_tests.cpp \
   test/mempool_limit_tests.cpp \
@@ -135,6 +136,7 @@ BITCOIN_TESTS =\
   test/prefilled_txs_parser_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
+  test/protocol_era_tests.cpp \
   test/protocol_tests.cpp \
   test/raii_event_tests.cpp \
   test/random_tests.cpp \
@@ -186,7 +188,6 @@ BITCOIN_TESTS =\
   test/txvalidationcache_tests.cpp \
   test/uint256_tests.cpp \
   test/undo_tests.cpp \
-  test/unique_array_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/validation_scheduler_tests.cpp \

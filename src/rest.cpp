@@ -10,6 +10,7 @@
 #include "core_io.h"
 #include "merkletreestore.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
 #include "rpc/jsonwriter.h"
@@ -20,8 +21,8 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 #include "version.h"
+
 #include <boost/algorithm/string.hpp>
 #include <univalue.h>
 
@@ -499,8 +500,8 @@ static bool rest_tx(Config &config, HTTPRequest *req,
 
     CTransactionRef tx;
     uint256 hashBlock = uint256();
-    bool isGenesisEnabled;
-    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled)) {
+    ProtocolEra era {};
+    if (!GetTransaction(config, txid, tx, true, hashBlock, era)) {
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
     }
 
@@ -527,7 +528,7 @@ static bool rest_tx(Config &config, HTTPRequest *req,
             req->StartWritingChunks(HTTP_OK);
             CHttpTextWriter httpWriter(*req);
             CJSONWriter jWriter(httpWriter, false);
-            TxToJSON(*tx, hashBlock, isGenesisEnabled, 0, jWriter);
+            TxToJSON(*tx, hashBlock, era, 0, jWriter);
             httpWriter.WriteLine();
             httpWriter.Flush();
             req->StopWritingChunks();
@@ -748,7 +749,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
                 int32_t height = (coin.GetHeight() == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.GetHeight();
-                ScriptPubKeyToUniv(coin.GetScriptPubKey(), true, IsGenesisEnabled(config, height), o);
+                ScriptPubKeyToUniv(coin.GetScriptPubKey(), true, GetProtocolEra(config, height), o);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }

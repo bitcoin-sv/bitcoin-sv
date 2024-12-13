@@ -4,7 +4,7 @@
 #include "rawtxvalidator.h"
 #include "config.h"
 #include "mining/journal_change_set.h"
-#include "config.h"
+#include "protocol_era.h"
 
 void RawTxValidator::ThreadFunc() 
 {
@@ -95,7 +95,7 @@ void RawTxValidator::ThreadFunc()
 }
 
 RawTxValidator::RawTxValidator(const Config& conf)
-    : queue(conf.GetMaxTxSize(true, true) + sizeof(RawTxValidator::ValidationTaskData),  
+    : queue(conf.GetMaxTxSize(ProtocolEra::PostGenesis, true) + sizeof(RawTxValidator::ValidationTaskData),  
             [](const ValidationTaskData &data) { return data.ApproximateSize(); })
 {
     workerThread = 

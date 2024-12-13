@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     // FrozenTXOData with invalid value
     const auto ftd0 = []{
         CFrozenTXODB::FrozenTXOData ftd = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
-        ftd.blacklist = static_cast<CFrozenTXODB::FrozenTXOData::Blacklist>(0);
+        ftd.blacklist = static_cast<CFrozenTXODB::FrozenTXOData::Blacklist>(0); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
         return ftd;
     }();
 

@@ -19,6 +19,8 @@
 #include "fs.h"
 #include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
+#include "protocol_era.h"
+#include "script/malleability_status.h"
 #include "script/script_error.h"
 #include "sync.h"
 #include "streams.h"
@@ -563,7 +565,7 @@ std::string GetWarnings(const std::string &strFor);
  * Retrieve a transaction (from memory pool, or from disk, if possible).
  */
 bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
-    bool fAllowSlow, uint256 &hashBlock, bool& isGenesisEnabled);
+    bool fAllowSlow, uint256 &hashBlock, ProtocolEra& era);
 
 /**
  * Find the best known block, and make it the active tip of the block chain.
@@ -644,21 +646,6 @@ void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 /** Check if DAA HF has activated. */
 bool IsDAAEnabled(const Config &config, int32_t nHeight);
 
-/** Check if Genesis has activated. */
-bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
-/** Check if Genesis has activated.
- * Do not call this overload with height of coin. If the coin was created in mempool, 
- * this function will throw exception.
- */
-bool IsGenesisEnabled(const Config& config, int32_t nHeight);
-/**  Check if Genesis has activated.
- * When a coins is present in mempool, it will have height MEMPOOL_HEIGHT. 
- * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
- *as parameter to correctly determine if genesis is enabled for this coin.
- */
-bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight);
-int GetGenesisActivationHeight(const Config& config);
-
 /**
  * Helper to return the script flags which should be checked for a block with given parent
  */
@@ -666,7 +653,7 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
 /**
  * Get script verification flags to use.
  */
-uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled);
+uint32_t GetScriptVerifyFlags(const Config &config, ProtocolEra era);
 
 /**
  * A function used to produce a default value for a number of Low priority threads
@@ -853,7 +840,7 @@ std::string FormatStateMessage(const CValidationState &state);
  * @return number of sigops this transaction's outputs will produce when spent
  * @see CTransaction::FetchInputs
  */
-uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled, bool& sigOpCountError);
+uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, ProtocolEra era, bool& sigOpCountError);
 
 /**
  * Count ECDSA signature operations in pay-to-script-hash inputs.
@@ -881,7 +868,7 @@ uint64_t GetTransactionSigOpCount(const Config& config,
                                   const CTransaction& tx,
                                   const ICoinsViewCache& inputs,
                                   bool checkP2SH, 
-                                  bool isGenesisEnabled, 
+                                  ProtocolEra era,
                                   bool& sigOpCountError);
 
 /**
@@ -906,6 +893,7 @@ std::optional<bool> CheckInputScripts(
     const uint32_t flags,
     bool sigCacheStore,
     const PrecomputedTransactionData& txdata,
+    const std::shared_ptr<std::atomic<malleability::status>>& malleability,
     std::vector<CScriptCheck>* pvChecks);
 
 /**
@@ -946,8 +934,13 @@ void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs,
 /** Transaction validation functions */
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t blockHeight = -1);
+bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state,
+                             uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                             uint64_t maxTxSizeConsensus, ProtocolEra era);
+bool CheckCoinbase(const CTransaction &tx, CValidationState &state,
+                   uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                   uint64_t maxTxSizeConsensus, ProtocolEra era,
+                   int32_t blockHeight = -1);
 
 namespace Consensus {
 
@@ -1016,17 +1009,20 @@ private:
     PrecomputedTransactionData txdata;
     std::reference_wrapper<const Config> config;
     bool consensus = false;
+    std::shared_ptr<std::atomic<malleability::status>> malleability {nullptr};
 
 public:
     // NOLINTNEXTLINE(performance-unnecessary-value-param)
     CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
                  const CTransaction &txToIn, unsigned int nInIn,
                  uint32_t nFlagsIn, bool cacheIn,
-                 const PrecomputedTransactionData& txdataIn)
+                 const PrecomputedTransactionData& txdataIn,
+                 const std::shared_ptr<std::atomic<malleability::status>>& malleabilityIn)
         : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
           nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
-          // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-          error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn), config(configIn), consensus(consensusIn) {}
+          txdata(txdataIn), config(configIn), consensus(consensusIn),
+          malleability{malleabilityIn}
+    {}
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
 

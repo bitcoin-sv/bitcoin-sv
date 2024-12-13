@@ -16,9 +16,12 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
+#include "init.h"
+#include "invalid_txn_publisher.h"
 #include "merkletreestore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "rpc/http_protocol.h"
 #include "rpc/protocol.h"
 #include "rpc/server.h"
@@ -31,9 +34,7 @@
 #include "txn_validator.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "validation.h"
-#include "init.h"
-#include "invalid_txn_publisher.h"
+
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
 #include <boost/thread/thread.hpp>              // boost::thread::interrupt
 #include <condition_variable>
@@ -182,7 +183,7 @@ void writeBlockHeaderEnhancedJSONFields(CJSONWriter& jWriter,
     if(coinbaseTx)
     {
         jWriter.writeBeginArray("tx");
-        TxToJSON(*coinbaseTx, uint256(), IsGenesisEnabled(config, blockindex->GetHeight()), RPCSerializationFlags(), jWriter);
+        TxToJSON(*coinbaseTx, uint256(), GetProtocolEra(config, blockindex->GetHeight()), RPCSerializationFlags(), jWriter);
         jWriter.writeEndArray();
     }
 
@@ -1677,13 +1678,13 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     }
 
     jWriter.writeBeginArray("tx");
-    bool isGenesisEnabled = IsGenesisEnabled(config, blockIndex.GetHeight());
+    ProtocolEra era { GetProtocolEra(config, blockIndex.GetHeight()) };
     do
     {
         const CTransaction& transaction = reader->ReadTransaction();
         if (showTxDetails)
         {
-            TxToJSON(transaction, uint256(), isGenesisEnabled, RPCSerializationFlags(), jWriter);
+            TxToJSON(transaction, uint256(), era, RPCSerializationFlags(), jWriter);
         }
         else
         {
@@ -1977,8 +1978,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
                              ? (chainActive.Height() + 1)
                              : coin.GetHeight();
-            ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true,
-                               IsGenesisEnabled(config, height), o);
+            ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true, GetProtocolEra(config, height), o);
             ret.push_back(Pair("scriptPubKey", o));
             ret.push_back(Pair("coinbase", coin.IsCoinBase()));
             ret.push_back(Pair("confiscation", coin.IsConfiscation()));
@@ -3448,8 +3448,8 @@ UniValue getblockstats_impl(const Config &config,
             for (const CTxIn &in : tx->vin) {
                 CTransactionRef tx_in;
                 uint256 hashBlock;
-                bool isGenesisEnabled;
-                if (!GetTransaction(config, in.prevout.GetTxId(), tx_in, true, hashBlock, isGenesisEnabled)) {
+                ProtocolEra era {};
+                if (!GetTransaction(config, in.prevout.GetTxId(), tx_in, true, hashBlock, era)) {
                     throw JSONRPCError(RPC_INTERNAL_ERROR,
                                        std::string("Unexpected internal error "
                                                    "(tx index seems corrupt)"));

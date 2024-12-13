@@ -4,34 +4,31 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "interpreter.h"
+
+#include "protocol_era.h"
+#include "script/malleability_status.h"
 #include "script_flags.h"
+#include "compat/endian.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
+#include "script/opcodes.h"
 #include "script/script.h"
+#include "script/script_error.h"
 #include "script/script_num.h"
 #include "taskcancellation.h"
 #include "uint256.h"
-#include "consensus/consensus.h"
 #include "script_config.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <utility>
+#include <variant>
+
 namespace {
-
-inline bool set_success(ScriptError *ret) {
-    if (ret) {
-        *ret = SCRIPT_ERR_OK;
-    }
-    return true;
-}
-
-inline bool set_error(ScriptError *ret, const ScriptError serror) {
-    if (ret) {
-        *ret = serror;
-    }
-    return false;
-}
 
 constexpr auto bits_per_byte{8};
 
@@ -229,18 +226,6 @@ static bool IsValidSignatureEncoding(const std::vector<uint8_t> &sig) {
     return true;
 }
 
-static bool IsLowDERSignature(const valtype &vchSig, ScriptError *serror) {
-    if (!IsValidSignatureEncoding(vchSig)) {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
-    }
-    std::vector<uint8_t> vchSigCopy(vchSig.begin(),
-                                    vchSig.begin() + vchSig.size() - 1);
-    if (!CPubKey::CheckLowS(vchSigCopy)) {
-        return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
-    }
-    return true;
-}
-
 static SigHashType GetHashType(const valtype &vchSig) {
     if (vchSig.size() == 0) {
         return SigHashType(0);
@@ -259,52 +244,77 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
-                            ScriptError *serror) {
+std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
+    const std::vector<uint8_t>& vchSig,
+    uint32_t flags)
+{
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
-    if (vchSig.size() == 0) {
-        return true;
+    if(vchSig.empty())
+        return malleability::status{};
+    
+    if((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
+                 SCRIPT_VERIFY_STRICTENC)) != 0 &&
+        !IsValidSignatureEncoding(vchSig))
+    {
+        return SCRIPT_ERR_SIG_DER;
     }
-    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
-                  SCRIPT_VERIFY_STRICTENC)) != 0 &&
-        !IsValidSignatureEncoding(vchSig)) {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+    
+    malleability::status ms {};
+    if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
+       !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
+    {
+        if(flags & SCRIPT_CHRONICLE)
+            ms |= malleability::high_s;
+        else
+            return SCRIPT_ERR_SIG_HIGH_S;
     }
-    if ((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
-        !IsLowDERSignature(vchSig, serror)) {
-        // serror is set
-        return false;
-    }
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) {
-        if (!GetHashType(vchSig).isDefined()) {
-            return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+    
+    if((flags & SCRIPT_VERIFY_STRICTENC) != 0)
+    {
+        if(!GetHashType(vchSig).isDefined())
+            return SCRIPT_ERR_SIG_HASHTYPE;
+
+        const bool usesForkId = GetHashType(vchSig).hasForkId();
+        const bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
+        if(!forkIdEnabled && usesForkId)
+            return SCRIPT_ERR_ILLEGAL_FORKID;
+
+        if(forkIdEnabled)
+        {
+            if(usesForkId)
+            {
+                ms |= malleability::disallowed;
+            }
+            else
+            {
+                // ForkID optional post-Chronicle
+                if((flags & SCRIPT_CHRONICLE) == 0)
+                    return SCRIPT_ERR_MUST_USE_FORKID;
+            }
         }
-        bool usesForkId = GetHashType(vchSig).hasForkId();
-        bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (!forkIdEnabled && usesForkId) {
-            return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
-        }
-        if (forkIdEnabled && !usesForkId) {
-            return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
-        }
     }
-    return true;
+
+    return ms;
 }
 
-static bool CheckPubKeyEncoding(const valtype &vchPubKey, uint32_t flags,
-                                ScriptError *serror) {
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 &&
-        !IsCompressedOrUncompressedPubKey(vchPubKey)) {
-        return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
+static ScriptError CheckPubKeyEncoding(const valtype& vchPubKey, uint32_t flags)
+{
+    if((flags & SCRIPT_VERIFY_STRICTENC) != 0 &&
+       !IsCompressedOrUncompressedPubKey(vchPubKey))
+    {
+        return SCRIPT_ERR_PUBKEYTYPE;
     }
+    
     // Only compressed keys are accepted when
     // SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE is enabled.
-    if (flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE &&
-        !IsCompressedPubKey(vchPubKey)) {
-        return set_error(serror, SCRIPT_ERR_NONCOMPRESSED_PUBKEY);
+    if(flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE &&
+       !IsCompressedPubKey(vchPubKey))
+    {
+        return SCRIPT_ERR_NONCOMPRESSED_PUBKEY;
     }
-    return true;
+
+    return SCRIPT_ERR_OK;
 }
 
 static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
@@ -336,22 +346,21 @@ static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
     return true;
 }
 
-static bool IsOpcodeDisabled(opcodetype opcode) {
-    switch (opcode) {
+static bool IsOpcodeDisabled(const opcodetype opcode,
+                             const ProtocolEra utxo_era)
+{
+    switch(opcode)
+    {
         case OP_2MUL:
         case OP_2DIV:
             // Disabled opcodes.
-            return true;
+            return utxo_era != ProtocolEra::PostChronicle;
 
         default:
             break;
     }
 
     return false;
-}
-
-static bool IsInvalidBranchingOpcode(opcodetype opcode) {
-    return opcode == OP_VERNOTIF || opcode == OP_VERIF;
 }
 
 inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
@@ -361,7 +370,13 @@ inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
     return (nOpCount <= config.GetMaxOpsPerScript(isGenesisEnabled, consensus));
 }
 
-std::optional<bool> EvalScript(
+static void to_le(const int32_t n, uint8_t* o)
+{
+    const int32_t le_n{static_cast<int32_t>(htole32(n))};
+    memcpy(o, &le_n, sizeof(le_n));
+}
+
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
@@ -372,8 +387,7 @@ std::optional<bool> EvalScript(
     LimitedStack& altstack,
     long& ipc,
     std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse,
-    ScriptError* serror)
+    std::vector<bool>& vfElse)
 {
     static const CScriptNum bnZero(0);
     static const CScriptNum bnOne(1);
@@ -386,22 +400,39 @@ std::optional<bool> EvalScript(
     opcodetype opcode;
     valtype vchPushValue;
 
-    set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+    const bool utxo_after_genesis { (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0 };
+    const bool utxo_after_chronicle { (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0 };
+    if(utxo_after_chronicle && !utxo_after_genesis)
+        return SCRIPT_ERR_INVALID_FLAGS;
 
-    const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
-    const uint64_t maxScriptNumLength = config.GetMaxScriptNumLength(utxo_after_genesis, consensus);
+    ProtocolEra utxoEra { ProtocolEra::PostChronicle };
+    if(!utxo_after_chronicle)
+    {
+        if(utxo_after_genesis)
+        {
+            utxoEra = ProtocolEra::PostGenesis;
+        }
+        else
+        {
+            utxoEra = ProtocolEra::PreGenesis;
+        }
+    }
+    const uint64_t maxScriptNumLength { config.GetMaxScriptNumLength(utxoEra, consensus) };
 
     if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
-    {
-        return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
-    }
-    uint64_t nOpCount = 0;
-    const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+        return SCRIPT_ERR_SCRIPT_SIZE;
 
+    uint64_t nOpCount = 0;
+    const min_encoding_check min_encode_check{flags & SCRIPT_VERIFY_MINIMALDATA
+                                                  ? flags & SCRIPT_CHRONICLE
+                                                        ? min_encoding_check::soft
+                                                        : min_encoding_check::hard
+                                                  : min_encoding_check::no};
     // if OP_RETURN is found in executed branches after genesis is activated,
     // we still have to check if the rest of the script is valid
     bool nonTopLevelReturnAfterGenesis = false;
-    
+
+    malleability::status ms {};
     try {
         while (pc < pend) {
             if (token.IsCanceled())
@@ -412,15 +443,13 @@ std::optional<bool> EvalScript(
             //
             // Read instruction
             //
-            if (!script.GetOp(pc, opcode, vchPushValue)) {
-                return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-            }
+            if (!script.GetOp(pc, opcode, vchPushValue))
+                return SCRIPT_ERR_BAD_OPCODE;
+ 
             ipc = pc - script.begin();
 
             if (!utxo_after_genesis && (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
-            {
-                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
-            }
+                return SCRIPT_ERR_PUSH_SIZE;
 
             // Do not execute instructions if Genesis OP_RETURN was found in executed branches.
             bool fExec = !count(vfExec.begin(), vfExec.end(), false) && (!nonTopLevelReturnAfterGenesis || opcode == OP_RETURN);
@@ -430,22 +459,28 @@ std::optional<bool> EvalScript(
             //
             // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, utxo_after_genesis, consensus)) {
-                return set_error(serror, SCRIPT_ERR_OP_COUNT);
-            }
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, utxo_after_genesis, consensus))
+                return SCRIPT_ERR_OP_COUNT;
 
             // Some opcodes are disabled.
-            if (IsOpcodeDisabled(opcode) && (!utxo_after_genesis || fExec )) {
-                return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
-            }
+            if(IsOpcodeDisabled(opcode, utxoEra) && (!utxo_after_genesis || fExec ))
+                return SCRIPT_ERR_DISABLED_OPCODE;
 
-            if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
-                if (fRequireMinimal &&
-                    !CheckMinimalPush(vchPushValue, opcode)) {
-                    return set_error(serror, SCRIPT_ERR_MINIMALDATA);
+            if(fExec && 0 <= opcode && opcode <= OP_PUSHDATA4)
+            {
+                if(require_min_encoding(min_encode_check)
+                   && !CheckMinimalPush(vchPushValue, opcode))
+                {
+                    if(min_encode_check == min_encoding_check::soft)
+                        ms |= malleability::non_minimal_push;
+                    else
+                        return SCRIPT_ERR_MINIMALDATA;
                 }
-                stack.push_back(vchPushValue);
-            } else if (fExec || (OP_IF <= opcode && opcode <= OP_ENDIF)) {
+
+                stack.push_back(std::move(vchPushValue));
+            }
+            else if(fExec || (OP_IF <= opcode && opcode <= OP_ENDIF))
+            {
                 switch (opcode) {
                     //
                     // Push value
@@ -484,19 +519,14 @@ std::optional<bool> EvalScript(
                     case OP_CHECKLOCKTIMEVERIFY: {
                         if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) || utxo_after_genesis) {
                             // not enabled; treat as a NOP2
-                            if (flags &
-                                SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {
-                                return set_error(
-                                    serror,
-                                    SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS);
-                            }
+                            if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                            
                             break;
                         }
 
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         // Note that elsewhere numeric opcodes are limited to
                         // operands in the range -2**31+1 to 2**31-1, however it
@@ -514,22 +544,20 @@ std::optional<bool> EvalScript(
                         // well beyond the 2**32-1 limit of the nLockTime field
                         // itself.
                         const CScriptNum nLockTime(stack.stacktop(-1).GetElement(),
-                                                   fRequireMinimal, 5);
+                                                   min_encode_check,
+                                                   ms,
+                                                   5);
 
                         // In the rare event that the argument may be < 0 due to
                         // some arithmetic being done first, you can always use
                         // 0 MAX CHECKLOCKTIMEVERIFY.
-                        if (nLockTime < 0) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_NEGATIVE_LOCKTIME);
-                        }
+                        if (nLockTime < 0)
+                            return SCRIPT_ERR_NEGATIVE_LOCKTIME;
 
                         // Actually compare the specified lock time with the
                         // transaction.
-                        if (!checker.CheckLockTime(nLockTime)) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_UNSATISFIED_LOCKTIME);
-                        }
+                        if (!checker.CheckLockTime(nLockTime))
+                            return SCRIPT_ERR_UNSATISFIED_LOCKTIME;
 
                         break;
                     }
@@ -537,33 +565,28 @@ std::optional<bool> EvalScript(
                     case OP_CHECKSEQUENCEVERIFY: {
                         if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) || utxo_after_genesis) {
                             // not enabled; treat as a NOP3
-                            if (flags &
-                                SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {
-                                return set_error(
-                                    serror,
-                                    SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS);
-                            }
+                            if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+
                             break;
                         }
 
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         // nSequence, like nLockTime, is a 32-bit unsigned
                         // integer field. See the comment in CHECKLOCKTIMEVERIFY
                         // regarding 5-byte numeric operands.
                         const CScriptNum nSequence(stack.stacktop(-1).GetElement(),
-                                                   fRequireMinimal, 5);
+                                                   min_encode_check,
+                                                   ms,
+                                                   5);
 
                         // In the rare event that the argument may be < 0 due to
                         // some arithmetic being done first, you can always use
                         // 0 MAX CHECKSEQUENCEVERIFY.
-                        if (nSequence < 0) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_NEGATIVE_LOCKTIME);
-                        }
+                        if (nSequence < 0)
+                            return SCRIPT_ERR_NEGATIVE_LOCKTIME;
 
                         // To provide for future soft-fork extensibility, if the
                         // operand has the disabled lock-time flag set,
@@ -574,74 +597,196 @@ std::optional<bool> EvalScript(
                         }
 
                         // Compare the specified sequence number with the input.
-                        if (!checker.CheckSequence(nSequence)) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_UNSATISFIED_LOCKTIME);
-                        }
+                        if (!checker.CheckSequence(nSequence))
+                            return SCRIPT_ERR_UNSATISFIED_LOCKTIME;
 
                         break;
                     }
+                    case OP_VER:
+                    {
+                        if(!utxo_after_chronicle)
+                            return SCRIPT_ERR_BAD_OPCODE;
 
+                        const auto tx_version{checker.Version()};
+                        std::vector<uint8_t> val(sizeof(tx_version));
+                        to_le(tx_version, val.data());
+                        stack.push_back(std::move(val));
+                        break;
+                    }
+                    case OP_SUBSTR:
+                    {
+                        if(!utxo_after_chronicle)
+                        {
+                            if(flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                            else
+                                break;
+                        }
+
+                        if(stack.size() < 3)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
+                                                min_encode_check,
+                                                ms,
+                                                maxScriptNumLength};
+                        const auto len{bn_len.getint()};
+
+                        const CScriptNum bn_begin{stack.stacktop(-2).GetElement(),
+                                                  min_encode_check,
+                                                  ms,
+                                                  maxScriptNumLength};
+                        const auto offset{bn_begin.getint()};
+                        
+                        auto& data{stack.stacktop(-3)};
+                        const auto size{std::ssize(data)};
+                        if(offset < 0 || 
+                           offset >= size ||
+                           len < 0 ||
+                           len > size - offset)
+                        {
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+                        }
+
+                        data.shrink(offset, len);
+                        stack.pop_back();
+                        stack.pop_back();
+                        break;
+                    }
+                    case OP_LEFT:
+                    {
+                        if(!utxo_after_chronicle)
+                        {
+                            if(flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                            else
+                                break;
+                        }
+
+                        if(stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
+                                                min_encode_check,
+                                                ms,
+                                                maxScriptNumLength};
+                        const auto len{bn_len.getint()};
+
+                        auto& data{stack.stacktop(-2)};
+                        const auto size{std::ssize(data)};
+                        if(len < 0 || len > size)
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+
+                        data.shrink(0, len);
+                        stack.pop_back();
+                        break;
+                    }
+                    case OP_RIGHT:
+                    {
+                        if(!utxo_after_chronicle)
+                        {
+                            if(flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                            else
+                                break;
+                        }
+
+                        if(stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
+                                                min_encode_check,
+                                                ms,
+                                                maxScriptNumLength};
+                        const auto len{bn_len.getint()};
+
+                        auto& data{stack.stacktop(-2)};
+                        const auto size{std::ssize(data)};
+                        if(len < 0 || len > size)
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+
+                        data.shrink(size - len, len);
+                        stack.pop_back();
+                        break;
+                    }
                     case OP_NOP1:
-                    case OP_NOP4:
-                    case OP_NOP5:
-                    case OP_NOP6:
                     case OP_NOP7:
                     case OP_NOP8:
                     case OP_NOP9:
                     case OP_NOP10: {
-                        if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {
-                            return set_error(
-                                serror, SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS);
-                        }
+                        if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+                            return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                        
                     } break;
 
+                    case OP_VERIF:
+                    case OP_VERNOTIF:
+                        if(!utxo_after_chronicle) 
+                        {   
+                            if(utxo_after_genesis && !fExec)
+                                break;
+                            else
+                                return SCRIPT_ERR_BAD_OPCODE;
+                        }
+                            
+                        [[fallthrough]];
                     case OP_IF:
-                    case OP_NOTIF: {
+                    case OP_NOTIF:
+                    {
                         // <expression> if [statements] [else [statements]]
                         // endif
                         bool fValue = false;
-                        if (fExec) {
-                            if (stack.size() < 1) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+                        if(fExec)
+                        {
+                            if(stack.size() < 1)
+                                return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
+
+                            const LimitedVector& vch = stack.stacktop(-1);
+                            if((opcode == OP_IF || opcode == OP_NOTIF)
+                                && flags & SCRIPT_VERIFY_MINIMALIF)
+                            {
+                                if(vch.size() > 1)
+                                    return SCRIPT_ERR_MINIMALIF;
+
+                                if(vch.size() == 1 && vch[0] != 1)
+                                    return SCRIPT_ERR_MINIMALIF;
                             }
-                            LimitedVector &vch = stack.stacktop(-1);
-                            if (flags & SCRIPT_VERIFY_MINIMALIF) {
-                                if (vch.size() > 1) {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_MINIMALIF);
-                                }
-                                if (vch.size() == 1 && vch[0] != 1) {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_MINIMALIF);
+                           
+                            if(opcode == OP_VERIF || opcode == OP_VERNOTIF)
+                            {
+                                if(vch.size() == 4)
+                                {
+                                    std::vector<uint8_t> val(sizeof(checker.Version()));
+                                    to_le(checker.Version(), val.data());
+                                    fValue = std::ranges::equal(val, vch);
                                 }
                             }
-                            fValue = CastToBool(vch.GetElement());
-                            if (opcode == OP_NOTIF) {
+                            else
+                                fValue = CastToBool(vch.GetElement());
+            
+                            if(opcode == OP_NOTIF || opcode == OP_VERNOTIF)
                                 fValue = !fValue;
-                            }
+
                             stack.pop_back();
                         }
                         vfExec.push_back(fValue);
                         vfElse.push_back(false);
-                    } break;
+                    }
+                    break;
 
                     case OP_ELSE: {
                         // Only one ELSE is allowed in IF after genesis.
-                        if (vfExec.empty() || (vfElse.back() && utxo_after_genesis)) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_UNBALANCED_CONDITIONAL);
-                        }
+                        if (vfExec.empty() || (vfElse.back() && utxo_after_genesis))
+                            return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
+
                         vfExec.back() = !vfExec.back();
                         vfElse.back() = true;
                     } break;
 
                     case OP_ENDIF: {
-                        if (vfExec.empty()) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_UNBALANCED_CONDITIONAL);
-                        }
+                        if (vfExec.empty())
+                            return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
+
                         vfExec.pop_back();
                         vfElse.pop_back();
                     } break;
@@ -649,16 +794,15 @@ std::optional<bool> EvalScript(
                     case OP_VERIFY: {
                         // (true -- ) or
                         // (false -- false) and return
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         bool fValue = CastToBool(stack.stacktop(-1).GetElement());
-                        if (fValue) {
+                        if (fValue)
                             stack.pop_back();
-                        } else {
-                            return set_error(serror, SCRIPT_ERR_VERIFY);
-                        }
+                        else
+                            return SCRIPT_ERR_VERIFY;
+
                     } break;
 
                     case OP_RETURN: {
@@ -666,116 +810,108 @@ std::optional<bool> EvalScript(
                             if (vfExec.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
-                                return set_success(serror);
+                                return malleability::status{};
                             }
 
                             // op_return encountered inside if statement after genesis --> check for invalid grammar
                             nonTopLevelReturnAfterGenesis = true;
-                        } else {
+                        } 
+                        else
                             // Pre-Genesis OP_RETURN marks script as invalid
-                            return set_error(serror, SCRIPT_ERR_OP_RETURN);
-                        }
+                            return SCRIPT_ERR_OP_RETURN;
+                        
                     } break;
 
                     //
                     // Stack ops
                     //
                     case OP_TOALTSTACK: {
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         altstack.moveTopToStack(stack);
                     } break;
 
                     case OP_FROMALTSTACK: {
-                        if (altstack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_ALTSTACK_OPERATION);
-                        }
+                        if (altstack.size() < 1)
+                            return SCRIPT_ERR_INVALID_ALTSTACK_OPERATION;
+ 
                         stack.moveTopToStack(altstack);
                     } break;
 
                     case OP_2DROP: {
                         // (x1 x2 -- )
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         stack.pop_back();
                         stack.pop_back();
                     } break;
 
                     case OP_2DUP: {
                         // (x1 x2 -- x1 x2 x1 x2)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         LimitedVector vch1 = stack.stacktop(-2);
                         LimitedVector vch2 = stack.stacktop(-1);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
                     } break;
 
                     case OP_3DUP: {
                         // (x1 x2 x3 -- x1 x2 x3 x1 x2 x3)
-                        if (stack.size() < 3) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 3)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         LimitedVector vch1 = stack.stacktop(-3);
                         LimitedVector vch2 = stack.stacktop(-2);
                         LimitedVector vch3 = stack.stacktop(-1);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
-                        stack.push_back(vch3);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
+                        stack.push_back(std::move(vch3));
                     } break;
 
                     case OP_2OVER: {
                         // (x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2)
-                        if (stack.size() < 4) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 4)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         LimitedVector vch1 = stack.stacktop(-4);
                         LimitedVector vch2 = stack.stacktop(-3);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
+                        stack.push_back(std::move(vch1));
+                        stack.push_back(std::move(vch2));
                     } break;
 
                     case OP_2ROT: {
                         // (x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2)
-                        if (stack.size() < 6) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-                        LimitedVector vch1 = stack.stacktop(-6);
-                        LimitedVector vch2 = stack.stacktop(-5);
-                        stack.erase(- 6, - 4);
-                        stack.push_back(vch1);
-                        stack.push_back(vch2);
+                        if (stack.size() < 6)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
+						const auto stack_size{stack.size()};
+						stack.swapElements(stack_size-1, stack_size-3);
+						stack.swapElements(stack_size-2, stack_size-4);
+						stack.swapElements(stack_size-1, stack_size-5);
+						stack.swapElements(stack_size-2, stack_size-6);
                     } break;
 
                     case OP_2SWAP: {
                         // (x1 x2 x3 x4 -- x3 x4 x1 x2)
-                        if (stack.size() < 4) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 4)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         stack.swapElements(stack.size() - 4, stack.size() - 2);
                         stack.swapElements(stack.size() - 3, stack.size() - 1);
                     } break;
 
                     case OP_IFDUP: {
                         // (x - 0 | x x)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         LimitedVector vch = stack.stacktop(-1);
                         if (CastToBool(vch.GetElement())) {
-                            stack.push_back(vch);
+                            stack.push_back(std::move(vch));
                         }
                     } break;
 
@@ -787,108 +923,98 @@ std::optional<bool> EvalScript(
 
                     case OP_DROP: {
                         // (x -- )
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         stack.pop_back();
                     } break;
 
                     case OP_DUP: {
                         // (x -- x x)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         LimitedVector vch = stack.stacktop(-1);
-                        stack.push_back(vch);
+                        stack.push_back(std::move(vch));
                     } break;
 
                     case OP_NIP: {
                         // (x1 x2 -- x2)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         stack.erase(-2);
                     } break;
 
                     case OP_OVER: {
                         // (x1 x2 -- x1 x2 x1)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         LimitedVector vch = stack.stacktop(-2);
-                        stack.push_back(vch);
+                        stack.push_back(std::move(vch));
                     } break;
 
                     case OP_PICK:
                     case OP_ROLL: {
                         // (xn ... x2 x1 x0 n - xn ... x2 x1 x0 xn)
                         // (xn ... x2 x1 x0 n - ... x2 x1 x0 xn)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
 
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum sn{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum sn{top,
+                                            min_encode_check,
+                                            ms,
+                                            maxScriptNumLength,
+                                            utxo_after_genesis};
                         stack.pop_back();
                         if(sn < 0 || sn >= stack.size())
-                        {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         const auto n{sn.to_size_t_limited()};
                         LimitedVector vch = stack.stacktop(-n - 1);
 
                         if (opcode == OP_ROLL) {
                             stack.erase(- n - 1);
                         }
-                        stack.push_back(vch);
+                        stack.push_back(std::move(vch));
                     } break;
 
                     case OP_ROT: {
                         // (x1 x2 x3 -- x2 x3 x1)
                         //  x2 x1 x3  after first swap
                         //  x2 x3 x1  after second swap
-                        if (stack.size() < 3) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 3)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         stack.swapElements(stack.size() - 3, stack.size() - 2);
                         stack.swapElements(stack.size() - 2, stack.size() - 1);
                     } break;
 
                     case OP_SWAP: {
                         // (x1 x2 -- x2 x1)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         stack.swapElements(stack.size() - 2, stack.size() - 1);
                     } break;
 
                     case OP_TUCK: {
                         // (x1 x2 -- x2 x1 x2)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         LimitedVector vch = stack.stacktop(-1);
                         stack.insert(-2, vch);
                     } break;
 
                     case OP_SIZE: {
                         // (in -- in size)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
 
                         CScriptNum bn(bsv::bint{stack.stacktop(-1).size()});
                         stack.push_back(bn.getvch());
@@ -901,18 +1027,16 @@ std::optional<bool> EvalScript(
                     case OP_OR:
                     case OP_XOR: {
                         // (x1 x2 - out)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                         LimitedVector &vch1 = stack.stacktop(-2);
                         LimitedVector &vch2 = stack.stacktop(-1);
 
                         // Inputs must be the same size
-                        if (vch1.size() != vch2.size()) {
-                            return set_error(serror,
-                                             SCRIPT_ERR_INVALID_OPERAND_SIZE);
-                        }
+                        if (vch1.size() != vch2.size())
+                            return SCRIPT_ERR_INVALID_OPERAND_SIZE;
+
 
                         // To avoid allocating, we modify vch1 in place.
                         switch (opcode) {
@@ -941,9 +1065,9 @@ std::optional<bool> EvalScript(
 
                     case OP_INVERT: {
                         // (x -- out)
-                        if (stack.size() < 1) {
-                            return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         LimitedVector &vch1 = stack.stacktop(-1);
                         // To avoid allocating, we modify vch1 in place
                         for(size_t i=0; i<vch1.size(); i++)
@@ -956,20 +1080,17 @@ std::optional<bool> EvalScript(
                     {
                         // (x n -- out)
                         if(stack.size() < 2)
-                        {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                        CScriptNum n{top,
+                                     min_encode_check,
+                                     ms,
+                                     maxScriptNumLength,
                                      utxo_after_genesis};
                         if(n < 0)
-                        {
-                            return set_error(serror,
-                                             SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                        }
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
 
                         stack.pop_back();
                         stack.pop_back();
@@ -989,7 +1110,7 @@ std::optional<bool> EvalScript(
                                          : CScriptNum{INT32_MAX};
                             } while(n > 0);
                         }
-                        stack.push_back(values);
+                        stack.push_back(std::move(values));
                     }
                     break;
 
@@ -997,20 +1118,17 @@ std::optional<bool> EvalScript(
                     {
                         // (x n -- out)
                         if(stack.size() < 2)
-                        {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                        CScriptNum n{top,
+                                     min_encode_check,
+                                     ms,
+                                     maxScriptNumLength,
                                      utxo_after_genesis};
                         if(n < 0)
-                        {
-                            return set_error(serror,
-                                             SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                        }
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
 
                         stack.pop_back();
                         stack.pop_back();
@@ -1030,7 +1148,7 @@ std::optional<bool> EvalScript(
                                          : CScriptNum{INT32_MAX};
                             } while(n > 0);
                         }
-                        stack.push_back(values);
+                        stack.push_back(std::move(values));
                     }
                     break;
 
@@ -1039,10 +1157,9 @@ std::optional<bool> EvalScript(
                         // case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
                         {
                             // (x1 x2 - bool)
-                            if (stack.size() < 2) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                            }
+                            if (stack.size() < 2)
+                                return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
                             LimitedVector &vch1 = stack.stacktop(-2);
                             LimitedVector &vch2 = stack.stacktop(-1);
 
@@ -1057,12 +1174,11 @@ std::optional<bool> EvalScript(
                             stack.pop_back();
                             stack.push_back(fEqual ? vchTrue : vchFalse);
                             if (opcode == OP_EQUALVERIFY) {
-                                if (fEqual) {
+                                if (fEqual)
                                     stack.pop_back();
-                                } else {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_EQUALVERIFY);
-                                }
+                                else
+                                    return SCRIPT_ERR_EQUALVERIFY;
+                                
                             }
                         }
                         break;
@@ -1072,17 +1188,20 @@ std::optional<bool> EvalScript(
                     //
                     case OP_1ADD:
                     case OP_1SUB:
+                    case OP_2MUL:
+                    case OP_2DIV:
                     case OP_NEGATE:
                     case OP_ABS:
                     case OP_NOT:
                     case OP_0NOTEQUAL: {
                         // (in -- out)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
                         const auto &top{stack.stacktop(-1).GetElement()};
-                        CScriptNum bn{top, fRequireMinimal,
+                        CScriptNum bn{top,
+                                      min_encode_check,
+                                      ms,
                                       maxScriptNumLength,
                                       utxo_after_genesis};
                         switch (opcode) {
@@ -1095,7 +1214,14 @@ std::optional<bool> EvalScript(
                                 bn -= utxo_after_genesis
                                           ? CScriptNum{bsv::bint{1}}
                                           : bnOne;
-                                // bn -= bnOne;
+                                break;
+                            case OP_2MUL:
+                                // post-Chronicle only
+                                bn += bn; 
+                                break;
+                            case OP_2DIV:
+                                // post-Chronicle only
+                                bn /= CScriptNum{bsv::bint{2}};
                                 break;
                             case OP_NEGATE:
                                 bn = -bn;
@@ -1136,20 +1262,22 @@ std::optional<bool> EvalScript(
                     case OP_MIN:
                     case OP_MAX: {
                         // (x1 x2 -- out)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto& arg_2 = stack.stacktop(-2);                        
                         const auto& arg_1 = stack.stacktop(-1);
 
-                        CScriptNum bn1(arg_2.GetElement(), fRequireMinimal,
-                                       maxScriptNumLength,
-                                       utxo_after_genesis);
-                        CScriptNum bn2(arg_1.GetElement(), fRequireMinimal,
-                                       maxScriptNumLength,
-                                       utxo_after_genesis);
+                        const CScriptNum bn1(arg_2.GetElement(),
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis);
+                        const CScriptNum bn2(arg_1.GetElement(),
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis);
                         CScriptNum bn;
                         switch (opcode) {
                             case OP_ADD:
@@ -1166,19 +1294,17 @@ std::optional<bool> EvalScript(
 
                             case OP_DIV:
                                 // denominator must not be 0
-                                if (bn2 == bnZero) {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_DIV_BY_ZERO);
-                                }
+                                if (bn2 == bnZero)
+                                    return SCRIPT_ERR_DIV_BY_ZERO;
+
                                 bn = bn1 / bn2;
                                 break;
 
                             case OP_MOD:
                                 // divisor must not be 0
-                                if (bn2 == bnZero) {
-                                    return set_error(serror,
-                                                     SCRIPT_ERR_MOD_BY_ZERO);
-                                }
+                                if (bn2 == bnZero)
+                                    return SCRIPT_ERR_MOD_BY_ZERO;
+
                                 bn = bn1 % bn2;
                                 break;
 
@@ -1224,37 +1350,38 @@ std::optional<bool> EvalScript(
                         stack.push_back(bn.getvch());
 
                         if (opcode == OP_NUMEQUALVERIFY) {
-                            if (CastToBool(stack.stacktop(-1).GetElement())) {
+                            if (CastToBool(stack.stacktop(-1).GetElement()))
                                 stack.pop_back();
-                            } else {
-                                return set_error(serror,
-                                                 SCRIPT_ERR_NUMEQUALVERIFY);
-                            }
+                            else
+                                return SCRIPT_ERR_NUMEQUALVERIFY;
+                            
                         }
                     } break;
 
                     case OP_WITHIN: {
                         // (x min max -- out)
-                        if (stack.size() < 3) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 3)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
 
                         const auto& top_3{stack.stacktop(-3).GetElement()};
-                        const CScriptNum bn1{
-                            top_3, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum bn1{top_3,
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis};
                         const auto& top_2{stack.stacktop(-2).GetElement()};
-                        const CScriptNum bn2{
-                            top_2, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum bn2{top_2,
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis};
                         const auto& top_1{stack.stacktop(-1).GetElement()};
-                        const CScriptNum bn3{
-                            top_1, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum bn3{top_1,
+                                             min_encode_check,
+                                             ms,
+                                             maxScriptNumLength,
+                                             utxo_after_genesis};
                         const bool fValue = (bn2 <= bn1 && bn1 < bn3);
                         stack.pop_back();
                         stack.pop_back();
@@ -1272,10 +1399,8 @@ std::optional<bool> EvalScript(
                     case OP_HASH160:
                     case OP_HASH256: {
                         // (in -- hash)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         LimitedVector &vch = stack.stacktop(-1);
                         valtype vchHash((opcode == OP_RIPEMD160 ||
@@ -1305,7 +1430,7 @@ std::optional<bool> EvalScript(
                                 .Finalize(vchHash.data());
                         }
                         stack.pop_back();
-                        stack.push_back(vchHash);
+                        stack.push_back(std::move(vchHash));
                     } break;
 
                     case OP_CODESEPARATOR: {
@@ -1316,19 +1441,25 @@ std::optional<bool> EvalScript(
                     case OP_CHECKSIG:
                     case OP_CHECKSIGVERIFY: {
                         // (sig pubkey -- bool)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+                        
                         LimitedVector &vchSig = stack.stacktop(-2);
                         LimitedVector &vchPubKey = stack.stacktop(-1);
 
-                        if (!CheckSignatureEncoding(vchSig.GetElement(), flags, serror) ||
-                            !CheckPubKeyEncoding(vchPubKey.GetElement(), flags, serror)) {
-                            // serror is set
-                            return false;
-                        }
+                        const auto v{CheckSignatureEncoding(vchSig.GetElement(), flags)};
+                        if(std::holds_alternative<ScriptError>(v))
+                            return v;
+                        else
+                            ms |= std::get<malleability::status>(v);
 
+                        if(const ScriptError error{
+                               CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
+                           error != SCRIPT_ERR_OK)
+                        {
+                            return error;
+                        }
+                            
                         // Subset of script starting at the most recent
                         // codeseparator
                         CScript scriptCode(pbegincodehash, pend);
@@ -1339,21 +1470,17 @@ std::optional<bool> EvalScript(
                         bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
                                                          scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
-                        if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
-                            vchSig.size()) {
-                            return set_error(serror, SCRIPT_ERR_SIG_NULLFAIL);
-                        }
+                        if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
+                            return SCRIPT_ERR_SIG_NULLFAIL;
 
                         stack.pop_back();
                         stack.pop_back();
                         stack.push_back(fSuccess ? vchTrue : vchFalse);
                         if (opcode == OP_CHECKSIGVERIFY) {
-                            if (fSuccess) {
+                            if (fSuccess)
                                 stack.pop_back();
-                            } else {
-                                return set_error(serror,
-                                                 SCRIPT_ERR_CHECKSIGVERIFY);
-                            }
+                            else
+                                return SCRIPT_ERR_CHECKSIGVERIFY;
                         }
                     } break;
 
@@ -1363,28 +1490,29 @@ std::optional<bool> EvalScript(
                         // num_of_pubkeys -- bool)
 
                         uint64_t i = 1;
-                        if (stack.size() < i) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < i)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes) 
                         // because only 4 byte integers are supported by  OP_CHECKMULTISIG / OP_CHECKMULTISIGVERIFY
-                        int64_t nKeysCountSigned =
-                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal, CScriptNum::MAXIMUM_ELEMENT_SIZE).getint();
-                        if (nKeysCountSigned < 0) {
-                            return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
-                        }
+                        const int64_t
+                            nKeysCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
+                                                          min_encode_check,
+                                                          ms,
+                                                          CScriptNum::
+                                                              MAXIMUM_ELEMENT_SIZE)
+                                                   .getint();
+                        if (nKeysCountSigned < 0)
+                            return SCRIPT_ERR_PUBKEY_COUNT;
 
                         uint64_t nKeysCount = static_cast<uint64_t>(nKeysCountSigned);
-                        if (nKeysCount > config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)) {
-                            return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
-                        }
+                        if (nKeysCount > config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus))
+                            return SCRIPT_ERR_PUBKEY_COUNT;
 
                         nOpCount += nKeysCount;
-                        if (!IsValidMaxOpsPerScript(nOpCount, config, utxo_after_genesis, consensus)) {
-                            return set_error(serror, SCRIPT_ERR_OP_COUNT);
-                        }
+                        if (!IsValidMaxOpsPerScript(nOpCount, config, utxo_after_genesis, consensus))
+                            return SCRIPT_ERR_OP_COUNT;
+ 
                         uint64_t ikey = ++i;
                         // ikey2 is the position of last non-signature item in
                         // the stack. Top stack item = 1. With
@@ -1392,28 +1520,28 @@ std::optional<bool> EvalScript(
                         // operation fails.
                         uint64_t ikey2 = nKeysCount + 2;
                         i += nKeysCount;
-                        if (stack.size() < i) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < i)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        int64_t nSigsCountSigned =
-                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal, CScriptNum::MAXIMUM_ELEMENT_SIZE).getint();
+                        const int64_t
+                            nSigsCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
+                                                          min_encode_check,
+                                                          ms,
+                                                          CScriptNum::
+                                                              MAXIMUM_ELEMENT_SIZE)
+                                                   .getint();
 
-                        if (nSigsCountSigned < 0) {
-                            return set_error(serror, SCRIPT_ERR_SIG_COUNT);
-                        }
+                        if (nSigsCountSigned < 0)
+                            return SCRIPT_ERR_SIG_COUNT;
+
                         uint64_t nSigsCount = static_cast<uint64_t>(nSigsCountSigned);
-                        if (nSigsCount > nKeysCount) {
-                            return set_error(serror, SCRIPT_ERR_SIG_COUNT);
-                        }
+                        if (nSigsCount > nKeysCount)
+                            return SCRIPT_ERR_SIG_COUNT;
 
                         uint64_t isig = ++i;
                         i += nSigsCount;
-                        if (stack.size() < i) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < i)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         // Subset of script starting at the most recent
                         // codeseparator
@@ -1440,10 +1568,17 @@ std::optional<bool> EvalScript(
                             // CHECKMULTISIG NOT if the STRICTENC flag is set.
                             // See the script_(in)valid tests for details.
 
-                            if (!CheckSignatureEncoding(vchSig.GetElement(), flags, serror) ||
-                                !CheckPubKeyEncoding(vchPubKey.GetElement(), flags, serror)) {
-                                // serror is set
-                                return false;
+                            const auto v = CheckSignatureEncoding(vchSig.GetElement(), flags);
+                            if(std::holds_alternative<ScriptError>(v))
+                                return v;
+                            else
+                                ms |= std::get<malleability::status>(v);
+
+                            if(const auto error{
+                                   CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
+                               error != SCRIPT_ERR_OK)
+                            {
+                                return error;
                             }
 
                             // Check signature
@@ -1471,9 +1606,9 @@ std::optional<bool> EvalScript(
                             // signatures must be empty vector
                             if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
                                 !ikey2 && stack.stacktop(-1).size()) {
-                                return set_error(serror,
-                                                 SCRIPT_ERR_SIG_NULLFAIL);
+                                return SCRIPT_ERR_SIG_NULLFAIL;
                             }
+ 
                             if (ikey2 > 0) {
                                 ikey2--;
                             }
@@ -1486,25 +1621,21 @@ std::optional<bool> EvalScript(
                         // Unfortunately this is a potential source of
                         // mutability, so optionally verify it is exactly equal
                         // to zero prior to removing it from the stack.
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) &&
-                            stack.stacktop(-1).size()) {
-                            return set_error(serror, SCRIPT_ERR_SIG_NULLDUMMY);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+ 
+                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stack.stacktop(-1).size())
+                            return SCRIPT_ERR_SIG_NULLDUMMY;
+
                         stack.pop_back();
 
                         stack.push_back(fSuccess ? vchTrue : vchFalse);
 
                         if (opcode == OP_CHECKMULTISIGVERIFY) {
-                            if (fSuccess) {
+                            if (fSuccess)
                                 stack.pop_back();
-                            } else {
-                                return set_error(
-                                    serror, SCRIPT_ERR_CHECKMULTISIGVERIFY);
-                            }
+                            else
+                                return SCRIPT_ERR_CHECKMULTISIGVERIFY;
                         }
                     } break;
 
@@ -1513,10 +1644,8 @@ std::optional<bool> EvalScript(
                     //
                     case OP_CAT: {
                         // (x1 x2 -- out)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         LimitedVector &vch1 = stack.stacktop(-2);
                         // We make copy of last element on stack (vch2) so we can pop the last
@@ -1526,9 +1655,8 @@ std::optional<bool> EvalScript(
                         LimitedVector vch2 = stack.stacktop(-1);
 
                         if (!utxo_after_genesis &&
-                            (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
-                        {
-                            return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                            (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)){
+                            return SCRIPT_ERR_PUSH_SIZE;
                         }
 
                         stack.pop_back();
@@ -1538,20 +1666,19 @@ std::optional<bool> EvalScript(
                     case OP_SPLIT: {
                         // (in position -- x1 x2)
                         if(stack.size() < 2)
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const LimitedVector& data = stack.stacktop(-2);
 
                         // Make sure the split point is apropriate.
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum n{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum n{top,
+                                           min_encode_check,
+                                           ms,
+                                           maxScriptNumLength,
+                                           utxo_after_genesis};
                         if(n < 0 || n > data.size())
-                            return set_error(serror,
-                                             SCRIPT_ERR_INVALID_SPLIT_RANGE);
+                            return SCRIPT_ERR_INVALID_SPLIT_RANGE;
 
                         const auto position{n.to_size_t_limited()};
 
@@ -1564,8 +1691,8 @@ std::optional<bool> EvalScript(
                         stack.pop_back();
 
                         // Replace existing stack values by the new values.
-                        stack.push_back(n1);
-                        stack.push_back(n2);
+                        stack.push_back(std::move(n1));
+                        stack.push_back(std::move(n2));
                     } break;
 
                     //
@@ -1573,24 +1700,21 @@ std::optional<bool> EvalScript(
                     //
                     case OP_NUM2BIN: {
                         // (in size -- out)
-                        if (stack.size() < 2) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto& arg_1 = stack.stacktop(-1).GetElement();
-                        const CScriptNum n{
-                            arg_1, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        const CScriptNum n{arg_1,
+                                           min_encode_check,
+                                           ms,
+                                           maxScriptNumLength,
+                                           utxo_after_genesis};
                         if(n < 0 || n > std::numeric_limits<int32_t>::max())
-                            return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                            return SCRIPT_ERR_PUSH_SIZE;
 
                         const auto size{n.to_size_t_limited()};
                         if(!utxo_after_genesis && (size > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
-                        {
-                            return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
-                        }
+                            return SCRIPT_ERR_PUSH_SIZE;
 
                         stack.pop_back();
                         LimitedVector &rawnum = stack.stacktop(-1);
@@ -1598,11 +1722,9 @@ std::optional<bool> EvalScript(
                         // Try to see if we can fit that number in the number of
                         // byte requested.
                         rawnum.MinimallyEncode();
-                        if (rawnum.size() > size) {
+                        if (rawnum.size() > size)
                             // We definitively cannot.
-                            return set_error(serror,
-                                             SCRIPT_ERR_IMPOSSIBLE_ENCODING);
-                        }
+                            return SCRIPT_ERR_IMPOSSIBLE_ENCODING;
 
                         // We already have an element of the right size, we
                         // don't need to do anything.
@@ -1621,30 +1743,20 @@ std::optional<bool> EvalScript(
 
                     case OP_BIN2NUM: {
                         // (in -- out)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
+                        if (stack.size() < 1)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         LimitedVector &n = stack.stacktop(-1);
                         n.MinimallyEncode();
 
                         // The resulting number must be a valid number.
                         if (!n.IsMinimallyEncoded(maxScriptNumLength))
-                        {
-                            return set_error(serror,
-                                             SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                        }
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+
                     } break;
 
-                    default: {
-                        if (IsInvalidBranchingOpcode(opcode) && utxo_after_genesis && !fExec)
-                        {
-                            break;
-                        }
-
-                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-                    }
+                    default:
+                        return SCRIPT_ERR_BAD_OPCODE;
                 }
             }
 
@@ -1652,52 +1764,61 @@ std::optional<bool> EvalScript(
             if (!utxo_after_genesis &&
                (stack.size() + altstack.size() > MAX_STACK_ELEMENTS_BEFORE_GENESIS))
             {
-                return set_error(serror, SCRIPT_ERR_STACK_SIZE);
+                return SCRIPT_ERR_STACK_SIZE;
             }
         }
     }
     catch(scriptnum_overflow_error& err)
     {
-        return set_error(serror, SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
+        return SCRIPT_ERR_SCRIPTNUM_OVERFLOW;
     }
     catch(scriptnum_minencode_error& err)
     {
-        return set_error(serror, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
+        return SCRIPT_ERR_SCRIPTNUM_MINENCODE;
     }
     catch(stack_overflow_error& err)
     {
-        return set_error(serror, SCRIPT_ERR_STACK_SIZE);
+        return SCRIPT_ERR_STACK_SIZE;
     }
     catch(const bsv::big_int_error&)
     {
-        return set_error(serror, SCRIPT_ERR_BIG_INT);
+        return SCRIPT_ERR_BIG_INT;
     }
     catch(...)
     {
-        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+        return SCRIPT_ERR_UNKNOWN_ERROR;
     }
 
     if (!vfExec.empty()) {
-        return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+        return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
     }
 
-    return set_success(serror);
+    return ms;
 }
 
-std::optional<bool> EvalScript(
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
     uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* serror)
+    const BaseSignatureChecker& checker)
 {
     LimitedStack altstack {stack.makeChildStack()};
     long ipc{0};
     std::vector<bool> vfExec, vfElse;
-    return EvalScript(config, consensus, token, stack, script, flags, checker, altstack, ipc, vfExec, vfElse, serror);
+    return EvalScript(config,
+                      consensus,
+                      token,
+                      stack,
+                      script,
+                      flags,
+                      checker,
+                      altstack,
+                      ipc,
+                      vfExec,
+                      vfElse);
 }
 
 namespace {
@@ -2044,49 +2165,86 @@ bool TransactionSignatureChecker::CheckSequence(
     return true;
 }
 
-std::optional<bool> VerifyScript(
+int32_t TransactionSignatureChecker::Version() const
+{
+    return txTo->nVersion;
+}
+
+std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
-    uint32_t flags,
-    const BaseSignatureChecker& checker,
-    ScriptError* serror)
+    uint32_t flags,       
+    const BaseSignatureChecker& checker, 
+    std::atomic<malleability::status>& malleability)
 {
-    set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-
     // If FORKID is enabled, we also ensure strict encoding.
     if (flags & SCRIPT_ENABLE_SIGHASH_FORKID) {
         flags |= SCRIPT_VERIFY_STRICTENC;
     }
 
-    if ((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly()) {
-        return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
+    // Track malleability for just this execution of VerifyScript
+    malleability::status our_malleability {};
+
+    if(!scriptSig.IsPushOnly())
+    {
+        our_malleability |= malleability::non_push_data;
     }
 
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
-    if (auto res = EvalScript(config, consensus, token, stack, scriptSig, flags, checker, serror);
-        !res.has_value() || !res.value())
+
+    if(const auto o = EvalScript(config,
+                                 consensus,
+                                 token,
+                                 stack,
+                                 scriptSig,
+                                 flags,
+                                 checker);
+       !o.has_value())
     {
-        return res;
+        return {};
     }
+    else
+    {
+        const auto v{o.value()};
+        if(std::holds_alternative<ScriptError>(v))
+            return std::make_pair(false, std::get<ScriptError>(v));
+        else
+            our_malleability |= std::get<malleability::status>(v);
+    }
+
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack.makeRootStackCopy();
     }
-    if (auto res = EvalScript(config, consensus, token, stack, scriptPubKey, flags, checker, serror);
-        !res.has_value() || !res.value())
+
+    if(const auto o = EvalScript(config,
+                                 consensus,
+                                 token,
+                                 stack,
+                                 scriptPubKey,
+                                 flags,
+                                 checker);
+       !o.has_value())
     {
-        return res;
+        return {};
     }
-    if (stack.empty()) {
-        return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+    else
+    {
+        const auto v{o.value()};
+        if(std::holds_alternative<ScriptError>(v))
+            return std::make_pair(false, std::get<ScriptError>(v));
+        else
+            our_malleability |= std::get<malleability::status>(v);
     }
 
-    if (CastToBool(stack.back().GetElement()) == false) {
-        return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-    }
+    if(stack.empty())
+        return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+
+    if(CastToBool(stack.back().GetElement()) == false)
+        return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
 
     // Additional validation for spend-to-script-hash transactions:
     // But only if if the utxo is before genesis
@@ -2095,9 +2253,8 @@ std::optional<bool> VerifyScript(
         IsP2SH(scriptPubKey))
     {
         // scriptSig must be literals-only or validation fails
-        if (!scriptSig.IsPushOnly()) {
-            return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
-        }
+        if(!scriptSig.IsPushOnly())
+            return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
 
         // Restore stack.
         stack = std::move(stackCopy);
@@ -2111,32 +2268,110 @@ std::optional<bool> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         stack.pop_back();
 
-        if (auto res = EvalScript(config, consensus, token, stack, pubKey2, flags, checker, serror);
-            !res.has_value() || !res.value())
+        if(const auto o = EvalScript(config,
+                                     consensus,
+                                     token,
+                                     stack,
+                                     pubKey2,
+                                     flags,
+                                     checker);
+           !o.has_value())
         {
-            return res;
+            return {};
         }
-        if (stack.empty()) {
-            return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+        else
+        {
+            const auto v{o.value()};
+            if(std::holds_alternative<ScriptError>(v))
+                return std::make_pair(false, std::get<ScriptError>(v));
+            else
+                our_malleability |= std::get<malleability::status>(v);
         }
-        if (!CastToBool(stack.back().GetElement())) {
-            return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-        }
+
+        if(stack.empty())
+            return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+
+        if(!CastToBool(stack.back().GetElement()))
+            return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+
     }
+
+    // Set unclean stack bit in malleability status
+    if(stack.size() != 1)
+        our_malleability |= malleability::unclean_stack;
+
+    // malleability::status fully atomically combined for us after this point.
+    // We then use value we wrote to atomic without reading it again to
+    // ensure this thread doesn't see different values at different times
+    // below (not that it would really matter if we did see different values,
+    // but it avoids confusion).
+    malleability::status combined_malleability { malleability |= our_malleability };
 
     // The CLEANSTACK check is only performed after potential P2SH evaluation,
     // as the non-P2SH evaluation of a P2SH script will obviously not result in
     // a clean stack (the P2SH inputs remain). The same holds for witness
     // evaluation.
-    if ((flags & SCRIPT_VERIFY_CLEANSTACK) != 0) {
+    if (flags & SCRIPT_VERIFY_CLEANSTACK)
+    {
         // Disallow CLEANSTACK without P2SH, as otherwise a switch
         // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
         // softfork (and P2SH should be one).
-        assert((flags & SCRIPT_VERIFY_P2SH) != 0);
-        if (stack.size() != 1) {
-            return set_error(serror, SCRIPT_ERR_CLEANSTACK);
+        if(!(flags & SCRIPT_VERIFY_P2SH))
+            return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
+
+        // If Chronicle is activated then apply clean stack check only if FORKID is set.
+        // (Since clean stack rule was only ever a policy rule (not consensus) it doesn't
+        // make sense to make it dependent on UTXO age).
+        bool checkCleanStack { (flags & SCRIPT_CHRONICLE)? is_disallowed(combined_malleability) : true };
+
+        if(checkCleanStack && is_unclean_stack(combined_malleability))
+        {
+            return std::make_pair(false, SCRIPT_ERR_CLEANSTACK);
         }
     }
 
-    return set_success(serror);
+    // Checks for non-push-only scriptSig
+    if(flags & SCRIPT_VERIFY_SIGPUSHONLY)
+    {
+        bool checkSigPushOnly {false};
+        if((flags & SCRIPT_GENESIS) && !(flags & SCRIPT_CHRONICLE))
+        {
+            // Apply Genesis push only consensus rules
+            checkSigPushOnly = true;
+        }
+        else if(flags & SCRIPT_CHRONICLE)
+        {
+            // After Chronicle apply push only checks if FORKID is set
+            checkSigPushOnly = is_disallowed(combined_malleability);
+        }
+
+        if(checkSigPushOnly && has_non_push_data(combined_malleability))
+        {
+            return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
+        }
+    }
+
+    if(flags & SCRIPT_CHRONICLE)
+    {
+        if(is_disallowed(combined_malleability))
+        {
+            if(flags & SCRIPT_VERIFY_LOW_S)
+            {
+                if(is_high_s(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
+            }
+
+            if(flags & SCRIPT_VERIFY_MINIMALDATA)
+            {
+                if(is_non_minimal_push(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_MINIMALDATA);
+
+                if(is_non_minimal_scriptnum(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
+            }
+        }
+    }
+
+    return std::make_pair(true, SCRIPT_ERR_OK);
 }
+

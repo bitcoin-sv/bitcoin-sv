@@ -12,8 +12,6 @@
 #include <utility>
 #include <vector>
 
-#include "unique_array.h"
-
 // Parses a p2p message into a segment containing a single tx.
 // As the tx may be parsed over several invocations of op() the 
 // class must maintain state information.
@@ -23,6 +21,8 @@
 class tx_parser
 {
 public:
+    using value_type = std::vector<uint8_t>;
+
     enum class state 
     {
         version,
@@ -38,10 +38,10 @@ public:
     
     size_t buffer_size() const;
     size_t size() const;
-    bool empty() const { return size() == 0; }
+    [[nodiscard]] size_t readable_size() const;
     void clear() { size_ = 0;}
 
-    unique_array buffer() &&;
+    value_type buffer() &&;
     
     friend std::ostream& operator<<(std::ostream&, const state&);
 
@@ -73,7 +73,7 @@ private:
     std::vector<std::vector<uint8_t>> op_buffers_;
     std::vector<uint8_t> locktime_buffer_;
 
-    unique_array buffer_;
+    value_type buffer_;
     size_t size_{};
 };
 

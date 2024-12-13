@@ -8,10 +8,14 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
+#include "script/interpreter.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "config.h"
+
+#include <cstdint>
 
 TransactionSignatureCreator::TransactionSignatureCreator(
     const CKeyStore *keystoreIn, const CTransaction *txToIn, unsigned int nInIn,
@@ -73,7 +77,7 @@ static bool SignN(const std::vector<valtype> &multisigdata,
  * Returns false if scriptPubKey could not be completely satisfied.
  */
 static bool SignStep(const BaseSignatureCreator &creator,
-                     bool utxoAfterGenesis,
+                     ProtocolEra utxoEra,
                      const CScript &scriptPubKey,
                      std::vector<valtype> &ret,
                      txnouttype &whichTypeRet) {
@@ -82,7 +86,7 @@ static bool SignStep(const BaseSignatureCreator &creator,
     ret.clear();
 
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, utxoAfterGenesis, whichTypeRet, vSolutions)) {
+    if (!Solver(scriptPubKey, utxoEra, whichTypeRet, vSolutions)) {
         return false;
     }
 
@@ -139,13 +143,19 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator, bool genesisEnabled, bool utxoAfterGenesis,
-                      const CScript& fromPubKey, SignatureData& sigdata) {
+static bool ProduceSignature(const Config& config,
+                             const bool consensus,
+                             const BaseSignatureCreator& creator,
+                             ProtocolEra era,
+                             ProtocolEra utxoEra,
+                             const CScript& fromPubKey,
+                             SignatureData& sigdata)
+{
     CScript script = fromPubKey;
     bool solved = true;
     std::vector<valtype> result;
     txnouttype whichType;
-    solved = SignStep(creator, utxoAfterGenesis, script, result, whichType);
+    solved = SignStep(creator, utxoEra, script, result, whichType);
     CScript subscript;
 
     if (solved && whichType == TX_SCRIPTHASH) {
@@ -154,24 +164,49 @@ bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureC
         // subscript:
         script = subscript = CScript(result[0].begin(), result[0].end());
         solved = solved &&
-                 SignStep(creator, utxoAfterGenesis, script, result, whichType) &&
+                 SignStep(creator, utxoEra, script, result, whichType) &&
                  whichType != TX_SCRIPTHASH;
         result.push_back(
             std::vector<uint8_t>(subscript.begin(), subscript.end()));
     }
 
     sigdata.scriptSig = PushAll(result);
+    return solved;
+}
+
+bool SignAndVerify(const Config& config,
+                   const bool consensus,
+                   const BaseSignatureCreator& creator,
+                   const ProtocolEra era,
+                   const ProtocolEra utxoEra,
+                   const CScript& fromPubKey,
+                   SignatureData& sigdata)
+{
+    const bool solved = ProduceSignature(config,
+                                         consensus,
+                                         creator,
+                                         era,
+                                         utxoEra,
+                                         fromPubKey,
+                                         sigdata);
+    if(!solved)
+        return false;
 
     // no need to cancel script verification after n time
     // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
+    uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
+    std::atomic<malleability::status> ms {};
+    const auto o = VerifyScript(config,
+                                consensus,
+                                source->GetToken(),
+                                sigdata.scriptSig,
+                                fromPubKey,
+                                flags,
+                                creator.Checker(),
+                                ms);
 
-    // Test solution
-
-    uint32_t flags = StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis);
-    return solved &&
-           VerifyScript(config, consensus, source->GetToken(), sigdata.scriptSig, fromPubKey,
-                        flags, creator.Checker()).value();
+    return (o.has_value() && o->first);
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,
@@ -188,26 +223,33 @@ void UpdateTransaction(CMutableTransaction &tx, unsigned int nIn,
     tx.vin[nIn].scriptSig = data.scriptSig;
 }
 
-bool SignSignature(const Config& config, const CKeyStore& keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CScript& fromPubKey,
+bool SignSignature(const Config& config, const CKeyStore& keystore,
+                   ProtocolEra era, ProtocolEra utxoEra,
+                   const CScript& fromPubKey,
                    CMutableTransaction& txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType) {
     assert(nIn < txTo.vin.size());
 
     CTransaction txToConst(txTo);
-    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount,
-                                        sigHashType);
+    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, sigHashType);
 
     SignatureData sigdata;
     //Consensus parameter can be set to false or true here, because MULTISIG OP is a nonstandard transaction. 
     //Method SignSignature handles only standard transactions
-    bool ret = ProduceSignature(config, false, creator, genesisEnabled, utxoAfterGenesis, fromPubKey, sigdata);
+    const bool ret = SignAndVerify(config,
+                                   false,
+                                   creator,
+                                   era,
+                                   utxoEra,
+                                   fromPubKey,
+                                   sigdata);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }
 
-bool SignSignature(const Config &config, const CKeyStore &keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CTransaction &txFrom,
+bool SignSignature(const Config &config, const CKeyStore &keystore,
+                   ProtocolEra era, ProtocolEra utxoEra,
+                   const CTransaction &txFrom,
                    CMutableTransaction &txTo, unsigned int nIn,
                    SigHashType sigHashType) {
     assert(nIn < txTo.vin.size());
@@ -215,7 +257,7 @@ bool SignSignature(const Config &config, const CKeyStore &keystore, bool genesis
     assert(txin.prevout.GetN() < txFrom.vout.size());
     const CTxOut &txout = txFrom.vout[txin.prevout.GetN()];
 
-    return SignSignature(config, keystore, genesisEnabled, utxoAfterGenesis,
+    return SignSignature(config, keystore, era, utxoEra,
                          txout.scriptPubKey, txTo, nIn, txout.nValue,
                          sigHashType);
 }
@@ -284,12 +326,23 @@ struct Stacks {
     Stacks() {}
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
-    explicit Stacks(const Config& config, bool consensus, const SignatureData &data) {
+
+    Stacks(const Config& config,
+           bool consensus,
+           const SignatureData& data,
+           int32_t tx_version,
+           ProtocolEra era)
+    {
         // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
         LimitedStack stack(UINT32_MAX);
         auto source = task::CCancellationSource::Make();
-        EvalScript(config, consensus, source->GetToken(), stack, data.scriptSig,
-                   MANDATORY_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker());
+        EvalScript(config,
+                   consensus,
+                   source->GetToken(),
+                   stack,
+                   data.scriptSig,
+                   MandatoryScriptVerifyFlags(era),
+                   BaseSignatureChecker());
         stack.MoveToValtypes(script);
     }
 
@@ -339,7 +392,7 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
             txnouttype txType2;
             std::vector<std::vector<uint8_t>> vSolutions2;
 
-            Solver(pubKey2, false, txType2, vSolutions2); // if we are here than genesis is not enables
+            Solver(pubKey2, ProtocolEra::PreGenesis, txType2, vSolutions2); // if we are here than genesis is not enabled
             sigs1.script.pop_back();
             sigs2.script.pop_back();
             Stacks result = CombineSignatures(pubKey2, checker, txType2,
@@ -355,17 +408,24 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
     }
 }
 
-SignatureData CombineSignatures(const Config& config, bool consensus, const CScript& scriptPubKey,
+SignatureData CombineSignatures(const Config& config,
+                                bool consensus,
+                                const CScript& scriptPubKey,
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,
+                                const int32_t tx_version1,
                                 const SignatureData& scriptSig2,
-                                bool utxoAfterGenesis) {
+                                const int32_t tx_version2,
+                                ProtocolEra era,
+                                ProtocolEra utxoEra)
+{
     txnouttype txType;
     std::vector<std::vector<uint8_t>> vSolutions;
-    Solver(scriptPubKey, utxoAfterGenesis, txType, vSolutions);
+    Solver(scriptPubKey, utxoEra, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
-                             Stacks(config, consensus, scriptSig1), Stacks(config, consensus, scriptSig2))
+                             Stacks(config, consensus, scriptSig1, tx_version1, era),
+                             Stacks(config, consensus, scriptSig2, tx_version2, era))
         .Output();
 }
 

@@ -20,7 +20,7 @@ jobs:
       matrix:
         org_repo: [nchain/svn_dev]
         tag : [ubuntu_22.04]
-    runs-on: [ self-hosted ]
+    runs-on: [ self-hosted, docker, large ]
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 5 
@@ -50,7 +50,7 @@ jobs:
         org_repo: [nchain/svn_dev]
         tag: [ubuntu_22.04, debian_11, centos_9]
         toolset: [gcc]
-    runs-on: [ self-hosted ]
+    runs-on: [ self-hosted, docker, large ]
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 90
@@ -78,13 +78,13 @@ jobs:
         org_repo: [nchain/svn_dev]
         tag : [ubuntu_22.04]
         toolset: [clang]
-        version: [ 17 ]
+        version: [ 18 ]
         build_type: [ Release, Debug ]
         include:
-          - version: 17
+          - version: 18
             build_type: Release
             sanitizers: asan usan
-    runs-on: [ self-hosted ]
+    runs-on: [ self-hosted, docker, large ]
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 90

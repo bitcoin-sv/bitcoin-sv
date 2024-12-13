@@ -28,7 +28,7 @@ BOOST_AUTO_TEST_CASE(read_0_bytes)
 
     std::vector<uint8_t> ip;
     const auto bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data(), ip.size());
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(false, msg.Complete());
 }
 
@@ -54,19 +54,19 @@ BOOST_AUTO_TEST_CASE(read_header_only_msg)
 
     // Write the header
     auto bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data(), ip.size());
-    BOOST_CHECK_EQUAL(24, bytes_read);
+    BOOST_CHECK_EQUAL(24U, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 
     // Check the header has been read into CMessageHeader
     const CMessageHeader& hdr = msg.GetHeader();
     BOOST_CHECK_EQUAL("verack", hdr.GetCommand());
-    BOOST_CHECK_EQUAL(0, hdr.GetPayloadLength());
+    BOOST_CHECK_EQUAL(0U, hdr.GetPayloadLength());
 
     // Write the payload
     bytes_read = msg.Read(GlobalConfig::GetConfig(), 
                           ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 }
 
@@ -94,25 +94,25 @@ BOOST_AUTO_TEST_CASE(read_ping_msg)
 
     // Write the header
     auto bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data(), ip.size());
-    BOOST_CHECK_EQUAL(24, bytes_read);
+    BOOST_CHECK_EQUAL(24U, bytes_read);
     BOOST_CHECK_EQUAL(false, msg.Complete());
 
     // Check the header has been read into CMessageHeader
     const CMessageHeader& hdr = msg.GetHeader();
     BOOST_CHECK_EQUAL("ping", hdr.GetCommand());
-    BOOST_CHECK_EQUAL(8, hdr.GetPayloadLength());
+    BOOST_CHECK_EQUAL(8U, hdr.GetPayloadLength());
 
     // Write the payload
     bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
-    BOOST_CHECK_EQUAL(8, bytes_read);
+    BOOST_CHECK_EQUAL(8U, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 
     // Read payload
     msg_buffer& msg_buff = msg.GetData();
     uint64_t nonce; // NOLINT(cppcoreguidelines-init-variables)
     msg_buff >> nonce; 
-    BOOST_CHECK_EQUAL(42, nonce);
+    BOOST_CHECK_EQUAL(42U, nonce);
 }
 
 BOOST_AUTO_TEST_CASE(read_extmsg_msg)
@@ -158,20 +158,20 @@ BOOST_AUTO_TEST_CASE(read_extmsg_msg)
     // Check the header has been read into CMessageHeader
     const CMessageHeader& hdr = msg.GetHeader();
     BOOST_CHECK_EQUAL("ping", hdr.GetCommand());
-    BOOST_CHECK_EQUAL(0x8, hdr.GetPayloadLength());
+    BOOST_CHECK_EQUAL(0x8U, hdr.GetPayloadLength());
 
     // Read the payload
     bytes_read = msg.Read(config, 
                           ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
-    BOOST_CHECK_EQUAL(8, bytes_read);
+    BOOST_CHECK_EQUAL(8U, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 
     // Read payload
     msg_buffer& msg_buff = msg.GetData();
     uint64_t nonce; // NOLINT(cppcoreguidelines-init-variables)
     msg_buff >> nonce; 
-    BOOST_CHECK_EQUAL(42, nonce);
+    BOOST_CHECK_EQUAL(42U, nonce);
 }
 
 BOOST_AUTO_TEST_CASE(read_block_msg)
@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(read_block_msg)
 
     // Write header
     auto bytes_read = msg.Read(config, ip.data(), ip.size());
-    BOOST_CHECK_EQUAL(24, bytes_read);
+    BOOST_CHECK_EQUAL(24U, bytes_read);
     BOOST_CHECK_EQUAL(false, msg.Complete()); // header is read but not the payload
     
     // Check the header has been read into CMessageHeader
@@ -271,18 +271,18 @@ BOOST_AUTO_TEST_CASE(block_msg_with_superflous_data)
 
     // Write the header
     auto bytes_read = msg.Read(config, ip.data(), ip.size());
-    BOOST_CHECK_EQUAL(24, bytes_read);
+    BOOST_CHECK_EQUAL(24U, bytes_read);
     BOOST_CHECK_EQUAL(false, msg.Complete());
 
     // Check the header has been read into CMessageHeader
     const CMessageHeader& hdr = msg.GetHeader();
     BOOST_CHECK_EQUAL("block", hdr.GetCommand());
-    BOOST_CHECK_EQUAL(82, hdr.GetPayloadLength());
+    BOOST_CHECK_EQUAL(82U, hdr.GetPayloadLength());
 
     // Write the payload
     bytes_read = msg.Read(config, ip.data() + bytes_read, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                           ip.size() - bytes_read);
-    BOOST_CHECK_EQUAL(82, bytes_read);
+    BOOST_CHECK_EQUAL(82U, bytes_read);
     BOOST_CHECK_EQUAL(true, msg.Complete());
 }
 

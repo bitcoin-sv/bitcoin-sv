@@ -563,15 +563,6 @@ private:
 
 } // namespace
 
-static bool ProcessMessage(const Config& config,
-                           const CNodePtr& pfrom,
-                           const std::string& strCommand,
-                           msg_buffer& vRecv,
-                           int64_t nTimeReceived,
-                           const CChainParams& chainparams,
-                           CConnman& connman,
-                           const std::atomic<bool>& interruptMsgProc);
-
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     // Try to obtain an access to the node's state data.
     const CNodeStateRef stateRef { GetState(nodeid) };
@@ -2420,7 +2411,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
         bool fAlreadyHave = AlreadyHave(inv);
 
-        if(inv.type == MSG_BLOCK) {
+        if(inv.type == MSG_BLOCK)
+        {
             LogPrint(BCLog::NETMSG, "got block inv: %s %s peer=%d\n", inv.hash.ToString(),
                 fAlreadyHave ? "have" : "new", pfrom->id);
             UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
@@ -2443,7 +2435,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                          pfrom->id);
             }
         }
-        else {
+        else if(inv.type == MSG_TX)
+        {
             LogPrint(BCLog::TXNSRC | BCLog::NETMSGVERB, "got txn inv: %s %s txnsrc peer=%d\n",
                 inv.hash.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
             pfrom->AddInventoryKnown(inv);
@@ -2454,6 +2447,12 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
             else if(!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
                 pfrom->AskFor(inv, config);
             }
+        }
+        else
+        {
+            LogPrint(BCLog::NETMSG, "Got invalid inv type %d from peer=%d\n", static_cast<int>(inv.type), pfrom->id);
+            // Disconnect them
+            pfrom->fDisconnect = true;
         }
 
         // Track requests for our stuff
@@ -4554,14 +4553,14 @@ static void ProcessDoubleSpendMessage(const Config& config,
 /**
 * Process next message.
 */
-static bool ProcessMessage(const Config& config,
-                           const CNodePtr& pfrom,
-                           const std::string& strCommand,
-                           msg_buffer& vRecv,
-                           int64_t nTimeReceived,
-                           const CChainParams& chainparams,
-                           CConnman& connman,
-                           const std::atomic<bool>& interruptMsgProc)
+bool ProcessMessage(const Config& config,
+                    const CNodePtr& pfrom,
+                    const std::string& strCommand,
+                    msg_buffer& vRecv,
+                    int64_t nTimeReceived,
+                    const CChainParams& chainparams,
+                    CConnman& connman,
+                    const std::atomic<bool>& interruptMsgProc)
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
              SanitizeString(strCommand), vRecv.size(), pfrom->id);
@@ -4829,7 +4828,16 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Don't bother if send buffer is too full to respond anyway
-    if (pfrom->GetPausedForSending(true)) {
+
+    // If the send buffer is full, but we're still able to receive more, wait
+    // until the other end has drained some of the backlog to avoid filling
+    // the sending queue even more.
+    //
+    // In the unlikely event that both the send and recv buffers are full,
+    // then allow message processing a chance to free things up and drain some
+    // incoming data, but special handling in PushMessage will discard any
+    // resulting replies that would further saturate the send queue.
+    if (pfrom->GetPausedForSending(true) && ! pfrom->GetPausedForReceiving()) {
         return false;
     }
 

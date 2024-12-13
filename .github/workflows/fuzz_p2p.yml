@@ -1,0 +1,23 @@
+# Copyright (c) 2024 BSV Blockchain Association
+# Distributed under the Open BSV software license,
+# see the accompanying file LICENSE.
+
+name: Fuzz - P2P
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz_P2P:
+    runs-on: [ self-hosted, docker, large ]
+    container:
+      image: nchain/svn_dev:ubuntu_22.04
+    steps:
+      - name: No-op
+        run: echo "Placeholder for P2P fuzzing"
+
+

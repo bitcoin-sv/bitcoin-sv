@@ -932,26 +932,13 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
     if(g_connman)
     {
         unsigned maxBuffSize { g_connman->GetSendBufferSize() };
-        bool pausedForReceiving {false};
-        if(checkPauseRecv && mAssociation.GetPausedForReceiving(Association::PausedFor::ANY))
-        {
-            pausedForReceiving = true;
-            // If we're paused for both sending and receiving, allow a temporary
-            // increase in send buffer size to get things moving
-            size_t multiplier { static_cast<size_t>(gArgs.GetArg("-maxsendbuffermult", DEFAULT_MAXSENDBUFFER_MULTIPLIER)) };
-            if(multiplier > 0)
-            {
-                maxBuffSize *= multiplier;
-            }
-        }
-
-        bool pausedForSending { mAssociation.GetTotalSendQueueSize() > maxBuffSize };
+        bool pausedForSending { mAssociation.GetTotalSendQueueMemoryUsage() > maxBuffSize };
 
         // This complex if/else is just to try and limit logging so that we only log
         // as we enter or leave the pause send & recv state.
         if(checkPauseRecv)
         {
-            if(pausedForSending && pausedForReceiving)
+            if(pausedForSending && GetPausedForReceiving())
             {
                 if(!mEnteredPauseSendRecv)
                 {
@@ -975,6 +962,11 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
     }
 
     return false;
+}
+
+bool CNode::GetPausedForReceiving() const
+{
+    return mAssociation.GetPausedForReceiving(Association::PausedFor::ANY);
 }
 
 void CNode::SetSendVersion(int nVersionIn) {
@@ -3061,6 +3053,15 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
 
 void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg&& msg, StreamType stream)
 {
+    // If the peer is paused for both sending and receiving, discard messages until
+    // they have cleared the backlog.
+    if(pnode->GetPausedForSending() && pnode->GetPausedForReceiving())
+    {
+        LogPrint(BCLog::NETMSG, "Dropping %s message because we're paused for send and receive to peer=%d\n",
+            SanitizeString(msg.Command().c_str()), pnode->id);
+        return;
+    }
+
     // Ensure we don't send extended messages to a peer that won't understand them
     uint64_t nPayloadLength { msg.Size() };
     int sendVersion { pnode->SendVersionIsSet()? pnode->GetSendVersion() : INIT_PROTO_VERSION };

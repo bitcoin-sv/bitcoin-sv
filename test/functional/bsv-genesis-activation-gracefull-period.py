@@ -25,7 +25,7 @@ from test_framework.test_framework import ComparisonTestFramework, wait_until
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
 from test_framework.mininode import msg_tx, mininode_lock
-from test_framework.cdefs import GENESIS_GRACEFULL_ACTIVATION_PERIOD
+from test_framework.cdefs import GENESIS_GRACEFUL_ACTIVATION_PERIOD
 from test_framework.key import CECKey
 from time import sleep
 from test_framework.script import (CScript, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE,
@@ -63,7 +63,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.genesisactivationheight = 154 + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)
+        self.genesisactivationheight = 154 + int(GENESIS_GRACEFUL_ACTIVATION_PERIOD)
         self.extra_args = [['-genesisactivationheight=%d' % self.genesisactivationheight, '-acceptnonstdtxn', '-banscore=1', '-maxopsperscriptpolicy=1000', '-txnvalidationmaxduration=100000']]
 
     def run_test(self):
@@ -103,7 +103,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         wait_until(lambda: txOpAdd2.sha256 in [msg.data for msg in rejected_txs], timeout=5, lock=mininode_lock)
 
         assert_equal(len(rejected_txs), 1) # rejected
-        assert_equal(rejected_txs[0].reason, b'max-script-num-length-policy-limit-violated (Script number overflow)')
+        assert_equal(rejected_txs[0].reason, b'mandatory-script-verify-flag-failed (Script number overflow)')
         wait_until(lambda: len(self.nodes[0].listbanned()) == 1, timeout=5)  # and banned
         self.nodes[0].clearbanned()
         wait_until(lambda: len(self.nodes[0].listbanned()) == 0, timeout=5)  # and not banned
@@ -297,7 +297,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         rejected_txs = []
 
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
-        genesisHeightNoGracefullPeriod = self.genesisactivationheight + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)
+        genesisHeightNoGracefullPeriod = self.genesisactivationheight + int(GENESIS_GRACEFUL_ACTIVATION_PERIOD)
 
         #now we need to raise block count so we are in genesis but before gracefull period is over
         for x in range(height, genesisHeightNoGracefullPeriod):
@@ -305,7 +305,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
             test.blocks_and_transactions.append([self.chain.tip, True])
         yield test
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
-        assert_equal(height, self.genesisactivationheight + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)) # check if we are in right height
+        assert_equal(height, self.genesisactivationheight + int(GENESIS_GRACEFUL_ACTIVATION_PERIOD)) # check if we are in right height
 
         # generate an empty block, height is Genesis + gracefull period + 1, we moved beyond gracefull period now
         block(9, spend=out[12])

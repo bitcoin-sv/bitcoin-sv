@@ -234,9 +234,9 @@ OP_CHECKMULTISIGVERIFY = CScriptOp(0xaf)
 OP_NOP1 = CScriptOp(0xb0)
 OP_CHECKLOCKTIMEVERIFY = CScriptOp(0xb1)
 OP_CHECKSEQUENCEVERIFY = CScriptOp(0xb2)
-OP_NOP4 = CScriptOp(0xb3)
-OP_NOP5 = CScriptOp(0xb4)
-OP_NOP6 = CScriptOp(0xb5)
+OP_SUBSTR = CScriptOp(0xb3)
+OP_LEFT = CScriptOp(0xb4)
+OP_RIGHT = CScriptOp(0xb5)
 OP_NOP7 = CScriptOp(0xb6)
 OP_NOP8 = CScriptOp(0xb7)
 OP_NOP9 = CScriptOp(0xb8)
@@ -361,9 +361,9 @@ VALID_OPCODES = {
     OP_NOP1,
     OP_CHECKLOCKTIMEVERIFY,
     OP_CHECKSEQUENCEVERIFY,
-    OP_NOP4,
-    OP_NOP5,
-    OP_NOP6,
+    OP_SUBSTR,
+    OP_LEFT,
+    OP_RIGHT,
     OP_NOP7,
     OP_NOP8,
     OP_NOP9,
@@ -480,9 +480,9 @@ OPCODE_NAMES.update({
     OP_NOP1: 'OP_NOP1',
     OP_CHECKLOCKTIMEVERIFY: 'OP_CHECKLOCKTIMEVERIFY',
     OP_CHECKSEQUENCEVERIFY: 'OP_CHECKSEQUENCEVERIFY',
-    OP_NOP4: 'OP_NOP4',
-    OP_NOP5: 'OP_NOP5',
-    OP_NOP6: 'OP_NOP6',
+    OP_SUBSTR: 'OP_SUBSTR',
+    OP_LEFT: 'OP_LEFT',
+    OP_RIGHT: 'OP_RIGHT',
     OP_NOP7: 'OP_NOP7',
     OP_NOP8: 'OP_NOP8',
     OP_NOP9: 'OP_NOP9',
@@ -599,9 +599,9 @@ OPCODES_BY_NAME = {
     'OP_NOP1': OP_NOP1,
     'OP_CHECKLOCKTIMEVERIFY': OP_CHECKLOCKTIMEVERIFY,
     'OP_CHECKSEQUENCEVERIFY': OP_CHECKSEQUENCEVERIFY,
-    'OP_NOP4': OP_NOP4,
-    'OP_NOP5': OP_NOP5,
-    'OP_NOP6': OP_NOP6,
+    'OP_SUBSTR': OP_SUBSTR,
+    'OP_LEFT': OP_LEFT,
+    'OP_RIGHT': OP_RIGHT,
     'OP_NOP7': OP_NOP7,
     'OP_NOP8': OP_NOP8,
     'OP_NOP9': OP_NOP9,
@@ -910,9 +910,8 @@ def SignatureHash(script, txTo, inIdx, hashtype):
     s = txtmp.serialize()
     s += struct.pack(b"<I", hashtype)
 
-    hash = hash256(s)
+    return hash256(s)
 
-    return (hash, None)
 
 # TODO: Allow cached hashPrevouts/hashSequence/hashOutputs to be provided.
 # Performance optimization probably not necessary for python tests, however.

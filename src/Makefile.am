@@ -215,6 +215,7 @@ BITCOIN_CORE_H = \
   protocol.h \
   random.h \
   rawtxvalidator.h \
+  protocol_era.h \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
@@ -261,6 +262,7 @@ BITCOIN_CORE_H = \
   time_locked_mempool.h \
   transaction_specific_config.h \
   txdb.h \
+  txdb_defaults.h \
   txhasher.h \
   txmempool.h \
   txmempoolevictioncandidates.h \
@@ -278,7 +280,6 @@ BITCOIN_CORE_H = \
   txn_validator.h \
   ui_interface.h \
   undo.h \
-  unique_array.h \
   util.h \
   utilmoneystr.h \
   utiltime.h \
@@ -425,7 +426,6 @@ libbitcoin_server_a_SOURCES = \
   txn_recent_rejects.cpp \
   txn_validator.cpp \
   ui_interface.cpp \
-  unique_array.cpp \
   validation.cpp \
   validationinterface.cpp \
   vmtouch.cpp \
@@ -515,6 +515,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/int_serialization.h \
   script/limitedstack.cpp \
   script/limitedstack.h \
+  script/malleability_status.h \
   script/opcodes.cpp \
   script/opcodes.h \
   script/script_flags.h \
@@ -551,6 +552,7 @@ libbitcoin_common_a_SOURCES = \
   net/netaddress.cpp \
   net/netbase.cpp \
   protocol.cpp \
+  protocol_era.cpp \
   rpc/jsonwriter.cpp \
   scheduler.cpp \
   script/sign.cpp \

@@ -71,7 +71,8 @@ public:
     }
 };
 
-static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFiles) {
+static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFileSize, size_t nMaxFiles)
+{
     leveldb::Options options;
     options.block_cache = leveldb::NewLRUCache(nCacheSize / 2);
     // up to two write buffers may be held in memory simultaneously
@@ -79,6 +80,7 @@ static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFiles) {
     options.filter_policy = leveldb::NewBloomFilterPolicy(10);
     options.compression = leveldb::kNoCompression;
     options.max_open_files = nMaxFiles;
+    options.max_file_size = nMaxFileSize;
     options.info_log = new CBitcoinLevelDBLogger();
     if (leveldb::kMajorVersion > 1 ||
         (leveldb::kMajorVersion == 1 && leveldb::kMinorVersion >= 16)) {
@@ -89,14 +91,16 @@ static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFiles) {
     return options;
 }
 
-CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory,
-                       bool fWipe, bool obfuscate, MaxFiles maxFiles) {
+CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
+                       bool fMemory, bool fWipe, bool obfuscate,
+                       MaxFiles maxFiles, size_t nMaxFileSize)
+{
     penv = nullptr;
     readoptions.verify_checksums = true;
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
-    options = GetOptions(nCacheSize, maxFiles.maxFiles);
+    options = GetOptions(nCacheSize, nMaxFileSize, maxFiles.maxFiles);
     options.create_if_missing = true;
     if (fMemory) {
         penv = leveldb::NewMemEnv(leveldb::Env::Default());

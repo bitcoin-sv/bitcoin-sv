@@ -18,6 +18,7 @@
 #include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "rpc/http_protocol.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
@@ -30,13 +31,13 @@
 #include "txn_validator.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 #include "merkletreestore.h"
 #include "rpc/blockchain.h"
 #include "rpc/misc.h"
 #include "consensus/merkle.h"
 #include "util.h"
 #include "rawtxvalidator.h"
+#include <variant>
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -191,8 +192,8 @@ void getrawtransaction(const Config& config,
 
     CTransactionRef tx;
     uint256 hashBlock;
-    bool isGenesisEnabled;
-    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled)) 
+    ProtocolEra era {};
+    if (!GetTransaction(config, txid, tx, true, hashBlock, era)) 
     {
         throw JSONRPCError(
             RPC_INVALID_ADDRESS_OR_KEY,
@@ -243,11 +244,11 @@ void getrawtransaction(const Config& config,
                 blockData.confirmations = 0;
             }
         }
-        TxToJSON(*tx, hashBlock, isGenesisEnabled, RPCSerializationFlags(), jWriter, blockData);
+        TxToJSON(*tx, hashBlock, era, RPCSerializationFlags(), jWriter, blockData);
     } 
     else 
     {
-        TxToJSON(*tx, uint256(), isGenesisEnabled, RPCSerializationFlags(), jWriter);
+        TxToJSON(*tx, uint256(), era, RPCSerializationFlags(), jWriter);
     }
 
     textWriter.Write(", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
@@ -325,8 +326,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     {
         CTransactionRef tx;
         uint256 foundBlockHash;
-        bool isGenesisEnabledDummy; // not used
-        if (!GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, isGenesisEnabledDummy) ||
+        if (ProtocolEra era; !GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, era) ||
             foundBlockHash.IsNull())
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
@@ -744,8 +744,9 @@ void decoderawtransaction(const Config& config,
         std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
             return IsP2SH(out.scriptPubKey);
         });
+    ProtocolEra era { genesisEnabled? ProtocolEra::PostGenesis : ProtocolEra::PreGenesis };
     CJSONWriter jWriter(textWriter, false);
-    TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
+    TxToJSON(tx, uint256(), era, 0, jWriter);
     
     textWriter.Write(", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
 }
@@ -789,10 +790,9 @@ static UniValue decodescript(const Config &config,
         // Empty scripts are valid.
     }
 
-    ScriptPubKeyToUniv(
-        script, true,
-        !IsP2SH(script), // treat all transactions as post-Genesis, except P2SH
-        r);
+    // Treat all transactions as post-Genesis, except P2SH
+    ProtocolEra era { IsP2SH(script)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+    ScriptPubKeyToUniv(script, true, era, r);
 
     UniValue type;
     type = find_value(r, "type");
@@ -1063,7 +1063,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false, false), true, config.GetGenesisActivationHeight());
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -1133,9 +1133,10 @@ static UniValue signrawtransaction(const Config &config,
     // rehashing.
     const CTransaction txConst(mergedTx);
 
-    bool genesisEnabled = IsGenesisEnabled(config, activeChainHeight + 1);
+    ProtocolEra era { GetProtocolEra(config, activeChainHeight + 1) };
 
     // Sign what we can:
+    std::atomic<malleability::status> malleability {};
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
         auto coin = view.GetCoinWithScript(txin.prevout);
@@ -1148,47 +1149,68 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), activeChainHeight + 1);
+        ProtocolEra utxoEra { GetProtocolEra(config, coin.value(), activeChainHeight + 1) };
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
-            (i < mergedTx.vout.size())) {
-            ProduceSignature(config, true, MutableTransactionSignatureCreator(
-                                 &keystore, &mergedTx, i, amount, sigHashType),
-                             genesisEnabled, utxoAfterGenesis, prevPubKey, sigdata);
+        if((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
+           (i < mergedTx.vout.size()))
+        {
+            SignAndVerify(config,
+                          true,
+                          MutableTransactionSignatureCreator(&keystore,
+                                                             &mergedTx,
+                                                             i,
+                                                             amount,
+                                                             sigHashType),
+                          era,
+                          utxoEra,
+                          prevPubKey,
+                          sigdata);
         }
 
         // ... and merge in other signatures:
-        for (const CMutableTransaction &txv : txVariants) {
-            if (txv.vin.size() > i) {
-                sigdata = CombineSignatures(
-                    config, 
-                    true,
-                    prevPubKey,
-                    TransactionSignatureChecker(&txConst, i, amount), sigdata,
-                    DataFromTransaction(txv, i),
-                    utxoAfterGenesis);
+        for(const CMutableTransaction& txv : txVariants)
+        {
+            if(txv.vin.size() > i)
+            {
+               sigdata = CombineSignatures(config,
+                                           true,
+                                           prevPubKey,
+                                           TransactionSignatureChecker(&txConst,
+                                                                       i,
+                                                                       amount),
+                                           sigdata,
+                                           txConst.nVersion,
+                                           DataFromTransaction(txv, i),
+                                           txv.nVersion,
+                                           era,
+                                           utxoEra);
             }
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
 
-        ScriptError serror = SCRIPT_ERR_OK;
         auto source = task::CCancellationSource::Make();
-        auto res =
+        const auto res =
             VerifyScript(
                 config,
                 true,
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,
-                StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis),
+                StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra),
                 TransactionSignatureChecker(&txConst, i, amount),
-                &serror);
-        if (!res.value())
+                malleability);
+        if(!res.has_value())
         {
-            TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+            TxInErrorToJSON(txin, vErrors, "Validation timeout");
+        }
+        else if(!res->first)
+        {
+            TxInErrorToJSON(txin,
+                            vErrors,
+                            ScriptErrorString(res->second));
         }
     }
 
@@ -1258,7 +1280,11 @@ namespace
 
 
     // Parse UniValue and set TransactionSpecificConfig
-    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc, const UniValue& jsonConfig, uint32_t skipScriptFlags, std::string& rejectReason)
+    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc,
+                                      const UniValue& jsonConfig,
+                                      uint32_t skipScriptFlags,
+                                      ProtocolEra era,
+                                      std::string& rejectReason)
     {
         const std::set<std::string> allPolicySettings = {"maxtxsizepolicy","datacarriersize","maxscriptsizepolicy","maxscriptnumlengthpolicy",
                                                          "maxstackmemoryusagepolicy","maxscriptnumlengthpolicy","limitancestorcount", "limitcpfpgroupmemberscount",
@@ -1310,19 +1336,19 @@ namespace
         }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) ||
-            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
     
        if (UniValue maxstackmemoryusagepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxstackmemoryusagepolicy", maxstackmemoryusagepolicy_uv, rejectReason) || 
-           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
+           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(era, tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
        {
           return false;
        }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) || 
-            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
@@ -1886,6 +1912,9 @@ void sendrawtransactions(const Config& config,
     std::shared_ptr<TransactionSpecificConfig> global_tsc;
     uint32_t skipScriptFlagsGlobal = 0;
 
+    // Get active protocol
+    ProtocolEra era { GetProtocolEra(config, chainActive.Height()) };
+
     // Check if we have a second parameter that provides config for all inputs
     if (!request.params[1].empty() && request.params[1].isObject())
     {
@@ -1895,7 +1924,7 @@ void sendrawtransactions(const Config& config,
         }
 
         global_tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
-        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, rejectReason))
+        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, era, rejectReason))
         {
              throw JSONRPCError(RPC_INVALID_PARAMETER, rejectReason);
         }
@@ -1980,7 +2009,7 @@ void sendrawtransactions(const Config& config,
         {
             tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
             // set transaction specific config and skipScriptFlags. Put transaction to invalid array with appropriate reject_reason if anything fails.
-            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, rejectReason))
+            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, era, rejectReason))
             {
                 RawTxValidator::RawTxValidatorResult result{ txid, CValidationState(), false };
                 result.state.value().Error(rejectReason);
@@ -2412,8 +2441,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
         {
             CTransactionRef tx;
             uint256 hashBlock;
-            bool isGenesisEnabled;
-            if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled))
+            if (ProtocolEra era; !GetTransaction(config, txid, tx, true, hashBlock, era))
             {
                 if (fTxIndex)
                     hints << "No such mempool or blockchain transaction";

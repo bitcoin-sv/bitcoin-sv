@@ -5,6 +5,7 @@
 
 #include "test/test_bitcoin.h"
 
+#include <boost/random.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -258,8 +259,8 @@ namespace  {
     class DeterministicUUIDGenerator
     {
     private:
-        boost::mt19937 random_generator;
-        using uuid_random_generator_type = boost::uuids::basic_random_generator<boost::mt19937>;
+        boost::random::mt19937 random_generator;
+        using uuid_random_generator_type = boost::uuids::basic_random_generator<boost::random::mt19937>;
         uuid_random_generator_type uuid_random_generator;
 
     public:

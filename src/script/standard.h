@@ -7,6 +7,7 @@
 #define BITCOIN_SCRIPT_STANDARD_H
 
 #include "script/interpreter.h"
+#include "protocol_era.h"
 #include "uint256.h"
 
 #include <boost/variant.hpp>
@@ -31,16 +32,28 @@ static const uint64_t DEFAULT_DATA_CARRIER_SIZE = UINT32_MAX;
 
 /**
  * Mandatory script verification flags that all new blocks must comply with for
- * them to be valid. (but old blocks may not comply with) Currently just P2SH,
- * but in the future other flags may be added, such as a soft-fork to enforce
- * strict DER encoding.
+ * them to be valid. (but old blocks may not comply with).
  *
  * Failing one of these tests may trigger a DoS ban - see CheckInputs() for
  * details.
  */
-static const uint32_t MANDATORY_SCRIPT_VERIFY_FLAGS =
-    SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC |
-    SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_NULLFAIL;
+static const uint32_t PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS =
+    SCRIPT_VERIFY_P2SH |
+    SCRIPT_VERIFY_STRICTENC |
+    SCRIPT_ENABLE_SIGHASH_FORKID |
+    SCRIPT_VERIFY_NULLFAIL |
+    SCRIPT_VERIFY_LOW_S;
+
+static const uint32_t POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS =
+    SCRIPT_VERIFY_P2SH |
+    SCRIPT_VERIFY_STRICTENC |
+    SCRIPT_ENABLE_SIGHASH_FORKID |
+    SCRIPT_VERIFY_NULLFAIL |
+    SCRIPT_VERIFY_LOW_S |
+    SCRIPT_CHRONICLE;
+
+// Get mandatory script verify flags for the given protocol era
+uint32_t MandatoryScriptVerifyFlags(ProtocolEra era);
 
 enum txnouttype {
     TX_NONSTANDARD,
@@ -78,19 +91,18 @@ bool IsValidDestination(const CTxDestination &dest);
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction
  * types.
  */
-bool Solver(const CScript& scriptPubKey, bool genesisEnabled, txnouttype& typeRet,
+bool Solver(const CScript& scriptPubKey, ProtocolEra era, txnouttype& typeRet,
     std::vector<std::vector<uint8_t>>& vSolutionsRet);
 
 /*
  * Extract a single destination from P2PK, P2PKH, P2SH
  */
-bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled, CTxDestination &addressRet);
+bool ExtractDestination(const CScript &scriptPubKey, ProtocolEra era, CTxDestination &addressRet);
 /**
  * Extracts all destinations from the script. P2PK, P2PKH, P2SH and MULTISIG.
  */
-bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
-                         std::vector<CTxDestination> &addressRet,
-                         int &nRequiredRet);
+bool ExtractDestinations(const CScript &scriptPubKey, ProtocolEra era, txnouttype &typeRet,
+                         std::vector<CTxDestination> &addressRet, int &nRequiredRet);
 
 CScript GetScriptForDestination(const CTxDestination &dest);
 CScript GetScriptForRawPubKey(const CPubKey &pubkey);

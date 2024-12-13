@@ -8,6 +8,8 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
+#include "script/malleability_status.h"
+#include "script/script_error.h"
 #include "taskcancellation.h"
 #include "version.h"
 
@@ -88,17 +90,20 @@ static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKe
 
         PrecomputedTransactionData txdata(tx);
         auto source = task::CCancellationSource::Make();
+        std::atomic<malleability::status> ms {};
 
-        auto res =
+        const auto res =
           VerifyScript(
               config, true,
               source->GetToken(),
               tx.vin[nIn].scriptSig,
               CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
-              TransactionSignatureChecker(&tx, nIn, amount, txdata), nullptr);
+              TransactionSignatureChecker(&tx, nIn, amount, txdata),
+              ms);
 
-        return res.value();
-    } catch (const std::exception &) {
+        return (res.has_value() && res->first);
+    }
+    catch (const std::exception &) {
         // Error deserializing
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE);
     }

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "protocol_era.h"
+
 #include <cstdint>
 
 /**
@@ -15,7 +17,7 @@ class CScriptConfig
 {
 public:
     virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool isConsensus) const = 0;
-    virtual uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const = 0;
     virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
     virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool isConsensus) const = 0;
     virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const = 0;

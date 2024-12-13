@@ -6,6 +6,7 @@
 
 #include "dstencode.h"
 #include "primitives/transaction.h"
+#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "script/standard.h"
@@ -14,6 +15,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include <univalue.h>
+#include <variant>
 
 std::string FormatScript(const CScript &script) {
     std::string ret;
@@ -117,7 +119,10 @@ void ScriptToAsmStr(const CScript& script,
         {
             if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4))
             {
-                textWriter.Write(strprintf("%d", CScriptNum(vch, false).getint()));
+                malleability::status ms{};
+                textWriter.Write(
+                    strprintf("%d",
+                              CScriptNum(vch, min_encoding_check::no, ms).getint()));
             }
             else
             {
@@ -140,7 +145,9 @@ void ScriptToAsmStr(const CScript& script,
                         // TODO: Remove after the Hard Fork.
                         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
                     }
-                    if (CheckSignatureEncoding(vch, flags, nullptr))
+                    
+                    const auto v = CheckSignatureEncoding(vch, flags); 
+                    if(std::holds_alternative<malleability::status>(v))
                     {
                         const uint8_t chSigHashType = vch.back();
                         if (mapSigHashTypes.count(chSigHashType))
@@ -203,7 +210,8 @@ void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serialFl
     ssTx << tx;
 }
 
-void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out) {
+void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, ProtocolEra era, UniValue &out)
+{
     txnouttype type;
     std::vector<CTxDestination> addresses;
     int nRequired;
@@ -213,7 +221,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
     }
 
-    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired)) {
+    if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired)) {
         out.pushKV("type", GetTxnOutputType(type));
         return;
     }
@@ -230,7 +238,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
 
 void TxToJSON(const CTransaction& tx,
               const uint256& hashBlock,
-              bool utxoAfterGenesis,
+              ProtocolEra era,
               const int serializeFlags,
               CJSONWriter& entry,
               const std::optional<CBlockDetailsData>&  blockData)
@@ -288,7 +296,7 @@ void TxToJSON(const CTransaction& tx,
         entry.pushKV("n", static_cast<int64_t>(i));
 
         entry.writeBeginObject("scriptPubKey");
-        ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
+        ScriptPublicKeyToJSON(txout.scriptPubKey, true, era, entry);
         entry.writeEndObject();
 
         entry.writeEndObject();
@@ -325,7 +333,7 @@ void TxToJSON(const CTransaction& tx,
 
 void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
                            bool fIncludeHex,
-                           bool isGenesisEnabled,
+                           ProtocolEra era,
                            CJSONWriter& entry) {
     txnouttype type;
     std::vector<CTxDestination> addresses;
@@ -343,7 +351,7 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
         entry.pushQuote();
     }
 
-    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired))
+    if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired))
     {
         entry.pushKV("type", GetTxnOutputType(type));
         return;

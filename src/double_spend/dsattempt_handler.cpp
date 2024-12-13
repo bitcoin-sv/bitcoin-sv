@@ -1,18 +1,18 @@
 // Copyright (c) 2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <double_spend/dsattempt_handler.h>
+#include "double_spend/dsattempt_handler.h"
 
-#include <coins.h>
-#include <config.h>
-#include <logging.h>
-#include <net/net_processing.h>
-#include <rpc/client.h>
-#include <rpc/http_protocol.h>
-#include <rpc/http_request.h>
-#include <rpc/http_response.h>
-#include <txdb.h>
-#include <validation.h>
+#include "coins.h"
+#include "config.h"
+#include "logging.h"
+#include "net/net_processing.h"
+#include "protocol_era.h"
+#include "rpc/client.h"
+#include "rpc/http_protocol.h"
+#include "rpc/http_request.h"
+#include "rpc/http_response.h"
+#include "txdb.h"
 
 namespace
 {
@@ -157,7 +157,8 @@ std::optional<bool> DSAttemptHandler::ValidateDoubleSpend(
     }
 
     // Get script verification flags
-    uint32_t scriptVerifyFlags { GetScriptVerifyFlags(mConfig, IsGenesisEnabled(mConfig, chainActive.Height() + 1)) };
+    ProtocolEra era { GetProtocolEra(mConfig, chainActive.Height() + 1) };
+    uint32_t scriptVerifyFlags { GetScriptVerifyFlags(mConfig, era) };
 
     // Set verification timeout to the longest we'll allow
     task::CCancellationToken token { task::CTimedCancellationSource::Make(mConfig.GetMaxNonStdTxnValidationDuration()) };
@@ -172,7 +173,7 @@ std::optional<bool> DSAttemptHandler::ValidateDoubleSpend(
 
     return CheckInputScripts(token, mConfig, false, scriptdetails.scriptPubKey, scriptdetails.amount,
         *doubleSpend, state, input, scriptdetails.coinHeight, scriptdetails.spendHeight, scriptVerifyFlags,
-        false, txdata, nullptr);
+        false, txdata, std::make_shared<std::atomic<malleability::status>>(), nullptr);
 }
 
 // Check if either of the given transactions are notification enabled, and if so whether there are any

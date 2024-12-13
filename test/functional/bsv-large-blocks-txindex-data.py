@@ -44,6 +44,7 @@ class BlockFileStore(ComparisonTestFramework):
                 '-maxtxnvalidatorasynctasksrunduration=55002',
                 '-rpcservertimeout=1000',
                 '-genesisactivationheight=%d' % self.genesisactivationheight,
+                '-dbcache=256MB',
                 "-txindex"
             ]
         ]

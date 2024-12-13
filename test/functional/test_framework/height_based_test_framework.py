@@ -25,6 +25,7 @@ class TxCollection:
         self.block_invalid_txs = []
         self.p2p_valid_txs = []
         self.p2p_invalid_txs = []
+        self.p2p_timeout = 30
         self.mempool_txs = []
 
     @property
@@ -35,7 +36,7 @@ class TxCollection:
     def label(self):
         return self._label
 
-    def add_tx(self, tx, p2p_reject_reason=None, block_reject_reason=None):
+    def add_tx(self, tx, p2p_timeout=30, p2p_reject_reason=None, block_reject_reason=None):
         if p2p_reject_reason:
             self.p2p_invalid_txs.append((tx, p2p_reject_reason))
         else:
@@ -46,6 +47,8 @@ class TxCollection:
             self.block_invalid_txs.append((tx, block_reject_reason))
         else:
             self.block_valid_txs.append(tx)
+
+        self.p2p_timeout = p2p_timeout
 
     def add_mempool_tx(self, tx):
         self.mempool_txs.append(tx)
@@ -122,7 +125,7 @@ class HeightBasedTestsCase:
 class SimpleTestDefinition:
 
     def __init__(self, utxo_label, locking_script, label, unlocking_script,
-                 p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None,
+                 p2p_reject_reason=None, block_reject_reason=None, p2p_timeout=30, test_tx_locking_script=None,
                  post_utxo_tx_creation=lambda tx: tx, post_test_tx_creation=lambda tx: tx):
         self.scenario = None
         self.label = label
@@ -131,6 +134,7 @@ class SimpleTestDefinition:
         self.utxo_label = utxo_label
         self.p2p_reject_reason = p2p_reject_reason
         self.block_reject_reason = block_reject_reason
+        self.p2p_timeout = p2p_timeout
         self.test_tx_locking_script = test_tx_locking_script or CScript([OP_FALSE, OP_RETURN])
         self.funding_tx = None
         self.test_tx = None
@@ -189,7 +193,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
                 tx = t.make_test_tx()
                 tx.rehash()
                 self.log.info(f"Created Test Tx {loghash(tx.hash)} for scenario: \"{t.scenario or self.NAME}\" and for test_label: {t.label}")
-                tx_collection.add_tx(tx, t.p2p_reject_reason, t.block_reject_reason)
+                tx_collection.add_tx(tx, t.p2p_timeout, t.p2p_reject_reason, t.block_reject_reason)
 
 
 class SimplifiedTestFramework(BitcoinTestFramework):
@@ -245,7 +249,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash, timeout=10, check_interval=0.2)
         return block, coinbase_tx
 
-    def _new_block_check_reject(self, connection, txs, reasons, label="", block_txs=[]):
+    def _new_block_check_reject(self, connection, txs, reasons, label="", block_txs=[], block_reject_timeout=60):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         rejects = []
 
@@ -264,17 +268,18 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                         self.log.info(f".... and added transactions to block {loghash(txn.hash)}")
 
                 wait_until(lambda: len(rejects) == 1 and rejects[0].data == block.sha256,
-                           timeout=10, check_interval=0.2,
+                           timeout=(block_reject_timeout * self.options.timeoutfactor), check_interval=0.2,
                            label=f"Waiting for block with tx {tx.hash[8]}... and reject reason '{reason}' to be rejected " + label)
                 if reason:
                     self.log.info(f"Expect the block {loghash(block.hash)} to be rejected")
                     assert rejects[0].reason.startswith(reason), f"mismatching rejection reason: got {rejects[0].reason} expected {reason}"
 
-    def _new_block_check_accept(self, connection, txs=[], label="", remove_accepted_block=False):
+    def _new_block_check_accept(self, connection, txs=[], label="", block_accept_timeout=60, remove_accepted_block=False):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         block, coinbase_tx = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=txs)
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=60, check_interval=0.2, label="Waiting for block to become current tip " + label)
+                   timeout=(block_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
+                   label="Waiting for block to become current tip " + label)
 
         blk_ht = connection.rpc.getblock(connection.rpc.getbestblockhash())["height"]
         if txs:
@@ -321,7 +326,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         for tx in to_accept:
             connection.rpc.sendrawtransaction(ToHex(tx)) # will raise if not successful
 
-    def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label):
+    def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label, p2p_reject_timeout):
         rejects = []
 
         def on_reject(_, msg):
@@ -333,7 +338,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 del rejects[:]
                 connection.send_message(msg_tx(tx))
                 wait_until(lambda: (len(rejects) == 1) and rejects[0].data == tx.sha256,
-                           timeout=30, check_interval=0.2,
+                           timeout=(p2p_reject_timeout * self.options.timeoutfactor), check_interval=0.2,
                            label=f"Waiting tx to be rejected. Reason {reason} At {test_label} {height_label} tx:{tx.hash}")
                 if reason:
                     assert rejects[0].reason == reason, f"Mismatching rejection reason: got {rejects[0].reason} expected {reason}"
@@ -374,21 +379,21 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             self.log.info(f"No transactions to test at height {label} height={height}")
 
         if tx_col.mempool_txs:
-            self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS", p2p_accept_timeout=test.P2P_ACCEPT_TIMEOUT)
+            self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS", p2p_accept_timeout=tx_col.p2p_timeout)
 
         if tx_col.p2p_invalid_txs:
             txs, reasons = zip(*tx_col.p2p_invalid_txs)
-            self._process_p2p_rejects(conn, txs, reasons, test_label=test.NAME, height_label=label)
+            self._process_p2p_rejects(conn, txs, reasons, test_label=test.NAME, height_label=label, p2p_reject_timeout=tx_col.p2p_timeout)
 
         if tx_col.p2p_valid_txs:
-            self._process_p2p_accepts(conn, tx_col.p2p_valid_txs, test_label=test.NAME, height_label=label, p2p_accept_timeout=test.P2P_ACCEPT_TIMEOUT)
+            self._process_p2p_accepts(conn, tx_col.p2p_valid_txs, test_label=test.NAME, height_label=label, p2p_accept_timeout=tx_col.p2p_timeout)
 
         if tx_col.block_invalid_txs:
             txs, reasons = zip(*tx_col.block_invalid_txs)
-            self._new_block_check_reject(conn, txs=txs, reasons=reasons, label=f"At \"{test.NAME}\" {label}", block_txs=tx_col.mempool_txs)
+            self._new_block_check_reject(conn, txs=txs, reasons=reasons, label=f"At \"{test.NAME}\" {label}", block_txs=tx_col.mempool_txs, block_reject_timeout=tx_col.p2p_timeout)
 
         if tx_col.block_valid_txs:
-            self._new_block_check_accept(conn, txs=tx_col.mempool_txs + tx_col.block_valid_txs, label=f"At \"{test.NAME}\" {label}")
+            self._new_block_check_accept(conn, txs=tx_col.mempool_txs + tx_col.block_valid_txs, label=f"At \"{test.NAME}\" {label}", block_accept_timeout=tx_col.p2p_timeout)
             self.log.info(f"Invalidating the block {loghash(conn.rpc.getbestblockhash())} to confirm the txs are back to mempool")
             conn.rpc.invalidateblock(conn.rpc.getbestblockhash())
 
@@ -403,7 +408,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         txs_to_be_in_the_next_block = transactions_for_next_block + tx_col.mempool_txs + tx_col.block_valid_txs
         if txs_to_be_in_the_next_block:
-            self._new_block_check_accept(conn, txs=txs_to_be_in_the_next_block, label=f"At \"{test.NAME}\" {label}")
+            self._new_block_check_accept(conn, txs=txs_to_be_in_the_next_block, label=f"At \"{test.NAME}\" {label}", block_accept_timeout=tx_col.p2p_timeout)
 
     def _do_prepare_for_height(self, conn, test, label, height, additional_conns):
         self.log.info(f"Preparing for {label} at height={height}")

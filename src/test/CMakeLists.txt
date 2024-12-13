@@ -127,6 +127,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	locked_ref_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
+    malleability_status_tests.cpp
 	mempool_dump_load_tests.cpp
 	mempool_snapshot_tests.cpp
 	mempool_tests.cpp
@@ -159,6 +160,7 @@ add_test_to_suite(bitcoin test_bitcoin
     prefilled_tx_parser_tests.cpp
     prefilled_txs_parser_tests.cpp
 	prevector_tests.cpp
+    protocol_era_tests.cpp
 	protocol_tests.cpp
 	raii_event_tests.cpp
 	random_tests.cpp
@@ -204,7 +206,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp
 	undo_tests.cpp
-    unique_array_tests.cpp
 	univalue_tests.cpp
 	util_tests.cpp
     validation_scheduler_tests.cpp

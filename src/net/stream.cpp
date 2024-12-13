@@ -1,11 +1,12 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <config.h>
-#include <net/net.h>
-#include <net/netbase.h>
-#include <net/stream.h>
+#include "net/stream.h"
+
 #include "config.h"
+#include "memusage.h"
+#include "net/net.h"
+#include "net/netbase.h"
 
 // Enable enum_cast for StreamType, so we can log informatively
 const enumTableT<StreamType>& enumTable(StreamType)
@@ -25,6 +26,18 @@ const enumTableT<StreamType>& enumTable(StreamType)
 namespace
 {
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
+
+    // Estimate memory usage for a message on the receive queue
+    uint64_t RecvMsgMemoryUsage(const CNetMessage& msg)
+    {
+        // sizeof(CNetMessage) (which includes the msg header) +
+        // overhead of a std::list entry +
+        // payload length
+        uint64_t msgEstimatedMemory { memusage::MallocUsage(sizeof(CNetMessage)) };
+        msgEstimatedMemory += sizeof(void*) * 2;
+        msgEstimatedMemory += memusage::MallocUsage(msg.GetHeader().GetPayloadLength());
+        return msgEstimatedMemory;
+    }
 }
 
 Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize)
@@ -265,9 +278,9 @@ std::pair<Stream::QueuedNetMessage, bool> Stream::GetNextMessage()
         msg = std::move(mRecvCompleteMsgQueue.front());
         mRecvCompleteMsgQueue.pop_front();
 
-        // Update total queued msgs size
-        mRecvMsgQueueSize -= msg->GetTotalLength();
-        mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
+        // Update total queued msgs memory usage
+        mRecvMsgQueueMemory -= RecvMsgMemoryUsage(*msg);
+        mPauseRecv = mRecvMsgQueueMemory > mMaxRecvBuffSize;
     }
 
     // Return whether we still have more msgs queued
@@ -292,7 +305,7 @@ void Stream::CopyStats(StreamStats& stats) const
         LOCK(cs_mRecvMsgQueue);
         stats.nRecvBytes = mTotalBytesRecv;
         stats.fPauseRecv = mPauseRecv;
-        stats.nRecvSize = mRecvMsgQueueSize;
+        stats.nRecvSize = mRecvMsgQueueMemory;
         stats.mapRecvBytesPerMsgCmd = mRecvBytesPerMsgCmd;
 
         // Avg bandwidth measurements
@@ -439,7 +452,7 @@ uint64_t Stream::SocketSendData()
 
 void Stream::GetNewMsgs()
 {
-    uint64_t nSizeAdded {0};
+    uint64_t nMemoryAdded {0};
 
     LOCK(cs_mRecvMsgQueue);
     auto it { mRecvMsgQueue.begin() };
@@ -449,8 +462,6 @@ void Stream::GetNewMsgs()
         {   
             break;
         }
-        uint64_t msgSize { (*it)->GetTotalLength() };
-        nSizeAdded += msgSize;
 
         // Update recieved msg counts
         mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find((*it)->GetHeader().GetCommand()) };
@@ -460,14 +471,17 @@ void Stream::GetNewMsgs()
         }
 
         assert(i != mRecvBytesPerMsgCmd.end());
-        i->second += msgSize;
+        i->second += (*it)->GetTotalLength();
+
+        // Additional memory used by another entry in queue of messages:
+        nMemoryAdded += RecvMsgMemoryUsage(**it);
     }
 
     mRecvCompleteMsgQueue.splice(mRecvCompleteMsgQueue.end(), mRecvMsgQueue, mRecvMsgQueue.begin(), it);
 
-    // Track total queued complete msgs size
-    mRecvMsgQueueSize += nSizeAdded;
-    mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
+    // Track total queued complete msgs memory usage
+    mRecvMsgQueueMemory += nMemoryAdded;
+    mPauseRecv = mRecvMsgQueueMemory > mMaxRecvBuffSize;
 }
 
 Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize)

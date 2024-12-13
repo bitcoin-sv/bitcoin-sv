@@ -7,6 +7,7 @@
 #define BITCOIN_WALLET_WALLET_H
 
 #include "amount.h"
+#include "protocol_era.h"
 #include "script/ismine.h"
 #include "script/sign.h"
 #include "streams.h"
@@ -256,11 +257,15 @@ public:
      */
     int32_t GetHeightInMainChain() const;
     /**
-    * Return is the transaction height larger or equal to the genesis activation height. 
+    * Return is the transaction height larger or equal to the given protocol activation height. 
     * If in mempool, we assume that it will be mined in next block.
     */
-    bool IsGenesisEnabled() const;
-
+    bool IsProtocolActive(ProtocolName name) const;
+    /**
+    * Get protocol activation state for the transaction.
+    * If in mempool, we assume that it will be mined in next block.
+    */
+    ProtocolEra GetProtocolEra() const;
 
     /**
      * Pass this transaction to the mempool. Fails if absolute fee exceeds
@@ -1226,8 +1231,9 @@ bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!ProduceSignature(config, false, DummySignatureCreator(this), true, false, scriptPubKey,
-                              sigdata)) {
+        if (!SignAndVerify(config, false, DummySignatureCreator(this),
+                          ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, scriptPubKey,
+                          sigdata)) {
             return false;
         } else {
             UpdateTransaction(txNew, nIn, sigdata);

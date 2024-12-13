@@ -706,11 +706,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer "
                                           "in kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB)."),
                                         DEFAULT_MAXSENDBUFFER));
-    strUsage += HelpMessageOpt("-maxsendbuffermult=<n>",
-        strprintf(_("Temporary multiplier applied to the -maxsendbuffer size to "
-                    "allow connections to unblock themselves in the unlikely "
-                    "situation where they have become paused for both sending and "
-                    "receiving (default: %d)"), DEFAULT_MAXSENDBUFFER_MULTIPLIER));
     strUsage += HelpMessageOpt(
         "-factormaxsendqueuesbytes=<n>",
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
@@ -1033,7 +1028,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
-                config.GetAcceptNonStandardOutput(true)));
+                config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
     }
     strUsage += HelpMessageOpt(
@@ -1142,9 +1137,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     strUsage += HelpMessageOpt(
         "-maxscriptnumlengthpolicy=<n>",
-        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited) after Genesis is activated. "
+        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited). "
             "The value may be given in bytes or with unit (B, kB, MB, GB).",
-            DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
+            DEFAULT_SCRIPT_NUM_LENGTH_POLICY));
 
     strUsage += HelpMessageOpt(
         "-softconsensusfreezeduration",
@@ -1421,6 +1416,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
                   CoinsDB::MaxFiles::Default().maxFiles));
     strUsage += HelpMessageOpt(
+        "-maxcoinsdbfilesize=<n>",
+        strprintf(_("Set maximum file size used by the coins leveldb (default: %d MB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE / ONE_MEBIBYTE));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -1435,7 +1435,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "for violating Genesis rules in case the calling node is not yet on Genesis height and vice versa. "
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
-            DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+            DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD));
+    strUsage += HelpMessageOpt(
+        "-maxchroniclegracefulperiod=<n>",
+        strprintf(_("Set maximum allowed number of blocks for Chronicle graceful period (default: %d) where nodes will not be banned "
+                    "for violating Chronicle rules in case the calling node is not yet on Chronicle height and vice versa. "
+                    "Seting 0 will disable Chronicle graceful period. Chronicle graceful period range :"
+                    "(CHRONICLE_ACTIVATION_HEIGHT - n |...| CHRONICLE_ACTIVATION_HEIGHT |...| CHRONICLE_ACTIVATION_HEIGHT + n)"),
+            DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD));
 
     strUsage += HelpMessageGroup(_("Invalid transactions sink options:"));
     std::string availableSinks = StringJoin(", ", config.GetAvailableInvalidTxSinks());
@@ -2401,9 +2408,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             return InitError(err);
         }
     }
-    // Configure genesis activation height.
+    // Configure genesis & chronicle activation heights.
     int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
+        return InitError(err);
+    }
+    int32_t chronicleActivationHeight = static_cast<int32_t>(gArgs.GetArg("-chronicleactivationheight", chainparams.GetConsensus().chronicleHeight));
+    if (std::string err; !config.SetChronicleActivationHeight(chronicleActivationHeight, &err)) {
         return InitError(err);
     }
 
@@ -2682,16 +2693,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
-
     if(std::string err; !config.SetMaxCoinsProviderCacheSize(
         gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
         &err))
     {
         return InitError(err);
     }
-
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetCoinsDBMaxFileSize(
+        gArgs.GetArgAsBytes("-maxcoinsdbfilesize", CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE), &err))
     {
         return InitError(err);
     }
@@ -2894,7 +2908,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                       chainparams.NetworkIDString()));
 
     config.SetAcceptNonStandardOutput(
-        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
 
     // Enable selfish mining detection
@@ -2967,20 +2981,30 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Configure maximum length of numbers in scripts
     if (gArgs.IsArgSet("-maxscriptnumlengthpolicy"))
     {
-        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
         if (std::string err; !config.SetMaxScriptNumLengthPolicy(value, &err))
         {
             return InitError(err);
         }
     }
 
-    // Configure max number of blocks in which Genesis graceful period is active
+    // Configure max number of blocks in which Genesis/Chronicle graceful period is active
     if (gArgs.IsArgSet("-maxgenesisgracefulperiod"))
     {
-        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD);
+        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD);
 
         std::string err;
         if (!config.SetGenesisGracefulPeriod(value, &err))
+        {
+            return InitError(err);
+        }
+    }
+    if (gArgs.IsArgSet("-maxchroniclegracefulperiod"))
+    {
+        const int64_t value = gArgs.GetArg("-maxchroniclegracefulperiod", DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD);
+
+        std::string err;
+        if (!config.SetChronicleGracefulPeriod(value, &err))
         {
             return InitError(err);
         }
@@ -3536,6 +3560,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                     std::make_unique<CoinsDB>(
                         config.GetMaxCoinsProviderCacheSize(),
                         nCoinDBCache,
+                        config.GetCoinsDBMaxFileSize(),
                         CDBWrapper::MaxFiles{config.GetMaxCoinsDbOpenFiles()},
                         false,
                         fReindex || fReindexChainState);
