@@ -28,7 +28,8 @@ BOOST_AUTO_TEST_CASE(default_move)
     BOOST_CHECK_EQUAL(0U, a.size());
 
     single_seg_parser b{std::move(a)};
-    BOOST_CHECK_EQUAL(0U, a.size()); // NOLINT(bugprone-use-after-move)
+    // NOLINTNEXTLINE(bugprone-use-after-move, clang-analyzer-cplusplus.Move)
+    BOOST_CHECK_EQUAL(0U, a.size());
     BOOST_CHECK_EQUAL(0U, b.size()); // NOLINT(cert-err58-cpp)
 }
 
