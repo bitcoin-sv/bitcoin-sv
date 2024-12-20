@@ -372,7 +372,6 @@ BOOST_AUTO_TEST_CASE(tx_parser_by_parts)
         BOOST_CHECK_EQUAL(n, bytes_read);
         BOOST_CHECK_EQUAL(0U, bytes_reqd);
         BOOST_CHECK_EQUAL(0U, parser.buffer_size());
-        offset += bytes_read;
     }
     
     {
