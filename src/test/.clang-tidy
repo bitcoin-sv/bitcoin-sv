@@ -1,4 +1,9 @@
-Checks: '-bugprone-unchecked-optional-access'
+Checks: '-clang-analyzer-core.NullDereference,
+         -clang-analyzer-cplusplus.NewDelete,
+         -clang-analyzer-cplusplus.NewDeleteLeaks,
+      '
 
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
 ...
 
