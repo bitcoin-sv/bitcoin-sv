@@ -353,7 +353,7 @@ size_t ser_size(const CTransaction&);
 /**
  * A mutable version of CTransaction.
  */
-class CMutableTransaction {
+class CMutableTransaction { // NOLINT(clang-analyzer-optin.performance.Padding)
 public:
     int32_t nVersion;
     std::vector<CTxIn> vin;
