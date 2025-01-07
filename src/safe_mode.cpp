@@ -24,19 +24,34 @@ bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) c
             return true;
         }
         // if it is higher than tip or lower than base it is not member
-        if(pindexNew->GetHeight() >= fork.first->GetHeight() || pindexNew->GetHeight() <= fork.second->back()->GetHeight())
+        if(pindexNew->GetHeight() >= fork.first->GetHeight()
+           || pindexNew->GetHeight() <= fork.second->back()->GetHeight())
         {
             return false;
         }
 
-        for(const CBlockIndex* pindex: *fork.second)
+        if(fork.second)
         {
-            if(pindex == pindexNew)
+            // shortcut lookup index by height
+            const auto& blocks = *fork.second;
+            if(!blocks.empty())
             {
-                return true;
+                const auto h0 = blocks.front()->GetHeight();
+                const auto index = h0 - pindexNew->GetHeight();
+                if(index >= 0 && index < ssize(blocks))
+                    if(blocks[index] == pindexNew)
+                        return true;
+            }
+
+            // fallback to linear search
+            for(const CBlockIndex* pindex: blocks)
+            {
+                if(pindex == pindexNew)
+                    return true;
             }
         }
     }
+            
     return false;
 }
 
