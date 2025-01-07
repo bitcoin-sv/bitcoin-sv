@@ -1,6 +1,8 @@
 Checks: '-clang-analyzer-core.NullDereference,
          -clang-analyzer-cplusplus.NewDelete,
          -clang-analyzer-cplusplus.NewDeleteLeaks,
+
+         -clang-diagnostic-deprecated-declarations
       '
 
 WarningsAsErrors: '*'
