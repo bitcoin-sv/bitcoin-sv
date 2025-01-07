@@ -27,6 +27,7 @@ add_executable(bench_bitcoin
         op_codes.cpp
         perf.cpp
         rollingbloom.cpp
+        safe_mode.cpp
         serialisation.cpp
         thread_safe_queue.cpp
         data/block413567.raw.h)

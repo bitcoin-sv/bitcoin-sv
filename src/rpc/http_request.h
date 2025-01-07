@@ -122,10 +122,12 @@ class HTTPRequest
         std::string toEncode { toEncodeStr.str() };
 
         std::string encoded {};
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         char* encodedURI { evhttp_uriencode(toEncode.data(), toEncode.size(), false) };
         if(encodedURI)
         {   
             encoded = encodedURI;
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory, cppcoreguidelines-no-malloc)
             free(encodedURI);
         }
         else

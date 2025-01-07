@@ -2,33 +2,16 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
+#include <cstdint>
 
 #include "block_index_store.h"
 #include "safe_mode.h"
 #include "config.h"
 #include "sync.h"
 #include "validation.h"
-
-struct chain_guard
-{
-    chain_guard()
-    {
-        chainActive.SetTip(nullptr);
-        mapBlockIndex.clear();
-    }
-
-    ~chain_guard()
-    {
-        chainActive.SetTip(nullptr);
-        mapBlockIndex.clear();
-    }
-
-    chain_guard(const chain_guard&) = default;
-    chain_guard(chain_guard&&) = default;
-    chain_guard& operator=(const chain_guard&) = default;
-    chain_guard& operator=(chain_guard&&) = default;
-};
+#include "chain_guard.h"
 
 BOOST_AUTO_TEST_SUITE(safe_mode_tests)
 

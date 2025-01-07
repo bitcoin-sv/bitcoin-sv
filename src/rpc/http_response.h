@@ -24,6 +24,11 @@ class HTTPResponse
     HTTPResponse(const std::vector<std::string>& expectedHeaders) : mExpectedHeaders{expectedHeaders} {}
     virtual ~HTTPResponse() = default;
 
+    HTTPResponse& operator=(const HTTPResponse&) = default;
+    HTTPResponse(const HTTPResponse&) = default;
+    HTTPResponse(HTTPResponse&&) = default;
+    HTTPResponse& operator=(HTTPResponse&&) = default;
+
     void SetStatus(int status) { mStatus = status; };
     void SetError(int error) { mError = error; }
     int GetStatus() const { return mStatus; }
