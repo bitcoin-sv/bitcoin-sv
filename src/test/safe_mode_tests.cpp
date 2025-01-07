@@ -162,4 +162,78 @@ BOOST_FIXTURE_TEST_CASE(get_fork_tips_3, chain_guard)
     BOOST_CHECK_EQUAL(1, tips.count(bi_2));
 }
 
+BOOST_AUTO_TEST_CASE(check_safe_mode_parameters_nullptr)
+{
+    LOCK(cs_main);
+
+    const auto& config{GlobalConfig::GetConfig()};
+    SafeMode sm;
+    sm.CheckSafeModeParameters(config, nullptr);
+    const auto forks = sm.forks();
+    BOOST_CHECK(forks.empty());
+}
+
+BOOST_AUTO_TEST_CASE(check_safe_mode_parameters_safe_mode_max_fork_dist)
+{
+    using test_args = std::tuple<int,   // fork distance offset
+                                 int>;  // expected number of forks
+    const std::vector<test_args> test_data{ {-1, 1},   // lt safemode_max_fork_dist
+                                            { 0, 1},   // eq safemode_max_fork_dist
+                                            { 1, 0} }; // gt safemode_max_fork_dist
+    for(const auto& [offset, exp_forks_size] : test_data)
+    {
+        chain_guard guard;
+        
+        LOCK(cs_main);
+
+        CBlockHeader hdr;
+        uint256 prev_hash;
+        hdr.hashPrevBlock = prev_hash;
+        BlockIndexStore blockIndexStore;
+        CBlockIndex* tip{blockIndexStore.Insert(hdr)};
+        prev_hash = tip->GetBlockHash();
+        
+        CBlockIndex* tip_1{};
+        uint256 prev_hash_1{prev_hash};
+
+        CBlockIndex* tip_2{};
+        uint256 prev_hash_2{prev_hash};
+
+        const auto& config{GlobalConfig::GetConfig()};
+        const auto safemode_max_fork_dist = config.GetSafeModeMaxForkDistance();
+        uint32_t timestamp{};
+        for(int64_t i{}; i < safemode_max_fork_dist + offset; ++i)
+        {
+            CBlockHeader hdr_1;
+            hdr_1.hashPrevBlock = prev_hash_1;
+            hdr_1.nTime = ++timestamp;
+            tip_1 = blockIndexStore.Insert(hdr_1);
+            prev_hash_1 = tip_1->GetBlockHash();
+            
+            CBlockHeader hdr_2;
+            hdr_2.hashPrevBlock = prev_hash_2;
+            hdr_2.nTime = ++timestamp;
+            tip_2 = blockIndexStore.Insert(hdr_2);
+            prev_hash_2 = tip_2->GetBlockHash();
+        }
+
+        chainActive.SetTip(tip_1);
+        
+        SafeMode sm;
+        sm.CheckSafeModeParameters(config, tip_2);
+        const auto forks = sm.forks();
+        BOOST_CHECK_EQUAL(exp_forks_size, forks.size());
+        if(!forks.empty())
+        {
+            const auto fork = forks.find(tip_2);
+            BOOST_CHECK_EQUAL(safemode_max_fork_dist + offset, fork->second->size());
+        }
+    
+        const auto status = sm.GetStatus();
+        BOOST_CHECK(status.starts_with(forks.empty()
+                                           ? R"({"safemodeenabled": false)"
+                                           : R"({"safemodeenabled": true)"));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
