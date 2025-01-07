@@ -42,6 +42,6 @@ target_link_libraries(bench_bitcoin
         univalue
         $<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 
-if(enable_clang-tidy)
-        AddClangTidy(bench_bitcoin)
+if(ENABLE_CLANG_TIDY)
+    AddClangTidy(bench_bitcoin)
 endif()

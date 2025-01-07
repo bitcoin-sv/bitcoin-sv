@@ -109,15 +109,6 @@ if(CCACHE)
 	set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE})
 endif(CCACHE)
 
-###
-# static analyzer
-###
-option(enable_clang-tidy "Use clang static analyzer" ON)
-
-if(enable_clang-tidy)
-    include(ClangTidy)
-endif()
-
 # Add the magic target check and check-all.
 add_custom_target(check-all)
 add_custom_target(check)
