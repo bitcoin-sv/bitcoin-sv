@@ -71,11 +71,11 @@ class SafeMode
     */
     struct SafeModeResult
     {
-        const CBlockIndex* activeChainTip;
-        const CBlockIndex* reorgedFrom;
-        int numberOfDisconnectedBlocks;
+        const CBlockIndex* activeChainTip{};
+        const CBlockIndex* reorgedFrom{};
+        int numberOfDisconnectedBlocks{};
         std::map<const CBlockIndex*, SafeModeFork> forks;
-        SafeModeLevel maxLevel;
+        SafeModeLevel maxLevel{SafeModeLevel::NONE};
 
         bool ShouldNotify(const SafeModeResult& oldResult) const;
         void AddFork(const CBlockIndex* forkTip, const CBlockIndex* forkBase, SafeModeLevel level);
@@ -117,6 +117,9 @@ private: // data members
     std::unique_ptr<rpc::client::RPCClientConfig> webhookConfig;
 
 public:
+
+    const auto& forks() const { return safeModeForks; }
+
     /**
     * Updates safe mode status after a change in the blockchain.
     * If the change is related to a single block (connected, invalidated, ...) it is passed as pindexNew. 

@@ -113,4 +113,53 @@ BOOST_FIXTURE_TEST_CASE(exclude_ignored_blocks, chain_guard)
     BOOST_CHECK_EQUAL(tip_2, ignored_blocks[0]);
 }
 
+BOOST_FIXTURE_TEST_CASE(get_fork_tips_0, chain_guard)
+{
+    LOCK(cs_main);
+    const auto tips = GetForkTips();
+    BOOST_CHECK(tips.empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(get_fork_tips_1, chain_guard)
+{
+    LOCK(cs_main);
+
+    CBlockHeader hdr; 
+    auto* bi = mapBlockIndex.Insert(hdr);
+    chainActive.SetTip(bi);
+
+    const auto tips = GetForkTips();
+    BOOST_CHECK(tips.empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(get_fork_tips_2, chain_guard)
+{
+    LOCK(cs_main);
+
+    CBlockHeader hdr; 
+    auto* bi = mapBlockIndex.Insert(hdr);
+
+    const auto tips = GetForkTips();
+    BOOST_CHECK_EQUAL(1, tips.size());
+    BOOST_CHECK_EQUAL(1, tips.count(bi));
+}
+
+BOOST_FIXTURE_TEST_CASE(get_fork_tips_3, chain_guard)
+{
+    LOCK(cs_main);
+
+    uint32_t timestamp{};
+    CBlockHeader hdr_1; 
+    hdr_1.nTime = ++timestamp;
+    auto* bi_1 = mapBlockIndex.Insert(hdr_1);
+    CBlockHeader hdr_2; 
+    hdr_2.nTime = ++timestamp;
+    auto* bi_2 = mapBlockIndex.Insert(hdr_2);
+
+    const auto tips = GetForkTips();
+    BOOST_CHECK_EQUAL(2, tips.size());
+    BOOST_CHECK_EQUAL(1, tips.count(bi_1));
+    BOOST_CHECK_EQUAL(1, tips.count(bi_2));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
