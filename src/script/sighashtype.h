@@ -15,6 +15,7 @@ enum {
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
+    SIGHASH_RELAX = 0x20,
     SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
 };
@@ -38,17 +39,24 @@ class SigHashType {
 private:
     uint32_t sigHash;
 
+    static constexpr uint32_t BASE_SIGHASH_MASK {0x1F}; // Low 5 bits
+
 public:
     explicit SigHashType() : sigHash(SIGHASH_ALL) {}
 
     explicit SigHashType(uint32_t sigHashIn) : sigHash(sigHashIn) {}
 
     SigHashType withBaseType(BaseSigHashType baseSigHashType) const {
-        return SigHashType((sigHash & ~0x1f) | uint32_t(baseSigHashType));
+        return SigHashType((sigHash & ~BASE_SIGHASH_MASK) | uint32_t(baseSigHashType));
     }
 
     SigHashType withForkValue(uint32_t forkId) const {
         return SigHashType((forkId << 8) | (sigHash & 0xff));
+    }
+
+    SigHashType withRelax(bool relax = true) const {
+        return SigHashType((sigHash & ~SIGHASH_RELAX) |
+                           (relax ? SIGHASH_RELAX : 0));
     }
 
     SigHashType withForkId(bool forkId = true) const {
@@ -62,23 +70,21 @@ public:
     }
 
     BaseSigHashType getBaseType() const {
-        return BaseSigHashType(sigHash & 0x1f);
+        return BaseSigHashType(sigHash & BASE_SIGHASH_MASK);
     }
 
     uint32_t getForkValue() const { return sigHash >> 8; }
 
     bool isDefined() const {
         auto baseType =
-            BaseSigHashType(sigHash & ~(SIGHASH_FORKID | SIGHASH_ANYONECANPAY));
+            BaseSigHashType(sigHash & ~(SIGHASH_RELAX | SIGHASH_FORKID | SIGHASH_ANYONECANPAY));
         return baseType >= BaseSigHashType::ALL &&
                baseType <= BaseSigHashType::SINGLE;
     }
 
+    bool hasRelax() const { return (sigHash & SIGHASH_RELAX) != 0; }
     bool hasForkId() const { return (sigHash & SIGHASH_FORKID) != 0; }
-
-    bool hasAnyoneCanPay() const {
-        return (sigHash & SIGHASH_ANYONECANPAY) != 0;
-    }
+    bool hasAnyoneCanPay() const { return (sigHash & SIGHASH_ANYONECANPAY) != 0; }
 
     uint32_t getRawSigHashType() const { return sigHash; }
 
