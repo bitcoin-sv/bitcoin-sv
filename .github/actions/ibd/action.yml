@@ -27,7 +27,7 @@ runs:
     - name: Configure bitcoind
       run: |
         mkdir ~/.bitcoin
-        cp .github/workflows/docker/cargo/bitcoin.conf ~/.bitcoin/
+        cp .github/docker/cargo/bitcoin.conf ~/.bitcoin/
       shell: bash
     - name: restore cache
       if: inputs.restore == 'true'
