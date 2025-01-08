@@ -1461,161 +1461,163 @@ BOOST_AUTO_TEST_CASE(chronicle_pushdata_only)
 
     std::vector<TestBuilder> tests;
 
-    auto postChronicleFlags { SCRIPT_GENESIS |
-                              SCRIPT_UTXO_AFTER_GENESIS |
-                              SCRIPT_CHRONICLE |
-                              SCRIPT_UTXO_AFTER_CHRONICLE |
-                              SCRIPT_ENABLE_SIGHASH_FORKID |
-                              SCRIPT_VERIFY_SIGPUSHONLY };
+    auto preGenesisFlags { StandardScriptVerifyFlags(ProtocolEra::PreGenesis) | InputScriptVerifyFlags(ProtocolEra::PreGenesis, ProtocolEra::PreGenesis) };
+    auto preChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostGenesis) | InputScriptVerifyFlags(ProtocolEra::PostGenesis, ProtocolEra::PostGenesis) };
+    auto postChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostChronicle) | InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle) };
+    auto preForkIDFlags { preGenesisFlags & ~SCRIPT_ENABLE_SIGHASH_FORKID };
 
-    // Post-Chronicle, scriptSig only pushes, signed with forkid
+    /************************/
+    /* Post Chronicle Tests */
+    /************************/
+
+    // Post-Chronicle, scriptSig only pushes, malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig only pushes, with FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig only pushes, malleability DISALLOWED", postChronicleFlags, false)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
-    // Post-Chronicle, scriptSig only pushes, signed without forkid
+    // Post-Chronicle, scriptSig only pushes, malleability allowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig only pushes, without FORKID", postChronicleFlags, false)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+                "PostChronicle, scriptSig only pushes, malleability ALLOWED", postChronicleFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable)
             .ScriptError(SCRIPT_ERR_OK));
-    // Post Chronicle, scriptSig only pushes, mixed-sig forkid
+    // Post Chronicle, scriptSig only pushes, mixed-sig malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
                                       << ToByteVector(keys.pubkey1C)
                                       << ToByteVector(keys.pubkey2C) << OP_3
                                       << OP_CHECKMULTISIG,
-                "PostChronicle, scriptSig only pushes, mixed-sig FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig only pushes, mixed-sig malleability DISALLOWED", postChronicleFlags, false)
             .Num(0)
             .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
-            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
 
-    // Post-Chronicle, scriptSig contains opcodes with no effect, signed with forkid
+    // Post-Chronicle, scriptSig contains opcodes with no effect, malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig contains opcodes with no effect, with FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains opcodes with no effect, malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_FALSE << OP_IF << OP_ENDIF)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::disallowed | malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
-    // Post-Chronicle, scriptSig contains opcodes with no effect, signed without forkid
+    // Post-Chronicle, scriptSig contains opcodes with no effect, malleability allowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig contains opcodes with no effect, without FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains opcodes with no effect, malleability ALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_FALSE << OP_IF << OP_ENDIF)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_OK));
-    // Post Chronicle, scriptSig scriptSig contains opcodes with no effect, mixed-sig forkid
+    // Post Chronicle, scriptSig scriptSig contains opcodes with no effect, mixed-sig malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
                                       << ToByteVector(keys.pubkey1C)
                                       << ToByteVector(keys.pubkey2C) << OP_3
                                       << OP_CHECKMULTISIG,
-                "PostChronicle, scriptSig scriptSig contains opcodes with no effect, mixed-sig FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig scriptSig contains opcodes with no effect, mixed-sig malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_FALSE << OP_IF << OP_ENDIF)
             .Num(0)
             .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
-            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::disallowed | malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
 
-    // Post-Chronicle, scriptSig contains opcodes that result TRUE, signed with forkid
+    // Post-Chronicle, scriptSig contains opcodes that result TRUE, malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_DROP,
-                "PostChronicle, scriptSig contains opcodes that result TRUE, with FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains opcodes that result TRUE, malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_1 << OP_1 << OP_ADD)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::disallowed | malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
-    // Post-Chronicle, scriptSig contains opcodes that result TRUE, signed without forkid
+    // Post-Chronicle, scriptSig contains opcodes that result TRUE, malleability allowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_DROP,
-                "PostChronicle, scriptSig contains opcodes that result TRUE, without FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains opcodes that result TRUE, malleability ALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_1 << OP_1 << OP_ADD)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_OK));
-    // Post Chronicle, scriptSig scriptSig contains opcodes that result TRUE, mixed-sig forkid
+    // Post Chronicle, scriptSig scriptSig contains opcodes that result TRUE, mixed-sig malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
                                       << ToByteVector(keys.pubkey1C)
                                       << ToByteVector(keys.pubkey2C) << OP_3
                                       << OP_CHECKMULTISIG << OP_DROP,
-                "PostChronicle, scriptSig scriptSig contains opcodes that result TRUE, mixed-sig FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig scriptSig contains opcodes that result TRUE, mixed-sig malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_1 << OP_1 << OP_ADD)
             .Num(0)
             .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
-            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::disallowed | malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
 
-    // Post-Chronicle, scriptSig contains opcodes that result FALSE, signed with forkid
+    // Post-Chronicle, scriptSig contains opcodes that result FALSE, malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_DROP,
-                "PostChronicle, scriptSig contains opcodes that result FALSE, with FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains opcodes that result FALSE, malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_1 << OP_1 << OP_SUB)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable) // FALSE evaluation bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_EVAL_FALSE));
-    // Post-Chronicle, scriptSig contains opcodes that result FALSE, signed without forkid
+    // Post-Chronicle, scriptSig contains opcodes that result FALSE, malleability allowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG << OP_DROP,
-                "PostChronicle, scriptSig contains opcodes that result FALSE, without FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains opcodes that result FALSE, malleability ALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_1 << OP_1 << OP_SUB)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable) // FALSE evaluation bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_EVAL_FALSE));
-    // Post Chronicle, scriptSig scriptSig contains opcodes that result FALSE, mixed-sig forkid
+    // Post Chronicle, scriptSig scriptSig contains opcodes that result FALSE, mixed-sig malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
                                       << ToByteVector(keys.pubkey1C)
                                       << ToByteVector(keys.pubkey2C) << OP_3
                                       << OP_CHECKMULTISIG << OP_DROP,
-                "PostChronicle, scriptSig scriptSig contains opcodes that result FALSE, mixed-sig FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig scriptSig contains opcodes that result FALSE, mixed-sig malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_1 << OP_1 << OP_SUB)
             .Num(0)
             .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
-            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable) // FALSE evaluation bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_EVAL_FALSE));
 
-    // Post-Chronicle, scriptSig contains unbalanced conditional, signed with forkid
+    // Post-Chronicle, scriptSig contains unbalanced conditional, malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig contains unbalanced conditional, with FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains unbalanced conditional, malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_TRUE << OP_FALSE << OP_IF)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable) // Unbalanced IF/ELSE bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_UNBALANCED_CONDITIONAL));
-    // Post-Chronicle, scriptSig contains unbalanced conditional, signed without forkid
+    // Post-Chronicle, scriptSig contains unbalanced conditional, malleability allowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig contains unbalanced conditional, without FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig contains unbalanced conditional, malleability ALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_TRUE << OP_FALSE << OP_IF)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable) // Unbalanced IF/ELSE bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_UNBALANCED_CONDITIONAL));
-    // Post Chronicle, scriptSig scriptSig contains unbalanced conditional, mixed-sig forkid
+    // Post Chronicle, scriptSig scriptSig contains unbalanced conditional, mixed-sig malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C)
                                       << ToByteVector(keys.pubkey1C)
                                       << ToByteVector(keys.pubkey2C) << OP_3
                                       << OP_CHECKMULTISIG,
-                "PostChronicle, scriptSig scriptSig contains unbalanced conditional, mixed-sig FORKID", postChronicleFlags, false)
+                "PostChronicle, scriptSig scriptSig contains unbalanced conditional, mixed-sig malleability DISALLOWED", postChronicleFlags, false)
             .PushScript(CScript() << OP_TRUE << OP_FALSE << OP_IF)
             .Num(0)
             .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
-            .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
+            .PushSig(keys.key1, SigHashType().withForkId().withRelax(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
             .Malleability(malleability::non_malleable) // Unbalanced IF/ELSE bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_UNBALANCED_CONDITIONAL));
@@ -1628,85 +1630,72 @@ BOOST_AUTO_TEST_CASE(chronicle_pushdata_only)
             .Malleability(malleability::non_malleable) // Signature encoding check bails out before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_SIG_DER));
 
-    auto preChronicleFlags { SCRIPT_GENESIS |
-                             SCRIPT_UTXO_AFTER_GENESIS |
-                             SCRIPT_ENABLE_SIGHASH_FORKID |
-                             SCRIPT_VERIFY_SIGPUSHONLY };
+    /***********************/
+    /* Pre Chronicle Tests */
+    /***********************/
 
-    // Pre-Chronicle, old pushonly rules still apply, signed with forkid
+    // Pre-Chronicle, old pushonly rules still apply
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreChronicle, old pushonly rules apply 1, with FORKID", preChronicleFlags, false)
+                "PreChronicle, old pushonly rules apply 1", preChronicleFlags, false)
             .PushScript(CScript() << OP_FALSE << OP_IF << OP_ENDIF)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, preChronicleFlags)
             .Malleability(malleability::disallowed | malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
    tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreChronicle, old pushonly rules apply 2, with FORKID", preChronicleFlags, false)
+                "PreChronicle, old pushonly rules apply 2", preChronicleFlags, false)
             .PushScript(CScript() << OP_RETURN)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, preChronicleFlags)
             .Malleability(malleability::non_malleable) // RETURN leaves invalid stack before we even hit malleability checks
             .ScriptError(SCRIPT_ERR_INVALID_STACK_OPERATION));
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreChronicle, old pushonly rules apply 3, with FORKID", preChronicleFlags, false)
+                "PreChronicle, old pushonly rules apply 3", preChronicleFlags, false)
             .PushScript(CScript() << OP_NOP)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, preChronicleFlags)
             .Malleability(malleability::disallowed | malleability::non_push_data)
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
-    // Pre-Chronicle, old pushonly rules still apply, signed without forkid
-    tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreChronicle, old pushonly rules apply 1, without FORKID", preChronicleFlags, false)
-            .PushScript(CScript() << OP_FALSE << OP_IF << OP_ENDIF)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preChronicleFlags)
-            .Malleability(malleability::non_malleable) // Missing FORKID bails out before we even hit malleability checks
-            .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
-   tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreChronicle, old pushonly rules apply 2, without FORKID", preChronicleFlags, false)
-            .PushScript(CScript() << OP_RETURN)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preChronicleFlags)
-            .Malleability(malleability::non_malleable) // RETURN leaves invalid stack before we even hit malleability checks
-            .ScriptError(SCRIPT_ERR_INVALID_STACK_OPERATION));
-    tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreChronicle, old pushonly rules apply 3, without FORKID", preChronicleFlags, false)
-            .PushScript(CScript() << OP_NOP)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preChronicleFlags)
-            .Malleability(malleability::non_malleable) // Missing FORKID bails out before we even hit malleability checks
-            .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
 
-    auto preGenesisFlags { SCRIPT_ENABLE_SIGHASH_FORKID };
+    /*********************/
+    /* Pre Genesis Tests */
+    /*********************/
 
-    // Pre-Genesis, scriptSig only pushes, signed with forkid
+    // Pre-Genesis, scriptSig only pushes
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreGenesis, scriptSig only pushes, with FORKID", preGenesisFlags, false)
+                "PreGenesis, scriptSig only pushes", preGenesisFlags, false)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, preGenesisFlags)
+            .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
-    // Pre-Genesis, scriptSig only pushes, signed without forkid
+    // Pre-Genesis, scriptSig non-push only
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreGenesis, scriptSig only pushes, without FORKID", preGenesisFlags, false)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preGenesisFlags)
-            .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
-
-    // Pre-Genesis, scriptSig non-push only, signed with forkid
-    tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreGenesis, scriptSig non-push only, with FORKID", preGenesisFlags, false)
+                "PreGenesis, scriptSig non-push only", preGenesisFlags, false)
             .PushScript(CScript() << OP_NOP)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, preGenesisFlags)
-            .ScriptError(SCRIPT_ERR_OK));
-    // Pre-Genesis, scriptSig non-push only, signed without forkid
+            .Malleability(malleability::non_push_data | malleability::disallowed)
+            .ScriptError(SCRIPT_ERR_OK));   // Pre-Genesis, non-push data was allowed in unlocking script
+
+    /********************/
+    /* Pre ForkID Tests */
+    /********************/
+
+    // Pre-ForkID, scriptSig only pushes
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PreGenesis, scriptSig non-push only, with FORKID", preGenesisFlags, false)
+                "PreForkID, scriptSig only pushes", preForkIDFlags, false)
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preForkIDFlags)
+            .Malleability(malleability::non_malleable)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Pre-ForkID, scriptSig non-push only
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                "PreForkID, scriptSig non-push only", preForkIDFlags, false)
             .PushScript(CScript() << OP_NOP)
-            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preGenesisFlags)
-            .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
+            .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, preForkIDFlags)
+            .Malleability(malleability::non_push_data)
+            .ScriptError(SCRIPT_ERR_OK));
 
     for (TestBuilder& test : tests)
     {
