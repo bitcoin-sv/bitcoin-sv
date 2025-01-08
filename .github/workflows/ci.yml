@@ -62,7 +62,7 @@ jobs:
       - name: Benchmark
         uses: ./.github/workflows/benchmark/ 
       - name: Build
-        uses: ./.github/workflows/build_bitcoin_autotools
+        uses: ./.github/actions/build_bitcoin_autotools
       - name: Unit test
         uses: ./.github/workflows/unit_test_bitcoin_autotools
       - name: Functional test
