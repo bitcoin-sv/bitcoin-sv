@@ -66,7 +66,7 @@ jobs:
       - name: Unit test
         uses: ./.github/actions/unit_test_bitcoin_autotools
       - name: Functional test
-        uses: ./.github/workflows/functional_test
+        uses: ./.github/actions/functional_test
         with: 
           tag: ${{ matrix.tag }}
           toolset: ${{ matrix.toolset }}
@@ -113,7 +113,7 @@ jobs:
         uses: ./.github/workflows/bench_test_bitcoin_cmake
       - name: Functional test
         if: ${{ matrix.build_type != 'Debug' }}
-        uses: ./.github/workflows/functional_test
+        uses: ./.github/actions/functional_test
         with: 
           tag: ${{ matrix.tag }}
           toolset: ${{ matrix.toolset }}
