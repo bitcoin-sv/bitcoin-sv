@@ -19,7 +19,7 @@ runs:
   using: "composite"
   steps:
     - run: |
-        args=$(.github/workflows/build_bitcoin_cmake/build.sh \
+        args=$(.github/actions/build_bitcoin_cmake/build.sh \
              ${{ inputs.build_type }} \
              ${{ inputs.sanitizers }})
         cmake -G Ninja . ${args}
@@ -27,7 +27,7 @@ runs:
       if: inputs.targets
       shell: bash
     - run: |
-        args=$(.github/workflows/build_bitcoin_cmake/build.sh \
+        args=$(.github/actions/build_bitcoin_cmake/build.sh \
              ${{ inputs.build_type }} \
              ${{ inputs.sanitizers }})
         cmake -G Ninja . ${args}

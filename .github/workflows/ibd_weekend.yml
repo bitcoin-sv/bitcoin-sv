@@ -33,7 +33,7 @@ jobs:
         with:
           clean: ''
       - name: Build Bitcoin
-        uses: ./.github/workflows/build_bitcoin_cmake
+        uses: ./.github/actions/build_bitcoin_cmake
         with: 
           targets: bitcoind bitcoin-cli
       - name: Initial Block Download

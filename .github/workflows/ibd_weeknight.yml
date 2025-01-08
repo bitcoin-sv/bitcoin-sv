@@ -25,7 +25,7 @@ jobs:
         with:
           clean: ''
       - name: Build Bitcoin
-        uses: ./.github/workflows/build_bitcoin_cmake
+        uses: ./.github/actions/build_bitcoin_cmake
         with: 
           build_type: Release
       - name: Initial Block Download

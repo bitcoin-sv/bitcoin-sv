@@ -101,7 +101,7 @@ jobs:
           toolset: ${{ matrix.toolset }}
           version: ${{ matrix.version }}
       - name: Build Bitcoin
-        uses: ./.github/workflows/build_bitcoin_cmake
+        uses: ./.github/actions/build_bitcoin_cmake
         with: 
           build_type: ${{ matrix.build_type }}
           sanitizers: ${{ matrix.sanitizers }}
