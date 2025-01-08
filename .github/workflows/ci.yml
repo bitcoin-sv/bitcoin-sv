@@ -60,7 +60,7 @@ jobs:
         with:
           clean: ''
       - name: Benchmark
-        uses: ./.github/workflows/benchmark/ 
+        uses: ./.github/actions/benchmark/ 
       - name: Build
         uses: ./.github/actions/build_bitcoin_autotools
       - name: Unit test
@@ -94,7 +94,7 @@ jobs:
         with:
           clean: ''
       - name: Benchmark
-        uses: ./.github/workflows/benchmark/ 
+        uses: ./.github/actions/benchmark/ 
       - name: Select toolset version
         uses: ./.github/actions/select_toolset_version
         with: 

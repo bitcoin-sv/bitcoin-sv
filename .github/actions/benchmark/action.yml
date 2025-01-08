@@ -5,5 +5,5 @@ description: 'Benchmark test of C.I. environment'
 runs:
   using: "composite"
   steps:
-    - run: .github/workflows/benchmark/benchmark.sh 
+    - run: .github/actions/benchmark/benchmark.sh 
       shell: bash
