@@ -64,7 +64,7 @@ jobs:
       - name: Build
         uses: ./.github/actions/build_bitcoin_autotools
       - name: Unit test
-        uses: ./.github/workflows/unit_test_bitcoin_autotools
+        uses: ./.github/actions/unit_test_bitcoin_autotools
       - name: Functional test
         uses: ./.github/workflows/functional_test
         with: 
