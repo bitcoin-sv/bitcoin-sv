@@ -1473,7 +1473,7 @@ BOOST_AUTO_TEST_CASE(chronicle_pushdata_only)
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
                 "PostChronicle, scriptSig only pushes, with FORKID", postChronicleFlags, false)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
-            .Malleability(malleability::disallowed)
+            .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
     // Post-Chronicle, scriptSig only pushes, signed without forkid
     tests.push_back(
@@ -1493,7 +1493,7 @@ BOOST_AUTO_TEST_CASE(chronicle_pushdata_only)
             .PushSig(keys.key0, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key1, SigHashType(), 32, 32, Amount{0}, postChronicleFlags)
             .PushSig(keys.key2, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
-            .Malleability(malleability::disallowed)
+            .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
 
     // Post-Chronicle, scriptSig contains opcodes with no effect, signed with forkid
@@ -3631,7 +3631,7 @@ BOOST_AUTO_TEST_CASE(get_script_verify_flags)
     BOOST_CHECK(flags & SCRIPT_UTXO_AFTER_CHRONICLE);
 }
 
-BOOST_AUTO_TEST_CASE(chronicle_forkid_script_validation)
+BOOST_AUTO_TEST_CASE(chronicle_forkid_relax_script_validation)
 {
     const KeyData keys {};
     const Amount TEST_AMOUNT {12345};
@@ -3641,54 +3641,112 @@ BOOST_AUTO_TEST_CASE(chronicle_forkid_script_validation)
     auto preChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostGenesis) | InputScriptVerifyFlags(ProtocolEra::PostGenesis, ProtocolEra::PostGenesis) };
     auto postChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostChronicle) | InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle) };
     auto forkidNotEnabledFlags { preGenesisFlags & ~SCRIPT_ENABLE_SIGHASH_FORKID };
- 
-    // Pre-ForkID, signed with forkid
+
+    // Pre-ForkID, signed without forkid, without relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PreForkID FORKID", forkidNotEnabledFlags, false, TEST_AMOUNT)
+                    "P2PK PreForkID not FORKID not RELAX", forkidNotEnabledFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT)
+            .Malleability(malleability::non_malleable)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Pre-ForkID, signed without forkid, with relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreForkID not FORKID RELAX", forkidNotEnabledFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withRelax(), 32, 32, TEST_AMOUNT)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_RELAX));
+    // Pre-ForkID, signed with forkid, without relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreForkID FORKID not RELAX", forkidNotEnabledFlags, false, TEST_AMOUNT)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT)
             .ScriptError(SCRIPT_ERR_ILLEGAL_FORKID));
-    // Pre-ForkID, signed without forkid
+    // Pre-ForkID, signed with forkid, with relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PreForkID not FORKID", forkidNotEnabledFlags, false, TEST_AMOUNT)
-            .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT)
-            .ScriptError(SCRIPT_ERR_OK));
-    // Pre-Genesis, signed with forkid
+                    "P2PK PreForkID FORKID RELAX", forkidNotEnabledFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, TEST_AMOUNT)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_FORKID));
+
+    // Pre-Genesis, signed without forkid, without relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PreGenesis FORKID", preGenesisFlags, false, TEST_AMOUNT)
-            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, preGenesisFlags)
-            .ScriptError(SCRIPT_ERR_OK));
-    // Pre-Genesis, signed without forkid
-    tests.push_back(
-        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PreGenesis not FORKID", preGenesisFlags, false, TEST_AMOUNT)
+                    "P2PK PreGenesis not FORKID not RELAX", preGenesisFlags, false, TEST_AMOUNT)
             .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT, preGenesisFlags)
             .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
-    // Pre-Chronicle, signed with forkid
+    // Pre-Genesis, signed without forkid, with relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PreChronicle FORKID", preChronicleFlags, false, TEST_AMOUNT)
-            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, preChronicleFlags)
+                    "P2PK PreGenesis not FORKID RELAX", preGenesisFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withRelax(), 32, 32, TEST_AMOUNT, preGenesisFlags)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_RELAX));
+    // Pre-Genesis, signed with forkid, without relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreGenesis FORKID not RELAX", preGenesisFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, preGenesisFlags)
+            .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
-    // Pre-Chronicle, signed without forkid
+    // Pre-Genesis, signed with forkid, with relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PreChronicle not FORKID", preChronicleFlags, false, TEST_AMOUNT)
+                    "P2PK PreGenesis FORKID RELAX", preGenesisFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, TEST_AMOUNT, preGenesisFlags)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_RELAX));
+
+    // Pre-Chronicle, signed without forkid, without relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreChronicle not FORKID not RELAX", preChronicleFlags, false, TEST_AMOUNT)
             .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT, preChronicleFlags)
             .ScriptError(SCRIPT_ERR_MUST_USE_FORKID));
-    // Post-Chronicle, signed with forkid
+    // Pre-Chronicle, signed without forkid, with relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PostChronicle FORKID", postChronicleFlags, false, TEST_AMOUNT)
-            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+                    "P2PK PreChronicle not FORKID RELAX", preChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withRelax(), 32, 32, TEST_AMOUNT, preChronicleFlags)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_RELAX));
+    // Pre-Chronicle, signed with forkid, without relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PreChronicle FORKID not RELAX", preChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, preChronicleFlags)
+            .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
-    // Post-Chronicle, signed without forkid
+    // Pre-Chronicle, signed with forkid, with relax
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                    "P2PK PostChronicle not FORKID", postChronicleFlags, false, TEST_AMOUNT)
+                    "P2PK PreChronicle FORKID RELAX", preChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, TEST_AMOUNT, preChronicleFlags)
+            .ScriptError(SCRIPT_ERR_ILLEGAL_RELAX));
+
+    // Post-Chronicle, signed without forkid, without relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PostChronicle not FORKID not RELAX", postChronicleFlags, false, TEST_AMOUNT)
             .PushSig(keys.key0, SigHashType(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+            .Malleability(malleability::non_malleable)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, signed without forkid, with relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PostChronicle not FORKID RELAX", postChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withRelax(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+            .Malleability(malleability::non_malleable)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, signed with forkid, without relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PostChronicle FORKID not RELAX", postChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+            .Malleability(malleability::non_malleable | malleability::disallowed)
+            .ScriptError(SCRIPT_ERR_OK));
+    // Post-Chronicle, signed with forkid, with relax
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "P2PK PostChronicle FORKID RELAX", postChronicleFlags, false, TEST_AMOUNT)
+            .PushSig(keys.key0, SigHashType().withForkId().withRelax(), 32, 32, TEST_AMOUNT, postChronicleFlags)
+            .Malleability(malleability::non_malleable)
             .ScriptError(SCRIPT_ERR_OK));
 
     for(TestBuilder& test : tests)
