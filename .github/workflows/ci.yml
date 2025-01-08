@@ -108,7 +108,7 @@ jobs:
       - name: Unit test secp256k1
         uses: ./.github/workflows/unit_test_secp256k1_cmake
       - name: Unit test Bitcoin
-        uses: ./.github/workflows/unit_test_bitcoin_cmake
+        uses: ./.github/actions/unit_test_bitcoin_cmake
       - name: Bench test Bitcoin
         uses: ./.github/workflows/bench_test_bitcoin_cmake
       - name: Functional test
