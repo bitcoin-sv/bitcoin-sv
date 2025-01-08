@@ -17,7 +17,7 @@ runs:
   using: "composite"
   steps:
     - run: |
-        .github/workflows/select_toolset_version/update-alternatives-cpp.sh -r \
+        .github/actions/select_toolset_version/update-alternatives-cpp.sh -r \
             ${{ inputs.toolset }} \
             ${{ inputs.version }}
       shell: bash

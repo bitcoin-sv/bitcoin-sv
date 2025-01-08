@@ -96,7 +96,7 @@ jobs:
       - name: Benchmark
         uses: ./.github/workflows/benchmark/ 
       - name: Select toolset version
-        uses: ./.github/workflows/select_toolset_version
+        uses: ./.github/actions/select_toolset_version
         with: 
           toolset: ${{ matrix.toolset }}
           version: ${{ matrix.version }}
