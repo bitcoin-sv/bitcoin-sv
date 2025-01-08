@@ -97,6 +97,8 @@ const char *ScriptErrorString(const ScriptError serror) {
             return "Illegal use of SIGHASH_FORKID";
         case SCRIPT_ERR_MUST_USE_FORKID:
             return "Signature must use SIGHASH_FORKID";
+        case SCRIPT_ERR_ILLEGAL_RELAX:
+            return "Illegal use of SIGHASH_RELAX";
         case SCRIPT_ERR_BIG_INT:
             return "Big integer OpenSSL error";
         case SCRIPT_ERR_INVALID_FLAGS:

@@ -275,22 +275,30 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
         if(!GetHashType(vchSig).isDefined())
             return SCRIPT_ERR_SIG_HASHTYPE;
 
+        const bool usesRelax = GetHashType(vchSig).hasRelax();
         const bool usesForkId = GetHashType(vchSig).hasForkId();
+        const bool chronicleEnabled = flags & SCRIPT_CHRONICLE;
         const bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
         if(!forkIdEnabled && usesForkId)
             return SCRIPT_ERR_ILLEGAL_FORKID;
+        if(!chronicleEnabled && usesRelax)
+            return SCRIPT_ERR_ILLEGAL_RELAX;
 
         if(forkIdEnabled)
         {
-            if(usesForkId)
+            if(!chronicleEnabled)
             {
-                ms |= malleability::disallowed;
-            }
-            else
-            {
-                // ForkID optional post-Chronicle
-                if((flags & SCRIPT_CHRONICLE) == 0)
+                if(!usesForkId)
+                {
+                    // Pre-Chronicle ForkID is mandatory
                     return SCRIPT_ERR_MUST_USE_FORKID;
+                }
+            }
+
+            if(usesForkId && !usesRelax)
+            {
+                // Strict malleability rules enforced if ForkID set and Relax unset
+                ms |= malleability::disallowed;
             }
         }
     }
