@@ -15,10 +15,23 @@ concurrency:
 
 jobs:
   ibd_weeknight:
+    env:
+      GITHUB_TOKEN: ${{ secrets.ACTIONS_PAT }}
     runs-on: [ self-hosted, docker, large, perf ]
     container:
       image: nchain/svn_dev:ubuntu_22.04
       options: --cap-add CAP_PERFMON --cap-add CAP_BPF --volume /lib/modules:/lib/modules
+    strategy:
+      max-parallel: 1
+      matrix:
+        array: [
+          { duration: $((5 * 60)), restore: false, save: true },
+          { duration: $((15 * 60)), restore: true,  save: true },
+          { duration: $((30 * 60)), restore: true,  save: true },
+          { duration: $((1 * 60 * 60)), restore: true,  save: true },
+          { duration: $((1 * 60 * 60)), restore: true,  save: true },
+          { duration: $((1 * 60 * 60)), restore: true,  save: false },
+        ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,9 +41,10 @@ jobs:
         uses: ./.github/actions/build_bitcoin_cmake
         with: 
           build_type: Release
+          targets: bitcoind bitcoin-cli
       - name: Initial Block Download
         uses: ./.github/actions/ibd
         with:
-          duration: $((5 * 60 * 60)) # Note: Each job must be < 6hrs
-          restore: false
-          save: false
+          duration: ${{ matrix.array.duration }}
+          restore: ${{ matrix.array.restore }}
+          save: ${{ matrix.array.save }}

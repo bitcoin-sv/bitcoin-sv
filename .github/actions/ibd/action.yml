@@ -57,11 +57,17 @@ runs:
     - name: Run bitcoind
       run: |
         ./src/bitcoind&
+      shell: bash
+    - name: Run Perf
+      run: |
         perf record -g \
                     -F 99 \
                     -p $(pidof bitcoind) \
                     -o tmp.dat \
                     -- sleep ${{ inputs.duration }}
+      shell: bash
+    - name: Stop Bitcoind
+      run: |
         ./src/bitcoin-cli stop
         while pidof -q bitcoind;
         do
