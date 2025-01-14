@@ -9,6 +9,61 @@
 
 #include <set>
 
+// default constructor
+static_assert(SigHashType{}.isDefined());
+
+static_assert(!SigHashType{}.hasRelax());
+static_assert(SigHashType{}.withRelax().hasRelax());
+static_assert(!SigHashType{}.withRelax(false).hasRelax());
+
+static_assert(!SigHashType{}.hasForkId());
+static_assert(SigHashType{}.withForkId().hasForkId());
+static_assert(!SigHashType{}.withForkId(false).hasForkId());
+
+static_assert(!SigHashType{}.hasAnyoneCanPay());
+static_assert(SigHashType{}.withAnyoneCanPay().hasAnyoneCanPay());
+static_assert(!SigHashType{}.withAnyoneCanPay(false).hasAnyoneCanPay());
+
+static_assert(SigHashType{}.getBaseType() == BaseSigHashType::ALL);
+
+static_assert(SigHashType{}.getRawSigHashType() == SIGHASH_ALL);
+
+static_assert(SigHashType{}.getForkValue() == 0);
+
+// constructor with argument
+static_assert(!SigHashType{0}.isDefined());
+static_assert(SigHashType{1}.isDefined());
+static_assert(SigHashType{2}.isDefined());
+static_assert(SigHashType{3}.isDefined());
+static_assert(!SigHashType{4}.isDefined());
+static_assert(!SigHashType{0x11}.isDefined());
+static_assert(SigHashType{0x21}.isDefined());
+static_assert(SigHashType{0x41}.isDefined());
+static_assert(SigHashType{0x81}.isDefined());
+
+static_assert(SigHashType{0x20}.hasRelax());
+static_assert(SigHashType{0x20}.withRelax().hasRelax());
+static_assert(!SigHashType{0x20}.withRelax(false).hasRelax());
+
+static_assert(SigHashType{0x40}.hasForkId());
+static_assert(SigHashType{0x40}.withForkId().hasForkId());
+static_assert(!SigHashType{0x40}.withForkId(false).hasForkId());
+
+static_assert(SigHashType{0x12345678}.getForkValue() == 0x123456);
+
+static_assert(SigHashType{0x80}.hasAnyoneCanPay());
+static_assert(SigHashType{0x80}.withAnyoneCanPay().hasAnyoneCanPay());
+static_assert(!SigHashType{0x80}.withAnyoneCanPay(false).hasAnyoneCanPay());
+
+static_assert(SigHashType{0xe0}.getBaseType() == BaseSigHashType::UNSUPPORTED);
+static_assert(SigHashType{0xe1}.getBaseType() == BaseSigHashType::ALL);
+static_assert(SigHashType{0xe2}.getBaseType() == BaseSigHashType::NONE);
+static_assert(SigHashType{0xe3}.getBaseType() == BaseSigHashType::SINGLE);
+
+static_assert(SigHashType{0x81}.getRawSigHashType() == (SIGHASH_ANYONECANPAY | SIGHASH_ALL));
+static_assert(SigHashType{0x42}.getRawSigHashType() == (SIGHASH_FORKID | SIGHASH_NONE));
+static_assert(SigHashType{0x23}.getRawSigHashType() == (SIGHASH_RELAX | SIGHASH_SINGLE));
+
 BOOST_FIXTURE_TEST_SUITE(sighashtype_tests, BasicTestingSetup)
 
 static void CheckSigHashType(SigHashType t,
