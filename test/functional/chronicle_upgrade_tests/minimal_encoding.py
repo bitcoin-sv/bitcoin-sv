@@ -2,7 +2,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from chronicle_upgrade_tests.test_base import ChronicleHeightTestsCase
-from test_framework.script import CScriptOp, OP_DROP, OP_PUSHDATA1, OP_0, OP_1ADD, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import CScriptOp, OP_DROP, OP_PUSHDATA1, OP_0, OP_1ADD, SIGHASH_ALL, SIGHASH_FORKID, SIGHASH_RELAX
 
 """
 Test that before Chronicle we reject scripts without minimal encoding of
@@ -11,8 +11,8 @@ pushdata and script nums.
 Test that during the Chronicle grace period we soft-reject such non-minimally
 encoded data and script nums.
 
-Test that after Chronicle we accept non-minimally encoded values provided ForkID
-is not set.
+Test that after Chronicle we accept non-minimally encoded values provided tx
+is appropriately signed.
 """
 
 
@@ -43,28 +43,28 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         if tx_collection.label == "PRE_CHRONICLE":
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; rejected
-            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
+            # Large data push, signed malleable; rejected
+            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Data push larger than necessary)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Large data push, multi-input, mixed forkid; rejected
+            # Large data push, multi-input, mixed malleability; rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
@@ -72,28 +72,28 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Data push larger than necessary)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; rejected
+            # Non-minimally encoded, signed malleable; rejected
             spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-minimally encoded script number)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Non-minimally encoded, multi-input, mixed forkid; rejected
+            # Non-minimally encoded, multi-input, mixed malleability; rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -105,28 +105,28 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_GRACE":
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; rejected
+            # Large data push, signed malleable; rejected
             spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Data push larger than necessary)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Large data push, multi-input, mixed forkid; rejected
+            # Large data push, multi-input, mixed malleability; rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
@@ -134,28 +134,28 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Data push larger than necessary)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; rejected
-            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
+            # Non-minimally encoded, signed malleable; rejected
+            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-minimally encoded script number)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Non-minimally encoded, multi-input, mixed forkid; rejected
+            # Non-minimally encoded, multi-input, mixed malleability; rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -167,28 +167,28 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; rejected
-            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
+            # Large data push, signed malleable; rejected
+            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Data push larger than necessary)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Large data push, multi-input, mixed forkid; rejected
+            # Large data push, multi-input, mixed malleability; rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
@@ -196,28 +196,28 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Data push larger than necessary)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; rejected
+            # Non-minimally encoded, signed malleable; rejected
             spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-minimally encoded script number)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Non-minimally encoded, multi-input, mixed forkid; rejected
+            # Non-minimally encoded, multi-input, mixed malleability; rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -229,52 +229,52 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; accepted for mining into the next block
+            # Large data push, signed malleable; accepted for mining into the next block
             spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3)
 
-            # Large data push, multi-input, mixed forkid; P2P rejected
+            # Large data push, multi-input, mixed malleability; P2P rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
             tx_collection.add_tx(tx4,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; accepted for mining into next block
-            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
+            # Non-minimally encoded, signed malleable; accepted for mining into next block
+            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7)
 
-            # Non-minimally encoded, multi-input, mixed forkid; P2P rejected
+            # Non-minimally encoded, multi-input, mixed malleability; P2P rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -285,52 +285,52 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; accepted
-            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
+            # Large data push, signed malleable; accepted
+            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3)
 
-            # Large data push, multi-input, mixed forkid; P2P rejected
+            # Large data push, multi-input, mixed malleability; P2P rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
             tx_collection.add_tx(tx4,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; accepted
+            # Non-minimally encoded, signed malleable; accepted
             spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7)
 
-            # Non-minimally encoded, multi-input, mixed forkid; P2P rejected
+            # Non-minimally encoded, multi-input, mixed malleability; P2P rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -341,52 +341,52 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; accepted
+            # Large data push, signed malleable; accepted
             spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3)
 
-            # Large data push, multi-input, mixed forkid; P2P rejected
+            # Large data push, multi-input, mixed malleability; P2P rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
             tx_collection.add_tx(tx4,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; accepted
-            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
+            # Non-minimally encoded, signed malleable; accepted
+            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7)
 
-            # Non-minimally encoded, multi-input, mixed forkid; P2P rejected
+            # Non-minimally encoded, multi-input, mixed malleability; P2P rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -397,52 +397,52 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; accepted
-            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
+            # Large data push, signed malleable; accepted
+            spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3)
 
-            # Large data push, multi-input, mixed forkid; P2P rejected
+            # Large data push, multi-input, mixed malleability; P2P rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
             tx_collection.add_tx(tx4,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; accepted
+            # Non-minimally encoded, signed malleable; accepted
             spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7)
 
-            # Non-minimally encoded, multi-input, mixed forkid; P2P rejected
+            # Non-minimally encoded, multi-input, mixed malleability; P2P rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
@@ -453,52 +453,52 @@ class MinimalEncodingTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            # Minimal data push, signed with forkid; accepted
+            # Minimal data push, signed non-malleable; accepted
             spend_tx1, tx1 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMAL_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx1)
             tx_collection.add_tx(tx1)
 
-            # Large data push, signed with forkid; P2P rejected
+            # Large data push, signed non-malleable; P2P rejected
             spend_tx2, tx2 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx2)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Large data push, signed without forkid; accepted
+            # Large data push, signed malleable; accepted
             spend_tx3, tx3 = self.create_txns(utxos, [SIGHASH_ALL], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx3)
             tx_collection.add_tx(tx3)
 
-            # Large data push, multi-input, mixed forkid; P2P rejected
+            # Large data push, multi-input, mixed malleability; P2P rejected
             spend_tx4, tx4 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.LARGE_DATA_PUSH)
             tx_collection.add_mempool_tx(spend_tx4)
             tx_collection.add_tx(tx4,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Data push larger than necessary)')
 
-            # Minimally encoded, signed with forkid; accepted
+            # Minimally encoded, signed non-malleable; accepted
             spend_tx5, tx5 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx5)
             tx_collection.add_tx(tx5)
 
-            # Non-minimally encoded, signed with forkid; P2P rejected
+            # Non-minimally encoded, signed non-malleable; P2P rejected
             spend_tx6, tx6 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx6)
             tx_collection.add_tx(tx6,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Non-minimally encoded script number)')
 
-            # Non-minimally encoded, signed without forkid; accepted
-            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL], self.NON_MINIMALLY_ENCODED)
+            # Non-minimally encoded, signed malleable; accepted
+            spend_tx7, tx7 = self.create_txns(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx7)
             tx_collection.add_tx(tx7)
 
-            # Non-minimally encoded, multi-input, mixed forkid; P2P rejected
+            # Non-minimally encoded, multi-input, mixed malleability; P2P rejected
             spend_tx8, tx8 = self.create_txns(utxos, [
                 SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL,
+                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
                 SIGHASH_ALL
             ], self.NON_MINIMALLY_ENCODED)
             tx_collection.add_mempool_tx(spend_tx8)
